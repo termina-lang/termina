@@ -1,0 +1,13 @@
+Global {
+  This is where globals are defined?
+}
+
+Function {
+ f ...
+ g ...
+ etc
+}
+
+Agent {
+  I don't remember if they were called agents hehe
+}
