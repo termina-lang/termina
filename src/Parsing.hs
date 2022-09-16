@@ -161,7 +161,7 @@ procedureParser = do
 constantParser :: Parser Const
 constantParser = parseLitInt <|> parseLitBool <|> parseLitChar
   where
-    parseLitInt = I . fromIntegral <$> number
+    parseLitInt = I <$> number
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> anyChar
 
@@ -174,14 +174,14 @@ localDeclarations = do
   ty <- basicTypesParse
   reservedOp "="
   val <- constantParser
-  semi
+  _ <- semi
   return $ LDecl (name, ty, val, p )
 
 stmtParser :: Parser (Stmt SourcePos)
 stmtParser = do
   p <- getPosition
   reserved "skip"
-  semi
+  _ <- semi
   return $ Skip p
 
 compoundParser :: Parser (CompoundStmt SourcePos)
@@ -193,7 +193,7 @@ atomDeclParser = do
   reserved "Atomic"
   ty <- angles basicTypesParse
   nm <- identifier
-  semi
+  _ <- semi
   return $ Atom ty nm
 
 volatileDeclParser :: Parser Global
@@ -205,13 +205,13 @@ volatileDeclParser = do
   -- From doc: Parses a non-negative whole number in the hexadecimal system.
   -- https://hackage.haskell.org/package/parsec-3.1.15.1/docs/Text-Parsec-Token.html
   addr <- hexa
-  semi
+  _ <- semi
   return $ Volatile ty nm addr
 
 pairTypeInt :: Parser (BType, Int)
 pairTypeInt = do
       ty <- basicTypesParse
-      comma
+      _ <- comma
       gint <- number
       return (ty,gint)
 
@@ -220,7 +220,7 @@ msgQueueDeclParser = do
   reserved "MsgQueue"
   (ty, gint) <- angles pairTypeInt
   nm <- identifier
-  semi
+  _ <- semi
   return $ MsgQueue ty gint nm
 
 poolDeclParser :: Parser Global
@@ -228,7 +228,7 @@ poolDeclParser = do
   reserved "Pool"
   (ty,gint) <- angles pairTypeInt
   nm <- identifier
-  semi
+  _ <- semi
   return $ Pool ty gint nm
 
 glblDecl :: Parser Global
