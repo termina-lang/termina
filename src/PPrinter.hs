@@ -4,14 +4,17 @@ module PPrinter where
 import AST
 import Prettyprinter
 
--- import PrettyPrinter.Render.Terminal
+import Prettyprinter.Render.Terminal
+import Data.Text (Text)
+
+type DocStyle = Doc AnsiStyle
 
 -- | Parameter pretty printer
-ppParam :: Param -> Doc ann
+ppParam :: Param -> DocStyle
 ppParam (Param (nm, ty)) = pretty nm <+> colon <+> viaShow ty
 
 -- | Compound Statement Printer
-ppCStmt :: (a -> Doc ann) -> CompoundStmt a -> Doc ann
+ppCStmt :: (a -> DocStyle) -> CompoundStmt a -> DocStyle
 ppCStmt annP (Compound ldecs stmts) =
   vsep $ map ppLocalDec ldecs ++ map ppStmt stmts
   where
@@ -29,7 +32,7 @@ ppCStmt annP (Compound ldecs stmts) =
           annP ann
         ]
 
-prettyPrintElem' :: (a -> Doc ann) -> AASTElem a -> Doc ann
+prettyPrintElem' :: (a -> DocStyle) -> AASTElem a -> DocStyle
 prettyPrintElem' annP (Task nm param cstmt ann) =
   vsep
     [ hsep [pretty "Task", parens (ppParam param), align (braces (ppCStmt annP cstmt))],
@@ -38,3 +41,6 @@ prettyPrintElem' annP (Task nm param cstmt ann) =
 prettyPrintElem' annP (Proc nm (p, ps) pty cstmt ann) = pretty "TODO"
 prettyPrintElem' annP (Handler nm ps cstmt ann) = pretty "TODO"
 prettyPrintElem' annP (GlbDec glb ann) = pretty "TODO"
+
+render :: DocStyle -> Text
+render = renderStrict . layoutSmart defaultLayoutOptions

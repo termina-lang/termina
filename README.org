@@ -2,11 +2,12 @@
 
 * TODO List
 ** DONE Create Project
-** TODO First AST (Annotated AST)
+** DONE First AST (Annotated AST)
 Termina expressions are a (proper) subset of C, but it has 4 different top level constructs.
 - Global variables?
 - Rutines
 - Functions
 - I forgot the last one.
-
-** TODO Simple Parser
+** DONE Simple Parser
+** DONE Simple Pretty Printer
+** TODO Simple C99 Printer
