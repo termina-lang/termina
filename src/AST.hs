@@ -21,6 +21,7 @@ data BType
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
   | Bool | Char
+  deriving Show
 
 ----------------------------------------
 -- | Datatype representing Global Declarations
@@ -45,6 +46,7 @@ data CompoundStmt a = Compound
 newtype LocalDecl a = LDecl {unLDecl :: (Identifier, BType, Const , a)}
 
 data Const = B Bool | I Int | C Char
+  deriving Show
 
 -- | Simple datatype enumerating some of the constructions of our language
 data Stmt a
@@ -52,6 +54,7 @@ data Stmt a
   | Conditional a
   | ForLoop a
   | Skip a
+  | CComment String a
 
 type AnnProgram a = [AASTElem a]
 

@@ -23,6 +23,9 @@ dependencies:
 - base >= 4.7 && < 5
 # Parser
 - parsec
+# Pretty printer lib
+- prettyprinter
+- prettyprinter-ansi-terminal
 # Commandline options
 - options
 # REPL

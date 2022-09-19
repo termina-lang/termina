@@ -74,6 +74,9 @@ comma = Tok.comma lexer
 semi :: Parser String
 semi = Tok.semi lexer
 
+stringLit :: Parser String
+stringLit = Tok.stringLiteral lexer
+
 reserved :: String -> Parsec String () ()
 reserved = Tok.reserved lexer
 
@@ -178,11 +181,12 @@ localDeclarations = do
   return $ LDecl (name, ty, val, p )
 
 stmtParser :: Parser (Stmt SourcePos)
-stmtParser = do
-  p <- getPosition
-  reserved "skip"
-  _ <- semi
-  return $ Skip p
+stmtParser = getPosition >>= \p ->
+  (parseSkip p)
+  <|> (parseComment p)
+  where
+    parseSkip p = reserved "skip" >> semi >>= \_ -> return (Skip p)
+    parseComment p = reserved "ccmt" >> stringLit >>= \str -> return (CComment str p)
 
 compoundParser :: Parser (CompoundStmt SourcePos)
 compoundParser = braces $
