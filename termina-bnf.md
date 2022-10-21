@@ -22,7 +22,7 @@
 // - unprotected global objects (used by a single task or handler)
 <global-declaration> ::= <volatile-declaration>
                        | <protected-declaration>
-                       | <unprotected-declaration>
+                       | <static-declaration>
     
 // This element declares a volatile global variable.
 // These are not "real" variables. They are used to
@@ -33,12 +33,13 @@
 <volatile-declaration> ::= 'volatile' <identifier> ':' <basic-type> 'at' <address> ';'
 
 // This element declares a global object that implements an implicit protection
-// mechanism that allows a data-race free access to its members.
-<protected-declaration> ::= 'protected' <identifier> ':' <basic-type> { '=' <constant> }? ';'
+// mechanism that allows a data-race free access to its members. The object has
+// to be of a resource class type (To Be Defined).
+<protected-declaration> ::= 'protected' <identifier> ':' <class-identifier> { '=' <constant> }? ';'
 
 // This element declares a local object that can only be used by a single task or
 // event handler.
-<unprotected-declaration> ::= 'unprotected' <identifier> ':' <basic-type> { '=' <constant> }? ';'
+<static-declaration> ::= 'static' <identifier> ':' <basic-type> { '=' <constant> }? ';'
 
 // The list of basic types
 <basic-type> ::= 'u8'
