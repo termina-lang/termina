@@ -34,11 +34,11 @@
 
 // This element declares a global object that implements an implicit protection
 // mechanism that allows a data-race free access to its members.
-<protected-declaration> ::= 'protected' <identifier> ':' <basic-type> '=' <constant> ';'
+<protected-declaration> ::= 'protected' <identifier> ':' <basic-type> { '=' <constant> }? ';'
 
 // This element declares a local object that can only be used by a single task or
 // event handler.
-<unprotected-declaration> ::= 'unprotected' <identifier> ':' <basic-type> '=' <constant> ';'
+<unprotected-declaration> ::= 'unprotected' <identifier> ':' <basic-type> { '=' <constant> }? ';'
 
 // The list of basic types
 <basic-type> ::= 'u8'
