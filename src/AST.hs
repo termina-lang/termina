@@ -2,82 +2,117 @@
 
 module AST where
 
-
 -- | Annotated AST
-data AASTElem a
+data AnnASTElement a
   -- | A task takes an `Identifier`, at least one parameter, a type and its body
-  = Task Identifier Param (CompoundStmt a) a
-  | Proc Identifier (Param, [Param]) BType (CompoundStmt a) a
-  | Handler Identifier [Param] (CompoundStmt a) a
-  | GlbDec Global a
+  = Task Identifier [Parameter] TypeSpecifier [Statement a] (Statement a) [ a ]
+  | Function Identifier [Parameter] TypeSpecifier [Statement a] (Statement a) [ a ]
+  | Handler Identifier [Parameter] [Statement a] (Statement a) [ a ]
+  | GlobalDeclaration (Global a)
+  | ModuleInclusion Identifier [ a ]
+  deriving Show
 
 -- | Identifiers as `String`
 type Identifier = String
 -- | Addresses as `String`
 type Address = Integer
-
--- | Basic Types
-data BType
+-- | General type specifier
+data TypeSpecifier
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
-  | Bool | Char
+  | Bool | Char | DefinedType Identifier 
+  | Vector TypeSpecifier Expression
+  | MsgQueue TypeSpecifier Expression
+  | Pool TypeSpecifier Expression
+  deriving Show
+
+data Op
+  = Reference
+  | MemberAccess
+  | Multiplication
+  | Division
+  | Addition
+  | Substraction
+  | BitwiseLeftShift
+  | BitwiseRightShift
+  | RelationalLT
+  | RelationalLTE
+  | RelationalGT
+  | RelationalGTE
+  | RelationalEqual
+  | RelationalNotEqual
+  | BitwiseAnd
+  | BitwiseOr
+  | BitwiseXor
+  | LogicalAnd
+  | LogicalOr
+  deriving Show
+
+data Expression
+  = Variable Identifier
+  | Constant Const
+  | BinOp Op Expression Expression
+  | ReferenceExpression Expression
+  | FunctionExpression Expression [Expression]
+  | FieldValuesAssignmentsExpression [FieldValueAssignment]
+  | VectorIndexExpression Expression Expression
+  | VectorInitExpression Expression Expression
   deriving Show
 
 ----------------------------------------
--- | Datatype representing Global Declarations
-data Global
-  = Atom BType Identifier
-  | Volatile BType Identifier Address
-  | MsgQueue BType Int Identifier
-  | Pool BType Int Identifier
-
-----------------------------------------
-newtype Param = Param { unParam :: (Identifier, BType)}
-paramIdent :: Param -> Identifier
-paramIdent = fst . unParam
-paramBType :: Param -> BType
-paramBType = snd . unParam
-
-data CompoundStmt a = Compound
-  {localDecl :: [LocalDecl a]
-  , stms :: [Stmt a]
-  }
-
-newtype LocalDecl a = LDecl {unLDecl :: (Identifier, BType, Const , a)}
-
-data Const = B Bool | I Int | C Char
+-- | Datatype representing Global Declarations. 
+-- There are three types of global declarations:
+-- - volatile
+-- - static
+-- - protected
+data Global a
+  = Volatile Identifier TypeSpecifier Address [ a ]
+  | Static Identifier TypeSpecifier (Maybe Expression) [ a ]
+  | Protected Identifier TypeSpecifier (Maybe Expression) [ a ]
+  | Const Identifier TypeSpecifier Expression [ a ]
   deriving Show
 
--- | Simple datatype enumerating some of the constructions of our language
-data Stmt a
-  = Assign
-  | Conditional a
-  | ForLoop a
-  | Skip a
-  | CComment String a
+----------------------------------------
+data Parameter = Parameter {
+  paramIdentifier :: Identifier
+  , paramTypeSpecifier :: TypeSpecifier
+} deriving Show
 
-type AnnProgram a = [AASTElem a]
+data FieldValueAssignment = FieldValueAssignment {
+  fieldAssigIdentifier :: Identifier
+  , fieldAssigExpression :: Expression
+} deriving Show
+
+data MatchCase a =
+  MatchCase Expression [ Statement a ] [ a ]
+  deriving Show
+
+data ElseIf a =
+  ElseIf Expression [ Statement a ] [ a ]
+  deriving Show
+
+data Statement a =
+  Declaration Identifier TypeSpecifier (Maybe Expression) [ a ]
+  | AssignmentStmt Expression Expression [ a ]
+  | IfElseStmt Expression [ Statement a ] [ ElseIf a ] [ Statement a ] [ a ]
+  | MatchStatement Expression [ MatchCase a ] [ a ]
+  -- | For loop
+  | ForLoopStmt Expression Expression [ Statement a ] [ a ]
+  | SingleExpStmt Expression [ a ]
+  | ReturnStmt (Maybe Expression) [ a ]
+  deriving Show
+
+-- | Constant values:
+-- - Booleans
+-- - Decimal integers
+-- - Characters
+-- - String literals
+data Const = B Bool | I Int | C Char | S String
+  deriving Show
+
+type AnnotatedProgram a = [AnnASTElement a]
+type Block a = [Statement a]
 
 -- When annotations are just `()` we get a normal ASTs and Programs
-type AST = AASTElem ()
-type Program = AnnProgram ()
-
-----------------------------------------
--- Extra Info
-
--- | Raw Data-types, Basic - Raw = {Bool, Char} declared as synonyms.
-data RawType
-  = RawUInt8 | RawUInt16 | RawUInt32 | RawUInt64
-  | RawInt8 | RawInt16 | RawInt32 | RawInt64
-
-basicToRaw :: BType -> RawType
-basicToRaw Bool = RawInt8
-basicToRaw Char = RawInt8
-basicToRaw UInt8 = RawUInt8
-basicToRaw UInt16 = RawUInt16
-basicToRaw UInt32 = RawUInt32
-basicToRaw UInt64 = RawUInt64
-basicToRaw Int8 = RawInt8
-basicToRaw Int16 = RawInt16
-basicToRaw Int32 = RawInt32
-basicToRaw Int64 = RawInt64
+type AST = AnnASTElement ()
+type Program = AnnotatedProgram ()

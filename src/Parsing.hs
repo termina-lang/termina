@@ -11,10 +11,13 @@ import Text.Parsec.String
 -- Importing tokenizer
 import qualified Text.Parsec.Token as Tok
 import qualified Text.Parsec.Language as Lang
-import qualified Text.Parsec.Token as Tok
+import qualified Text.Parsec.Expr as Ex
 
 -- | This is what we will build in this section
-type PositionAST = AASTElem SourcePos
+data Annotation =
+    Position SourcePos
+  | Attribute Identifier Expression
+  deriving Show
 
 ----------------------------------------
 -- Lexer
@@ -25,17 +28,23 @@ lexer = Tok.makeTokenParser langDef
   where
     reservedNames =
       -- Globals
-      ["Atomic","Volatile","MsgQueue","Pool"]
+      ["volatile","static","protected", "const"]
       ++ -- Basic Types
       ["u8","u16","u32","u64"
       ,"i8","i16","i32","i64"
       ,"bool","char"]
+      ++ -- Polymorphic Types
+      ["MsgQueue","Pool"]
+      ++ -- Struct and Union Types
+      ["struct","union"]
       ++ -- Declarations
-      ["Task","Procedure","Handler", "at"]
+      ["task","function","handler", "at"]
       ++ -- Stmt
-      ["let", "skip"]
+      ["var", "match", "for", "if", "else", "return"]
       ++ -- Constants
       ["true","false"]
+      ++ -- Modules
+      ["mod"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
@@ -47,9 +56,28 @@ lexer = Tok.makeTokenParser langDef
                    -- | Rest of identifiers accepted characters
                    , Tok.identLetter = alphaNum <|> char '_'
                    -- | Operators begin with
-                   , Tok.opStart = oneOf ":,;=&|<=>+-*/."
+                   , Tok.opStart = oneOf ".*/+-<>=!&|^,;(["
                    , Tok.reservedNames = reservedNames
-                   , Tok.reservedOpNames = [":","=",";",","]
+                   , Tok.reservedOpNames = [
+                       "." -- MemberAccess
+                      ,"*" -- Multiplication
+                      ,"/" -- Division
+                      ,"+" -- Addition
+                      ,"-" -- Substraction
+                      ,"<<" -- BitwiseLeftShift
+                      ,">>" -- BitwiseRightShift
+                      ,"<" -- RelationalLT
+                      ,"<=" -- RelationalLTE
+                      ,">" -- RelationalGT
+                      ,">=" -- RelationalGTE
+                      ,"==" -- RelationalEqual
+                      ,"!=" -- RelationalNotEqual
+                      ,"&" -- BitwiseAnd
+                      ,"|" -- BitwiseOr
+                      ,"^" -- BitwiseXor
+                      ,"&&" -- LogicalAnd
+                      ,"||" -- LogicalOr
+                    ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
                    }
@@ -61,6 +89,9 @@ wspcs = Tok.whiteSpace lexer
 
 braces :: Parsec String () a -> Parsec String () a
 braces = Tok.braces lexer
+
+brackets :: Parsec String () a -> Parsec String () a
+brackets = Tok.brackets lexer
 
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
@@ -83,11 +114,11 @@ reserved = Tok.reserved lexer
 reservedOp :: String -> Parsec String () ()
 reservedOp = Tok.reservedOp lexer
 
-identifier :: Parser String
-identifier = Tok.identifier lexer
+identifierParser :: Parser String
+identifierParser = Tok.identifier lexer
 
 hexa :: Parser Integer
-hexa = Tok.hexadecimal lexer
+hexa = char '0' >> Tok.hexadecimal lexer
 
 number :: Parser Int
 number = fromInteger <$> Tok.natural lexer
@@ -97,9 +128,13 @@ number = fromInteger <$> Tok.natural lexer
 ----------------------------------------
 
 -- | Types
-basicTypesParse :: Parser BType
-basicTypesParse =
-  (reserved "u8" >> return UInt8)
+typeSpecifierParser :: Parser TypeSpecifier
+typeSpecifierParser =
+  msgQueueParser
+  <|> poolParser
+  <|> vectorParser
+  <|> (DefinedType <$> identifierParser)
+  <|> (reserved "u8" >> return UInt8)
   <|> (reserved "u16" >> return UInt16)
   <|> (reserved "u32" >> return UInt32)
   <|> (reserved "u64" >> return UInt64)
@@ -110,141 +145,332 @@ basicTypesParse =
   <|> (reserved "bool" >> return Bool)
   <|> (reserved "char" >> return Char)
 
-multLines :: Parser [String]
-multLines = sepBy (many (satisfy (\c -> (c /= '}') && (c /= '{')) )) newline
+parameterParser :: Parser Parameter
+parameterParser = do
+  identifier <- identifierParser
+  reservedOp ":"
+  Parameter identifier <$> typeSpecifierParser
 
-withPos :: Parser a -> Parser (a, SourcePos)
-withPos p = do
-  pos <- getPosition
-  res <- p
-  return (res,pos)
---
+fieldValuesAssignExpressionParser :: Parser Expression
+fieldValuesAssignExpressionParser = try $
+  braces (FieldValuesAssignmentsExpression <$> sepBy (
+    do
+      identifier <- identifierParser
+      reservedOp "="
+      FieldValueAssignment identifier <$> expressionParser
+    )
+  comma)
 
-paramParser :: Parser Param
-paramParser = curry Param <$> identifier <*> basicTypesParse
+attributeParser :: Parser Annotation
+attributeParser = do
+  char '#' >> brackets (Attribute <$> identifierParser <*> parens expressionParser)
 
-paramParse1 :: Parser (Param, [Param])
-paramParse1 = sepBy1 paramParser comma
-  >>= \case
-   (x : xs) -> return (x,xs)
-   _ -> parserFail "Expecting at least one argument"
+msgQueueParser :: Parser TypeSpecifier
+msgQueueParser = do
+  reserved "MsgQueue"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- semi
+  quantity <- variableParser <|> constExprParser
+  _ <- reservedOp ">"
+  return $ MsgQueue typeSpecifier quantity
+
+poolParser :: Parser TypeSpecifier
+poolParser = do
+  reserved "Pool"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- semi
+  quantity <- variableParser <|> constExprParser
+  _ <- reservedOp ">"
+  return $ Pool typeSpecifier quantity
+
+vectorParser :: Parser TypeSpecifier
+vectorParser = do
+  _ <- reservedOp "["
+  typeSpecifier <- typeSpecifierParser
+  _ <- semi
+  quantity <- variableParser <|> constExprParser
+  _ <- reservedOp "]"
+  return $ Vector typeSpecifier quantity
+
+-- Expression Parser
+
+expressionParser :: Parser Expression
+expressionParser = Ex.buildExpressionParser
+    [[referencePrefix]
+    ,[functionPostfix]
+    ,[vectorIndexPostfix]
+    ,[binaryInfix "." MemberAccess Ex.AssocRight]
+    ,[binaryInfix "*" Multiplication Ex.AssocLeft,
+      binaryInfix "/" Division Ex.AssocLeft]
+    ,[binaryInfix "+" Addition Ex.AssocLeft,
+      binaryInfix "-" Substraction Ex.AssocLeft]
+    ,[binaryInfix "<<" BitwiseLeftShift Ex.AssocLeft,
+      binaryInfix ">>" BitwiseRightShift Ex.AssocLeft]
+    ,[binaryInfix "<" RelationalLT Ex.AssocLeft,
+      binaryInfix "<=" RelationalLTE Ex.AssocLeft,
+      binaryInfix ">" RelationalGT Ex.AssocLeft,
+      binaryInfix ">=" RelationalGTE Ex.AssocLeft]
+    ,[binaryInfix "==" RelationalEqual Ex.AssocLeft,
+      binaryInfix "!=" RelationalNotEqual Ex.AssocLeft]
+    ,[binaryInfix "&" BitwiseAnd Ex.AssocLeft]
+    ,[binaryInfix "|" BitwiseOr Ex.AssocLeft]
+    ,[binaryInfix "^" BitwiseXor Ex.AssocLeft]
+    ,[binaryInfix "&&" LogicalAnd Ex.AssocLeft]
+    ,[binaryInfix "||" LogicalOr Ex.AssocLeft]
+    ]
+    termParser
+  where binaryInfix s f = Ex.Infix (do
+          _ <- reservedOp s
+          return (BinOp f))
+        referencePrefix = Ex.Prefix (do
+          _ <- reservedOp "&"
+          return ReferenceExpression)
+        functionPostfix = Ex.Postfix $ try (do
+          _ <- parens wspcs
+          return $ \parent -> FunctionExpression parent []) <|> (do
+          arguments <- parens $ sepBy expressionParser comma
+          return $ \parent -> FunctionExpression parent arguments)
+        vectorIndexPostfix = Ex.Postfix $ (do
+          index <- brackets expressionParser
+          return $ \parent ->  VectorIndexExpression parent index)
+
+termParser :: Parser Expression
+termParser = vectorInitParser  <|>  variableParser
+  <|> constExprParser
+
+  <|> fieldValuesAssignExpressionParser
+  <|> parens expressionParser
+
+variableParser :: Parser Expression
+variableParser = try $ Variable <$> identifierParser
+
+vectorInitParser :: Parser Expression
+vectorInitParser = try $ do
+  _ <- reservedOp "["
+  value <- expressionParser
+  _ <- semi
+  amount <- expressionParser
+  _ <- reservedOp "]"
+  return $ VectorInitExpression value amount
 
 -- -- Task Definition
 
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
-taskParser :: Parser PositionAST
-taskParser = do
+taskParser :: Parser (AnnASTElement Annotation)
+taskParser = try $ do
+  attributes <- many attributeParser
   p <- getPosition
-  reserved "Task"
-  name <- identifier
-  param <- parens paramParser
-  body <- compoundParser
-  return $ Task name param body p
+  reserved "task"
+  name <- identifierParser
+  params <- parens (sepBy parameterParser comma)
+  reservedOp "->"
+  typeSpec <- typeSpecifierParser
+  reservedOp "{"
+  body <- many blockItemParser
+  ret <- returnStmtParser
+  reservedOp "}"
+  return $ Task name params typeSpec body ret (Position p : attributes)
 
-handlerParser :: Parser PositionAST
-handlerParser = do
-  reserved "Handler"
+handlerParser :: Parser (AnnASTElement Annotation)
+handlerParser = try $ do
+  attributes <- many attributeParser
   p <- getPosition
-  name <- identifier
-  params <- parens (sepEndBy paramParser comma)
-  compound <- compoundParser
-  return $ Handler name params compound p
+  reserved "handler"
+  name <- identifierParser
+  params <- parens (sepBy parameterParser comma)
+  reservedOp "{"
+  body <- many blockItemParser
+  ret <- returnStmtParser
+  reservedOp "}"
+  return $ Handler name params body ret (Position p : attributes)
 
-procedureParser :: Parser PositionAST
-procedureParser = do
+returnStmtParser :: Parser (Statement Annotation)
+returnStmtParser = do
+  attributes <- many attributeParser
   p <- getPosition
-  reserved "Procedure"
-  name <- identifier
-  params <- parens paramParse1
-  reservedOp ":"
-  btype <- basicTypesParse
-  body <- compoundParser
-  return $ Proc name params btype body p
+  _ <- reserved "return"
+  ret <- optionMaybe expressionParser
+  _ <- semi
+  return $ ReturnStmt ret (Position p : attributes)
 
-constantParser :: Parser Const
-constantParser = parseLitInt <|> parseLitBool <|> parseLitChar
+functionParser :: Parser (AnnASTElement Annotation)
+functionParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "fn"
+  name <- identifierParser
+  params <- parens (sepBy parameterParser comma)
+  reservedOp "->"
+  typeSpec <- typeSpecifierParser
+  reservedOp "{"
+  body <- many blockItemParser
+  ret <- returnStmtParser
+  reservedOp "}"
+  return $ Function name params typeSpec body ret (Position p : attributes)
+
+moduleInclusionParser :: Parser (AnnASTElement Annotation)
+moduleInclusionParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "mod"
+  name <- identifierParser
+  _ <- semi
+  return $ ModuleInclusion name (Position p : attributes)
+
+constExprParser :: Parser Expression
+constExprParser = try $ Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
   where
     parseLitInt = I <$> number
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> anyChar
 
-localDeclarations :: Parser (LocalDecl SourcePos)
-localDeclarations = do
+declarationParser :: Parser (Statement Annotation)
+declarationParser = try $ do
+  attributes <- many attributeParser
   p <- getPosition
-  reserved "let"
-  name <- identifier
+  reserved "var"
+  name <- identifierParser
   reservedOp ":"
-  ty <- basicTypesParse
+  ty <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  _ <- semi
+  return $ Declaration name ty initializer (Position p : attributes)
+
+singleExprStmtParser :: Parser (Statement Annotation)
+singleExprStmtParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  expression <- expressionParser
+  _ <- semi
+  return $ SingleExpStmt expression (Position p : attributes)
+
+blockItemParser :: Parser (Statement Annotation)
+blockItemParser = matchStmtParser
+  <|> ifElseIfStmtParser
+  <|> declarationParser
+  <|> assignmentStmtPaser
+  <|> singleExprStmtParser
+
+assignmentStmtPaser :: Parser (Statement Annotation)
+assignmentStmtPaser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  lval <- expressionParser
   reservedOp "="
-  val <- constantParser
+  rval <- expressionParser
   _ <- semi
-  return $ LDecl (name, ty, val, p )
+  return $ AssignmentStmt lval rval (Position p : attributes)
 
-stmtParser :: Parser (Stmt SourcePos)
-stmtParser = getPosition >>= \p ->
-  (parseSkip p)
-  <|> (parseComment p)
-  where
-    parseSkip p = reserved "skip" >> semi >>= \_ -> return (Skip p)
-    parseComment p = reserved "ccmt" >> stringLit >>= \str -> return (CComment str p)
+matchCaseParser :: Parser (MatchCase Annotation)
+matchCaseParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  caseExpression <- expressionParser
+  reservedOp "=>"
+  compound <- braces $ many blockItemParser
+  return $ MatchCase caseExpression compound (Position p : attributes)
 
-compoundParser :: Parser (CompoundStmt SourcePos)
-compoundParser = braces $
-  Compound <$> (many localDeclarations) <*> (many stmtParser)
+matchStmtParser :: Parser (Statement Annotation)
+matchStmtParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "match"
+  matchExpression <- expressionParser
+  cases <- braces (many1 matchCaseParser)
+  return $ MatchStatement matchExpression cases (Position p : attributes)
 
-atomDeclParser :: Parser Global
-atomDeclParser = do
-  reserved "Atomic"
-  ty <- angles basicTypesParse
-  nm <- identifier
-  _ <- semi
-  return $ Atom ty nm
+elseIfParser :: Parser (ElseIf Annotation)
+elseIfParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  _ <- reserved "else"
+  _ <- reserved "if"
+  expression <- expressionParser
+  compound <- braces $ many blockItemParser
+  return $ ElseIf expression compound (Position p : attributes)
 
-volatileDeclParser :: Parser Global
-volatileDeclParser = do
-  reserved "Volatile"
-  ty <- angles basicTypesParse
-  nm <- identifier
+ifElseIfStmtParser :: Parser (Statement Annotation)
+ifElseIfStmtParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "if"
+  expression <- expressionParser
+  ifCompound <- braces $ many blockItemParser
+  elseIfs <- many elseIfParser
+  _ <- reserved "else"
+  elseCompound <- braces $ many blockItemParser
+  return $ IfElseStmt expression ifCompound elseIfs elseCompound  (Position p : attributes)
+
+volatileDeclParser :: Parser (Global Annotation)
+volatileDeclParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "volatile"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
   reserved "at"
   -- From doc: Parses a non-negative whole number in the hexadecimal system.
   -- https://hackage.haskell.org/package/parsec-3.1.15.1/docs/Text-Parsec-Token.html
   addr <- hexa
   _ <- semi
-  return $ Volatile ty nm addr
+  return $ Volatile identifier typeSpecifier addr (Position p : attributes)
 
-pairTypeInt :: Parser (BType, Int)
-pairTypeInt = do
-      ty <- basicTypesParse
-      _ <- comma
-      gint <- number
-      return (ty,gint)
-
-msgQueueDeclParser :: Parser Global
-msgQueueDeclParser = do
-  reserved "MsgQueue"
-  (ty, gint) <- angles pairTypeInt
-  nm <- identifier
+staticDeclParser :: Parser (Global Annotation)
+staticDeclParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "static"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
   _ <- semi
-  return $ MsgQueue ty gint nm
+  return $ Static identifier typeSpecifier initializer (Position p : attributes)
 
-poolDeclParser :: Parser Global
-poolDeclParser = do
-  reserved "Pool"
-  (ty,gint) <- angles pairTypeInt
-  nm <- identifier
+protectedDeclParser :: Parser (Global Annotation)
+protectedDeclParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "protected"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
   _ <- semi
-  return $ Pool ty gint nm
+  return $ Protected identifier typeSpecifier initializer (Position p : attributes)
 
-glblDecl :: Parser Global
-glblDecl = poolDeclParser <|> msgQueueDeclParser
-  <|> atomDeclParser  <|> volatileDeclParser
+constDeclParser :: Parser (Global Annotation)
+constDeclParser = try $ do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "const"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reservedOp "="
+  initializer <- expressionParser
+  _ <- semi
+  return $ Const identifier typeSpecifier initializer (Position p : attributes)
+
+globalDeclParser :: Parser (AnnASTElement Annotation)
+globalDeclParser = try $ do
+  g <- volatileDeclParser <|> staticDeclParser <|> protectedDeclParser <|> constDeclParser
+  return $ GlobalDeclaration g
 
 -- | Top Level parser
-topLevel :: Parser [AASTElem SourcePos]
+topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many $
-  taskParser <|> handlerParser <|> procedureParser
-  <|> (getPosition >>= \p -> GlbDec <$> glblDecl <*> pure p )
-
+  taskParser <|> handlerParser <|> functionParser <|> globalDeclParser
+  <|> moduleInclusionParser
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
