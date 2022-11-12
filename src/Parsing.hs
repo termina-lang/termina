@@ -108,6 +108,9 @@ semi = Tok.semi lexer
 stringLit :: Parser String
 stringLit = Tok.stringLiteral lexer
 
+charLit :: Parser Char
+charLit = Tok.charLiteral lexer
+
 reserved :: String -> Parsec String () ()
 reserved = Tok.reserved lexer
 
@@ -152,7 +155,7 @@ parameterParser = do
   Parameter identifier <$> typeSpecifierParser
 
 fieldValuesAssignExpressionParser :: Parser Expression
-fieldValuesAssignExpressionParser = try $
+fieldValuesAssignExpressionParser = 
   braces (FieldValuesAssignmentsExpression <$> sepBy (
     do
       identifier <- identifierParser
@@ -227,27 +230,24 @@ expressionParser = Ex.buildExpressionParser
         referencePrefix = Ex.Prefix (do
           _ <- reservedOp "&"
           return ReferenceExpression)
-        functionPostfix = Ex.Postfix $ try (do
-          _ <- parens wspcs
-          return $ \parent -> FunctionExpression parent []) <|> (do
-          arguments <- parens $ sepBy expressionParser comma
+        functionPostfix = Ex.Postfix (do
+          arguments <- parens $ sepBy (try expressionParser) comma
           return $ \parent -> FunctionExpression parent arguments)
-        vectorIndexPostfix = Ex.Postfix $ (do
+        vectorIndexPostfix = Ex.Postfix (do
           index <- brackets expressionParser
           return $ \parent ->  VectorIndexExpression parent index)
 
 termParser :: Parser Expression
-termParser = vectorInitParser  <|>  variableParser
+termParser = vectorInitParser <|> variableParser
   <|> constExprParser
-
   <|> fieldValuesAssignExpressionParser
   <|> parens expressionParser
 
 variableParser :: Parser Expression
-variableParser = try $ Variable <$> identifierParser
+variableParser = Variable <$> identifierParser
 
 vectorInitParser :: Parser Expression
-vectorInitParser = try $ do
+vectorInitParser = do
   _ <- reservedOp "["
   value <- expressionParser
   _ <- semi
@@ -259,7 +259,7 @@ vectorInitParser = try $ do
 
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
 taskParser :: Parser (AnnASTElement Annotation)
-taskParser = try $ do
+taskParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "task"
@@ -274,7 +274,7 @@ taskParser = try $ do
   return $ Task name params typeSpec body ret (Position p : attributes)
 
 handlerParser :: Parser (AnnASTElement Annotation)
-handlerParser = try $ do
+handlerParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "handler"
@@ -296,7 +296,7 @@ returnStmtParser = do
   return $ ReturnStmt ret (Position p : attributes)
 
 functionParser :: Parser (AnnASTElement Annotation)
-functionParser = try $ do
+functionParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "fn"
@@ -311,7 +311,7 @@ functionParser = try $ do
   return $ Function name params typeSpec body ret (Position p : attributes)
 
 moduleInclusionParser :: Parser (AnnASTElement Annotation)
-moduleInclusionParser = try $ do
+moduleInclusionParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "mod"
@@ -320,14 +320,15 @@ moduleInclusionParser = try $ do
   return $ ModuleInclusion name (Position p : attributes)
 
 constExprParser :: Parser Expression
-constExprParser = try $ Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
+constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar <|> parseLitString)
   where
     parseLitInt = I <$> number
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
-    parseLitChar = C <$> anyChar
+    parseLitChar = C <$> charLit
+    parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
-declarationParser = try $ do
+declarationParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "var"
@@ -341,7 +342,7 @@ declarationParser = try $ do
   return $ Declaration name ty initializer (Position p : attributes)
 
 singleExprStmtParser :: Parser (Statement Annotation)
-singleExprStmtParser = try $ do
+singleExprStmtParser = do
   attributes <- many attributeParser
   p <- getPosition
   expression <- expressionParser
@@ -349,14 +350,14 @@ singleExprStmtParser = try $ do
   return $ SingleExpStmt expression (Position p : attributes)
 
 blockItemParser :: Parser (Statement Annotation)
-blockItemParser = matchStmtParser
-  <|> ifElseIfStmtParser
-  <|> declarationParser
-  <|> assignmentStmtPaser
+blockItemParser = try matchStmtParser
+  <|> try ifElseIfStmtParser
+  <|> try declarationParser
+  <|> try assignmentStmtPaser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
-assignmentStmtPaser = try $ do
+assignmentStmtPaser = do
   attributes <- many attributeParser
   p <- getPosition
   lval <- expressionParser
@@ -366,7 +367,7 @@ assignmentStmtPaser = try $ do
   return $ AssignmentStmt lval rval (Position p : attributes)
 
 matchCaseParser :: Parser (MatchCase Annotation)
-matchCaseParser = try $ do
+matchCaseParser = do
   attributes <- many attributeParser
   p <- getPosition
   caseExpression <- expressionParser
@@ -375,16 +376,16 @@ matchCaseParser = try $ do
   return $ MatchCase caseExpression compound (Position p : attributes)
 
 matchStmtParser :: Parser (Statement Annotation)
-matchStmtParser = try $ do
+matchStmtParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "match"
   matchExpression <- expressionParser
-  cases <- braces (many1 matchCaseParser)
+  cases <- braces (many1 $ try matchCaseParser)
   return $ MatchStatement matchExpression cases (Position p : attributes)
 
 elseIfParser :: Parser (ElseIf Annotation)
-elseIfParser = try $ do
+elseIfParser = do
   attributes <- many attributeParser
   p <- getPosition
   _ <- reserved "else"
@@ -394,19 +395,19 @@ elseIfParser = try $ do
   return $ ElseIf expression compound (Position p : attributes)
 
 ifElseIfStmtParser :: Parser (Statement Annotation)
-ifElseIfStmtParser = try $ do
+ifElseIfStmtParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "if"
   expression <- expressionParser
   ifCompound <- braces $ many blockItemParser
-  elseIfs <- many elseIfParser
+  elseIfs <- many $ try elseIfParser
   _ <- reserved "else"
   elseCompound <- braces $ many blockItemParser
   return $ IfElseStmt expression ifCompound elseIfs elseCompound  (Position p : attributes)
 
 volatileDeclParser :: Parser (Global Annotation)
-volatileDeclParser = try $ do
+volatileDeclParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "volatile"
@@ -421,7 +422,7 @@ volatileDeclParser = try $ do
   return $ Volatile identifier typeSpecifier addr (Position p : attributes)
 
 staticDeclParser :: Parser (Global Annotation)
-staticDeclParser = try $ do
+staticDeclParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "static"
@@ -435,7 +436,7 @@ staticDeclParser = try $ do
   return $ Static identifier typeSpecifier initializer (Position p : attributes)
 
 protectedDeclParser :: Parser (Global Annotation)
-protectedDeclParser = try $ do
+protectedDeclParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "protected"
@@ -449,7 +450,7 @@ protectedDeclParser = try $ do
   return $ Protected identifier typeSpecifier initializer (Position p : attributes)
 
 constDeclParser :: Parser (Global Annotation)
-constDeclParser = try $ do
+constDeclParser = do
   attributes <- many attributeParser
   p <- getPosition
   reserved "const"
@@ -462,7 +463,7 @@ constDeclParser = try $ do
   return $ Const identifier typeSpecifier initializer (Position p : attributes)
 
 globalDeclParser :: Parser (AnnASTElement Annotation)
-globalDeclParser = try $ do
+globalDeclParser = do
   g <- volatileDeclParser <|> staticDeclParser <|> protectedDeclParser <|> constDeclParser
   return $ GlobalDeclaration g
 
