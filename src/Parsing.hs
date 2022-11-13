@@ -16,7 +16,7 @@ import qualified Text.Parsec.Expr as Ex
 -- | This is what we will build in this section
 data Annotation =
     Position SourcePos
-  | Attribute Identifier Expression
+  | Attribute Identifier (Maybe Expression)
   deriving Show
 
 ----------------------------------------
@@ -37,6 +37,8 @@ lexer = Tok.makeTokenParser langDef
       ["MsgQueue","Pool"]
       ++ -- Struct and Union Types
       ["struct","union"]
+      ++ -- Dynamic Subtyping
+      ["'dyn"]
       ++ -- Declarations
       ["task","function","handler", "at"]
       ++ -- Stmt
@@ -136,6 +138,8 @@ typeSpecifierParser =
   msgQueueParser
   <|> poolParser
   <|> vectorParser
+  <|> referenceParser
+  <|> dynamicSubtypeParser
   <|> (DefinedType <$> identifierParser)
   <|> (reserved "u8" >> return UInt8)
   <|> (reserved "u16" >> return UInt16)
@@ -155,7 +159,7 @@ parameterParser = do
   Parameter identifier <$> typeSpecifierParser
 
 fieldValuesAssignExpressionParser :: Parser Expression
-fieldValuesAssignExpressionParser = 
+fieldValuesAssignExpressionParser =
   braces (FieldValuesAssignmentsExpression <$> sepBy (
     do
       identifier <- identifierParser
@@ -166,7 +170,7 @@ fieldValuesAssignExpressionParser =
 
 attributeParser :: Parser Annotation
 attributeParser = do
-  char '#' >> brackets (Attribute <$> identifierParser <*> parens expressionParser)
+  char '#' >> brackets (Attribute <$> identifierParser <*> optionMaybe (parens expressionParser))
 
 msgQueueParser :: Parser TypeSpecifier
 msgQueueParser = do
@@ -197,11 +201,21 @@ vectorParser = do
   _ <- reservedOp "]"
   return $ Vector typeSpecifier quantity
 
+referenceParser :: Parser TypeSpecifier
+referenceParser = do
+  _ <- reservedOp "&"
+  Reference <$> typeSpecifierParser
+
+dynamicSubtypeParser :: Parser TypeSpecifier
+dynamicSubtypeParser = do
+  _ <- reservedOp "'dyn"
+  Reference <$> typeSpecifierParser
+
 -- Expression Parser
 
 expressionParser :: Parser Expression
 expressionParser = Ex.buildExpressionParser
-    [[referencePrefix]
+    [[referencePrefix, castingPostfix]
     ,[functionPostfix]
     ,[vectorIndexPostfix]
     ,[binaryInfix "." MemberAccess Ex.AssocRight]
@@ -230,12 +244,16 @@ expressionParser = Ex.buildExpressionParser
         referencePrefix = Ex.Prefix (do
           _ <- reservedOp "&"
           return ReferenceExpression)
+        castingPostfix = Ex.Postfix (do
+          _ <- reserved "as"
+          typeSpecificer <- typeSpecifierParser
+          return $ \parent -> Casting parent typeSpecificer)
         functionPostfix = Ex.Postfix (do
           arguments <- parens $ sepBy (try expressionParser) comma
           return $ \parent -> FunctionExpression parent arguments)
         vectorIndexPostfix = Ex.Postfix (do
           index <- brackets expressionParser
-          return $ \parent ->  VectorIndexExpression parent index)
+          return $ \parent ->  VectorIndexExpression parent index)
 
 termParser :: Parser Expression
 termParser = vectorInitParser <|> variableParser
@@ -280,11 +298,13 @@ handlerParser = do
   reserved "handler"
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
+  reservedOp "->"
+  typeSpec <- typeSpecifierParser
   reservedOp "{"
   body <- many blockItemParser
   ret <- returnStmtParser
   reservedOp "}"
-  return $ Handler name params body ret (Position p : attributes)
+  return $ Handler name params typeSpec body ret (Position p : attributes)
 
 returnStmtParser :: Parser (Statement Annotation)
 returnStmtParser = do
@@ -302,8 +322,9 @@ functionParser = do
   reserved "fn"
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
-  reservedOp "->"
-  typeSpec <- typeSpecifierParser
+  typeSpec <- optionMaybe (do
+    reservedOp "->"
+    typeSpecifierParser)
   reservedOp "{"
   body <- many blockItemParser
   ret <- returnStmtParser
@@ -354,6 +375,7 @@ blockItemParser = try matchStmtParser
   <|> try ifElseIfStmtParser
   <|> try declarationParser
   <|> try assignmentStmtPaser
+  <|> try forLoopStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
@@ -398,13 +420,27 @@ ifElseIfStmtParser :: Parser (Statement Annotation)
 ifElseIfStmtParser = do
   attributes <- many attributeParser
   p <- getPosition
-  reserved "if"
+  _ <- reserved "if"
   expression <- expressionParser
   ifCompound <- braces $ many blockItemParser
   elseIfs <- many $ try elseIfParser
-  _ <- reserved "else"
-  elseCompound <- braces $ many blockItemParser
+  elseCompound <- option [] (do
+    _ <- reserved "else"
+    braces $ many $ try blockItemParser)
   return $ IfElseStmt expression ifCompound elseIfs elseCompound  (Position p : attributes)
+
+forLoopStmtParser :: Parser (Statement Annotation)
+forLoopStmtParser = do
+  attributes <- many attributeParser
+  p <- getPosition
+  _ <- reserved "for"
+  identifier <- identifierParser
+  _ <- reserved "in"
+  start <- expressionParser
+  _ <- reservedOp ".."
+  end <- expressionParser
+  compound <- braces $ many blockItemParser
+  return $ ForLoopStmt identifier start end compound (Position p : attributes)
 
 volatileDeclParser :: Parser (Global Annotation)
 volatileDeclParser = do
@@ -467,11 +503,64 @@ globalDeclParser = do
   g <- volatileDeclParser <|> staticDeclParser <|> protectedDeclParser <|> constDeclParser
   return $ GlobalDeclaration g
 
+typeDefintionParser :: Parser (AnnASTElement Annotation)
+typeDefintionParser = do
+  d <- structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser
+  return $ TypeDefinition d
+
+fieldDefinitionParser :: Parser FieldDefinition
+fieldDefinitionParser = do
+  identifier <- identifierParser
+  _ <- reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  _ <- semi
+  return $ FieldDefinition identifier typeSpecifier initializer
+
+structDefinitionParser :: Parser (TypeDef Annotation)
+structDefinitionParser = do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "struct"
+  identifier <- identifierParser
+  fields <- braces (many1 $ try fieldDefinitionParser)
+  _ <- semi
+  return $ Struct identifier fields (Position p : attributes)
+
+unionDefinitionParser :: Parser (TypeDef Annotation)
+unionDefinitionParser = do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "union"
+  identifier <- identifierParser
+  fields <- braces (many1 $ try fieldDefinitionParser)
+  _ <- semi
+  return $ Union identifier fields (Position p : attributes)
+
+variantDefinitionParser :: Parser EnumVariant
+variantDefinitionParser = do
+  identifier <- identifierParser
+  assocTypes <- try $ parens $ sepBy typeSpecifierParser comma
+  return $ EnumVariant identifier assocTypes
+
+enumDefinitionParser :: Parser (TypeDef Annotation)
+enumDefinitionParser = do
+  attributes <- many attributeParser
+  p <- getPosition
+  reserved "enum"
+  identifier <- identifierParser
+  variants <- braces (sepBy1 (try variantDefinitionParser) comma)
+  _ <- semi
+  return $ Enum identifier variants (Position p : attributes)
+
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many $
-  taskParser <|> handlerParser <|> functionParser <|> globalDeclParser
-  <|> moduleInclusionParser
+  try taskParser <|> try handlerParser 
+  <|> try functionParser <|> try globalDeclParser
+  <|> try typeDefintionParser <|> moduleInclusionParser
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
