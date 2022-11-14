@@ -42,7 +42,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Declarations
       ["task","function","handler", "at"]
       ++ -- Stmt
-      ["var", "match", "for", "if", "else", "return"]
+      ["var", "match", "for", "if", "else", "return", "break"]
       ++ -- Constants
       ["true","false"]
       ++ -- Modules
@@ -323,6 +323,14 @@ returnStmtParser = do
   _ <- semi
   return $ ReturnStmt ret (Position p : attributes)
 
+breakStmtParser :: Parser (Statement Annotation)
+breakStmtParser = do
+  attributes <- many attributeParser
+  p <- getPosition
+  _ <- reserved "break"
+  _ <- semi
+  return $ Break (Position p : attributes)
+
 functionParser :: Parser (AnnASTElement Annotation)
 functionParser = do
   attributes <- many attributeParser
@@ -383,6 +391,7 @@ blockItemParser = try ifElseIfStmtParser
   <|> try declarationParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
+  <|> breakStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)

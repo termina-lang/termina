@@ -127,6 +127,7 @@ data Statement a =
   | ForLoopStmt Identifier (Expression a) (Expression a) [ Statement a ] [ a ]
   | SingleExpStmt (Expression a) [ a ]
   | ReturnStmt (Maybe (Expression a)) [ a ]
+  | Break [ a ]
   deriving Show
 
 -- | Constant values:
