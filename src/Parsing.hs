@@ -79,6 +79,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
+                      ,"#" -- Attribute
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -170,8 +171,8 @@ fieldValuesAssignExpressionParser =
   comma)
 
 attributeParser :: Parser Annotation
-attributeParser = do
-  char '#' >> brackets (Attribute <$> identifierParser <*> optionMaybe (parens expressionParser))
+attributeParser =
+  reservedOp "#" >> brackets (Attribute <$> identifierParser <*> optionMaybe (parens expressionParser))
 
 msgQueueParser :: Parser (TypeSpecifier Annotation)
 msgQueueParser = do
@@ -203,20 +204,13 @@ vectorParser = do
   return $ Vector typeSpecifier quantity
 
 referenceParser :: Parser (TypeSpecifier Annotation)
-referenceParser = do
-  _ <- reservedOp "&"
-  Reference <$> typeSpecifierParser
+referenceParser = reservedOp "&" >> Reference <$> typeSpecifierParser
 
 dynamicSubtypeParser :: Parser (TypeSpecifier Annotation)
-dynamicSubtypeParser = do
-  _ <- reservedOp "'dyn"
-  Reference <$> typeSpecifierParser
+dynamicSubtypeParser = reservedOp "'dyn" >> Reference <$> typeSpecifierParser
 
 optionParser :: Parser (TypeSpecifier Annotation)
-optionParser = do
-  reserved "Option"
-  typeSpecifier <- angles typeSpecifierParser
-  return $ Option typeSpecifier
+optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 
 -- Expression Parser
 
