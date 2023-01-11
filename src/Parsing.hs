@@ -13,6 +13,8 @@ import qualified Text.Parsec.Token as Tok
 import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Expr as Ex
 
+import Data.Functor
+
 -- | This is what we will build in this section
 data Annotation =
     Position SourcePos
@@ -590,10 +592,9 @@ classDefinitionParser = do
   return $ Class identifier fields (Position p : attributes)
 
 variantDefinitionParser :: Parser (EnumVariant Annotation)
-variantDefinitionParser = do
-  identifier <- identifierParser
-  assocTypes <- try $ parens $ sepBy typeSpecifierParser comma
-  return $ EnumVariant identifier assocTypes
+variantDefinitionParser = identifierParser >>= \ identifier ->
+  try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
+  <|> return (EnumVariant identifier [])
 
 enumDefinitionParser :: Parser (TypeDef Annotation)
 enumDefinitionParser = do
