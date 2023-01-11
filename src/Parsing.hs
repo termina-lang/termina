@@ -607,10 +607,14 @@ enumDefinitionParser = do
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
-topLevel = many $
+topLevel = many1 $
   try taskParser <|> try handlerParser 
   <|> try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser <|> moduleInclusionParser
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
+
+-- | Simple function to test parsers
+strParse :: String -> Either ParseError (AnnotatedProgram Annotation)
+strParse = parse topLevel ""
