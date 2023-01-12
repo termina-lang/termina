@@ -5,8 +5,8 @@ import Prelude hiding (id)
 
 import AST
 import Prettyprinter
-
 import Prettyprinter.Render.Terminal
+
 import Data.Text (Text)
 
 type DocStyle = Doc AnsiStyle
@@ -24,8 +24,19 @@ namefy :: String -> String
 namefy = ("__" ++)
 --------------------------------------------------------------------------------
 
+-- | Basic Type Printer
 ppType :: Printer TypeSpecifier a
-ppType _ppa _ = pretty "TODO"
+ppType _ppa Int8 = pretty "int8_t"
+ppType _ppa Int16 = pretty "int16_t"
+ppType _ppa Int32 = pretty "int32_t"
+ppType _ppa Int64 = pretty "int64_t"
+ppType _ppa UInt8 = pretty "uint8_t"
+ppType _ppa UInt16 = pretty "uint16_t"
+ppType _ppa UInt32 = pretty "uint32_t"
+ppType _ppa UInt64 = pretty "uint64_t"
+ppType _ppa Bool = pretty "uint8_t"
+ppType _ppa Char = pretty "char"
+ppType _ _ = error "TODO: Type Printer"
 
 ppEnumVariant :: Printer EnumVariant a
 ppEnumVariant ppa a = hsep (map (ppType ppa) (assocData a)) <+> pretty (namefy (variantIdentifier a))
@@ -106,3 +117,10 @@ ppCStmt _ _ = pretty "TODO"
 
 render :: DocStyle -> Text
 render = renderStrict . layoutSmart defaultLayoutOptions
+
+ppAnnAST :: Printer AnnASTElement a
+ppAnnAST _ppa (TypeDefinition tydef) = ppTypeDef _ppa tydef
+ppAnnAST _ppa _ = error "TODO"
+
+ppProgram :: Program -> [Text]
+ppProgram = map (render . ppAnnAST undefined)

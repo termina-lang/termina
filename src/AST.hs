@@ -11,7 +11,7 @@ data AnnASTElement a
   | GlobalDeclaration (Global a)
   | TypeDefinition (TypeDef a)
   | ModuleInclusion Identifier [ a ]
-  deriving Show
+  deriving (Show,Functor)
 
 -- | Identifiers as `String`
 type Identifier = String
@@ -28,7 +28,7 @@ data TypeSpecifier a
   | Option (TypeSpecifier a)
   | Reference (TypeSpecifier a)
   | DynamicSubtype (TypeSpecifier a)
-  deriving Show
+  deriving (Show, Functor)
 
 data Op
   = MemberAccess
@@ -62,7 +62,7 @@ data Expression a
   | VectorIndexExpression (Expression a) (Expression a) -- Binary operation : array indexing
   | VectorInitExpression (Expression a) (Expression a) -- Vector initializer
   | MatchExpression (Expression a) [ MatchCase a ]
-  deriving Show
+  deriving (Show, Functor)
 
 ----------------------------------------
 -- | Datatype representing Global Declarations. 
@@ -75,49 +75,49 @@ data Global a
   | Static Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
   | Protected Identifier (TypeSpecifier a)  (Maybe (Expression a)) [ a ]
   | Const Identifier (TypeSpecifier a)  (Expression a) [ a ]
-  deriving Show
+  deriving (Show, Functor)
 
 data TypeDef a
   = Struct Identifier [FieldDefinition a]  [ a ]
   | Union Identifier [FieldDefinition a] [ a ]
   | Enum Identifier [EnumVariant a] [ a ]
   | Class Identifier [ClassMember a] [ a ]
-  deriving Show
+  deriving (Show, Functor)
 
 data ClassMember a
   = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
   | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) [Statement a] (Statement a) [ a ]
-  deriving Show
+  deriving (Show, Functor)
 
 ----------------------------------------
 data Parameter a = Parameter {
   paramIdentifier :: Identifier
   , paramTypeSpecifier :: TypeSpecifier a
-} deriving Show
+} deriving (Show, Functor)
 
 data FieldValueAssignment a = FieldValueAssignment {
   fieldAssigIdentifier :: Identifier
   , fieldAssigExpression :: Expression a
-} deriving Show
+} deriving (Show, Functor)
 
 data FieldDefinition a = FieldDefinition {
   fieldIdentifier :: Identifier
   , fieldTypeSpecifier :: TypeSpecifier a
   , fieldDefaultValue :: Maybe (Expression a)
-} deriving Show
+} deriving (Show, Functor)
 
 data EnumVariant a = EnumVariant {
   variantIdentifier :: Identifier
   , assocData :: [ TypeSpecifier a ]
-} deriving Show
+} deriving (Show, Functor)
 
 data MatchCase a =
   MatchCase (Expression a) [ Statement a ] (Statement a) [ a ]
-  deriving Show
+  deriving (Show,Functor)
 
 data ElseIf a =
   ElseIf (Expression a) [ Statement a ] [ a ]
-  deriving Show
+  deriving (Show, Functor)
 
 data Statement a =
   Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
@@ -128,7 +128,7 @@ data Statement a =
   | SingleExpStmt (Expression a) [ a ]
   | ReturnStmt (Maybe (Expression a)) [ a ]
   | Break [ a ]
-  deriving Show
+  deriving (Show, Functor)
 
 -- | Constant values:
 -- - Booleans
@@ -144,3 +144,6 @@ type Block a = [Statement a]
 -- When annotations are just `()` we get a normal ASTs and Programs
 type AST = AnnASTElement ()
 type Program = AnnotatedProgram ()
+
+forgetAnnotations :: AnnotatedProgram a -> Program
+forgetAnnotations = map (fmap (const ()))
