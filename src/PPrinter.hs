@@ -20,8 +20,38 @@ enum = pretty "enum"
 struct = pretty "struct"
 union = pretty "union"
 
+declarationList :: [DocStyle] -> DocStyle
+declarationList = encloseSep emptyDoc (semi <> line) emptyDoc
+
+braces' :: DocStyle -> DocStyle
+braces' b = braces (line <> b <> line)
+
+function
+  -- Type
+  :: DocStyle
+  -- Name
+  -> DocStyle
+  -- Params
+  -> [DocStyle]
+  -- Body
+  -> DocStyle -> DocStyle
+function ty nm ps bd =
+  vsep [
+    ty <+> nm <+> parens ( sep (punctuate comma ps) ) ,
+    braces' ( align (indentTab bd) )
+       ]
+
+
+
+indentTab :: DocStyle -> DocStyle
+indentTab = indent 4
+
 namefy :: String -> String
 namefy = ("__" ++)
+
+commented :: DocStyle -> DocStyle
+commented c = vsep [ pretty "/*", c , pretty "*/"]
+
 --------------------------------------------------------------------------------
 
 -- | Basic Type Printer
@@ -36,7 +66,14 @@ ppType _ppa UInt32 = pretty "uint32_t"
 ppType _ppa UInt64 = pretty "uint64_t"
 ppType _ppa Bool = pretty "uint8_t"
 ppType _ppa Char = pretty "char"
-ppType _ _ = error "TODO: Type Printer"
+ppType _ppa (DefinedType ident) = pretty ident
+-- Missing Cases
+ppType _ppa (Vector {}) = pretty "TODO:VEC"
+ppType _ppa (MsgQueue {}) = pretty "TODO:MsgQueue"
+ppType _ppa (Pool {}) = pretty "TODO:POOL"
+ppType _ppa (Option {}) = pretty "TODO:Option"
+ppType _ppa (Reference {}) = pretty "TODO:Reference"
+ppType _ppa (DynamicSubtype {}) = pretty "TODO:Dynamic"
 
 ppEnumVariant :: Printer EnumVariant a
 ppEnumVariant ppa a = hsep (map (ppType ppa) (assocData a)) <+> pretty (namefy (variantIdentifier a))
@@ -47,46 +84,95 @@ ppFieldDefinition ppa fld = hsep [
   pretty $ fieldIdentifier fld
   ]
 
+ppParameter :: Printer Parameter a
+ppParameter ppa (Parameter ident ty) = ppType ppa ty <+> pretty ident
+
+ppClassMemDef :: Printer ClassMember a
+ppClassMemDef ppa (ClassField ident tyspec _mbdef anns) =
+  vsep [
+  commented $ vsep $ map ppa anns,
+  ppType ppa tyspec <+> pretty ident
+  ]
+ppClassMemDef ppa (ClassMethod ident params mbty stmts retStmt anns) =
+  let nmPreffix = pretty (namefy ident) in
+  vsep [
+  commented $ vsep $ map ppa anns,
+  -- TODO Nothing ClassMethod Ty
+  function
+    (maybe (pretty "void") (ppType ppa) mbty)
+    nmPreffix
+    (map (ppParameter ppa) params)
+    (vsep (punctuate semi (map (ppCStmt ppa) (stmts ++ [retStmt]))))
+       ]
+
+
 -- | TypeDef pretty printer.
 ppTypeDef :: Printer TypeDef a
-ppTypeDef _ppa (Struct id fls _anns) =
+ppTypeDef ppa (Struct id fls anns) =
   vsep [
+  commented (align $ vsep $ map ppa anns),
   typedef <+> struct,
-  braces $ indent 4 $ align $ vsep $ punctuate semi $ map (ppFieldDefinition _ppa) fls,
+  braces' $ indentTab $ align $ declarationList $ map (ppFieldDefinition ppa) fls,
   pretty (namefy id) <> semi
        ]
-ppTypeDef _ppa (Union _id _fls _anns) = pretty "TODO : Union Type declaration"
-ppTypeDef _ppa (Enum id enns _anns) =
+ppTypeDef ppa (Union ident fls anns) =
+  vsep [
+  commented (align $ vsep $ map ppa anns),
+  typedef <+> union,
+  braces' $ indentTab $ align $ declarationList $ map (ppFieldDefinition ppa) fls,
+  pretty ident <> semi
+       ]
+ppTypeDef ppa (Enum ident enns anns) =
   let (enums, unions) = foldr (\(a, p) (es, us) ->
                                  ( hsep (map pretty [variantIdentifier a, "=", show p])
                                   : es
                                  , if null (assocData a)
                                    then us
-                                   else ppEnumVariant _ppa a : us
+                                   else ppEnumVariant ppa a : us
                                  )) ([], []) (zip enns ([0 ..] :: [Int]))
   in
     vsep [
-        typedef <+> pretty id,
-        braces $ indent 4 $ align $ vsep $ punctuate comma enums,
+        commented (align $ vsep $ map ppa anns),
+        typedef <+> enum,
+        braces' $ indentTab $ align $ vsep $ punctuate comma enums,
         if null unions
         then -- Just enum
-        pretty id <> semi
+        pretty ident <> semi
         else -- Struct enum
-        let enumid = namefy ("enum_" ++ id) in
+        let enumid = namefy ("enum_" ++ ident) in
                 vsep [
                   pretty enumid <> semi,
                   typedef <+> struct,
-                  braces (indent 4 (align(vsep [
+                  braces' (indentTab (align(vsep [
                                   pretty enumid <+> pretty (namefy "variant") <> semi,
                                   union,
-                                  braces $ indent 4 $ align $ vsep $ punctuate comma unions
+                                  (braces' $ indentTab $ align $ vsep $ punctuate comma unions) <> semi
                                   ])))
-                  ]
+                  ],
+        pretty ident <> semi
         ]
-ppTypeDef _ppa (Class _id _clsm _anns) = pretty "TODO : Class definition"
+ppTypeDef ppa (Class ident clsm anns) =
+  let (fields, methods) =
+        foldl (\(fs,ms) clmem ->
+                 let ppDef = ppClassMemDef ppa clmem in
+                 case clmem of
+                   ClassField {} -> (ppDef : fs, ms)
+                   ClassMethod {} -> (fs, ppDef : ms)
+              )
+            ([],[]) clsm
+  in
+  vsep [
+  commented (align $ vsep $ map ppa anns),
+  -- Struct
+  typedef <+> struct,
+  braces' $ indentTab $ align $ declarationList fields,
+  pretty ident <> semi,
+  -- Methods
+  vsep methods
+       ]
 
 -- | Compound Statement Printer
-ppCStmt :: (a -> DocStyle) -> Statement a -> DocStyle
+ppCStmt :: Printer Statement a
 ppCStmt _ _ = pretty "TODO"
 -- ppCStmt annP (Compound ldecs stmts) =
 --   vsep $ map ppLocalDec ldecs ++ map ppStmt stmts
@@ -124,3 +210,6 @@ ppAnnAST _ppa _ = error "TODO"
 
 ppProgram :: Program -> [Text]
 ppProgram = map (render . ppAnnAST undefined)
+
+ppAnnonProgram :: Show a => AnnotatedProgram a -> Text
+ppAnnonProgram = render . vsep . map (ppAnnAST (pretty . show))

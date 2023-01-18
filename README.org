@@ -1,5 +1,11 @@
 * Termina Language/Transpiler Implementation
 
+* Example
+
+#+begin_src bash
+stack run -- --print --output=examples/res.c examples/datadefs.fin
+#+end_src
+
 * TODO List
 ** DONE Create Project
 ** DONE First AST (Annotated AST)
@@ -11,3 +17,4 @@ Termina expressions are a (proper) subset of C, but it has 4 different top level
 ** DONE Simple Parser
 ** DONE Simple Pretty Printer
 ** TODO Simple C99 Printer
+** TODO Ask Pablo: ClassMethod Ty Nothing?? Translates to void?

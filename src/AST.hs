@@ -1,3 +1,4 @@
+{-# Language DeriveFunctor #-}
 -- | Module where ASTs are defined.
 
 module AST where

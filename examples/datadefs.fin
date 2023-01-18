@@ -1,0 +1,31 @@
+class TMChannel {
+
+  tm_sent_packets : u32 = 0;
+
+  fn send_tm_list(list : 'dyn TMList) -> Result {
+
+    var ret : Result = Ok;
+
+    return ret;
+
+  }
+
+  fn get_tm_sent_packets() -> u32 {
+    return tm_sent_packets;
+  }
+};
+
+enum Message {
+    In (u32),
+    Out (u32),
+    Stop,
+    Reset
+};
+
+struct TMPackHeader {
+
+    pack_id : u16 = 0x0B21;
+    seq_ctrl : u16 = 0xC000;
+    length : u16 = 0;
+
+};

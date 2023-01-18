@@ -3,23 +3,36 @@ module Main (main) where
 -- import AST
 import Parsing
 import Options
+import PPrinter
 -- import Control.Applicative
 
 import Text.Parsec (runParser)
+
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 -- data Mode = Transpiler | Interpreter
 
 data MainOptions = MainOptions
   {optREPL :: Bool
+  , optPrintAST :: Bool
+  , optOutput :: Maybe String
   }
 
 instance Options MainOptions where
-  defineOptions = pure MainOptions
-        <*> simpleOption "repl" False
+  defineOptions = MainOptions
+        <$> simpleOption "repl" False
             "Choose Termina transpiler mode: Transpiler or Interpreter."
+        <*> simpleOption "print" False
+            "Prints AST after parsed"
+        <*> simpleOption "output" Nothing
+            "Output file"
 
 main :: IO ()
 main = runCommand $ \opts args ->
+    let
+      output = maybe print TIO.writeFile (optOutput opts)
+    in
     if optREPL opts then
         putStrLn "Not Implemented yet"
     else
@@ -29,5 +42,10 @@ main = runCommand $ \opts args ->
               src_code <- readFile filepath
               case runParser (contents topLevel) () filepath src_code of
                 Left err -> ioError $ userError $ "Parser Error: " ++ show err
-                Right _ -> putStrLn "Ok!"
+                Right ast ->
+                  output
+                  (if optPrintAST opts then
+                    ppAnnonProgram ast
+                  else
+                    T.pack "Ok!" )
             _ -> ioError $ userError "Too much arguments king!"
