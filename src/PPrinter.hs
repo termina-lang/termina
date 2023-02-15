@@ -14,14 +14,20 @@ type DocStyle = Doc AnsiStyle
 type Printer b a = (a -> DocStyle) -> b a -> DocStyle
 --------------------------------------------------------------------------------
 -- C pretty keywords
-typedef, enum, struct, union :: DocStyle
+return, typedef, enum, struct, union :: DocStyle
 typedef = pretty "typedef"
 enum = pretty "enum"
 struct = pretty "struct"
 union = pretty "union"
+return = pretty "return"
+
 
 declarationList :: [DocStyle] -> DocStyle
-declarationList = encloseSep emptyDoc (semi <> line) emptyDoc
+declarationList =
+  encloseSep
+    emptyDoc
+    semi
+    (semi <> line)
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
@@ -93,7 +99,7 @@ ppClassMemDef ppa (ClassField ident tyspec _mbdef anns) =
   commented $ vsep $ map ppa anns,
   ppType ppa tyspec <+> pretty ident
   ]
-ppClassMemDef ppa (ClassMethod ident params mbty stmts retStmt anns) =
+ppClassMemDef ppa (ClassMethod ident params mbty blocks anns) =
   let nmPreffix = pretty (namefy ident) in
   vsep [
   commented $ vsep $ map ppa anns,
@@ -102,7 +108,13 @@ ppClassMemDef ppa (ClassMethod ident params mbty stmts retStmt anns) =
     (maybe (pretty "void") (ppType ppa) mbty)
     nmPreffix
     (map (ppParameter ppa) params)
-    (vsep (punctuate semi (map (ppCStmt ppa) (stmts ++ [retStmt]))))
+    (vsep (punctuate semi
+           ( -- Format body of block
+             map (ppCStmt ppa) (blockBody blocks)
+             --
+             ++
+             -- Format return
+             maybe [PPrinter.return] (const [pretty "TODO EXP"]) (fst (blockRet blocks)))))
        ]
 
 
@@ -113,7 +125,7 @@ ppTypeDef ppa (Struct id fls anns) =
   commented (align $ vsep $ map ppa anns),
   typedef <+> struct,
   braces' $ indentTab $ align $ declarationList $ map (ppFieldDefinition ppa) fls,
-  pretty (namefy id) <> semi
+  pretty id <> semi
        ]
 ppTypeDef ppa (Union ident fls anns) =
   vsep [

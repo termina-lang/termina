@@ -3,12 +3,25 @@
 
 module AST where
 
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
+
+type ReturnDef a = (Maybe (Expression a), [a])
+
+-- | |BlockRet| represent a body block with its return statement
+data BlockRet a
+  = BlockRet
+  {blockBody :: [Statement a]
+  , blockRet :: ReturnDef a
+  }
+  deriving (Show, Functor)
+
 -- | Annotated AST
 data AnnASTElement a
-  -- | A task takes an `Identifier`, at least one parameter, a type and its body
-  = Task Identifier [Parameter a] (TypeSpecifier a) [Statement a] (Statement a) [ a ]
-  | Function Identifier [Parameter a] (Maybe (TypeSpecifier a)) [Statement a] (Statement a) [ a ]
-  | Handler Identifier [Parameter a] (TypeSpecifier a) [Statement a] (Statement a) [ a ]
+  -- | A task takes an `Identifier`,  a type and its body plus returnt value
+  = Task Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]
+  | Function Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ a ]
+  | Handler Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]
   | GlobalDeclaration (Global a)
   | TypeDefinition (TypeDef a)
   | ModuleInclusion Identifier [ a ]
@@ -30,6 +43,22 @@ data TypeSpecifier a
   | Reference (TypeSpecifier a)
   | DynamicSubtype (TypeSpecifier a)
   deriving (Show, Functor)
+
+-- Ground Type equiality?
+groundTyEq :: TypeSpecifier a -> TypeSpecifier a -> Bool
+groundTyEq  UInt8  UInt8 = True
+groundTyEq  UInt16  UInt16 = True
+groundTyEq  UInt32  UInt32 = True
+groundTyEq  UInt64  UInt64 = True
+groundTyEq  Int8  Int8 = True
+groundTyEq  Int16  Int16 = True
+groundTyEq  Int32  Int32 = True
+groundTyEq  Int64  Int64 = True
+groundTyEq  Bool  Bool = True
+groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq  a  b = False
 
 data Op
   = MemberAccess
@@ -59,7 +88,7 @@ data Expression a
   | ReferenceExpression (Expression a)
   | Casting (Expression a) (TypeSpecifier a)
   | FunctionExpression (Expression a) [ Expression a ]
-  | FieldValuesAssignmentsExpression [FieldValueAssignment a]
+  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a]
   | VectorIndexExpression (Expression a) (Expression a) -- Binary operation : array indexing
   | VectorInitExpression (Expression a) (Expression a) -- Vector initializer
   | MatchExpression (Expression a) [ MatchCase a ]
@@ -87,7 +116,7 @@ data TypeDef a
 
 data ClassMember a
   = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) [Statement a] (Statement a) [ a ]
+  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ a ]
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -113,7 +142,7 @@ data EnumVariant a = EnumVariant {
 } deriving (Show, Functor)
 
 data MatchCase a =
-  MatchCase (Expression a) [ Statement a ] (Statement a) [ a ]
+  MatchCase (Expression a) (BlockRet a) [ a ]
   deriving (Show,Functor)
 
 data ElseIf a =
@@ -127,7 +156,7 @@ data Statement a =
   -- | For loop
   | ForLoopStmt Identifier (Expression a) (Expression a) [ Statement a ] [ a ]
   | SingleExpStmt (Expression a) [ a ]
-  | ReturnStmt (Maybe (Expression a)) [ a ]
+  | ReturnStmt (ReturnDef a) [ a ]
   | Break [ a ]
   deriving (Show, Functor)
 

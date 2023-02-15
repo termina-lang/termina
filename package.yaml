@@ -33,6 +33,9 @@ dependencies:
 # FilePath
 - filepath
 - text
+#
+- containers
+- mtl >= 2.3.1
 
 ghc-options:
 - -Wall

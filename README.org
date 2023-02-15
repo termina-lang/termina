@@ -18,3 +18,41 @@ Termina expressions are a (proper) subset of C, but it has 4 different top level
 ** DONE Simple Pretty Printer
 ** TODO Simple C99 Printer
 ** TODO Ask Pablo: ClassMethod Ty Nothing?? Translates to void?
+** TODO Ask Pablo: Variables types and scope.
+Do we allow local shadowing? Local variables can have the same name as global ones shadowing them?
+This generates scopes
+** TODO Type of constants. Literal numbers?
+** TODO Types of operations, multiplication division, it seems they are overloaded.
+** TODO [Q2] Type bitwiseshifts. Type dependent?
+Isn't a shift bigger than the size of a variables undefined?
+~(>>) : iY -> iX -> iY with {Y >= X}~?
+** TODO Type Eq: Structural? What types can be compared by ~==~
+** TODO [Q1] Type aliases are equivalent?
+#+begin_quote
+type A int
+type B int
+
+var a : A = 1
+var b : B = 2
+
+if (a == b)
+then print "Capaz que sí"
+else "Capaz que no"
+#+end_quote
+** TODO FunctionExpression shouldn't it be ~FunctionExpression Ident [Expression a]~?
+** TODO [Q3] ~FieldValuesAssignmentsExpression fs? : ??~
+Added type Type name.
+Like in Rust,C, etc
+#+begin_src rust
+let var : ... = FieldNameTy {fn1 : bla, ...}
+#+end_src
+** TODO [Q4] Vectors.
+Type ~Vector T E~, ~T~ is the type of elements, but what is ~E~? length?
+Shouldn't be a number?
+
+** TODO [Q5] Patter Matching
+*** Compiler types with pattern matching: option.
+*** Matching Case semantics.
+As it is we have arbitrary expressions.
+
+** TODO [Q6] Missing None and Some constructors?

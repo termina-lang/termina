@@ -2,7 +2,7 @@
 
 module Parsing where
 
-import AST
+import AST hiding (blockRet)
 -- Importing position from Parsec
 import Text.Parsec.Pos
 -- Importing parser combinators
@@ -164,7 +164,9 @@ parameterParser = do
 
 fieldValuesAssignExpressionParser :: Parser (Expression Annotation)
 fieldValuesAssignExpressionParser =
-  braces (FieldValuesAssignmentsExpression <$> sepBy (
+  braces (FieldValuesAssignmentsExpression <$>
+         identifierParser
+          <*> sepBy (
     do
       identifier <- identifierParser
       reservedOp "="
@@ -279,6 +281,11 @@ vectorInitParser = do
 
 -- -- Task Definition
 
+blockParser :: Parser (BlockRet Annotation)
+blockParser = BlockRet <$> many blockItemParser <*> returnStmtParser
+  -- body <- many blockItemParser
+  -- ret <- returnStmtParser
+
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
 taskParser :: Parser (AnnASTElement Annotation)
 taskParser = do
@@ -289,11 +296,8 @@ taskParser = do
   params <- parens (sepBy parameterParser comma)
   reservedOp "->"
   typeSpec <- typeSpecifierParser
-  reservedOp "{"
-  body <- many blockItemParser
-  ret <- returnStmtParser
-  reservedOp "}"
-  return $ Task name params typeSpec body ret (Position p : attributes)
+  blockRet <- braces blockParser
+  return $ Task name params typeSpec blockRet (Position p : attributes)
 
 handlerParser :: Parser (AnnASTElement Annotation)
 handlerParser = do
@@ -304,20 +308,17 @@ handlerParser = do
   params <- parens (sepBy parameterParser comma)
   reservedOp "->"
   typeSpec <- typeSpecifierParser
-  reservedOp "{"
-  body <- many blockItemParser
-  ret <- returnStmtParser
-  reservedOp "}"
-  return $ Handler name params typeSpec body ret (Position p : attributes)
+  blockRet <- braces blockParser
+  return $ Handler name params typeSpec blockRet (Position p : attributes)
 
-returnStmtParser :: Parser (Statement Annotation)
+returnStmtParser :: Parser (ReturnDef Annotation)
 returnStmtParser = do
   attributes <- many attributeParser
   p <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
   _ <- semi
-  return $ ReturnStmt ret (Position p : attributes)
+  return (ret, Position p : attributes)
 
 breakStmtParser :: Parser (Statement Annotation)
 breakStmtParser = do
@@ -337,11 +338,8 @@ functionParser = do
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
-  reservedOp "{"
-  body <- many blockItemParser
-  ret <- returnStmtParser
-  reservedOp "}"
-  return $ Function name params typeSpec body ret (Position p : attributes)
+  blockRet <- braces blockParser
+  return $ Function name params typeSpec blockRet (Position p : attributes)
 
 moduleInclusionParser :: Parser (AnnASTElement Annotation)
 moduleInclusionParser = do
@@ -406,11 +404,8 @@ matchCaseParser = do
   p <- getPosition
   caseExpression <- expressionParser
   reservedOp "=>"
-  reservedOp "{"
-  compound <- many blockItemParser
-  ret <- returnStmtParser
-  reservedOp "}"
-  return $ MatchCase caseExpression compound ret (Position p : attributes)
+  blockRet <- braces blockParser
+  return $ MatchCase caseExpression blockRet (Position p : attributes)
 
 matchExpressionParser :: Parser (Expression Annotation)
 matchExpressionParser = do
@@ -579,7 +574,7 @@ classMethodParser = do
   body <- many blockItemParser
   ret <- returnStmtParser
   reservedOp "}"
-  return $ ClassMethod name params typeSpec body ret (Position p : attributes)
+  return $ ClassMethod name params typeSpec (BlockRet body ret) (Position p : attributes)
 
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
