@@ -85,9 +85,12 @@ data Op
   | LogicalOr
   deriving Show
 
+data OptBody a = None a | Some (Expression a) a
+  deriving (Show, Functor)
 data Expression a
   = Variable Identifier
   | Constant (Const a)
+  | Options (OptBody a)
   | BinOp Op (Expression a) (Expression a)
   | ReferenceExpression (Expression a)
   | Casting (Expression a) (TypeSpecifier a)

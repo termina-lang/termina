@@ -217,7 +217,6 @@ optionParser :: Parser (TypeSpecifier Annotation)
 optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 
 -- Expression Parser
-
 expressionParser' :: Parser (Expression Annotation)
 expressionParser' = Ex.buildExpressionParser
     [[referencePrefix, castingPostfix]
@@ -263,11 +262,17 @@ expressionParser' = Ex.buildExpressionParser
 functionCallParser :: Parser (Expression Annotation)
 functionCallParser = FunctionExpression <$> identifierParser <*> parens (sepBy (try expressionParser) comma)
 
+optionExprParser :: Parser (Expression Annotation)
+optionExprParser =
+  (reserved "None" >> Options . None . Position <$> getPosition) <|>
+  (reserved "Some" >> parens expressionParser)
+
 expressionParser :: Parser (Expression Annotation)
-expressionParser = functionCallParser <|> expressionParser'
+expressionParser = functionCallParser <|> optionExprParser <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
-termParser = matchExpressionParser <|> vectorInitParser 
+termParser = matchExpressionParser
+  <|> vectorInitParser
   <|> variableParser
   <|> constExprParser
   <|> fieldValuesAssignExpressionParser
