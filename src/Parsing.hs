@@ -203,7 +203,7 @@ vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  quantity <- variableParser <|> constExprParser
+  quantity <- (V <$> identifierParser) <|> (K <$> number)
   _ <- reservedOp "]"
   return $ Vector typeSpecifier quantity
 
@@ -218,10 +218,10 @@ optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 
 -- Expression Parser
 
-expressionParser :: Parser (Expression Annotation)
-expressionParser = Ex.buildExpressionParser
+expressionParser' :: Parser (Expression Annotation)
+expressionParser' = Ex.buildExpressionParser
     [[referencePrefix, castingPostfix]
-    ,[functionPostfix]
+    -- ,[functionPostfix]
     ,[vectorIndexPostfix]
     ,[binaryInfix "." MemberAccess Ex.AssocRight]
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
@@ -253,12 +253,18 @@ expressionParser = Ex.buildExpressionParser
           _ <- reserved "as"
           typeSpecificer <- typeSpecifierParser
           return $ \parent -> Casting parent typeSpecificer)
-        functionPostfix = Ex.Postfix (do
-          arguments <- parens $ sepBy (try expressionParser) comma
-          return $ \parent -> FunctionExpression parent arguments)
+        -- functionPostfix = Ex.Postfix (do
+        --   arguments <- parens $ sepBy (try expressionParser) comma
+        --   return $ \parent -> FunctionExpression parent arguments)
         vectorIndexPostfix = Ex.Postfix (do
           index <- brackets expressionParser
           return $ \parent ->  VectorIndexExpression parent index)
+
+functionCallParser :: Parser (Expression Annotation)
+functionCallParser = FunctionExpression <$> identifierParser <*> parens (sepBy (try expressionParser) comma)
+
+expressionParser :: Parser (Expression Annotation)
+expressionParser = functionCallParser <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = matchExpressionParser <|> vectorInitParser 
@@ -353,7 +359,12 @@ moduleInclusionParser = do
 constExprParser :: Parser (Expression Annotation)
 constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar <|> parseLitString)
   where
-    parseLitInt = I <$> number
+    parseLitInt =
+      do
+        num <- number
+        reservedOp "::"
+        ty <- typeSpecifierParser
+        return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
     parseLitString = S <$> stringLit
@@ -402,10 +413,12 @@ matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
   attributes <- many attributeParser
   p <- getPosition
-  caseExpression <- expressionParser
+  reserved "case"
+  cons <- identifierParser
+  args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   blockRet <- braces blockParser
-  return $ MatchCase caseExpression blockRet (Position p : attributes)
+  return $ MatchCase cons args blockRet (Position p : attributes)
 
 matchExpressionParser :: Parser (Expression Annotation)
 matchExpressionParser = do

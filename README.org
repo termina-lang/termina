@@ -17,17 +17,36 @@ Termina expressions are a (proper) subset of C, but it has 4 different top level
 ** DONE Simple Parser
 ** DONE Simple Pretty Printer
 ** TODO Simple C99 Printer
-** TODO Ask Pablo: ClassMethod Ty Nothing?? Translates to void?
+** DONE Ask Pablo: ClassMethod Ty Nothing?? Translates to void?
 ** TODO Ask Pablo: Variables types and scope.
 Do we allow local shadowing? Local variables can have the same name as global ones shadowing them?
 This generates scopes
-** TODO Type of constants. Literal numbers?
-** TODO Types of operations, multiplication division, it seems they are overloaded.
+** DONE [Q0] Type of constants. Literal numbers?
+#+begin_src rust
+let i : i32 = (45325245453252454532524545325245 : i32);
+#+end_src
+
+#+begin_src c
+int i;
+i = 45325245u;
+#+end_src
+
+#+begin_src haskell
+AssignmentStmt (Variable "i")
+  (Constant (I 45.245)) [] :: Statement a
+#+end_src
+
+Sol: Type annotations over constants
+** TODO Constants are in their type? Wait until we have something better to check overflows and stuff?
+** DONE Types of operations, multiplication division, it seems they are overloaded.
+Overloaded.
 ** TODO [Q2] Type bitwiseshifts. Type dependent?
 Isn't a shift bigger than the size of a variables undefined?
 ~(>>) : iY -> iX -> iY with {Y >= X}~?
-** TODO Type Eq: Structural? What types can be compared by ~==~
-** TODO [Q1] Type aliases are equivalent?
+
+Check Misra C + C std, etc. SAT, abstract interpretation, etc
+
+** DONE [Q1] Type aliases are equivalent?
 #+begin_quote
 type A int
 type B int
@@ -37,22 +56,71 @@ var b : B = 2
 
 if (a == b)
 then print "Capaz que sí"
-else "Capaz que no"
+else print "Capaz que no"
 #+end_quote
-** TODO FunctionExpression shouldn't it be ~FunctionExpression Ident [Expression a]~?
-** TODO [Q3] ~FieldValuesAssignmentsExpression fs? : ??~
+Name equality.
+
+However, Vectors are structural equivalent, no?
+
+#+begin_src termina
+type A Vector i32 5
+
+let a : A = [1,2,3,4,5]
+let b : Vector i32 5 = [1,2,3,4,5]
+
+if a == b
+then print("Capaz que sí")
+else print("Capaz que no")
+#+end_src
+
+No, Name Equality, two types with different /names/ are different!
+
+** DONE FunctionExpression shouldn't it be ~FunctionExpression Ident [Expression a]~?
+
+#+begin_src haskell
+return $ \case {
+                Identifier fs -> FunctionExpression fs arguments);
+                _ -> fail;
+}
+#+end_src
+
+small example
+
+#+begin_src termina
+fn f(a : i32){return g(32)}
+#+end_src
+
+#+begin_src haskell
+strParse "fn f(a : i32){return g((32::i32) + (45::i32));}"
+#+end_src
+Res
+#+begin_src haskell
+Right [Function "f" [Parameter {paramIdentifier = "a", paramTypeSpecifier = Int32}] Nothing (BlockRet {blockBody = [], blockRet = (Just (FunctionExpression "g" [BinOp Addition (Constant (I Int32 32)) (Constant (I Int32 45))]),[Position (line 1, column 15)])}) [Position (line 1, column 1)]]
+#+end_src
+
+** DONE [Q3] ~FieldValuesAssignmentsExpression fs? : ??~
 Added type Type name.
 Like in Rust,C, etc
 #+begin_src rust
-let var : ... = FieldNameTy {fn1 : bla, ...}
+let t : FieldNameTy = FieldNameTy {fn1 : bla, ...}
 #+end_src
-** TODO [Q4] Vectors.
-Type ~Vector T E~, ~T~ is the type of elements, but what is ~E~? length?
-Shouldn't be a number?
 
-** TODO [Q5] Patter Matching
-*** Compiler types with pattern matching: option.
+** IDEA [Q4] Vectors -> Compiling time known length.
+Type ~Vector T E~, ~T~ is the type of elements, but what is ~E~? length?
+
+~E~ should be an integer known at compiling time.
+
+The idea of being known at compiler time is implemented using abstract interpretation.
+I'll leave it for later, constant folding too.
+
+** DONE [Q5] Patter Matching
+*** DONE Compiler types with pattern matching: option.
 *** Matching Case semantics.
 As it is we have arbitrary expressions.
 
-** TODO [Q6] Missing None and Some constructors?
+Classic PM, not almighty racket.
+
+** DONE [Q6] Missing None and Some constructors?
+** TODO C compiler flags
+** TODO [Q7] String type? there is no string type, check it
+** TODO [Q8] Check: x::NumTY, check \(x \in NumTy\)? \(x\) is constant.

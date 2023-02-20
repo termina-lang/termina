@@ -11,7 +11,7 @@ type ReturnDef a = (Maybe (Expression a), [a])
 -- | |BlockRet| represent a body block with its return statement
 data BlockRet a
   = BlockRet
-  {blockBody :: [Statement a]
+  { blockBody :: [Statement a]
   , blockRet :: ReturnDef a
   }
   deriving (Show, Functor)
@@ -36,13 +36,17 @@ data TypeSpecifier a
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
   | Bool | Char | DefinedType Identifier
-  | Vector (TypeSpecifier a) (Expression a)
+  | Vector (TypeSpecifier a) VectorSize -- (Expression a)
   | MsgQueue (TypeSpecifier a) (Expression a)
   | Pool (TypeSpecifier a) (Expression a)
-  | Option (TypeSpecifier a)
+  | Option (TypeSpecifier a)
+  -- enum Option<T> {None | Some (a) }
   | Reference (TypeSpecifier a)
   | DynamicSubtype (TypeSpecifier a)
   deriving (Show, Functor)
+
+data VectorSize = K Int | V Identifier
+ deriving Show
 
 -- Ground Type equiality?
 groundTyEq :: TypeSpecifier a -> TypeSpecifier a -> Bool
@@ -83,11 +87,11 @@ data Op
 
 data Expression a
   = Variable Identifier
-  | Constant Const
+  | Constant (Const a)
   | BinOp Op (Expression a) (Expression a)
   | ReferenceExpression (Expression a)
   | Casting (Expression a) (TypeSpecifier a)
-  | FunctionExpression (Expression a) [ Expression a ]
+  | FunctionExpression Identifier [ Expression a ]
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a]
   | VectorIndexExpression (Expression a) (Expression a) -- Binary operation : array indexing
   | VectorInitExpression (Expression a) (Expression a) -- Vector initializer
@@ -142,7 +146,7 @@ data EnumVariant a = EnumVariant {
 } deriving (Show, Functor)
 
 data MatchCase a =
-  MatchCase (Expression a) (BlockRet a) [ a ]
+  MatchCase Identifier [Identifier] (BlockRet a) [ a ]
   deriving (Show,Functor)
 
 data ElseIf a =
@@ -165,8 +169,8 @@ data Statement a =
 -- - Decimal integers
 -- - Characters
 -- - String literals
-data Const = B Bool | I Int | C Char | S String
-  deriving Show
+data Const a = B Bool | I (TypeSpecifier a) Int | C Char | S String
+  deriving (Show, Functor)
 
 type AnnotatedProgram a = [AnnASTElement a]
 type Block a = [Statement a]

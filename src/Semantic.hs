@@ -1,19 +1,20 @@
-{-# Language FlexibleContexts, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase       #-}
 -- | Semantic Analysis. Type checking
 
 module Semantic where
 
-import AST
+import           AST
 
-import Data.List (sortOn)
+import           Data.List                  (sortOn)
 
 -- import Control.Monad.State as ST
-import Data.Map as M
+import           Data.Map                   as M
 
-import Control.Monad.Except (MonadError(..))
+import           Control.Monad.Except       (MonadError (..))
 -- import Control.Monad.Error.Class (withError)
-import Control.Monad.State.Strict as ST
-import Control.Monad.Identity
+import           Control.Monad.Identity
+import           Control.Monad.State.Strict as ST
 
 type SemAnn = ()
 
@@ -22,11 +23,13 @@ type SemAnn = ()
 
 type Type = TypeSpecifier SemAnn
 
+-- Know we have another category of ints. Those known at compiler time.
+
 ----------------------------------------
 -- Task type information
 data SemTask' a = STask
   { taskArgs :: [Parameter a]
-  , taskRet :: TypeSpecifier a
+  , taskRet  :: TypeSpecifier a
   , taskAnns :: [ a ]
   }
 
@@ -37,7 +40,7 @@ type SemTask = SemTask' SemAnn
 
 data SemFunction' a = SFunction
   { funArgs :: [Parameter a]
-  , funRet :: TypeSpecifier a
+  , funRet  :: TypeSpecifier a
   , funAnns :: [ a ]
   }
 
@@ -48,7 +51,7 @@ type SemFunction = SemFunction' SemAnn
 
 data SemHandler' a = SemHandler
   { handlerArgs :: [Parameter a]
-  , handlerRet :: TypeSpecifier a
+  , handlerRet  :: TypeSpecifier a
   , handlerAnns :: [ a ]
   }
 
@@ -66,10 +69,10 @@ data SemGlobal' a
 type SemGlobal = SemGlobal' SemAnn
 
 getTySemGlobal :: SemGlobal -> Type
-getTySemGlobal (SVolatile ty _) = ty
-getTySemGlobal (SStatic ty _) = ty
+getTySemGlobal (SVolatile ty _)  = ty
+getTySemGlobal (SStatic ty _)    = ty
 getTySemGlobal (SProtected ty _) = ty
-getTySemGlobal (SConst ty _) = ty
+getTySemGlobal (SConst ty _)     = ty
 
 --
 
@@ -99,8 +102,6 @@ data Errors
   | ENoTyFound Identifier
   -- | Not a function
   | ENotAFun Identifier
-  -- | FunctionExpression mismatch
-  | EFunctionExpression (Expression SemAnn)
   -- | Parameter and argument type mismatch
   | EParam Type Type
   -- | Wrong number of params
@@ -118,9 +119,14 @@ data Errors
   | EPMMissingOption1
   -- | Global Object but not a type
   | EGlobalNoType Identifier
+  -- | Vectors with dynamic length
+  | EVectorConst (Expression SemAnn)
+  -- | Not an integer const
+  | ENotIntConst (Const SemAnn)
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
-withError f = flip catchError (throwError . f)
+withError = flip catchError . (throwError .)
+
 ----------------------------------------
 -- Global env: global definitions variables, tasks, functions, .., and types
 type GlobalEnv = Map Identifier GEntry
@@ -130,11 +136,8 @@ type LocalEnv = Map Identifier Type
 data StateAnalyzer
  = StateAnalyzer
  { global :: GlobalEnv
- , local :: LocalEnv
+ , local  :: LocalEnv
  }
-
--- type MonadAnnT m anns = ErrorT (Errors anns) (StateT (StateAnalyzer anns) m)
--- type MonadAnn anns = MonadAnnT Identity anns
 
 class (MonadState StateAnalyzer m, MonadError Errors m) => SemMonad m where
 
@@ -157,12 +160,6 @@ type BoxedType = BoxedType' SemAnn
 -------------
 -- First approach: Load everything, type-check one at a time.
 
-typeOfConst :: Const -> BoxedType
-typeOfConst (B _) = NoBoxed Bool
-typeOfConst (I i) = Numeric i
-typeOfConst (C _) = NoBoxed Char
-typeOfConst (S _) = NoBoxed $ Reference Char -- Not sure about this
-
 -- | Checks if two type are the same numeric type.
 sameNumTy :: Type -> Type -> Bool
 sameNumTy a b = sameTy a b && numTy a
@@ -177,25 +174,33 @@ sameTy = groundTyEq
 (=?=) :: MonadError Errors m => Type -> Type -> m Type
 t1 =?= t2 = if sameTy t1 t2 then return t1 else throwError (EMismatch t1 t2)
 
+getIntConst :: MonadError Errors m => Const a -> m Int
+getIntConst (I _ i) = return i
+getIntConst e = throwError (ENotIntConst e)
+
+
 boolTy :: Type -> Bool
 boolTy Bool = True
-boolTy _ = False
+boolTy _    = False
 
 numTy :: Type -> Bool
-numTy UInt8 = True
+numTy UInt8  = True
 numTy UInt16 = True
 numTy UInt32 = True
 numTy UInt64 = True
-numTy Int8 = True
-numTy Int16 = True
-numTy Int32 = True
-numTy Int64 = True
-numTy _ = False
+numTy Int8   = True
+numTy Int16  = True
+numTy Int32  = True
+numTy Int64  = True
+numTy _      = False
 
 -- Lots of questions here.
 typeOfOps :: MonadError Errors m => Op -> Type -> Type -> m Type
 -- Alg ops Same numeric type
-typeOfOps Multiplication tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
+typeOfOps Multiplication tyl tyr =
+  if sameNumTy tyl tyr
+  then return tyl
+  else throwError (EMismatch tyl tyr)
 typeOfOps Division tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
 typeOfOps Addition tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
 typeOfOps Substraction tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
@@ -241,8 +246,16 @@ expressionType (Variable a) =
     Nothing -> gets global >>= \glbs ->
       case M.lookup a glbs of
         Just (GGlob gvars) -> return (getTySemGlobal gvars)
-        _ -> throwError ENotVar
-expressionType (Constant c) = _constant
+        _                  -> throwError ENotVar
+expressionType (Constant c) =
+  case c of
+    B b -> return Bool
+    I tyI i ->
+      -- Q8
+      if numTy tyI then return tyI else throwError (ENumTs [tyI])
+    C c -> return Char
+    S str -> _string_type_q7
+
 expressionType (Casting e nty) = expressionType e >>= \ety ->
   if casteableTys ety nty then return nty else throwError (ECasteable ety nty)
 expressionType (BinOp op le re) = do
@@ -251,18 +264,13 @@ expressionType (BinOp op le re) = do
   typeOfOps op tyle tyre
 expressionType (ReferenceExpression e) = Reference <$> expressionType e
 -- Function call?
-expressionType (FunctionExpression funExp args) =
-  case funExp of
-    (Variable funName) -> do
-      gbls <- gets global
-      case M.lookup funName gbls of
-        Just (GFun (SFunction pTy retTy _anns)) ->
-          paramTy pTy args >> return retTy
-        Just ge -> throwError (ENotFoundFun funName ge)
-        Nothing ->  throwError (ENotAFun funName)
-    _ -> throwError (EFunctionExpression funExp)
--- Creates an expression of?
--- Q3
+expressionType (FunctionExpression fun_name args) =
+   gets global >>= \glbs ->
+    case M.lookup fun_name gbls of
+      Just (GFun (SFunction pTy retTy _anns)) ->
+        paramTy pTy args >> return retTy
+      Just ge -> throwError (ENotFoundFun funName ge)
+      Nothing ->  throwError (ENotAFun funName)
 expressionType (FieldValuesAssignmentsExpression id_ty fs) =
   getNameTy id_ty >>= \case {
    Struct _ ty_fs _ann ->
@@ -271,7 +279,6 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs) =
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
    _ -> throwError (ETyNotStruct id_ty);
   }
--- Q4
 expressionType (VectorIndexExpression vec_exp index_exp) =
   expressionType vec_exp >>= \case {
     Vector ty_elems _vexp ->
@@ -281,26 +288,29 @@ expressionType (VectorIndexExpression vec_exp index_exp) =
     ;
     ty -> throwError (EVector ty);
                                    }
-expressionType (VectorInitExpression iexp lexp) = do
+-- Q4
+expressionType (VectorInitExpression iexp lexp@(Constant c)) = do
   init_ty <- expressionType iexp
   len_ty <- expressionType lexp
   if numTy len_ty
-  then return (Vector init_ty _Q4)
-  else  throwError (ENumTs [len_ty])
+  then Vector init_ty . K <$> getIntConst c
+-- getIntConst c >>= return . Vector init_ty . K
+  else throwError (ENumTs [len_ty])
+expressionType (VectorInitExpression _ lexp) = throwError (EVectorConst lexp)
 -- [Q5]
 expressionType (MatchExpression e cs) =
   expressionType e >>= \case {
   -- Base Types PM
-   Option pty -> pmOption pty cs;
+   Option pty     -> pmOption pty cs;
    ;
   -- User defined PM
-   DefinedType id -> _definePM;
+   DefinedType id -> _Q5;
    }
 
 pmOption :: SemMonad m => Type -> [MatchCase SemAnn] -> m Type
-pmOption ty [cn, cs] = _OptionPatternMatching
-pmOption _ [] = throwError EPMMissingOption0
-pmOption _ [_] = throwError EPMMissingOption1
+pmOption ty [cn, cs] = _OptionPatternMatching_Q6
+pmOption _ []        = throwError EPMMissingOption0
+pmOption _ [_]       = throwError EPMMissingOption1
 
 checkFieldValue :: SemMonad m => FieldDefinition SemAnn -> FieldValueAssignment SemAnn  -> m ()
 checkFieldValue (FieldDefinition fid fty _) (FieldValueAssignment faid faexp) =
