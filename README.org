@@ -124,3 +124,17 @@ Classic PM, not almighty racket.
 ** TODO C compiler flags
 ** TODO [Q7] String type? there is no string type, check it
 ** TODO [Q8] Check: x::NumTY, check \(x \in NumTy\)? \(x\) is constant.
+** TODO [Q9] What's the type of an empty return? Unit? Unit is not part of our types.
+I think we should added or we wont have procedures.
+In that case we also should add value ~()~.
+** TODO Only correct breaks.
+Implement stack another check.
+** TODO [Q10] Assignment expressions lhs is an expression?
+#+begin_src haskell
+data Statement a =
+  ...
+  | AssignmentStmt (Expression a) (Expression a) [ a ]
+  ...
+#+end_src
+
+I assume this is a mistake, I'll fix it and ask later.

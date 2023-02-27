@@ -362,7 +362,7 @@ moduleInclusionParser = do
   return $ ModuleInclusion name (Position p : attributes)
 
 constExprParser :: Parser (Expression Annotation)
-constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar <|> parseLitString)
+constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
   where
     parseLitInt =
       do
@@ -372,7 +372,7 @@ constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar <|
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
-    parseLitString = S <$> stringLit
+    -- parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
 declarationParser = do
@@ -408,7 +408,7 @@ assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
   attributes <- many attributeParser
   p <- getPosition
-  lval <- expressionParser
+  lval <- identifierParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi

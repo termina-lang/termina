@@ -6,7 +6,7 @@ module Semantic where
 
 import           AST
 
-import           Data.List                  (sortOn)
+import           Data.List                  (sortOn, sort, foldl')
 
 -- import Control.Monad.State as ST
 import           Data.Map                   as M
@@ -89,6 +89,7 @@ type GEntry = GEntry' SemAnn
 data Errors
   -- | Expected /similar/ types?
   = EMismatch Type Type
+  | EMismatchIdNotEnum Identifier (TypeDef SemAnn)
   | ECasteable Type Type
   -- | Expected Numeric Types
   | ENumTs [Type]
@@ -96,6 +97,7 @@ data Errors
   | EReferenceGlobal Identifier
   -- | Not Variable found
   | ENotVar
+  | ENotNamedVar Identifier
   -- | Not Function found
   | ENotFoundFun Identifier GEntry
   -- | Type Id not found
@@ -115,14 +117,23 @@ data Errors
   -- | Expecting a Vecotor got
   | EVector Type
   -- | Pattern Matching Missing cases
-  | EPMMissingOption0
-  | EPMMissingOption1
+  | EPMMissingOption0 -- Missing None
+  | EPMMissingOption1 -- Missing Some
+  | EPMMoreOptions -- More cases??
+  | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
   -- | Global Object but not a type
   | EGlobalNoType Identifier
   -- | Vectors with dynamic length
   | EVectorConst (Expression SemAnn)
   -- | Not an integer const
   | ENotIntConst (Const SemAnn)
+  -- | PM Enum errors
+  | EMCMissingEnum Identifier
+  | EMCMoreArgs [Identifier]
+  | EMCMissingArgs [TypeSpecifier SemAnn]
+  | EMCEmpty
+  -- | ForLoop
+  | EBadRange
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
 withError = flip catchError . (throwError .)
@@ -148,6 +159,48 @@ getNameTy tid = gets global >>=
                                           _ -> throwError (EGlobalNoType tid)
                                              }) . M.lookup tid
 
+getEnumTy :: SemMonad m => Identifier -> m [EnumVariant SemAnn]
+getEnumTy tid = getNameTy tid >>= \case
+  Enum _ fs _a -> return fs
+  ty -> throwError (EMismatchIdNotEnum tid ty)
+
+-- | Execute computation |comp| in another state |s|.
+withInState :: MonadState s m => s -> m a -> m a
+withInState tempState comp = do
+  -- Get current state.
+  prevst <- get
+  -- Set temporal state
+  put tempState
+  -- Execute computation
+  res <- comp
+  -- Remove state after computing comp, and recover the previous one.
+  put prevst
+  return res
+
+-- Execute comp but bracktracking the state
+-- Useful for blocks semantic analysis
+localScope :: SemMonad m => m a -> m a
+localScope comp = do
+  prevst <- get
+  res <- comp
+  put prevst
+  return res
+
+-- We are allowing shadowing
+addTempVars :: MonadState StateAnalyzer m => [(Identifier, Type)] -> m a -> m a
+addTempVars newVars ma = do
+  prevSt <- get
+  let tmpState = Prelude.foldr (\(v,k) -> M.insert v k) (local prevSt) newVars
+  withInState (prevSt{local = tmpState}) ma
+
+-- Add variables to the local environment.
+-- I assume shadow biding. If we do not want that we should be more strict.
+addVars :: MonadState StateAnalyzer m => [(Identifier, Type)] -> m ()
+addVars newVars = modify (\s -> s{local = Data.List.foldl' (\m (k,v) -> M.insert k v m) (local s) newVars})
+
+-- Get Type of a defined variable, if it is not defined throw an error.
+getVarTy :: SemMonad m => Identifier -> m Type
+getVarTy id = gets local >>= maybe (throwError ( ENotNamedVar id)) return . M.lookup id
 -- | Boxed types represent overloaded types.
 -- For example, literal ints, what type should we give them? It dependens on the
 -- context, so we leave them unspecified.
@@ -174,7 +227,7 @@ sameTy = groundTyEq
 (=?=) :: MonadError Errors m => Type -> Type -> m Type
 t1 =?= t2 = if sameTy t1 t2 then return t1 else throwError (EMismatch t1 t2)
 
-getIntConst :: MonadError Errors m => Const a -> m Int
+getIntConst :: MonadError Errors m => Const SemAnn -> m Int
 getIntConst (I _ i) = return i
 getIntConst e = throwError (ENotIntConst e)
 
@@ -234,8 +287,17 @@ paramTy [] [] = return ()
 paramTy (p : ps) (a : as) = checkParamTy (paramTypeSpecifier p) a >> paramTy ps as
 paramTy _ _ = throwError EFunParams
 
+--
 casteableTys :: Type -> TypeSpecifier SemAnn -> Bool
-casteableTys _ _ = _casteable
+casteableTys UInt8 UInt16  = True
+casteableTys UInt16 UInt32  = True
+casteableTys UInt32 UInt64  = True
+casteableTys Int8 Int16  = True
+casteableTys Int16 Int32  = True
+casteableTys Int32 Int64  = True
+-- Last option being the same.
+-- This is a trivial casting :muscle:
+casteableTys a b = sameTy a b
 
 expressionType :: SemMonad m => Expression SemAnn -> m Type
 expressionType (Variable a) =
@@ -254,7 +316,6 @@ expressionType (Constant c) =
       -- Q8
       if numTy tyI then return tyI else throwError (ENumTs [tyI])
     C c -> return Char
-    S str -> _string_type_q7
 
 expressionType (Casting e nty) = expressionType e >>= \ety ->
   if casteableTys ety nty then return nty else throwError (ECasteable ety nty)
@@ -266,11 +327,11 @@ expressionType (ReferenceExpression e) = Reference <$> expressionType e
 -- Function call?
 expressionType (FunctionExpression fun_name args) =
    gets global >>= \glbs ->
-    case M.lookup fun_name gbls of
+    case M.lookup fun_name glbs of
       Just (GFun (SFunction pTy retTy _anns)) ->
         paramTy pTy args >> return retTy
-      Just ge -> throwError (ENotFoundFun funName ge)
-      Nothing ->  throwError (ENotAFun funName)
+      Just ge -> throwError (ENotFoundFun fun_name ge)
+      Nothing ->  throwError (ENotAFun fun_name)
 expressionType (FieldValuesAssignmentsExpression id_ty fs) =
   getNameTy id_ty >>= \case {
    Struct _ ty_fs _ann ->
@@ -303,14 +364,68 @@ expressionType (MatchExpression e cs) =
   -- Base Types PM
    Option pty     -> pmOption pty cs;
    ;
-  -- User defined PM
-   DefinedType id -> _Q5;
+  -- User defined PM only Enums
+   DefinedType id -> getEnumTy id >>= pmEnums cs
    }
 
+-- Zipping list of same length
+zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
+zipSameLength ea eb f as bs = zipSameLength' ea eb f as bs []
+  where
+    -- Tail recursive version
+    zipSameLength' :: ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> [c] -> Either e [c]
+    zipSameLength' _ _ _ [] [] acc = Right acc
+    zipSameLength' ea eb f (a : as) (b : bs) acc = zipSameLength' ea eb f as bs (f a b : acc)
+    zipSameLength' ea _ _ [] bs _ = Left (ea bs)
+    zipSameLength' _ eb _ as [] _ = Left (eb as)
+--
+
+-- Not assuming anything. Ordering matchs just in case.
+pmEnums :: SemMonad m => [MatchCase SemAnn] -> [EnumVariant SemAnn] -> m Type
+pmEnums mc evs = join $ checkSame <$> (zipWithM pmEnumsS sorted_mc sorted_evs)
+  where
+    checkSame :: SemMonad m => [Type] -> m Type
+    checkSame [] = throwError EMCEmpty
+    checkSame (t:ts) = foldM (=?=) t ts
+    sorted_mc :: [MatchCase SemAnn]
+    sorted_mc = sortOn matchIdentifier mc
+    sorted_evs :: [EnumVariant SemAnn]
+    sorted_evs = sortOn variantIdentifier evs
+    pmEnumsS :: SemMonad m => MatchCase SemAnn -> EnumVariant SemAnn -> m Type
+    pmEnumsS mc ev =
+      if matchIdentifier mc == variantIdentifier ev
+      then
+        either throwError
+        (\scope -> addTempVars
+          scope
+          (retblockType (matchBody mc)))
+        (zipSameLength EMCMissingArgs EMCMoreArgs (,) (matchBVars mc) (assocData ev))
+      else throwError (EMCMissingEnum (variantIdentifier ev))
+
+
 pmOption :: SemMonad m => Type -> [MatchCase SemAnn] -> m Type
-pmOption ty [cn, cs] = _OptionPatternMatching_Q6
+pmOption ty [cs1, cs2] =
+  if matchIdentifier cs1 == "None" then pmOption' ty cs1 cs2
+  else pmOption' ty cs2 cs1
+  where
+    noneConditions cs = matchIdentifier cs == "None" && Prelude.null(matchBVars cs)
+    someConditions cs = matchIdentifier cs == "Some" && length(matchBVars cs) == 1
+    -- I am sure this could be improved
+    pmOption' :: SemMonad m => Type -> MatchCase SemAnn -> MatchCase SemAnn -> m Type
+    pmOption' ty csnone cssome =
+     if noneConditions csnone
+     then if someConditions cssome
+          then do
+            tyNone <- retblockType (matchBody csnone)
+            tySome <- case matchBVars cssome of
+              [v] -> addTempVars [(v,ty)] (retblockType (matchBody cssome))
+              _ -> throwError EPMMoreOptionsVariables
+            tyNone =?= tySome
+          else throwError EPMMissingOption1
+     else throwError EPMMissingOption0
 pmOption _ []        = throwError EPMMissingOption0
 pmOption _ [_]       = throwError EPMMissingOption1
+pmOption _ _ = throwError EPMMoreOptions
 
 checkFieldValue :: SemMonad m => FieldDefinition SemAnn -> FieldValueAssignment SemAnn  -> m ()
 checkFieldValue (FieldDefinition fid fty _) (FieldValueAssignment faid faexp) =
@@ -328,6 +443,41 @@ checkFieldValues fds fas = checkSortedFields sorted_fds sorted_fas
     checkSortedFields ms [] = throwError (EFieldMissing (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) =
       checkFieldValue d a >> checkSortedFields ds as
+
+retblockType :: SemMonad m => BlockRet SemAnn -> m Type
+retblockType (BlockRet bbody (mret, _anns)) =
+  -- Blocks should have their own scope.
+  blockType bbody
+  >> maybe (return Unit) expressionType mret
+
+blockType :: SemMonad m => Block SemAnn -> m ()
+blockType = mapM_ statementTySimple
+
+-- Symple type checking statements. We should do something about Break
+statementTySimple :: SemMonad m => Statement SemAnn -> m ()
+-- Declaration semantic analysis
+statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
+  addVars[(lhs_id, lhs_type)]
+statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
+  ((lhs_type =?=) =<<) (expressionType expr) >>= \_ ->
+  addVars [(lhs_id,lhs_type)]
+----
+statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
+  void $ join $ (=?=) <$> getVarTy lhs_id <*> expressionType rhs_expr
+statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
+  let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
+  mapM_ (join . ((Bool =?=) <$>) . expressionType) (cond_expr : cs) >>
+  mapM_ (localScope . blockType) ([tt_branch] ++ bds ++ [otherwise_branch])
+-- Here we could implement some abstract interpretation analysis
+statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
+  from_ty <- expressionType from_expr
+  to_ty <- expressionType to_expr
+  if sameNumTy from_ty to_ty
+  then addTempVars [(it_id,from_ty)] (blockType body_stmt)
+  else throwError EBadRange
+statementTySimple (SingleExpStmt expr _anns) = void $ expressionType expr
+-- Break is not handled right now, but may do something. Stack of breaking points.
+statementTySimple (Break _anns) = return ()
 
 -- semTask
 --   :: Identifier -> [Parameter a] -> TypeSpecifier a -> BlockRet a

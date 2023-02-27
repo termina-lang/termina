@@ -1,9 +1,9 @@
-{-# Language DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor #-}
 -- | Module where ASTs are defined.
 
 module AST where
 
-import Data.List.NonEmpty (NonEmpty)
+import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 
 type ReturnDef a = (Maybe (Expression a), [a])
@@ -12,7 +12,7 @@ type ReturnDef a = (Maybe (Expression a), [a])
 data BlockRet a
   = BlockRet
   { blockBody :: [Statement a]
-  , blockRet :: ReturnDef a
+  , blockRet  :: ReturnDef a
   }
   deriving (Show, Functor)
 
@@ -43,6 +43,8 @@ data TypeSpecifier a
   -- enum Option<T> {None | Some (a) }
   | Reference (TypeSpecifier a)
   | DynamicSubtype (TypeSpecifier a)
+  -- See Q9
+  | Unit
   deriving (Show, Functor)
 
 data VectorSize = K Int | V Identifier
@@ -102,7 +104,7 @@ data Expression a
   deriving (Show, Functor)
 
 ----------------------------------------
--- | Datatype representing Global Declarations. 
+-- | Datatype representing Global Declarations.
 -- There are three types of global declarations:
 -- - volatile
 -- - static
@@ -128,42 +130,48 @@ data ClassMember a
 
 ----------------------------------------
 data Parameter a = Parameter {
-  paramIdentifier :: Identifier
+  paramIdentifier      :: Identifier
   , paramTypeSpecifier :: TypeSpecifier a
 } deriving (Show, Functor)
 
 data FieldValueAssignment a = FieldValueAssignment {
-  fieldAssigIdentifier :: Identifier
+  fieldAssigIdentifier   :: Identifier
   , fieldAssigExpression :: Expression a
 } deriving (Show, Functor)
 
 data FieldDefinition a = FieldDefinition {
-  fieldIdentifier :: Identifier
+  fieldIdentifier      :: Identifier
   , fieldTypeSpecifier :: TypeSpecifier a
-  , fieldDefaultValue :: Maybe (Expression a)
+  , fieldDefaultValue  :: Maybe (Expression a)
 } deriving (Show, Functor)
 
 data EnumVariant a = EnumVariant {
   variantIdentifier :: Identifier
-  , assocData :: [ TypeSpecifier a ]
+  , assocData       :: [ TypeSpecifier a ]
 } deriving (Show, Functor)
 
-data MatchCase a =
-  MatchCase Identifier [Identifier] (BlockRet a) [ a ]
-  deriving (Show,Functor)
+data MatchCase a = MatchCase
+  { matchIdentifier :: Identifier
+  , matchBVars :: [Identifier]
+  , matchBody :: BlockRet a
+  , matchAttr:: [a]
+  } deriving (Show,Functor)
 
-data ElseIf a =
-  ElseIf (Expression a) [ Statement a ] [ a ]
+data ElseIf a = ElseIf
+  { elseIfCond :: Expression a,
+    elseIfBody :: Block a,
+    elseIfAnss :: [a]
+  }
   deriving (Show, Functor)
 
 data Statement a =
   Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | AssignmentStmt (Expression a) (Expression a) [ a ]
+  | AssignmentStmt Identifier (Expression a) [ a ]
   | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] [ a ]
   -- | For loop
   | ForLoopStmt Identifier (Expression a) (Expression a) [ Statement a ] [ a ]
   | SingleExpStmt (Expression a) [ a ]
-  | ReturnStmt (ReturnDef a) [ a ]
+  -- | ReturnStmt (ReturnDef a) [ a ]
   | Break [ a ]
   deriving (Show, Functor)
 
@@ -172,7 +180,7 @@ data Statement a =
 -- - Decimal integers
 -- - Characters
 -- - String literals
-data Const a = B Bool | I (TypeSpecifier a) Int | C Char | S String
+data Const a = B Bool | I (TypeSpecifier a) Int | C Char -- | S String
   deriving (Show, Functor)
 
 type AnnotatedProgram a = [AnnASTElement a]
