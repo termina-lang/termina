@@ -98,6 +98,8 @@ data Errors
   -- | Not Variable found
   | ENotVar
   | ENotNamedVar Identifier
+  -- No shadow binding
+  | EVarDefined Identifier
   -- | Not Function found
   | ENotFoundFun Identifier GEntry
   -- | Type Id not found
@@ -152,6 +154,7 @@ data StateAnalyzer
 
 class (MonadState StateAnalyzer m, MonadError Errors m) => SemMonad m where
 
+-- | Get global definition
 getNameTy :: SemMonad m => Identifier -> m (TypeDef SemAnn)
 getNameTy tid = gets global >>=
   maybe (throwError (ENoTyFound tid)) (\case {
@@ -159,49 +162,68 @@ getNameTy tid = gets global >>=
                                           _ -> throwError (EGlobalNoType tid)
                                              }) . M.lookup tid
 
+-- | From a global name get enum variations
 getEnumTy :: SemMonad m => Identifier -> m [EnumVariant SemAnn]
 getEnumTy tid = getNameTy tid >>= \case
   Enum _ fs _a -> return fs
   ty -> throwError (EMismatchIdNotEnum tid ty)
 
--- | Execute computation |comp| in another state |s|.
+-- | Execute computation |comp| in a temporal state |tempState| wihtout
+-- modifying current state.
 withInState :: MonadState s m => s -> m a -> m a
-withInState tempState comp = do
-  -- Get current state.
-  prevst <- get
-  -- Set temporal state
-  put tempState
-  -- Execute computation
-  res <- comp
-  -- Remove state after computing comp, and recover the previous one.
-  put prevst
-  return res
+withInState tempState comp = localScope (put tempState >> comp)
 
 -- Execute comp but bracktracking the state
 -- Useful for blocks semantic analysis
-localScope :: SemMonad m => m a -> m a
+localScope :: MonadState s m => m a -> m a
 localScope comp = do
   prevst <- get
   res <- comp
   put prevst
   return res
 
--- We are allowing shadowing
-addTempVars :: MonadState StateAnalyzer m => [(Identifier, Type)] -> m a -> m a
-addTempVars newVars ma = do
-  prevSt <- get
-  let tmpState = Prelude.foldr (\(v,k) -> M.insert v k) (local prevSt) newVars
-  withInState (prevSt{local = tmpState}) ma
+
+-- | Adding new local varialbes
+addTempVars :: SemMonad m => [(Identifier, Type)] -> m a -> m a
+addTempVars newVars ma =
+  localScope (addVariables newVars >> ma)
+  where
+    addVariables = mapM_ (uncurry insertVar)
 
 -- Add variables to the local environment.
 -- I assume shadow biding. If we do not want that we should be more strict.
 addVars :: MonadState StateAnalyzer m => [(Identifier, Type)] -> m ()
 addVars newVars = modify (\s -> s{local = Data.List.foldl' (\m (k,v) -> M.insert k v m) (local s) newVars})
 
--- Get Type of a defined variable, if it is not defined throw an error.
-getVarTy :: SemMonad m => Identifier -> m Type
-getVarTy id = gets local >>= maybe (throwError ( ENotNamedVar id)) return . M.lookup id
--- | Boxed types represent overloaded types.
+-- | Insert varialbe in local scope
+insertVar :: SemMonad m => Identifier -> Type -> m ()
+insertVar id ty = lookupVar id
+  >>= maybe
+  -- | If there is no variable named |id|
+  (modify (\s -> s{local = M.insert id ty (local s)}))
+  -- | if there is throw error
+  (const (throwError (EVarDefined id)))
+
+-- | Get the Type of a (already) defined variable. If it is not defined throw an error.
+getDefinedVarTy :: SemMonad m => Identifier -> m Type
+getDefinedVarTy id =
+  (M.lookup id <$> (gets local))
+  -- | Get local variables map and check if |id| is a member of that map
+  >>= maybe (throwError (ENotNamedVar id)) return
+  -- | if |id| is not a member throw error |ENotNamedVar| or return its type
+
+
+-- | Lookups |idenfitier| in local scope first (I assuming this is the most
+-- frequent case) and then the global scope.
+-- Returns the type of |identifier| in case it is defined.
+lookupVar :: SemMonad m => Identifier -> m (Maybe (Either Type GEntry))
+lookupVar id =
+ gets (\s -> (local s, global s)) >>= \(locals, globals) ->
+  case M.lookup id locals of
+    Just ty -> return (Just (Left ty))
+    Nothing -> maybe (return Nothing) (return . Just . Right) (M.lookup id globals)
+
+-- | Boxed types rejpresent overloaded types.
 -- For example, literal ints, what type should we give them? It dependens on the
 -- context, so we leave them unspecified.
 data BoxedType' a
@@ -463,7 +485,7 @@ statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
   addVars [(lhs_id,lhs_type)]
 ----
 statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
-  void $ join $ (=?=) <$> getVarTy lhs_id <*> expressionType rhs_expr
+  void $ join $ (=?=) <$> getDefinedVarTy lhs_id <*> expressionType rhs_expr
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
   let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   mapM_ (join . ((Bool =?=) <$>) . expressionType) (cond_expr : cs) >>
@@ -479,11 +501,14 @@ statementTySimple (SingleExpStmt expr _anns) = void $ expressionType expr
 -- Break is not handled right now, but may do something. Stack of breaking points.
 statementTySimple (Break _anns) = return ()
 
--- semTask
---   :: Identifier -> [Parameter a] -> TypeSpecifier a -> BlockRet a
---   -> State (GlobalEnv a) (Maybe (SemTask a))
--- semTask ident args tyret block = _
 
-
--- createEnv :: AnnotatedProgram a -> State (GlobalEnv a) (AnnotatedProgram a)
--- createEnv _ = _
+----
+taskSemAnalyzer :: SemMonad m
+  => Identifier -> [Parameter SemAnn] -> TypeSpecifier SemAnn
+  -> BlockRet SemAnn -> [SemAnn] -> m Type
+taskSemAnalyzer taskId taskPs taskRetType taskBody _anns =
+  addTempVars -- | Add
+    (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) taskPs)
+    -- | list of variables
+    ((taskRetType =?=) =<< (retblockType taskBody))
+    -- | analyze the body and check the returining type

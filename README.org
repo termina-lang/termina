@@ -6,7 +6,7 @@
 stack run -- --print --output=examples/res.c examples/datadefs.fin
 #+end_src
 
-* TODO List
+* List of TODOs!
 ** DONE Create Project
 ** DONE First AST (Annotated AST)
 Termina expressions are a (proper) subset of C, but it has 4 different top level constructs.
@@ -18,9 +18,11 @@ Termina expressions are a (proper) subset of C, but it has 4 different top level
 ** DONE Simple Pretty Printer
 ** TODO Simple C99 Printer
 ** DONE Ask Pablo: ClassMethod Ty Nothing?? Translates to void?
-** TODO Ask Pablo: Variables types and scope.
+** DONE Ask Pablo: Variables types and scope.
 Do we allow local shadowing? Local variables can have the same name as global ones shadowing them?
-This generates scopes
+
+We do not allow shadowing.
+
 ** DONE [Q0] Type of constants. Literal numbers?
 #+begin_src rust
 let i : i32 = (45325245453252454532524545325245 : i32);
@@ -130,6 +132,7 @@ In that case we also should add value ~()~.
 ** TODO Only correct breaks.
 Implement stack another check.
 ** TODO [Q10] Assignment expressions lhs is an expression?
+
 #+begin_src haskell
 data Statement a =
   ...
@@ -138,3 +141,4 @@ data Statement a =
 #+end_src
 
 I assume this is a mistake, I'll fix it and ask later.
+** TODO Constant Environment.
