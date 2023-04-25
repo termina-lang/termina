@@ -22,7 +22,6 @@ Termina expressions are a (proper) subset of C, but it has 4 different top level
 Do we allow local shadowing? Local variables can have the same name as global ones shadowing them?
 
 We do not allow shadowing.
-
 ** DONE [Q0] Type of constants. Literal numbers?
 #+begin_src rust
 let i : i32 = (45325245453252454532524545325245 : i32);
@@ -129,7 +128,7 @@ Classic PM, not almighty racket.
 ** TODO [Q9] What's the type of an empty return? Unit? Unit is not part of our types.
 I think we should added or we wont have procedures.
 In that case we also should add value ~()~.
-** TODO Only correct breaks.
+** TODO [Q11] Only correct breaks.
 Implement stack another check.
 ** TODO [Q10] Assignment expressions lhs is an expression?
 
@@ -141,4 +140,17 @@ data Statement a =
 #+end_src
 
 I assume this is a mistake, I'll fix it and ask later.
+** TODO [Q12] Do we accept procedures?
+#+begin_src c
+void function_name() { return;}
+#+end_src
+
+Reads as
+#+begin_src haskell
+Function "function_name" [] Nothing ([], Ret ()) [] :: AnnASTElement ()
+#+end_src
+** TODO [Q13] Why Static, Protected and Const have expressions?
+Ask Pablo because I think he wanted to have something more concrete.
+Statics should be a memory address? no?
 ** TODO Constant Environment.
+** TODO Implement Error Pretty Printer

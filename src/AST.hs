@@ -18,7 +18,6 @@ data BlockRet a
 
 -- | Annotated AST
 data AnnASTElement a
-  -- | A task takes an `Identifier`,  a type and its body plus returnt value
   = Task Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]
   | Function Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ a ]
   | Handler Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]

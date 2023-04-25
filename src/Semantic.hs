@@ -1,15 +1,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase       #-}
--- | Semantic Analysis. Type checking
+{-# LANGUAGE TupleSections       #-}
+
+-- | Semantic Analysis Module i.e. Type checking
 
 module Semantic where
-
 import           AST
 
 import           Data.List                  (sortOn, sort, foldl')
 
 -- import Control.Monad.State as ST
 import           Data.Map                   as M
+
+import Control.Arrow
 
 import           Control.Monad.Except       (MonadError (..))
 -- import Control.Monad.Error.Class (withError)
@@ -18,13 +21,13 @@ import           Control.Monad.State.Strict as ST
 
 type SemAnn = ()
 
+
+-- How we interpret types
 -- Variables can have two types
 -- - Simple types, uint,int, etc
 
 type Type = TypeSpecifier SemAnn
-
 -- Know we have another category of ints. Those known at compiler time.
-
 ----------------------------------------
 -- Task type information
 data SemTask' a = STask
@@ -32,6 +35,7 @@ data SemTask' a = STask
   , taskRet  :: TypeSpecifier a
   , taskAnns :: [ a ]
   }
+  deriving Show
 
 type SemTask = SemTask' SemAnn
 
@@ -43,6 +47,7 @@ data SemFunction' a = SFunction
   , funRet  :: TypeSpecifier a
   , funAnns :: [ a ]
   }
+  deriving Show
 
 type SemFunction = SemFunction' SemAnn
 
@@ -54,6 +59,7 @@ data SemHandler' a = SemHandler
   , handlerRet  :: TypeSpecifier a
   , handlerAnns :: [ a ]
   }
+  deriving Show
 
 type SemHandler = SemHandler' SemAnn
 
@@ -65,6 +71,7 @@ data SemGlobal' a
   | SStatic (TypeSpecifier a) [ a ]
   | SProtected (TypeSpecifier a) [ a ]
   | SConst (TypeSpecifier a) [ a ]
+  deriving Show
 
 type SemGlobal = SemGlobal' SemAnn
 
@@ -82,9 +89,12 @@ data GEntry' a
   | GHand (SemHandler' a)
   | GGlob (SemGlobal' a)
   | GType (TypeDef a)
+  deriving Show
 
 type GEntry = GEntry' SemAnn
 
+----------------------------------------
+-- Error Handling
 ----------------------------------------
 data Errors
   -- | Expected /similar/ types?
@@ -136,9 +146,11 @@ data Errors
   | EMCEmpty
   -- | ForLoop
   | EBadRange
+  deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
 withError = flip catchError . (throwError .)
+----------------------------------------
 
 ----------------------------------------
 -- Global env: global definitions variables, tasks, functions, .., and types
@@ -152,6 +164,7 @@ data StateAnalyzer
  , local  :: LocalEnv
  }
 
+-- | Shortcut: Our Semantic monad is just State + Errors
 class (MonadState StateAnalyzer m, MonadError Errors m) => SemMonad m where
 
 -- | Get global definition
@@ -223,15 +236,6 @@ lookupVar id =
     Just ty -> return (Just (Left ty))
     Nothing -> maybe (return Nothing) (return . Just . Right) (M.lookup id globals)
 
--- | Boxed types rejpresent overloaded types.
--- For example, literal ints, what type should we give them? It dependens on the
--- context, so we leave them unspecified.
-data BoxedType' a
-  = NoBoxed (TypeSpecifier a)
-  | Numeric Int
-
-type BoxedType = BoxedType' SemAnn
-
 -------------
 -- First approach: Load everything, type-check one at a time.
 
@@ -269,7 +273,6 @@ numTy Int32  = True
 numTy Int64  = True
 numTy _      = False
 
--- Lots of questions here.
 typeOfOps :: MonadError Errors m => Op -> Type -> Type -> m Type
 -- Alg ops Same numeric type
 typeOfOps Multiplication tyl tyr =
@@ -475,7 +478,7 @@ retblockType (BlockRet bbody (mret, _anns)) =
 blockType :: SemMonad m => Block SemAnn -> m ()
 blockType = mapM_ statementTySimple
 
--- Symple type checking statements. We should do something about Break
+-- | Type checking statements. We should do something about Break
 statementTySimple :: SemMonad m => Statement SemAnn -> m ()
 -- Declaration semantic analysis
 statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
@@ -499,16 +502,46 @@ statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
   else throwError EBadRange
 statementTySimple (SingleExpStmt expr _anns) = void $ expressionType expr
 -- Break is not handled right now, but may do something. Stack of breaking points.
-statementTySimple (Break _anns) = return ()
+statementTySimple (Break _anns) = return () -- See Q11
 
-
-----
+----------------------------------------
+-- Programs Semantic Analyzer
+-- For now all are kinda the same thing but eventually they should not :shrug:
+----------------------------------------
+-- Task Semantic Analyzer
 taskSemAnalyzer :: SemMonad m
-  => Identifier -> [Parameter SemAnn] -> TypeSpecifier SemAnn
+  => [Parameter SemAnn] -> TypeSpecifier SemAnn
   -> BlockRet SemAnn -> [SemAnn] -> m Type
-taskSemAnalyzer taskId taskPs taskRetType taskBody _anns =
+taskSemAnalyzer taskPs taskRetType taskBody _anns =
   addTempVars -- | Add
     (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) taskPs)
     -- | list of variables
     ((taskRetType =?=) =<< (retblockType taskBody))
     -- | analyze the body and check the returining type
+
+-- Function Semantic Analyzer
+functionSemAnalyzer :: SemMonad m
+ => [Parameter SemAnn] -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> [ SemAnn ] -> m Type
+functionSemAnalyzer funPS mbfunRetTy funBody _anns =
+  addTempVars -- | Add scoped variables
+  (fmap (\ p -> (paramIdentifier p , paramTypeSpecifier p)) funPS)
+  $ -- within the scope + parameters, check body type
+  case mbfunRetTy of
+    -- [Q12] Do we accept procedures?
+    Nothing -> undefined
+    Just retTy -> (retTy =?=) =<< (retblockType funBody)
+
+-- Handler Semantic Analyzer (Template)
+handlerSemAnalyzer :: SemMonad m
+  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m Type
+handlerSemAnalyzer hanPS hanType hanBody _anns =
+  addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
+  $
+  (hanType =?=) =<< (reblockType hanBody)
+
+-- | Keeping only type information
+globalCheck :: SemMonad m => Global SemAnn -> m GEntry'
+globalCheck (Volatile ident ty addr anns) = return (SVolatile ty anns)
+globalCheck (Static ident ty mexpr anns) = _
+globalCheck (Protected ident ty mexpr _anns) = _
+globalCheck (Const ident ty expr _anns) = _
