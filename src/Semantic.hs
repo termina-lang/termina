@@ -1,18 +1,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase       #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TupleSections    #-}
 
 -- | Semantic Analysis Module i.e. Type checking
 
 module Semantic where
 import           AST
 
-import           Data.List                  (sortOn, sort, foldl')
+import           Data.List                  (foldl', sort, sortOn)
 
 -- import Control.Monad.State as ST
 import           Data.Map                   as M
 
-import Control.Arrow
+import           Control.Arrow
 
 import           Control.Monad.Except       (MonadError (..))
 -- import Control.Monad.Error.Class (withError)
@@ -20,7 +20,6 @@ import           Control.Monad.Identity
 import           Control.Monad.State.Strict as ST
 
 type SemAnn = ()
-
 
 -- How we interpret types
 -- Variables can have two types
@@ -69,7 +68,7 @@ type SemHandler = SemHandler' SemAnn
 data SemGlobal' a
   = SVolatile (TypeSpecifier a) [ a ]
   | SStatic (TypeSpecifier a) [ a ]
-  | SProtected (TypeSpecifier a) [ a ]
+  | SShared (TypeSpecifier a) [ a ]
   | SConst (TypeSpecifier a) [ a ]
   deriving Show
 
@@ -78,7 +77,7 @@ type SemGlobal = SemGlobal' SemAnn
 getTySemGlobal :: SemGlobal -> Type
 getTySemGlobal (SVolatile ty _)  = ty
 getTySemGlobal (SStatic ty _)    = ty
-getTySemGlobal (SProtected ty _) = ty
+getTySemGlobal (SShared ty _) = ty
 getTySemGlobal (SConst ty _)     = ty
 
 --
@@ -157,11 +156,13 @@ withError = flip catchError . (throwError .)
 type GlobalEnv = Map Identifier GEntry
 -- Local env: variables to their type
 type LocalEnv = Map Identifier Type
+type ROEnv = Map Identifier Type
 
 data StateAnalyzer
  = StateAnalyzer
  { global :: GlobalEnv
  , local  :: LocalEnv
+ , ro :: ROEnv
  }
 
 -- | Shortcut: Our Semantic monad is just State + Errors
@@ -179,7 +180,7 @@ getNameTy tid = gets global >>=
 getEnumTy :: SemMonad m => Identifier -> m [EnumVariant SemAnn]
 getEnumTy tid = getNameTy tid >>= \case
   Enum _ fs _a -> return fs
-  ty -> throwError (EMismatchIdNotEnum tid ty)
+  ty           -> throwError (EMismatchIdNotEnum tid ty)
 
 -- | Execute computation |comp| in a temporal state |tempState| wihtout
 -- modifying current state.
@@ -255,7 +256,7 @@ t1 =?= t2 = if sameTy t1 t2 then return t1 else throwError (EMismatch t1 t2)
 
 getIntConst :: MonadError Errors m => Const SemAnn -> m Int
 getIntConst (I _ i) = return i
-getIntConst e = throwError (ENotIntConst e)
+getIntConst e       = throwError (ENotIntConst e)
 
 
 boolTy :: Type -> Bool
@@ -315,14 +316,14 @@ paramTy _ _ = throwError EFunParams
 --
 casteableTys :: Type -> TypeSpecifier SemAnn -> Bool
 casteableTys UInt8 UInt16  = True
-casteableTys UInt16 UInt32  = True
-casteableTys UInt32 UInt64  = True
-casteableTys Int8 Int16  = True
-casteableTys Int16 Int32  = True
-casteableTys Int32 Int64  = True
+casteableTys UInt16 UInt32 = True
+casteableTys UInt32 UInt64 = True
+casteableTys Int8 Int16    = True
+casteableTys Int16 Int32   = True
+casteableTys Int32 Int64   = True
 -- Last option being the same.
 -- This is a trivial casting :muscle:
-casteableTys a b = sameTy a b
+casteableTys a b           = sameTy a b
 
 expressionType :: SemMonad m => Expression SemAnn -> m Type
 expressionType (Variable a) =
@@ -410,7 +411,7 @@ pmEnums :: SemMonad m => [MatchCase SemAnn] -> [EnumVariant SemAnn] -> m Type
 pmEnums mc evs = join $ checkSame <$> (zipWithM pmEnumsS sorted_mc sorted_evs)
   where
     checkSame :: SemMonad m => [Type] -> m Type
-    checkSame [] = throwError EMCEmpty
+    checkSame []     = throwError EMCEmpty
     checkSame (t:ts) = foldM (=?=) t ts
     sorted_mc :: [MatchCase SemAnn]
     sorted_mc = sortOn matchIdentifier mc
@@ -444,7 +445,7 @@ pmOption ty [cs1, cs2] =
             tyNone <- retblockType (matchBody csnone)
             tySome <- case matchBVars cssome of
               [v] -> addTempVars [(v,ty)] (retblockType (matchBody cssome))
-              _ -> throwError EPMMoreOptionsVariables
+              _   -> throwError EPMMoreOptionsVariables
             tyNone =?= tySome
           else throwError EPMMissingOption1
      else throwError EPMMissingOption0
@@ -484,9 +485,8 @@ statementTySimple :: SemMonad m => Statement SemAnn -> m ()
 statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
   addVars[(lhs_id, lhs_type)]
 statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
-  ((lhs_type =?=) =<<) (expressionType expr) >>= \_ ->
+  ((lhs_type =?=) =<<) (expressionType expr) >>
   addVars [(lhs_id,lhs_type)]
-----
 statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
   void $ join $ (=?=) <$> getDefinedVarTy lhs_id <*> expressionType rhs_expr
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
@@ -528,20 +528,33 @@ functionSemAnalyzer funPS mbfunRetTy funBody _anns =
   $ -- within the scope + parameters, check body type
   case mbfunRetTy of
     -- [Q12] Do we accept procedures?
-    Nothing -> undefined
+    Nothing    -> _VoidTy
     Just retTy -> (retTy =?=) =<< (retblockType funBody)
 
 -- Handler Semantic Analyzer (Template)
-handlerSemAnalyzer :: SemMonad m
+handlerSemAnalyzer :: SemMonad m =>
   [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m Type
 handlerSemAnalyzer hanPS hanType hanBody _anns =
   addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
   $
-  (hanType =?=) =<< (reblockType hanBody)
+  (hanType =?=) =<< (retblockType hanBody)
 
--- | Keeping only type information
-globalCheck :: SemMonad m => Global SemAnn -> m GEntry'
+-- Keeping only type information
+globalCheck :: SemMonad m => Global SemAnn -> m SemGlobal
 globalCheck (Volatile ident ty addr anns) = return (SVolatile ty anns)
-globalCheck (Static ident ty mexpr anns) = _
-globalCheck (Protected ident ty mexpr _anns) = _
-globalCheck (Const ident ty expr _anns) = _
+-- [Q13]
+globalCheck (Static ident ty (Just (Constant _Address)) anns) = _returnStatic
+globalCheck (Static _ _ _ _) = _Static
+--
+globalCheck (Shared ident ty mexpr anns) =
+  case mexpr of
+    Just expr -> do
+      eTy  <- expressionType expr
+      _ <- ty =?= eTy
+      return (SShared ty anns)
+    Nothing -> _SharedNoExpr
+-- TODO [Q14]
+globalCheck (Const ident ty expr anns) = do
+      eTy  <- expressionType expr
+      _ <- ty =?= eTy
+      return (SConst ty anns)

@@ -140,7 +140,7 @@ data Statement a =
 #+end_src
 
 I assume this is a mistake, I'll fix it and ask later.
-** TODO [Q12] Do we accept procedures?
+** DONE [Q12] Do we accept procedures?
 #+begin_src c
 void function_name() { return;}
 #+end_src
@@ -149,8 +149,48 @@ Reads as
 #+begin_src haskell
 Function "function_name" [] Nothing ([], Ret ()) [] :: AnnASTElement ()
 #+end_src
-** TODO [Q13] Why Static, Protected and Const have expressions?
+
+Returns Void, (C void)
+** DONE [Q13] Why Static, Shared and Const have expressions?
 Ask Pablo because I think he wanted to have something more concrete.
-Statics should be a memory address? no?
+Statics should be a memory address?
+#+begin_src  haskell
+data Global a
+  = Volatile Identifier (TypeSpecifier a) Address [ a ]
+  | Static Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
+    -- ---------------------------------^^^^^^^^^^^^^^^^^^^^^
+  | Shared Identifier (TypeSpecifier a)  (Maybe (Expression a)) [ a ]
+    -- -------------------------------------^^^^^^^^^^^^^^^^^^^^^
+  | Const Identifier (TypeSpecifier a)  (Expression a) [ a ]
+    -- ---------------------------------^^^^^^^^^^^^^^-------
+  deriving (Show, Functor)
+#+end_src
+
+Default values for structure initialization.
+Ground types do not have default values.
+
+** DONE What are protected variables?
+Classes a la C, functions API.
+** DONE Following-up question from Q13: What to do when there is no expression?
+Default values but only structures.
 ** TODO Constant Environment.
+Read Only Environment
 ** TODO Implement Error Pretty Printer
+** TODO Q14 Constant Checker?
+If there is no function call, the expression should be constant, shouldn't it?
+** TODO Shared can only have classes
+Nothing | Just ( ... : Ty  ) <- Ty \in Class
+
+#+begin_src haskell
+...
+  | Class Identifier [ClassMember a] [ a ]
+#+end_src
+#+begin_quote
+Another definition of monitor is a thread-safe class, object, or module that
+wraps around a mutex in order to safely allow access to a method or variable by
+more than one thread.
+#+end_quote
+
+Members of ^^ Classes are ~shared~ objects.
+
+*** TODO [Martin] (check Ocaml modules)

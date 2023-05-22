@@ -4,6 +4,7 @@ module PPrinter where
 import Prelude hiding (id)
 
 import AST
+-- https://hackage.haskell.org/package/prettyprinter
 import Prettyprinter
 import Prettyprinter.Render.Terminal
 
@@ -12,6 +13,7 @@ import Data.Text (Text)
 type DocStyle = Doc AnsiStyle
 
 type Printer b a = (a -> DocStyle) -> b a -> DocStyle
+
 --------------------------------------------------------------------------------
 -- C pretty keywords
 return, typedef, enum, struct, union :: DocStyle
@@ -20,7 +22,6 @@ enum = pretty "enum"
 struct = pretty "struct"
 union = pretty "union"
 return = pretty "return"
-
 
 declarationList :: [DocStyle] -> DocStyle
 declarationList =
@@ -46,8 +47,6 @@ function ty nm ps bd =
     ty <+> nm <+> parens ( sep (punctuate comma ps) ) ,
     braces' ( align (indentTab bd) )
        ]
-
-
 
 indentTab :: DocStyle -> DocStyle
 indentTab = indent 4

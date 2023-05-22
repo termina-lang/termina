@@ -28,7 +28,7 @@ data AnnASTElement a
 
 -- | Identifiers as `String`
 type Identifier = String
--- | Addresses as `String`
+-- | Addresses as `Integer`
 type Address = Integer
 -- | General type specifier
 data TypeSpecifier a
@@ -107,11 +107,11 @@ data Expression a
 -- There are three types of global declarations:
 -- - volatile
 -- - static
--- - protected
+-- - shared
 data Global a
   = Volatile Identifier (TypeSpecifier a) Address [ a ]
   | Static Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | Protected Identifier (TypeSpecifier a)  (Maybe (Expression a)) [ a ]
+  | Shared Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
   | Const Identifier (TypeSpecifier a)  (Expression a) [ a ]
   deriving (Show, Functor)
 

@@ -367,7 +367,7 @@ constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
     parseLitInt =
       do
         num <- number
-        reservedOp "::"
+        reservedOp ":"
         ty <- typeSpecifierParser
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
@@ -509,7 +509,7 @@ protectedDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Protected identifier typeSpecifier initializer (Position p : attributes)
+  return $ Shared identifier typeSpecifier initializer (Position p : attributes)
 
 constDeclParser :: Parser (Global Annotation)
 constDeclParser = do
