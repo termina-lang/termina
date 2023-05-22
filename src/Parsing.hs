@@ -268,7 +268,7 @@ optionExprParser =
   (reserved "Some" >> parens expressionParser)
 
 expressionParser :: Parser (Expression Annotation)
-expressionParser = functionCallParser <|> optionExprParser <|> expressionParser'
+expressionParser = try functionCallParser <|> try optionExprParser <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = matchExpressionParser

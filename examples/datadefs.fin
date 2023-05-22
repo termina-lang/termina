@@ -24,8 +24,8 @@ enum Message {
 
 struct TMPackHeader {
 
-    pack_id : u16 = 0x0B21;
-    seq_ctrl : u16 = 0xC000;
-    length : u16 = 0;
+    pack_id : u16 = 0x0B21 : u16;
+    seq_ctrl : u16 = 0xC000 : u16;
+    length : u16 = 0 : u16;
 
 };
