@@ -6,6 +6,8 @@
 stack run -- --print --output=examples/res.c examples/datadefs.fin
 #+end_src
 
+* Meta TODOs!
+** TODO Haddock include semantics package?
 * List of TODOs!
 ** DONE Create Project
 ** DONE First AST (Annotated AST)
@@ -179,6 +181,7 @@ Read Only Environment
 ** TODO Q14 Constant Checker?
 If there is no function call, the expression should be constant, shouldn't it?
 ** TODO Shared can only have classes
+
 Nothing | Just ( ... : Ty  ) <- Ty \in Class
 
 #+begin_src haskell
@@ -194,3 +197,32 @@ more than one thread.
 Members of ^^ Classes are ~shared~ objects.
 
 *** TODO [Martin] (check Ocaml modules)
+** TODO Q15 What are referenced expressions?
+#+begin_src haskell
+data Expression a = ...
+  | ReferenceExpression (Expression a)
+...
+#+end_src
+
+I checked the reference slides but I am a little bit confused.
+** TODO Parser
+** TODO Q16 Type of length expressions.
+** TODO Q17 Can we assign stuff to arguments? Or are they Read-Only?
+#+begin_src termina
+bool func(x : u16) {
+  var y : u16 = 5 : u16;
+  x = 1;
+  return (x + y);
+}
+#+end_src
+
+#+begin_src termina
+match(expr){
+  case Some(x) => {
+    x = x + 1; return(x);
+  };
+  case None => {return(42);}
+}
+#+end_src
+
+Same goes for pattern matching bindings.

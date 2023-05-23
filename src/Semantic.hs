@@ -327,7 +327,25 @@ casteableTys a b           = sameTy a b
 
 expressionType :: SemMonad m => Expression SemAnn -> m Type
 expressionType (Variable a) =
-  -- Check if it is a local variable
+  -- | Check if it is a local variable. And its typing rule
+  {-
+\[
+\begin{array}{c}
+\inferce[evarG]
+{ (x, \tau) \in G}
+% ----------------------------------------
+{G, L, RO \vdash x : \tau}\\
+\inferce[evarL]
+{ (x, \tau) \in L}
+% ----------------------------------------
+{G, L, RO \vdash x : \tau}\\
+\inferce[evarRO]
+{ (x, \tau) \in RO}
+% ----------------------------------------
+{G, L, RO \vdash x : \tau}
+\end{array}
+\]
+-}
   gets local >>= \locals ->
   case M.lookup a locals of
     Just t -> return t
@@ -336,22 +354,82 @@ expressionType (Variable a) =
         Just (GGlob gvars) -> return (getTySemGlobal gvars)
         _                  -> throwError ENotVar
 expressionType (Constant c) =
+  -- | Constants
+  {-
+\[
+\begin{array}{c}
+\inference[econstTrue]
+% ----------------------------------------
+{ \_ \vdash true : \mathsf{Bool}}\\
+\inference[econstFalse]
+% ----------------------------------------
+{ \_ \vdash false : \mathsf{Bool}}\\
+\inference[econstIntX]
+{n \in \mathsf{IntX}}
+% ----------------------------------------
+{\_ \vdash n : \mathsf{IntX}}\\
+\inference[econstC]
+% ----------------------------------------
+{ \_ \vdash c : \mathsf{Char}}
+\end{array}
+\]
+-}
   case c of
     B b -> return Bool
     I tyI i ->
-      -- Q8
+      -- DONE Q8
       if numTy tyI then return tyI else throwError (ENumTs [tyI])
     C c -> return Char
 
-expressionType (Casting e nty) = expressionType e >>= \ety ->
-  if casteableTys ety nty then return nty else throwError (ECasteable ety nty)
+expressionType (Casting e nty) =
+  -- | Casting Expressions.
+  {-
+\[
+\inference[eCast]
+{E \vdash e : \tau \\ \tau \subseteq \theta}
+% ----------------------------------------
+{ E \vdash e as \theta : \theta}
+\]
+-}
+  expressionType e >>= \ety ->
+  if casteableTys ety nty -- ety \subseteq nty
+  then return nty else throwError (ECasteable ety nty)
 expressionType (BinOp op le re) = do
+  -- | Binary operation typings
+  {-
+\[
+\inference[eBOps]{
+  E \vdash e_1 : \theta_1 \\
+  E \vdash e_2 : \theta_2 \\
+  Type(\oplus)(\theta_1,\theta_2) = \tau \\
+}
+% ----------------------------------------
+{ E \vdash e_1 \oplus e_2 : \tau}
+\]
+-}
   tyle <- expressionType le
   tyre <- expressionType re
   typeOfOps op tyle tyre
-expressionType (ReferenceExpression e) = Reference <$> expressionType e
+expressionType (ReferenceExpression e) =
+  -- | Reference Expression
+  -- TODO [Q15]
+  Reference <$> expressionType e
 -- Function call?
 expressionType (FunctionExpression fun_name args) =
+  -- | Function Expression.  A tradicional function call
+  {-
+\[
+\inference[eFuncCall]{
+  (f, \texttt{Func}(\mathsf{Args}, \tau)) \in G \\
+  (a_1, \tau_1) \in G \cup L \cup RO \\
+  \ldots \\
+  (a_n, \tau_n) \in G \cup L \cup RO \\
+  (\tau_1, \ldots, \tau_n) \in Args \\
+}
+% ----------------------------------------
+{ G,L,RO \vdash f(a_1, \ldots, a_n) : \tau}
+\]
+-}
    gets global >>= \glbs ->
     case M.lookup fun_name glbs of
       Just (GFun (SFunction pTy retTy _anns)) ->
@@ -359,6 +437,31 @@ expressionType (FunctionExpression fun_name args) =
       Just ge -> throwError (ENotFoundFun fun_name ge)
       Nothing ->  throwError (ENotAFun fun_name)
 expressionType (FieldValuesAssignmentsExpression id_ty fs) =
+  -- | Field Type
+  {-
+\[
+\begin{array}{c}
+\inference[eStruct]
+{
+  (\mathsf{RcTy}, \texttt{Struct}(\mathsf{Fields})) \in G \\
+  (r_i, \tau_i) \in \mathsf{Fields}, i \in [1, \ldots, n] \\
+  \mathsf{Fields} \setminus \{r_1, \ldots, r_n \} = \emptyset \\
+  G , L , RO \vdash e_i : \tau_i,  i \in [1, \ldots, n]
+}
+% ----------------------------------------
+{ G, L , RO \vdash  \mathsf{RcTy} \{ r_1 = e_1 , \ldots , r_n = e_n \} : \mathsf{RcTy}}\\
+\inference[eUnion]
+{
+  (\mathsf{UnionTy}, \texttt{Union}(\mathsf{Fields})) \in G \\
+  (r_i, \tau_i) \in \mathsf{Fields}, i \in [1, \ldots, n] \\
+  \mathsf{Fields} \setminus \{r_1, \ldots, r_n \} = \emptyset \\
+  G , L , RO \vdash e_i : \tau_i,  i \in [1, \ldots, n]
+}
+% ----------------------------------------
+{ G, L , RO \vdash  \mathsf{UnionTy} \{ r_1 = e_1 , \ldots , r_n = e_n \} : \mathsf{UnionTy}}\\
+\end{array}
+\]
+-}
   getNameTy id_ty >>= \case {
    Struct _ ty_fs _ann ->
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
@@ -367,6 +470,18 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs) =
    _ -> throwError (ETyNotStruct id_ty);
   }
 expressionType (VectorIndexExpression vec_exp index_exp) =
+  -- | VectorIndex.
+  {-
+\[
+\inference[eVectorIndex]
+{ G, L, RO \vdash v : \mathsf{Vector}(\tau) \\
+  G, L, RO \vdash e : \theta \\
+  \mathsf{Index}(\theta)
+}
+% ----------------------------------------
+{ G, L, RO \vdash v[e] : \tau}
+\]
+-}
   expressionType vec_exp >>= \case {
     Vector ty_elems _vexp ->
         expressionType index_exp >>= \ity ->
@@ -375,17 +490,47 @@ expressionType (VectorIndexExpression vec_exp index_exp) =
     ;
     ty -> throwError (EVector ty);
                                    }
--- Q4
+-- IDEA Q4
 expressionType (VectorInitExpression iexp lexp@(Constant c)) = do
+-- | Vector Initialization
+{-
+\inference[eVecInit]
+{
+G, L, RO \vdash e : \tau \\
+c \in Ty \\ TODO Q16
+}
+% ----------------------------------------
+{G , L , RO \vdash [ e ; c : Ty ] : \mathsf{Vector}(\tau, c)}
+-}
   init_ty <- expressionType iexp
   len_ty <- expressionType lexp
   if numTy len_ty
   then Vector init_ty . K <$> getIntConst c
--- getIntConst c >>= return . Vector init_ty . K
   else throwError (ENumTs [len_ty])
 expressionType (VectorInitExpression _ lexp) = throwError (EVectorConst lexp)
--- [Q5]
+-- DONE [Q5]
+-- TODO [Q17]
 expressionType (MatchExpression e cs) =
+  -- | Pattern Matching.
+  {-
+\[
+\begin{array}{c}
+\inference[OptionMatch]
+{ G, L, RO |- e : Option(\theta) \\
+  G, L, RO |- e_2 : \tau \\
+  G, L \cup \{(x, \theta)\}, RO |- e_1 : \tau \\
+}
+% ----------------------------------------
+{ G,L,RO |- match(e){case Some(x) => e_1; case None => e_2 } : \tau}\\
+\inference[GenMatch]
+{ G,L,RO |- e : \mathsf{Enum}(\overline{cs}) \\
+  G,L \cup \{(\overline{c_i} \cdot \overline{\tau_i})\},RO |- e_i : \tau (C_i, \overline{\tau_i}) \in \overline{cs}\\
+  \overline{cs} \setminus \{ C_1, \ldots, C_n \} = \emptyset
+}
+{ G,L,RO |- match(e){case C_1(\overline{c_1}) => e_1; ... ; case C_n(\overline{c_n}) => e_n } : \tau}
+\end{array}
+\]
+-}
   expressionType e >>= \case {
   -- Base Types PM
    Option pty     -> pmOption pty cs;
