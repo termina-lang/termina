@@ -8,6 +8,8 @@ stack run -- --print --output=examples/res.c examples/datadefs.fin
 
 * Meta TODOs!
 ** TODO Haddock include semantics package?
+** TODO Typing rules .tex
+
 * List of TODOs!
 ** DONE Create Project
 ** DONE First AST (Annotated AST)
@@ -130,8 +132,9 @@ Classic PM, not almighty racket.
 ** TODO [Q9] What's the type of an empty return? Unit? Unit is not part of our types.
 I think we should added or we wont have procedures.
 In that case we also should add value ~()~.
-** TODO [Q11] Only correct breaks.
+** DONE [Q11] Only correct breaks. Break no more.
 Implement stack another check.
+
 ** TODO [Q10] Assignment expressions lhs is an expression?
 
 #+begin_src haskell
@@ -226,3 +229,10 @@ match(expr){
 #+end_src
 
 Same goes for pattern matching bindings.
+
+** TODO Q18 Types accepting default values.
+Ground types do not have default values
+Maybe that's enough.
+
+** TODO Q19 We can only change local variable values.
+Can we assign something to a global variable? I don't think so.

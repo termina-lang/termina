@@ -625,29 +625,91 @@ blockType :: SemMonad m => Block SemAnn -> m ()
 blockType = mapM_ statementTySimple
 
 -- | Type checking statements. We should do something about Break
+-- Rules here are just environment control.
 statementTySimple :: SemMonad m => Statement SemAnn -> m ()
 -- Declaration semantic analysis
 statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
+{-
+\[
+\inference[varDecDef]
+{ x \notin G \cup L \cup RO % No shadow binding
+  \mathsf{Default}(\tau) % \tau accepts default value? TODO Q18
+}
+% ----------------------------------------
+{G, L, RO |- \texttt{var} x : \tau  \leadsto G,L \cup \{(x,\tau)\}, RO}
+\]
+-}
   addVars[(lhs_id, lhs_type)]
 statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
+{-
+\[
+\inference[varDecVal]
+{ x \notin G \cup L \cup RO % No shadow binding
+  G, L, RO |- e : \tau \\
+}
+% ----------------------------------------
+{ (G, L, RO) \{ \texttt{var} x : \tau = e \}(G,L \cup \{(x,\tau)\}, RO)}
+\]
+-}
   ((lhs_type =?=) =<<) (expressionType expr) >>
   addVars [(lhs_id,lhs_type)]
 statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
+{- TODO Q19
+\[
+\inference[assign]
+{ (x, \tau) \in L \\
+  G, L, RO |- e : \tau
+}
+% ----------------------------------------
+{(G, L, RO) \{x = e\} (G,L \cup \{(x,\tau)\}, RO)}
+\]
+-}
   void $ join $ (=?=) <$> getDefinedVarTy lhs_id <*> expressionType rhs_expr
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
+{-
+\[
+\inference[ifElse]
+{  G, L, RO |- e : \mathsf{Bool} \\
+  {G, L, RO} \{ b_{tt} \} {G, L, RO} \\
+  {G, L, RO} \{ b_{ff} \} {G, L, RO} \\
+}
+% ----------------------------------------
+{(G, L, RO) \{ \texttt{if} (e) \{ b_{tt} \} \texttt{else} \{ b_{ff}\}  \} (G,L,RO)}
+\]
+-}
   let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   mapM_ (join . ((Bool =?=) <$>) . expressionType) (cond_expr : cs) >>
   mapM_ (localScope . blockType) ([tt_branch] ++ bds ++ [otherwise_branch])
 -- Here we could implement some abstract interpretation analysis
 statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
+{-
+\[
+\inference[forLoop]
+{ G, L, RO |- e_{l} : \tau  \\
+  G, L, RO |- e_{u} : \tau \\
+  \mathsf{NumTy}(\tau) \\
+  \llbraces e_{l} \rrbraces \leq \llbraces e_{u} \rrbraces \\
+  {G, L, RO \cup \{(i, \tau)\}} \{ b_{body} \} {G, L, RO \cup \{(i, \tau)\}}
+}
+% ----------------------------------------
+{(G, L, RO) \{ \texttt{for} i \texttt{in} e_{l} e_{u} { \mathsf{body} } \} (G,L,RO)}
+\]
+-}
   from_ty <- expressionType from_expr
   to_ty <- expressionType to_expr
   if sameNumTy from_ty to_ty
   then addTempVars [(it_id,from_ty)] (blockType body_stmt)
   else throwError EBadRange
-statementTySimple (SingleExpStmt expr _anns) = void $ expressionType expr
--- Break is not handled right now, but may do something. Stack of breaking points.
-statementTySimple (Break _anns) = return () -- See Q11
+statementTySimple (SingleExpStmt expr _anns) =
+{-
+\[
+\inference[singleExp]
+{ G, L, RO |- e : \tau  \\}
+% ----------------------------------------
+{(G, L, RO) \{ e \} (G,L,RO)}
+\]
+-}
+  void $ expressionType expr
 
 ----------------------------------------
 -- Programs Semantic Analyzer
