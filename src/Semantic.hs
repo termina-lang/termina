@@ -145,6 +145,10 @@ data Errors
   | EMCEmpty
   -- | ForLoop
   | EBadRange
+  -- | Static not literal constant
+  | EStaticK
+  -- | Defined GEntry
+  | EDefinedGEntry GEntry
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
@@ -708,60 +712,93 @@ statementTySimple (SingleExpStmt expr _anns) =
 % ----------------------------------------
 {(G, L, RO) \{ e \} (G,L,RO)}
 \]
--}
-  void $ expressionType expr
+-} void $ expressionType expr
 
 ----------------------------------------
 -- Programs Semantic Analyzer
 -- For now all are kinda the same thing but eventually they should not :shrug:
 ----------------------------------------
+-- TODO : Rewrite this last part.
+-- We do not need a local environment here. Take it out.
+
 -- Task Semantic Analyzer
 taskSemAnalyzer :: SemMonad m
   => [Parameter SemAnn] -> TypeSpecifier SemAnn
-  -> BlockRet SemAnn -> [SemAnn] -> m Type
-taskSemAnalyzer taskPs taskRetType taskBody _anns =
-  addTempVars -- | Add
-    (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) taskPs)
+  -> BlockRet SemAnn -> [SemAnn] -> m SemTask
+taskSemAnalyzer taskPs taskRetType taskBody anns =
+  -- | Add
+  addTempVars
     -- | list of variables
-    ((taskRetType =?=) =<< (retblockType taskBody))
+    (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) taskPs)
     -- | analyze the body and check the returining type
+    ((taskRetType =?=) =<< (retblockType taskBody))
+  >> return (STask taskPs taskRetType anns)
 
 -- Function Semantic Analyzer
 functionSemAnalyzer :: SemMonad m
- => [Parameter SemAnn] -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> [ SemAnn ] -> m Type
-functionSemAnalyzer funPS mbfunRetTy funBody _anns =
-  addTempVars -- | Add scoped variables
+ => [Parameter SemAnn] -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemFunction
+functionSemAnalyzer funPS mbfunRetTy funBody anns =
+  (-- | Add scoped variables Q17
+  addTempVars
   (fmap (\ p -> (paramIdentifier p , paramTypeSpecifier p)) funPS)
   $ -- within the scope + parameters, check body type
   case mbfunRetTy of
     -- [Q12] Do we accept procedures?
-    Nothing    -> _VoidTy
-    Just retTy -> (retTy =?=) =<< (retblockType funBody)
+    Nothing    -> return Unit
+    Just retTy -> (retTy =?=) =<< (retblockType funBody)) >>= \ty -> return (SFunction funPS ty anns)
 
 -- Handler Semantic Analyzer (Template)
 handlerSemAnalyzer :: SemMonad m =>
-  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m Type
-handlerSemAnalyzer hanPS hanType hanBody _anns =
-  addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
-  $
-  (hanType =?=) =<< (retblockType hanBody)
+  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemHandler
+handlerSemAnalyzer hanPS hanType hanBody anns =
+  (addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
+              $ (hanType =?=) =<< (retblockType hanBody)) >>=
+  \ty -> return (SemHandler hanPS ty anns)
+
 
 -- Keeping only type information
-globalCheck :: SemMonad m => Global SemAnn -> m SemGlobal
-globalCheck (Volatile ident ty addr anns) = return (SVolatile ty anns)
--- [Q13]
-globalCheck (Static ident ty (Just (Constant _Address)) anns) = _returnStatic
-globalCheck (Static _ _ _ _) = _Static
+globalCheck :: SemMonad m => Global SemAnn -> m (Identifier, SemGlobal)
+globalCheck (Volatile ident ty addr anns) = return (ident, SVolatile ty anns)
+-- DONE [Q13]
+globalCheck (Static ident ty (Just (Constant _Address)) anns) = return $ (ident , SStatic ty anns)
+globalCheck (Static _ _ _ _) = throwError EStaticK
 --
 globalCheck (Shared ident ty mexpr anns) =
   case mexpr of
+    -- If it has an initial value great
     Just expr -> do
       eTy  <- expressionType expr
       _ <- ty =?= eTy
-      return (SShared ty anns)
-    Nothing -> _SharedNoExpr
+      return (ident ,SShared ty anns)
+    -- If it has not, we need to check for defaults.
+    Nothing -> return (ident, SShared ty anns)
 -- TODO [Q14]
 globalCheck (Const ident ty expr anns) = do
       eTy  <- expressionType expr
       _ <- ty =?= eTy
-      return (SConst ty anns)
+      return (ident , SConst ty anns)
+
+-- Global Helpers
+-- | Add global member if it doesn't exists
+addGlobal :: SemMonad m => Identifier -> GEntry -> m ()
+addGlobal ident gentry =
+  -- | Lookup if |ident| is already in global map
+  ((M.lookup ident) <$> (gets global)) >>=
+  maybe
+    -- | If it is not par of the global map
+    (modify (\s -> s{global = M.insert ident gentry (global s)}))
+    -- | If it is defined
+    (const $ throwError $ EDefinedGEntry gentry)
+
+-- Here we actually only need Global
+programSeman :: SemMonad m => AnnASTElement SemAnn -> m ()
+programSeman (Task ident ps ty bret anns) =
+  addGlobal ident . GTask =<< taskSemAnalyzer ps ty bret anns
+programSeman (Function ident ps mty bret anns) =
+  addGlobal ident . GFun =<< functionSemAnalyzer ps mty bret anns
+programSeman (Handler ident ps ty bret anns) =
+  addGlobal ident . GHand =<< handlerSemAnalyzer ps ty bret anns
+programSeman (GlobalDeclaration gbl) =
+  (uncurry addGlobal) =<< ((\(nn,gg) -> (nn, GGlob gg)) <$> globalCheck gbl)
+programSeman (TypeDefinition tydef) = _TypeDefinition
+programSeman (ModuleInclusion ident anns) = _ModuleInclusion

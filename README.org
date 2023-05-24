@@ -236,3 +236,5 @@ Maybe that's enough.
 
 ** TODO Q19 We can only change local variable values.
 Can we assign something to a global variable? I don't think so.
+
+** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
