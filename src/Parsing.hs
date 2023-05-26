@@ -15,10 +15,15 @@ import qualified Text.Parsec.Expr as Ex
 
 import Data.Functor
 
--- | This is what we will build in this section
-data Annotation =
-    Position SourcePos
-  | Attribute Identifier (Maybe (Expression Annotation))
+{- | Type of the parsing annotations
+
+This type is used to identify the annotations made on the different 
+elements of the AST. In this case, the annotations will only include 
+the position in the source file where the element is located.
+
+-} 
+newtype Annotation = 
+  Position SourcePos -- ^ Source code position
   deriving Show
 
 ----------------------------------------
@@ -44,7 +49,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Declarations
       ["task","function","handler", "at"]
       ++ -- Stmt
-      ["var", "match", "for", "if", "else", "return", "break"]
+      ["var", "match", "for", "if", "else", "return", "while"]
       ++ -- Constants
       ["true","false"]
       ++ -- Modules
@@ -174,9 +179,25 @@ fieldValuesAssignExpressionParser =
     )
   comma)
 
-attributeParser :: Parser Annotation
-attributeParser =
-  reservedOp "#" >> brackets (Attribute <$> identifierParser <*> optionMaybe (parens expressionParser))
+-- | Parser for an element modifier
+-- A modifier is of the form:
+-- #[identifier(expression)]
+-- where:
+-- - identifier: is a mandatory identifier that names the attribute or modifier
+-- - expresssion: is an optional expression between parenthesis.AST
+-- Examples of a modifier:
+-- #[priority(5)] for a task
+-- #[packed] for a struct or union
+
+modifierParser :: Parser (Modifier Annotation)
+modifierParser = do
+  p <- getPosition
+  _ <- reservedOp "#" 
+  _ <- reservedOp "["
+  identifier <- identifierParser
+  initializer <- optionMaybe (parens constExprParser')
+  _ <- reservedOp "]"
+  return $ Modifier identifier (KC <$> initializer) (Position p)
 
 msgQueueParser :: Parser (TypeSpecifier Annotation)
 msgQueueParser = do
@@ -300,7 +321,7 @@ blockParser = BlockRet <$> many blockItemParser <*> returnStmtParser
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
 taskParser :: Parser (AnnASTElement Annotation)
 taskParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "task"
   name <- identifierParser
@@ -308,11 +329,11 @@ taskParser = do
   reservedOp "->"
   typeSpec <- typeSpecifierParser
   blockRet <- braces blockParser
-  return $ Task name params typeSpec blockRet (Position p : attributes)
+  return $ Task name params typeSpec blockRet modifiers (Position p)
 
 handlerParser :: Parser (AnnASTElement Annotation)
 handlerParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "handler"
   name <- identifierParser
@@ -320,28 +341,20 @@ handlerParser = do
   reservedOp "->"
   typeSpec <- typeSpecifierParser
   blockRet <- braces blockParser
-  return $ Handler name params typeSpec blockRet (Position p : attributes)
+  return $ Handler name params typeSpec blockRet modifiers (Position p)
 
-returnStmtParser :: Parser (ReturnDef Annotation)
+returnStmtParser :: Parser (ReturnStmt Annotation)
 returnStmtParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
   _ <- semi
-  return (ret, Position p : attributes)
-
-breakStmtParser :: Parser (Statement Annotation)
-breakStmtParser = do
-  attributes <- many attributeParser
-  p <- getPosition
-  _ <- reserved "break"
-  _ <- semi
-  return $ Break (Position p : attributes)
+  return $ ReturnStmt ret modifiers (Position p)
 
 functionParser :: Parser (AnnASTElement Annotation)
 functionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "fn"
   name <- identifierParser
@@ -350,19 +363,19 @@ functionParser = do
     reservedOp "->"
     typeSpecifierParser)
   blockRet <- braces blockParser
-  return $ Function name params typeSpec blockRet (Position p : attributes)
+  return $ Function name params typeSpec blockRet modifiers (Position p)
 
 moduleInclusionParser :: Parser (AnnASTElement Annotation)
 moduleInclusionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "mod"
   name <- identifierParser
   _ <- semi
-  return $ ModuleInclusion name (Position p : attributes)
+  return $ ModuleInclusion name modifiers (Position p)
 
-constExprParser :: Parser (Expression Annotation)
-constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
+constExprParser' :: Parser (Const Annotation)
+constExprParser' = parseLitInt <|> parseLitBool <|> parseLitChar
   where
     parseLitInt =
       do
@@ -372,11 +385,14 @@ constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
+    
+constExprParser :: Parser (Expression Annotation)
+constExprParser = Constant <$> constExprParser'
     -- parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
 declarationParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "var"
   name <- identifierParser
@@ -386,44 +402,43 @@ declarationParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Declaration name ty initializer (Position p : attributes)
+  return $ Declaration name ty initializer modifiers (Position p)
 
 singleExprStmtParser :: Parser (Statement Annotation)
 singleExprStmtParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   expression <- expressionParser
   _ <- semi
-  return $ SingleExpStmt expression (Position p : attributes)
+  return $ SingleExpStmt expression modifiers (Position p)
 
 blockItemParser :: Parser (Statement Annotation)
 blockItemParser = try ifElseIfStmtParser
   <|> try declarationParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
-  <|> breakStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   lval <- identifierParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi
-  return $ AssignmentStmt lval rval (Position p : attributes)
+  return $ AssignmentStmt lval rval modifiers (Position p)
 
 matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "case"
   cons <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   blockRet <- braces blockParser
-  return $ MatchCase cons args blockRet (Position p : attributes)
+  return $ MatchCase cons args blockRet modifiers (Position p)
 
 matchExpressionParser :: Parser (Expression Annotation)
 matchExpressionParser = do
@@ -434,17 +449,17 @@ matchExpressionParser = do
 
 elseIfParser :: Parser (ElseIf Annotation)
 elseIfParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "else"
   _ <- reserved "if"
   expression <- expressionParser
   compound <- braces $ many blockItemParser
-  return $ ElseIf expression compound (Position p : attributes)
+  return $ ElseIf expression compound modifiers (Position p)
 
 ifElseIfStmtParser :: Parser (Statement Annotation)
 ifElseIfStmtParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "if"
   expression <- expressionParser
@@ -453,11 +468,11 @@ ifElseIfStmtParser = do
   elseCompound <- option [] (do
     _ <- reserved "else"
     braces $ many $ try blockItemParser)
-  return $ IfElseStmt expression ifCompound elseIfs elseCompound  (Position p : attributes)
+  return $ IfElseStmt expression ifCompound elseIfs elseCompound modifiers (Position p)
 
 forLoopStmtParser :: Parser (Statement Annotation)
 forLoopStmtParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "for"
   identifier <- identifierParser
@@ -465,12 +480,15 @@ forLoopStmtParser = do
   start <- expressionParser
   _ <- reservedOp ".."
   end <- expressionParser
+  breakCondition <- optionMaybe (do
+    reserved "while"
+    expressionParser)
   compound <- braces $ many blockItemParser
-  return $ ForLoopStmt identifier start end compound (Position p : attributes)
+  return $ ForLoopStmt identifier start end breakCondition compound modifiers (Position p)
 
 volatileDeclParser :: Parser (Global Annotation)
 volatileDeclParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "volatile"
   identifier <- identifierParser
@@ -481,11 +499,11 @@ volatileDeclParser = do
   -- https://hackage.haskell.org/package/parsec-3.1.15.1/docs/Text-Parsec-Token.html
   addr <- hexa
   _ <- semi
-  return $ Volatile identifier typeSpecifier addr (Position p : attributes)
+  return $ Volatile identifier typeSpecifier addr modifiers (Position p)
 
 staticDeclParser :: Parser (Global Annotation)
 staticDeclParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "static"
   identifier <- identifierParser
@@ -495,11 +513,11 @@ staticDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Static identifier typeSpecifier initializer (Position p : attributes)
+  return $ Static identifier typeSpecifier initializer modifiers (Position p)
 
 protectedDeclParser :: Parser (Global Annotation)
 protectedDeclParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "protected"
   identifier <- identifierParser
@@ -509,11 +527,11 @@ protectedDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Shared identifier typeSpecifier initializer (Position p : attributes)
+  return $ Shared identifier typeSpecifier initializer modifiers (Position p)
 
 constDeclParser :: Parser (Global Annotation)
 constDeclParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "const"
   identifier <- identifierParser
@@ -522,7 +540,7 @@ constDeclParser = do
   _ <- reservedOp "="
   initializer <- expressionParser
   _ <- semi
-  return $ Const identifier typeSpecifier initializer (Position p : attributes)
+  return $ Const identifier typeSpecifier initializer modifiers (Position p)
 
 globalDeclParser :: Parser (AnnASTElement Annotation)
 globalDeclParser = do
@@ -539,35 +557,32 @@ fieldDefinitionParser = do
   identifier <- identifierParser
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
-  initializer <- optionMaybe (do
-    reservedOp "="
-    expressionParser)
   _ <- semi
-  return $ FieldDefinition identifier typeSpecifier initializer
+  return $ FieldDefinition identifier typeSpecifier
 
 structDefinitionParser :: Parser (TypeDef Annotation)
 structDefinitionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "struct"
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ Struct identifier fields (Position p : attributes)
+  return $ Struct identifier fields modifiers (Position p)
 
 unionDefinitionParser :: Parser (TypeDef Annotation)
 unionDefinitionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "union"
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ Union identifier fields (Position p : attributes)
+  return $ Union identifier fields modifiers (Position p)
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   identifier <- identifierParser
   _ <- reservedOp ":"
@@ -576,11 +591,11 @@ classFieldDefinitionParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ ClassField identifier typeSpecifier initializer (Position p : attributes)
+  return $ ClassField identifier typeSpecifier initializer modifiers (Position p)
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "fn"
   name <- identifierParser
@@ -592,32 +607,32 @@ classMethodParser = do
   body <- many blockItemParser
   ret <- returnStmtParser
   reservedOp "}"
-  return $ ClassMethod name params typeSpec (BlockRet body ret) (Position p : attributes)
+  return $ ClassMethod name params typeSpec (BlockRet body ret) modifiers (Position p)
 
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "class"
   identifier <- identifierParser
   fields <- braces (many1 $ try classFieldDefinitionParser <|> classMethodParser)
   _ <- semi
-  return $ Class identifier fields (Position p : attributes)
+  return $ Class identifier fields modifiers (Position p)
 
 variantDefinitionParser :: Parser (EnumVariant Annotation)
-variantDefinitionParser = identifierParser >>= \ identifier ->
+variantDefinitionParser = identifierParser >>= \identifier ->
   try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
   <|> return (EnumVariant identifier [])
 
 enumDefinitionParser :: Parser (TypeDef Annotation)
 enumDefinitionParser = do
-  attributes <- many attributeParser
+  modifiers <- many modifierParser
   p <- getPosition
   reserved "enum"
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
   _ <- semi
-  return $ Enum identifier variants (Position p : attributes)
+  return $ Enum identifier variants modifiers (Position p)
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
