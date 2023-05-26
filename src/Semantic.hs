@@ -32,7 +32,7 @@ type Type = TypeSpecifier SemAnn
 data SemTask' a = STask
   { taskArgs :: [Parameter a]
   , taskRet  :: TypeSpecifier a
-  , taskAnns :: [ a ]
+  , taskAnns :: a
   }
   deriving Show
 
@@ -44,7 +44,7 @@ type SemTask = SemTask' SemAnn
 data SemFunction' a = SFunction
   { funArgs :: [Parameter a]
   , funRet  :: TypeSpecifier a
-  , funAnns :: [ a ]
+  , funAnns :: a
   }
   deriving Show
 
@@ -56,7 +56,7 @@ type SemFunction = SemFunction' SemAnn
 data SemHandler' a = SemHandler
   { handlerArgs :: [Parameter a]
   , handlerRet  :: TypeSpecifier a
-  , handlerAnns :: [ a ]
+  , handlerAnns :: a
   }
   deriving Show
 
@@ -66,19 +66,19 @@ type SemHandler = SemHandler' SemAnn
 ----------------------------------------
 
 data SemGlobal' a
-  = SVolatile (TypeSpecifier a) [ a ]
-  | SStatic (TypeSpecifier a) [ a ]
-  | SShared (TypeSpecifier a) [ a ]
-  | SConst (TypeSpecifier a) [ a ]
+  = SVolatile (TypeSpecifier a) a
+  | SStatic (TypeSpecifier a) a
+  | SShared (TypeSpecifier a) a
+  | SConst (TypeSpecifier a) a
   deriving Show
 
 type SemGlobal = SemGlobal' SemAnn
 
 getTySemGlobal :: SemGlobal -> Type
-getTySemGlobal (SVolatile ty _)  = ty
-getTySemGlobal (SStatic ty _)    = ty
-getTySemGlobal (SShared ty _) = ty
-getTySemGlobal (SConst ty _)     = ty
+getTySemGlobal (SVolatile ty _) = ty
+getTySemGlobal (SStatic ty _)   = ty
+getTySemGlobal (SShared ty _)   = ty
+getTySemGlobal (SConst ty _)    = ty
 
 --
 
@@ -144,7 +144,8 @@ data Errors
   | EMCMissingArgs [TypeSpecifier SemAnn]
   | EMCEmpty
   -- | ForLoop
-  | EBadRange
+  | EBadRange -- ^ Range conditions are not met
+  | EForWhileTy Type -- ^ Type of while is not Bool
   -- | Static not literal constant
   | EStaticK
   -- | Defined GEntry
@@ -164,11 +165,11 @@ type ROEnv = Map Identifier Type
 
 data StateAnalyzer
  = StateAnalyzer
- { global :: GlobalEnv
+ {
+   global :: GlobalEnv
  , local  :: LocalEnv
- , ro :: ROEnv
- }
-
+ , ro     :: ROEnv
+}
 -- | Shortcut: Our Semantic monad is just State + Errors
 class (MonadState StateAnalyzer m, MonadError Errors m) => SemMonad m where
 
@@ -183,8 +184,8 @@ getNameTy tid = gets global >>=
 -- | From a global name get enum variations
 getEnumTy :: SemMonad m => Identifier -> m [EnumVariant SemAnn]
 getEnumTy tid = getNameTy tid >>= \case
-  Enum _ fs _a -> return fs
-  ty           -> throwError (EMismatchIdNotEnum tid ty)
+  Enum _ fs _mods _anns -> return fs
+  ty                    -> throwError (EMismatchIdNotEnum tid ty)
 
 -- | Execute computation |comp| in a temporal state |tempState| wihtout
 -- modifying current state.
@@ -467,9 +468,9 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs) =
 \]
 -}
   getNameTy id_ty >>= \case {
-   Struct _ ty_fs _ann ->
+   Struct _ ty_fs _mods _ann ->
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
-   Union _ ty_fs _ann ->
+   Union _ ty_fs _mods _ann ->
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
    _ -> throwError (ETyNotStruct id_ty);
   }
@@ -603,7 +604,7 @@ pmOption _ [_]       = throwError EPMMissingOption1
 pmOption _ _ = throwError EPMMoreOptions
 
 checkFieldValue :: SemMonad m => FieldDefinition SemAnn -> FieldValueAssignment SemAnn  -> m ()
-checkFieldValue (FieldDefinition fid fty _) (FieldValueAssignment faid faexp) =
+checkFieldValue (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then expressionType faexp >>= void . (fty =?=)
   else throwError (EFieldMissing [fid])
@@ -620,7 +621,7 @@ checkFieldValues fds fas = checkSortedFields sorted_fds sorted_fas
       checkFieldValue d a >> checkSortedFields ds as
 
 retblockType :: SemMonad m => BlockRet SemAnn -> m Type
-retblockType (BlockRet bbody (mret, _anns)) =
+retblockType (BlockRet bbody (ReturnStmt mret _mods _anns)) =
   -- Blocks should have their own scope.
   blockType bbody
   >> maybe (return Unit) expressionType mret
@@ -632,7 +633,7 @@ blockType = mapM_ statementTySimple
 -- Rules here are just environment control.
 statementTySimple :: SemMonad m => Statement SemAnn -> m ()
 -- Declaration semantic analysis
-statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
+statementTySimple (Declaration lhs_id lhs_type Nothing _mods _anns) =
 {-
 \[
 \inference[varDecDef]
@@ -644,7 +645,7 @@ statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
 \]
 -}
   addVars[(lhs_id, lhs_type)]
-statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
+statementTySimple (Declaration lhs_id lhs_type (Just expr) _mods _anns) =
 {-
 \[
 \inference[varDecVal]
@@ -657,7 +658,7 @@ statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
 -}
   ((lhs_type =?=) =<<) (expressionType expr) >>
   addVars [(lhs_id,lhs_type)]
-statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
+statementTySimple (AssignmentStmt lhs_id rhs_expr _mods _anns) =
 {- TODO Q19
 \[
 \inference[assign]
@@ -669,7 +670,7 @@ statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
 \]
 -}
   void $ join $ (=?=) <$> getDefinedVarTy lhs_id <*> expressionType rhs_expr
-statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
+statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _mods _anns) =
 {-
 \[
 \inference[ifElse]
@@ -685,7 +686,7 @@ statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) 
   mapM_ (join . ((Bool =?=) <$>) . expressionType) (cond_expr : cs) >>
   mapM_ (localScope . blockType) ([tt_branch] ++ bds ++ [otherwise_branch])
 -- Here we could implement some abstract interpretation analysis
-statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
+statementTySimple (ForLoopStmt it_id from_expr to_expr Nothing body_stmt _mods _ann) = do
 {-
 \[
 \inference[forLoop]
@@ -704,7 +705,31 @@ statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
   if sameNumTy from_ty to_ty
   then addTempVars [(it_id,from_ty)] (blockType body_stmt)
   else throwError EBadRange
-statementTySimple (SingleExpStmt expr _anns) =
+statementTySimple (ForLoopStmt it_id from_expr to_expr (Just while) body_stmt _mods _ann) = do
+{-
+\[
+\inference[forLoop]
+{ G, L, RO |- e_{l} : \tau  \\
+  G, L, RO |- e_{u} : \tau \\
+  G, L, RO |- e_{w} : \mathsf{Bool} \\
+  \mathsf{NumTy}(\tau) \\
+  \llbraces e_{l} \rrbraces \leq \llbraces e_{u} \rrbraces \\
+  {G, L, RO \cup \{(i, \tau)\}} \{ b_{body} \} {G, L, RO \cup \{(i, \tau)\}}
+}
+% ----------------------------------------
+{(G, L, RO) \{ \texttt{for} i \texttt{in} e_{l} e_{u} \texttt{while} e_{w} { \mathsf{body} } \} (G,L,RO)}
+\]
+-}
+  from_ty <- expressionType from_expr
+  to_ty <- expressionType to_expr
+  while_ty <- expressionType while
+  if (sameTy Bool while_ty) then
+    if sameNumTy from_ty to_ty
+    then addTempVars [(it_id,from_ty)] (blockType body_stmt)
+    else throwError EBadRange
+  else throwError $ EForWhileTy while_ty
+
+statementTySimple (SingleExpStmt expr _mods _anns) =
 {-
 \[
 \inference[singleExp]
@@ -724,7 +749,7 @@ statementTySimple (SingleExpStmt expr _anns) =
 -- Task Semantic Analyzer
 taskSemAnalyzer :: SemMonad m
   => [Parameter SemAnn] -> TypeSpecifier SemAnn
-  -> BlockRet SemAnn -> [SemAnn] -> m SemTask
+  -> BlockRet SemAnn -> SemAnn -> m SemTask
 taskSemAnalyzer taskPs taskRetType taskBody anns =
   -- | Add
   addTempVars
@@ -735,8 +760,8 @@ taskSemAnalyzer taskPs taskRetType taskBody anns =
   >> return (STask taskPs taskRetType anns)
 
 -- Function Semantic Analyzer
-functionSemAnalyzer :: SemMonad m
- => [Parameter SemAnn] -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemFunction
+functionSemAnalyzer :: SemMonad m => [Parameter SemAnn]
+  -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> SemAnn -> m SemFunction
 functionSemAnalyzer funPS mbfunRetTy funBody anns =
   (-- | Add scoped variables Q17
   addTempVars
@@ -749,7 +774,7 @@ functionSemAnalyzer funPS mbfunRetTy funBody anns =
 
 -- Handler Semantic Analyzer (Template)
 handlerSemAnalyzer :: SemMonad m =>
-  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemHandler
+  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> SemAnn -> m SemHandler
 handlerSemAnalyzer hanPS hanType hanBody anns =
   (addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
               $ (hanType =?=) =<< (retblockType hanBody)) >>=
@@ -758,12 +783,12 @@ handlerSemAnalyzer hanPS hanType hanBody anns =
 
 -- Keeping only type information
 globalCheck :: SemMonad m => Global SemAnn -> m (Identifier, SemGlobal)
-globalCheck (Volatile ident ty addr anns) = return (ident, SVolatile ty anns)
+globalCheck (Volatile ident ty addr _mods anns) = return (ident, SVolatile ty anns)
 -- DONE [Q13]
-globalCheck (Static ident ty (Just (Constant _Address)) anns) = return $ (ident , SStatic ty anns)
-globalCheck (Static _ _ _ _) = throwError EStaticK
+globalCheck (Static ident ty (Just (Constant _Address)) _mods anns) = return $ (ident , SStatic ty anns)
+globalCheck (Static _ _ _ _ _) = throwError EStaticK
 --
-globalCheck (Shared ident ty mexpr anns) =
+globalCheck (Shared ident ty mexpr _mods anns) =
   case mexpr of
     -- If it has an initial value great
     Just expr -> do
@@ -773,7 +798,7 @@ globalCheck (Shared ident ty mexpr anns) =
     -- If it has not, we need to check for defaults.
     Nothing -> return (ident, SShared ty anns)
 -- TODO [Q14]
-globalCheck (Const ident ty expr anns) = do
+globalCheck (Const ident ty expr _mods anns) = do
       eTy  <- expressionType expr
       _ <- ty =?= eTy
       return (ident , SConst ty anns)
@@ -792,13 +817,13 @@ addGlobal ident gentry =
 
 -- Here we actually only need Global
 programSeman :: SemMonad m => AnnASTElement SemAnn -> m ()
-programSeman (Task ident ps ty bret anns) =
+programSeman (Task ident ps ty bret _mods anns) =
   addGlobal ident . GTask =<< taskSemAnalyzer ps ty bret anns
-programSeman (Function ident ps mty bret anns) =
+programSeman (Function ident ps mty bret _mods anns) =
   addGlobal ident . GFun =<< functionSemAnalyzer ps mty bret anns
-programSeman (Handler ident ps ty bret anns) =
+programSeman (Handler ident ps ty bret _mods anns) =
   addGlobal ident . GHand =<< handlerSemAnalyzer ps ty bret anns
 programSeman (GlobalDeclaration gbl) =
   (uncurry addGlobal) =<< ((\(nn,gg) -> (nn, GGlob gg)) <$> globalCheck gbl)
 programSeman (TypeDefinition tydef) = _TypeDefinition
-programSeman (ModuleInclusion ident anns) = _ModuleInclusion
+programSeman (ModuleInclusion ident _mods anns) = _ModuleInclusion

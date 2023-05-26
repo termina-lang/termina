@@ -3,9 +3,6 @@
 
 module AST where
 
-import           Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-
 data ReturnStmt a 
   = ReturnStmt
   { 
@@ -194,7 +191,7 @@ data Global a
     | Const 
       Identifier -- ^ name of the constant
       (TypeSpecifier a) -- ^ type of the constant
-      (Expression a) -- ^ initialization expression (optional)
+      (Expression a) -- ^ initialization expression
       [ Modifier a ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
