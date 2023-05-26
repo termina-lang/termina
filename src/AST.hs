@@ -69,10 +69,13 @@ data AnnASTElement a =
 
   deriving (Show,Functor)
 
+newtype ConstExpression a = KC (Const a)
+  deriving (Show,Functor)
+
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier a = Modifier Identifier (Maybe (Expression a)) a
+data Modifier a = Modifier Identifier (Maybe (ConstExpression a)) a
   deriving (Show,Functor)
 
 -- | Identifiers as `String`

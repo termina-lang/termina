@@ -195,9 +195,9 @@ modifierParser = do
   _ <- reservedOp "#" 
   _ <- reservedOp "["
   identifier <- identifierParser
-  initializer <- optionMaybe (parens expressionParser)
+  initializer <- optionMaybe (parens constExprParser')
   _ <- reservedOp "]"
-  return $ Modifier identifier initializer (Position p)
+  return $ Modifier identifier (KC <$> initializer) (Position p)
 
 msgQueueParser :: Parser (TypeSpecifier Annotation)
 msgQueueParser = do
@@ -374,8 +374,8 @@ moduleInclusionParser = do
   _ <- semi
   return $ ModuleInclusion name modifiers (Position p)
 
-constExprParser :: Parser (Expression Annotation)
-constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
+constExprParser' :: Parser (Const Annotation)
+constExprParser' = parseLitInt <|> parseLitBool <|> parseLitChar
   where
     parseLitInt =
       do
@@ -385,6 +385,9 @@ constExprParser = Constant <$> (parseLitInt <|> parseLitBool <|> parseLitChar)
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
+    
+constExprParser :: Parser (Expression Annotation)
+constExprParser = Constant <$> constExprParser'
     -- parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
