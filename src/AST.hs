@@ -6,30 +6,81 @@ module AST where
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 
-type ReturnDef a = (Maybe (Expression a), [a])
+data ReturnStmt a 
+  = ReturnStmt
+  { 
+    returnExpression :: Maybe (Expression a)
+  , returnModifiers :: [Modifier a]
+  , returnAnnotation :: a
+  }
+  deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
 data BlockRet a
   = BlockRet
-  { blockBody :: [Statement a]
-  , blockRet  :: ReturnDef a
+  { 
+    blockBody :: [Statement a]
+  , blockRet  :: ReturnStmt a
   }
   deriving (Show, Functor)
 
--- | Annotated AST
-data AnnASTElement a
-  = Task Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]
-  | Function Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ a ]
-  | Handler Identifier [Parameter a] (TypeSpecifier a) (BlockRet a) [ a ]
-  | GlobalDeclaration (Global a)
-  | TypeDefinition (TypeDef a)
-  | ModuleInclusion Identifier [ a ]
+-- | Annotated AST element
+data AnnASTElement a =
+  -- | Task construtor
+  Task
+    Identifier -- ^ task identifier (name)
+    [Parameter a] -- ^ list of parameters (possibly empty)
+    (TypeSpecifier a) -- ^ returned value type (should be TaskRet)
+    (BlockRet a) -- ^ statements block
+    [ Modifier a ] -- ^ list of possible modifiers
+    a -- ^ transpiler annotations
+
+  -- | Function constructor
+  | Function 
+    Identifier -- ^ function identifier (name)
+    [Parameter a] -- ^ list of parameters (possibly empty)
+    (Maybe (TypeSpecifier a)) -- ^ type of the return value (optional)
+    (BlockRet a) -- ^ statements block (with return)
+    [ Modifier a ] -- ^ list of possible modifiers
+    a -- ^ transpiler annotations
+
+  -- | Handler constructor
+  | Handler
+    Identifier -- ^ Handler identifier (name)
+    [Parameter a] -- ^ list of parameters (TBC)
+    (TypeSpecifier a) -- ^ returned value type (should be Result)
+    (BlockRet a) -- ^ statements block (with return)
+    [ Modifier a ] -- ^ list of possible modifiers
+    a -- ^ transpiler annotations
+
+  -- | Global declaration constructor  
+  | GlobalDeclaration
+    (Global a) -- ^ the global object
+
+  -- | Type definition constructor
+  | TypeDefinition
+    (TypeDef a) -- ^ the type definition (struct, union, etc.)
+  
+  -- | Module inclusion constructor
+  | ModuleInclusion 
+    Identifier -- ^ identifier of the module
+    [ Modifier a ] -- ^ list of possible modifiers
+    a -- ^ transpiler annotations
+
+  deriving (Show,Functor)
+
+-- | Modifier data type
+-- Modifiers can be applied to different constructs. They must include
+-- an identifier and also may define an expression.
+data Modifier a = Modifier Identifier (Maybe (Expression a)) a
   deriving (Show,Functor)
 
 -- | Identifiers as `String`
 type Identifier = String
+
 -- | Addresses as `Integer`
 type Address = Integer
+
 -- | General type specifier
 data TypeSpecifier a
   = UInt8 | UInt16 | UInt32 | UInt64
@@ -63,7 +114,7 @@ groundTyEq  Bool  Bool = True
 groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  a  b = False
+groundTyEq  _ _ = False
 
 data Op
   = MemberAccess
@@ -88,6 +139,7 @@ data Op
 
 data OptBody a = None a | Some (Expression a) a
   deriving (Show, Functor)
+
 data Expression a
   = Variable Identifier
   | Constant (Const a)
@@ -108,29 +160,68 @@ data Expression a
 -- - volatile
 -- - static
 -- - shared
+-- - const
 data Global a
-  = Volatile Identifier (TypeSpecifier a) Address [ a ]
-  | Static Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | Shared Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | Const Identifier (TypeSpecifier a)  (Expression a) [ a ]
+  = 
+    -- | Volatile global variable constructor
+    Volatile 
+      Identifier -- ^ name of the variable
+      (TypeSpecifier a) -- ^ type of the variable
+      Address -- ^ address where the variable is located
+      [ Modifier a ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
+    -- | Static global variable constructor
+    | Static
+      Identifier -- ^ name of the variable
+      (TypeSpecifier a) -- ^ type of the variable
+      (Maybe (Expression a)) -- ^ initialization expression (optional)
+      [ Modifier a ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
+    -- | Shared global variable constructor
+    | Shared
+      Identifier -- ^ name of the variable
+      (TypeSpecifier a) -- ^ type of the variable
+      (Maybe (Expression a)) -- ^ initialization expression (optional)
+      [ Modifier a ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
+    -- | Constant constructor
+    | Const 
+      Identifier -- ^ name of the constant
+      (TypeSpecifier a) -- ^ type of the constant
+      (Expression a) -- ^ initialization expression (optional)
+      [ Modifier a ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
   deriving (Show, Functor)
 
 data TypeDef a
-  = Struct Identifier [FieldDefinition a]  [ a ]
-  | Union Identifier [FieldDefinition a] [ a ]
-  | Enum Identifier [EnumVariant a] [ a ]
-  | Class Identifier [ClassMember a] [ a ]
+  = Struct Identifier [FieldDefinition a]  [ Modifier a ] a
+  | Union Identifier [FieldDefinition a] [ Modifier a ] a
+  | Enum Identifier [EnumVariant a] [ Modifier a ] a
+  | Class Identifier [ClassMember a] [ Modifier a ] a
   deriving (Show, Functor)
 
 data ClassMember a
-  = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ a ]
+  = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a)) [ Modifier a ] a
+  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ Modifier a ] a
   deriving (Show, Functor)
 
 ----------------------------------------
+
+-- | Parameter data type
+--
+-- This type constructor is used to build the parameters that are
+-- listed as part of the definition of a function.
+--
+-- This type constructor takes two arguments:
+-- - the identifier of the parameter
+-- - the type of the parameter
 data Parameter a = Parameter {
-  paramIdentifier      :: Identifier
-  , paramTypeSpecifier :: TypeSpecifier a
+  paramIdentifier      :: Identifier -- ^ paramter identifier (name)
+  , paramTypeSpecifier :: TypeSpecifier a -- ^ type of the parameter
 } deriving (Show, Functor)
 
 data FieldValueAssignment a = FieldValueAssignment {
@@ -150,28 +241,30 @@ data EnumVariant a = EnumVariant {
 } deriving (Show, Functor)
 
 data MatchCase a = MatchCase
-  { matchIdentifier :: Identifier
+  { 
+    matchIdentifier :: Identifier
   , matchBVars :: [Identifier]
   , matchBody :: BlockRet a
-  , matchAttr:: [a]
+  , matchModifiers :: [ Modifier a ]
+  , matchAnnotation :: a
   } deriving (Show,Functor)
 
 data ElseIf a = ElseIf
-  { elseIfCond :: Expression a,
-    elseIfBody :: Block a,
-    elseIfAnss :: [a]
-  }
-  deriving (Show, Functor)
+  { 
+    elseIfCond :: Expression a
+  , elseIfBody :: Block a
+  , elseIfModifiers :: [ Modifier a ]
+  , elseIfAnnotation :: a
+  } deriving (Show, Functor)
 
 data Statement a =
-  Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
-  | AssignmentStmt Identifier (Expression a) [ a ]
-  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] [ a ]
+  Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) [ Modifier a ] a
+  | AssignmentStmt Identifier (Expression a) [ Modifier a ] a
+  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] [ Modifier a ] a
   -- | For loop
-  | ForLoopStmt Identifier (Expression a) (Expression a) [ Statement a ] [ a ]
-  | SingleExpStmt (Expression a) [ a ]
-  -- | ReturnStmt (ReturnDef a) [ a ]
-  | Break [ a ]
+  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] [ Modifier a ] a
+  | SingleExpStmt (Expression a) [ Modifier a ] a
+  -- | ReturnStmt (ReturnStmt a) [ a ]
   deriving (Show, Functor)
 
 -- | Constant values:
