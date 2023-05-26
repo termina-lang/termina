@@ -235,7 +235,6 @@ data FieldValueAssignment a = FieldValueAssignment {
 data FieldDefinition a = FieldDefinition {
   fieldIdentifier      :: Identifier
   , fieldTypeSpecifier :: TypeSpecifier a
-  , fieldDefaultValue  :: Maybe (Expression a)
 } deriving (Show, Functor)
 
 data EnumVariant a = EnumVariant {

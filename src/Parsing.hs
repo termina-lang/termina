@@ -557,11 +557,8 @@ fieldDefinitionParser = do
   identifier <- identifierParser
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
-  initializer <- optionMaybe (do
-    reservedOp "="
-    expressionParser)
   _ <- semi
-  return $ FieldDefinition identifier typeSpecifier initializer
+  return $ FieldDefinition identifier typeSpecifier
 
 structDefinitionParser :: Parser (TypeDef Annotation)
 structDefinitionParser = do
