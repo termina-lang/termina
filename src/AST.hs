@@ -10,7 +10,6 @@ data ReturnStmt a
   = ReturnStmt
   { 
     returnExpression :: Maybe (Expression a)
-  , returnModifiers :: [Modifier a]
   , returnAnnotation :: a
   }
   deriving (Show, Functor)
@@ -75,7 +74,7 @@ newtype ConstExpression a = KC (Const a)
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier a = Modifier Identifier (Maybe (ConstExpression a)) a
+data Modifier a = Modifier Identifier (Maybe (ConstExpression a))
   deriving (Show,Functor)
 
 -- | Identifiers as `String`
@@ -89,9 +88,9 @@ data TypeSpecifier a
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
   | Bool | Char | DefinedType Identifier
-  | Vector (TypeSpecifier a) VectorSize -- (Expression a)
-  | MsgQueue (TypeSpecifier a) (Expression a)
-  | Pool (TypeSpecifier a) (Expression a)
+  | Vector (TypeSpecifier a) Size
+  | MsgQueue (TypeSpecifier a) Size
+  | Pool (TypeSpecifier a) Size
   | Option (TypeSpecifier a)
   -- enum Option<T> {None | Some (a) }
   | Reference (TypeSpecifier a)
@@ -100,7 +99,7 @@ data TypeSpecifier a
   | Unit
   deriving (Show, Functor)
 
-data VectorSize = K Int | V Identifier
+newtype Size = K Integer
  deriving Show
 
 -- Ground Type equiality?
@@ -208,8 +207,8 @@ data TypeDef a
   deriving (Show, Functor)
 
 data ClassMember a
-  = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a)) [ Modifier a ] a
-  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) [ Modifier a ] a
+  = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a))  a
+  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) a
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -247,7 +246,6 @@ data MatchCase a = MatchCase
     matchIdentifier :: Identifier
   , matchBVars :: [Identifier]
   , matchBody :: BlockRet a
-  , matchModifiers :: [ Modifier a ]
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
@@ -255,17 +253,16 @@ data ElseIf a = ElseIf
   { 
     elseIfCond :: Expression a
   , elseIfBody :: Block a
-  , elseIfModifiers :: [ Modifier a ]
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
 data Statement a =
-  Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) [ Modifier a ] a
-  | AssignmentStmt Identifier (Expression a) [ Modifier a ] a
-  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] [ Modifier a ] a
+  Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) a
+  | AssignmentStmt Identifier (Expression a) a
+  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] a
   -- | For loop
-  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] [ Modifier a ] a
-  | SingleExpStmt (Expression a) [ Modifier a ] a
+  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] a
+  | SingleExpStmt (Expression a) a
   -- | ReturnStmt (ReturnStmt a) [ a ]
   deriving (Show, Functor)
 
@@ -274,7 +271,7 @@ data Statement a =
 -- - Decimal integers
 -- - Characters
 -- - String literals
-data Const a = B Bool | I (TypeSpecifier a) Int | C Char -- | S String
+data Const a = B Bool | I (TypeSpecifier a) Integer | C Char -- | S String
   deriving (Show, Functor)
 
 type AnnotatedProgram a = [AnnASTElement a]
