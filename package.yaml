@@ -75,3 +75,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - termina
+    - hspec
+    - hspec-discover
+    - hspec-contrib
