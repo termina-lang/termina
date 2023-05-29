@@ -21,8 +21,8 @@ This type is used to identify the annotations made on the different
 elements of the AST. In this case, the annotations will only include 
 the position in the source file where the element is located.
 
--} 
-newtype Annotation = 
+-}
+newtype Annotation =
   Position SourcePos -- ^ Source code position
   deriving Show
 
@@ -87,6 +87,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
                       ,"#" -- Attribute
+                      ,"::" -- EnumVariant
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -177,17 +178,21 @@ parameterParser = do
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
+-- | Parser for a field value assignments expression
+-- This expression is used to create annonymous structures to serve as right
+-- hand side of an assignment expression.
+-- Examples of this expression:
+-- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 fieldValuesAssignExpressionParser :: Parser (Expression Annotation)
 fieldValuesAssignExpressionParser =
-  braces (FieldValuesAssignmentsExpression <$>
-         identifierParser
-          <*> sepBy (
-    do
-      identifier <- identifierParser
-      reservedOp "="
-      FieldValueAssignment identifier <$> expressionParser
-    )
-  comma)
+  do
+    assignments <- braces (sepBy (do
+            identifier <- identifierParser
+            _ <- reservedOp "="
+            FieldValueAssignment identifier <$> expressionParser) comma)
+    _ <- reservedOp ":"
+    identifier <- identifierParser
+    return $ FieldValuesAssignmentsExpression identifier assignments
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -201,7 +206,7 @@ fieldValuesAssignExpressionParser =
 
 modifierParser :: Parser (Modifier Annotation)
 modifierParser = do
-  _ <- reservedOp "#" 
+  _ <- reservedOp "#"
   _ <- reservedOp "["
   identifier <- identifierParser
   initializer <- optionMaybe (parens constExprParser')
@@ -297,8 +302,20 @@ optionExprParser =
   (reserved "None" >> Options . None . Position <$> getPosition) <|>
   (reserved "Some" >> parens expressionParser)
 
+enumVariantExprParser :: Parser (Expression Annotation)
+enumVariantExprParser = do
+  enum <- identifierParser
+  _ <- reserved "::"
+  variant <- identifierParser
+  parameterList <-
+    option [] (parens (sepBy (try expressionParser) comma))
+  return $ EnumVariantExpression enum variant parameterList
+
 expressionParser :: Parser (Expression Annotation)
-expressionParser = try functionCallParser <|> try optionExprParser <|> expressionParser'
+expressionParser = try functionCallParser
+  <|> try enumVariantExprParser
+  <|> try optionExprParser
+  <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = matchExpressionParser
@@ -393,7 +410,7 @@ constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
-    
+
 constExprParser :: Parser (Expression Annotation)
 constExprParser = Constant <$> constExprParser'
     -- parseLitString = S <$> stringLit
@@ -636,7 +653,7 @@ enumDefinitionParser = do
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
-  try taskParser <|> try handlerParser 
+  try taskParser <|> try handlerParser
   <|> try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser <|> moduleInclusionParser
 

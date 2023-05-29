@@ -3,9 +3,6 @@
 
 module AST where
 
-import           Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-
 data ReturnStmt a 
   = ReturnStmt
   { 
@@ -151,6 +148,7 @@ data Expression a
   | Casting (Expression a) (TypeSpecifier a)
   | FunctionExpression Identifier [ Expression a ]
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a]
+  | EnumVariantExpression Identifier Identifier [ Expression a ]
   | VectorIndexExpression (Expression a) (Expression a) -- Binary operation : array indexing
   | VectorInitExpression (Expression a) (Expression a) -- Vector initializer
   | MatchExpression (Expression a) [ MatchCase a ]
