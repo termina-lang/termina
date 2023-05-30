@@ -600,15 +600,11 @@ unionDefinitionParser = do
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
-  p <- getPosition
   identifier <- identifierParser
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
-  initializer <- optionMaybe (do
-    reservedOp "="
-    expressionParser)
   _ <- semi
-  return $ ClassField identifier typeSpecifier initializer (Position p)
+  return $ ClassField identifier typeSpecifier
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do

@@ -205,7 +205,7 @@ data TypeDef a
   deriving (Show, Functor)
 
 data ClassMember a
-  = ClassField Identifier (TypeSpecifier a) (Maybe (Expression a))  a
+  = ClassField Identifier (TypeSpecifier a)
   | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) a
   deriving (Show, Functor)
 
