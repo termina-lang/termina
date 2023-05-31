@@ -21,8 +21,8 @@ This type is used to identify the annotations made on the different
 elements of the AST. In this case, the annotations will only include 
 the position in the source file where the element is located.
 
--} 
-newtype Annotation = 
+-}
+newtype Annotation =
   Position SourcePos -- ^ Source code position
   deriving Show
 
@@ -87,6 +87,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
                       ,"#" -- Attribute
+                      ,"::" -- EnumVariant
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -133,8 +134,18 @@ identifierParser = Tok.identifier lexer
 hexa :: Parser Integer
 hexa = char '0' >> Tok.hexadecimal lexer
 
-number :: Parser Int
-number = fromInteger <$> Tok.natural lexer
+-- | Parser for natural numbers (positive integers + 0)
+-- This parser is used solely when declaring a new vector to specify
+-- its dimension, i.e. the parser checks that we specify the dimension
+-- as a natural number.
+natural :: Parser Integer
+natural = Tok.natural lexer
+
+-- | Parser for integer numbers
+-- This parser is used when defining regular integer literals
+-- TODO: Change it to support Termina's hex format.
+integer :: Parser Integer
+integer = Tok.integer lexer
 
 ----------------------------------------
 -- Parser
@@ -167,17 +178,21 @@ parameterParser = do
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
+-- | Parser for a field value assignments expression
+-- This expression is used to create annonymous structures to serve as right
+-- hand side of an assignment expression.
+-- Examples of this expression:
+-- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 fieldValuesAssignExpressionParser :: Parser (Expression Annotation)
 fieldValuesAssignExpressionParser =
-  braces (FieldValuesAssignmentsExpression <$>
-         identifierParser
-          <*> sepBy (
-    do
-      identifier <- identifierParser
-      reservedOp "="
-      FieldValueAssignment identifier <$> expressionParser
-    )
-  comma)
+  do
+    assignments <- braces (sepBy (do
+            identifier <- identifierParser
+            _ <- reservedOp "="
+            FieldValueAssignment identifier <$> expressionParser) comma)
+    _ <- reservedOp ":"
+    identifier <- identifierParser
+    return $ FieldValuesAssignmentsExpression identifier assignments
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -191,13 +206,12 @@ fieldValuesAssignExpressionParser =
 
 modifierParser :: Parser (Modifier Annotation)
 modifierParser = do
-  p <- getPosition
-  _ <- reservedOp "#" 
+  _ <- reservedOp "#"
   _ <- reservedOp "["
   identifier <- identifierParser
   initializer <- optionMaybe (parens constExprParser')
   _ <- reservedOp "]"
-  return $ Modifier identifier (KC <$> initializer) (Position p)
+  return $ Modifier identifier (KC <$> initializer)
 
 msgQueueParser :: Parser (TypeSpecifier Annotation)
 msgQueueParser = do
@@ -205,9 +219,9 @@ msgQueueParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  quantity <- variableParser <|> constExprParser
+  size <- K <$> natural
   _ <- reservedOp ">"
-  return $ MsgQueue typeSpecifier quantity
+  return $ MsgQueue typeSpecifier size
 
 poolParser :: Parser (TypeSpecifier Annotation)
 poolParser = do
@@ -215,18 +229,18 @@ poolParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  quantity <- variableParser <|> constExprParser
+  size <- K <$> natural
   _ <- reservedOp ">"
-  return $ Pool typeSpecifier quantity
+  return $ Pool typeSpecifier size
 
 vectorParser :: Parser (TypeSpecifier Annotation)
 vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  quantity <- (V <$> identifierParser) <|> (K <$> number)
+  size <- K <$> natural
   _ <- reservedOp "]"
-  return $ Vector typeSpecifier quantity
+  return $ Vector typeSpecifier size
 
 referenceParser :: Parser (TypeSpecifier Annotation)
 referenceParser = reservedOp "&" >> Reference <$> typeSpecifierParser
@@ -288,8 +302,20 @@ optionExprParser =
   (reserved "None" >> Options . None . Position <$> getPosition) <|>
   (reserved "Some" >> parens expressionParser)
 
+enumVariantExprParser :: Parser (Expression Annotation)
+enumVariantExprParser = do
+  enum <- identifierParser
+  _ <- reserved "::"
+  variant <- identifierParser
+  parameterList <-
+    option [] (parens (sepBy (try expressionParser) comma))
+  return $ EnumVariantExpression enum variant parameterList
+
 expressionParser :: Parser (Expression Annotation)
-expressionParser = try functionCallParser <|> try optionExprParser <|> expressionParser'
+expressionParser = try functionCallParser
+  <|> try enumVariantExprParser
+  <|> try optionExprParser
+  <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = matchExpressionParser
@@ -345,12 +371,11 @@ handlerParser = do
 
 returnStmtParser :: Parser (ReturnStmt Annotation)
 returnStmtParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
   _ <- semi
-  return $ ReturnStmt ret modifiers (Position p)
+  return $ ReturnStmt ret (Position p)
 
 functionParser :: Parser (AnnASTElement Annotation)
 functionParser = do
@@ -375,24 +400,23 @@ moduleInclusionParser = do
   return $ ModuleInclusion name modifiers (Position p)
 
 constExprParser' :: Parser (Const Annotation)
-constExprParser' = parseLitInt <|> parseLitBool <|> parseLitChar
+constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
   where
-    parseLitInt =
+    parseLitInteger =
       do
-        num <- number
+        num <- integer
         reservedOp ":"
         ty <- typeSpecifierParser
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
-    
+
 constExprParser :: Parser (Expression Annotation)
 constExprParser = Constant <$> constExprParser'
     -- parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
 declarationParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   reserved "var"
   name <- identifierParser
@@ -402,15 +426,14 @@ declarationParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Declaration name ty initializer modifiers (Position p)
+  return $ Declaration name ty initializer (Position p)
 
 singleExprStmtParser :: Parser (Statement Annotation)
 singleExprStmtParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   expression <- expressionParser
   _ <- semi
-  return $ SingleExpStmt expression modifiers (Position p)
+  return $ SingleExpStmt expression (Position p)
 
 blockItemParser :: Parser (Statement Annotation)
 blockItemParser = try ifElseIfStmtParser
@@ -421,24 +444,22 @@ blockItemParser = try ifElseIfStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
-  modifiers <- many modifierParser
   p <- getPosition
   lval <- identifierParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi
-  return $ AssignmentStmt lval rval modifiers (Position p)
+  return $ AssignmentStmt lval rval (Position p)
 
 matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   reserved "case"
   cons <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   blockRet <- braces blockParser
-  return $ MatchCase cons args blockRet modifiers (Position p)
+  return $ MatchCase cons args blockRet (Position p)
 
 matchExpressionParser :: Parser (Expression Annotation)
 matchExpressionParser = do
@@ -449,17 +470,15 @@ matchExpressionParser = do
 
 elseIfParser :: Parser (ElseIf Annotation)
 elseIfParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "else"
   _ <- reserved "if"
   expression <- expressionParser
   compound <- braces $ many blockItemParser
-  return $ ElseIf expression compound modifiers (Position p)
+  return $ ElseIf expression compound (Position p)
 
 ifElseIfStmtParser :: Parser (Statement Annotation)
 ifElseIfStmtParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "if"
   expression <- expressionParser
@@ -468,11 +487,10 @@ ifElseIfStmtParser = do
   elseCompound <- option [] (do
     _ <- reserved "else"
     braces $ many $ try blockItemParser)
-  return $ IfElseStmt expression ifCompound elseIfs elseCompound modifiers (Position p)
+  return $ IfElseStmt expression ifCompound elseIfs elseCompound (Position p)
 
 forLoopStmtParser :: Parser (Statement Annotation)
 forLoopStmtParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   _ <- reserved "for"
   identifier <- identifierParser
@@ -484,7 +502,7 @@ forLoopStmtParser = do
     reserved "while"
     expressionParser)
   compound <- braces $ many blockItemParser
-  return $ ForLoopStmt identifier start end breakCondition compound modifiers (Position p)
+  return $ ForLoopStmt identifier start end breakCondition compound (Position p)
 
 volatileDeclParser :: Parser (Global Annotation)
 volatileDeclParser = do
@@ -582,20 +600,14 @@ unionDefinitionParser = do
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
-  modifiers <- many modifierParser
-  p <- getPosition
   identifier <- identifierParser
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
-  initializer <- optionMaybe (do
-    reservedOp "="
-    expressionParser)
   _ <- semi
-  return $ ClassField identifier typeSpecifier initializer modifiers (Position p)
+  return $ ClassField identifier typeSpecifier
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
-  modifiers <- many modifierParser
   p <- getPosition
   reserved "fn"
   name <- identifierParser
@@ -607,7 +619,7 @@ classMethodParser = do
   body <- many blockItemParser
   ret <- returnStmtParser
   reservedOp "}"
-  return $ ClassMethod name params typeSpec (BlockRet body ret) modifiers (Position p)
+  return $ ClassMethod name params typeSpec (BlockRet body ret) (Position p)
 
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
@@ -637,7 +649,7 @@ enumDefinitionParser = do
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
-  try taskParser <|> try handlerParser 
+  try taskParser <|> try handlerParser
   <|> try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser <|> moduleInclusionParser
 
