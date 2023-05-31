@@ -1,4 +1,5 @@
 -- | Module to pretty-print Termina Programs
+
 module PPrinter where
 
 import Prelude hiding (id)
@@ -7,6 +8,7 @@ import AST
 -- https://hackage.haskell.org/package/prettyprinter
 import Prettyprinter
 import Prettyprinter.Render.Terminal
+
 import Parsing (Annotation)
 
 import Data.Text (Text)
@@ -92,7 +94,7 @@ indentTab = indent 4
 namefy :: String -> String
 namefy = ("__" ++)
 
-ppRootType :: TypeSpecifier a -> DocStyle
+ppRootType :: TypeSpecifier -> DocStyle
 ppRootType UInt8 = uint8C
 ppRootType UInt16 = uint16C
 ppRootType UInt32 = uint32C
@@ -130,21 +132,21 @@ ppRootType (DynamicSubtype ts) = case ts of
   _ -> ppRootType ts <+> pretty "*"
 ppRootType Unit = error "unsupported type"
 
-ppSize :: TypeSpecifier a -> DocStyle
+ppSize :: TypeSpecifier -> DocStyle
 ppSize (Vector ts (K size)) = ppSize ts <> brackets (pretty size)
 ppSize _ = emptyDoc
 
-ppDeclaration :: String -> TypeSpecifier a -> DocStyle
+ppDeclaration :: String -> TypeSpecifier -> DocStyle
 ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppSize ts
 
-ppFieldDefinition :: FieldDefinition a -> DocStyle
+ppFieldDefinition :: FieldDefinition -> DocStyle
 ppFieldDefinition (FieldDefinition identifier typeSpecifier) =
   ppDeclaration identifier typeSpecifier <> semi
 
 -- | Pretty prints an enum variant
 -- This function is only used when generating the variant enumeration
 -- It takes as arguments the variant and its index.
-ppEnumVariant :: EnumVariant a -> DocStyle
+ppEnumVariant :: EnumVariant -> DocStyle
 ppEnumVariant (EnumVariant identifier _) = pretty identifier
 
 --------------------------------------------------------------------------------
@@ -177,21 +179,21 @@ ppClassMemDef ppa (ClassMethod ident params mbty blocks anns) =
 -}
 
 ppModifier :: Modifier a -> DocStyle
-ppModifier (Modifier identifier (Just (KC (I _ integer)))) = pretty identifier <> parens (pretty integer)
-ppModifier (Modifier identifier (Just (KC (B True)))) = pretty identifier <> parens (pretty "1")
-ppModifier (Modifier identifier (Just (KC (B False)))) = pretty identifier <> parens (pretty "0")
-ppModifier (Modifier identifier (Just (KC (C char)))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
+ppModifier (Modifier identifier (Just (KC (I _ integer) _))) = pretty identifier <> parens (pretty integer)
+ppModifier (Modifier identifier (Just (KC (B True) _))) = pretty identifier <> parens (pretty "1")
+ppModifier (Modifier identifier (Just (KC (B False) _))) = pretty identifier <> parens (pretty "0")
+ppModifier (Modifier identifier (Just (KC (C char) _))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
 ppModifier (Modifier identifier Nothing) = pretty identifier
 
 ppTypeAttributes :: [Modifier a] -> DocStyle
 ppTypeAttributes [] = emptyDoc
 ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDoc (comma <> space) (map ppModifier mods))) <> space
 
-ppEnumVariantParameter :: TypeSpecifier a -> Integer -> DocStyle
+ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index = 
   ppDeclaration (namefy (show index)) ts <> semi
 
-ppEnumVariantParameterStruct :: EnumVariant a -> DocStyle
+ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant id params) =
   structC <+> braces' (
     vsep $

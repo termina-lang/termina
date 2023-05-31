@@ -25,8 +25,8 @@ data AnnASTElement a =
   -- | Task construtor
   Task
     Identifier -- ^ task identifier (name)
-    [Parameter a] -- ^ list of parameters (possibly empty)
-    (TypeSpecifier a) -- ^ returned value type (should be TaskRet)
+    [Parameter] -- ^ list of parameters (possibly empty)
+    TypeSpecifier -- ^ returned value type (should be TaskRet)
     (BlockRet a) -- ^ statements block
     [ Modifier a ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
@@ -34,8 +34,8 @@ data AnnASTElement a =
   -- | Function constructor
   | Function 
     Identifier -- ^ function identifier (name)
-    [Parameter a] -- ^ list of parameters (possibly empty)
-    (Maybe (TypeSpecifier a)) -- ^ type of the return value (optional)
+    [Parameter] -- ^ list of parameters (possibly empty)
+    (Maybe TypeSpecifier) -- ^ type of the return value (optional)
     (BlockRet a) -- ^ statements block (with return)
     [ Modifier a ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
@@ -43,8 +43,8 @@ data AnnASTElement a =
   -- | Handler constructor
   | Handler
     Identifier -- ^ Handler identifier (name)
-    [Parameter a] -- ^ list of parameters (TBC)
-    (TypeSpecifier a) -- ^ returned value type (should be Result)
+    [Parameter] -- ^ list of parameters (TBC)
+    TypeSpecifier -- ^ returned value type (should be Result)
     (BlockRet a) -- ^ statements block (with return)
     [ Modifier a ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
@@ -65,7 +65,12 @@ data AnnASTElement a =
 
   deriving (Show,Functor)
 
-newtype ConstExpression a = KC (Const a)
+
+-- | This type represents constant expressions.
+-- Since we are not implementing it right now, we only have constants.
+-- The idea is to eventually replace it by constant (at compilation time)
+-- expressions. We also annotate them for debbuging purposes.
+data ConstExpression a = KC Const a
   deriving (Show,Functor)
 
 -- | Modifier data type
@@ -81,26 +86,26 @@ type Identifier = String
 type Address = Integer
 
 -- | General type specifier
-data TypeSpecifier a
+data TypeSpecifier
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
   | Bool | Char | DefinedType Identifier
-  | Vector (TypeSpecifier a) Size
-  | MsgQueue (TypeSpecifier a) Size
-  | Pool (TypeSpecifier a) Size
-  | Option (TypeSpecifier a)
+  | Vector TypeSpecifier Size
+  | MsgQueue TypeSpecifier Size
+  | Pool TypeSpecifier Size
+  | Option TypeSpecifier
   -- enum Option<T> {None | Some (a) }
-  | Reference (TypeSpecifier a)
-  | DynamicSubtype (TypeSpecifier a)
+  | Reference TypeSpecifier
+  | DynamicSubtype TypeSpecifier
   -- See Q9
   | Unit
-  deriving (Show, Functor)
+  deriving (Show)
 
 newtype Size = K Integer
  deriving Show
 
 -- Ground Type equiality?
-groundTyEq :: TypeSpecifier a -> TypeSpecifier a -> Bool
+groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
 groundTyEq  UInt8  UInt8 = True
 groundTyEq  UInt16  UInt16 = True
 groundTyEq  UInt32  UInt32 = True
@@ -141,11 +146,11 @@ data OptBody a = None a | Some (Expression a) a
 
 data Expression a
   = Variable Identifier
-  | Constant (Const a)
+  | Constant Const a
   | Options (OptBody a)
   | BinOp Op (Expression a) (Expression a)
   | ReferenceExpression (Expression a)
-  | Casting (Expression a) (TypeSpecifier a)
+  | Casting (Expression a) TypeSpecifier
   | FunctionExpression Identifier [ Expression a ]
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a]
   | EnumVariantExpression Identifier Identifier [ Expression a ]
@@ -166,7 +171,7 @@ data Global a
     -- | Volatile global variable constructor
     Volatile 
       Identifier -- ^ name of the variable
-      (TypeSpecifier a) -- ^ type of the variable
+      TypeSpecifier -- ^ type of the variable
       Address -- ^ address where the variable is located
       [ Modifier a ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -174,7 +179,7 @@ data Global a
     -- | Static global variable constructor
     | Static
       Identifier -- ^ name of the variable
-      (TypeSpecifier a) -- ^ type of the variable
+      TypeSpecifier -- ^ type of the variable
       (Maybe (Expression a)) -- ^ initialization expression (optional)
       [ Modifier a ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -182,7 +187,7 @@ data Global a
     -- | Shared global variable constructor
     | Shared
       Identifier -- ^ name of the variable
-      (TypeSpecifier a) -- ^ type of the variable
+      TypeSpecifier -- ^ type of the variable
       (Maybe (Expression a)) -- ^ initialization expression (optional)
       [ Modifier a ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -190,7 +195,7 @@ data Global a
     -- | Constant constructor
     | Const 
       Identifier -- ^ name of the constant
-      (TypeSpecifier a) -- ^ type of the constant
+      TypeSpecifier -- ^ type of the constant
       (Expression a) -- ^ initialization expression
       [ Modifier a ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -198,15 +203,15 @@ data Global a
   deriving (Show, Functor)
 
 data TypeDef a
-  = Struct Identifier [FieldDefinition a]  [ Modifier a ] a
-  | Union Identifier [FieldDefinition a] [ Modifier a ] a
-  | Enum Identifier [EnumVariant a] [ Modifier a ] a
+  = Struct Identifier [FieldDefinition]  [ Modifier a ] a
+  | Union Identifier [FieldDefinition] [ Modifier a ] a
+  | Enum Identifier [EnumVariant] [ Modifier a ] a
   | Class Identifier [ClassMember a] [ Modifier a ] a
   deriving (Show, Functor)
 
 data ClassMember a
-  = ClassField Identifier (TypeSpecifier a)
-  | ClassMethod Identifier [Parameter a] (Maybe (TypeSpecifier a)) (BlockRet a) a
+  = ClassField Identifier TypeSpecifier
+  | ClassMethod Identifier [Parameter] (Maybe TypeSpecifier) (BlockRet a) a
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -219,25 +224,25 @@ data ClassMember a
 -- This type constructor takes two arguments:
 -- - the identifier of the parameter
 -- - the type of the parameter
-data Parameter a = Parameter {
+data Parameter = Parameter {
   paramIdentifier      :: Identifier -- ^ paramter identifier (name)
-  , paramTypeSpecifier :: TypeSpecifier a -- ^ type of the parameter
-} deriving (Show, Functor)
+  , paramTypeSpecifier :: TypeSpecifier -- ^ type of the parameter
+} deriving (Show)
 
 data FieldValueAssignment a = FieldValueAssignment {
   fieldAssigIdentifier   :: Identifier
   , fieldAssigExpression :: Expression a
 } deriving (Show, Functor)
 
-data FieldDefinition a = FieldDefinition {
+data FieldDefinition = FieldDefinition {
   fieldIdentifier      :: Identifier
-  , fieldTypeSpecifier :: TypeSpecifier a
-} deriving (Show, Functor)
+  , fieldTypeSpecifier :: TypeSpecifier
+} deriving (Show)
 
-data EnumVariant a = EnumVariant {
+data EnumVariant = EnumVariant {
   variantIdentifier :: Identifier
-  , assocData       :: [ TypeSpecifier a ]
-} deriving (Show, Functor)
+  , assocData       :: [ TypeSpecifier ]
+} deriving (Show)
 
 data MatchCase a = MatchCase
   { 
@@ -255,7 +260,7 @@ data ElseIf a = ElseIf
   } deriving (Show, Functor)
 
 data Statement a =
-  Declaration Identifier (TypeSpecifier a) (Maybe (Expression a)) a
+  Declaration Identifier TypeSpecifier (Maybe (Expression a)) a
   | AssignmentStmt Identifier (Expression a) a
   | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] a
   -- | For loop
@@ -269,8 +274,8 @@ data Statement a =
 -- - Decimal integers
 -- - Characters
 -- - String literals
-data Const a = B Bool | I (TypeSpecifier a) Integer | C Char -- | S String
-  deriving (Show, Functor)
+data Const = B Bool | I TypeSpecifier Integer | C Char -- | S String
+  deriving (Show)
 
 type AnnotatedProgram a = [AnnASTElement a]
 type Block a = [Statement a]

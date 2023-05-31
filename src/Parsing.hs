@@ -152,7 +152,7 @@ integer = Tok.integer lexer
 ----------------------------------------
 
 -- | Types
-typeSpecifierParser :: Parser (TypeSpecifier Annotation)
+typeSpecifierParser :: Parser TypeSpecifier
 typeSpecifierParser =
   msgQueueParser
   <|> poolParser
@@ -172,7 +172,7 @@ typeSpecifierParser =
   <|> (reserved "bool" >> return Bool)
   <|> (reserved "char" >> return Char)
 
-parameterParser :: Parser (Parameter Annotation)
+parameterParser :: Parser Parameter
 parameterParser = do
   identifier <- identifierParser
   reservedOp ":"
@@ -208,12 +208,13 @@ modifierParser :: Parser (Modifier Annotation)
 modifierParser = do
   _ <- reservedOp "#"
   _ <- reservedOp "["
+  p <- getPosition
   identifier <- identifierParser
   initializer <- optionMaybe (parens constExprParser')
   _ <- reservedOp "]"
-  return $ Modifier identifier (KC <$> initializer)
+  return $ Modifier identifier (flip KC (Position p) <$> initializer )
 
-msgQueueParser :: Parser (TypeSpecifier Annotation)
+msgQueueParser :: Parser TypeSpecifier
 msgQueueParser = do
   reserved "MsgQueue"
   _ <- reservedOp "<"
@@ -223,7 +224,7 @@ msgQueueParser = do
   _ <- reservedOp ">"
   return $ MsgQueue typeSpecifier size
 
-poolParser :: Parser (TypeSpecifier Annotation)
+poolParser :: Parser TypeSpecifier
 poolParser = do
   reserved "Pool"
   _ <- reservedOp "<"
@@ -233,7 +234,7 @@ poolParser = do
   _ <- reservedOp ">"
   return $ Pool typeSpecifier size
 
-vectorParser :: Parser (TypeSpecifier Annotation)
+vectorParser :: Parser TypeSpecifier
 vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
@@ -242,13 +243,13 @@ vectorParser = do
   _ <- reservedOp "]"
   return $ Vector typeSpecifier size
 
-referenceParser :: Parser (TypeSpecifier Annotation)
+referenceParser :: Parser TypeSpecifier
 referenceParser = reservedOp "&" >> Reference <$> typeSpecifierParser
 
-dynamicSubtypeParser :: Parser (TypeSpecifier Annotation)
+dynamicSubtypeParser :: Parser TypeSpecifier
 dynamicSubtypeParser = reservedOp "'dyn" >> Reference <$> typeSpecifierParser
 
-optionParser :: Parser (TypeSpecifier Annotation)
+optionParser :: Parser TypeSpecifier
 optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 
 -- Expression Parser
@@ -399,7 +400,7 @@ moduleInclusionParser = do
   _ <- semi
   return $ ModuleInclusion name modifiers (Position p)
 
-constExprParser' :: Parser (Const Annotation)
+constExprParser' :: Parser Const
 constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
   where
     parseLitInteger =
@@ -412,7 +413,7 @@ constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
     parseLitChar = C <$> charLit
 
 constExprParser :: Parser (Expression Annotation)
-constExprParser = Constant <$> constExprParser'
+constExprParser = flip Constant . Position  <$> getPosition <*> constExprParser'
     -- parseLitString = S <$> stringLit
 
 declarationParser :: Parser (Statement Annotation)
@@ -570,7 +571,7 @@ typeDefintionParser = do
   d <- structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser
   return $ TypeDefinition d
 
-fieldDefinitionParser :: Parser (FieldDefinition Annotation)
+fieldDefinitionParser :: Parser FieldDefinition
 fieldDefinitionParser = do
   identifier <- identifierParser
   _ <- reservedOp ":"
@@ -631,7 +632,7 @@ classDefinitionParser = do
   _ <- semi
   return $ Class identifier fields modifiers (Position p)
 
-variantDefinitionParser :: Parser (EnumVariant Annotation)
+variantDefinitionParser :: Parser EnumVariant
 variantDefinitionParser = identifierParser >>= \identifier ->
   try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
   <|> return (EnumVariant identifier [])
