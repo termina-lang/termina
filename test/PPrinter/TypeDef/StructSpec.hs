@@ -61,7 +61,7 @@ alignedStruct = TypeDefinition
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
     FieldDefinition "field2" (Vector UInt32 (K 10))
-  ] [Modifier "align" (Just (KC (I undefined 16)))] undefined)
+  ] [Modifier "align" (Just (KC (I UInt32 16) undefined))] undefined)
 
 {- | Aligned Struct type.
 In Termina's context sytax:
@@ -81,7 +81,7 @@ packedAndAlignedStruct = TypeDefinition
     FieldDefinition "field2" (Vector UInt32 (K 10))
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I undefined 16)))
+      Modifier "align" (Just (KC (I UInt32 16) undefined))
     ] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text

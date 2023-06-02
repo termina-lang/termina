@@ -45,7 +45,7 @@ alignedClassWithOneEmptyMethod = TypeDefinition
     ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "align" (Just (KC (I undefined 16)))] undefined)
+  ] [Modifier "align" (Just (KC (I UInt32 16) undefined))] undefined)
 
 packedAndAlignedClassWithOneEmptyMethod :: AnnASTElement Annotation
 packedAndAlignedClassWithOneEmptyMethod = TypeDefinition
@@ -57,7 +57,7 @@ packedAndAlignedClassWithOneEmptyMethod = TypeDefinition
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I undefined 16)))
+      Modifier "align" (Just (KC (I UInt32 16) undefined))
     ] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text

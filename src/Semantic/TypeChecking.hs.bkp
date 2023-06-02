@@ -3,9 +3,25 @@
 {-# LANGUAGE TupleSections    #-}
 
 -- | Semantic Analysis Module i.e. Type checking
+-- In particular this module, describes a mapping from |AST Parser.Annotation| to |AST SemanticAnnotations|
 
-module Semantic where
+module Semantic.TypeChecking where
+
+-- Termina Stuff
 import           AST
+
+-- Just annotations from Parser
+import qualified Parsing as Parser (Annotation(..))
+
+-- Interpretation of types
+import Semantic.Types
+-- Error module
+import Semantic.Errors
+-- Semantic Monad
+import Semantic.Monad
+
+----------------------------------------
+-- Libaries and stuff
 
 import           Data.List                  (foldl', sort, sortOn)
 
@@ -14,308 +30,68 @@ import           Data.Map                   as M
 
 import           Control.Arrow
 
-import           Control.Monad.Except       (MonadError (..))
--- import Control.Monad.Error.Class (withError)
-import           Control.Monad.Identity
-import           Control.Monad.State.Strict as ST
-
-type SemAnn = ()
-
--- How we interpret types
--- Variables can have two types
--- - Simple types, uint,int, etc
-
-type Type = TypeSpecifier SemAnn
--- Know we have another category of ints. Those known at compiler time.
-----------------------------------------
--- Task type information
-data SemTask' a = STask
-  { taskArgs :: [Parameter a]
-  , taskRet  :: TypeSpecifier a
-  , taskAnns :: [ a ]
-  }
-  deriving Show
-
-type SemTask = SemTask' SemAnn
-
--- type AnnTaskEnv = Map Identifier (SemTask SemAnn)
-----------------------------------------
-
-data SemFunction' a = SFunction
-  { funArgs :: [Parameter a]
-  , funRet  :: TypeSpecifier a
-  , funAnns :: [ a ]
-  }
-  deriving Show
-
-type SemFunction = SemFunction' SemAnn
-
--- type AnnFunEnv = Map Identifier (SemFunction SemAnn)
-----------------------------------------
-
-data SemHandler' a = SemHandler
-  { handlerArgs :: [Parameter a]
-  , handlerRet  :: TypeSpecifier a
-  , handlerAnns :: [ a ]
-  }
-  deriving Show
-
-type SemHandler = SemHandler' SemAnn
-
--- type AnnHandlerEnv = Map Identifier (SemHandler SemAnn)
-----------------------------------------
-
-data SemGlobal' a
-  = SVolatile (TypeSpecifier a) [ a ]
-  | SStatic (TypeSpecifier a) [ a ]
-  | SShared (TypeSpecifier a) [ a ]
-  | SConst (TypeSpecifier a) [ a ]
-  deriving Show
-
-type SemGlobal = SemGlobal' SemAnn
-
-getTySemGlobal :: SemGlobal -> Type
-getTySemGlobal (SVolatile ty _)  = ty
-getTySemGlobal (SStatic ty _)    = ty
-getTySemGlobal (SShared ty _) = ty
-getTySemGlobal (SConst ty _)     = ty
-
---
-
-data GEntry' a
-  = GFun (SemFunction' a)
-  | GTask (SemTask' a)
-  | GHand (SemHandler' a)
-  | GGlob (SemGlobal' a)
-  | GType (TypeDef a)
-  deriving Show
-
-type GEntry = GEntry' SemAnn
-
-----------------------------------------
--- Error Handling
-----------------------------------------
-data Errors
-  -- | Expected /similar/ types?
-  = EMismatch Type Type
-  | EMismatchIdNotEnum Identifier (TypeDef SemAnn)
-  | ECasteable Type Type
-  -- | Expected Numeric Types
-  | ENumTs [Type]
-  -- | Reference of a global type?
-  | EReferenceGlobal Identifier
-  -- | Not Variable found
-  | ENotVar
-  | ENotNamedVar Identifier
-  -- No shadow binding
-  | EVarDefined Identifier
-  -- | Not Function found
-  | ENotFoundFun Identifier GEntry
-  -- | Type Id not found
-  | ENoTyFound Identifier
-  -- | Not a function
-  | ENotAFun Identifier
-  -- | Parameter and argument type mismatch
-  | EParam Type Type
-  -- | Wrong number of params
-  | EFunParams
-  -- | Type Identifier is not Union/Struct
-  | ETyNotStruct Identifier
-  -- | Record missing fields
-  | EFieldMissing [Identifier]
-  -- | Record extra fields
-  | EFieldExtra [Identifier]
-  -- | Expecting a Vecotor got
-  | EVector Type
-  -- | Pattern Matching Missing cases
-  | EPMMissingOption0 -- Missing None
-  | EPMMissingOption1 -- Missing Some
-  | EPMMoreOptions -- More cases??
-  | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
-  -- | Global Object but not a type
-  | EGlobalNoType Identifier
-  -- | Vectors with dynamic length
-  | EVectorConst (Expression SemAnn)
-  -- | Not an integer const
-  | ENotIntConst (Const SemAnn)
-  -- | PM Enum errors
-  | EMCMissingEnum Identifier
-  | EMCMoreArgs [Identifier]
-  | EMCMissingArgs [TypeSpecifier SemAnn]
-  | EMCEmpty
-  -- | ForLoop
-  | EBadRange
-  -- | Static not literal constant
-  | EStaticK
-  -- | Defined GEntry
-  | EDefinedGEntry GEntry
-  deriving Show
-
-withError :: MonadError e m => (e -> e) -> m a -> m a
-withError = flip catchError . (throwError .)
-----------------------------------------
-
-----------------------------------------
--- Global env: global definitions variables, tasks, functions, .., and types
-type GlobalEnv = Map Identifier GEntry
--- Local env: variables to their type
-type LocalEnv = Map Identifier Type
-type ROEnv = Map Identifier Type
-
-data StateAnalyzer
- = StateAnalyzer
- { global :: GlobalEnv
- , local  :: LocalEnv
- , ro :: ROEnv
- }
-
--- | Shortcut: Our Semantic monad is just State + Errors
-class (MonadState StateAnalyzer m, MonadError Errors m) => SemMonad m where
-
--- | Get global definition
-getNameTy :: SemMonad m => Identifier -> m (TypeDef SemAnn)
-getNameTy tid = gets global >>=
-  maybe (throwError (ENoTyFound tid)) (\case {
-                                          GType tydef -> return tydef;
-                                          _ -> throwError (EGlobalNoType tid)
-                                             }) . M.lookup tid
-
--- | From a global name get enum variations
-getEnumTy :: SemMonad m => Identifier -> m [EnumVariant SemAnn]
-getEnumTy tid = getNameTy tid >>= \case
-  Enum _ fs _a -> return fs
-  ty           -> throwError (EMismatchIdNotEnum tid ty)
-
--- | Execute computation |comp| in a temporal state |tempState| wihtout
--- modifying current state.
-withInState :: MonadState s m => s -> m a -> m a
-withInState tempState comp = localScope (put tempState >> comp)
-
--- Execute comp but bracktracking the state
--- Useful for blocks semantic analysis
-localScope :: MonadState s m => m a -> m a
-localScope comp = do
-  prevst <- get
-  res <- comp
-  put prevst
-  return res
-
-
--- | Adding new local varialbes
-addTempVars :: SemMonad m => [(Identifier, Type)] -> m a -> m a
-addTempVars newVars ma =
-  localScope (addVariables newVars >> ma)
-  where
-    addVariables = mapM_ (uncurry insertVar)
-
--- Add variables to the local environment.
--- I assume shadow biding. If we do not want that we should be more strict.
-addVars :: MonadState StateAnalyzer m => [(Identifier, Type)] -> m ()
-addVars newVars = modify (\s -> s{local = Data.List.foldl' (\m (k,v) -> M.insert k v m) (local s) newVars})
-
--- | Insert varialbe in local scope
-insertVar :: SemMonad m => Identifier -> Type -> m ()
-insertVar id ty = lookupVar id
-  >>= maybe
-  -- | If there is no variable named |id|
-  (modify (\s -> s{local = M.insert id ty (local s)}))
-  -- | if there is throw error
-  (const (throwError (EVarDefined id)))
-
--- | Get the Type of a (already) defined variable. If it is not defined throw an error.
-getDefinedVarTy :: SemMonad m => Identifier -> m Type
-getDefinedVarTy id =
-  (M.lookup id <$> (gets local))
-  -- | Get local variables map and check if |id| is a member of that map
-  >>= maybe (throwError (ENotNamedVar id)) return
-  -- | if |id| is not a member throw error |ENotNamedVar| or return its type
-
-
--- | Lookups |idenfitier| in local scope first (I assuming this is the most
--- frequent case) and then the global scope.
--- Returns the type of |identifier| in case it is defined.
-lookupVar :: SemMonad m => Identifier -> m (Maybe (Either Type GEntry))
-lookupVar id =
- gets (\s -> (local s, global s)) >>= \(locals, globals) ->
-  case M.lookup id locals of
-    Just ty -> return (Just (Left ty))
-    Nothing -> maybe (return Nothing) (return . Just . Right) (M.lookup id globals)
 
 -------------
--- First approach: Load everything, type-check one at a time.
+-- More helers, incomplete errors
+-- Function to type check types of binary operations.
+-- It returns resulting type of using an operation.
+typeOfOps :: Locations -> Op -> Type -> Type -> SemanticMonad Type
+typeOfOps locs op lty = maybe (return lty) (throwError . annotateError locs . uncurry EMismatch) . typeOfOps' op lty
+where
+  typeOfOps' :: Op -> Type -> Type -> Maybe (Type,Type)
+  -- Alg ops Same numeric type
+  typeOfOps' Multiplication tyl tyr = cmpNumTy tyl tyr
+  typeOfOps' Division tyl tyr = cmpNumTy tyl tyr
+  typeOfOps' Addition tyl tyr = cmpNumTy tyl tyr
+  typeOfOps' Substraction tyl tyr = cmpNumTy tyl tyr
+  -- shifts both numeric but may not be the same
+  -- Q2
+  typeOfOps' BitwiseLeftShift tyl tyr = justNumTy tyl tyr
+  typeOfOps' BitwiseRightShift tyl tyr = justNumTy tyl tyr
+  -- >, =>, <, <= : some numeric type.
+  typeOfOps' RelationalLT tyl tyr = cmpNumTy tyl tyr
+  typeOfOps' RelationalLTE tyl tyr =cmpNumTy tyl tyr
+  typeOfOps' RelationalGT tyl tyr =cmpNumTy tyl tyr
+  typeOfOps' RelationalGTE tyl tyr =cmpNumTy tyl tyr
+  -- Equiality: TODO I think we said structural equality, but not sure.
+  typeOfOps' RelationalEqual tyl tyr = sameTyOne tyl tyr
+  typeOfOps' RelationalNotEqual tyl tyr = sameTyOne tyl tyr
+  -- Bitwise. I guess this is like C so nums?
+  typeOfOps' BitwiseAnd tyl tyr = cmpNumTy tyl tyr
+  typeOfOps' BitwiseOr tyl tyr =cmpNumTy tyl tyr
+  typeOfOps' BitwiseXor tyl tyr =cmpNumTy tyl tyr
+  -- Logical And/Or bool
+  typeOfOps' LogicalAnd tyl tyr = justBoolTy tyl tyr
+  typeOfOps' LogicalOr tyl tyr  = justBoolTy tyl tyr
+  sameTyOne t t' =
+    if sameTy t t'
+    then Nothing
+    else Just (t,t')
+  cmpNumTy t t' =
+    if sameNumTy t t'
+    then Nothing
+    else Just (t,t')
+  justNumTy t t' =
+    if numTy t && numTy t'
+    then Nothing
+    else Just (t,t')
+  justBoolTy t t' =
+    if boolTy t && boolTy t'
+    then Nothing
+    else Just (t,t')
 
--- | Checks if two type are the same numeric type.
-sameNumTy :: Type -> Type -> Bool
-sameNumTy a b = sameTy a b && numTy a
+-- Checks param types.
+-- checkParamTy :: SemMonad m => Type -> Expression Parser.Annotations -> SemanticMonad (Expression SemanticAnns )
+-- checkParamTy pTy aTy =
+--   expressionType aTy >>= \texp ->
+--     withError (const (EParam pTy texp)) (void (pTy =?= texp))
 
--- Same Type. Should we solve type aliases?
--- [Q1]
-sameTy :: Type -> Type -> Bool
-sameTy = groundTyEq
--- To solve type synonyms we need an environment, but if they have the same name
--- they are the same ty :shrug:
-
-(=?=) :: MonadError Errors m => Type -> Type -> m Type
-t1 =?= t2 = if sameTy t1 t2 then return t1 else throwError (EMismatch t1 t2)
-
-getIntConst :: MonadError Errors m => Const SemAnn -> m Int
-getIntConst (I _ i) = return i
-getIntConst e       = throwError (ENotIntConst e)
-
-
-boolTy :: Type -> Bool
-boolTy Bool = True
-boolTy _    = False
-
-numTy :: Type -> Bool
-numTy UInt8  = True
-numTy UInt16 = True
-numTy UInt32 = True
-numTy UInt64 = True
-numTy Int8   = True
-numTy Int16  = True
-numTy Int32  = True
-numTy Int64  = True
-numTy _      = False
-
-typeOfOps :: MonadError Errors m => Op -> Type -> Type -> m Type
--- Alg ops Same numeric type
-typeOfOps Multiplication tyl tyr =
-  if sameNumTy tyl tyr
-  then return tyl
-  else throwError (EMismatch tyl tyr)
-typeOfOps Division tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
-typeOfOps Addition tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
-typeOfOps Substraction tyl tyr = if sameNumTy tyl tyr then return tyl else throwError (EMismatch tyl tyr)
--- shifts both numeric but may not be the same
--- Q2
-typeOfOps BitwiseLeftShift tyl tyr = if numTy tyl && numTy tyr then return tyl else throwError (ENumTs [tyl,tyr])
-typeOfOps BitwiseRightShift tyl tyr = if numTy tyl && numTy tyr then return tyl else throwError (ENumTs [tyl,tyr])
--- >, =>, <, <= : some numeric type.
-typeOfOps RelationalLT tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps RelationalLTE tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps RelationalGT tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps RelationalGTE tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
--- Equiality: TODO I think we said structural equality, but not sure.
-typeOfOps RelationalEqual tyl tyr = if sameTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps RelationalNotEqual tyl tyr = if sameTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
--- Bitwise. I guess this is like C so nums?
-typeOfOps BitwiseAnd tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps BitwiseOr tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
-typeOfOps BitwiseXor tyl tyr = if sameNumTy tyl tyr then return Bool else throwError (EMismatch tyl tyr)
--- Logical And/Or bool
-typeOfOps LogicalAnd tyl tyr = if boolTy tyl && boolTy tyr then return tyl else throwError (EMismatch tyl tyr)
-typeOfOps LogicalOr tyl tyr = if boolTy tyl && boolTy tyr then return tyl else throwError (EMismatch tyl tyr)
-
-
-checkParamTy :: SemMonad m => Type -> Expression SemAnn -> m ()
-checkParamTy pTy aTy = expressionType aTy >>= \texp ->
-    withError (const (EParam pTy texp)) (void (pTy =?= texp))
-
-paramTy :: SemMonad m => [Parameter SemAnn] -> [Expression SemAnn] -> m ()
+paramTy :: [Parameter] -> [Expression Parser.Annotations] -> SemanticMonad ([Expression SemanticAnns])
 paramTy [] [] = return ()
 paramTy (p : ps) (a : as) = checkParamTy (paramTypeSpecifier p) a >> paramTy ps as
 paramTy _ _ = throwError EFunParams
+  where checkParaTy pTy exp =
+          expressionType exp >>=
 
 --
 casteableTys :: Type -> TypeSpecifier SemAnn -> Bool
@@ -467,9 +243,9 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs) =
 \]
 -}
   getNameTy id_ty >>= \case {
-   Struct _ ty_fs _ann ->
+   Struct _ ty_fs _mods _ann ->
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
-   Union _ ty_fs _ann ->
+   Union _ ty_fs _mods _ann ->
        checkFieldValues ty_fs fs >> return (DefinedType id_ty) ;
    _ -> throwError (ETyNotStruct id_ty);
   }
@@ -603,7 +379,7 @@ pmOption _ [_]       = throwError EPMMissingOption1
 pmOption _ _ = throwError EPMMoreOptions
 
 checkFieldValue :: SemMonad m => FieldDefinition SemAnn -> FieldValueAssignment SemAnn  -> m ()
-checkFieldValue (FieldDefinition fid fty _) (FieldValueAssignment faid faexp) =
+checkFieldValue (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then expressionType faexp >>= void . (fty =?=)
   else throwError (EFieldMissing [fid])
@@ -620,7 +396,7 @@ checkFieldValues fds fas = checkSortedFields sorted_fds sorted_fas
       checkFieldValue d a >> checkSortedFields ds as
 
 retblockType :: SemMonad m => BlockRet SemAnn -> m Type
-retblockType (BlockRet bbody (mret, _anns)) =
+retblockType (BlockRet bbody (ReturnStmt mret _mods _anns)) =
   -- Blocks should have their own scope.
   blockType bbody
   >> maybe (return Unit) expressionType mret
@@ -632,7 +408,7 @@ blockType = mapM_ statementTySimple
 -- Rules here are just environment control.
 statementTySimple :: SemMonad m => Statement SemAnn -> m ()
 -- Declaration semantic analysis
-statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
+statementTySimple (Declaration lhs_id lhs_type Nothing _mods _anns) =
 {-
 \[
 \inference[varDecDef]
@@ -644,7 +420,7 @@ statementTySimple (Declaration lhs_id lhs_type Nothing _anns) =
 \]
 -}
   addVars[(lhs_id, lhs_type)]
-statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
+statementTySimple (Declaration lhs_id lhs_type (Just expr) _mods _anns) =
 {-
 \[
 \inference[varDecVal]
@@ -657,7 +433,7 @@ statementTySimple (Declaration lhs_id lhs_type (Just expr)  _anns) =
 -}
   ((lhs_type =?=) =<<) (expressionType expr) >>
   addVars [(lhs_id,lhs_type)]
-statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
+statementTySimple (AssignmentStmt lhs_id rhs_expr _mods _anns) =
 {- TODO Q19
 \[
 \inference[assign]
@@ -669,7 +445,7 @@ statementTySimple (AssignmentStmt lhs_id rhs_expr _anns) =
 \]
 -}
   void $ join $ (=?=) <$> getDefinedVarTy lhs_id <*> expressionType rhs_expr
-statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) =
+statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _mods _anns) =
 {-
 \[
 \inference[ifElse]
@@ -685,7 +461,7 @@ statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch _anns) 
   mapM_ (join . ((Bool =?=) <$>) . expressionType) (cond_expr : cs) >>
   mapM_ (localScope . blockType) ([tt_branch] ++ bds ++ [otherwise_branch])
 -- Here we could implement some abstract interpretation analysis
-statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
+statementTySimple (ForLoopStmt it_id from_expr to_expr Nothing body_stmt _mods _ann) = do
 {-
 \[
 \inference[forLoop]
@@ -704,7 +480,31 @@ statementTySimple (ForLoopStmt it_id from_expr to_expr body_stmt _ann) = do
   if sameNumTy from_ty to_ty
   then addTempVars [(it_id,from_ty)] (blockType body_stmt)
   else throwError EBadRange
-statementTySimple (SingleExpStmt expr _anns) =
+statementTySimple (ForLoopStmt it_id from_expr to_expr (Just while) body_stmt _mods _ann) = do
+{-
+\[
+\inference[forLoop]
+{ G, L, RO |- e_{l} : \tau  \\
+  G, L, RO |- e_{u} : \tau \\
+  G, L, RO |- e_{w} : \mathsf{Bool} \\
+  \mathsf{NumTy}(\tau) \\
+  \llbraces e_{l} \rrbraces \leq \llbraces e_{u} \rrbraces \\
+  {G, L, RO \cup \{(i, \tau)\}} \{ b_{body} \} {G, L, RO \cup \{(i, \tau)\}}
+}
+% ----------------------------------------
+{(G, L, RO) \{ \texttt{for} i \texttt{in} e_{l} e_{u} \texttt{while} e_{w} { \mathsf{body} } \} (G,L,RO)}
+\]
+-}
+  from_ty <- expressionType from_expr
+  to_ty <- expressionType to_expr
+  while_ty <- expressionType while
+  if (sameTy Bool while_ty) then
+    if sameNumTy from_ty to_ty
+    then addTempVars [(it_id,from_ty)] (blockType body_stmt)
+    else throwError EBadRange
+  else throwError $ EForWhileTy while_ty
+
+statementTySimple (SingleExpStmt expr _mods _anns) =
 {-
 \[
 \inference[singleExp]
@@ -724,7 +524,7 @@ statementTySimple (SingleExpStmt expr _anns) =
 -- Task Semantic Analyzer
 taskSemAnalyzer :: SemMonad m
   => [Parameter SemAnn] -> TypeSpecifier SemAnn
-  -> BlockRet SemAnn -> [SemAnn] -> m SemTask
+  -> BlockRet SemAnn -> SemAnn -> m SemTask
 taskSemAnalyzer taskPs taskRetType taskBody anns =
   -- | Add
   addTempVars
@@ -735,8 +535,8 @@ taskSemAnalyzer taskPs taskRetType taskBody anns =
   >> return (STask taskPs taskRetType anns)
 
 -- Function Semantic Analyzer
-functionSemAnalyzer :: SemMonad m
- => [Parameter SemAnn] -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemFunction
+functionSemAnalyzer :: SemMonad m => [Parameter SemAnn]
+  -> (Maybe (TypeSpecifier SemAnn)) -> (BlockRet SemAnn) -> SemAnn -> m SemFunction
 functionSemAnalyzer funPS mbfunRetTy funBody anns =
   (-- | Add scoped variables Q17
   addTempVars
@@ -749,7 +549,7 @@ functionSemAnalyzer funPS mbfunRetTy funBody anns =
 
 -- Handler Semantic Analyzer (Template)
 handlerSemAnalyzer :: SemMonad m =>
-  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> [ SemAnn ] -> m SemHandler
+  [Parameter SemAnn] -> (TypeSpecifier SemAnn) -> (BlockRet SemAnn) -> SemAnn -> m SemHandler
 handlerSemAnalyzer hanPS hanType hanBody anns =
   (addTempVars (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) hanPS)
               $ (hanType =?=) =<< (retblockType hanBody)) >>=
@@ -758,12 +558,12 @@ handlerSemAnalyzer hanPS hanType hanBody anns =
 
 -- Keeping only type information
 globalCheck :: SemMonad m => Global SemAnn -> m (Identifier, SemGlobal)
-globalCheck (Volatile ident ty addr anns) = return (ident, SVolatile ty anns)
+globalCheck (Volatile ident ty addr _mods anns) = return (ident, SVolatile ty anns)
 -- DONE [Q13]
-globalCheck (Static ident ty (Just (Constant _Address)) anns) = return $ (ident , SStatic ty anns)
-globalCheck (Static _ _ _ _) = throwError EStaticK
+globalCheck (Static ident ty (Just (Constant _Address)) _mods anns) = return $ (ident , SStatic ty anns)
+globalCheck (Static _ _ _ _ _) = throwError EStaticK
 --
-globalCheck (Shared ident ty mexpr anns) =
+globalCheck (Shared ident ty mexpr _mods anns) =
   case mexpr of
     -- If it has an initial value great
     Just expr -> do
@@ -773,7 +573,7 @@ globalCheck (Shared ident ty mexpr anns) =
     -- If it has not, we need to check for defaults.
     Nothing -> return (ident, SShared ty anns)
 -- TODO [Q14]
-globalCheck (Const ident ty expr anns) = do
+globalCheck (Const ident ty expr _mods anns) = do
       eTy  <- expressionType expr
       _ <- ty =?= eTy
       return (ident , SConst ty anns)
@@ -792,13 +592,13 @@ addGlobal ident gentry =
 
 -- Here we actually only need Global
 programSeman :: SemMonad m => AnnASTElement SemAnn -> m ()
-programSeman (Task ident ps ty bret anns) =
+programSeman (Task ident ps ty bret _mods anns) =
   addGlobal ident . GTask =<< taskSemAnalyzer ps ty bret anns
-programSeman (Function ident ps mty bret anns) =
+programSeman (Function ident ps mty bret _mods anns) =
   addGlobal ident . GFun =<< functionSemAnalyzer ps mty bret anns
-programSeman (Handler ident ps ty bret anns) =
+programSeman (Handler ident ps ty bret _mods anns) =
   addGlobal ident . GHand =<< handlerSemAnalyzer ps ty bret anns
 programSeman (GlobalDeclaration gbl) =
   (uncurry addGlobal) =<< ((\(nn,gg) -> (nn, GGlob gg)) <$> globalCheck gbl)
 programSeman (TypeDefinition tydef) = _TypeDefinition
-programSeman (ModuleInclusion ident anns) = _ModuleInclusion
+programSeman (ModuleInclusion ident _mods anns) = _ModuleInclusion

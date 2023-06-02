@@ -5,10 +5,10 @@ import Prettyprinter
 import AST
 import PPrinter.Common
 
-ppField :: Identifier -> TypeSpecifier a -> DocStyle
+ppField :: Identifier -> TypeSpecifier -> DocStyle
 ppField identifier ts = ppDeclaration identifier ts <> semi
 
-ppStructField :: FieldDefinition a -> DocStyle
+ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppField identifier ts
 
 ppClassField :: ClassMember a -> DocStyle
@@ -21,7 +21,7 @@ ppClassMutexField = mutex <+> pretty "__mutex_id" <> semi
 filterStructModifiers :: [Modifier a] -> [Modifier a]
 filterStructModifiers = foldr (\modifier ms ->
     case modifier of
-      packedStructModifier -> modifier : ms
+      Modifier "packed" Nothing -> modifier : ms
       Modifier "align" _ -> modifier : ms
       _ -> ms
     ) []
@@ -33,23 +33,27 @@ filterClassModifiers = foldr (\modifier ms ->
       _ -> ms) []
 
 hasNoHandler :: [Modifier a] -> Bool
-hasNoHandler modifiers = Modifier "no_handler" Nothing `elem` modifiers
+hasNoHandler modifiers = case modifiers of
+  [] -> False
+  (m : ms) -> case m of
+    Modifier "no_handler" Nothing -> True
+    _ -> hasNoHandler ms
 
 -- | Pretty prints an enum variant
 -- This function is only used when generating the variant enumeration
 -- It takes as arguments the variant and its index.
-ppEnumVariant :: EnumVariant a -> DocStyle
+ppEnumVariant :: EnumVariant -> DocStyle
 ppEnumVariant (EnumVariant identifier _) = pretty identifier
 
 ppTypeAttributes :: [Modifier a] -> DocStyle
 ppTypeAttributes [] = emptyDoc
 ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDoc (comma <> space) (map ppModifier mods))) <> space
 
-ppEnumVariantParameter :: TypeSpecifier a -> Integer -> DocStyle
+ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
   ppDeclaration (namefy (show index)) ts <> semi
 
-ppEnumVariantParameterStruct :: EnumVariant a -> DocStyle
+ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant identifier params) =
   structC <+> braces' (
     vsep $
@@ -139,7 +143,7 @@ ppTypeDef before after (Class identifier members modifiers anns) =
             -- | If the no_handler modifier is set, then we may use
             -- a mutex sempahore to handle mutual exclusion
             ([(indentTab . align)
-                ppClassMutexField | hasNoHandler classModifiers]))) 
+                ppClassMutexField | hasNoHandler classModifiers])))
               <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
         after anns
       ]

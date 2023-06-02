@@ -10,7 +10,7 @@ type DocStyle = Doc AnsiStyle
 
 class PrinterAnnotation a where
   location :: a -> SourcePos
-  typeSpecifier :: a -> TypeSpecifier a
+  typeSpecifier :: a -> TypeSpecifier
 
 -- | Type of the pretty printers
 type Printer a b =
@@ -78,7 +78,7 @@ enumIdentifier identifier = pretty "__enum_" <> pretty identifier
 enumVariantsField :: DocStyle
 enumVariantsField = pretty "__variant"
 
-ppRootType :: TypeSpecifier a -> DocStyle
+ppRootType :: TypeSpecifier -> DocStyle
 ppRootType UInt8 = uint8C
 ppRootType UInt16 = uint16C
 ppRootType UInt32 = uint32C
@@ -116,26 +116,24 @@ ppRootType (DynamicSubtype ts) = case ts of
   _ -> ppRootType ts <+> pretty "*"
 ppRootType Unit = error "unsupported type"
 
-ppSize :: TypeSpecifier a -> DocStyle
+ppSize :: TypeSpecifier -> DocStyle
 ppSize (Vector ts (K size)) = ppSize ts <> brackets (pretty size)
 ppSize _ = emptyDoc
 
-ppDeclaration :: Identifier -> TypeSpecifier a -> DocStyle
+ppDeclaration :: Identifier -> TypeSpecifier -> DocStyle
 ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppSize ts
-
-
 
 ppPrinterFunctionDeclaration ::
     Identifier -> -- ^ function identifier (name)
-    [Parameter a] -> -- ^ list of parameters (possibly empty)
-    Maybe (TypeSpecifier a) -> -- ^ type of the return value (optional)
+    [Parameter] -> -- ^ list of parameters (possibly empty)
+    Maybe TypeSpecifier -> -- ^ type of the return value (optional)
     DocStyle
 ppPrinterFunctionDeclaration identifier parameters returnValue =
   maybe voidC ppRootType returnValue <+> pretty identifier
 
 ppModifier :: Modifier a -> DocStyle
-ppModifier (Modifier identifier (Just (KC (I _ integer)))) = pretty identifier <> parens (pretty integer)
-ppModifier (Modifier identifier (Just (KC (B True)))) = pretty identifier <> parens (pretty "1")
-ppModifier (Modifier identifier (Just (KC (B False)))) = pretty identifier <> parens (pretty "0")
-ppModifier (Modifier identifier (Just (KC (C char)))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
+ppModifier (Modifier identifier (Just (KC (I _ integer) _))) = pretty identifier <> parens (pretty integer)
+ppModifier (Modifier identifier (Just (KC (B True) _))) = pretty identifier <> parens (pretty "1")
+ppModifier (Modifier identifier (Just (KC (B False) _))) = pretty identifier <> parens (pretty "0")
+ppModifier (Modifier identifier (Just (KC (C char) _))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
 ppModifier (Modifier identifier Nothing) = pretty identifier
