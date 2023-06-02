@@ -2,23 +2,23 @@
 
 module Parsing where
 
-import AST hiding (blockRet)
+import           AST                  hiding (blockRet)
 -- Importing position from Parsec
-import Text.Parsec.Pos
+import           Text.Parsec.Pos
 -- Importing parser combinators
-import Text.Parsec
-import Text.Parsec.String
+import           Text.Parsec
+import           Text.Parsec.String
 -- Importing tokenizer
-import qualified Text.Parsec.Token as Tok
+import qualified Text.Parsec.Expr     as Ex
 import qualified Text.Parsec.Language as Lang
-import qualified Text.Parsec.Expr as Ex
+import qualified Text.Parsec.Token    as Tok
 
-import Data.Functor
+import           Data.Functor
 
 {- | Type of the parsing annotations
 
-This type is used to identify the annotations made on the different 
-elements of the AST. In this case, the annotations will only include 
+This type is used to identify the annotations made on the different
+elements of the AST. In this case, the annotations will only include
 the position in the source file where the element is located.
 
 -}
@@ -184,15 +184,17 @@ parameterParser = do
 -- Examples of this expression:
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 fieldValuesAssignExpressionParser :: Parser (Expression Annotation)
-fieldValuesAssignExpressionParser =
-  do
-    assignments <- braces (sepBy (do
-            identifier <- identifierParser
-            _ <- reservedOp "="
-            FieldValueAssignment identifier <$> expressionParser) comma)
+fieldValuesAssignExpressionParser = do
+    assignments <- braces (sepBy flValues comma)
+    p <- getPosition
     _ <- reservedOp ":"
     identifier <- identifierParser
-    return $ FieldValuesAssignmentsExpression identifier assignments
+    return $ FieldValuesAssignmentsExpression identifier assignments (Position p)
+    where
+      flValues = do
+            identifier <- identifierParser
+            _ <- reservedOp "="
+            FieldValueAssignment identifier <$> expressionParser
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -280,23 +282,31 @@ expressionParser' = Ex.buildExpressionParser
     termParser
   where binaryInfix s f = Ex.Infix (do
           _ <- reservedOp s
-          return (BinOp f))
+          p <- getPosition
+          return $ \l r -> BinOp f l r (Position p))
         referencePrefix = Ex.Prefix (do
           _ <- reservedOp "&"
-          return ReferenceExpression)
+          p <- getPosition
+          return $ flip ReferenceExpression (Position p))
         castingPostfix = Ex.Postfix (do
           _ <- reserved "as"
+          p <- getPosition
           typeSpecificer <- typeSpecifierParser
-          return $ \parent -> Casting parent typeSpecificer)
+          return $ \parent -> Casting parent typeSpecificer (Position p))
         -- functionPostfix = Ex.Postfix (do
         --   arguments <- parens $ sepBy (try expressionParser) comma
         --   return $ \parent -> FunctionExpression parent arguments)
         vectorIndexPostfix = Ex.Postfix (do
           index <- brackets expressionParser
-          return $ \parent ->  VectorIndexExpression parent index)
+          p <- getPosition
+          return $ \parent ->  VectorIndexExpression parent index (Position p))
 
 functionCallParser :: Parser (Expression Annotation)
-functionCallParser = FunctionExpression <$> identifierParser <*> parens (sepBy (try expressionParser) comma)
+functionCallParser =
+  FunctionExpression
+  <$> identifierParser
+  <*> parens (sepBy (try expressionParser) comma)
+  <*> (Position <$> getPosition)
 
 optionExprParser :: Parser (Expression Annotation)
 optionExprParser =
@@ -306,11 +316,12 @@ optionExprParser =
 enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
   enum <- identifierParser
+  p <- getPosition
   _ <- reserved "::"
   variant <- identifierParser
   parameterList <-
     option [] (parens (sepBy (try expressionParser) comma))
-  return $ EnumVariantExpression enum variant parameterList
+  return $ EnumVariantExpression enum variant parameterList (Position p)
 
 expressionParser :: Parser (Expression Annotation)
 expressionParser = try functionCallParser
@@ -327,16 +338,17 @@ termParser = matchExpressionParser
   <|> parens expressionParser
 
 variableParser :: Parser (Expression Annotation)
-variableParser = Variable <$> identifierParser
+variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
 
 vectorInitParser :: Parser (Expression Annotation)
 vectorInitParser = do
   _ <- reservedOp "["
+  p <- getPosition
   value <- expressionParser
   _ <- semi
   amount <- expressionParser
   _ <- reservedOp "]"
-  return $ VectorInitExpression value amount
+  return $ VectorInitExpression value amount (Position p)
 
 -- -- Task Definition
 
@@ -454,8 +466,8 @@ assignmentStmtPaser = do
 
 matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
-  p <- getPosition
   reserved "case"
+  p <- getPosition
   cons <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
@@ -465,9 +477,10 @@ matchCaseParser = do
 matchExpressionParser :: Parser (Expression Annotation)
 matchExpressionParser = do
   reserved "match"
+  p <- getPosition
   matchExpression <- expressionParser
   cases <- braces (many1 $ try matchCaseParser)
-  return $ MatchExpression matchExpression cases
+  return $ MatchExpression matchExpression cases (Position p)
 
 elseIfParser :: Parser (ElseIf Annotation)
 elseIfParser = do

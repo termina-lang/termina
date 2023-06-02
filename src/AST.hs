@@ -145,18 +145,18 @@ data OptBody a = None a | Some (Expression a) a
   deriving (Show, Functor)
 
 data Expression a
-  = Variable Identifier
+  = Variable Identifier a
   | Constant Const a
   | Options (OptBody a)
-  | BinOp Op (Expression a) (Expression a)
-  | ReferenceExpression (Expression a)
-  | Casting (Expression a) TypeSpecifier
-  | FunctionExpression Identifier [ Expression a ]
-  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a]
-  | EnumVariantExpression Identifier Identifier [ Expression a ]
-  | VectorIndexExpression (Expression a) (Expression a) -- Binary operation : array indexing
-  | VectorInitExpression (Expression a) (Expression a) -- Vector initializer
-  | MatchExpression (Expression a) [ MatchCase a ]
+  | BinOp Op (Expression a) (Expression a) a
+  | ReferenceExpression (Expression a) a
+  | Casting (Expression a) TypeSpecifier a
+  | FunctionExpression Identifier [ Expression a ] a
+  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
+  | EnumVariantExpression Identifier Identifier [ Expression a ] a
+  | VectorIndexExpression (Expression a) (Expression a) a -- Binary operation : array indexing
+  | VectorInitExpression (Expression a) (Expression a) a -- Vector initializer
+  | MatchExpression (Expression a) [ MatchCase a ] a
   deriving (Show, Functor)
 
 ----------------------------------------
