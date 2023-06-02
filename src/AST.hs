@@ -66,13 +66,13 @@ data AnnASTElement a =
   deriving (Show,Functor)
 
 newtype ConstExpression a = KC (Const a)
-  deriving (Show,Functor)
+  deriving (Show,Functor,Eq)
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
 data Modifier a = Modifier Identifier (Maybe (ConstExpression a))
-  deriving (Show,Functor)
+  deriving (Show,Functor,Eq)
 
 -- | Identifiers as `String`
 type Identifier = String
@@ -94,10 +94,10 @@ data TypeSpecifier a
   | DynamicSubtype (TypeSpecifier a)
   -- See Q9
   | Unit
-  deriving (Show, Functor)
+  deriving (Show, Functor,Eq)
 
 newtype Size = K Integer
- deriving Show
+ deriving (Show, Eq)
 
 -- Ground Type equiality?
 groundTyEq :: TypeSpecifier a -> TypeSpecifier a -> Bool
@@ -270,7 +270,7 @@ data Statement a =
 -- - Characters
 -- - String literals
 data Const a = B Bool | I (TypeSpecifier a) Integer | C Char -- | S String
-  deriving (Show, Functor)
+  deriving (Show, Functor,Eq)
 
 type AnnotatedProgram a = [AnnASTElement a]
 type Block a = [Statement a]
