@@ -7,6 +7,8 @@ module Semantic.Monad where
 import           Data.Map                   as M
 
 import           AST
+import           Utils.AST
+
 import qualified Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
 import           Semantic.Types
@@ -21,7 +23,7 @@ type Locations = Parser.Annotation
 
 data SemanticAnns = SemAnn
   { -- | Location on source code
-    parse  :: Locations
+    location  :: Locations
     -- | Type after type checking
   , ty_ann :: TypeSpecifier}
 
@@ -96,7 +98,7 @@ getGlobalTy tid loc = gets global >>=
 getGlobalEnumTy :: Identifier -> Locations -> SemanticMonad [EnumVariant]
 getGlobalEnumTy tid loc = getGlobalTy tid loc >>= \case
   Enum _ fs _mods _anns -> return fs
-  ty                    -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap parse ty)
+  ty                    -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap location ty)
 
 
 -- | Adding new *local* variables.
@@ -207,6 +209,13 @@ sameOrErr loc t1 t2 =
   if sameTy t1 t2
   then return t1
   else throwError $ annotateError loc $ EMismatch t1 t2
+
+mustByTy :: TypeSpecifier -> Expression SemanticAnns -> SemanticMonad (Expression SemanticAnns)
+mustByTy ty exp = sameOrErr loc ty ty_exp >> return exp
+  where
+    ann_exp = getAnnotations exp
+    loc = location ann_exp
+    ty_exp = ty_ann ann_exp
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
