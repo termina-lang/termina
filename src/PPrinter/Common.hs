@@ -123,13 +123,18 @@ ppSize _ = emptyDoc
 ppDeclaration :: Identifier -> TypeSpecifier -> DocStyle
 ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppSize ts
 
+ppParameter :: Parameter -> DocStyle
+ppParameter (Parameter identifier ts) = ppDeclaration identifier ts
+
 ppPrinterFunctionDeclaration ::
     Identifier -> -- ^ function identifier (name)
     [Parameter] -> -- ^ list of parameters (possibly empty)
     Maybe TypeSpecifier -> -- ^ type of the return value (optional)
     DocStyle
-ppPrinterFunctionDeclaration identifier parameters returnValue =
-  maybe voidC ppRootType returnValue <+> pretty identifier
+ppPrinterFunctionDeclaration identifier parameters rTS =
+  maybe voidC ppRootType rTS <+> 
+    pretty identifier <> 
+      parens (align (fillSep (punctuate comma (map ppParameter parameters))))
 
 ppModifier :: Modifier a -> DocStyle
 ppModifier (Modifier identifier (Just (KC (I _ integer) _))) = pretty identifier <> parens (pretty integer)

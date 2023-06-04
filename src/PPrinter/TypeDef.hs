@@ -5,14 +5,20 @@ import Prettyprinter
 import AST
 import PPrinter.Common
 
-ppField :: Identifier -> TypeSpecifier -> DocStyle
-ppField identifier ts = ppDeclaration identifier ts <> semi
 
 ppStructField :: FieldDefinition -> DocStyle
-ppStructField (FieldDefinition identifier ts) = ppField identifier ts
+ppStructField (FieldDefinition identifier ts) = ppDeclaration identifier ts <> semi
+
+classMethodName :: String -> String -> String
+classMethodName classId methodId = "__" <> classId <> "_" <> methodId
+
+ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
+ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
+  ppPrinterFunctionDeclaration (classMethodName classId methodId) parameters rTS <> semi
+ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts) = ppField identifier ts
+ppClassField (ClassField identifier ts) = ppDeclaration identifier ts <> semi
 ppClassField _ = error "invalid class member"
 
 ppClassMutexField :: DocStyle
@@ -56,10 +62,9 @@ ppEnumVariantParameter ts index =
 ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant identifier params) =
   structC <+> braces' (
-    vsep $
+    indentTab . align $ vsep $
       zipWith
-        (\x y -> indentTab . align $ ppEnumVariantParameter x y)
-          params [0..]
+        ppEnumVariantParameter params [0..]
       ) <+> pretty (namefy identifier) <> semi
 
 -- | TypeDef pretty printer.
@@ -70,10 +75,8 @@ ppTypeDef before after (Struct identifier fls modifiers anns) =
   vsep [
     before anns,
     typedefC <+> structC <+> braces' (
-      vsep $
-        map (indentTab
-          . align
-          . ppStructField) fls
+      indentTab . align $ vsep $
+        map ppStructField fls
         ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
     after anns
   ]
@@ -83,10 +86,8 @@ ppTypeDef before after (Union identifier fls modifiers anns) =
   vsep [
     before anns,
     typedefC <+> unionC <+> braces' (
-      vsep $
-        map (indentTab
-          . align
-          . ppStructField) fls
+      indentTab . align $ vsep $
+        map ppStructField fls
         ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
     after anns
   ]
@@ -97,10 +98,8 @@ ppTypeDef before after (Enum identifier variants _ anns) =
   vsep [
     before anns,
     typedefC <+> enumC <+> braces' (
-      vsep $ punctuate comma $
-        map (indentTab
-          . align
-          . ppEnumVariant) variants
+      indentTab . align $ vsep $ punctuate comma $
+        map ppEnumVariant variants
         ) <+> enumIdentifier identifier <> semi,
     emptyDoc, -- empty line
     typedefC <+> structC <+> braces' (
@@ -131,27 +130,29 @@ ppTypeDef before after (Class identifier members modifiers anns) =
                  ClassMethod {} -> (fs, member : ms)
           ) ([],[]) members
   in
-    if not (null fields) then
-      vsep [
-        before anns,
-        typedefC <+> structC <+> braces' (
-          vsep (
-            -- | Map the regular fields
-            map (indentTab
-              . align
-              . ppClassField) fields ++
-            -- | If the no_handler modifier is set, then we may use
-            -- a mutex sempahore to handle mutual exclusion
-            ([(indentTab . align)
-                ppClassMutexField | hasNoHandler classModifiers])))
-              <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        after anns
-      ]
-    else if hasNoHandler classModifiers then
-      vsep [
-        before anns,
-        typedefC <+> structC <+> braces' (
-            (indentTab . align) ppClassMutexField) <+> pretty identifier <> semi,
-        after anns
-      ]
-    else emptyDoc
+    vsep $ (
+      if not (null fields) then
+        [
+          before anns,
+          typedefC <+> structC <+> braces' (
+            indentTab . align $
+            vsep (
+              -- | Map the regular fields
+              map ppClassField fields ++
+              -- | If the no_handler modifier is set, then we may use
+              -- a mutex sempahore to handle mutual exclusion
+              ([ppClassMutexField | hasNoHandler classModifiers])))
+                <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
+          after anns
+        ]
+      else if hasNoHandler classModifiers then
+        [
+          before anns,
+          typedefC <+> structC <+> braces' (
+              (indentTab . align) ppClassMutexField) <+> pretty identifier <> semi,
+          after anns
+        ]
+      else
+        [emptyDoc])
+      ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods
+
