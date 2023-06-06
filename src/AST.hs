@@ -140,22 +140,21 @@ data Op
   | LogicalOr
   deriving Show
 
-data OptBody a = None a | Some (Expression a) a
+data OptionVariant a = None | Some (Expression a)
   deriving (Show, Functor)
 
 data Expression a
   = Variable Identifier a
   | Constant Const a
-  | Options (OptBody a)
+  | OptionVariantExpression (OptionVariant a) a
   | BinOp Op (Expression a) (Expression a) a
   | ReferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
   | FunctionExpression Identifier [ Expression a ] a
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
   | EnumVariantExpression Identifier Identifier [ Expression a ] a
-  | VectorIndexExpression (Expression a) (Expression a) a -- Binary operation : array indexing
-  | VectorInitExpression (Expression a) (Expression a) a -- Vector initializer
-  | MatchExpression (Expression a) [ MatchCase a ] a
+  | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
+  | VectorInitExpression (Expression a) (Expression a) a -- ^ Vector initializer
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -247,7 +246,7 @@ data MatchCase a = MatchCase
   { 
     matchIdentifier :: Identifier
   , matchBVars :: [Identifier]
-  , matchBody :: BlockRet a
+  , matchBody :: Block a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
@@ -264,6 +263,7 @@ data Statement a =
   | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] a
   -- | For loop
   | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] a
+  | MatchStmt (Expression a) [ MatchCase a ] a
   | SingleExpStmt (Expression a) a
   -- | ReturnStmt (ReturnStmt a) [ a ]
   deriving (Show, Functor)
