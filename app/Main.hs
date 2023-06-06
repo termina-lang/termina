@@ -45,7 +45,7 @@ main = runCommand $ \opts args ->
                 Right ast ->
                   output
                   (if optPrintAST opts then
-                    ppAnnonProgram ast
+                    ppHeaderFile ast
                   else
                     T.pack "Ok!" )
             _ -> ioError $ userError "Too much arguments king!"
