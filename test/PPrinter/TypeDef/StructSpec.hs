@@ -96,8 +96,9 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a struct with two fields" $ do
       renderSingleASTElement structWithTwoFields `shouldBe`
         pack (
@@ -105,8 +106,9 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a packed struct" $ do
       renderSingleASTElement packedStruct `shouldBe`
         pack (
@@ -115,8 +117,9 @@ spec = do
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed)) id0;" ++
-            "\n")
+            "} __attribute__((packed)) id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints an aligned struct" $ do
       renderSingleASTElement alignedStruct `shouldBe`
         pack (
@@ -125,8 +128,9 @@ spec = do
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((align(16))) id0;" ++
-            "\n")
+            "} __attribute__((align(16))) id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a packet & aligned struct" $ do
       renderSingleASTElement packedAndAlignedStruct `shouldBe`
         pack (
@@ -135,5 +139,6 @@ spec = do
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed, align(16))) id0;" ++
-            "\n")
+            "} __attribute__((packed, align(16))) id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")

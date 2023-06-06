@@ -52,8 +52,9 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints an enum with two regular fields" $ do
       renderSingleASTElement enumWithTwoRegularFields `shouldBe`
         pack (
@@ -67,8 +68,9 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints an enum with one parameterized field" $ do
       renderSingleASTElement enumWithOneParameterizedField `shouldBe`
         pack (
@@ -87,8 +89,9 @@ spec = do
             "        } __field0;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints an enum with multiple parameterized fields" $ do
       renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
         pack (
@@ -119,5 +122,6 @@ spec = do
             "        } __field3;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")

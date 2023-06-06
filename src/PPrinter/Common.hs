@@ -1,16 +1,39 @@
 module PPrinter.Common where
 
 import AST
-import Text.Parsec.Pos
 
 import Prettyprinter
 import Prettyprinter.Render.Terminal
+import Data.Maybe
+import Semantic.Monad
 
 type DocStyle = Doc AnsiStyle
 
-class PrinterAnnotation a where
-  location :: a -> SourcePos
-  typeSpecifier :: a -> TypeSpecifier
+getExpType :: Expression SemanticAnns -> TypeSpecifier
+getExpType (Variable _ ann) = ty_ann ann
+getExpType (Constant _ ann) = ty_ann ann
+getExpType (OptionVariantExpression _ ann) = ty_ann ann
+getExpType (BinOp _ _ _ ann) = ty_ann ann
+getExpType (ReferenceExpression _ ann) = ty_ann ann
+getExpType (Casting _ _ ann) = ty_ann ann
+getExpType (FunctionExpression _ _ ann) = ty_ann ann
+getExpType (FieldValuesAssignmentsExpression _ _ ann) = ty_ann ann
+getExpType (EnumVariantExpression _ _ _ ann) = ty_ann ann
+getExpType (VectorIndexExpression _ _ ann) = ty_ann ann
+getExpType (VectorInitExpression _ _ ann) = ty_ann ann
+
+getLocation :: Expression SemanticAnns -> Locations
+getLocation (Variable _ ann) = parse ann
+getLocation (Constant _ ann) = parse ann
+getLocation (OptionVariantExpression _ ann) = parse ann
+getLocation (BinOp _ _ _ ann) = parse ann
+getLocation (ReferenceExpression _ ann) = parse ann
+getLocation (Casting _ _ ann) = parse ann
+getLocation (FunctionExpression _ _ ann) = parse ann
+getLocation (FieldValuesAssignmentsExpression _ _ ann) = parse ann
+getLocation (EnumVariantExpression _ _ _ ann) = parse ann
+getLocation (VectorIndexExpression _ _ ann) = parse ann
+getLocation (VectorInitExpression _ _ ann) = parse ann
 
 -- | Type of the pretty printers
 type Printer a b =
@@ -30,7 +53,7 @@ indentTab = indent 4
 
 -- | This function is used to create the names of temporal variables
 -- and symbols.
-namefy :: String -> String
+namefy :: Identifier -> Identifier
 namefy = ("__" ++)
 
 --------------------------------------------------------------------------------
@@ -72,7 +95,7 @@ pool = pretty "__termina_pool_t"
 msgQueue = pretty "__termina_msg_queue_id_t"
 mutex = pretty "__termina_mutex_id_t"
 
-enumIdentifier :: String -> DocStyle
+enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty "__enum_" <> pretty identifier
 
 enumVariantsField :: DocStyle
@@ -126,15 +149,18 @@ ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppSize ts
 ppParameter :: Parameter -> DocStyle
 ppParameter (Parameter identifier ts) = ppDeclaration identifier ts
 
-ppPrinterFunctionDeclaration ::
-    Identifier -> -- ^ function identifier (name)
-    [Parameter] -> -- ^ list of parameters (possibly empty)
-    Maybe TypeSpecifier -> -- ^ type of the return value (optional)
+ppFunctionDeclaration ::
+    DocStyle -> -- ^ function identifier (name)
+    [DocStyle] -> -- ^ list of parameters (possibly empty)
+    Maybe DocStyle -> -- ^ type of the return value (optional)
     DocStyle
-ppPrinterFunctionDeclaration identifier parameters rTS =
-  maybe voidC ppRootType rTS <+> 
-    pretty identifier <> 
-      parens (align (fillSep (punctuate comma (map ppParameter parameters))))
+ppFunctionDeclaration identifier parameters rTS =
+  fromMaybe voidC rTS <+> identifier <>
+      parens (align (fillSep (punctuate comma parameters)))
+
+ppFunctionCall :: DocStyle -> [DocStyle] -> DocStyle
+ppFunctionCall identifier parameters = identifier <>
+      parens (align (fillSep (punctuate comma parameters)))
 
 ppModifier :: Modifier a -> DocStyle
 ppModifier (Modifier identifier (Just (KC (I _ integer) _))) = pretty identifier <> parens (pretty integer)
@@ -142,3 +168,11 @@ ppModifier (Modifier identifier (Just (KC (B True) _))) = pretty identifier <> p
 ppModifier (Modifier identifier (Just (KC (B False) _))) = pretty identifier <> parens (pretty "0")
 ppModifier (Modifier identifier (Just (KC (C char) _))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
 ppModifier (Modifier identifier Nothing) = pretty identifier
+
+ppConst :: Const -> DocStyle
+ppConst (B b) = if b then pretty "1" else pretty "0"
+ppConst (I ts integer) = parens (ppRootType ts) <> pretty integer
+ppConst (C char) = pretty char
+
+typeDefEqFunctionName :: Identifier -> Identifier
+typeDefEqFunctionName identifier = "__" ++ identifier ++ "__eq"

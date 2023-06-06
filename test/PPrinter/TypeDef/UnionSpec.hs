@@ -37,5 +37,6 @@ spec = do
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} id0;" ++
-            "\n")
+            "} id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")

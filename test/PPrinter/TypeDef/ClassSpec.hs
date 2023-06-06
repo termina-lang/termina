@@ -104,14 +104,18 @@ spec = do
     it "Prints a class with one method and zero fields" $ do
       renderSingleASTElement classWithOneMethodAndZeroFields `shouldBe`
         pack (
-          "\n" ++ 
+          "\n" ++
+          "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+          "\n" ++
           "void __id0_method0(uint8_t param0, uint16_t param1, uint32_t param2,\n" ++
           "                   uint64_t param3, int8_t param4, int16_t param5,\n" ++
           "                   int32_t param6, int64_t param7);\n")
     it "Prints a class with two methods and zero fields" $ do
       renderSingleASTElement classWithTwoMethodsAndZeroFields `shouldBe`
         pack (
-          "\n" ++ 
+          "\n" ++
+          "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+          "\n" ++
           "void __id0_method0(uint8_t param0, TMPacket * param1);\n" ++
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
@@ -122,7 +126,9 @@ spec = do
             "typedef struct {\n" ++
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
-            "\n" ++ 
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
             "void __id0_method0();\n")
     it "Prints a class marked as no_handler with two fields" $ do
       renderSingleASTElement noHandlerClassWithOneEmptyMethod `shouldBe`
@@ -134,6 +140,8 @@ spec = do
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
             "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
             "void __id0_method0();\n")
     it "Prints a class with one method and two fields" $ do
       renderSingleASTElement classWithOneMethodAndTwoFields `shouldBe`
@@ -142,9 +150,10 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "} id0;" ++
+            "} id0;\n" ++
             "\n" ++
-            "\n" ++ 
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed class" $ do
       renderSingleASTElement packedClass `shouldBe`
@@ -155,6 +164,8 @@ spec = do
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed)) id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
             "\n" ++
             "void __id0_method0(char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
@@ -167,6 +178,8 @@ spec = do
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed & aligned class" $ do
       renderSingleASTElement packedAndAlignedClass `shouldBe`
@@ -177,5 +190,7 @@ spec = do
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
+            "\n" ++
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
             "\n" ++
             "void __id0_method0();\n")

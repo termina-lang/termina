@@ -9,12 +9,13 @@ import PPrinter.Common
 ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppDeclaration identifier ts <> semi
 
-classMethodName :: String -> String -> String
+classMethodName :: Identifier -> Identifier -> Identifier
 classMethodName classId methodId = "__" <> classId <> "_" <> methodId
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
-  ppPrinterFunctionDeclaration (classMethodName classId methodId) parameters rTS <> semi
+  ppFunctionDeclaration (pretty (classMethodName classId methodId))
+    (map ppParameter parameters) (ppRootType <$> rTS) <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
 ppClassField :: ClassMember a -> DocStyle
@@ -67,6 +68,14 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
         ppEnumVariantParameter params [0..]
       ) <+> pretty (namefy identifier) <> semi
 
+ppTypeDefEq :: Identifier -> DocStyle
+ppTypeDefEq identifier = 
+  ppFunctionDeclaration (pretty (typeDefEqFunctionName identifier))
+    (map ppParameter [
+    Parameter "__lhs" (Reference (DefinedType identifier)),
+    Parameter "__rhs" (Reference (DefinedType identifier))])
+  (ppRootType <$> Just UInt8)
+  
 -- | TypeDef pretty printer.
 ppTypeDef :: Printer TypeDef a
 -- | Struct declaration pretty printer
@@ -78,7 +87,9 @@ ppTypeDef before after (Struct identifier fls modifiers anns) =
       indentTab . align $ vsep $
         map ppStructField fls
         ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-    after anns
+    after anns,
+    ppTypeDefEq identifier <> semi,
+    emptyDoc
   ]
 -- | Union declaration pretty printer
 ppTypeDef before after (Union identifier fls modifiers anns) =
@@ -89,7 +100,9 @@ ppTypeDef before after (Union identifier fls modifiers anns) =
       indentTab . align $ vsep $
         map ppStructField fls
         ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-    after anns
+    after anns,
+    ppTypeDefEq identifier <> semi,
+    emptyDoc
   ]
 -- | Enum declaration pretty printer  
 ppTypeDef before after (Enum identifier variants _ anns) =
@@ -118,7 +131,9 @@ ppTypeDef before after (Enum identifier variants _ anns) =
           ]
       ]
     ) <+> pretty identifier <> semi,
-    after anns
+    after anns,
+    ppTypeDefEq identifier <> semi,
+    emptyDoc
   ]
 ppTypeDef before after (Class identifier members modifiers anns) =
   let structModifiers = filterStructModifiers modifiers in
@@ -154,5 +169,5 @@ ppTypeDef before after (Class identifier members modifiers anns) =
         ]
       else
         [emptyDoc])
+      ++ [ppTypeDefEq identifier <> semi, emptyDoc]
       ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods
-
