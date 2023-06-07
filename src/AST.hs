@@ -246,9 +246,9 @@ data ElseIf a = ElseIf
 data Statement a =
   Declaration Identifier TypeSpecifier (Maybe (Expression a)) a
   | AssignmentStmt Identifier (Expression a) a
-  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] a
+  | IfElseStmt (Expression a) (Block a) [ ElseIf a ] (Block a) a
   -- | For loop
-  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] a
+  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) (Block a) a
   | SingleExpStmt (Expression a) a
   -- | ReturnStmt (ReturnStmt a) [ a ]
   deriving (Show, Functor)

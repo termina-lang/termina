@@ -1,81 +1,82 @@
+{-# LANGUAGE DeriveFunctor #-}
 -- | Semantic interpretation of types
 
 module Semantic.Types where
 
 import           AST
+import           Utils.AST
 
 ----------------------------------------
 -- Semantic interpretation of types.
 -- Termina types are the same through out all the transpilation process.
 -- We only have weird ints going around.
-----------------------------------------
-
--- | Task type information
-data SemTask a = STask
-  { taskArgs :: [Parameter]
-  , taskRet  :: TypeSpecifier
-  , taskAnns :: a
-  }
-  deriving Show
-
--- type SemTask = SemTask' SemAnn
-
-----------------------------------------
-
--- | Functions type information
-data SemFunction a = SFunction
-  { funArgs :: [Parameter]
-  , funRet  :: TypeSpecifier
-  , funAnns :: a
-  }
-  deriving Show
-
--- type SemFunction = SemFunction' SemAnn
-
-----------------------------------------
-
--- | Handler type information
-data SemHandler a = SemHandler
-  { handlerArgs :: [Parameter]
-  , handlerRet  :: TypeSpecifier
-  , handlerAnns :: a
-  }
-  deriving Show
-
--- type SemHandler = SemHandler' SemAnn
 
 ----------------------------------------
 
 -- | Global type information
-data SemGlobal a
-  = SVolatile TypeSpecifier a
-  | SStatic TypeSpecifier a
-  | SShared TypeSpecifier a
-  | SConst TypeSpecifier a
+data SemGlobal
+  = SVolatile TypeSpecifier
+  | SStatic TypeSpecifier
+  | SShared TypeSpecifier
+  | SConst TypeSpecifier
   deriving Show
 
 -- type SemGlobal = SemGlobal' SemAnn
 
-getTySemGlobal :: SemGlobal a -> TypeSpecifier
-getTySemGlobal (SVolatile ty _) = ty
-getTySemGlobal (SStatic ty _)   = ty
-getTySemGlobal (SShared ty _)   = ty
-getTySemGlobal (SConst ty _)    = ty
+getTySemGlobal :: SemGlobal -> TypeSpecifier
+getTySemGlobal (SVolatile ty) = ty
+getTySemGlobal (SStatic ty)   = ty
+getTySemGlobal (SShared ty)   = ty
+getTySemGlobal (SConst ty)    = ty
 
 ----------------------------------------
 
 -- | General global entities
 data GEntry a
-  = GFun (SemFunction a)
+  = GFun
+    { funArgs :: [Parameter]
+    , funRet  :: TypeSpecifier
+    }
   -- ^ Functions
-  | GTask (SemTask a)
+  | GTask
+    { taskArgs :: [Parameter]
+    , taskRet  :: TypeSpecifier
+    }
   -- ^ Tasks
-  | GHand (SemHandler a)
+  | GHand
+  { handlerArgs :: [Parameter]
+  , handlerRet  :: TypeSpecifier
+  }
   -- ^ Handlers
-  | GGlob (SemGlobal a)
+  | GGlob SemGlobal
   -- ^ Globals
   | GType (TypeDef a)
   -- ^ Types
-  deriving Show
+  deriving (Functor, Show)
 
 -- type GEntry = GEntry' SemAnn
+
+----------------------------------------
+-- Subtyping.
+-- This fuction says what types can be casted into others.
+casteableTys :: TypeSpecifier -> TypeSpecifier-> Bool
+casteableTys UInt8 UInt16  = True
+casteableTys UInt8 UInt32  = True
+casteableTys UInt8 UInt64  = True
+--
+casteableTys UInt16 UInt32 = True
+casteableTys UInt16 UInt64 = True
+--
+casteableTys UInt32 UInt64 = True
+--
+casteableTys Int8 Int16    = True
+casteableTys Int8 Int32    = True
+casteableTys Int8 Int64    = True
+--
+casteableTys Int16 Int32   = True
+casteableTys Int16 Int64   = True
+--
+casteableTys Int32 Int64   = True
+-- Last option being the same.
+-- This is a trivial casting :muscle:
+casteableTys a b           = groundTyEq a b
