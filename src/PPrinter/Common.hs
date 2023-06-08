@@ -15,12 +15,14 @@ getExpType (Constant _ ann) = ty_ann ann
 getExpType (OptionVariantExpression _ ann) = ty_ann ann
 getExpType (BinOp _ _ _ ann) = ty_ann ann
 getExpType (ReferenceExpression _ ann) = ty_ann ann
+getExpType (DereferenceExpression _ ann) = ty_ann ann
 getExpType (Casting _ _ ann) = ty_ann ann
 getExpType (FunctionExpression _ _ ann) = ty_ann ann
 getExpType (FieldValuesAssignmentsExpression _ _ ann) = ty_ann ann
 getExpType (EnumVariantExpression _ _ _ ann) = ty_ann ann
 getExpType (VectorIndexExpression _ _ ann) = ty_ann ann
 getExpType (VectorInitExpression _ _ ann) = ty_ann ann
+getExpType (ParensExpression expr _) = getExpType expr
 
 getLocation :: Expression SemanticAnns -> Locations
 getLocation (Variable _ ann) = parse ann
@@ -28,12 +30,14 @@ getLocation (Constant _ ann) = parse ann
 getLocation (OptionVariantExpression _ ann) = parse ann
 getLocation (BinOp _ _ _ ann) = parse ann
 getLocation (ReferenceExpression _ ann) = parse ann
+getLocation (DereferenceExpression _ ann) = parse ann
 getLocation (Casting _ _ ann) = parse ann
 getLocation (FunctionExpression _ _ ann) = parse ann
 getLocation (FieldValuesAssignmentsExpression _ _ ann) = parse ann
 getLocation (EnumVariantExpression _ _ _ ann) = parse ann
 getLocation (VectorIndexExpression _ _ ann) = parse ann
 getLocation (VectorInitExpression _ _ ann) = parse ann
+getLocation (ParensExpression expr _) = getLocation expr
 
 -- | Type of the pretty printers
 type Printer a b =
@@ -139,40 +143,47 @@ ppRootType (DynamicSubtype ts) = case ts of
   _ -> ppRootType ts <+> pretty "*"
 ppRootType Unit = error "unsupported type"
 
-ppSize :: TypeSpecifier -> DocStyle
-ppSize (Vector ts (K size)) = ppSize ts <> brackets (pretty size)
-ppSize _ = emptyDoc
+ppDimension :: TypeSpecifier -> DocStyle
+ppDimension (Vector ts (KC size)) = ppDimension ts <> brackets (ppConst size)
+ppDimension _ = emptyDoc
 
 ppDeclaration :: Identifier -> TypeSpecifier -> DocStyle
-ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppSize ts
+ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppDimension ts
 
 ppParameter :: Parameter -> DocStyle
 ppParameter (Parameter identifier ts) = ppDeclaration identifier ts
 
-ppFunctionDeclaration ::
+-- | Pretty print a C function declaration
+ppCFunctionDeclaration ::
     DocStyle -> -- ^ function identifier (name)
     [DocStyle] -> -- ^ list of parameters (possibly empty)
     Maybe DocStyle -> -- ^ type of the return value (optional)
     DocStyle
-ppFunctionDeclaration identifier parameters rTS =
+ppCFunctionDeclaration identifier parameters rTS =
   fromMaybe voidC rTS <+> identifier <>
       parens (align (fillSep (punctuate comma parameters)))
 
-ppFunctionCall :: DocStyle -> [DocStyle] -> DocStyle
-ppFunctionCall identifier parameters = identifier <>
+-- | Pretty print a C function call
+ppCFunctionCall :: DocStyle -> [DocStyle] -> DocStyle
+ppCFunctionCall identifier parameters = identifier <>
       parens (align (fillSep (punctuate comma parameters)))
-
-ppModifier :: Modifier a -> DocStyle
-ppModifier (Modifier identifier (Just (KC (I _ integer) _))) = pretty identifier <> parens (pretty integer)
-ppModifier (Modifier identifier (Just (KC (B True) _))) = pretty identifier <> parens (pretty "1")
-ppModifier (Modifier identifier (Just (KC (B False) _))) = pretty identifier <> parens (pretty "0")
-ppModifier (Modifier identifier (Just (KC (C char) _))) = pretty identifier <> parens (pretty "'" <> pretty char <> pretty "'")
-ppModifier (Modifier identifier Nothing) = pretty identifier
 
 ppConst :: Const -> DocStyle
 ppConst (B b) = if b then pretty "1" else pretty "0"
-ppConst (I ts integer) = parens (ppRootType ts) <> pretty integer
-ppConst (C char) = pretty char
+ppConst (I _ integer) = pretty integer
+ppConst (C char) = pretty "'" <> pretty char <> pretty "'"
 
-typeDefEqFunctionName :: Identifier -> Identifier
-typeDefEqFunctionName identifier = "__" ++ identifier ++ "__eq"
+ppModifier :: Modifier -> DocStyle
+ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (ppConst c)
+ppModifier (Modifier identifier Nothing) = pretty identifier
+
+typeDefEqFunctionName :: Identifier -> DocStyle
+typeDefEqFunctionName identifier = pretty ("__" ++ identifier ++ "__eq")
+
+-- | Pretty print a reference expression
+ppCReferenceExpression :: DocStyle -> DocStyle
+ppCReferenceExpression expr = pretty "&" <> expr
+
+-- | Pretty print a dereference expression
+ppCDereferenceExpression :: DocStyle -> DocStyle
+ppCDereferenceExpression expr = pretty "*" <> expr

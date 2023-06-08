@@ -31,7 +31,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "field0" [UInt32],
     EnumVariant "field1" [],
     EnumVariant "field2" [UInt64, DefinedType "id1", Char],
-    EnumVariant "field3" [Int8, Vector (Vector Char (K 20)) (K 35)]
+    EnumVariant "field3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
   ] [] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text

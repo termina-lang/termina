@@ -20,7 +20,7 @@ unionWithThreeFields = TypeDefinition
   (Union "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K 10))
+    FieldDefinition "field2" (Vector UInt32 (KC (I UInt32 10)))
   ] [] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text

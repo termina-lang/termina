@@ -30,7 +30,7 @@ classWithTwoMethodsAndZeroFields = TypeDefinition (Class "id0" [
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined,
     ClassMethod "method1" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Vector UInt8 (K 32))
+      Parameter "param1" (Vector UInt8 (KC (I UInt32 32)))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [] undefined)
@@ -45,7 +45,7 @@ classWithOneMethodAndTwoFields :: AnnASTElement Annotation
 classWithOneMethodAndTwoFields = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (K 24)),
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [] undefined)
@@ -54,7 +54,7 @@ noHandlerClassWithOneEmptyMethod :: AnnASTElement Annotation
 noHandlerClassWithOneEmptyMethod = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (K 24)),
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [Modifier "no_handler" Nothing] undefined)
@@ -64,10 +64,10 @@ packedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
     ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [
       Parameter "param0" Char,
-      Parameter "param1" (Vector UInt8 (K 16))
+      Parameter "param1" (Vector UInt8 (KC (I UInt32 16)))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [Modifier "packed" Nothing] undefined)
@@ -77,22 +77,22 @@ alignedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
     ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "align" (Just (KC (I UInt32 16) undefined))] undefined)
+  ] [Modifier "align" (Just (KC (I UInt32 16)))] undefined)
 
 packedAndAlignedClass :: AnnASTElement Annotation
 packedAndAlignedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
     ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I UInt32 16) undefined))
+      Modifier "align" (Just (KC (I UInt32 16)))
     ] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text

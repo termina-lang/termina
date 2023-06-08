@@ -28,7 +28,7 @@ data AnnASTElement a =
     [Parameter] -- ^ list of parameters (possibly empty)
     TypeSpecifier -- ^ returned value type (should be TaskRet)
     (BlockRet a) -- ^ statements block
-    [ Modifier a ] -- ^ list of possible modifiers
+    [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   -- | Function constructor
@@ -37,7 +37,7 @@ data AnnASTElement a =
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
     (BlockRet a) -- ^ statements block (with return)
-    [ Modifier a ] -- ^ list of possible modifiers
+    [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   -- | Handler constructor
@@ -46,7 +46,7 @@ data AnnASTElement a =
     [Parameter] -- ^ list of parameters (TBC)
     TypeSpecifier -- ^ returned value type (should be Result)
     (BlockRet a) -- ^ statements block (with return)
-    [ Modifier a ] -- ^ list of possible modifiers
+    [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   -- | Global declaration constructor  
@@ -60,7 +60,7 @@ data AnnASTElement a =
   -- | Module inclusion constructor
   | ModuleInclusion 
     Identifier -- ^ identifier of the module
-    [ Modifier a ] -- ^ list of possible modifiers
+    [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   deriving (Show,Functor)
@@ -69,14 +69,14 @@ data AnnASTElement a =
 -- Since we are not implementing it right now, we only have constants.
 -- The idea is to eventually replace it by constant (at compilation time)
 -- expressions. We also annotate them for debbuging purposes.
-data ConstExpression a = KC Const a
-  deriving (Show,Functor)
+newtype ConstExpression = KC Const
+  deriving (Show)
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier a = Modifier Identifier (Maybe (ConstExpression a))
-  deriving (Show,Functor)
+data Modifier = Modifier Identifier (Maybe ConstExpression)
+  deriving (Show)
 
 -- | Identifiers as `String`
 type Identifier = String
@@ -86,14 +86,15 @@ type Address = Integer
 
 -- | General type specifier
 data TypeSpecifier
+  -- Primitive types
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64
   | Bool | Char | DefinedType Identifier
-  | Vector TypeSpecifier Size
+  | Vector TypeSpecifier ConstExpression
+  | Option TypeSpecifier
+  -- Non-primitive types
   | MsgQueue TypeSpecifier Size
   | Pool TypeSpecifier Size
-  | Option TypeSpecifier
-  -- enum Option<T> {None | Some (a) }
   | Reference TypeSpecifier
   | DynamicSubtype TypeSpecifier
   -- See Q9
@@ -146,15 +147,17 @@ data OptionVariant a = None | Some (Expression a)
 data Expression a
   = Variable Identifier a
   | Constant Const a
+  | ParensExpression (Expression a) a
   | OptionVariantExpression (OptionVariant a) a
   | BinOp Op (Expression a) (Expression a) a
   | ReferenceExpression (Expression a) a
+  | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
   | FunctionExpression Identifier [ Expression a ] a
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
   | EnumVariantExpression Identifier Identifier [ Expression a ] a
   | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
-  | VectorInitExpression (Expression a) (Expression a) a -- ^ Vector initializer
+  | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -171,7 +174,7 @@ data Global a
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       Address -- ^ address where the variable is located
-      [ Modifier a ] -- ^ list of possible modifiers
+      [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Static global variable constructor
@@ -179,7 +182,7 @@ data Global a
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       (Maybe (Expression a)) -- ^ initialization expression (optional)
-      [ Modifier a ] -- ^ list of possible modifiers
+      [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Shared global variable constructor
@@ -187,7 +190,7 @@ data Global a
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       (Maybe (Expression a)) -- ^ initialization expression (optional)
-      [ Modifier a ] -- ^ list of possible modifiers
+      [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Constant constructor
@@ -195,16 +198,16 @@ data Global a
       Identifier -- ^ name of the constant
       TypeSpecifier -- ^ type of the constant
       (Expression a) -- ^ initialization expression
-      [ Modifier a ] -- ^ list of possible modifiers
+      [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
   deriving (Show, Functor)
 
 data TypeDef a
-  = Struct Identifier [FieldDefinition]  [ Modifier a ] a
-  | Union Identifier [FieldDefinition] [ Modifier a ] a
-  | Enum Identifier [EnumVariant] [ Modifier a ] a
-  | Class Identifier [ClassMember a] [ Modifier a ] a
+  = Struct Identifier [FieldDefinition]  [ Modifier ] a
+  | Union Identifier [FieldDefinition] [ Modifier ] a
+  | Enum Identifier [EnumVariant] [ Modifier ] a
+  | Class Identifier [ClassMember a] [ Modifier ] a
   deriving (Show, Functor)
 
 data ClassMember a
@@ -258,14 +261,37 @@ data ElseIf a = ElseIf
   } deriving (Show, Functor)
 
 data Statement a =
-  Declaration Identifier TypeSpecifier (Maybe (Expression a)) a
-  | AssignmentStmt Identifier (Expression a) a
-  | IfElseStmt (Expression a) [ Statement a ] [ ElseIf a ] [ Statement a ] a
+  -- | Declaration statement
+  Declaration 
+    Identifier -- ^ name of the variable
+    TypeSpecifier -- ^ type of the variable
+    (Expression a) -- ^ initialization expression
+    a
+  | AssignmentStmt 
+    Identifier -- ^ name of the variable
+    (Expression a) -- ^ assignment expression
+    a
+  | IfElseStmt
+    (Expression a) -- ^ conditional expression
+    [ Statement a ] -- ^ statements in the if block
+    [ ElseIf a ] -- ^ list of else if blocks
+    [ Statement a ] -- ^ statements in the else block
+    a
   -- | For loop
-  | ForLoopStmt Identifier (Expression a) (Expression a) (Maybe (Expression a)) [ Statement a ] a
-  | MatchStmt (Expression a) [ MatchCase a ] a
-  | SingleExpStmt (Expression a) a
-  -- | ReturnStmt (ReturnStmt a) [ a ]
+  | ForLoopStmt 
+    Identifier -- ^ name of the iterator variable
+    (Expression a) -- ^ initial value of the iterator
+    (Expression a) -- ^ final value of the iterator
+    (Maybe (Expression a)) -- ^ break condition (optional)
+    [ Statement a ] -- ^ statements in the for loop
+    a
+  | MatchStmt
+    (Expression a) -- ^ expression to match
+    [ MatchCase a ] -- ^ list of match cases
+    a
+  | SingleExpStmt
+    (Expression a) -- ^ expression
+    a
   deriving (Show, Functor)
 
 -- | Constant values:

@@ -14,18 +14,26 @@ classMethodName classId methodId = "__" <> classId <> "_" <> methodId
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
-  ppFunctionDeclaration (pretty (classMethodName classId methodId))
+  ppCFunctionDeclaration (pretty (classMethodName classId methodId))
     (map ppParameter parameters) (ppRootType <$> rTS) <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
+-- | Pretty prints a class field
+-- This function is only used when generating the class structure.
+-- It takes as argument the class member to print.
+-- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
 ppClassField (ClassField identifier ts) = ppDeclaration identifier ts <> semi
 ppClassField _ = error "invalid class member"
 
+-- | Pretty prints a class mutex field
+-- This function is only used when generating the class structure.
+-- It returns the pretty printed class mutex field.
+-- This field is only generated if the no_handler modifier is set.
 ppClassMutexField :: DocStyle
 ppClassMutexField = mutex <+> pretty "__mutex_id" <> semi
 
-filterStructModifiers :: [Modifier a] -> [Modifier a]
+filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = foldr (\modifier ms ->
     case modifier of
       Modifier "packed" Nothing -> modifier : ms
@@ -33,13 +41,13 @@ filterStructModifiers = foldr (\modifier ms ->
       _ -> ms
     ) []
 
-filterClassModifiers :: [Modifier a] -> [Modifier a]
+filterClassModifiers :: [Modifier] -> [Modifier]
 filterClassModifiers = foldr (\modifier ms ->
     case modifier of
       Modifier "no_handler" Nothing -> modifier : ms
       _ -> ms) []
 
-hasNoHandler :: [Modifier a] -> Bool
+hasNoHandler :: [Modifier] -> Bool
 hasNoHandler modifiers = case modifiers of
   [] -> False
   (m : ms) -> case m of
@@ -52,7 +60,7 @@ hasNoHandler modifiers = case modifiers of
 ppEnumVariant :: EnumVariant -> DocStyle
 ppEnumVariant (EnumVariant identifier _) = pretty identifier
 
-ppTypeAttributes :: [Modifier a] -> DocStyle
+ppTypeAttributes :: [Modifier] -> DocStyle
 ppTypeAttributes [] = emptyDoc
 ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDoc (comma <> space) (map ppModifier mods))) <> space
 
@@ -70,7 +78,7 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
 
 ppTypeDefEq :: Identifier -> DocStyle
 ppTypeDefEq identifier = 
-  ppFunctionDeclaration (pretty (typeDefEqFunctionName identifier))
+  ppCFunctionDeclaration (typeDefEqFunctionName identifier)
     (map ppParameter [
     Parameter "__lhs" (Reference (DefinedType identifier)),
     Parameter "__rhs" (Reference (DefinedType identifier))])
