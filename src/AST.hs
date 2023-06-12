@@ -148,16 +148,19 @@ data Expression a
   = Variable Identifier a
   | Constant Const a
   | ParensExpression (Expression a) a
-  | OptionVariantExpression (OptionVariant a) a
   | BinOp Op (Expression a) (Expression a) a
+  | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
   | ReferenceExpression (Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
   | FunctionExpression Identifier [ Expression a ] a
-  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
-  | EnumVariantExpression Identifier Identifier [ Expression a ] a
-  | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
+  -- These four constructors cannot be used on regular (primitive?) expressions
+  -- These two can only be used as the RHS of an assignment:
   | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
+  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
+  -- These two can only be used as the RHS of an assignment or as a case of a match expression:
+  | EnumVariantExpression Identifier Identifier [ Expression a ] a
+  | OptionVariantExpression (OptionVariant a) a
   deriving (Show, Functor)
 
 ----------------------------------------
