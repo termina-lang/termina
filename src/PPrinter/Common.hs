@@ -94,64 +94,58 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, mutex :: DocStyle
+pool, msgQueue, mutex, option :: DocStyle
 pool = pretty "__termina_pool_t"
 msgQueue = pretty "__termina_msg_queue_id_t"
 mutex = pretty "__termina_mutex_id_t"
+option = pretty "__termina_option_t"
 
 enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty "__enum_" <> pretty identifier
 
+-- | Pretty prints the name of the field that will store the variant
+-- inside the struct corresponding to the enum.
 enumVariantsField :: DocStyle
 enumVariantsField = pretty "__variant"
 
-ppRootType :: TypeSpecifier -> DocStyle
-ppRootType UInt8 = uint8C
-ppRootType UInt16 = uint16C
-ppRootType UInt32 = uint32C
-ppRootType UInt64 = uint64C
-ppRootType Int8 = int8C
-ppRootType Int16 = int16C
-ppRootType Int32 = int32C
-ppRootType Int64 = int64C
-ppRootType Bool = uint8C
-ppRootType Char = charC
-ppRootType (DefinedType typeIdentifier) = pretty typeIdentifier
-ppRootType (Vector ts _) = ppRootType ts
-ppRootType (Option ts) = case ts of
-  Option ts' -> ppRootType ts'
-  Vector ts' _ -> ppRootType ts'
-  Reference ts' -> ppRootType ts'
-  DynamicSubtype ts' -> ppRootType ts'
-  Unit -> error "unsupported type"
-  _ -> ppRootType ts <+> pretty "*"
-ppRootType (Pool _ _) = pool
-ppRootType (Reference ts) = case ts of
-  Option ts' -> ppRootType ts'
-  Vector ts' _ -> ppRootType ts'
-  Reference ts' -> ppRootType ts'
-  DynamicSubtype ts' -> ppRootType ts'
-  Unit -> error "unsupported type"
-  _ -> ppRootType ts <+> pretty "*"
-ppRootType (MsgQueue _ _) = msgQueue
-ppRootType (DynamicSubtype ts) = case ts of
-  Option ts' -> ppRootType ts'
-  Vector ts' _ -> ppRootType ts'
-  Reference ts' -> ppRootType ts'
-  DynamicSubtype ts' -> ppRootType ts'
-  Unit -> error "unsupported type"
-  _ -> ppRootType ts <+> pretty "*"
-ppRootType Unit = error "unsupported type"
+-- | Pretty prints the corresponding C type of a primitive type
+-- This function is used to pretty print the type of a variable
+ppPrimitiveType :: TypeSpecifier -> DocStyle
+-- | Unsigned integer types
+ppPrimitiveType UInt8 = uint8C
+ppPrimitiveType UInt16 = uint16C
+ppPrimitiveType UInt32 = uint32C
+ppPrimitiveType UInt64 = uint64C
+-- | Signed integer types
+ppPrimitiveType Int8 = int8C
+ppPrimitiveType Int16 = int16C
+ppPrimitiveType Int32 = int32C
+ppPrimitiveType Int64 = int64C
+ppPrimitiveType Bool = uint8C
+ppPrimitiveType Char = charC
+ppPrimitiveType (DefinedType typeIdentifier) = pretty typeIdentifier
+-- | Vector type
+-- The type of the vector is the type of the elements
+ppPrimitiveType (Vector ts _) = ppPrimitiveType ts
+-- | Option type
+ppPrimitiveType (Option _) = option <+> pretty "*"
+-- Non-primitive types:
+ppPrimitiveType _ = error "unsupported type"
 
 ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (KC size)) = ppDimension ts <> brackets (ppConst size)
 ppDimension _ = emptyDoc
 
-ppDeclaration :: Identifier -> TypeSpecifier -> DocStyle
-ppDeclaration identifier ts = ppRootType ts <+> pretty identifier <> ppDimension ts
+ppReturnType :: TypeSpecifier -> DocStyle
+ppReturnType (Vector ts _) = ppPrimitiveType ts <+> pretty "*"
+ppReturnType ts = ppPrimitiveType ts
 
-ppParameter :: Parameter -> DocStyle
-ppParameter (Parameter identifier ts) = ppDeclaration identifier ts
+ppParameterDeclaration :: Parameter -> DocStyle
+ppParameterDeclaration (Parameter identifier (Reference ts)) = 
+  case ts of 
+    (Vector _ _) -> ppPrimitiveType ts <+> pretty ("__ref__" ++ identifier) <> ppDimension ts
+    _ -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
+ppParameterDeclaration (Parameter identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
 
 -- | Pretty print a C function declaration
 ppCFunctionDeclaration ::
@@ -186,4 +180,4 @@ ppCReferenceExpression expr = pretty "&" <> expr
 
 -- | Pretty print a dereference expression
 ppCDereferenceExpression :: DocStyle -> DocStyle
-ppCDereferenceExpression expr = pretty "*" <> expr
+ppCDereferenceExpression expr = pretty "*" <> parens expr

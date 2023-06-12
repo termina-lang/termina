@@ -8,5 +8,5 @@ import Semantic.Monad
 import PPrinter.Expression
 
 ppStatement :: Statement SemanticAnns -> DocStyle
-ppStatement (SingleExpStmt expr ann) = ppExpression expr <> semi
+ppStatement (SingleExpStmt expr _) = ppExpression expr <> semi
 

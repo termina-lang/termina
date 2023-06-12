@@ -7,7 +7,7 @@ import PPrinter.Common
 
 
 ppStructField :: FieldDefinition -> DocStyle
-ppStructField (FieldDefinition identifier ts) = ppDeclaration identifier ts <> semi
+ppStructField (FieldDefinition identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 
 classMethodName :: Identifier -> Identifier -> Identifier
 classMethodName classId methodId = "__" <> classId <> "_" <> methodId
@@ -15,7 +15,7 @@ classMethodName classId methodId = "__" <> classId <> "_" <> methodId
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
   ppCFunctionDeclaration (pretty (classMethodName classId methodId))
-    (map ppParameter parameters) (ppRootType <$> rTS) <> semi
+    (map ppParameterDeclaration parameters) (ppReturnType <$> rTS) <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
 -- | Pretty prints a class field
@@ -23,7 +23,7 @@ ppClassMethodDeclaration _ _ = error "invalid class membeer"
 -- It takes as argument the class member to print.
 -- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts) = ppDeclaration identifier ts <> semi
+ppClassField (ClassField identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 ppClassField _ = error "invalid class member"
 
 -- | Pretty prints a class mutex field
@@ -66,7 +66,7 @@ ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDo
 
 ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
-  ppDeclaration (namefy (show index)) ts <> semi
+  ppPrimitiveType ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
 
 ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant identifier params) =
@@ -79,10 +79,9 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
 ppTypeDefEq :: Identifier -> DocStyle
 ppTypeDefEq identifier = 
   ppCFunctionDeclaration (typeDefEqFunctionName identifier)
-    (map ppParameter [
-    Parameter "__lhs" (Reference (DefinedType identifier)),
-    Parameter "__rhs" (Reference (DefinedType identifier))])
-  (ppRootType <$> Just UInt8)
+    [pretty identifier <+> pretty "*" <+> pretty "__lhs",
+     pretty identifier <+> pretty "*" <+> pretty "__rhs"]
+    (ppPrimitiveType <$> Just UInt8)
   
 -- | TypeDef pretty printer.
 ppTypeDef :: Printer TypeDef a
