@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.UnionSpec (spec) where
+module UT.PPrinter.TypeDef.UnionSpec (spec) where
 
 import Test.Hspec
 import PPrinter

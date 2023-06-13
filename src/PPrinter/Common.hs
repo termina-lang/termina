@@ -141,8 +141,8 @@ ppReturnType (Vector ts _) = ppPrimitiveType ts <+> pretty "*"
 ppReturnType ts = ppPrimitiveType ts
 
 ppParameterDeclaration :: Parameter -> DocStyle
-ppParameterDeclaration (Parameter identifier (Reference ts)) = 
-  case ts of 
+ppParameterDeclaration (Parameter identifier (Reference ts)) =
+  case ts of
     (Vector _ _) -> ppPrimitiveType ts <+> pretty ("__ref__" ++ identifier) <> ppDimension ts
     _ -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
 ppParameterDeclaration (Parameter identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
@@ -171,8 +171,17 @@ ppModifier :: Modifier -> DocStyle
 ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (ppConst c)
 ppModifier (Modifier identifier Nothing) = pretty identifier
 
+methodName :: Identifier -> Identifier -> DocStyle
+methodName identifier method = pretty("__" ++ identifier ++ "_" ++ method)
+
 typeDefEqFunctionName :: Identifier -> DocStyle
-typeDefEqFunctionName identifier = pretty ("__" ++ identifier ++ "__eq")
+typeDefEqFunctionName identifier = methodName identifier "_eq"
+
+poolMethodName :: Identifier -> DocStyle
+poolMethodName = methodName "pool"
+
+msgQueueMethodName :: Identifier -> DocStyle
+msgQueueMethodName = methodName "msg_queue"
 
 -- | Pretty print a reference expression
 ppCReferenceExpression :: DocStyle -> DocStyle

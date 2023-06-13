@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.EnumSpec (spec) where
+module UT.PPrinter.TypeDef.EnumSpec (spec) where
 
 import Test.Hspec
 import PPrinter

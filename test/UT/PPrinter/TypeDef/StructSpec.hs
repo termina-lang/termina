@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.StructSpec (spec) where
+module UT.PPrinter.TypeDef.StructSpec (spec) where
 
 import Test.Hspec
 import PPrinter

@@ -9,12 +9,12 @@ import PPrinter.Common
 ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 
-classMethodName :: Identifier -> Identifier -> Identifier
-classMethodName classId methodId = "__" <> classId <> "_" <> methodId
+classMethodName :: Identifier -> Identifier -> DocStyle
+classMethodName = methodName
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
-  ppCFunctionDeclaration (pretty (classMethodName classId methodId))
+  ppCFunctionDeclaration (classMethodName classId methodId)
     (map ppParameterDeclaration parameters) (ppReturnType <$> rTS) <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
@@ -77,12 +77,12 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
       ) <+> pretty (namefy identifier) <> semi
 
 ppTypeDefEq :: Identifier -> DocStyle
-ppTypeDefEq identifier = 
+ppTypeDefEq identifier =
   ppCFunctionDeclaration (typeDefEqFunctionName identifier)
     [pretty identifier <+> pretty "*" <+> pretty "__lhs",
      pretty identifier <+> pretty "*" <+> pretty "__rhs"]
     (ppPrimitiveType <$> Just UInt8)
-  
+
 -- | TypeDef pretty printer.
 ppTypeDef :: Printer TypeDef a
 -- | Struct declaration pretty printer

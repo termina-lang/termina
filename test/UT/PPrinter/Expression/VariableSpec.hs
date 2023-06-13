@@ -1,4 +1,4 @@
-module PPrinter.Expression.VariableSpec (spec) where
+module UT.PPrinter.Expression.VariableSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -6,33 +6,19 @@ import AST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
+import UT.PPrinter.Expression.Common
 
-integerTS, vectorTS, twoDimVectorTS, threeDimVectorTS :: TypeSpecifier
-integerTS = UInt16
-vectorTS = Vector UInt32 (KC (I UInt32 10))
-twoDimVectorTS = Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10))
-threeDimVectorTS = Vector (Vector (Vector Char (KC (I UInt32 40))) (KC (I UInt32 5))) (KC (I UInt32 10))
-
-
-integerVariable :: Expression SemanticAnns
-integerVariable = Variable "id0" (SemAnn undefined integerTS)
-
-vectorVariable :: Expression SemanticAnns
+integerVariable, vectorVariable, twoDimensionVectorVariable :: Expression SemanticAnns
+integerVariable = Variable "id0" (SemAnn undefined uint16TS)
 vectorVariable = Variable "id0" (SemAnn undefined vectorTS)
-
-twoDimensionVectorVariable :: Expression SemanticAnns
 twoDimensionVectorVariable = Variable "id0" (SemAnn undefined twoDimVectorTS)
 
-dynamicIntegerVariable :: Expression SemanticAnns
-dynamicIntegerVariable = Variable "id0" (SemAnn undefined (DynamicSubtype integerTS))
-
-dynamicVectorVariable :: Expression SemanticAnns
+dynamicIntegerVariable, dynamicVectorVariable :: Expression SemanticAnns
+dynamicIntegerVariable = Variable "id0" (SemAnn undefined (DynamicSubtype uint16TS))
 dynamicVectorVariable = Variable "id0" (SemAnn undefined (DynamicSubtype vectorTS))
 
-dynamicTwoDimensionVectorVariable :: Expression SemanticAnns
+dynamicTwoDimensionVectorVariable, dynamicThreeDimensionVectorVariable :: Expression SemanticAnns
 dynamicTwoDimensionVectorVariable = Variable "id0" (SemAnn undefined (DynamicSubtype twoDimVectorTS))
-
-dynamicThreeDimensionVectorVariable :: Expression SemanticAnns
 dynamicThreeDimensionVectorVariable = Variable "id0" (SemAnn undefined (DynamicSubtype threeDimVectorTS))
 
 renderExpression :: Expression SemanticAnns -> Text
@@ -50,12 +36,15 @@ spec = do
     it "Prints the name of a variable of type [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression twoDimensionVectorVariable `shouldBe`
         pack "id0"
+    it "Prints the name of a variable of type [[i64; 5 : u32]; 10 : u32] between parenthesis" $ do
+      renderExpression (ParensExpression twoDimensionVectorVariable (SemAnn undefined twoDimVectorTS)) `shouldBe`
+        pack "(id0)"
     it "Prints the name of a 'dyn variable of type u16" $ do
       renderExpression dynamicIntegerVariable `shouldBe`
         pack "*((uint16_t *)id0.datum)"
-    it "Prints the name of a 'dyn variable of type [u32; 10 : u32]" $ do
-      renderExpression dynamicVectorVariable `shouldBe`
-        pack "((uint32_t *)id0.datum)"
+    it "Prints the name of a 'dyn variable of type [u32; 10 : u32] between parenthesis" $ do
+      renderExpression (ParensExpression dynamicVectorVariable (SemAnn undefined (DynamicSubtype vectorTS))) `shouldBe`
+        pack "(((uint32_t *)id0.datum))"
     it "Prints the name of a 'dyn variable of type [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression dynamicTwoDimensionVectorVariable `shouldBe`
         pack "((int64_t (*)[10])id0.datum)"

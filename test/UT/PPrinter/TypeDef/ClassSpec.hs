@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.ClassSpec (spec) where
+module UT.PPrinter.TypeDef.ClassSpec (spec) where
 
 import Test.Hspec
 import PPrinter
