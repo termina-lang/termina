@@ -125,7 +125,7 @@ data Op
   | Multiplication
   | Division
   | Addition
-  | Substraction
+  | Subtraction
   | BitwiseLeftShift
   | BitwiseRightShift
   | RelationalLT

@@ -263,7 +263,7 @@ expressionParser' = Ex.buildExpressionParser
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft]
     ,[binaryInfix "+" Addition Ex.AssocLeft,
-      binaryInfix "-" Substraction Ex.AssocLeft]
+      binaryInfix "-" Subtraction Ex.AssocLeft]
     ,[binaryInfix "<<" BitwiseLeftShift Ex.AssocLeft,
       binaryInfix ">>" BitwiseRightShift Ex.AssocLeft]
     ,[binaryInfix "<" RelationalLT Ex.AssocLeft,
