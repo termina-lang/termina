@@ -25,7 +25,7 @@ classWithTwoMethodsAndZeroFields :: AnnASTElement Annotation
 classWithTwoMethodsAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Option (DefinedType "TMPacket"))
+      Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined,
     ClassMethod "method1" [
@@ -116,7 +116,7 @@ spec = do
           "\n" ++
           "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
           "\n" ++
-          "void __id0_method0(uint8_t param0, __termina_option_t * param1);\n" ++
+          "void __id0_method0(uint8_t param0, __Option_dyn_t param1);\n" ++
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one method and zero fields" $ do

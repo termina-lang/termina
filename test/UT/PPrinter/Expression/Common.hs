@@ -18,8 +18,9 @@ charConst = Constant (C 'a') (SemAnn undefined Char)
 trueBool = Constant (B True) (SemAnn undefined Bool)
 falseBool = Constant (B False) (SemAnn undefined Bool)
 
-uint16TS, vectorTS, twoDimVectorTS, threeDimVectorTS :: TypeSpecifier
+uint16TS, uint32TS, vectorTS, twoDimVectorTS, threeDimVectorTS :: TypeSpecifier
 uint16TS = UInt16
+uint32TS = UInt32
 vectorTS = Vector UInt32 (KC (I UInt32 10))
 twoDimVectorTS = Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10))
 threeDimVectorTS = Vector (Vector (Vector Char (KC (I UInt32 40))) (KC (I UInt32 5))) (KC (I UInt32 10))

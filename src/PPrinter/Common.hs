@@ -94,19 +94,19 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, mutex, option :: DocStyle
+pool, msgQueue, mutex, optionDyn :: DocStyle
 pool = pretty "__termina_pool_t"
 msgQueue = pretty "__termina_msg_queue_id_t"
 mutex = pretty "__termina_mutex_id_t"
-option = pretty "__termina_option_t"
+optionDyn = pretty "__Option_dyn_t"
 
 enumIdentifier :: Identifier -> DocStyle
-enumIdentifier identifier = pretty "__enum_" <> pretty identifier
+enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
 
 -- | Pretty prints the name of the field that will store the variant
 -- inside the struct corresponding to the enum.
 enumVariantsField :: DocStyle
-enumVariantsField = pretty "__variant"
+enumVariantsField = pretty (namefy "variant")
 
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
@@ -128,7 +128,7 @@ ppPrimitiveType (DefinedType typeIdentifier) = pretty typeIdentifier
 -- The type of the vector is the type of the elements
 ppPrimitiveType (Vector ts _) = ppPrimitiveType ts
 -- | Option type
-ppPrimitiveType (Option _) = option <+> pretty "*"
+ppPrimitiveType (Option (DynamicSubtype _)) = optionDyn
 -- Non-primitive types:
 ppPrimitiveType _ = error "unsupported type"
 

@@ -52,28 +52,61 @@ ppDynamicSubtypeObjectAddress expr =
             parens (ppDynamicSubtypeCast ts) <> ppExpression' expr <> pretty ".datum"
         _ -> error "unsupported expression"
 
+ppRefDynamicSubtypeObjectAddress :: Expression SemanticAnns -> DocStyle
+ppRefDynamicSubtypeObjectAddress expr =
+    case getExpType expr of
+        Reference (DynamicSubtype ts) ->
+            parens (ppDynamicSubtypeCast ts) <> (
+                case expr of 
+                    (ReferenceExpression _ _) ->  parens (ppExpression expr)
+                    _ -> ppExpression expr
+            ) <> pretty "->datum"
+        _ -> error "unsupported expression"
+
 ppDynamicSubtypeObject :: Expression SemanticAnns -> DocStyle
 ppDynamicSubtypeObject expr = ppCDereferenceExpression (ppDynamicSubtypeObjectAddress expr)
+
+ppRefDynamicSubtypeObject :: Expression SemanticAnns -> DocStyle
+ppRefDynamicSubtypeObject expr = ppCDereferenceExpression (ppRefDynamicSubtypeObjectAddress expr)
 
 ppMemberAccessExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 -- | If the right hand side is a function, then it is a method call
 ppMemberAccessExpression lhs (FunctionExpression methodId params _) =
     case getExpType lhs of
+        (Reference ts) ->
+            case ts of
+                -- | If the left hand size is a class:
+                (DefinedType classId) ->
+                    ppCFunctionCall
+                        (classMethodName classId methodId)
+                        (ppExpression lhs : map ppRootExpression params)
+                -- | If the left hand side is a pool:
+                (Pool _ _) ->
+                    ppCFunctionCall
+                        (poolMethodName methodId)
+                        (ppExpression lhs : map ppRootExpression params)
+                -- | If the left hand side is a message queue:
+                (MsgQueue _ _) ->
+                    ppCFunctionCall
+                        (msgQueueMethodName methodId)
+                        (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
+                -- | Anything else should not happen
+                _ -> error "unsupported expression"
         -- | If the left hand size is a class:
         (DefinedType classId) ->
             ppCFunctionCall
                 (classMethodName classId methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppParameterValue params)
+                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
         -- | If the left hand side is a pool:
         (Pool _ _) ->
             ppCFunctionCall
                 (poolMethodName methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppParameterValue params)
+                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
         -- | If the left hand side is a message queue:
         (MsgQueue _ _) ->
             ppCFunctionCall
                 (msgQueueMethodName methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppParameterValue params)
+                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
         -- | Anything else should not happen
         _ -> error "unsupported expression"
 -- | If the right hand side is not a function, then it is a field
@@ -167,7 +200,7 @@ ppExpression' (BinOp op expr1 expr2 _) =
     ppExpression expr1 <> ppBinaryOperator op <> ppExpression expr2
 ppExpression' (Casting expr' ts' _) = parens (ppPrimitiveType ts') <> ppExpression expr'
 ppExpression' (FunctionExpression identifier params _) =
-    ppCFunctionCall (pretty identifier) (map ppParameterValue params)
+    ppCFunctionCall (pretty identifier) (map ppRootExpression params)
 ppExpression' (VectorIndexExpression vector index _) =
     ppExpression vector <> brackets (ppExpression index)
 ppExpression' _ = error "unsupported expression"
@@ -177,14 +210,18 @@ ppExpression' _ = error "unsupported expression"
 -- not part of complex statements (i.e., match or assignments).
 ppExpression :: Expression SemanticAnns -> DocStyle
 ppExpression (ParensExpression expr _) = parens (ppExpression expr)
+-- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
 ppExpression (ReferenceExpression expr _) =
     case getExpType expr of
-        (DynamicSubtype _) -> parens (ppDynamicSubtypeObjectAddress expr)
+        -- | Any reference of a dynamic subtype is a reference to the __dyn_t structure  
+        (DynamicSubtype _) -> ppCReferenceExpression (ppExpression' expr)
+        -- | A reference to a vector is the vector itself  
         (Vector _ _) -> ppExpression expr
         _ -> ppCReferenceExpression (ppExpression expr)
 ppExpression (DereferenceExpression expr _) =
     case getExpType expr of
-        (Reference (DynamicSubtype _)) -> ppExpression expr
+        (Reference (DynamicSubtype (Vector _ _))) -> parens (ppRefDynamicSubtypeObjectAddress expr)
+        (Reference (DynamicSubtype _)) -> ppRefDynamicSubtypeObject expr
         (Reference (Vector _ _)) -> ppExpression expr
         _ -> ppCDereferenceExpression (ppExpression expr)
 ppExpression expr =
@@ -193,21 +230,13 @@ ppExpression expr =
         (DynamicSubtype _) -> ppDynamicSubtypeObject expr
         _ -> ppExpression' expr
 
--- | Pretty printer for the parameters of a function call
--- This printer is used to print the parameters of a function call.
--- The reason for this function to exist is that, when passed as parameters,
--- dynamic subtypes are not dereferenced.
-ppParameterValue :: Expression SemanticAnns -> DocStyle
-ppParameterValue (ParensExpression expr _) = parens (ppParameterValue expr)
-ppParameterValue (ReferenceExpression expr _) =
-    case getExpType expr of
-        (DynamicSubtype _) -> ppExpression' expr
-        (Vector _ _) -> ppExpression expr
-        _ -> ppCReferenceExpression (ppExpression expr)
-ppParameterValue (DereferenceExpression expr _) =
-    case getExpType expr of
-        -- A DynamicSubtype should never be dereferenced as a parameter.
-        -- We assume that the semantic analyzer has already checked this.
-        (Reference (Vector _ _)) -> ppExpression expr
-        _ -> ppCDereferenceExpression (ppExpression expr)
-ppParameterValue expr = ppExpression' expr
+-- | Pretty printer for a root expression
+-- This printer is used to print the parameters of a function call or to print
+-- single expression statements.
+ppRootExpression :: Expression SemanticAnns -> DocStyle
+ppRootExpression (ParensExpression expr _) = parens (ppRootExpression expr)
+ppRootExpression expr =
+    case expr of
+        (ReferenceExpression _ _) -> ppExpression expr
+        (DereferenceExpression _ _) -> ppExpression expr
+        _ -> ppExpression' expr
