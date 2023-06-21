@@ -85,7 +85,7 @@ logicalOrConst = BinOp LogicalOr falseBool trueBool (SemAnn undefined Bool)
 logicalOrExpr = BinOp LogicalOr var1LTConstant var2EqVar3 (SemAnn undefined Bool)
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do

@@ -34,7 +34,7 @@ tmChannelsend = BinOp MemberAccess tmChannel send (SemAnn undefined uint32TS)
 resource0foo0 = BinOp MemberAccess resource0 foo0 (SemAnn undefined uint32TS)
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do

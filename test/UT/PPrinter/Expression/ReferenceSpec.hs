@@ -39,7 +39,7 @@ derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined (
 derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined (DynamicSubtype twoDimVectorTS))
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do

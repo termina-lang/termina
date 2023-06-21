@@ -54,7 +54,7 @@ var0DivVar1 :: Expression SemanticAnns
 var0DivVar1 = BinOp Division var0 var1 (SemAnn undefined uint16TS)
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do

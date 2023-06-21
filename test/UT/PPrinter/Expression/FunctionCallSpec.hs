@@ -87,7 +87,7 @@ call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, dynVar1Plus
 call4Parameters = FunctionExpression "foo4" [dynVector0, referenceDynVar1, functionCallSingleVar0, call2Parameters] (SemAnn undefined Unit)
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do

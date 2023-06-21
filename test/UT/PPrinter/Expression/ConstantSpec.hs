@@ -11,7 +11,7 @@ import UT.PPrinter.Expression.Common
 
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppRootExpression
 
 spec :: Spec
 spec = do
