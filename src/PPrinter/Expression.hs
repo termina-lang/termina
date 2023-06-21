@@ -206,22 +206,19 @@ ppExpression' (VectorIndexExpression vector index _) =
 ppExpression' _ = error "unsupported expression"
 
 -- | Expression pretty printer
--- This printer can only be used simple expressions that are
--- not part of complex statements (i.e., match or assignments).
 ppExpression :: Expression SemanticAnns -> DocStyle
 ppExpression (ParensExpression expr _) = parens (ppExpression expr)
 -- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
 ppExpression (ReferenceExpression expr _) =
     case getExpType expr of
-        -- | Any reference of a dynamic subtype is a reference to the __dyn_t structure  
-        (DynamicSubtype _) -> ppCReferenceExpression (ppExpression' expr)
+        -- | A reference to a dynamic subtype is the address of the datum
+        (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress expr
         -- | A reference to a vector is the vector itself  
         (Vector _ _) -> ppExpression expr
         _ -> ppCReferenceExpression (ppExpression expr)
 ppExpression (DereferenceExpression expr _) =
     case getExpType expr of
-        (Reference (DynamicSubtype (Vector _ _))) -> parens (ppRefDynamicSubtypeObjectAddress expr)
-        (Reference (DynamicSubtype _)) -> ppRefDynamicSubtypeObject expr
+        (Reference (DynamicSubtype (Vector _ _))) -> parens (ppExpression expr)
         (Reference (Vector _ _)) -> ppExpression expr
         _ -> ppCDereferenceExpression (ppExpression expr)
 ppExpression expr =

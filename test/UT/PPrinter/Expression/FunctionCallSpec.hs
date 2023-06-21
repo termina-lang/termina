@@ -109,7 +109,7 @@ spec = do
         pack "foo(&var0)"
     it "Prints the expression: foo(&dynVar1)" $ do
       renderExpression functionCallSingleRefDynVar1 `shouldBe`
-        pack "foo(&dynVar1)"
+        pack "foo((uint16_t *)dynVar1.datum)"
     it "Prints the expression: foo(*p_var2)" $ do
       renderExpression functionCallSingleDerefVar0 `shouldBe`
         pack "foo(*(p_var2))"
@@ -127,10 +127,10 @@ spec = do
         pack "foo(*(p_var2) + (uint16_t)1024)"
     it "Prints the expression: foo(*p_var3 + 1024 : u16)" $ do
       renderExpression functionCallSingleDerefpDynVar3PlusConstant `shouldBe`
-        pack "foo(*((uint16_t *)p_dynVar3->datum) + (uint16_t)1024)"
+        pack "foo(*(p_dynVar3) + (uint16_t)1024)"
     it "Prints the expression: foo(*p_var2 + *p_dynVar3)" $ do
       renderExpression functionCallSingleDerefpVar2PlusDerefpDynVar3 `shouldBe`
-        pack "foo(*(p_var2) + *((uint16_t *)p_dynVar3->datum))"
+        pack "foo(*(p_var2) + *(p_dynVar3))"
     it "Prints the expression: foo(vector0)" $ do
       renderExpression functionCallSingleVector0 `shouldBe`
         pack "foo(vector0)"
@@ -142,7 +142,7 @@ spec = do
         pack "foo(dynVector0)"
     it "Prints the expression: foo(&dynVector0)" $ do
       renderExpression functionCallSingleRefDynVector0 `shouldBe`
-        pack "foo(&dynVector0)"
+        pack "foo((uint32_t *)dynVector0.datum)"
     it "Prints the expression: foo(p_vector1)" $ do
       renderExpression functionCallSinglepVector1 `shouldBe`
         pack "foo(p_vector1)"
@@ -159,5 +159,5 @@ spec = do
     it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + (uint16_t)1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`
         pack (
-          "foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + (uint16_t)1024,\n" ++
-          "                                           var0 + *((uint16_t *)dynVar1.datum)))")
+          "foo4(dynVector0, (uint16_t *)dynVar1.datum, foo(var0),\n" ++
+          "     foo2(var0 + (uint16_t)1024, var0 + *((uint16_t *)dynVar1.datum)))")
