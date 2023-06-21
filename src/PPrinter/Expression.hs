@@ -198,7 +198,10 @@ ppExpression' (BinOp RelationalNotEqual lhs rhs _) = ppRelationalNotEqualExpress
 ppExpression' (BinOp MemberAccess lhs rhs _) = ppMemberAccessExpression lhs rhs
 ppExpression' (BinOp op expr1 expr2 _) =
     ppExpression expr1 <> ppBinaryOperator op <> ppExpression expr2
-ppExpression' (Casting expr' ts' _) = parens (ppPrimitiveType ts') <> ppExpression expr'
+ppExpression' (Casting expr' ts' _) = 
+    case expr' of
+        (Constant (I _ integer) _) -> parens (ppPrimitiveType ts') <> pretty integer
+        _ -> parens (ppPrimitiveType ts') <> ppExpression expr'
 ppExpression' (FunctionExpression identifier params _) =
     ppCFunctionCall (pretty identifier) (map ppRootExpression params)
 ppExpression' (VectorIndexExpression vector index _) =
