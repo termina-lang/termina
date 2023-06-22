@@ -24,9 +24,9 @@ pVector0expr = ReferenceExpression vector0 (SemAnn undefined (Reference vectorTS
 pVector1expr = ReferenceExpression vector1 (SemAnn undefined (Reference twoDimVectorTS))
 
 pDynVar0expr, pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVar0expr = ReferenceExpression dynVar0 (SemAnn undefined (Reference (DynamicSubtype uint16TS)))
-pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference (DynamicSubtype vectorTS)))
-pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference (DynamicSubtype twoDimVectorTS)))
+pDynVar0expr = ReferenceExpression dynVar0 (SemAnn undefined (Reference uint16TS))
+pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference vectorTS))
+pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference twoDimVectorTS))
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
 derefpVar0 = DereferenceExpression pVar0expr (SemAnn undefined uint16TS)
@@ -34,9 +34,9 @@ derefpVector0 = DereferenceExpression pVector0expr (SemAnn undefined vectorTS)
 derefpVector1 = DereferenceExpression pVector1expr (SemAnn undefined twoDimVectorTS)
 
 derefpDynVar0expr, derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVar0expr = DereferenceExpression pDynVar0expr (SemAnn undefined (DynamicSubtype uint16TS))
-derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined (DynamicSubtype vectorTS))
-derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined (DynamicSubtype twoDimVectorTS))
+derefpDynVar0expr = DereferenceExpression pDynVar0expr (SemAnn undefined uint16TS)
+derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined vectorTS)
+derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined twoDimVectorTS)
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppRootExpression
@@ -77,8 +77,8 @@ spec = do
         pack "*((uint16_t *)dyn_var0.datum)"
     it "Prints the expression: *&dyn_vector0" $ do
       renderExpression derefpDynVector0expr `shouldBe`
-        pack "((uint32_t *)dyn_vector0.datum)"
+        pack "(uint32_t *)dyn_vector0.datum"
     it "Prints the expression: *&dyn_vector1" $ do
       renderExpression derefpDynVector1expr `shouldBe`
-        pack "((int64_t (*)[10])dyn_vector1.datum)"
+        pack "(int64_t (*)[10])dyn_vector1.datum"
 

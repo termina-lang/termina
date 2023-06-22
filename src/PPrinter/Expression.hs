@@ -221,7 +221,6 @@ ppExpression (ReferenceExpression expr _) =
         _ -> ppCReferenceExpression (ppExpression expr)
 ppExpression (DereferenceExpression expr _) =
     case getExpType expr of
-        (Reference (DynamicSubtype (Vector _ _))) -> parens (ppExpression expr)
         (Reference (Vector _ _)) -> ppExpression expr
         _ -> ppCDereferenceExpression (ppExpression expr)
 ppExpression expr =

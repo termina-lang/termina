@@ -37,8 +37,8 @@ pVector0expr :: Expression SemanticAnns
 pVector0expr = ReferenceExpression vector0 (SemAnn undefined (Reference vectorTS))
 
 pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference (DynamicSubtype vectorTS)))
-pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference (DynamicSubtype twoDimVectorTS)))
+pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference vectorTS))
+pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference twoDimVectorTS))
 
 derefpVector0 :: Expression SemanticAnns
 derefpVector0 = DereferenceExpression pVector0expr (SemAnn undefined vectorTS)
@@ -48,8 +48,8 @@ derefpVector0IndexConstant = VectorIndexExpression derefpVector0 uint32Index3 (S
 derefpVector0IndexVar0 = VectorIndexExpression derefpVector0 var0 (SemAnn undefined uint32TS)
 
 derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined (DynamicSubtype vectorTS))
-derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined (DynamicSubtype twoDimVectorTS))
+derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined vectorTS)
+derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined twoDimVectorTS)
 
 derefpDynVector0IndexExpression :: Expression SemanticAnns
 derefpDynVector0IndexExpression = VectorIndexExpression derefpDynVector0expr uint32Index3 (SemAnn undefined uint32TS)
@@ -87,7 +87,7 @@ spec = do
         pack "vector0[var0]" 
     it "Prints the expression: *dyn_vector0[3 : u32]" $ do
       renderExpression derefpDynVector0IndexExpression `shouldBe`
-        pack "((uint32_t *)dyn_vector0.datum)[(uint32_t)3]"
+        pack "(uint32_t *)dyn_vector0.datum[(uint32_t)3]"
     it "Prints the expression: *vector1[3 : u32][4 : u32]" $ do
       renderExpression derefpDynVector1IndexExpression `shouldBe`
-        pack "((int64_t (*)[10])dyn_vector1.datum)[(uint32_t)3][(uint32_t)4]"
+        pack "(int64_t (*)[10])dyn_vector1.datum[(uint32_t)3][(uint32_t)4]"
