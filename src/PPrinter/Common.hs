@@ -177,6 +177,12 @@ methodName identifier method = pretty("__" ++ identifier ++ "_" ++ method)
 typeDefEqFunctionName :: Identifier -> DocStyle
 typeDefEqFunctionName identifier = methodName identifier "_eq"
 
+structAssignAnonymFunctionName :: Identifier -> DocStyle
+structAssignAnonymFunctionName identifier = methodName identifier "_assign"
+
+enumAssignAnonymFunctionName :: Identifier -> Identifier -> DocStyle
+enumAssignAnonymFunctionName identifier variant = methodName identifier (variant ++ "__assign")
+
 poolMethodName :: Identifier -> DocStyle
 poolMethodName = methodName "pool"
 

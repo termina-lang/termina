@@ -54,7 +54,9 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0_field0__assign(id0 * __self);\n")
     it "Prints an enum with two regular fields" $ do
       renderSingleASTElement enumWithTwoRegularFields `shouldBe`
         pack (
@@ -70,7 +72,10 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0_field0__assign(id0 * __self);\n" ++
+            "void __id0_field1__assign(id0 * __self);\n")
     it "Prints an enum with one parameterized field" $ do
       renderSingleASTElement enumWithOneParameterizedField `shouldBe`
         pack (
@@ -91,7 +96,9 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0_field0__assign(id0 * __self, uint32_t __0);\n")
     it "Prints an enum with multiple parameterized fields" $ do
       renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
         pack (
@@ -124,4 +131,9 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0_field0__assign(id0 * __self, uint32_t __0);\n" ++
+            "void __id0_field1__assign(id0 * __self);\n" ++
+            "void __id0_field2__assign(id0 * __self, uint64_t __0, id1 * __1, char __2);\n" ++
+            "void __id0_field3__assign(id0 * __self, int8_t __0, char * __1, uint32_t __1_n);\n");
