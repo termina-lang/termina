@@ -78,6 +78,8 @@ data Errors a
   -- | Impossible Cases. Internal Transpiler errors
   | ERHSCatch
   | ELookupVar
+  | EUnboxingStmtExpr -- Unboxing statement as an expression.
+  | EUnboxingBlockRet -- Unboxing Blockret statement
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
