@@ -309,10 +309,17 @@ functionCallParser =
   <*> parens (sepBy (try expressionParser) comma)
   <*> (Position <$> getPosition)
 
-optionExprParser :: Parser (Expression Annotation)
-optionExprParser =
-  (reserved "None" >> Options . None . Position <$> getPosition) <|>
-  (reserved "Some" >> parens expressionParser)
+optionVariantExprParser :: Parser (Expression Annotation)
+optionVariantExprParser =
+  (do
+    p <- getPosition
+    _ <- reserved "None"
+    return $ OptionVariantExpression None (Position p)) <|>
+  (do
+    p <- getPosition
+    _ <- reserved "Some"
+    someExpr <- parens expressionParser
+    return $ OptionVariantExpression (Some someExpr) (Position p))
 
 enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
@@ -326,13 +333,12 @@ enumVariantExprParser = do
 
 expressionParser :: Parser (Expression Annotation)
 expressionParser = try functionCallParser
+  <|> try optionVariantExprParser
   <|> try enumVariantExprParser
-  <|> try optionExprParser
   <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
-termParser = matchExpressionParser
-  <|> vectorInitParser
+termParser = vectorInitParser
   <|> variableParser
   <|> constExprParser
   <|> fieldValuesAssignExpressionParser
@@ -454,6 +460,7 @@ blockItemParser = try ifElseIfStmtParser
   <|> try declarationParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
+  <|> try matchStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
@@ -472,16 +479,16 @@ matchCaseParser = do
   cons <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
-  blockRet <- braces blockParser
-  return $ MatchCase cons args blockRet (Position p)
+  compound <- braces $ many blockItemParser
+  return $ MatchCase cons args compound (Position p)
 
-matchExpressionParser :: Parser (Expression Annotation)
-matchExpressionParser = do
+matchStmtParser :: Parser (Statement Annotation)
+matchStmtParser = do
   reserved "match"
   p <- getPosition
   matchExpression <- expressionParser
   cases <- braces (many1 $ try matchCaseParser)
-  return $ MatchExpression matchExpression cases (Position p)
+  return $ MatchStmt matchExpression cases (Position p)
 
 elseIfParser :: Parser (ElseIf Annotation)
 elseIfParser = do
