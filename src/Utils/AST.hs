@@ -38,3 +38,23 @@ getAnnotations (FieldValuesAssignmentsExpression _ _ a) = a
 getAnnotations (EnumVariantExpression _ _ _ a)          = a
 getAnnotations (VectorIndexExpression _ _ a)            = a
 getAnnotations (VectorInitExpression _ _ a)             = a
+
+getAnnotationGlobal :: Global a -> a
+getAnnotationGlobal (Volatile _ _ _ _ a) = a
+getAnnotationGlobal (Static _ _ _ _ a)   = a
+getAnnotationGlobal (Shared _ _ _ _ a)   = a
+getAnnotationGlobal (Const _ _ _ _ a)    = a
+
+getAnnotationType :: TypeDef a -> a
+getAnnotationType (Struct _ _ _ a) = a
+getAnnotationType (Union _ _ _ a)  = a
+getAnnotationType (Enum _ _ _ a)   = a
+getAnnotationType (Class _ _ _ a)  = a
+
+getAnnotationsAST :: AnnASTElement a -> a
+getAnnotationsAST (Task _ _ _ _ _ a) = a
+getAnnotationsAST (Function _ _ _ _ _ a) = a
+getAnnotationsAST (Handler _ _ _ _ _ a) = a
+getAnnotationsAST (GlobalDeclaration glb) =  getAnnotationGlobal glb
+getAnnotationsAST (TypeDefinition type_def) =  getAnnotationType type_def
+getAnnotationsAST (ModuleInclusion {}) =  error "Module Inclusion not defined yet "
