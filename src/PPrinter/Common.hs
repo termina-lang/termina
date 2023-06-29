@@ -6,6 +6,7 @@ import Prettyprinter
 import Prettyprinter.Render.Terminal
 import Data.Maybe
 import Semantic.Monad
+import Data.Foldable (find)
 
 type DocStyle = Doc AnsiStyle
 
@@ -133,7 +134,7 @@ ppPrimitiveType (Option (DynamicSubtype _)) = optionDyn
 ppPrimitiveType _ = error "unsupported type"
 
 ppDimension :: TypeSpecifier -> DocStyle
-ppDimension (Vector ts (KC size)) = ppDimension ts <> brackets (ppConst size)
+ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts
 ppDimension _ = emptyDoc
 
 ppReturnType :: TypeSpecifier -> DocStyle
@@ -196,3 +197,27 @@ ppCReferenceExpression expr = pretty "&" <> expr
 -- | Pretty print a dereference expression
 ppCDereferenceExpression :: DocStyle -> DocStyle
 ppCDereferenceExpression expr = pretty "*" <> parens expr
+
+ppCForLoopInitExpression :: DocStyle -> DocStyle -> DocStyle -> DocStyle
+ppCForLoopInitExpression ts identifier initValue = ts <+> identifier <+> pretty "=" <+> initValue
+
+ppCForLoopIncrExpression :: DocStyle -> DocStyle -> DocStyle
+ppCForLoopIncrExpression identifier increment = identifier <+> pretty "=" <+> identifier <+> pretty "+" <+> increment
+
+ppCForLoop :: DocStyle -> DocStyle -> DocStyle -> DocStyle -> DocStyle
+ppCForLoop initializer cond incr body =
+    pretty "for" <+> parens
+      (initializer <> semi <+> cond <> semi <+> incr) <+> braces' (
+        (indentTab . align) body)
+
+-- | This function recursively finds all the field values assignments expressions from
+-- one of them
+findFieldValuesAssignmentsExpressions :: Identifier -> Expression SemanticAnns -> [(Identifier, Expression SemanticAnns)]
+findFieldValuesAssignmentsExpressions base expr =
+    case expr of
+        (FieldValuesAssignmentsExpression _ vas _) ->
+            (base, expr) : concatMap (\(FieldValueAssignment identifier expr') ->
+              findFieldValuesAssignmentsExpressions (base ++ "_" ++ identifier) expr') vas
+        (EnumVariantExpression {}) -> error "unsupported"
+        (VectorInitExpression expr' _ _) -> findFieldValuesAssignmentsExpressions base expr'
+        _ -> []

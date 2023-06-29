@@ -18,10 +18,10 @@ var5 = Variable "var5" (SemAnn undefined dynamicTMDescriptorTS)
 
 var0EqConstant, constantEqVar0, var1EqConstant, 
   constantEqVar1, var0EqVar1 :: Expression SemanticAnns
-var0EqConstant = BinOp RelationalEqual var0 uint16Const (SemAnn undefined Bool)
-constantEqVar0 = BinOp RelationalEqual uint16Const var0 (SemAnn undefined Bool)
-var1EqConstant = BinOp RelationalEqual var1 uint16Const (SemAnn undefined Bool)
-constantEqVar1 = BinOp RelationalEqual uint16Const var1 (SemAnn undefined Bool)
+var0EqConstant = BinOp RelationalEqual var0 uint16Const1024 (SemAnn undefined Bool)
+constantEqVar0 = BinOp RelationalEqual uint16Const1024 var0 (SemAnn undefined Bool)
+var1EqConstant = BinOp RelationalEqual var1 uint16Const1024 (SemAnn undefined Bool)
+constantEqVar1 = BinOp RelationalEqual uint16Const1024 var1 (SemAnn undefined Bool)
 var0EqVar1 = BinOp RelationalEqual var0 var1 (SemAnn undefined Bool)
 
 var2EqVar3, var2EqVar4, var4EqVar2, var4EqVar5 :: Expression SemanticAnns
@@ -32,10 +32,10 @@ var4EqVar5 = BinOp RelationalEqual var4 var5 (SemAnn undefined Bool)
 
 var0NeqConstant, constantNeqVar0, var1NeqConstant, 
   constantNeqVar1, var0NeqVar1 :: Expression SemanticAnns
-var0NeqConstant = BinOp RelationalNotEqual var0 uint16Const (SemAnn undefined Bool)
-constantNeqVar0 = BinOp RelationalNotEqual uint16Const var0 (SemAnn undefined Bool)
-var1NeqConstant = BinOp RelationalNotEqual var1 uint16Const (SemAnn undefined Bool)
-constantNeqVar1 = BinOp RelationalNotEqual uint16Const var1 (SemAnn undefined Bool)
+var0NeqConstant = BinOp RelationalNotEqual var0 uint16Const1024 (SemAnn undefined Bool)
+constantNeqVar0 = BinOp RelationalNotEqual uint16Const1024 var0 (SemAnn undefined Bool)
+var1NeqConstant = BinOp RelationalNotEqual var1 uint16Const1024 (SemAnn undefined Bool)
+constantNeqVar1 = BinOp RelationalNotEqual uint16Const1024 var1 (SemAnn undefined Bool)
 var0NeqVar1 = BinOp RelationalNotEqual var0 var1 (SemAnn undefined Bool)
 
 var2NeqVar3, var2NeqVar4, var4NeqVar2, var4NeqVar5 :: Expression SemanticAnns
@@ -46,34 +46,34 @@ var4NeqVar5 = BinOp RelationalNotEqual var4 var5 (SemAnn undefined Bool)
 
 var0GTConstant, constantGTVar0, var1GTConstant, 
   constantGTVar1, var0GTVar1 :: Expression SemanticAnns
-var0GTConstant = BinOp RelationalGT var0 uint16Const (SemAnn undefined Bool)
-constantGTVar0 = BinOp RelationalGT uint16Const var0 (SemAnn undefined Bool)
-var1GTConstant = BinOp RelationalGT var1 uint16Const (SemAnn undefined Bool)
-constantGTVar1 = BinOp RelationalGT uint16Const var1 (SemAnn undefined Bool)
+var0GTConstant = BinOp RelationalGT var0 uint16Const1024 (SemAnn undefined Bool)
+constantGTVar0 = BinOp RelationalGT uint16Const1024 var0 (SemAnn undefined Bool)
+var1GTConstant = BinOp RelationalGT var1 uint16Const1024 (SemAnn undefined Bool)
+constantGTVar1 = BinOp RelationalGT uint16Const1024 var1 (SemAnn undefined Bool)
 var0GTVar1 = BinOp RelationalGT var0 var1 (SemAnn undefined Bool)
 
 var0GTEConstant, constantGTEVar0, var1GTEConstant, 
   constantGTEVar1, var0GTEVar1 :: Expression SemanticAnns
-var0GTEConstant = BinOp RelationalGTE var0 uint16Const (SemAnn undefined Bool)
-constantGTEVar0 = BinOp RelationalGTE uint16Const var0 (SemAnn undefined Bool)
-var1GTEConstant = BinOp RelationalGTE var1 uint16Const (SemAnn undefined Bool)
-constantGTEVar1 = BinOp RelationalGTE uint16Const var1 (SemAnn undefined Bool)
+var0GTEConstant = BinOp RelationalGTE var0 uint16Const1024 (SemAnn undefined Bool)
+constantGTEVar0 = BinOp RelationalGTE uint16Const1024 var0 (SemAnn undefined Bool)
+var1GTEConstant = BinOp RelationalGTE var1 uint16Const1024 (SemAnn undefined Bool)
+constantGTEVar1 = BinOp RelationalGTE uint16Const1024 var1 (SemAnn undefined Bool)
 var0GTEVar1 = BinOp RelationalGTE var0 var1 (SemAnn undefined Bool)
 
 var0LTConstant, constantLTVar0, var1LTConstant, 
   constantLTVar1, var0LTVar1 :: Expression SemanticAnns
-var0LTConstant = BinOp RelationalLT var0 uint16Const (SemAnn undefined Bool)
-constantLTVar0 = BinOp RelationalLT uint16Const var0 (SemAnn undefined Bool)
-var1LTConstant = BinOp RelationalLT var1 uint16Const (SemAnn undefined Bool)
-constantLTVar1 = BinOp RelationalLT uint16Const var1 (SemAnn undefined Bool)
+var0LTConstant = BinOp RelationalLT var0 uint16Const1024 (SemAnn undefined Bool)
+constantLTVar0 = BinOp RelationalLT uint16Const1024 var0 (SemAnn undefined Bool)
+var1LTConstant = BinOp RelationalLT var1 uint16Const1024 (SemAnn undefined Bool)
+constantLTVar1 = BinOp RelationalLT uint16Const1024 var1 (SemAnn undefined Bool)
 var0LTVar1 = BinOp RelationalLT var0 var1 (SemAnn undefined Bool)
 
 var0LTEConstant, constantLTEVar0, var1LTEConstant, 
   constantLTEVar1, var0LTEVar1 :: Expression SemanticAnns
-var0LTEConstant = BinOp RelationalLTE var0 uint16Const (SemAnn undefined Bool)
-constantLTEVar0 = BinOp RelationalLTE uint16Const var0 (SemAnn undefined Bool)
-var1LTEConstant = BinOp RelationalLTE var1 uint16Const (SemAnn undefined Bool)
-constantLTEVar1 = BinOp RelationalLTE uint16Const var1 (SemAnn undefined Bool)
+var0LTEConstant = BinOp RelationalLTE var0 uint16Const1024 (SemAnn undefined Bool)
+constantLTEVar0 = BinOp RelationalLTE uint16Const1024 var0 (SemAnn undefined Bool)
+var1LTEConstant = BinOp RelationalLTE var1 uint16Const1024 (SemAnn undefined Bool)
+constantLTEVar1 = BinOp RelationalLTE uint16Const1024 var1 (SemAnn undefined Bool)
 var0LTEVar1 = BinOp RelationalLTE var0 var1 (SemAnn undefined Bool)
 
 logicalAndConst, logicalAndExpr :: Expression SemanticAnns

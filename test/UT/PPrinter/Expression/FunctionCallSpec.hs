@@ -35,12 +35,12 @@ referenceVector0 = ReferenceExpression vector0 (SemAnn undefined (Reference (Dyn
 referenceDynVector0 = ReferenceExpression dynVector0 (SemAnn undefined (Reference (DynamicSubtype vectorTS)))
 
 var0PlusConstant, dynVar1PlusConstant :: Expression SemanticAnns
-var0PlusConstant = BinOp Addition var0 uint16Const (SemAnn undefined uint16TS)
-dynVar1PlusConstant = BinOp Addition dynVar1 uint16Const (SemAnn undefined uint16TS)
+var0PlusConstant = BinOp Addition var0 uint16Const1024 (SemAnn undefined uint16TS)
+dynVar1PlusConstant = BinOp Addition dynVar1 uint16Const1024 (SemAnn undefined uint16TS)
 
 dereferencepVar2PlusConstant, dereferencepDynVar3PlusConstant :: Expression SemanticAnns
-dereferencepVar2PlusConstant = BinOp Addition dereferencepVar2 uint16Const (SemAnn undefined uint16TS)
-dereferencepDynVar3PlusConstant = BinOp Addition dereferencepDynVar3 uint16Const (SemAnn undefined uint16TS)
+dereferencepVar2PlusConstant = BinOp Addition dereferencepVar2 uint16Const1024 (SemAnn undefined uint16TS)
+dereferencepDynVar3PlusConstant = BinOp Addition dereferencepDynVar3 uint16Const1024 (SemAnn undefined uint16TS)
 
 var0PlusVar1, dereferencepVar2PlusdereferecepDynVar3 :: Expression SemanticAnns
 var0PlusVar1 = BinOp Addition var0 dynVar1 (SemAnn undefined uint16TS)

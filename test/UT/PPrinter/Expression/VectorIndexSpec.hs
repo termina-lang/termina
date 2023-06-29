@@ -22,11 +22,11 @@ dynVector0 = Variable "dyn_vector0" (SemAnn undefined (DynamicSubtype vectorTS))
 dynVector1 = Variable "dyn_vector1" (SemAnn undefined (DynamicSubtype twoDimVectorTS))
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
-vector0IndexConstant = VectorIndexExpression vector0 uint8Const (SemAnn undefined uint32TS)
+vector0IndexConstant = VectorIndexExpression vector0 uint8Const0x8 (SemAnn undefined uint32TS)
 vector0IndexVar0 = VectorIndexExpression vector0 var0 (SemAnn undefined uint32TS)
 
 dynVector0IndexConstant, dynVector0IndexVar0 :: Expression SemanticAnns
-dynVector0IndexConstant = VectorIndexExpression dynVector0 uint8Const (SemAnn undefined uint32TS)
+dynVector0IndexConstant = VectorIndexExpression dynVector0 uint8Const0x8 (SemAnn undefined uint32TS)
 dynVector0IndexVar0 = VectorIndexExpression dynVector0 var0 (SemAnn undefined uint32TS)
 
 vector1IndexFirstDym, vector1IndexExpression :: Expression SemanticAnns
@@ -90,4 +90,4 @@ spec = do
         pack "(uint32_t *)dyn_vector0.datum[(uint32_t)3]"
     it "Prints the expression: *vector1[3 : u32][4 : u32]" $ do
       renderExpression derefpDynVector1IndexExpression `shouldBe`
-        pack "(int64_t (*)[10])dyn_vector1.datum[(uint32_t)3][(uint32_t)4]"
+        pack "(int64_t (*)[5])dyn_vector1.datum[(uint32_t)3][(uint32_t)4]"

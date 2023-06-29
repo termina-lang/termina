@@ -47,7 +47,7 @@ spec = do
         pack "(((uint32_t *)id0.datum))"
     it "Prints the name of a 'dyn variable of type [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression dynamicTwoDimensionVectorVariable `shouldBe`
-        pack "((int64_t (*)[10])id0.datum)"
+        pack "((int64_t (*)[5])id0.datum)"
     it "Prints the name of a 'dyn variable of type [[[char; 40 : u32]; 5 : u32]; 10 : u32]" $ do
       renderExpression dynamicThreeDimensionVectorVariable `shouldBe`
-        pack "((char (*)[5][10])id0.datum)"
+        pack "((char (*)[5][40])id0.datum)"

@@ -9,8 +9,8 @@ import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 castUInt32toUInt8, castUInt32toUInt16 :: Expression SemanticAnns
-castUInt32toUInt8 = Casting uint32Const UInt8 (SemAnn undefined UInt8)
-castUInt32toUInt16 = Casting uint32Const UInt16 (SemAnn undefined uint16TS)
+castUInt32toUInt8 = Casting uint32Const0xFFFF0000 UInt8 (SemAnn undefined UInt8)
+castUInt32toUInt16 = Casting uint32Const0xFFFF0000 UInt16 (SemAnn undefined uint16TS)
 
 var0 :: Expression SemanticAnns
 var0 = Variable "var0" (SemAnn undefined uint16TS)

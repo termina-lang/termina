@@ -15,46 +15,46 @@ var1 :: Expression SemanticAnns
 var1 = Variable "var1" (SemAnn undefined (DynamicSubtype uint16TS))
 
 var0LeftShiftConstant :: Expression SemanticAnns
-var0LeftShiftConstant = BinOp BitwiseLeftShift var0 uint8Const (SemAnn undefined uint16TS)
+var0LeftShiftConstant = BinOp BitwiseLeftShift var0 uint8Const0x8 (SemAnn undefined uint16TS)
 
 constantLeftShiftVar0 :: Expression SemanticAnns
-constantLeftShiftVar0 = BinOp BitwiseLeftShift uint8Const var0 (SemAnn undefined uint16TS)
+constantLeftShiftVar0 = BinOp BitwiseLeftShift uint8Const0x8 var0 (SemAnn undefined uint16TS)
 
 var1LeftShiftConstant :: Expression SemanticAnns
-var1LeftShiftConstant = BinOp BitwiseLeftShift var1 uint8Const (SemAnn undefined uint16TS)
+var1LeftShiftConstant = BinOp BitwiseLeftShift var1 uint8Const0x8 (SemAnn undefined uint16TS)
 
 constantLeftShiftVar1 :: Expression SemanticAnns
-constantLeftShiftVar1 = BinOp BitwiseLeftShift uint8Const var1 (SemAnn undefined uint16TS)
+constantLeftShiftVar1 = BinOp BitwiseLeftShift uint8Const0x8 var1 (SemAnn undefined uint16TS)
 
 var0LeftShiftVar1 :: Expression SemanticAnns
 var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 var1 (SemAnn undefined uint16TS)
 
 var0LeftShiftVar1LeftShiftConstant :: Expression SemanticAnns
-var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 uint8Const (SemAnn undefined uint16TS)
+var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 uint8Const0x8 (SemAnn undefined uint16TS)
 
 var0RightShiftConstant :: Expression SemanticAnns
-var0RightShiftConstant = BinOp BitwiseRightShift var0 uint8Const (SemAnn undefined uint16TS)
+var0RightShiftConstant = BinOp BitwiseRightShift var0 uint8Const0x8 (SemAnn undefined uint16TS)
 
 constantRightShiftVar0 :: Expression SemanticAnns
-constantRightShiftVar0 = BinOp BitwiseRightShift uint8Const var0 (SemAnn undefined uint16TS)
+constantRightShiftVar0 = BinOp BitwiseRightShift uint8Const0x8 var0 (SemAnn undefined uint16TS)
 
 var0BitwiseAndConstant :: Expression SemanticAnns
-var0BitwiseAndConstant = BinOp BitwiseAnd var0 uint16Const (SemAnn undefined uint16TS)
+var0BitwiseAndConstant = BinOp BitwiseAnd var0 uint16Const1024 (SemAnn undefined uint16TS)
 
 constantBitwiseAndVar0 :: Expression SemanticAnns
-constantBitwiseAndVar0 = BinOp BitwiseAnd uint16Const var0 (SemAnn undefined uint16TS)
+constantBitwiseAndVar0 = BinOp BitwiseAnd uint16Const1024 var0 (SemAnn undefined uint16TS)
 
 var0BitwiseAndVar1 :: Expression SemanticAnns
 var0BitwiseAndVar1 = BinOp BitwiseAnd var0 var1 (SemAnn undefined uint16TS)
 
 var1BitwiseOrconstant :: Expression SemanticAnns
-var1BitwiseOrconstant = BinOp BitwiseOr var1 uint16Const (SemAnn undefined uint16TS)
+var1BitwiseOrconstant = BinOp BitwiseOr var1 uint16Const1024 (SemAnn undefined uint16TS)
 
 var0BitwiseOrVar1 :: Expression SemanticAnns
 var0BitwiseOrVar1 = BinOp BitwiseOr var0 var1 (SemAnn undefined uint16TS)
 
 var1BitwiseXorconstant :: Expression SemanticAnns
-var1BitwiseXorconstant = BinOp BitwiseXor var1 uint16Const (SemAnn undefined uint16TS)
+var1BitwiseXorconstant = BinOp BitwiseXor var1 uint16Const1024 (SemAnn undefined uint16TS)
 
 var0BitwiseXorVar1 :: Expression SemanticAnns
 var0BitwiseXorVar1 = BinOp BitwiseXor var0 var1 (SemAnn undefined uint16TS)

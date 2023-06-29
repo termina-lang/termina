@@ -15,40 +15,40 @@ var1 :: Expression SemanticAnns
 var1 = Variable "var1" (SemAnn undefined (DynamicSubtype uint16TS))
 
 var0PlusConstant :: Expression SemanticAnns
-var0PlusConstant = BinOp Addition var0 uint16Const (SemAnn undefined uint16TS)
+var0PlusConstant = BinOp Addition var0 uint16Const1024 (SemAnn undefined uint16TS)
 
 constantPlusVar0 :: Expression SemanticAnns
-constantPlusVar0 = BinOp Addition uint16Const var0 (SemAnn undefined uint16TS)
+constantPlusVar0 = BinOp Addition uint16Const1024 var0 (SemAnn undefined uint16TS)
 
 var1PlusConstant :: Expression SemanticAnns
-var1PlusConstant = BinOp Addition var1 uint16Const (SemAnn undefined uint16TS)
+var1PlusConstant = BinOp Addition var1 uint16Const1024 (SemAnn undefined uint16TS)
 
 constantPlusVar1 :: Expression SemanticAnns
-constantPlusVar1 = BinOp Addition uint16Const var1 (SemAnn undefined uint16TS)
+constantPlusVar1 = BinOp Addition uint16Const1024 var1 (SemAnn undefined uint16TS)
 
 var0PlusVar1 :: Expression SemanticAnns
 var0PlusVar1 = BinOp Addition var0 var1 (SemAnn undefined uint16TS)
 
 var0PlusVar1PlusConstant :: Expression SemanticAnns
-var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 uint16Const (SemAnn undefined uint16TS)
+var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 uint16Const1024 (SemAnn undefined uint16TS)
 
 var0MinusConstant :: Expression SemanticAnns
-var0MinusConstant = BinOp Subtraction var0 uint16Const (SemAnn undefined uint16TS)
+var0MinusConstant = BinOp Subtraction var0 uint16Const1024 (SemAnn undefined uint16TS)
 
 constantMinusVar0 :: Expression SemanticAnns
-constantMinusVar0 = BinOp Subtraction uint16Const var0 (SemAnn undefined uint16TS)
+constantMinusVar0 = BinOp Subtraction uint16Const1024 var0 (SemAnn undefined uint16TS)
 
 var0MultConstant :: Expression SemanticAnns
-var0MultConstant = BinOp Multiplication var0 uint16Const (SemAnn undefined uint16TS)
+var0MultConstant = BinOp Multiplication var0 uint16Const1024 (SemAnn undefined uint16TS)
 
 constantMultVar0 :: Expression SemanticAnns
-constantMultVar0 = BinOp Multiplication uint16Const var0 (SemAnn undefined uint16TS)
+constantMultVar0 = BinOp Multiplication uint16Const1024 var0 (SemAnn undefined uint16TS)
 
 var0MultVar1 :: Expression SemanticAnns
 var0MultVar1 = BinOp Multiplication var0 var1 (SemAnn undefined uint16TS)
 
 var1Divconstant :: Expression SemanticAnns
-var1Divconstant = BinOp Division var1 uint16Const (SemAnn undefined uint16TS)
+var1Divconstant = BinOp Division var1 uint16Const1024 (SemAnn undefined uint16TS)
 
 var0DivVar1 :: Expression SemanticAnns
 var0DivVar1 = BinOp Division var0 var1 (SemAnn undefined uint16TS)

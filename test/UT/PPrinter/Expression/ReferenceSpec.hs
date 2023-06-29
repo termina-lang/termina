@@ -61,7 +61,7 @@ spec = do
         pack "(uint32_t *)dyn_vector0.datum"
     it "Prints the expression: &dyn_vector1" $ do
       renderExpression pDynVector1expr `shouldBe`
-        pack "(int64_t (*)[10])dyn_vector1.datum"
+        pack "(int64_t (*)[5])dyn_vector1.datum"
   describe "Pretty printing dereference expressions" $ do
     it "Prints the expression: *(&var0)" $ do
       renderExpression derefpVar0 `shouldBe`
@@ -80,5 +80,5 @@ spec = do
         pack "(uint32_t *)dyn_vector0.datum"
     it "Prints the expression: *&dyn_vector1" $ do
       renderExpression derefpDynVector1expr `shouldBe`
-        pack "(int64_t (*)[10])dyn_vector1.datum"
+        pack "(int64_t (*)[5])dyn_vector1.datum"
 

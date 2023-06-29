@@ -30,17 +30,17 @@ ppBinaryOperator LogicalOr = space <> pretty  "||" <> space
 
 -- | Pretty prints the casting expression of a dynamic subtype
 ppDynamicSubtypeCast :: TypeSpecifier -> DocStyle
-ppDynamicSubtypeCast (Vector ts (KC size)) =
+ppDynamicSubtypeCast (Vector ts _) =
     case ts of
-        (Vector _ _) -> ppDynamicSubtypeCast' ts <> brackets (ppConst size)
+        (Vector _ _) -> ppPrimitiveType ts <+> parens (pretty "*") <> ppDynamicSubtypeCast' ts
         _ -> ppPrimitiveType ts <+> pretty "*"
 ppDynamicSubtypeCast ts = ppPrimitiveType ts <+> pretty "*"
 
 ppDynamicSubtypeCast' :: TypeSpecifier -> DocStyle
 ppDynamicSubtypeCast' (Vector ts (KC size)) =
     case ts of
-        (Vector _ _) -> ppDynamicSubtypeCast' ts <> brackets (ppConst size)
-        _ -> ppPrimitiveType ts <+> parens (pretty "*")
+        (Vector _ _) -> brackets (ppConst size) <> ppDynamicSubtypeCast' ts
+        _ -> brackets (ppConst size)
 ppDynamicSubtypeCast' ts = error $ "unsupported type" ++ show ts
 
 -- | Pretty prints the address of the object corresponding to the dynamic subtype
