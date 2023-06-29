@@ -207,15 +207,14 @@ fieldValuesAssignExpressionParser = do
 -- #[priority(5)] for a task
 -- #[packed] for a struct or union
 
-modifierParser :: Parser (Modifier Annotation)
+modifierParser :: Parser Modifier
 modifierParser = do
   _ <- reservedOp "#"
   _ <- reservedOp "["
-  p <- getPosition
   identifier <- identifierParser
   initializer <- optionMaybe (parens constExprParser')
   _ <- reservedOp "]"
-  return $ Modifier identifier (flip KC (Position p) <$> initializer )
+  return $ Modifier identifier (KC <$> initializer)
 
 msgQueueParser :: Parser TypeSpecifier
 msgQueueParser = do
@@ -242,7 +241,7 @@ vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- K <$> natural
+  size <- KC <$> constExprParser'
   _ <- reservedOp "]"
   return $ Vector typeSpecifier size
 
@@ -258,14 +257,14 @@ optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 -- Expression Parser
 expressionParser' :: Parser (Expression Annotation)
 expressionParser' = Ex.buildExpressionParser
-    [[referencePrefix, castingPostfix]
+    [[dereferencePrefix, referencePrefix, castingPostfix]
     -- ,[functionPostfix]
     ,[vectorIndexPostfix]
     ,[binaryInfix "." MemberAccess Ex.AssocRight]
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft]
     ,[binaryInfix "+" Addition Ex.AssocLeft,
-      binaryInfix "-" Substraction Ex.AssocLeft]
+      binaryInfix "-" Subtraction Ex.AssocLeft]
     ,[binaryInfix "<<" BitwiseLeftShift Ex.AssocLeft,
       binaryInfix ">>" BitwiseRightShift Ex.AssocLeft]
     ,[binaryInfix "<" RelationalLT Ex.AssocLeft,
@@ -287,8 +286,10 @@ expressionParser' = Ex.buildExpressionParser
           return $ \l r -> BinOp f l r (Position p))
         referencePrefix = Ex.Prefix (do
           _ <- reservedOp "&"
-          p <- getPosition
-          return $ flip ReferenceExpression (Position p))
+          flip ReferenceExpression . Position <$> getPosition)
+        dereferencePrefix = Ex.Prefix (do
+          _ <- reservedOp "*"
+          flip DereferenceExpression . Position <$> getPosition)
         castingPostfix = Ex.Postfix (do
           _ <- reserved "as"
           p <- getPosition
@@ -323,8 +324,8 @@ optionVariantExprParser =
 
 enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
-  enum <- identifierParser
   p <- getPosition
+  enum <- identifierParser
   _ <- reserved "::"
   variant <- identifierParser
   parameterList <-
@@ -342,7 +343,10 @@ termParser = vectorInitParser
   <|> variableParser
   <|> constExprParser
   <|> fieldValuesAssignExpressionParser
-  <|> parens expressionParser
+  <|> parensExprParser
+
+parensExprParser :: Parser (Expression Annotation)
+parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
 
 variableParser :: Parser (Expression Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
@@ -353,9 +357,9 @@ vectorInitParser = do
   p <- getPosition
   value <- expressionParser
   _ <- semi
-  amount <- expressionParser
+  size <- KC <$> constExprParser'
   _ <- reservedOp "]"
-  return $ VectorInitExpression value amount (Position p)
+  return $ VectorInitExpression value size (Position p)
 
 -- -- Task Definition
 
@@ -442,9 +446,8 @@ declarationParser = do
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser
-  initializer <- optionMaybe (do
-    reservedOp "="
-    expressionParser)
+  _ <- reservedOp "="
+  initializer <-  expressionParser
   _ <- semi
   return $ Declaration name ty initializer (Position p)
 

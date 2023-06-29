@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.ClassSpec (spec) where
+module UT.PPrinter.TypeDef.ClassSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -25,12 +25,12 @@ classWithTwoMethodsAndZeroFields :: AnnASTElement Annotation
 classWithTwoMethodsAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Option (DefinedType "TMPacket"))
+      Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined,
     ClassMethod "method1" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Vector UInt8 (K 32))
+      Parameter "param1" (Vector UInt8 (KC (I UInt32 32)))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [] undefined)
@@ -45,7 +45,7 @@ classWithOneMethodAndTwoFields :: AnnASTElement Annotation
 classWithOneMethodAndTwoFields = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (K 24)),
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [] undefined)
@@ -54,7 +54,7 @@ noHandlerClassWithOneEmptyMethod :: AnnASTElement Annotation
 noHandlerClassWithOneEmptyMethod = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (K 24)),
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [Modifier "no_handler" Nothing] undefined)
@@ -64,10 +64,10 @@ packedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
     ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [
       Parameter "param0" Char,
-      Parameter "param1" (Vector UInt8 (K 16))
+      Parameter "param1" (Vector UInt8 (KC (I UInt32 16)))
     ] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [Modifier "packed" Nothing] undefined)
@@ -77,22 +77,22 @@ alignedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
     ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "align" (Just (KC (I UInt32 16) undefined))] undefined)
+  ] [Modifier "align" (Just (KC (I UInt32 16)))] undefined)
 
 packedAndAlignedClass :: AnnASTElement Annotation
 packedAndAlignedClass = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt64,
-    ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (K 32)),
+    ClassField "field1" (DefinedType "TCDescriptor"),
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
     ClassMethod "method0" [] Nothing 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I UInt32 16) undefined))
+      Modifier "align" (Just (KC (I UInt32 16)))
     ] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text
@@ -105,7 +105,9 @@ spec = do
       renderSingleASTElement classWithOneMethodAndZeroFields `shouldBe`
         pack (
           "\n" ++
-          "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+          "typedef struct {\n" ++
+          "    uint32_t __dummy;\n" ++
+          "} id0;\n" ++
           "\n" ++
           "void __id0_method0(uint8_t param0, uint16_t param1, uint32_t param2,\n" ++
           "                   uint64_t param3, int8_t param4, int16_t param5,\n" ++
@@ -114,9 +116,11 @@ spec = do
       renderSingleASTElement classWithTwoMethodsAndZeroFields `shouldBe`
         pack (
           "\n" ++
-          "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+          "typedef struct {\n" ++
+          "    uint32_t __dummy;\n" ++
+          "} id0;\n" ++
           "\n" ++
-          "void __id0_method0(uint8_t param0, TMPacket * param1);\n" ++
+          "void __id0_method0(uint8_t param0, __Option_dyn_t param1);\n" ++
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one method and zero fields" $ do
@@ -126,8 +130,6 @@ spec = do
             "typedef struct {\n" ++
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class marked as no_handler with two fields" $ do
@@ -140,7 +142,8 @@ spec = do
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint64_t * __field1,\n" ++
+            "                   uint32_t __field1_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class with one method and two fields" $ do
@@ -152,7 +155,8 @@ spec = do
             "    uint64_t field1[24];\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint64_t * __field1,\n" ++
+            "                   uint32_t __field1_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed class" $ do
@@ -165,7 +169,8 @@ spec = do
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "void __id0__assign(id0 * __self, uint64_t __field0, uint16_t __field1,\n" ++
+            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
             "\n" ++
             "void __id0_method0(char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
@@ -178,7 +183,8 @@ spec = do
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "void __id0__assign(id0 * __self, uint64_t __field0, uint16_t __field1,\n" ++
+            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed & aligned class" $ do
@@ -187,10 +193,11 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
-            "    uint16_t field1;\n" ++
+            "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "void __id0__assign(id0 * __self, uint64_t __field0, TCDescriptor * __field1,\n" ++
+            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")

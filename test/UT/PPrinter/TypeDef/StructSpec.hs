@@ -1,4 +1,4 @@
-module PPrinter.TypeDef.StructSpec (spec) where
+module UT.PPrinter.TypeDef.StructSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -43,7 +43,7 @@ packedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K 10))
+    FieldDefinition "field2" (Vector UInt32 (KC (I UInt32 10)))
   ] [Modifier "packed" Nothing] undefined)
 
 {- | Aligned Struct type.
@@ -60,8 +60,8 @@ alignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K 10))
-  ] [Modifier "align" (Just (KC (I UInt32 16) undefined))] undefined)
+    FieldDefinition "field2" (Vector UInt32 (KC (I UInt32 10)))
+  ] [Modifier "align" (Just (KC (I UInt32 16)))] undefined)
 
 {- | Aligned Struct type.
 In Termina's context sytax:
@@ -78,10 +78,10 @@ packedAndAlignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K 10))
+    FieldDefinition "field2" (Vector UInt32 (KC (I UInt32 10)))
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I UInt32 16) undefined))
+      Modifier "align" (Just (KC (I UInt32 16)))
     ] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text
@@ -98,7 +98,9 @@ spec = do
             "    uint8_t field0;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0);\n")
     it "Prints a struct with two fields" $ do
       renderSingleASTElement structWithTwoFields `shouldBe`
         pack (
@@ -108,7 +110,9 @@ spec = do
             "    uint16_t field1;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1);\n")
     it "Prints a packed struct" $ do
       renderSingleASTElement packedStruct `shouldBe`
         pack (
@@ -119,7 +123,10 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
+            "                   uint32_t * __field2, uint32_t __field2_n);\n")
     it "Prints an aligned struct" $ do
       renderSingleASTElement alignedStruct `shouldBe`
         pack (
@@ -130,7 +137,10 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
+            "                   uint32_t * __field2, uint32_t __field2_n);\n")
     it "Prints a packet & aligned struct" $ do
       renderSingleASTElement packedAndAlignedStruct `shouldBe`
         pack (
@@ -141,4 +151,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
+            "\n" ++
+            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
+            "                   uint32_t * __field2, uint32_t __field2_n);\n")
