@@ -60,9 +60,10 @@ data Errors a
   -- | Global Object but not a type
   | EGlobalNoType Identifier
   -- | Vectors with dynamic length
-  | EVectorConst (Expression a)
+  | EVectorConst ConstExpression
   -- | Not an integer const
   | ENotIntConst Const
+  | EConstantOutRange Const
   -- | PM Enum errors
   | EMCMissingEnum Identifier
   | EMCMoreArgs [Identifier]
@@ -80,6 +81,8 @@ data Errors a
   | ELookupVar
   | EUnboxingStmtExpr -- Unboxing statement as an expression.
   | EUnboxingBlockRet -- Unboxing Blockret statement
+  -- | Unique names for types.
+  | EUsedTypeName Identifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

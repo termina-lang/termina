@@ -168,6 +168,17 @@ insertLocalVar loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident ty (local s)})
 
+insertGlobalTy :: Locations -> TypeDef SemanticAnns -> SemanticMonad ()
+insertGlobalTy loc tydef =
+  isDefined type_name >>= \b ->
+  if b
+  then -- | Notify the user the name is taken
+    throwError $ annotateError loc $ EUsedTypeName type_name
+  else -- | Add new type to globals
+    modify (\s -> s{global = M.insert type_name (GType tydef) (global s)})
+ where
+   type_name = identifierType tydef
+
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (uncurry (insertLocalVar loc))
 
@@ -312,9 +323,13 @@ getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
+-- TODO Type definitions, two kind of types, etc
 checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
-checkTypeDefinition loc (DefinedType identTy) = void (getGlobalTy loc identTy)
-checkTypeDefinition loc (Vector ty _)         = checkTypeDefinition loc ty
+checkTypeDefinition loc (DefinedType identTy) =
+  -- Check that the type was defined
+  void (getGlobalTy loc identTy)
+checkTypeDefinition loc (Vector ty _)         =
+  checkTypeDefinition loc ty
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
 checkTypeDefinition loc (Option ty)           = checkTypeDefinition loc ty
