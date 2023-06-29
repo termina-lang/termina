@@ -34,6 +34,7 @@ import Data.Maybe
 import           Data.Map                   as M
 
 import           Control.Arrow
+-- import Parser (Equation(lhs))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -54,7 +55,7 @@ typeOfOps locs op lty rty =
     typeOfOps' Multiplication tyl tyr = cmpNumTy tyl tyl tyr
     typeOfOps' Division tyl tyr = cmpNumTy tyl tyl tyr
     typeOfOps' Addition tyl tyr = cmpNumTy tyl tyl tyr
-    typeOfOps' Substraction tyl tyr = cmpNumTy tyl tyl tyr
+    typeOfOps' Subtraction tyl tyr = cmpNumTy tyl tyl tyr
     -- shifts both numeric but may not be the same
     -- Q2
     typeOfOps' BitwiseLeftShift tyl tyr = justNumTy tyl tyl tyr
@@ -163,16 +164,12 @@ expressionType (VectorIndexExpression vec_exp index_exp pann) =
     ; ty -> throwError $ annotateError pann (EVector ty)
     }
 -- IDEA Q4
-expressionType (VectorInitExpression iexp lexp@(Constant c _) pann) = do
+expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
 -- | Vector Initialization
-  init_ty <- expressionType iexp
-  len_ty <- expressionType lexp
-  type_initty<- getExpType init_ty
-  type_lenty <- getExpType len_ty
-  if numTy type_lenty
-  then
-    VectorInitExpression init_ty len_ty . (buildExpAnn pann . (Vector type_initty . K)) <$> getIntConst pann c
-  else throwError $ annotateError pann (ENumTs [type_lenty])
+  (typed_init , type_init) <- typeExpression iexp
+  -- Check that the type is correct
+  _ <- checkConstant pann const
+  return (VectorInitExpression typed_init kexp (buildExpAnn pann (Vector type_init kexp)))
 expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
 -- DONE [Q5]
 -- TODO [Q17]
@@ -234,13 +231,15 @@ blockType = mapM statementTySimple
 -- Rules here are just environment control.
 statementTySimple :: Statement Parser.Annotation -> SemanticMonad (Statement SemanticAnns)
 -- Declaration semantic analysis
-statementTySimple (Declaration lhs_id lhs_type Nothing anns) =
-  insertLocalVar anns lhs_id lhs_type >>
-  return (Declaration lhs_id lhs_type Nothing (buildStmtAnn anns))
-statementTySimple (Declaration lhs_id lhs_type (Just expr) anns) =
+statementTySimple (Declaration lhs_id lhs_type expr anns) =
+  -- Check type is alright
+  checkTypeDefinition anns lhs_type >>
+  -- Expression and type must match
   expressionType expr >>= mustByTy lhs_type >>= \ety ->
+  -- Insert variables in the local environment
   insertLocalVar anns lhs_id lhs_type >>
-  return (Declaration lhs_id lhs_type (Just ety) (buildStmtAnn anns))
+  -- Return annotated declaration
+  return (Declaration lhs_id lhs_type ety (buildStmtAnn anns))
 statementTySimple (AssignmentStmt lhs_id rhs_expr anns) =
 {- TODO Q19 && Q20 -}
   getLHSVarTy anns lhs_id >>= \lhs_ty ->
@@ -333,49 +332,34 @@ statementTySimple (SingleExpStmt expr anns) =
 --               (mustByTy hanType) =<< retblockType hanBody
 
 -- Keeping only type information
+-- TODO Check ident is not defined?
 globalCheck :: Global Parser.Annotation -> SemanticMonad (Global SemanticAnns)
 globalCheck (Volatile ident ty addr mods anns) =
   checkTypeDefinition anns ty >>
   -- Check TypeSpecifier is correct
-  flip (Volatile ident ty addr) (buildGlobalAnn anns (SVolatile ty)) <$>
-  mapM modifierTyCheck mods
+  return (Volatile ident ty addr mods (buildGlobalAnn anns (SVolatile ty)))
 -- DONE [Q13]
 globalCheck (Static ident ty (Just sexp@(Constant address a)) mods anns) =
   checkTypeDefinition anns ty >>
   expressionType sexp >>= \sexp_ty ->
-  flip (Static ident ty (Just sexp_ty)) (buildGlobalAnn anns (SStatic ty)) <$> mapM modifierTyCheck mods
+  return (Static ident ty (Just sexp_ty) mods (buildGlobalAnn anns (SStatic ty)))
 globalCheck (Static _ _ _ _ anns) = throwError $ annotateError anns EStaticK
 --
 globalCheck (Shared ident ty mexpr mods anns) = do
   checkTypeDefinition anns ty
-  modsty <- mapM modifierTyCheck mods
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> (mustByTy ty =<< expressionType expr)
               -- If it has not, we need to check for defaults.
               Nothing -> return Nothing
-  return (Shared ident ty exprty modsty (buildGlobalAnn anns (SShared ty)))
+  return (Shared ident ty exprty mods (buildGlobalAnn anns (SShared ty)))
 -- TODO [Q14]
 globalCheck (Const ident ty expr mods anns) =
   checkTypeDefinition anns ty >>
   Const ident ty
   <$> (mustByTy ty =<< expressionType expr)
-  <*> mapM modifierTyCheck mods
-  <*> return (buildGlobalAnn anns (SConst ty))
-
--- TODO
-modifierTyCheck :: Modifier Parser.Annotation -> SemanticMonad (Modifier SemanticAnns)
-modifierTyCheck (Modifier ident Nothing) = return (Modifier ident Nothing)
-modifierTyCheck (Modifier ident (Just kexp)) = Modifier ident . Just <$> constTy kexp
-
-constTy :: ConstExpression Parser.Annotation -> SemanticMonad (ConstExpression SemanticAnns)
-constTy (KC c ann) = return (KC c (buildExpAnn ann ty))
-  where
-    ty = case c of
-      B _ -> Bool
-      I ty _ -> ty
-      C _ -> Char
-
+  <*> pure mods
+  <*> pure (buildGlobalAnn anns (SConst ty))
 
 -- Global Helpers
 -- | Add global member if it doesn't exists
@@ -402,8 +386,8 @@ programSeman (Task ident ps ty bret mods anns) =
       (retblockType bret >>= \bret' ->
         blockRetTy ty bret' >> return bret'
          ))
-  <*> mapM modifierTyCheck mods
-  <*> return (buildGlobal anns (GTask ps ty)))
+  <*> pure mods
+  <*> pure (buildGlobal anns (GTask ps ty)))
 programSeman (Function ident ps mty bret mods anns) =
   maybe (return ()) (checkTypeDefinition anns) mty >>
   (Function ident ps mty
@@ -417,8 +401,8 @@ programSeman (Function ident ps mty bret mods anns) =
       blockRetTy
       mty) typed_bret >> return typed_bret
       )
-  <*> mapM modifierTyCheck mods
-  <*> return (buildGlobal anns (GFun ps (fromMaybe Unit mty))))
+  <*> pure mods
+  <*> pure (buildGlobal anns (GFun ps (fromMaybe Unit mty))))
 programSeman (Handler ident ps ty bret mods anns) =
   checkTypeDefinition anns ty >>
   Handler ident ps ty
@@ -427,12 +411,28 @@ programSeman (Handler ident ps ty bret mods anns) =
             blockRetTy ty typed_bret >>
             return typed_bret
       )
-  <*> mapM modifierTyCheck mods
-  <*> return (buildGlobal anns (GHand ps ty))
+  <*> pure mods
+  <*> pure (buildGlobal anns (GHand ps ty))
 programSeman (GlobalDeclaration gbl) =
+  -- TODO Add global declarations
   GlobalDeclaration <$> globalCheck gbl
-programSeman (TypeDefinition tydef) = _TypeDefinition
-programSeman (ModuleInclusion ident _mods anns) = _ModuleInclusion
+programSeman (TypeDefinition tydef) = _addType
+programSeman (ModuleInclusion ident _mods anns) = undefined
 
 typeExpression :: Expression Locations -> SemanticMonad (Expression SemanticAnns , TypeSpecifier)
 typeExpression e = expressionType e >>= \typed_e -> (typed_e, ) <$> getExpType typed_e
+
+-- | Function checking that constant expressions are correct.
+-- Here we have that syntact constant expressions are quite right, but we want
+-- to check that integers are correct.
+checkConstant :: Locations -> Const -> SemanticMonad Const
+checkConstant loc t@(I type_c c) =
+  -- |type_c| is correct
+  checkTypeDefinition loc type_c >>
+  if memberIntCons c type_c
+  then pure t
+  else throwError $ annotateError loc (EConstantOutRange t)
+checkConstant _ t = pure t
+
+typeDefCheck :: TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
+typeDefCheck _ = _TODO
