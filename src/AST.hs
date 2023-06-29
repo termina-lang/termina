@@ -104,22 +104,6 @@ data TypeSpecifier
 newtype Size = K Integer
  deriving (Show)
 
--- Ground Type equiality?
-groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
-groundTyEq  UInt8  UInt8 = True
-groundTyEq  UInt16  UInt16 = True
-groundTyEq  UInt32  UInt32 = True
-groundTyEq  UInt64  UInt64 = True
-groundTyEq  Int8  Int8 = True
-groundTyEq  Int16  Int16 = True
-groundTyEq  Int32  Int32 = True
-groundTyEq  Int64  Int64 = True
-groundTyEq  Bool  Bool = True
-groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  _ _ = False
-
 data Op
   = MemberAccess
   | Multiplication
@@ -312,5 +296,3 @@ type Block a = [Statement a]
 type AST = AnnASTElement ()
 type Program = AnnotatedProgram ()
 
-forgetAnnotations :: AnnotatedProgram a -> Program
-forgetAnnotations = map (fmap (const ()))

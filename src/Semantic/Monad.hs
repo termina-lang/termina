@@ -1,3 +1,6 @@
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE TupleSections #-}
+
 -- | Semantic Monad.
 -- Here lives the monad we use to handle semantic pass effects.
 -- It should be something like Exceptions + State
@@ -7,6 +10,8 @@ module Semantic.Monad where
 import           Data.Map                   as M
 
 import           AST
+import           Utils.AST
+
 import qualified Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
 import           Semantic.Types
@@ -19,11 +24,49 @@ import qualified Control.Monad.State.Strict as ST
 
 type Locations = Parser.Annotation
 
-data SemanticAnns = SemAnn
+internalErrorSeman :: Locations
+internalErrorSeman = Parser.Internal
+
+data SAnns a = SemAnn
   { -- | Location on source code
-    parse  :: Locations
+    location :: Locations
     -- | Type after type checking
-  , ty_ann :: TypeSpecifier}
+  , ty_ann   :: a}
+
+-- | Semantic elements
+-- we have three different semantic elements:
+data SemanticElems
+  = ETy TypeSpecifier -- ^ Expressions with their types
+  | STy -- ^ Statements with no types
+  | GTy (GEntry SemanticAnns) -- ^ Global elements with no types
+
+getTySpec :: SemanticElems -> Maybe TypeSpecifier
+getTySpec (ETy ty) = Just ty
+getTySpec _ = Nothing
+
+buildExpAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnn loc ty = SemAnn loc (ETy ty)
+
+buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
+buildGlobalAnn loc = SemAnn loc . GTy . GGlob
+
+buildGlobal :: Locations -> (GEntry SemanticAnns) -> SAnns SemanticElems
+buildGlobal loc = SemAnn loc . GTy
+
+buildStmtAnn :: Locations -> SAnns SemanticElems
+buildStmtAnn = flip SemAnn STy
+
+-- | Expression Semantic Annotations
+type SemanticAnns = SAnns SemanticElems
+
+forgetSemAnn :: SAnns a -> Locations
+forgetSemAnn = location
+
+-- -- | Global Definitions
+-- type GlobalsSemantic = SAnns (GEntry ())
+
+-- globType :: Locations -> SemGlobal -> GlobalsSemantic
+-- globType loc = SemAnn loc . GGlob
 
 type SemanticErrors = AnnotatedErrors Locations
 
@@ -81,8 +124,8 @@ localScope comp = do
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTy :: Identifier -> Locations -> SemanticMonad (TypeDef SemanticAnns)
-getGlobalTy tid loc = gets global >>=
+getGlobalTy :: Locations -> Identifier -> SemanticMonad (TypeDef SemanticAnns)
+getGlobalTy loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
   (throwError $ annotateError loc (ENoTyFound tid loc))
@@ -93,10 +136,18 @@ getGlobalTy tid loc = gets global >>=
       }) . M.lookup tid
 
 -- | From a global name get enum variations
-getGlobalEnumTy :: Identifier -> Locations -> SemanticMonad [EnumVariant]
-getGlobalEnumTy tid loc = getGlobalTy tid loc >>= \case
+getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
+getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
   Enum _ fs _mods _anns -> return fs
-  ty                    -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap parse ty)
+  ty                    -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap location ty)
+
+getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier)
+getFunctionTy loc iden =
+  catchError (getGlobalGEnTy loc iden ) (\_ -> throwError $ annotateError loc (ENotAFun iden))
+  >>= \case
+  GFun args retty -> return (args, retty)
+  ge -> throwError $ annotateError loc (ENotFoundFun iden (fmap forgetSemAnn ge))
+
 
 
 -- | Adding new *local* variables.
@@ -117,23 +168,44 @@ insertLocalVar loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident ty (local s)})
 
--- | Get the Type of a (already) defined variable. If it is not defined throw an error.
+insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
+insertLocalVariables loc = mapM_ (uncurry (insertLocalVar loc))
+
+-- | Get the Type of a local (already) defined variable. If it is not defined throw an error.
 getLocalVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
 getLocalVarTy loc ident =
   -- | Get local variables map and check if |ident| is a member of that map
-  (maybe
+  maybe
    (throwError $ annotateError loc (ENotNamedVar ident))
   -- ^ if |ident| is not a member throw error |ENotNamedVar|
-   return)
+   return
   -- ^ if |ident| is a member return its type
   . M.lookup ident
   =<< gets local
 
+-- | Get the Type of a global defined variable. If it is not defined throw an error.
+getGlobalVarTyLhs :: Locations -> Identifier -> SemanticMonad TypeSpecifier
+getGlobalVarTyLhs loc ident =
+  maybe (throwError $ annotateError loc (ENotNamedGlobal ident))
+  (\case{
+      GGlob glb ->
+      if lhsGlobal glb then return (getTySemGlobal glb)
+      else throwError (annotateError loc (EGlobalNotLHS ident))
+      ;
+      _ -> throwError (annotateError loc (EGlobalOtherType ident));
+        })
+  . M.lookup ident =<< gets global
+  where
+    -- TODO [Q20]
+    lhsGlobal (SVolatile {}) = True
+    lhsGlobal (SStatic {})   = True
+    lhsGlobal (SShared {})   = True
+    lhsGlobal (SConst {})    = False
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
 getROVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
 getROVarTy loc ident =
-  (M.lookup ident <$> (gets ro))
+  (M.lookup ident <$> gets ro)
   -- | Get local variables map and check if |ident| is a member of that map
   >>= maybe (throwError (annotateError loc (ENotNamedVar ident))) return
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
@@ -141,20 +213,36 @@ getROVarTy loc ident =
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)
 getGlobalGEnTy loc ident =
-  (gets global)
+  gets global
   -- | Get local variables map and check if |ident| is a member of that map
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
 getLHSVarTy,getRHSVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getLHSVarTy = getLocalVarTy
+getLHSVarTy loc ident =
+  catchError
+    (getLocalVarTy loc ident)
+    (\case{
+        AnnError (ENotNamedVar _) _loc -> getGlobalVarTyLhs loc ident;
+        l -> throwError l;
+          })
 getRHSVarTy loc ident =
   -- | Try first local environment
   catchError
     (getLocalVarTy loc ident)
   -- | If it is not defined there, check ro environment
     (\case {
-        ENotNamedVar _ -> getROVarTy loc ident;
+        ENotNamedVar _ ->
+        catchError (getROVarTy loc ident)
+        (\case {
+            ENotNamedVar _ -> getGlobalGEnTy loc ident >>=
+              (\case{
+                  GGlob sG -> return (getTySemGlobal sG);
+                  _ -> throwError $ annotateError loc (ENotNamedVar ident);
+                  });
+            _              -> throwError $ annotateError loc ERHSCatch;
+               } . semError)
+        ;
         _              -> throwError $ annotateError loc ERHSCatch
            } . semError)
 
@@ -208,6 +296,45 @@ sameOrErr loc t1 t2 =
   then return t1
   else throwError $ annotateError loc $ EMismatch t1 t2
 
+mustByTy :: TypeSpecifier -> Expression SemanticAnns -> SemanticMonad (Expression SemanticAnns)
+mustByTy ty exp = getExpType exp >>= sameOrErr loc ty >> return exp
+  where
+    ann_exp = getAnnotations exp
+    loc = location ann_exp
+
+blockRetTy :: TypeSpecifier -> BlockRet SemanticAnns -> SemanticMonad ()
+blockRetTy ty (BlockRet bd (ReturnStmt me ann)) =
+  maybe (throwError $ annotateError internalErrorSeman EUnboxingBlockRet)(void . sameOrErr (location ann) ty) (getTySpec $ ty_ann ann)
+
+
+
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
-getIntConst loc e       = throwError $ annotateError loc $ ENotIntConst e
+getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
+
+checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
+checkTypeDefinition loc (DefinedType identTy) = void (getGlobalTy loc identTy)
+checkTypeDefinition loc (Vector ty _)         = checkTypeDefinition loc ty
+checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
+checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
+checkTypeDefinition loc (Option ty)           = checkTypeDefinition loc ty
+checkTypeDefinition loc (Reference ty)        = checkTypeDefinition loc ty
+checkTypeDefinition loc (DynamicSubtype ty)   = checkTypeDefinition loc ty
+-- This is explicit just in case
+checkTypeDefinition _ UInt8                   = return ()
+checkTypeDefinition _ UInt16                  = return ()
+checkTypeDefinition _ UInt32                  = return ()
+checkTypeDefinition _ UInt64                  = return ()
+checkTypeDefinition _ Int8                    = return ()
+checkTypeDefinition _ Int16                   = return ()
+checkTypeDefinition _ Int32                   = return ()
+checkTypeDefinition _ Int64                   = return ()
+checkTypeDefinition _ Char                    = return ()
+checkTypeDefinition _ Bool                    = return ()
+checkTypeDefinition _ Unit                    = return ()
+
+getExpType :: Expression SemanticAnns -> SemanticMonad TypeSpecifier
+getExpType
+  = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
+  . getTySpec . ty_ann . getAnnotations
+

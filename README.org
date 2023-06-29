@@ -235,6 +235,10 @@ Ground types do not have default values
 Maybe that's enough.
 
 ** TODO Q19 We can only change local variable values.
-Can we assign something to a global variable? I don't think so.
+Can we assign something to a global variable? I don't think so. See next Question
+** TODO Q20 What globals can be assigned? LHS
 
 ** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
+
+** TODO modifiers type check
+** TODO type specifiers check
