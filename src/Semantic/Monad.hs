@@ -44,6 +44,10 @@ getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
 getTySpec _ = Nothing
 
+getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
+getGEntry (GTy a) = Just a
+getGEntry _ = Nothing
+
 buildExpAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnn loc ty = SemAnn loc (ETy ty)
 

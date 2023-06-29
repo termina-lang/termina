@@ -361,18 +361,6 @@ globalCheck (Const ident ty expr mods anns) =
   <*> pure mods
   <*> pure (buildGlobalAnn anns (SConst ty))
 
--- Global Helpers
--- | Add global member if it doesn't exists
--- addGlobal :: SemMonad m => Identifier -> GEntry -> m ()
--- addGlobal ident gentry =
---   -- | Lookup if |ident| is already in global map
---   ((M.lookup ident) <$> (gets global)) >>=
---   maybe
---     -- | If it is not par of the global map
---     (modify (\s -> s{global = M.insert ident gentry (global s)}))
---     -- | If it is defined
---     (const $ throwError $ EDefinedGEntry gentry)
-
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (AnnASTElement SemanticAnns)
 programSeman (Task ident ps ty bret mods anns) =
