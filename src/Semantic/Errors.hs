@@ -26,6 +26,9 @@ data Errors a
   | ENotNamedVar Identifier
   -- | Not Global Variable found
   | ENotNamedGlobal Identifier
+  | EGlobalOtherType Identifier
+  -- | Some globals cannot be assigned?
+  | EGlobalNotLHS Identifier
   -- | No shadow binding
   | EVarDefined Identifier
   -- | Not Function found
@@ -39,7 +42,10 @@ data Errors a
   -- | Wrong number of params
   | EFunParams
   -- | TypeSpecifier Identifier is not Union/Struct
-  | ETyNotStruct Identifier
+  -- Not struct type found with identifier
+  | ETyNotStructFound Identifier
+  -- Something was found but it is not an identifier
+  | ETyNotStruct Identifier (TypeDef a)
   -- | Record missing fields
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -72,6 +78,8 @@ data Errors a
   -- | Impossible Cases. Internal Transpiler errors
   | ERHSCatch
   | ELookupVar
+  | EUnboxingStmtExpr -- Unboxing statement as an expression.
+  | EUnboxingBlockRet -- Unboxing Blockret statement
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

@@ -22,8 +22,9 @@ elements of the AST. In this case, the annotations will only include
 the position in the source file where the element is located.
 
 -}
-newtype Annotation =
+data Annotation =
   Position SourcePos -- ^ Source code position
+  | Internal
   deriving Show
 
 ----------------------------------------
