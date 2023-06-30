@@ -80,3 +80,12 @@ casteableTys Int32 Int64   = True
 -- Last option being the same.
 -- This is a trivial casting :muscle:
 casteableTys a b           = groundTyEq a b
+
+-- Relation between types
+-- we use to define (dyn A \subseteq A)
+subTypes :: TypeSpecifier -> TypeSpecifier -> Bool
+subTypes (DynamicSubtype a) (DynamicSubtype b) = groundTyEq a b
+subTypes (DynamicSubtype a) b = groundTyEq a b
+subTypes a (DynamicSubtype b) = groundTyEq a b
+-- Id \subseteq Subtypes
+subTypes a b = groundTyEq a b
