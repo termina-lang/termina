@@ -189,8 +189,8 @@ zipSameLength ea eb f as bs = zipSameLength' ea eb f as bs []
 checkFieldValue
   :: Parser.Annotation
   -> FieldDefinition
-  -> FieldValueAssignment Parser.Annotation
-  -> SemanticMonad (FieldValueAssignment SemanticAnns)
+  -> FieldValueAssignment (Expression Parser.Annotation)
+  -> SemanticMonad (FieldValueAssignment (Expression SemanticAnns))
 checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then
@@ -200,8 +200,8 @@ checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) 
 checkFieldValues
   :: Parser.Annotation
   -> [FieldDefinition ]
-  -> [FieldValueAssignment Parser.Annotation]
-  -> SemanticMonad [FieldValueAssignment SemanticAnns]
+  -> [FieldValueAssignment (Expression Parser.Annotation)]
+  -> SemanticMonad [FieldValueAssignment (Expression SemanticAnns)]
 checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
   where
     tError = throwError . annotateError loc

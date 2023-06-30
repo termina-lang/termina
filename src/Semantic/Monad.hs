@@ -42,11 +42,11 @@ data SemanticElems
 
 getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
-getTySpec _ = Nothing
+getTySpec _        = Nothing
 
 getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
 getGEntry (GTy a) = Just a
-getGEntry _ = Nothing
+getGEntry _       = Nothing
 
 buildExpAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnn loc ty = SemAnn loc (ETy ty)
@@ -91,6 +91,9 @@ data ExpressionState
  , local  :: LocalEnv
  , ro     :: ROEnv
  }
+
+initialExpressionSt :: ExpressionState
+initialExpressionSt = ExprST empty empty empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State ExpressionState)
 
@@ -174,14 +177,19 @@ insertLocalVar loc ident ty =
 
 insertGlobalTy :: Locations -> TypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
-  isDefined type_name >>= \b ->
-  if b
-  then -- | Notify the user the name is taken
-    throwError $ annotateError loc $ EUsedTypeName type_name
-  else -- | Add new type to globals
-    modify (\s -> s{global = M.insert type_name (GType tydef) (global s)})
+  insertGlobal type_name (GType tydef) (annotateError loc $ EUsedTypeName type_name)
  where
    type_name = identifierType tydef
+
+insertGlobalFun :: Locations -> Identifier -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
+insertGlobalFun loc ident ps rettype =
+  insertGlobal ident (GFun ps rettype) (annotateError loc $ EUsedFunName ident)
+
+insertGlobal :: Identifier -> GEntry SemanticAnns -> SemanticErrors -> SemanticMonad ()
+insertGlobal ident entry err =
+  isDefined ident >>= \b ->
+  if b then throwError err
+  else modify (\s -> s{global = M.insert ident entry (global s)})
 
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (uncurry (insertLocalVar loc))
@@ -239,7 +247,7 @@ getLHSVarTy loc ident =
     (getLocalVarTy loc ident)
     (\case{
         AnnError (ENotNamedVar _) _loc -> getGlobalVarTyLhs loc ident;
-        l -> throwError l;
+        l                              -> throwError l;
           })
 getRHSVarTy loc ident =
   -- | Try first local environment
@@ -321,8 +329,6 @@ blockRetTy :: TypeSpecifier -> BlockRet SemanticAnns -> SemanticMonad ()
 blockRetTy ty (BlockRet bd (ReturnStmt me ann)) =
   maybe (throwError $ annotateError internalErrorSeman EUnboxingBlockRet)(void . sameOrErr (location ann) ty) (getTySpec $ ty_ann ann)
 
-
-
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
@@ -333,12 +339,17 @@ checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
   void (getGlobalTy loc identTy)
 checkTypeDefinition loc (Vector ty _)         =
-  checkTypeDefinition loc ty
+  if primitiveTypes ty then checkTypeDefinition loc ty
+  else throwError $ annotateError loc (ENoPrimitiveType ty)
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
-checkTypeDefinition loc (Option ty)           = checkTypeDefinition loc ty
+-- Dynamic Subtyping
+checkTypeDefinition loc (Option tyd@(DynamicSubtype ty)) = checkTypeDefinition loc tyd
+checkTypeDefinition loc (Option ty) = throwError $ annotateError loc $ EOptionDyn ty
 checkTypeDefinition loc (Reference ty)        = checkTypeDefinition loc ty
-checkTypeDefinition loc (DynamicSubtype ty)   = checkTypeDefinition loc ty
+checkTypeDefinition loc (DynamicSubtype ty)   =
+  if primitiveTypes ty then checkTypeDefinition loc ty
+  else throwError $ annotateError loc $ EDynPrim ty
 -- This is explicit just in case
 checkTypeDefinition _ UInt8                   = return ()
 checkTypeDefinition _ UInt16                  = return ()
@@ -357,3 +368,8 @@ getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
   . getTySpec . ty_ann . getAnnotations
 
+runTypeChecking
+  :: ExpressionState
+  -> SemanticMonad a
+  -> (Either SemanticErrors a , ExpressionState)
+runTypeChecking initSt = flip ST.runState initSt . runExceptT

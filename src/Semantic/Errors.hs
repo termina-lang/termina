@@ -83,6 +83,14 @@ data Errors a
   | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
   | EUsedTypeName Identifier
+  -- | Vector Type Primitive
+  | ENoPrimitiveType TypeSpecifier
+  -- | Only option Dyn
+  | EOptionDyn TypeSpecifier
+  -- | Dynamic a non primitive type
+  | EDynPrim TypeSpecifier
+  -- | Function Declaration error,
+  | EUsedFunName Identifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

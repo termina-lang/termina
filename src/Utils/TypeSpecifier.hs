@@ -4,6 +4,23 @@ module Utils.TypeSpecifier where
 
 import           AST
 
+-- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
+primitiveTypes :: TypeSpecifier -> Bool
+primitiveTypes UInt8           = True
+primitiveTypes UInt16          = True
+primitiveTypes UInt32          = True
+primitiveTypes UInt64          = True
+primitiveTypes Int8            = True
+primitiveTypes Int16           = True
+primitiveTypes Int32           = True
+primitiveTypes Int64           = True
+primitiveTypes Bool            = True
+primitiveTypes Char            = True
+primitiveTypes (DefinedType _) = True
+primitiveTypes (Vector _ _)    = True
+-- primitiveTypes (Option _)    = True
+primitiveTypes  _              = False
+
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True
 boolTy _    = False

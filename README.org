@@ -79,6 +79,34 @@ else print("Capaz que no")
 #+end_src
 
 No, Name Equality, two types with different /names/ are different!
+** TODO Add new Undyn (internal) operator
+#+begin_src haskell
+data CoreExpression a =
+  ...
+  | Undyn Identifier a
+  ...
+
+#+end_src
+** TODO Functions cannot return Dyn
+Returning dyns is not a good idea.
+
+#+begin_quote
+{
+f:Dyn t -> Dyn t
+x:Dyn t
+y = f(x)
+Free(y)
+}
+
+f(x) + 4  -- > Free(x)
+z = g(x,y); free(z)
+g(x,y) + 4 ;
+
+__z = g(x,y), __z_v = *__z, free(__z);
+E[__z_v + 4]
+
+Undyn (F(x))
+#+end_quote
 
 ** DONE FunctionExpression shouldn't it be ~FunctionExpression Ident [Expression a]~?
 
