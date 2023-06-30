@@ -6,39 +6,25 @@ import Prettyprinter
 import Prettyprinter.Render.Terminal
 import Data.Maybe
 import Semantic.Monad
-import Data.Foldable (find)
+
 
 type DocStyle = Doc AnsiStyle
 
-getExpType :: Expression SemanticAnns -> TypeSpecifier
-getExpType (Variable _ ann) = ty_ann ann
-getExpType (Constant _ ann) = ty_ann ann
-getExpType (OptionVariantExpression _ ann) = ty_ann ann
-getExpType (BinOp _ _ _ ann) = ty_ann ann
-getExpType (ReferenceExpression _ ann) = ty_ann ann
-getExpType (DereferenceExpression _ ann) = ty_ann ann
-getExpType (Casting _ _ ann) = ty_ann ann
-getExpType (FunctionExpression _ _ ann) = ty_ann ann
-getExpType (FieldValuesAssignmentsExpression _ _ ann) = ty_ann ann
-getExpType (EnumVariantExpression _ _ _ ann) = ty_ann ann
-getExpType (VectorIndexExpression _ _ ann) = ty_ann ann
-getExpType (VectorInitExpression _ _ ann) = ty_ann ann
-getExpType (ParensExpression expr _) = getExpType expr
-
-getLocation :: Expression SemanticAnns -> Locations
-getLocation (Variable _ ann) = parse ann
-getLocation (Constant _ ann) = parse ann
-getLocation (OptionVariantExpression _ ann) = parse ann
-getLocation (BinOp _ _ _ ann) = parse ann
-getLocation (ReferenceExpression _ ann) = parse ann
-getLocation (DereferenceExpression _ ann) = parse ann
-getLocation (Casting _ _ ann) = parse ann
-getLocation (FunctionExpression _ _ ann) = parse ann
-getLocation (FieldValuesAssignmentsExpression _ _ ann) = parse ann
-getLocation (EnumVariantExpression _ _ _ ann) = parse ann
-getLocation (VectorIndexExpression _ _ ann) = parse ann
-getLocation (VectorInitExpression _ _ ann) = parse ann
-getLocation (ParensExpression expr _) = getLocation expr
+getType :: Expression SemanticAnns -> TypeSpecifier
+getType (Variable _ (SemAnn _ (ETy ts))) = ts
+getType (Constant _ (SemAnn _ (ETy ts))) = ts 
+getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
+getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
+getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
+getType (DereferenceExpression _ (SemAnn _ (ETy ts))) = ts
+getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
+getType (FunctionExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
+getType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (ParensExpression expr _) = getType expr
+getType _ = error "invalid annotation"
 
 -- | Type of the pretty printers
 type Printer a b =

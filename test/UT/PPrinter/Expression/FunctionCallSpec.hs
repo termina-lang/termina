@@ -9,82 +9,85 @@ import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 var0, dynVar1, pVar2, pDynVar3 :: Expression SemanticAnns
-var0 = Variable "var0" (SemAnn undefined uint16TS)
-dynVar1 = Variable "dynVar1" (SemAnn undefined (DynamicSubtype uint16TS))
-pVar2 = Variable "p_var2" (SemAnn undefined (Reference uint16TS))
-pDynVar3 = Variable "p_dynVar3" (SemAnn undefined (Reference (DynamicSubtype uint16TS)))
+var0 = Variable "var0" uint16SemAnn
+dynVar1 = Variable "dynVar1" dynUInt16SemAnn
+pVar2 = Variable "p_var2" refUInt16SemAnn
+pDynVar3 = Variable "p_dynVar3" refUInt16SemAnn
 
 referenceVar0, referenceDynVar1 :: Expression SemanticAnns
-referenceVar0 = ReferenceExpression var0 (SemAnn undefined (Reference uint16TS))
-referenceDynVar1 = ReferenceExpression dynVar1 (SemAnn undefined (Reference (DynamicSubtype uint16TS)))
+referenceVar0 = ReferenceExpression var0 refUInt16SemAnn
+referenceDynVar1 = ReferenceExpression dynVar1 refUInt16SemAnn
 
 dereferencepVar2, dereferencepDynVar3 :: Expression SemanticAnns
-dereferencepVar2 = DereferenceExpression pVar2 (SemAnn undefined uint16TS)
-dereferencepDynVar3 = DereferenceExpression pDynVar3 (SemAnn undefined (DynamicSubtype uint16TS))
+dereferencepVar2 = DereferenceExpression pVar2 uint16SemAnn
+dereferencepDynVar3 = DereferenceExpression pDynVar3 uint16SemAnn
 
 vector0, dynVector0 :: Expression SemanticAnns
-vector0 = Variable "vector0" (SemAnn undefined vectorTS)
-dynVector0 = Variable "dynVector0" (SemAnn undefined (DynamicSubtype vectorTS))
+vector0 = Variable "vector0" (vectorSemAnn UInt32 (I UInt32 10))
+dynVector0 = Variable "dynVector0" (dynVectorSemAnn UInt32 (I UInt32 10))
 
 pVector1, pDynVector1 :: Expression SemanticAnns
-pVector1 = Variable "p_vector1" (SemAnn undefined (Reference vectorTS))
-pDynVector1 = Variable "p_dynVector1" (SemAnn undefined (DynamicSubtype vectorTS))
+pVector1 = Variable "p_vector1" (refVectorSemAnn UInt32 (I UInt32 10))
+pDynVector1 = Variable "p_dynVector1" (refVectorSemAnn UInt32 (I UInt32 10))
 
 referenceVector0, referenceDynVector0 :: Expression SemanticAnns
-referenceVector0 = ReferenceExpression vector0 (SemAnn undefined (Reference (DynamicSubtype vectorTS)))
-referenceDynVector0 = ReferenceExpression dynVector0 (SemAnn undefined (Reference (DynamicSubtype vectorTS)))
+referenceVector0 = ReferenceExpression vector0 (refVectorSemAnn UInt32 (I UInt32 10))
+referenceDynVector0 = ReferenceExpression dynVector0 (refVectorSemAnn UInt32 (I UInt32 10))
+
+uint16Const :: Expression SemanticAnns
+uint16Const = Constant (I UInt16 1024) uint16SemAnn
 
 var0PlusConstant, dynVar1PlusConstant :: Expression SemanticAnns
-var0PlusConstant = BinOp Addition var0 uint16Const1024 (SemAnn undefined uint16TS)
-dynVar1PlusConstant = BinOp Addition dynVar1 uint16Const1024 (SemAnn undefined uint16TS)
+var0PlusConstant = BinOp Addition var0 uint16Const uint16SemAnn
+dynVar1PlusConstant = BinOp Addition dynVar1 uint16Const uint16SemAnn
 
 dereferencepVar2PlusConstant, dereferencepDynVar3PlusConstant :: Expression SemanticAnns
-dereferencepVar2PlusConstant = BinOp Addition dereferencepVar2 uint16Const1024 (SemAnn undefined uint16TS)
-dereferencepDynVar3PlusConstant = BinOp Addition dereferencepDynVar3 uint16Const1024 (SemAnn undefined uint16TS)
+dereferencepVar2PlusConstant = BinOp Addition dereferencepVar2 uint16Const uint16SemAnn
+dereferencepDynVar3PlusConstant = BinOp Addition dereferencepDynVar3 uint16Const uint16SemAnn
 
 var0PlusVar1, dereferencepVar2PlusdereferecepDynVar3 :: Expression SemanticAnns
-var0PlusVar1 = BinOp Addition var0 dynVar1 (SemAnn undefined uint16TS)
-dereferencepVar2PlusdereferecepDynVar3 = BinOp Addition dereferencepVar2 dereferencepDynVar3 (SemAnn undefined uint16TS)
+var0PlusVar1 = BinOp Addition var0 dynVar1 uint16SemAnn
+dereferencepVar2PlusdereferecepDynVar3 = BinOp Addition dereferencepVar2 dereferencepDynVar3 uint16SemAnn
 
 functionCallSingleVar0, functionCallSingleDynVar1,
   functionCallSinglepVar2, functionCallSinglepDynVar3 :: Expression SemanticAnns
-functionCallSingleVar0 = FunctionExpression "foo" [var0] (SemAnn undefined Unit)
-functionCallSingleDynVar1 = FunctionExpression "foo" [dynVar1] (SemAnn undefined Unit)
-functionCallSinglepVar2 = FunctionExpression "foo" [pVar2] (SemAnn undefined Unit)
-functionCallSinglepDynVar3 = FunctionExpression "foo" [pDynVar3] (SemAnn undefined Unit)
+functionCallSingleVar0 = FunctionExpression "foo" [var0] unitSemAnn
+functionCallSingleDynVar1 = FunctionExpression "foo" [dynVar1] unitSemAnn
+functionCallSinglepVar2 = FunctionExpression "foo" [pVar2] unitSemAnn
+functionCallSinglepDynVar3 = FunctionExpression "foo" [pDynVar3] unitSemAnn
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
   functionCallSingleDerefVar0 :: Expression SemanticAnns
-functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] (SemAnn undefined Unit)
-functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceDynVar1] (SemAnn undefined Unit)
-functionCallSingleDerefVar0 = FunctionExpression "foo" [dereferencepVar2] (SemAnn undefined Unit)
+functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] unitSemAnn
+functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceDynVar1] unitSemAnn
+functionCallSingleDerefVar0 = FunctionExpression "foo" [dereferencepVar2] unitSemAnn
 
 functionCallSingleVar0PlusConstant, functionCallSingleDynVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
   functionCallSingleDerefpVar2PlusConstant, functionCallSingleDerefpDynVar3PlusConstant,
   functionCallSingleDerefpVar2PlusDerefpDynVar3 :: Expression SemanticAnns
-functionCallSingleVar0PlusConstant = FunctionExpression "foo" [var0PlusConstant] (SemAnn undefined Unit)
-functionCallSingleDynVar1PlusConstant = FunctionExpression "foo" [dynVar1PlusConstant] (SemAnn undefined Unit)
-functionCallSingleVar0PlusVar1 = FunctionExpression "foo" [var0PlusVar1] (SemAnn undefined Unit)
-functionCallSingleDerefpVar2PlusConstant = FunctionExpression "foo" [dereferencepVar2PlusConstant] (SemAnn undefined Unit)
-functionCallSingleDerefpDynVar3PlusConstant = FunctionExpression "foo" [dereferencepDynVar3PlusConstant] (SemAnn undefined Unit)
-functionCallSingleDerefpVar2PlusDerefpDynVar3 = FunctionExpression "foo" [dereferencepVar2PlusdereferecepDynVar3] (SemAnn undefined Unit)
+functionCallSingleVar0PlusConstant = FunctionExpression "foo" [var0PlusConstant] unitSemAnn
+functionCallSingleDynVar1PlusConstant = FunctionExpression "foo" [dynVar1PlusConstant] unitSemAnn
+functionCallSingleVar0PlusVar1 = FunctionExpression "foo" [var0PlusVar1] unitSemAnn
+functionCallSingleDerefpVar2PlusConstant = FunctionExpression "foo" [dereferencepVar2PlusConstant] unitSemAnn
+functionCallSingleDerefpDynVar3PlusConstant = FunctionExpression "foo" [dereferencepDynVar3PlusConstant] unitSemAnn
+functionCallSingleDerefpVar2PlusDerefpDynVar3 = FunctionExpression "foo" [dereferencepVar2PlusdereferecepDynVar3] unitSemAnn
 
 functionCallSingleVector0, functionCallSingleDynVector0,
   functionCallSinglepVector1, functionCallSinglepDynVector1 :: Expression SemanticAnns
-functionCallSingleVector0 = FunctionExpression "foo" [vector0] (SemAnn undefined Unit)
-functionCallSingleDynVector0 = FunctionExpression "foo" [dynVector0] (SemAnn undefined Unit)
-functionCallSinglepVector1 = FunctionExpression "foo" [pVector1] (SemAnn undefined Unit)
-functionCallSinglepDynVector1 = FunctionExpression "foo" [pDynVector1] (SemAnn undefined Unit)
+functionCallSingleVector0 = FunctionExpression "foo" [vector0] unitSemAnn
+functionCallSingleDynVector0 = FunctionExpression "foo" [dynVector0] unitSemAnn
+functionCallSinglepVector1 = FunctionExpression "foo" [pVector1] unitSemAnn
+functionCallSinglepDynVector1 = FunctionExpression "foo" [pDynVector1] unitSemAnn
 
 functionCallSingleRefVector0, functionCallSingleRefDynVector0 :: Expression SemanticAnns
-functionCallSingleRefVector0 = FunctionExpression "foo" [referenceVector0] (SemAnn undefined Unit)
-functionCallSingleRefDynVector0 = FunctionExpression "foo" [referenceDynVector0] (SemAnn undefined Unit)
+functionCallSingleRefVector0 = FunctionExpression "foo" [referenceVector0] unitSemAnn
+functionCallSingleRefDynVector0 = FunctionExpression "foo" [referenceDynVector0] unitSemAnn
 
 call2Parameters, call3Parameters, call4Parameters :: Expression SemanticAnns
-call2Parameters = FunctionExpression "foo2" [var0PlusConstant, var0PlusVar1] (SemAnn undefined Unit)
-call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, dynVar1PlusConstant] (SemAnn undefined Unit)
-call4Parameters = FunctionExpression "foo4" [dynVector0, referenceDynVar1, functionCallSingleVar0, call2Parameters] (SemAnn undefined Unit)
+call2Parameters = FunctionExpression "foo2" [var0PlusConstant, var0PlusVar1] unitSemAnn
+call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, dynVar1PlusConstant] unitSemAnn
+call4Parameters = FunctionExpression "foo4" [dynVector0, referenceDynVar1, functionCallSingleVar0, call2Parameters] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppRootExpression

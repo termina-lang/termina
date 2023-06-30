@@ -55,7 +55,7 @@ ppInitializeVector level target expr =
                 ppInitializeVector (level + 1) (target <> brackets (pretty iterator)) expr'
             )
         (FieldValuesAssignmentsExpression {}) -> error "Unsupported"
-        _ -> ppInitializeVectorFromExpression level target (ppRootExpression expr) (getExpType expr)
+        _ -> ppInitializeVectorFromExpression level target (ppRootExpression expr) (getType expr)
 
 ppInititalizeStructField :: Identifier -> FieldValueAssignment SemanticAnns -> [DocStyle]
 ppInititalizeStructField identifier (FieldValueAssignment field expr) =

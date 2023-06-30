@@ -10,28 +10,28 @@ import UT.PPrinter.Expression.Common
 
 tmDescriptor0, tmDescriptor1, resource0, tmChannel, tmPool, 
   bar0, bar1, field0, alloc, send, foo0 :: Expression SemanticAnns
-tmDescriptor0 = Variable "tm_descriptor0" (SemAnn undefined (DefinedType "TMDescriptor"))
-tmDescriptor1 = Variable "tm_descriptor1" (SemAnn undefined (DynamicSubtype (DefinedType "TMDescriptor")))
-resource0 = Variable "resource0" (SemAnn undefined (DefinedType "Resource"))
-tmChannel = Variable "tm_channel" (SemAnn undefined (MsgQueue (DefinedType "TMDescriptor") (K 10)))
-tmPool = Variable "tm_pool" (SemAnn undefined (Pool UInt32 (K 10)))
-bar0 = Variable "bar0" (SemAnn undefined uint16TS)
-bar1 = Variable "bar1" (SemAnn undefined (DynamicSubtype uint16TS))
-field0 = Variable "field0" (SemAnn undefined uint32TS)
-alloc = FunctionExpression "alloc" [] (SemAnn undefined Unit)
-send = FunctionExpression "send" [bar0] (SemAnn undefined UInt32)
-foo0 = FunctionExpression "foo0" [bar0, bar1] (SemAnn undefined Unit)
+tmDescriptor0 = Variable "tm_descriptor0" (definedTypeSemAnn "TMDescriptor")
+tmDescriptor1 = Variable "tm_descriptor1" (dynDefinedTypeSemAnn "TMDescriptor")
+resource0 = Variable "resource0" (definedTypeSemAnn "Resource")
+tmChannel = Variable "tm_channel" (msgQueueSemAnn (DefinedType "TMDescriptor") 10)
+tmPool = Variable "tm_pool" (poolSemAnn UInt32 10)
+bar0 = Variable "bar0" uint16SemAnn
+bar1 = Variable "bar1" dynUInt16SemAnn
+field0 = Variable "field0" uint32SemAnn
+alloc = FunctionExpression "alloc" [] unitSemAnn
+send = FunctionExpression "send" [bar0] uint32SemAnn
+foo0 = FunctionExpression "foo0" [bar0, bar1] unitSemAnn
 
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnns
-tmDescriptor0field0 = BinOp MemberAccess tmDescriptor0 field0 (SemAnn undefined uint32TS)
-tmDescriptor1field0 = BinOp MemberAccess tmDescriptor1 field0 (SemAnn undefined uint32TS)
+tmDescriptor0field0 = BinOp MemberAccess tmDescriptor0 field0 uint32SemAnn
+tmDescriptor1field0 = BinOp MemberAccess tmDescriptor1 field0 uint32SemAnn
 
 tmPoolAlloc :: Expression SemanticAnns
-tmPoolAlloc = BinOp MemberAccess tmPool alloc (SemAnn undefined uint32TS)
+tmPoolAlloc = BinOp MemberAccess tmPool alloc uint32SemAnn
 
 tmChannelsend, resource0foo0 :: Expression SemanticAnns
-tmChannelsend = BinOp MemberAccess tmChannel send (SemAnn undefined uint32TS)
-resource0foo0 = BinOp MemberAccess resource0 foo0 (SemAnn undefined uint32TS)
+tmChannelsend = BinOp MemberAccess tmChannel send uint32SemAnn
+resource0foo0 = BinOp MemberAccess resource0 foo0 uint32SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppRootExpression

@@ -8,18 +8,22 @@ import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
+vectorAnn, twoDymVectorAnn :: SemanticAnns
+vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+
 var0, vector0, vector1 :: Expression SemanticAnns
-var0 = Variable "var0" (SemAnn undefined uint16TS)
-vector0 = Variable "vector0" (SemAnn undefined vectorTS)
-vector1 = Variable "vector1" (SemAnn undefined twoDimVectorTS)
+var0 = Variable "var0" uint16SemAnn
+vector0 = Variable "vector0" vectorAnn
+vector1 = Variable "vector1" twoDymVectorAnn
 
 dynVar0, dynVector0, dynVector1 :: Expression SemanticAnns
-dynVar0 = Variable "dyn_var0" (SemAnn undefined (DynamicSubtype uint16TS))
+dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
 dynVector0 = Variable "dyn_vector0" (SemAnn undefined (DynamicSubtype vectorTS))
 dynVector1 = Variable "dyn_vector1" (SemAnn undefined (DynamicSubtype twoDimVectorTS))
 
 pVar0expr, pVector0expr, pVector1expr :: Expression SemanticAnns
-pVar0expr = ReferenceExpression var0 (SemAnn undefined (Reference uint16TS))
+pVar0expr = ReferenceExpression var0 refUInt16SemAnn
 pVector0expr = ReferenceExpression vector0 (SemAnn undefined (Reference vectorTS))
 pVector1expr = ReferenceExpression vector1 (SemAnn undefined (Reference twoDimVectorTS))
 
@@ -29,14 +33,14 @@ pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference ve
 pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference twoDimVectorTS))
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
-derefpVar0 = DereferenceExpression pVar0expr (SemAnn undefined uint16TS)
-derefpVector0 = DereferenceExpression pVector0expr (SemAnn undefined vectorTS)
-derefpVector1 = DereferenceExpression pVector1expr (SemAnn undefined twoDimVectorTS)
+derefpVar0 = DereferenceExpression pVar0expr uint16SemAnn
+derefpVector0 = DereferenceExpression pVector0expr (vectorSemAnn UInt32 (I UInt32 10))
+derefpVector1 = DereferenceExpression pVector1expr (twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10))
 
 derefpDynVar0expr, derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVar0expr = DereferenceExpression pDynVar0expr (SemAnn undefined uint16TS)
-derefpDynVector0expr = DereferenceExpression pDynVector0expr (SemAnn undefined vectorTS)
-derefpDynVector1expr = DereferenceExpression pDynVector1expr (SemAnn undefined twoDimVectorTS)
+derefpDynVar0expr = DereferenceExpression pDynVar0expr uint16SemAnn
+derefpDynVector0expr = DereferenceExpression pDynVector0expr (vectorSemAnn UInt32 (I UInt32 10))
+derefpDynVector1expr = DereferenceExpression pDynVector1expr (twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppRootExpression

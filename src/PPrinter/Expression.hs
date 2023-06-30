@@ -47,14 +47,14 @@ ppDynamicSubtypeCast' ts = error $ "unsupported type" ++ show ts
 -- This function assumes that the expression is a dynamic subtype
 ppDynamicSubtypeObjectAddress :: Expression SemanticAnns -> DocStyle
 ppDynamicSubtypeObjectAddress expr =
-    case getExpType expr of
+    case getType expr of
         DynamicSubtype ts ->
             parens (ppDynamicSubtypeCast ts) <> ppExpression' expr <> pretty ".datum"
         _ -> error "unsupported expression"
 
 ppRefDynamicSubtypeObjectAddress :: Expression SemanticAnns -> DocStyle
 ppRefDynamicSubtypeObjectAddress expr =
-    case getExpType expr of
+    case getType expr of
         Reference (DynamicSubtype ts) ->
             parens (ppDynamicSubtypeCast ts) <> (
                 case expr of 
@@ -72,7 +72,7 @@ ppRefDynamicSubtypeObject expr = ppCDereferenceExpression (ppRefDynamicSubtypeOb
 ppMemberAccessExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 -- | If the right hand side is a function, then it is a method call
 ppMemberAccessExpression lhs (FunctionExpression methodId params _) =
-    case getExpType lhs of
+    case getType lhs of
         (Reference ts) ->
             case ts of
                 -- | If the left hand size is a class:
@@ -114,8 +114,8 @@ ppMemberAccessExpression lhs rhs = ppExpression lhs <> ppBinaryOperator MemberAc
 
 ppRelationalNotEqualExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 ppRelationalNotEqualExpression lhs rhs =
-    let lhsType = getExpType lhs
-        rhsType = getExpType rhs in
+    let lhsType = getType lhs
+        rhsType = getType rhs in
     case (lhsType, rhsType) of
         -- If both are dynamic subtypes
         (DynamicSubtype ts', DynamicSubtype _) ->
@@ -151,8 +151,8 @@ ppRelationalNotEqualExpression lhs rhs =
 
 ppRelationalEqualExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 ppRelationalEqualExpression lhs rhs =
-    let lhsType = getExpType lhs
-        rhsType = getExpType rhs in
+    let lhsType = getType lhs
+        rhsType = getType rhs in
     case (lhsType, rhsType) of
         -- If both are dynamic subtypes
         (DynamicSubtype ts', DynamicSubtype _) ->
@@ -213,18 +213,18 @@ ppExpression :: Expression SemanticAnns -> DocStyle
 ppExpression (ParensExpression expr _) = parens (ppExpression expr)
 -- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
 ppExpression (ReferenceExpression expr _) =
-    case getExpType expr of
+    case getType expr of
         -- | A reference to a dynamic subtype is the address of the datum
         (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress expr
         -- | A reference to a vector is the vector itself  
         (Vector _ _) -> ppExpression expr
         _ -> ppCReferenceExpression (ppExpression expr)
 ppExpression (DereferenceExpression expr _) =
-    case getExpType expr of
+    case getType expr of
         (Reference (Vector _ _)) -> ppExpression expr
         _ -> ppCDereferenceExpression (ppExpression expr)
 ppExpression expr =
-    case getExpType expr of
+    case getType expr of
         (DynamicSubtype (Vector _ _)) -> parens (ppDynamicSubtypeObjectAddress expr)
         (DynamicSubtype _) -> ppDynamicSubtypeObject expr
         _ -> ppExpression' expr
