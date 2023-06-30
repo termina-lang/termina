@@ -20,7 +20,7 @@ data Expression a
   | ReferenceExpression (Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
-  | FunctionExpression  [ Expression a ] a
+  | FunctionExpression Identifier  [ Expression a ] a
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
   | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
@@ -28,5 +28,8 @@ data Expression a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantExpression Identifier Identifier [ Expression a ] a
   | OptionVariantExpression (OptionVariant a) a
+  -- | *Important change* : We make implicit Dyn to ground types explicit in
+  -- this AST. After the semantic analysis phase, no implicit converstions
+  -- between ground and dyn types.
   | Undyn Identifier a
   deriving (Show, Functor)
