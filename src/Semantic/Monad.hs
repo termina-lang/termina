@@ -368,5 +368,8 @@ getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
   . getTySpec . ty_ann . getAnnotations
 
-runTypeChecking :: ExpressionState -> SemanticMonad a -> (Either SemanticErrors a , ExpressionState)
+runTypeChecking
+  :: ExpressionState
+  -> SemanticMonad a
+  -> (Either SemanticErrors a , ExpressionState)
 runTypeChecking initSt = flip ST.runState initSt . runExceptT

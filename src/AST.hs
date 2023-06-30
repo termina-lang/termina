@@ -128,6 +128,8 @@ data Op
 data OptionVariant a = None | Some (Expression a)
   deriving (Show, Functor)
 
+-- type FuncName = Annotated Identifier
+
 data Expression a
   = Variable Identifier a
   | Constant Const a
@@ -137,11 +139,12 @@ data Expression a
   | ReferenceExpression (Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
-  | FunctionExpression Identifier [ Expression a ] a
+  | FunctionExpression  Identifier [ Expression a ] a
+  -- FunctionExpression (FuncName a) [ Expression a ] a
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
   | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
-  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment a] a
+  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment (Expression a)] a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantExpression Identifier Identifier [ Expression a ] a
   | OptionVariantExpression (OptionVariant a) a
@@ -217,9 +220,9 @@ data Parameter = Parameter {
   , paramTypeSpecifier :: TypeSpecifier -- ^ type of the parameter
 } deriving (Show)
 
-data FieldValueAssignment a = FieldValueAssignment {
+data FieldValueAssignment expr = FieldValueAssignment {
   fieldAssigIdentifier   :: Identifier
-  , fieldAssigExpression :: Expression a
+  , fieldAssigExpression :: expr
 } deriving (Show, Functor)
 
 data FieldDefinition = FieldDefinition {
