@@ -52,7 +52,7 @@ data GEntry a
   -- ^ Globals
   | GType (TypeDef a)
   -- ^ Types
-  deriving (Functor, Show)
+  deriving (Functor,Show)
 
 -- type GEntry = GEntry' SemAnn
 

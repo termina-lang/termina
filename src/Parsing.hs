@@ -369,7 +369,7 @@ blockParser = BlockRet <$> many blockItemParser <*> returnStmtParser
   -- ret <- returnStmtParser
 
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
-taskParser :: Parser (AnnASTElement Annotation)
+taskParser :: Parser (AnnASTElement  Annotation)
 taskParser = do
   modifiers <- many modifierParser
   p <- getPosition
@@ -381,7 +381,7 @@ taskParser = do
   blockRet <- braces blockParser
   return $ Task name params typeSpec blockRet modifiers (Position p)
 
-handlerParser :: Parser (AnnASTElement Annotation)
+handlerParser :: Parser (AnnASTElement  Annotation)
 handlerParser = do
   modifiers <- many modifierParser
   p <- getPosition
@@ -401,7 +401,7 @@ returnStmtParser = do
   _ <- semi
   return $ ReturnStmt ret (Position p)
 
-functionParser :: Parser (AnnASTElement Annotation)
+functionParser :: Parser (AnnASTElement  Annotation)
 functionParser = do
   modifiers <- many modifierParser
   p <- getPosition
@@ -414,7 +414,7 @@ functionParser = do
   blockRet <- braces blockParser
   return $ Function name params typeSpec blockRet modifiers (Position p)
 
-moduleInclusionParser :: Parser (AnnASTElement Annotation)
+moduleInclusionParser :: Parser (AnnASTElement  Annotation)
 moduleInclusionParser = do
   modifiers <- many modifierParser
   p <- getPosition
@@ -585,12 +585,12 @@ constDeclParser = do
   _ <- semi
   return $ Const identifier typeSpecifier initializer modifiers (Position p)
 
-globalDeclParser :: Parser (AnnASTElement Annotation)
+globalDeclParser :: Parser (AnnASTElement  Annotation)
 globalDeclParser = do
   g <- volatileDeclParser <|> staticDeclParser <|> protectedDeclParser <|> constDeclParser
   return $ GlobalDeclaration g
 
-typeDefintionParser :: Parser (AnnASTElement Annotation)
+typeDefintionParser :: Parser (AnnASTElement  Annotation)
 typeDefintionParser = do
   d <- structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser
   return $ TypeDefinition d
@@ -676,7 +676,8 @@ topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
   try taskParser <|> try handlerParser
   <|> try functionParser <|> try globalDeclParser
-  <|> try typeDefintionParser <|> moduleInclusionParser
+  <|> try typeDefintionParser
+  <|> moduleInclusionParser
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
