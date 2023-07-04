@@ -23,8 +23,8 @@ groundTyEq  _ _ = False
 ----------------------------------------
 -- Annotations helpers
 
-forgetAnnotations :: AnnotatedProgram a -> Program
-forgetAnnotations = map (fmap (const ()))
+-- forgetAnnotations :: AnnotatedProgram a -> Program
+-- forgetAnnotations = map (fmap (const ()))
 
 -- | First annotation level.
 getAnnotations :: Expression a -> a

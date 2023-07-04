@@ -102,7 +102,9 @@ paramTy ann (p : ps) (a : as) =
 paramTy ann (p : _) [] = throwError $ annotateError ann EFunParams
 paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 
-expressionType :: Expression Parser.Annotation -> SemanticMonad (Expression SemanticAnns)
+expressionType
+  :: Expression Parser.Annotation
+  -> SemanticMonad (Expression SemanticAnns)
 expressionType (Variable vident pann) =
   -- | Assign type to a variable found in the wild (RHS variables).
   Variable vident . buildExpAnn pann <$> getRHSVarTy pann vident
@@ -141,10 +143,13 @@ expressionType (FunctionExpression fun_name args pann) =
   flip (FunctionExpression fun_name) (buildExpAnn pann retty) <$> paramTy pann params args
 expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
   -- | Field Type
-  catchError (getGlobalTy pann id_ty ) (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
+  catchError
+    (getGlobalTy pann id_ty )
+    (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
   >>= \case{
    Struct _ ty_fs _mods _ann ->
-       flip (FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
+       flip (FieldValuesAssignmentsExpression id_ty)
+            (buildExpAnn pann (DefinedType id_ty))
        <$> checkFieldValues pann ty_fs fs;
    Union _ ty_fs _mods _ann ->
        flip (FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
@@ -189,8 +194,8 @@ zipSameLength ea eb f as bs = zipSameLength' ea eb f as bs []
 checkFieldValue
   :: Parser.Annotation
   -> FieldDefinition
-  -> FieldValueAssignment (Expression Parser.Annotation)
-  -> SemanticMonad (FieldValueAssignment (Expression SemanticAnns))
+  -> FieldValueAssignment Parser.Annotation
+  -> SemanticMonad (FieldValueAssignment SemanticAnns)
 checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then
@@ -200,8 +205,8 @@ checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) 
 checkFieldValues
   :: Parser.Annotation
   -> [FieldDefinition ]
-  -> [FieldValueAssignment (Expression Parser.Annotation)]
-  -> SemanticMonad [FieldValueAssignment (Expression SemanticAnns)]
+  -> [FieldValueAssignment Parser.Annotation]
+  -> SemanticMonad [FieldValueAssignment SemanticAnns]
 checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
   where
     tError = throwError . annotateError loc
