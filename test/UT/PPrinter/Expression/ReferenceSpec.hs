@@ -2,15 +2,21 @@ module UT.PPrinter.Expression.ReferenceSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
-import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
+import Semantic.Monad
 
-vectorAnn, twoDymVectorAnn :: SemanticAnns
+vectorAnn, dynVectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+
+refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
+refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
+refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 var0, vector0, vector1 :: Expression SemanticAnns
 var0 = Variable "var0" uint16SemAnn
@@ -19,18 +25,18 @@ vector1 = Variable "vector1" twoDymVectorAnn
 
 dynVar0, dynVector0, dynVector1 :: Expression SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
-dynVector0 = Variable "dyn_vector0" (SemAnn undefined (DynamicSubtype vectorTS))
-dynVector1 = Variable "dyn_vector1" (SemAnn undefined (DynamicSubtype twoDimVectorTS))
+dynVector0 = Variable "dyn_vector0" dynVectorAnn
+dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
 
 pVar0expr, pVector0expr, pVector1expr :: Expression SemanticAnns
 pVar0expr = ReferenceExpression var0 refUInt16SemAnn
-pVector0expr = ReferenceExpression vector0 (SemAnn undefined (Reference vectorTS))
-pVector1expr = ReferenceExpression vector1 (SemAnn undefined (Reference twoDimVectorTS))
+pVector0expr = ReferenceExpression vector0 refVectorAnn
+pVector1expr = ReferenceExpression vector1 refTwoDymVectorAnn
 
 pDynVar0expr, pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVar0expr = ReferenceExpression dynVar0 (SemAnn undefined (Reference uint16TS))
-pDynVector0expr = ReferenceExpression dynVector0 (SemAnn undefined (Reference vectorTS))
-pDynVector1expr = ReferenceExpression dynVector1 (SemAnn undefined (Reference twoDimVectorTS))
+pDynVar0expr = ReferenceExpression dynVar0 refUInt16SemAnn
+pDynVector0expr = ReferenceExpression dynVector0 refVectorAnn
+pDynVector1expr = ReferenceExpression dynVector1 refTwoDymVectorAnn
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
 derefpVar0 = DereferenceExpression pVar0expr uint16SemAnn
@@ -43,7 +49,7 @@ derefpDynVector0expr = DereferenceExpression pDynVector0expr (vectorSemAnn UInt3
 derefpDynVector1expr = DereferenceExpression pDynVector1expr (twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10))
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do

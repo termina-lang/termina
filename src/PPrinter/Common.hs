@@ -1,6 +1,6 @@
 module PPrinter.Common where
 
-import AST
+import SemanAST
 
 import Prettyprinter
 import Prettyprinter.Render.Terminal
@@ -23,6 +23,7 @@ getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (Undyn _ (SemAnn _ (ETy ts))) = ts
 getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid annotation"
 

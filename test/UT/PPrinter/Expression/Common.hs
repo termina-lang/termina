@@ -1,15 +1,15 @@
 module UT.PPrinter.Expression.Common where
 
-import AST
+import SemanAST
 import Semantic.Monad
 
 tySemAnn :: TypeSpecifier -> SemanticAnns
-tySemAnn ts = (SemAnn undefined (ETy ts))
+tySemAnn ts = SemAnn undefined (ETy ts)
 
 unitSemAnn :: SemanticAnns
 unitSemAnn = tySemAnn Unit
 
-uint8SemAnn, uint32SemAnn, uint16SemAnn, uint64SemAnn, int8SemAnn, 
+uint8SemAnn, uint32SemAnn, uint16SemAnn, uint64SemAnn, int8SemAnn,
     int16SemAnn, int32SemAnn, int64SemAnn, charSemAnn, boolSemAnn :: SemanticAnns
 uint8SemAnn = tySemAnn UInt8
 uint32SemAnn = tySemAnn UInt32
@@ -25,7 +25,7 @@ boolSemAnn = tySemAnn Bool
 dynTySemAnn :: TypeSpecifier -> SemanticAnns
 dynTySemAnn ts = tySemAnn (DynamicSubtype ts)
 
-dynUInt8SemAnn, dynUInt16SemAnn, dynUInt32SemAnn, dynUInt64SemAnn, dynInt8SemAnn, 
+dynUInt8SemAnn, dynUInt16SemAnn, dynUInt32SemAnn, dynUInt64SemAnn, dynInt8SemAnn,
     dynInt16SemAnn, dynInt32SemAnn, dynInt64SemAnn, dynCharSemAnn, dynBoolSemAnn :: SemanticAnns
 dynUInt8SemAnn = dynTySemAnn UInt8
 dynUInt16SemAnn = dynTySemAnn UInt16
@@ -41,7 +41,7 @@ dynBoolSemAnn = dynTySemAnn Bool
 refSemAnn :: TypeSpecifier -> SemanticAnns
 refSemAnn ts = tySemAnn (Reference ts)
 
-refUInt8SemAnn, refUInt16SemAnn, refUInt32SemAnn, refUInt64SemAnn, refInt8SemAnn, 
+refUInt8SemAnn, refUInt16SemAnn, refUInt32SemAnn, refUInt64SemAnn, refInt8SemAnn,
     refInt16SemAnn, refInt32SemAnn, refInt64SemAnn, refCharSemAnn, refBoolSemAnn :: SemanticAnns
 refUInt8SemAnn = refSemAnn UInt8
 refUInt16SemAnn = refSemAnn UInt16
@@ -63,6 +63,9 @@ dynVectorSemAnn ts size = tySemAnn (DynamicSubtype (Vector ts (KC size)))
 refVectorSemAnn :: TypeSpecifier -> Const -> SemanticAnns
 refVectorSemAnn ts size = tySemAnn (Reference (Vector ts (KC size)))
 
+refTwoDymVectorSemAnn :: TypeSpecifier -> Const -> Const -> SemanticAnns
+refTwoDymVectorSemAnn ts size1 size2 = tySemAnn (Reference (Vector (Vector ts (KC size1)) (KC size2)))
+
 uint16VecSemAnn, uint32VecSemAnn :: Const -> SemanticAnns
 uint16VecSemAnn = vectorSemAnn UInt16
 uint32VecSemAnn = vectorSemAnn UInt32
@@ -73,6 +76,16 @@ twoDymVectorSemAnn ts size1 size2 = tySemAnn (Vector (Vector ts (KC size1)) (KC 
 uint16TwoDymVecSemAnn, uint32TwoDymVecSemAnn :: Const -> Const -> SemanticAnns
 uint16TwoDymVecSemAnn = twoDymVectorSemAnn UInt16
 uint32TwoDymVecSemAnn = twoDymVectorSemAnn UInt32
+
+dynTwoDymVectorSemAnn :: TypeSpecifier -> Const -> Const -> SemanticAnns
+dynTwoDymVectorSemAnn ts size1 size2 = tySemAnn (DynamicSubtype (Vector (Vector ts (KC size1)) (KC size2)))
+
+dynThreeDymVectorSemAnn :: TypeSpecifier -> Const -> Const -> Const -> SemanticAnns
+dynThreeDymVectorSemAnn ts size1 size2 size3 = tySemAnn (DynamicSubtype (Vector (Vector (Vector ts (KC size1)) (KC size2)) (KC size3)))
+
+uint16DynTwoDymVecSemAnn, uint32DynTwoDymVecSemAnn :: Const -> Const -> SemanticAnns
+uint16DynTwoDymVecSemAnn = dynTwoDymVectorSemAnn UInt16
+uint32DynTwoDymVecSemAnn = dynTwoDymVectorSemAnn UInt32
 
 threeDymVectorSemAnn :: TypeSpecifier -> Const -> Const -> Const -> SemanticAnns
 threeDymVectorSemAnn ts size1 size2 size3 = tySemAnn (Vector (Vector (Vector ts (KC size1)) (KC size2)) (KC size3))

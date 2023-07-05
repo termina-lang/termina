@@ -2,7 +2,7 @@ module UT.PPrinter.Expression.ConstantSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
@@ -25,7 +25,7 @@ trueBool = Constant (B True) boolSemAnn
 falseBool = Constant (B False) boolSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do

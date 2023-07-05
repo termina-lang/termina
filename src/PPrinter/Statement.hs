@@ -2,7 +2,7 @@ module PPrinter.Statement where
 
 import Prettyprinter
 
-import AST
+import SemanAST
 import PPrinter.Common
 import Semantic.Monad
 import PPrinter.Expression
@@ -55,14 +55,14 @@ ppInitializeVector level target expr =
                 ppInitializeVector (level + 1) (target <> brackets (pretty iterator)) expr'
             )
         (FieldValuesAssignmentsExpression {}) -> error "Unsupported"
-        _ -> ppInitializeVectorFromExpression level target (ppRootExpression expr) (getType expr)
+        _ -> ppInitializeVectorFromExpression level target (ppExpression expr) (getType expr)
 
 ppInititalizeStructField :: Identifier -> FieldValueAssignment SemanticAnns -> [DocStyle]
 ppInititalizeStructField identifier (FieldValueAssignment field expr) =
     case expr of
         (FieldValuesAssignmentsExpression {}) ->
             [ppCReferenceExpression (pretty (identifier ++ "_" ++ field))]
-        _ -> [ppRootExpression expr]
+        _ -> [ppExpression expr]
 
 ppInitializeStruct :: Identifier -> Expression SemanticAnns -> DocStyle
 ppInitializeStruct target expr =
@@ -96,6 +96,6 @@ ppStatement (Declaration identifier ts expr _) =
                                         _ -> error "unsupported expression") initializers 
                                 ++ [ppInitializeStruct identifier expr <> semi, emptyDoc]
                     ]
-                _ -> ppPrimitiveType ts <+> pretty identifier <+> pretty "=" <+> ppRootExpression expr <> semi
+                _ -> ppPrimitiveType ts <+> pretty identifier <+> pretty "=" <+> ppExpression expr <> semi
         _ -> ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 ppStatement _ = error "Not implemented yet"

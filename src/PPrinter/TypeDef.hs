@@ -2,7 +2,7 @@ module PPrinter.TypeDef where
 
 import Prettyprinter
 
-import AST
+import SemanAST
 import PPrinter.Common
 
 

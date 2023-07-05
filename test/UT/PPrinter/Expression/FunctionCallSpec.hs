@@ -2,25 +2,34 @@ module UT.PPrinter.Expression.FunctionCallSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
-var0, dynVar1, pVar2, pDynVar3 :: Expression SemanticAnns
+var0, var1, pVar :: Expression SemanticAnns
+-- | var0 : u16
 var0 = Variable "var0" uint16SemAnn
-dynVar1 = Variable "dynVar1" dynUInt16SemAnn
-pVar2 = Variable "p_var2" refUInt16SemAnn
-pDynVar3 = Variable "p_dynVar3" refUInt16SemAnn
+-- | dynVar1 : 'dyn u16
+var1 = Variable "var1" dynUInt16SemAnn
+-- | p_var : &u16
+pVar = Variable "p_var" refUInt16SemAnn
 
-referenceVar0, referenceDynVar1 :: Expression SemanticAnns
+undynVar1 :: Expression SemanticAnns
+undynVar1 = Undyn var1 uint16SemAnn
+
+referenceVar0, referenceVar1 :: Expression SemanticAnns
+-- | &var0 : &u16
 referenceVar0 = ReferenceExpression var0 refUInt16SemAnn
-referenceDynVar1 = ReferenceExpression dynVar1 refUInt16SemAnn
+-- | &var1 : &u16
+referenceVar1 = ReferenceExpression var1 refUInt16SemAnn
 
-dereferencepVar2, dereferencepDynVar3 :: Expression SemanticAnns
-dereferencepVar2 = DereferenceExpression pVar2 uint16SemAnn
-dereferencepDynVar3 = DereferenceExpression pDynVar3 uint16SemAnn
+dereferencepVar, derefRefDynVar1 :: Expression SemanticAnns
+-- | *p_var : u16
+dereferencepVar = DereferenceExpression pVar uint16SemAnn
+-- | *&var1 : u16
+derefRefDynVar1 = DereferenceExpression referenceVar1 uint16SemAnn
 
 vector0, dynVector0 :: Expression SemanticAnns
 vector0 = Variable "vector0" (vectorSemAnn UInt32 (I UInt32 10))
@@ -37,41 +46,38 @@ referenceDynVector0 = ReferenceExpression dynVector0 (refVectorSemAnn UInt32 (I 
 uint16Const :: Expression SemanticAnns
 uint16Const = Constant (I UInt16 1024) uint16SemAnn
 
-var0PlusConstant, dynVar1PlusConstant :: Expression SemanticAnns
+var0PlusConstant, var1PlusConstant :: Expression SemanticAnns
 var0PlusConstant = BinOp Addition var0 uint16Const uint16SemAnn
-dynVar1PlusConstant = BinOp Addition dynVar1 uint16Const uint16SemAnn
+var1PlusConstant = BinOp Addition undynVar1 uint16Const uint16SemAnn
 
-dereferencepVar2PlusConstant, dereferencepDynVar3PlusConstant :: Expression SemanticAnns
-dereferencepVar2PlusConstant = BinOp Addition dereferencepVar2 uint16Const uint16SemAnn
-dereferencepDynVar3PlusConstant = BinOp Addition dereferencepDynVar3 uint16Const uint16SemAnn
+dereferencepVarPlusConstant :: Expression SemanticAnns
+dereferencepVarPlusConstant = BinOp Addition dereferencepVar uint16Const uint16SemAnn
 
-var0PlusVar1, dereferencepVar2PlusdereferecepDynVar3 :: Expression SemanticAnns
-var0PlusVar1 = BinOp Addition var0 dynVar1 uint16SemAnn
-dereferencepVar2PlusdereferecepDynVar3 = BinOp Addition dereferencepVar2 dereferencepDynVar3 uint16SemAnn
+var0PlusVar1, dereferencepVar2PlusderefRefVar1 :: Expression SemanticAnns
+var0PlusVar1 = BinOp Addition var0 undynVar1 uint16SemAnn
+dereferencepVar2PlusderefRefVar1 = BinOp Addition dereferencepVar derefRefDynVar1 uint16SemAnn
 
 functionCallSingleVar0, functionCallSingleDynVar1,
-  functionCallSinglepVar2, functionCallSinglepDynVar3 :: Expression SemanticAnns
+  functionCallSinglepVar :: Expression SemanticAnns
 functionCallSingleVar0 = FunctionExpression "foo" [var0] unitSemAnn
-functionCallSingleDynVar1 = FunctionExpression "foo" [dynVar1] unitSemAnn
-functionCallSinglepVar2 = FunctionExpression "foo" [pVar2] unitSemAnn
-functionCallSinglepDynVar3 = FunctionExpression "foo" [pDynVar3] unitSemAnn
+functionCallSingleDynVar1 = FunctionExpression "foo" [var1] unitSemAnn
+functionCallSinglepVar = FunctionExpression "foo" [pVar] unitSemAnn
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
-  functionCallSingleDerefVar0 :: Expression SemanticAnns
+  functionCallSingleDerefpVar :: Expression SemanticAnns
 functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] unitSemAnn
-functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceDynVar1] unitSemAnn
-functionCallSingleDerefVar0 = FunctionExpression "foo" [dereferencepVar2] unitSemAnn
+functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceVar1] unitSemAnn
+functionCallSingleDerefpVar = FunctionExpression "foo" [dereferencepVar] unitSemAnn
 
 functionCallSingleVar0PlusConstant, functionCallSingleDynVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
-  functionCallSingleDerefpVar2PlusConstant, functionCallSingleDerefpDynVar3PlusConstant,
-  functionCallSingleDerefpVar2PlusDerefpDynVar3 :: Expression SemanticAnns
+  functionCallSingleDerefpVarPlusConstant,
+  functionCallSingleDerefpVarPlusDerefRefVar1 :: Expression SemanticAnns
 functionCallSingleVar0PlusConstant = FunctionExpression "foo" [var0PlusConstant] unitSemAnn
-functionCallSingleDynVar1PlusConstant = FunctionExpression "foo" [dynVar1PlusConstant] unitSemAnn
+functionCallSingleDynVar1PlusConstant = FunctionExpression "foo" [var1PlusConstant] unitSemAnn
 functionCallSingleVar0PlusVar1 = FunctionExpression "foo" [var0PlusVar1] unitSemAnn
-functionCallSingleDerefpVar2PlusConstant = FunctionExpression "foo" [dereferencepVar2PlusConstant] unitSemAnn
-functionCallSingleDerefpDynVar3PlusConstant = FunctionExpression "foo" [dereferencepDynVar3PlusConstant] unitSemAnn
-functionCallSingleDerefpVar2PlusDerefpDynVar3 = FunctionExpression "foo" [dereferencepVar2PlusdereferecepDynVar3] unitSemAnn
+functionCallSingleDerefpVarPlusConstant = FunctionExpression "foo" [dereferencepVarPlusConstant] unitSemAnn
+functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionExpression "foo" [dereferencepVar2PlusderefRefVar1] unitSemAnn
 
 functionCallSingleVector0, functionCallSingleDynVector0,
   functionCallSinglepVector1, functionCallSinglepDynVector1 :: Expression SemanticAnns
@@ -86,11 +92,11 @@ functionCallSingleRefDynVector0 = FunctionExpression "foo" [referenceDynVector0]
 
 call2Parameters, call3Parameters, call4Parameters :: Expression SemanticAnns
 call2Parameters = FunctionExpression "foo2" [var0PlusConstant, var0PlusVar1] unitSemAnn
-call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, dynVar1PlusConstant] unitSemAnn
-call4Parameters = FunctionExpression "foo4" [dynVector0, referenceDynVar1, functionCallSingleVar0, call2Parameters] unitSemAnn
+call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, var1PlusConstant] unitSemAnn
+call4Parameters = FunctionExpression "foo4" [dynVector0, referenceVar1, functionCallSingleVar0, call2Parameters] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do
@@ -98,42 +104,36 @@ spec = do
     it "Prints the expression: foo(var0)" $ do
       renderExpression functionCallSingleVar0 `shouldBe`
         pack "foo(var0)"
-    it "Prints the expression: foo(dynVar1)" $ do
+    it "Prints the expression: foo(var1)" $ do
       renderExpression functionCallSingleDynVar1 `shouldBe`
-        pack "foo(dynVar1)"
-    it "Prints the expression: foo(p_var2)" $ do
-      renderExpression functionCallSinglepVar2 `shouldBe`
-        pack "foo(p_var2)"
-    it "Prints the expression: foo(p_dynVar3)" $ do
-      renderExpression functionCallSinglepDynVar3 `shouldBe`
-        pack "foo(p_dynVar3)"
+        pack "foo(var1)"
+    it "Prints the expression: foo(p_var)" $ do
+      renderExpression functionCallSinglepVar `shouldBe`
+        pack "foo(p_var)"
     it "Prints the expression: foo(&var0)" $ do
       renderExpression functionCallSingleRefVar0 `shouldBe` 
         pack "foo(&var0)"
-    it "Prints the expression: foo(&dynVar1)" $ do
+    it "Prints the expression: foo(&var1)" $ do
       renderExpression functionCallSingleRefDynVar1 `shouldBe`
-        pack "foo((uint16_t *)dynVar1.datum)"
-    it "Prints the expression: foo(*p_var2)" $ do
-      renderExpression functionCallSingleDerefVar0 `shouldBe`
-        pack "foo(*(p_var2))"
+        pack "foo((uint16_t *)var1.datum)"
+    it "Prints the expression: foo(*p_var)" $ do
+      renderExpression functionCallSingleDerefpVar `shouldBe`
+        pack "foo(*(p_var))"
     it "Prints the expression: foo(var0 + 1024 : u16)" $ do
       renderExpression functionCallSingleVar0PlusConstant `shouldBe`
         pack "foo(var0 + (uint16_t)1024)"
-    it "Prints the expression: foo(dynVar1 + 1024 : u16)" $ do
+    it "Prints the expression: foo(var1 + 1024 : u16)" $ do
       renderExpression functionCallSingleDynVar1PlusConstant `shouldBe`
-        pack "foo(*((uint16_t *)dynVar1.datum) + (uint16_t)1024)"
+        pack "foo(*((uint16_t *)var1.datum) + (uint16_t)1024)"
     it "Prints the expression: foo(var0 + dynVar1)" $ do
       renderExpression functionCallSingleVar0PlusVar1 `shouldBe`
-        pack "foo(var0 + *((uint16_t *)dynVar1.datum))"
-    it "Prints the expression: foo(*p_var2 + 1024 : u16)" $ do
-      renderExpression functionCallSingleDerefpVar2PlusConstant `shouldBe`
-        pack "foo(*(p_var2) + (uint16_t)1024)"
-    it "Prints the expression: foo(*p_var3 + 1024 : u16)" $ do
-      renderExpression functionCallSingleDerefpDynVar3PlusConstant `shouldBe`
-        pack "foo(*(p_dynVar3) + (uint16_t)1024)"
-    it "Prints the expression: foo(*p_var2 + *p_dynVar3)" $ do
-      renderExpression functionCallSingleDerefpVar2PlusDerefpDynVar3 `shouldBe`
-        pack "foo(*(p_var2) + *(p_dynVar3))"
+        pack "foo(var0 + *((uint16_t *)var1.datum))"
+    it "Prints the expression: foo(*p_var + 1024 : u16)" $ do
+      renderExpression functionCallSingleDerefpVarPlusConstant `shouldBe`
+        pack "foo(*(p_var) + (uint16_t)1024)"
+    it "Prints the expression: foo(*p_var + *p_dynVar3)" $ do
+      renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
+        pack "foo(*(p_var) + *((uint16_t *)var1.datum))"
     it "Prints the expression: foo(vector0)" $ do
       renderExpression functionCallSingleVector0 `shouldBe`
         pack "foo(vector0)"
@@ -153,14 +153,14 @@ spec = do
       renderExpression functionCallSinglepDynVector1 `shouldBe`
         pack "foo(p_dynVector1)"
   describe "Pretty printing function call expressions with multiple parameters" $ do
-    it "Prints the expression: foo2(var0 + (uint16_t)1024, var0 + dynVar1)" $ do
+    it "Prints the expression: foo2(var0 + (uint16_t)1024, var0 + var1)" $ do
       renderExpression call2Parameters `shouldBe`
-        pack "foo2(var0 + (uint16_t)1024, var0 + *((uint16_t *)dynVar1.datum))"
-    it "Prints the expression: foo3(vector0, &var0, dynVar1 + 1024 : u16)" $ do
+        pack "foo2(var0 + (uint16_t)1024, var0 + *((uint16_t *)var1.datum))"
+    it "Prints the expression: foo3(vector0, &var0, var1 + 1024 : u16)" $ do
       renderExpression call3Parameters `shouldBe`
-        pack "foo3(vector0, &var0, *((uint16_t *)dynVar1.datum) + (uint16_t)1024)"
+        pack "foo3(vector0, &var0, *((uint16_t *)var1.datum) + (uint16_t)1024)"
     it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + (uint16_t)1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`
         pack (
-          "foo4(dynVector0, (uint16_t *)dynVar1.datum, foo(var0),\n" ++
-          "     foo2(var0 + (uint16_t)1024, var0 + *((uint16_t *)dynVar1.datum)))")
+          "foo4(dynVector0, (uint16_t *)var1.datum, foo(var0),\n" ++
+          "     foo2(var0 + (uint16_t)1024, var0 + *((uint16_t *)var1.datum)))")

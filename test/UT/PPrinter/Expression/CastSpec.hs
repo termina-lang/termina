@@ -2,7 +2,7 @@ module UT.PPrinter.Expression.CastSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
@@ -31,7 +31,7 @@ castTMDescriptor0field0toUInt8 :: Expression SemanticAnns
 castTMDescriptor0field0toUInt8 = Casting tmDescriptor0field0 UInt8 uint8SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do

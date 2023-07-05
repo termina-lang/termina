@@ -2,11 +2,11 @@ module UT.PPrinter.Expression.MemberAccessSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
-import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
+import Semantic.Monad
 
 tmDescriptor0, tmDescriptor1, resource0, tmChannel, tmPool, 
   bar0, bar1, field0, alloc, send, foo0 :: Expression SemanticAnns
@@ -22,9 +22,12 @@ alloc = FunctionExpression "alloc" [] unitSemAnn
 send = FunctionExpression "send" [bar0] uint32SemAnn
 foo0 = FunctionExpression "foo0" [bar0, bar1] unitSemAnn
 
+undynTMDescriptor1 :: Expression SemanticAnns
+undynTMDescriptor1 = Undyn tmDescriptor1 (definedTypeSemAnn "TMDescriptor")
+
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnns
 tmDescriptor0field0 = BinOp MemberAccess tmDescriptor0 field0 uint32SemAnn
-tmDescriptor1field0 = BinOp MemberAccess tmDescriptor1 field0 uint32SemAnn
+tmDescriptor1field0 = BinOp MemberAccess undynTMDescriptor1 field0 uint32SemAnn
 
 tmPoolAlloc :: Expression SemanticAnns
 tmPoolAlloc = BinOp MemberAccess tmPool alloc uint32SemAnn
@@ -34,7 +37,7 @@ tmChannelsend = BinOp MemberAccess tmChannel send uint32SemAnn
 resource0foo0 = BinOp MemberAccess resource0 foo0 uint32SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do

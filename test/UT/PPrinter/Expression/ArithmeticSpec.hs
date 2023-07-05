@@ -2,33 +2,42 @@ module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 var0, var1 :: Expression SemanticAnns
+-- | var0 : u16
 var0 = Variable "var0" uint16SemAnn
+-- | var1 : 'dyn u16
 var1 = Variable "var1" dynUInt16SemAnn
 
+undynVar1 :: Expression SemanticAnns
+undynVar1 = Undyn var1 uint16SemAnn
+
 constUInt16 :: Expression SemanticAnns
+-- | 1024 : u16
 constUInt16 = Constant (I UInt16 1024) uint16SemAnn
 
 var0PlusConstant :: Expression SemanticAnns
+-- | var0 + 1024 : u16
 var0PlusConstant = BinOp Addition var0 constUInt16 uint16SemAnn
 
 constantPlusVar0 :: Expression SemanticAnns
+-- | 1024 : u16 + var0
 constantPlusVar0 = BinOp Addition constUInt16 var0 uint16SemAnn
 
 var1PlusConstant :: Expression SemanticAnns
-var1PlusConstant = BinOp Addition var1 constUInt16 uint16SemAnn
+-- | var1 + 1024 : u16
+var1PlusConstant = BinOp Addition undynVar1 constUInt16 uint16SemAnn
 
 constantPlusVar1 :: Expression SemanticAnns
-constantPlusVar1 = BinOp Addition constUInt16 var1 uint16SemAnn
+constantPlusVar1 = BinOp Addition constUInt16 undynVar1 uint16SemAnn
 
 var0PlusVar1 :: Expression SemanticAnns
-var0PlusVar1 = BinOp Addition var0 var1 uint16SemAnn
+var0PlusVar1 = BinOp Addition var0 undynVar1 uint16SemAnn
 
 var0PlusVar1PlusConstant :: Expression SemanticAnns
 var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 constUInt16 uint16SemAnn
@@ -46,16 +55,16 @@ constantMultVar0 :: Expression SemanticAnns
 constantMultVar0 = BinOp Multiplication constUInt16 var0 uint16SemAnn
 
 var0MultVar1 :: Expression SemanticAnns
-var0MultVar1 = BinOp Multiplication var0 var1 uint16SemAnn
+var0MultVar1 = BinOp Multiplication var0 undynVar1 uint16SemAnn
 
 var1Divconstant :: Expression SemanticAnns
-var1Divconstant = BinOp Division var1 constUInt16 uint16SemAnn
+var1Divconstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
 
 var0DivVar1 :: Expression SemanticAnns
-var0DivVar1 = BinOp Division var0 var1 uint16SemAnn
+var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do

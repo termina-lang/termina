@@ -2,15 +2,20 @@ module UT.PPrinter.Expression.BitwiseSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Data.Text
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 var0, var1 :: Expression SemanticAnns
+-- | var0 : u16
 var0 = Variable "var0" uint16SemAnn
+-- | var1 : 'dyn u16
 var1 = Variable "var1" dynUInt16SemAnn
+
+undynVar1 :: Expression SemanticAnns
+undynVar1 = Undyn var1 uint16SemAnn
 
 constUInt8, constUInt16 :: Expression SemanticAnns
 constUInt8 = Constant (I UInt8 0x08) uint8SemAnn
@@ -23,13 +28,13 @@ constantLeftShiftVar0 :: Expression SemanticAnns
 constantLeftShiftVar0 = BinOp BitwiseLeftShift constUInt8 var0 uint16SemAnn
 
 var1LeftShiftConstant :: Expression SemanticAnns
-var1LeftShiftConstant = BinOp BitwiseLeftShift var1 constUInt8 uint16SemAnn
+var1LeftShiftConstant = BinOp BitwiseLeftShift undynVar1 constUInt8 uint16SemAnn
 
 constantLeftShiftVar1 :: Expression SemanticAnns
-constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 var1 uint16SemAnn
+constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 undynVar1 uint16SemAnn
 
 var0LeftShiftVar1 :: Expression SemanticAnns
-var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 var1 uint16SemAnn
+var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 undynVar1 uint16SemAnn
 
 var0LeftShiftVar1LeftShiftConstant :: Expression SemanticAnns
 var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 constUInt8 uint16SemAnn
@@ -47,22 +52,22 @@ constantBitwiseAndVar0 :: Expression SemanticAnns
 constantBitwiseAndVar0 = BinOp BitwiseAnd constUInt16 var0 uint16SemAnn
 
 var0BitwiseAndVar1 :: Expression SemanticAnns
-var0BitwiseAndVar1 = BinOp BitwiseAnd var0 var1 uint16SemAnn
+var0BitwiseAndVar1 = BinOp BitwiseAnd var0 undynVar1 uint16SemAnn
 
 var1BitwiseOrconstant :: Expression SemanticAnns
-var1BitwiseOrconstant = BinOp BitwiseOr var1 constUInt16 uint16SemAnn
+var1BitwiseOrconstant = BinOp BitwiseOr undynVar1 constUInt16 uint16SemAnn
 
 var0BitwiseOrVar1 :: Expression SemanticAnns
-var0BitwiseOrVar1 = BinOp BitwiseOr var0 var1 uint16SemAnn
+var0BitwiseOrVar1 = BinOp BitwiseOr var0 undynVar1 uint16SemAnn
 
 var1BitwiseXorconstant :: Expression SemanticAnns
-var1BitwiseXorconstant = BinOp BitwiseXor var1 constUInt16 uint16SemAnn
+var1BitwiseXorconstant = BinOp BitwiseXor undynVar1 constUInt16 uint16SemAnn
 
 var0BitwiseXorVar1 :: Expression SemanticAnns
-var0BitwiseXorVar1 = BinOp BitwiseXor var0 var1 uint16SemAnn
+var0BitwiseXorVar1 = BinOp BitwiseXor var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression
 
 spec :: Spec
 spec = do
