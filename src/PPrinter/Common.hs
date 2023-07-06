@@ -96,6 +96,13 @@ enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
 enumVariantsField :: DocStyle
 enumVariantsField = pretty (namefy "variant")
 
+optionSomeVariant, optionNoneVariant :: DocStyle
+optionSomeVariant = pretty "Some"
+optionNoneVariant = pretty "None"
+
+optionSomeField :: DocStyle
+optionSomeField = pretty (namefy "Some")
+
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
 ppPrimitiveType :: TypeSpecifier -> DocStyle
@@ -196,15 +203,3 @@ ppCForLoop initializer cond incr body =
     pretty "for" <+> parens
       (initializer <> semi <+> cond <> semi <+> incr) <+> braces' (
         (indentTab . align) body)
-
--- | This function recursively finds all the field values assignments expressions from
--- one of them
-findFieldValuesAssignmentsExpressions :: Identifier -> Expression SemanticAnns -> [(Identifier, Expression SemanticAnns)]
-findFieldValuesAssignmentsExpressions base expr =
-    case expr of
-        (FieldValuesAssignmentsExpression _ vas _) ->
-            (base, expr) : concatMap (\(FieldValueAssignment identifier expr') ->
-              findFieldValuesAssignmentsExpressions (base ++ "_" ++ identifier) expr') vas
-        (EnumVariantExpression {}) -> error "unsupported"
-        (VectorInitExpression expr' _ _) -> findFieldValuesAssignmentsExpressions base expr'
-        _ -> []

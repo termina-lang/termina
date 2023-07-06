@@ -142,9 +142,6 @@ spec = do
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint64_t * __field1,\n" ++
-            "                   uint32_t __field1_n);\n" ++
-            "\n" ++
             "void __id0_method0();\n")
     it "Prints a class with one method and two fields" $ do
       renderSingleASTElement classWithOneMethodAndTwoFields `shouldBe`
@@ -154,9 +151,6 @@ spec = do
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
             "} id0;\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint64_t * __field1,\n" ++
-            "                   uint32_t __field1_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed class" $ do
@@ -169,9 +163,6 @@ spec = do
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
-            "void __id0__assign(id0 * __self, uint64_t __field0, uint16_t __field1,\n" ++
-            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
-            "\n" ++
             "void __id0_method0(char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
       renderSingleASTElement alignedClass `shouldBe`
@@ -183,9 +174,6 @@ spec = do
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
-            "void __id0__assign(id0 * __self, uint64_t __field0, uint16_t __field1,\n" ++
-            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
-            "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed & aligned class" $ do
       renderSingleASTElement packedAndAlignedClass `shouldBe`
@@ -196,8 +184,5 @@ spec = do
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint64_t __field0, TCDescriptor * __field1,\n" ++
-            "                   TMDescriptor * __field2, uint32_t __field2_n);\n" ++
             "\n" ++
             "void __id0_method0();\n")

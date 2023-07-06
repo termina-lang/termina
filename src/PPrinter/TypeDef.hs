@@ -71,15 +71,6 @@ ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
   ppPrimitiveType ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
 
-ppEnumVariantParamAssign :: TypeSpecifier -> Integer -> [DocStyle]
-ppEnumVariantParamAssign ts index =
-  case ts of
-    Vector _ (KC (I sizeTs _)) ->
-      [ppPrimitiveType ts <+> pretty "*" <+> pretty ("__" ++ show index),
-      ppPrimitiveType sizeTs <+> pretty (namefy (show index)) <> pretty "_n"]
-    DefinedType _ -> [ppPrimitiveType ts <+> pretty "*" <+> pretty (namefy (show index))]
-    _ -> [ppPrimitiveType ts <+> pretty (namefy (show index))]
-
 ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant identifier params) =
   structC <+> braces' (
@@ -94,54 +85,6 @@ ppTypeDefEq identifier =
     [pretty identifier <+> pretty "*" <+> pretty "__lhs",
      pretty identifier <+> pretty "*" <+> pretty "__rhs"]
     (ppPrimitiveType <$> Just UInt8)
-
-ppTypeDefAssignAnonym :: TypeDef a -> [DocStyle]
-ppTypeDefAssignAnonym (Struct typeId fls _ _) =
-  [ppCFunctionDeclaration (structAssignAnonymFunctionName typeId)
-    (pretty typeId <+> pretty "*" <+> pretty "__self" :
-      foldr (
-        \field fs ->
-          (case field of
-            FieldDefinition fieldId ts ->
-              case ts of
-                Vector _ (KC (I sizeTs _)) -> [ppPrimitiveType ts <+> pretty "*" <+> pretty ("__" ++ fieldId),
-                  ppPrimitiveType sizeTs <+> pretty ("__" ++ fieldId) <> pretty "_n"]
-                DefinedType _ -> [ppPrimitiveType ts <+> pretty "*" <+> pretty ("__" ++ fieldId)]
-                _ -> [ppPrimitiveType ts <+> pretty ("__" ++ fieldId)]
-          ) ++ fs
-        ) [] fls)
-    Nothing]
-ppTypeDefAssignAnonym (Enum typeId variants _ _) =
-  map (
-    \(EnumVariant variantId params) ->
-      ppCFunctionDeclaration (enumAssignAnonymFunctionName typeId variantId)
-        (pretty typeId <+> pretty "*" <+> pretty "__self" :
-          concat (zipWith ppEnumVariantParamAssign params [0..]))
-      Nothing
-  ) variants
-ppTypeDefAssignAnonym (Class typeId members _ _) =
-  let fls = foldr (\member fs -> case member of
-        ClassField {} -> member : fs
-        _ -> fs) [] members
-  in
-    [case fls of
-      [] -> emptyDoc
-      _ -> ppCFunctionDeclaration (structAssignAnonymFunctionName typeId)
-        (pretty typeId <+> pretty "*" <+> pretty "__self" :
-          foldr (
-            \field fs ->
-              (case field of
-                ClassField fieldId ts ->
-                  case ts of
-                    Vector _ (KC (I sizeTs _)) -> [ppPrimitiveType ts <+> pretty "*" <+> pretty ("__" ++ fieldId),
-                      ppPrimitiveType sizeTs <+> pretty ("__" ++ fieldId) <> pretty "_n"]
-                    DefinedType _ -> [ppPrimitiveType ts <+> pretty "*" <+> pretty ("__" ++ fieldId)]
-                    _ -> [ppPrimitiveType ts <+> pretty ("__" ++ fieldId)]
-                _ -> error "invalid class member"
-              ) ++ fs
-            ) [] fls)
-        Nothing]
-ppTypeDefAssignAnonym _ = error "unsupported"
 
 -- | TypeDef pretty printer.
 ppTypeDef :: Printer TypeDef a
@@ -158,8 +101,7 @@ ppTypeDef before after typeDef =
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
         after anns,
         ppTypeDefEq identifier <> semi,
-        emptyDoc] ++
-        (map (<> semi) (ppTypeDefAssignAnonym typeDef) ++ [emptyDoc])
+        emptyDoc]
     -- | Union declaration pretty printer
     (Union identifier fls modifiers anns) ->
       let structModifiers = filterStructModifiers modifiers in
@@ -202,8 +144,7 @@ ppTypeDef before after typeDef =
         ) <+> pretty identifier <> semi,
         after anns,
         ppTypeDefEq identifier <> semi,
-        emptyDoc ] ++
-        (map (<> semi) (ppTypeDefAssignAnonym typeDef) ++ [emptyDoc])
+        emptyDoc ]
     (Class identifier members modifiers anns) ->
       let structModifiers = filterStructModifiers modifiers in
       let classModifiers = filterClassModifiers modifiers in
@@ -245,12 +186,4 @@ ppTypeDef before after typeDef =
                   (indentTab . align) ppClassDummyField) <+> pretty identifier <> semi,
               after anns
             ])
-          ++
-            let fls = foldr (\member fs -> case member of
-                  ClassField {} -> member : fs
-                  _ -> fs) [] members
-            in
-              case fls of
-                [] -> []
-                _ -> map (<> semi) (ppTypeDefAssignAnonym typeDef) ++ [emptyDoc]
           ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods

@@ -38,6 +38,9 @@ dynInt64SemAnn = dynTySemAnn Int64
 dynCharSemAnn = dynTySemAnn Char
 dynBoolSemAnn = dynTySemAnn Bool
 
+optionDynSemAnn :: TypeSpecifier -> SemanticAnns
+optionDynSemAnn ts = tySemAnn (Option (DynamicSubtype ts))
+
 refSemAnn :: TypeSpecifier -> SemanticAnns
 refSemAnn ts = tySemAnn (Reference ts)
 

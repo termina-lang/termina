@@ -9,29 +9,29 @@ import Data.Text
 enumWithOneRegularField :: AnnASTElement Annotation
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
-    EnumVariant "field0" []
+    EnumVariant "variant0" []
   ] [] undefined)
 
 enumWithTwoRegularFields :: AnnASTElement Annotation
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
-    EnumVariant "field0" [],
-    EnumVariant "field1" []
+    EnumVariant "variant0" [],
+    EnumVariant "variant1" []
   ] [] undefined)
 
 enumWithOneParameterizedField :: AnnASTElement Annotation
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
-    EnumVariant "field0" [UInt32]
+    EnumVariant "variant0" [UInt32]
   ] [] undefined)
 
 enumWithMultipleParameterizedFields :: AnnASTElement Annotation
 enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
-    EnumVariant "field0" [UInt32],
-    EnumVariant "field1" [],
-    EnumVariant "field2" [UInt64, DefinedType "id1", Char],
-    EnumVariant "field3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
+    EnumVariant "variant0" [UInt32],
+    EnumVariant "variant1" [],
+    EnumVariant "variant2" [UInt64, DefinedType "id1", Char],
+    EnumVariant "variant3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
   ] [] undefined)
 
 renderSingleASTElement :: AnnASTElement a -> Text
@@ -40,12 +40,12 @@ renderSingleASTElement = render . ppHeaderASTElement ppEmptyDoc ppEmptyDoc
 spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
-    it "Prints an enum with one regular field" $ do
+    it "Prints an enum with one regular variant" $ do
       renderSingleASTElement enumWithOneRegularField `shouldBe`
         pack (
             "\n" ++
             "typedef enum {\n" ++
-            "    field0\n" ++
+            "    variant0\n" ++
             "} __enum_id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
@@ -54,16 +54,14 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0_field0__assign(id0 * __self);\n")
-    it "Prints an enum with two regular fields" $ do
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+    it "Prints an enum with two regular variants" $ do
       renderSingleASTElement enumWithTwoRegularFields `shouldBe`
         pack (
             "\n" ++
             "typedef enum {\n" ++
-            "    field0,\n" ++
-            "    field1\n" ++
+            "    variant0,\n" ++
+            "    variant1\n" ++
             "} __enum_id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
@@ -72,16 +70,13 @@ spec = do
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0_field0__assign(id0 * __self);\n" ++
-            "void __id0_field1__assign(id0 * __self);\n")
-    it "Prints an enum with one parameterized field" $ do
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+    it "Prints an enum with one parameterized variant" $ do
       renderSingleASTElement enumWithOneParameterizedField `shouldBe`
         pack (
             "\n" ++
             "typedef enum {\n" ++
-            "    field0\n" ++
+            "    variant0\n" ++
             "} __enum_id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
@@ -91,23 +86,21 @@ spec = do
             "    union {\n" ++
             "        struct {\n" ++
             "            uint32_t __0;\n" ++
-            "        } __field0;\n" ++
+            "        } __variant0;\n" ++
             "    };\n" ++
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0_field0__assign(id0 * __self, uint32_t __0);\n")
-    it "Prints an enum with multiple parameterized fields" $ do
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+    it "Prints an enum with multiple parameterized variants" $ do
       renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "\n" ++
             "typedef enum {\n" ++
-            "    field0,\n" ++
-            "    field1,\n" ++
-            "    field2,\n" ++
-            "    field3\n" ++
+            "    variant0,\n" ++
+            "    variant1,\n" ++
+            "    variant2,\n" ++
+            "    variant3\n" ++
             "} __enum_id0;\n" ++
             "\n" ++
             "typedef struct {\n" ++
@@ -117,23 +110,18 @@ spec = do
             "    union {\n" ++
             "        struct {\n" ++
             "            uint32_t __0;\n" ++
-            "        } __field0;\n" ++
+            "        } __variant0;\n" ++
             "        struct {\n" ++
             "            uint64_t __0;\n" ++
             "            id1 __1;\n" ++
             "            char __2;\n" ++
-            "        } __field2;\n" ++
+            "        } __variant2;\n" ++
             "        struct {\n" ++
             "            int8_t __0;\n" ++
             "            char __1[35][20];\n" ++
-            "        } __field3;\n" ++
+            "        } __variant3;\n" ++
             "    };\n" ++
             "\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0_field0__assign(id0 * __self, uint32_t __0);\n" ++
-            "void __id0_field1__assign(id0 * __self);\n" ++
-            "void __id0_field2__assign(id0 * __self, uint64_t __0, id1 * __1, char __2);\n" ++
-            "void __id0_field3__assign(id0 * __self, int8_t __0, char * __1, uint32_t __1_n);\n");
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n");
