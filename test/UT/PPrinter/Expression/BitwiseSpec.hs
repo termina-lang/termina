@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.BitwiseSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
@@ -67,7 +68,7 @@ var0BitwiseXorVar1 :: Expression SemanticAnns
 var0BitwiseXorVar1 = BinOp BitwiseXor var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do

@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.VariableSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
@@ -28,7 +29,7 @@ dynVector2 = Variable "dyn_vector2" dynThreeDymVectorAnn
 
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do

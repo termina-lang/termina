@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.FunctionCallSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
@@ -96,7 +97,7 @@ call3Parameters = FunctionExpression "foo3" [vector0, referenceVar0, var1PlusCon
 call4Parameters = FunctionExpression "foo4" [dynVector0, referenceVar1, functionCallSingleVar0, call2Parameters] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do

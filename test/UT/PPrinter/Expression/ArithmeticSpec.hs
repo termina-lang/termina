@@ -3,10 +3,11 @@ module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
+import Data.Map
 
 var0, var1 :: Expression SemanticAnns
 -- | var0 : u16
@@ -64,7 +65,7 @@ var0DivVar1 :: Expression SemanticAnns
 var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do
@@ -108,5 +109,4 @@ spec = do
     it "Prints the expression: var0 / var1 : u16" $ do
       renderExpression var0DivVar1 `shouldBe`
         pack "var0 / *((uint16_t *)var1.datum)"
-        
-    
+

@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.RelationalSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
@@ -97,7 +98,7 @@ logicalOrConst = BinOp LogicalOr falseBool trueBool boolSemAnn
 logicalOrExpr = BinOp LogicalOr var1LTConstant var2EqVar3 boolSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do

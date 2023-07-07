@@ -22,16 +22,17 @@ ppInitializeVectorFromExpression level target source ts =
                   (ppPrimitiveType indexTS)
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
-           in let condExpr =
-                    pretty iterator <+> pretty "<" <+> parens (ppPrimitiveType indexTS) <> pretty size
-               in let incrExpr =
-                        ppCForLoopIncrExpression
-                          (pretty iterator)
-                          (parens (ppPrimitiveType indexTS) <> pretty (show (1 :: Integer)))
-                   in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets (pretty iterator)) (source <> brackets (pretty iterator)) ts')
+              condExpr =
+                  pretty iterator <+> pretty "<" <+> parens (ppPrimitiveType indexTS) <> pretty size
+              incrExpr =
+                  ppCForLoopIncrExpression
+                  (pretty iterator)
+                  (parens (ppPrimitiveType indexTS) <> pretty (show (1 :: Integer)))
+              in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets (pretty iterator)) (source <> brackets (pretty iterator)) ts')
         _ -> target <+> pretty "=" <+> source <> semi
 
 ppInitializeVector ::
+  Substitutions ->
   -- | Current vector nesting level. This argument is used to
   -- generate the name of the iterator variable.
   Integer ->
@@ -41,11 +42,11 @@ ppInitializeVector ::
   -- |  The initialization expression
   Expression SemanticAnns ->
   DocStyle
-ppInitializeVector level target expr =
+ppInitializeVector subs level target expr =
   let iterator = namefy ("i" ++ show level)
    in case expr of
-        (FieldValuesAssignmentsExpression {}) -> ppInitializeStruct target expr
-        (OptionVariantExpression {}) -> ppInitializeOption target expr
+        (FieldValuesAssignmentsExpression {}) -> ppInitializeStruct subs target expr
+        (OptionVariantExpression {}) -> ppInitializeOption subs target expr
         (VectorInitExpression expr' (KC (I indexTS size)) _) ->
           let initExpr =
                 ppCForLoopInitExpression
@@ -62,66 +63,69 @@ ppInitializeVector level target expr =
                         initExpr
                         condExpr
                         incrExpr
-                        ( ppInitializeVector (level + 1) (target <> brackets (pretty iterator)) expr'
+                        ( ppInitializeVector subs (level + 1) (target <> brackets (pretty iterator)) expr'
                         )
-        (EnumVariantExpression {}) -> ppInitializeEnum target expr
-        _ -> ppInitializeVectorFromExpression level target (ppExpression expr) (getType expr)
+        (EnumVariantExpression {}) -> ppInitializeEnum subs target expr
+        _ -> ppInitializeVectorFromExpression level target (ppExpression subs expr) (getType expr)
 
-ppFieldInitializer :: DocStyle -> DocStyle -> Expression SemanticAnns -> DocStyle
-ppFieldInitializer identifier field expr =
+ppFieldInitializer :: Substitutions ->  DocStyle -> DocStyle -> Expression SemanticAnns -> DocStyle
+ppFieldInitializer subs identifier field expr =
   case expr of
     (FieldValuesAssignmentsExpression {}) ->
-      ppInitializeStruct (identifier <> pretty "." <> field) expr
+      ppInitializeStruct subs (identifier <> pretty "." <> field) expr
     (OptionVariantExpression {}) ->
-      ppInitializeOption (identifier <> pretty "." <> field) expr
+      ppInitializeOption subs (identifier <> pretty "." <> field) expr
     (VectorInitExpression {}) ->
-      ppInitializeVector 0 (identifier <> pretty "." <> field) expr
+      ppInitializeVector subs 0 (identifier <> pretty "." <> field) expr
     (EnumVariantExpression {}) ->
-      ppInitializeEnum (identifier <> pretty "." <> field) expr
-    _ -> identifier <> pretty "." <> field <+> pretty "=" <+> ppExpression expr <> semi
+      ppInitializeEnum subs (identifier <> pretty "." <> field) expr
+    _ -> identifier <> pretty "." <> field <+> pretty "=" <+> ppExpression subs expr <> semi
 
 -- | This function initializes a struct using a field values assignments expression
 -- as initializer. The name of sthe struct is passed as argument.
 ppInitializeStruct ::
+  Substitutions ->
   -- | Name of the struct
   DocStyle ->
   -- |  The initialization expression
   Expression SemanticAnns ->
   DocStyle
-ppInitializeStruct target expr =
+ppInitializeStruct subs target expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
     (FieldValuesAssignmentsExpression _ vas _) ->
         vsep $
-            map (\(FieldValueAssignment field expr') -> ppFieldInitializer target (pretty field) expr') vas
+            map (\(FieldValueAssignment field expr') -> ppFieldInitializer subs target (pretty field) expr') vas
     _ -> error "Incorrect expression"
 
 ppInitializeEnum ::
+  Substitutions ->
   -- | Name of the enum
   DocStyle ->
   -- |  The initialization expression
   Expression SemanticAnns ->
   DocStyle
-ppInitializeEnum target expr =
+ppInitializeEnum subs target expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
     (EnumVariantExpression _ variant params _) ->
         vsep $
             (target <> pretty "." <> enumVariantsField <+> pretty "=" <+> pretty variant <> semi) : zipWith
-            (\e index -> ppFieldInitializer target (pretty (namefy variant) <> pretty "." <> pretty (namefy (show (index :: Integer)))) e) params [0..]
+            (\e index -> ppFieldInitializer subs target (pretty (namefy variant) <> pretty "." <> pretty (namefy (show (index :: Integer)))) e) params [0..]
     _ -> error "Incorrect expression"
 
 ppInitializeOption ::
+    Substitutions ->
     -- | Name of the option
     DocStyle ->
     -- |  The initialization expression
     Expression SemanticAnns ->
     DocStyle
-ppInitializeOption target expr =
+ppInitializeOption subs target expr =
     case expr of
         (OptionVariantExpression (Some e) _) ->
             vsep [target <> pretty "." <> enumVariantsField <+> pretty "=" <+> optionSomeVariant <> semi,
-                ppFieldInitializer target optionSomeField e]
+                ppFieldInitializer subs target optionSomeField e]
         (OptionVariantExpression None _) ->
             target <> pretty "." <> enumVariantsField <+> pretty "=" <+> optionNoneVariant <> semi
         _ -> error "Incorrect expression"

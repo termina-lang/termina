@@ -1,18 +1,16 @@
 module PPrinter.Common where
 
-import SemanAST
-
+import Data.Maybe
 import Prettyprinter
 import Prettyprinter.Render.Terminal
-import Data.Maybe
+import SemanAST
 import Semantic.Monad
-
 
 type DocStyle = Doc AnsiStyle
 
 getType :: Expression SemanticAnns -> TypeSpecifier
 getType (Variable _ (SemAnn _ (ETy ts))) = ts
-getType (Constant _ (SemAnn _ (ETy ts))) = ts 
+getType (Constant _ (SemAnn _ (ETy ts))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
@@ -29,13 +27,13 @@ getType _ = error "invalid annotation"
 
 -- | Type of the pretty printers
 type Printer a b =
-  (b -> DocStyle)
-  -- ^ Function that pretty prints an annotation BEFORE printing the construct
-  -> (b -> DocStyle)
-  -- ^ Function that pretty prints an annotation AFTER printing the construct
-  -> a b
-  -- ^ The annotated element to pretty print
-  -> DocStyle
+  -- | Function that pretty prints an annotation BEFORE printing the construct
+  (b -> DocStyle) ->
+  -- | Function that pretty prints an annotation AFTER printing the construct
+  (b -> DocStyle) ->
+  -- | The annotated element to pretty print
+  a b ->
+  DocStyle
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
@@ -43,8 +41,8 @@ braces' b = braces (line <> b <> line)
 indentTab :: DocStyle -> DocStyle
 indentTab = indent 4
 
--- | This function is used to create the names of temporal variables
--- and symbols.
+-- |  This function is used to create the names of temporal variables
+--  and symbols.
 namefy :: Identifier -> Identifier
 namefy = ("__" ++)
 
@@ -57,7 +55,7 @@ typedefC = pretty "typedef"
 enumC = pretty "enum"
 structC = pretty "struct"
 unionC = pretty "union"
-voidC = pretty "void";
+voidC = pretty "void"
 
 -- C pretty unsigned integer types
 uint8C, uint16C, uint32C, uint64C :: DocStyle
@@ -91,8 +89,8 @@ optionDyn = pretty "__Option_dyn_t"
 enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
 
--- | Pretty prints the name of the field that will store the variant
--- inside the struct corresponding to the enum.
+-- |  Pretty prints the name of the field that will store the variant
+--  inside the struct corresponding to the enum.
 enumVariantsField :: DocStyle
 enumVariantsField = pretty (namefy "variant")
 
@@ -101,17 +99,18 @@ optionSomeVariant = pretty "Some"
 optionNoneVariant = pretty "None"
 
 optionSomeField :: DocStyle
-optionSomeField = pretty (namefy "Some")
+optionSomeField = pretty (namefy "Some") <> pretty ".__0"
 
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
 ppPrimitiveType :: TypeSpecifier -> DocStyle
--- | Unsigned integer types
+
+-- |  Unsigned integer types
 ppPrimitiveType UInt8 = uint8C
 ppPrimitiveType UInt16 = uint16C
 ppPrimitiveType UInt32 = uint32C
 ppPrimitiveType UInt64 = uint64C
--- | Signed integer types
+-- \| Signed integer types
 ppPrimitiveType Int8 = int8C
 ppPrimitiveType Int16 = int16C
 ppPrimitiveType Int32 = int32C
@@ -119,10 +118,10 @@ ppPrimitiveType Int64 = int64C
 ppPrimitiveType Bool = uint8C
 ppPrimitiveType Char = charC
 ppPrimitiveType (DefinedType typeIdentifier) = pretty typeIdentifier
--- | Vector type
+-- \| Vector type
 -- The type of the vector is the type of the elements
 ppPrimitiveType (Vector ts _) = ppPrimitiveType ts
--- | Option type
+-- \| Option type
 ppPrimitiveType (Option (DynamicSubtype _)) = optionDyn
 -- Non-primitive types:
 ppPrimitiveType _ = error "unsupported type"
@@ -144,18 +143,23 @@ ppParameterDeclaration (Parameter identifier ts) = ppPrimitiveType ts <+> pretty
 
 -- | Pretty print a C function declaration
 ppCFunctionDeclaration ::
-    DocStyle -> -- ^ function identifier (name)
-    [DocStyle] -> -- ^ list of parameters (possibly empty)
-    Maybe DocStyle -> -- ^ type of the return value (optional)
-    DocStyle
+  -- | function identifier (name)
+  DocStyle ->
+  -- | list of parameters (possibly empty)
+  [DocStyle] ->
+  -- | type of the return value (optional)
+  Maybe DocStyle ->
+  DocStyle
 ppCFunctionDeclaration identifier parameters rTS =
-  fromMaybe voidC rTS <+> identifier <>
-      parens (align (fillSep (punctuate comma parameters)))
+  fromMaybe voidC rTS
+    <+> identifier
+      <> parens (align (fillSep (punctuate comma parameters)))
 
 -- | Pretty print a C function call
 ppCFunctionCall :: DocStyle -> [DocStyle] -> DocStyle
-ppCFunctionCall identifier parameters = identifier <>
-      parens (align (fillSep (punctuate comma parameters)))
+ppCFunctionCall identifier parameters =
+  identifier
+    <> parens (align (fillSep (punctuate comma parameters)))
 
 ppConst :: Const -> DocStyle
 ppConst (B b) = if b then pretty "1" else pretty "0"
@@ -167,7 +171,7 @@ ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (pp
 ppModifier (Modifier identifier Nothing) = pretty identifier
 
 methodName :: Identifier -> Identifier -> DocStyle
-methodName identifier method = pretty("__" ++ identifier ++ "_" ++ method)
+methodName identifier method = pretty ("__" ++ identifier ++ "_" ++ method)
 
 typeDefEqFunctionName :: Identifier -> DocStyle
 typeDefEqFunctionName identifier = methodName identifier "_eq"
@@ -200,6 +204,33 @@ ppCForLoopIncrExpression identifier increment = identifier <+> pretty "=" <+> id
 
 ppCForLoop :: DocStyle -> DocStyle -> DocStyle -> DocStyle -> DocStyle
 ppCForLoop initializer cond incr body =
-    pretty "for" <+> parens
-      (initializer <> semi <+> cond <> semi <+> incr) <+> braces' (
-        (indentTab . align) body)
+  pretty "for"
+    <+> parens
+      (initializer <> semi <+> cond <> semi <+> incr)
+    <+> braces'
+      ( (indentTab . align) body
+      )
+
+ppCIfBlock ::
+  -- | Conditional expression
+  DocStyle 
+  -- | Body
+  -> DocStyle ->
+  DocStyle
+ppCIfBlock cond body =
+  pretty "if" <+> parens cond <+> braces' (line <> (indentTab . align) body)
+
+ppCElseIfBlock ::
+  -- | Conditional expression
+  DocStyle 
+  -- | Body
+  -> DocStyle ->
+  DocStyle
+ppCElseIfBlock cond body =
+  pretty "else" <+> pretty "if" <+> parens cond <+> braces' (line <> (indentTab . align) body)
+
+ppCElseBlock ::
+  -- | Body
+  DocStyle -> DocStyle
+ppCElseBlock body =
+  pretty "else" <+> braces' (line <> (indentTab . align) body)

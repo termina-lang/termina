@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.ReferenceSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
@@ -49,8 +50,8 @@ derefpDynVector0expr = DereferenceExpression pDynVector0expr (vectorSemAnn UInt3
 derefpDynVector1expr = DereferenceExpression pDynVector1expr (twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10))
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
-
+renderExpression = render . ppExpression empty
+ 
 spec :: Spec
 spec = do
   describe "Pretty printing reference expressions" $ do

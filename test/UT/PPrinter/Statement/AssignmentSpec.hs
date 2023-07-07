@@ -3,7 +3,8 @@ module UT.PPrinter.Statement.AssignmentSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Statement
 import UT.PPrinter.Expression.Common
@@ -78,7 +79,7 @@ option0 = AssignmentStmt "option0" (OptionVariantExpression (Some dynVar0) optio
 option1 = AssignmentStmt "option1" (OptionVariantExpression None optionDynUInt32SemAnn) undefined
 
 renderStatement :: Statement SemanticAnns -> Text
-renderStatement = render . ppStatement
+renderStatement = render . ppStatement empty
 
 spec :: Spec
 spec = do
@@ -95,7 +96,7 @@ spec = do
         pack (
           "{\n" ++
           "    option0.__variant = Some;\n" ++
-          "    option0.__Some = dyn_var0;\n" ++
+          "    option0.__Some.__0 = dyn_var0;\n" ++
           "}")
     it "Prints the statement option1 = None; where option1 : Option <'dyn u32>" $ do
       renderStatement option1 `shouldBe`

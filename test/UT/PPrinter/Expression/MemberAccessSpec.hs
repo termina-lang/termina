@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.MemberAccessSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
@@ -37,7 +38,7 @@ tmChannelsend = BinOp MemberAccess tmChannel send uint32SemAnn
 resource0foo0 = BinOp MemberAccess resource0 foo0 uint32SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do

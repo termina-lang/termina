@@ -3,7 +3,8 @@ module UT.PPrinter.Expression.VectorIndexSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Data.Text
+import Data.Text hiding (empty)
+import Data.Map
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
@@ -70,7 +71,7 @@ derefpDynVector1FirstDym = VectorIndexExpression derefpDynVector1expr uint32Inde
 derefpDynVector1IndexExpression = VectorIndexExpression derefpDynVector1FirstDym uint32Index4 int64SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do
