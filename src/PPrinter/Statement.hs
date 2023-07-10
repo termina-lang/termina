@@ -78,23 +78,22 @@ ppStatement subs (ForLoopStmt iterator initValue endValue breakCond body _ ) =
         ppStatement subs (Declaration startSymbol iteratorTS initValue undefined),
         ppStatement subs (Declaration endSymbol iteratorTS endValue undefined),
         emptyDoc,
-        ppCForLoop initExpr condExpr incrExpr (vsep [ppStatement subs s <> line | s <- body])
+        ppCForLoop initExpr condExpr incrExpr (line <> vsep [ppStatement subs s <> line | s <- body])
     ]
 -- | Print a match in which the expression is a
 -- single variable (i.e., we do not need to evaluate it)
 ppStatement subs (MatchStmt expr matchCases _) =
     let ppMatchCaseOthers symbol cls =
             case cls of
-                [] -> emptyDoc
                 [c] -> space <> ppCElseBlock (ppMatchCase subs symbol c)
                 c : cs -> 
                     case c of (MatchCase identifier _ _ _) -> 
                                 space <> ppCElseIfBlock 
                                     (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty identifier) 
                                     (ppMatchCase subs symbol c) <> ppMatchCaseOthers symbol cs
+                [] -> emptyDoc
         ppMatchCases symbol cls =
             case cls of 
-                [] -> error "empty case list!"
                 -- | Single case, we do not need to evaluate it, just print the case
                 [c] -> ppMatchCase subs symbol c
                 c : cs -> 
@@ -102,6 +101,7 @@ ppStatement subs (MatchStmt expr matchCases _) =
                                 ppCIfBlock 
                                     (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty identifier) 
                                     (ppMatchCase subs symbol c) <> ppMatchCaseOthers symbol cs
+                [] -> error "empty case list!"
     in
     case expr of
         (Variable {}) ->
