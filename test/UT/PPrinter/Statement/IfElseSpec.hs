@@ -34,6 +34,9 @@ uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
 uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 
+constToFoo0 :: Statement SemanticAnns
+constToFoo0 = AssignmentStmt "foo0" uint32Const0 undefined
+
 dynVar0 :: Expression SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
 
@@ -43,6 +46,9 @@ option1 = Declaration "option1" optionDynUInt32TS (OptionVariantExpression None 
 
 twoDeclarations :: [Statement SemanticAnns]
 twoDeclarations = [vector1, option0]
+
+oneAssignment :: [Statement SemanticAnns]
+oneAssignment = [constToFoo0]
 
 oneDeclaration :: [Statement SemanticAnns]
 oneDeclaration = [option1]
@@ -56,6 +62,12 @@ singleIf = IfElseStmt cond0 twoDeclarations [] [] undefined
 
 ifElse :: Statement SemanticAnns
 ifElse = IfElseStmt cond1 twoDeclarations [] oneDeclaration undefined
+
+elseIf :: ElseIf SemanticAnns
+elseIf = ElseIf cond0 oneAssignment undefined
+
+ifElseIf :: Statement SemanticAnns
+ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] oneDeclaration undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement = render . ppStatement empty
@@ -103,6 +115,39 @@ spec = do
           "        option0.__variant = Some;\n" ++
           "        option0.__Some.__0 = dyn_var0;\n" ++
           "    }\n" ++
+          "\n" ++
+          "} else {\n" ++
+          "\n" ++
+          "    __Option_dyn_t option1;\n" ++
+          "\n" ++
+          "    {\n" ++
+          "        option1.__variant = None;\n" ++
+          "    }\n" ++
+          "\n" ++
+          "}")
+    it "Prints an if-else-if-else statement" $ do
+      renderStatement ifElseIf `shouldBe`
+        pack (
+          "if (foo0 != (uint32_t)4294901760) {\n" ++
+          "\n" ++
+          "    uint32_t vector1[10];\n" ++
+          "\n" ++
+          "    {\n" ++
+          "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "            vector1[__i0] = vector0[__i0];\n" ++
+          "        }\n" ++
+          "    }\n" ++
+          "\n" ++
+          "    __Option_dyn_t option0;\n" ++
+          "\n" ++
+          "    {\n" ++
+          "        option0.__variant = Some;\n" ++
+          "        option0.__Some.__0 = dyn_var0;\n" ++
+          "    }\n" ++
+          "\n" ++
+          "} else if (foo0 == (uint32_t)0) {\n" ++
+          "\n" ++
+          "    foo0 = (uint32_t)0;\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++
