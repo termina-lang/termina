@@ -37,18 +37,15 @@ ppClassDummyField :: DocStyle
 ppClassDummyField = uint32C <+> pretty "__dummy" <> semi
 
 filterStructModifiers :: [Modifier] -> [Modifier]
-filterStructModifiers = foldr (\modifier ms ->
-    case modifier of
-      Modifier "packed" Nothing -> modifier : ms
-      Modifier "align" _ -> modifier : ms
-      _ -> ms
-    ) []
-
+filterStructModifiers = filter (\case
+      Modifier "packed" Nothing -> True
+      Modifier "align" _ -> True
+      _ -> False)
+    
 filterClassModifiers :: [Modifier] -> [Modifier]
-filterClassModifiers = foldr (\modifier ms ->
-    case modifier of
-      Modifier "no_handler" Nothing -> modifier : ms
-      _ -> ms) []
+filterClassModifiers = filter (\case
+      Modifier "no_handler" Nothing -> True
+      _ -> False)
 
 hasNoHandler :: [Modifier] -> Bool
 hasNoHandler modifiers = case modifiers of
@@ -93,7 +90,7 @@ ppTypeDef before after typeDef =
     -- | Struct declaration pretty printer
     (Struct identifier fls modifiers anns) ->
       let structModifiers = filterStructModifiers modifiers in
-      vsep $ [
+      vsep [
         before anns,
         typedefC <+> structC <+> braces' (
           indentTab . align $ vsep $
@@ -119,8 +116,7 @@ ppTypeDef before after typeDef =
     (Enum identifier variants _ anns) ->
       let variantsWithParams = filter (not . null . assocData) variants
       in
-      vsep $
-        [ before anns,
+      vsep [ before anns,
         typedefC <+> enumC <+> braces' (
           indentTab . align $ vsep $ punctuate comma $
             map ppEnumVariant variants
