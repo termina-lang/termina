@@ -174,19 +174,29 @@ ppExpression subs (ParensExpression expr _) = parens (ppExpression subs expr)
 -- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
 ppExpression subs (ReferenceExpression expr _) =
     case getType expr of
-        -- | A reference to a dynamic subtype is the address of the datum
+        -- | A reference to a dynamic subtype is the address stored in the object
         (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress subs expr
-        -- | A reference to a vector is the vector itself  
+        -- | A reference to a vector is the vector itself (no need to create a reference
+        -- to it)
         (Vector _ _) -> ppExpression subs expr
         _ -> ppCReferenceExpression (ppExpression subs expr)
+-- | If the expression is a dereference, we need to check if it is to a vector
 ppExpression subs (DereferenceExpression expr _) =
     case getType expr of
+        -- | A dereference to a vector is printed as the name of the vector
         (Reference (Vector _ _)) -> ppExpression subs expr
         _ -> ppCDereferenceExpression (ppExpression subs expr)
+-- | If the expression is a dynamic subtype treated as its base type, we need to
+-- check if it is a vector
 ppExpression subs (Undyn expr _) =
     case getType expr of
+        -- | If it is a vector, we need to print the address of the datum
         (DynamicSubtype (Vector _ _)) -> parens (ppDynamicSubtypeObjectAddress subs expr)
+        -- | Else, we print the derefence to the datum
         (DynamicSubtype _) -> ppDynamicSubtypeObject subs expr
+        -- | An undyn can only be applied to a dynamic subtype. We are not
+        -- supposed to reach here. If we are here, it means that the semantic
+        -- analysis is wrong.
         _ -> error "Unsupported expression"
 ppExpression subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
 ppExpression _ (Constant constant _) =
