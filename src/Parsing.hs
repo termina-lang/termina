@@ -257,10 +257,7 @@ optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 -- Expression Parser
 expressionParser' :: Parser (Expression Annotation)
 expressionParser' = Ex.buildExpressionParser
-    [[dereferencePrefix, referencePrefix, castingPostfix]
-    -- ,[functionPostfix]
-    ,[vectorIndexPostfix]
-    ,[binaryInfix "." MemberAccess Ex.AssocRight]
+    [[castingPostfix]
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft]
     ,[binaryInfix "+" Addition Ex.AssocLeft,
@@ -284,24 +281,11 @@ expressionParser' = Ex.buildExpressionParser
           _ <- reservedOp s
           p <- getPosition
           return $ \l r -> BinOp f l r (Position p))
-        referencePrefix = Ex.Prefix (do
-          _ <- reservedOp "&"
-          flip ReferenceExpression . Position <$> getPosition)
-        dereferencePrefix = Ex.Prefix (do
-          _ <- reservedOp "*"
-          flip DereferenceExpression . Position <$> getPosition)
         castingPostfix = Ex.Postfix (do
           _ <- reserved "as"
           p <- getPosition
           typeSpecificer <- typeSpecifierParser
           return $ \parent -> Casting parent typeSpecificer (Position p))
-        -- functionPostfix = Ex.Postfix (do
-        --   arguments <- parens $ sepBy (try expressionParser) comma
-        --   return $ \parent -> FunctionExpression parent arguments)
-        vectorIndexPostfix = Ex.Postfix (do
-          index <- brackets expressionParser
-          p <- getPosition
-          return $ \parent ->  VectorIndexExpression parent index (Position p))
 
 functionCallParser :: Parser (Expression Annotation)
 functionCallParser =
@@ -336,11 +320,14 @@ expressionParser :: Parser (Expression Annotation)
 expressionParser = try functionCallParser
   <|> try optionVariantExprParser
   <|> try enumVariantExprParser
+  <|> try (AccessObject <$> vectorIndexParser)
+  <|> try (AccessObject <$> memberAccessParser)
+  <|> try (AccessObject <$> dereferenceParser)
   <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = vectorInitParser
-  <|> variableParser
+  <|> AccessObject <$> variableParser
   <|> constExprParser
   <|> fieldValuesAssignExpressionParser
   <|> parensExprParser
@@ -348,7 +335,40 @@ termParser = vectorInitParser
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
 
-variableParser :: Parser (Expression Annotation)
+memberAccessParser :: Parser (Object Expression Annotation)
+memberAccessParser = do
+  p <- getPosition
+  object <- expressionParser
+  _ <- reservedOp "."
+  m <- identifierParser
+  return $ MemberAccess object m (Position p)
+
+vectorIndexParser :: Parser (Object Expression Annotation)
+vectorIndexParser = do
+  p <- getPosition
+  object <- expressionParser
+  index <- brackets expressionParser
+  return $ VectorIndexExpression object index (Position p)
+
+dereferenceParser :: Parser (Object Expression Annotation)
+dereferenceParser = do
+  p <- getPosition
+  _ <- reservedOp "*"
+  object <- expressionParser
+  return $ Dereference object (Position p)
+
+-- | This parser is only used to parse object expressions that are used 
+-- as the left hand side of an assignment expression.
+objectParser :: Parser (Object Expression Annotation)
+objectParser = try memberAccessParser
+  <|> try vectorIndexParser
+  <|> dereferenceParser
+  <|> Variable <$> identifierParser <*> (Position <$> getPosition)
+  <|> parens objectParser 
+  -- ^ Just in case we have a parenthesized object.
+  -- Should we allow this?
+
+variableParser :: Parser (Object Expression Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
 
 vectorInitParser :: Parser (Expression Annotation)
@@ -469,7 +489,7 @@ blockItemParser = try ifElseIfStmtParser
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
   p <- getPosition
-  lval <- identifierParser
+  lval <- objectParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi
