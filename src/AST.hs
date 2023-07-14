@@ -1,43 +1,18 @@
 {-# LANGUAGE DeriveFunctor #-}
--- | Module where ASTs are defined.
+-- | Module defining AST after parsing.
+-- The parsing module defines a function |SourceCode -> AnnotatedProgram
+-- ParseAnnotations|.
+-- In this module, we only define what expressions are after parsing.
 
 module AST
   ( module AST
-  --   TypeSpecifier (..)
-  -- , Expression(..)
-  -- , Parameter(..)
-  -- , Modifier(..)
-  -- , ReturnStmt(..)
-  -- , BlockRet (..)
-  -- , AnnASTElement(..)
-  -- , Global(..)
-  -- , TypeDef(..)
-  -- , ClassMember(..)
-  -- , MatchCase(..)
-  -- , ElseIf(..)
-  -- , Statement(..)
-  -- , AnnotatedProgram(..)
-  -- , Block(..)
-  -- , Const(..)
-  -- , Size(..)
-  -- , Op(..)
-  -- , OptionVariant(..)
-  -- , ConstExpression(..)
-  -- , FieldDefinition(..)
-  -- , EnumVariant(..)
   , module CoreAST
-  -- , FieldValueAssignment'(..)
-  -- , BlockRet'(..)
-  -- , AnnASTElement'(..)
-  -- , ReturnStmt'(..)
-  -- , Statement'(..)
-  -- , MatchCase'(..)
   ) where
 
-
+-- From |CoreAST| we get all basic blocks.
 import CoreAST
 
--- | First AST after parsing?
+-- | First AST after parsing
 data Expression a
   = Variable Identifier a
   | Constant Const a
@@ -58,7 +33,6 @@ data Expression a
   | OptionVariantExpression (OptionVariant (Expression a)) a
   deriving (Show, Functor)
 
--- type OptionVariant a = OptionVariant' (Expression a)
 type ReturnStmt = ReturnStmt' Expression
 type BlockRet = BlockRet' Expression
 type AnnASTElement = AnnASTElement' Expression
@@ -69,15 +43,9 @@ type TypeDef = TypeDef' Expression
 
 type ClassMember = ClassMember' Expression
 
--- type FieldValueAssignment a = FieldValueAssignment' (Expression a)
-
 type MatchCase = MatchCase' Expression
 type ElseIf = ElseIf' Expression
 type Statement = Statement' Expression
 
 type AnnotatedProgram a = [AnnASTElement' Expression a]
 type Block a = Block' Expression a
-
--- When annotations are just `()` we get a normal ASTs and Programs
--- type AST = AnnASTElement ()
--- type Program = AnnotatedProgram ()
