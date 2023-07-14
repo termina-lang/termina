@@ -235,8 +235,9 @@ data ElseIf' expr a = ElseIf
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
 data Object expr a
   = Variable Identifier a -- ^ Plain identifier |v|
-  | VectorIndexExpression (Object expr a) (expr a) a -- ^ Array indexing | o [ Ix ]
-  | MemberAccess (Object expr a) Identifier a -- ^ Data structure access | o.name |
+  | VectorIndexExpression (expr a) (expr a) a -- ^ Array indexing | o [ Ix ]
+  | MemberAccess (expr a) Identifier a -- ^ Data structure access | o.name |
+  | Dereference (expr a) a -- ^ Dereference | *exp |
   deriving (Show, Functor)
 
 data Statement' expr a =
