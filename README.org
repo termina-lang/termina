@@ -6,6 +6,10 @@
 stack run -- --print --output=examples/res.c examples/datadefs.fin
 #+end_src
 
+* Type Rules
+https://hackmd.io/@parraman/BkFRR09Y2
+
+
 * Meta TODOs!
 ** TODO Haddock include semantics package?
 ** TODO Typing rules .tex
