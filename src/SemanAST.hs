@@ -5,19 +5,19 @@ module SemanAST
   , module CoreAST
   ) where
 
-
 import CoreAST
 
+-- | Expression here is same as AST plus |Undyn|
 data Expression a
-  = Variable Identifier a
+  = AccessObject (Object Expression a)
   | Constant Const a
   | ParensExpression (Expression a) a
   | BinOp Op (Expression a) (Expression a) a
-  | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
   | ReferenceExpression (Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
   | FunctionExpression  Identifier [ Expression a ] a
+  -------
   | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
   | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment' Expression a] a
   | EnumVariantExpression Identifier Identifier [ Expression a ] a

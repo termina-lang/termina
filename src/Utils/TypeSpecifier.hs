@@ -18,13 +18,13 @@ primitiveTypes Bool            = True
 primitiveTypes Char            = True
 primitiveTypes (DefinedType _) = True
 primitiveTypes (Vector _ _)    = True
--- primitiveTypes (Option _)    = True
 primitiveTypes  _              = False
 
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True
 boolTy _    = False
 
+-- | Predicate definining when a |TypeSpecifier| is numeric.
 numTy :: TypeSpecifier -> Bool
 numTy UInt8  = True
 numTy UInt16 = True

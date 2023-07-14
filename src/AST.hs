@@ -10,26 +10,32 @@ module AST
   ) where
 
 -- From |CoreAST| we get all basic blocks.
-import CoreAST
+import           CoreAST
 
 -- | First AST after parsing
 data Expression a
-  = Variable Identifier a
-  | Constant Const a
+  = AccessObject (Object Expression a)
+  | Constant Const a -- ^ | 24 : i8|
   | ParensExpression (Expression a) a
   | BinOp Op (Expression a) (Expression a) a
-  | VectorIndexExpression (Expression a) (Expression a) a -- ^ Binary operation : array indexing
-  | ReferenceExpression (Expression a) a
+  | ReferenceExpression (Object Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
-  | FunctionExpression  Identifier [ Expression a ] a
+  | FunctionExpression Identifier [ Expression a ] a
   -- FunctionExpression (FuncName a) [ Expression a ] a
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
-  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment' Expression a] a
+  | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
+  | FieldValuesAssignmentsExpression
+    Identifier -- ^ Structure type identifier
+    [FieldValueAssignment' Expression a] -- ^ Initial value of each field identifier
+    a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
-  | EnumVariantExpression Identifier Identifier [ Expression a ] a
+  | EnumVariantExpression
+    Identifier -- ^ Enum identifier
+    Identifier -- ^ Variant identifier
+    [ Expression a ] -- ^ list of expressions
+    a
   | OptionVariantExpression (OptionVariant (Expression a)) a
   deriving (Show, Functor)
 

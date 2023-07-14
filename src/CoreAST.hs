@@ -70,7 +70,7 @@ data AnnASTElement' expr a =
 -- Since we are not implementing it right now, we only have constants.
 -- The idea is to eventually replace it by constant (at compilation time)
 -- expressions. We also annotate them for debbuging purposes.
-newtype ConstExpression = KC Const
+data ConstExpression = KC Const | KV Identifier
   deriving (Show)
 
 -- | Modifier data type
@@ -106,8 +106,7 @@ newtype Size = K Integer
  deriving (Show)
 
 data Op
-  = MemberAccess
-  | Multiplication
+  = Multiplication
   | Division
   | Addition
   | Subtraction
@@ -233,6 +232,13 @@ data ElseIf' expr a = ElseIf
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
+-- | Assignable and /accessable/ values. LHS, referencable and accessable.
+data Object expr a
+  = Variable Identifier a -- ^ Plain identifier |v|
+  | VectorIndexExpression (Object expr a) (expr a) a -- ^ Array indexing | o [ Ix ]
+  | MemberAccess (Object expr a) Identifier a -- ^ Data structure access | o.name |
+  deriving (Show, Functor)
+
 data Statement' expr a =
   -- | Declaration statement
   Declaration
@@ -241,7 +247,7 @@ data Statement' expr a =
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
-    Identifier -- ^ name of the variable
+    (Object expr a) -- ^ name of the variable
     (expr a) -- ^ assignment expression
     a
   | IfElseStmt
@@ -271,8 +277,7 @@ data Statement' expr a =
 -- - Booleans
 -- - Decimal integers
 -- - Characters
--- - String literals
-data Const = B Bool | I TypeSpecifier Integer | C Char -- | S String
+data Const = B Bool | I TypeSpecifier Integer | C Char
   deriving (Show)
 
 type AnnotatedProgram' expr a = [AnnASTElement' expr a]
