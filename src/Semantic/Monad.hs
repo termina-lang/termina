@@ -9,7 +9,9 @@ module Semantic.Monad where
 
 import           Data.Map                   as M
 
+-- AST Info
 import           AST
+import           SemanAST                   as SAST
 import           Utils.AST
 
 import qualified Parsing                    as Parser (Annotation (..))
@@ -38,7 +40,7 @@ data SAnns a = SemAnn
 data SemanticElems
   = ETy TypeSpecifier -- ^ Expressions with their types
   | STy -- ^ Statements with no types
-  | GTy (GEntry SemanticAnns) -- ^ Global elements with no types
+  | GTy (GEntry SemanticAnns) -- ^ Global elements
 
 getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
@@ -54,7 +56,7 @@ buildExpAnn loc ty = SemAnn loc (ETy ty)
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
 
-buildGlobal :: Locations -> (GEntry SemanticAnns) -> SAnns SemanticElems
+buildGlobal :: Locations -> GEntry SemanticAnns -> SAnns SemanticElems
 buildGlobal loc = SemAnn loc . GTy
 
 buildStmtAnn :: Locations -> SAnns SemanticElems
@@ -285,33 +287,11 @@ isDefined ident = get >>= return . (\st ->
                              || (isDefinedIn ident (ro st))
                           )
 
--- lookupVar :: Locations -> Identifier -> SemanticMonad (Maybe (Either TypeSpecifier (GEntry SemanticAnns)))
--- lookupVar loc ident =
---   catchError
---     (Left <$> (getRHSVarTy loc ident))
---     (\case {
---         ENotNamedVar _ ->
---             catchError
---                 (Right <$> (getGlobalGEnTy loc ident))
---                 (\case {
---                     ENotNamedVar _ -> return Nothing;
---                     _ -> throwError $ annotateError loc ELookupVar
---                        } . semError) ;
---         _              -> throwError $ annotateError loc ELookupVar
---            } . semError)
--- This function is kinda weird, we should know if we want variables or functions,etc.
--- And |lookupVar| makes no distintion between different constructs.
-
 -------------
 -- Type |Type| helpers!
 -- | Checks if two type are the same numeric type.
 sameNumTy :: TypeSpecifier -> TypeSpecifier -> Bool
 sameNumTy a b = sameTy a b && numTy a
-
--- Same Type. Should we solve type aliases?
--- [Q1]
-sameTy :: TypeSpecifier -> TypeSpecifier -> Bool
-sameTy = groundTyEq
 
 sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad TypeSpecifier
 sameOrErr loc t1 t2 =
@@ -363,7 +343,7 @@ checkTypeDefinition _ Char                    = return ()
 checkTypeDefinition _ Bool                    = return ()
 checkTypeDefinition _ Unit                    = return ()
 
-getExpType :: Expression SemanticAnns -> SemanticMonad TypeSpecifier
+getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
   . getTySpec . ty_ann . getAnnotations

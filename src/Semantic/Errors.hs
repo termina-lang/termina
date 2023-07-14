@@ -52,6 +52,10 @@ data Errors a
   | EFieldExtra [Identifier]
   -- | Expecting a Vecotor got
   | EVector TypeSpecifier
+  -- | Expecting a Enumeration when memberAccessing got
+  | EMemberAccess TypeSpecifier
+  | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
+  | EMemberAccessUDef (TypeDef a)
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some
@@ -91,6 +95,8 @@ data Errors a
   | EDynPrim TypeSpecifier
   -- | Function Declaration error,
   | EUsedFunName Identifier
+  -- | Error getting type of expressions of objects.
+  | EUnboxingObjectExpr
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

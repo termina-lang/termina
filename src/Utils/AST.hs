@@ -3,6 +3,7 @@
 module Utils.AST where
 
 import           AST
+import           Utils.CoreAST
 
 -- Ground Type equiality?
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
@@ -28,7 +29,7 @@ groundTyEq  _ _ = False
 
 -- | First annotation level.
 getAnnotations :: Expression a -> a
-getAnnotations (Variable _ a)                           = a
+getAnnotations (Object obj)                             = getObjectAnnotations obj
 getAnnotations (Constant _ a)                           = a
 getAnnotations (BinOp _ _ _ a)                          = a
 getAnnotations (ReferenceExpression _ a)                = a
