@@ -2,59 +2,70 @@ module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
-import Data.Text
+import SemanAST
+import Data.Text hiding (empty)
 import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
+import Data.Map
 
-var0 :: Expression SemanticAnns
-var0 = Variable "var0" (SemAnn undefined uint16TS)
+var0, var1 :: Expression SemanticAnns
+-- | var0 : u16
+var0 = Variable "var0" uint16SemAnn
+-- | var1 : 'dyn u16
+var1 = Variable "var1" dynUInt16SemAnn
 
-var1 :: Expression SemanticAnns
-var1 = Variable "var1" (SemAnn undefined (DynamicSubtype uint16TS))
+undynVar1 :: Expression SemanticAnns
+undynVar1 = Undyn var1 uint16SemAnn
+
+constUInt16 :: Expression SemanticAnns
+-- | 1024 : u16
+constUInt16 = Constant (I UInt16 1024) uint16SemAnn
 
 var0PlusConstant :: Expression SemanticAnns
-var0PlusConstant = BinOp Addition var0 uint16Const (SemAnn undefined uint16TS)
+-- | var0 + 1024 : u16
+var0PlusConstant = BinOp Addition var0 constUInt16 uint16SemAnn
 
 constantPlusVar0 :: Expression SemanticAnns
-constantPlusVar0 = BinOp Addition uint16Const var0 (SemAnn undefined uint16TS)
+-- | 1024 : u16 + var0
+constantPlusVar0 = BinOp Addition constUInt16 var0 uint16SemAnn
 
 var1PlusConstant :: Expression SemanticAnns
-var1PlusConstant = BinOp Addition var1 uint16Const (SemAnn undefined uint16TS)
+-- | var1 + 1024 : u16
+var1PlusConstant = BinOp Addition undynVar1 constUInt16 uint16SemAnn
 
 constantPlusVar1 :: Expression SemanticAnns
-constantPlusVar1 = BinOp Addition uint16Const var1 (SemAnn undefined uint16TS)
+constantPlusVar1 = BinOp Addition constUInt16 undynVar1 uint16SemAnn
 
 var0PlusVar1 :: Expression SemanticAnns
-var0PlusVar1 = BinOp Addition var0 var1 (SemAnn undefined uint16TS)
+var0PlusVar1 = BinOp Addition var0 undynVar1 uint16SemAnn
 
 var0PlusVar1PlusConstant :: Expression SemanticAnns
-var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 uint16Const (SemAnn undefined uint16TS)
+var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 constUInt16 uint16SemAnn
 
 var0MinusConstant :: Expression SemanticAnns
-var0MinusConstant = BinOp Subtraction var0 uint16Const (SemAnn undefined uint16TS)
+var0MinusConstant = BinOp Subtraction var0 constUInt16 uint16SemAnn
 
 constantMinusVar0 :: Expression SemanticAnns
-constantMinusVar0 = BinOp Subtraction uint16Const var0 (SemAnn undefined uint16TS)
+constantMinusVar0 = BinOp Subtraction constUInt16 var0 uint16SemAnn
 
 var0MultConstant :: Expression SemanticAnns
-var0MultConstant = BinOp Multiplication var0 uint16Const (SemAnn undefined uint16TS)
+var0MultConstant = BinOp Multiplication var0 constUInt16 uint16SemAnn
 
 constantMultVar0 :: Expression SemanticAnns
-constantMultVar0 = BinOp Multiplication uint16Const var0 (SemAnn undefined uint16TS)
+constantMultVar0 = BinOp Multiplication constUInt16 var0 uint16SemAnn
 
 var0MultVar1 :: Expression SemanticAnns
-var0MultVar1 = BinOp Multiplication var0 var1 (SemAnn undefined uint16TS)
+var0MultVar1 = BinOp Multiplication var0 undynVar1 uint16SemAnn
 
 var1Divconstant :: Expression SemanticAnns
-var1Divconstant = BinOp Division var1 uint16Const (SemAnn undefined uint16TS)
+var1Divconstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
 
 var0DivVar1 :: Expression SemanticAnns
-var0DivVar1 = BinOp Division var0 var1 (SemAnn undefined uint16TS)
+var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppRootExpression
+renderExpression = render . ppExpression empty
 
 spec :: Spec
 spec = do
@@ -98,5 +109,4 @@ spec = do
     it "Prints the expression: var0 / var1 : u16" $ do
       renderExpression var0DivVar1 `shouldBe`
         pack "var0 / *((uint16_t *)var1.datum)"
-        
-    
+

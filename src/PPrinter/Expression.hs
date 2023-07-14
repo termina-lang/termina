@@ -2,11 +2,13 @@ module PPrinter.Expression where
 
 import Prettyprinter
 
-import AST
+import SemanAST
 import PPrinter.Common
 import Semantic.Monad
 import PPrinter.TypeDef
+import Data.Map
 
+type Substitutions = Map Identifier DocStyle
 
 ppBinaryOperator :: Op -> DocStyle
 ppBinaryOperator MemberAccess = pretty "."
@@ -30,212 +32,189 @@ ppBinaryOperator LogicalOr = space <> pretty  "||" <> space
 
 -- | Pretty prints the casting expression of a dynamic subtype
 ppDynamicSubtypeCast :: TypeSpecifier -> DocStyle
-ppDynamicSubtypeCast (Vector ts (KC size)) =
+ppDynamicSubtypeCast (Vector ts _) =
     case ts of
-        (Vector _ _) -> ppDynamicSubtypeCast' ts <> brackets (ppConst size)
+        (Vector _ _) -> ppPrimitiveType ts <+> parens (pretty "*") <> ppDynamicSubtypeCast' ts
         _ -> ppPrimitiveType ts <+> pretty "*"
 ppDynamicSubtypeCast ts = ppPrimitiveType ts <+> pretty "*"
 
 ppDynamicSubtypeCast' :: TypeSpecifier -> DocStyle
-ppDynamicSubtypeCast' (Vector ts (KC size)) =
+ppDynamicSubtypeCast' (Vector ts (KC vs)) =
     case ts of
-        (Vector _ _) -> ppDynamicSubtypeCast' ts <> brackets (ppConst size)
-        _ -> ppPrimitiveType ts <+> parens (pretty "*")
+        (Vector _ _) -> brackets (ppConst vs) <> ppDynamicSubtypeCast' ts
+        _ -> brackets (ppConst vs)
 ppDynamicSubtypeCast' ts = error $ "unsupported type" ++ show ts
 
 -- | Pretty prints the address of the object corresponding to the dynamic subtype
 -- This function assumes that the expression is a dynamic subtype
-ppDynamicSubtypeObjectAddress :: Expression SemanticAnns -> DocStyle
-ppDynamicSubtypeObjectAddress expr =
-    case getExpType expr of
+ppDynamicSubtypeObjectAddress :: Substitutions -> Expression SemanticAnns -> DocStyle
+ppDynamicSubtypeObjectAddress subs expr =
+    case getType expr of
         DynamicSubtype ts ->
-            parens (ppDynamicSubtypeCast ts) <> ppExpression' expr <> pretty ".datum"
+            parens (ppDynamicSubtypeCast ts) <> ppExpression subs expr <> pretty ".datum"
         _ -> error "unsupported expression"
 
-ppRefDynamicSubtypeObjectAddress :: Expression SemanticAnns -> DocStyle
-ppRefDynamicSubtypeObjectAddress expr =
-    case getExpType expr of
+ppRefDynamicSubtypeObjectAddress :: Substitutions -> Expression SemanticAnns -> DocStyle
+ppRefDynamicSubtypeObjectAddress subs expr =
+    case getType expr of
         Reference (DynamicSubtype ts) ->
             parens (ppDynamicSubtypeCast ts) <> (
                 case expr of 
-                    (ReferenceExpression _ _) ->  parens (ppExpression expr)
-                    _ -> ppExpression expr
+                    (ReferenceExpression _ _) ->  parens (ppExpression subs expr)
+                    _ -> ppExpression subs expr
             ) <> pretty "->datum"
         _ -> error "unsupported expression"
 
-ppDynamicSubtypeObject :: Expression SemanticAnns -> DocStyle
-ppDynamicSubtypeObject expr = ppCDereferenceExpression (ppDynamicSubtypeObjectAddress expr)
+ppDynamicSubtypeObject :: Substitutions -> Expression SemanticAnns -> DocStyle
+ppDynamicSubtypeObject subs expr = ppCDereferenceExpression (ppDynamicSubtypeObjectAddress subs expr)
 
-ppRefDynamicSubtypeObject :: Expression SemanticAnns -> DocStyle
-ppRefDynamicSubtypeObject expr = ppCDereferenceExpression (ppRefDynamicSubtypeObjectAddress expr)
+ppRefDynamicSubtypeObject :: Substitutions -> Expression SemanticAnns -> DocStyle
+ppRefDynamicSubtypeObject subs expr = ppCDereferenceExpression (ppRefDynamicSubtypeObjectAddress subs expr)
 
-ppMemberAccessExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
+ppMemberAccessExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 -- | If the right hand side is a function, then it is a method call
-ppMemberAccessExpression lhs (FunctionExpression methodId params _) =
-    case getExpType lhs of
+ppMemberAccessExpression subs lhs (FunctionExpression methodId params _) =
+    case getType lhs of
         (Reference ts) ->
             case ts of
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
                     ppCFunctionCall
                         (classMethodName classId methodId)
-                        (ppExpression lhs : map ppRootExpression params)
+                        (ppExpression subs lhs : (ppExpression subs <$> params))
                 -- | If the left hand side is a pool:
                 (Pool _ _) ->
                     ppCFunctionCall
                         (poolMethodName methodId)
-                        (ppExpression lhs : map ppRootExpression params)
+                        (ppExpression subs lhs : (ppExpression subs <$> params))
                 -- | If the left hand side is a message queue:
                 (MsgQueue _ _) ->
                     ppCFunctionCall
                         (msgQueueMethodName methodId)
-                        (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
+                        (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
                 -- | Anything else should not happen
                 _ -> error "unsupported expression"
         -- | If the left hand size is a class:
         (DefinedType classId) ->
             ppCFunctionCall
                 (classMethodName classId methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
+                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
         (Pool _ _) ->
             ppCFunctionCall
                 (poolMethodName methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
+                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
         (MsgQueue _ _) ->
             ppCFunctionCall
                 (msgQueueMethodName methodId)
-                (ppCReferenceExpression (ppExpression lhs) : map ppRootExpression params)
+                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
         -- | Anything else should not happen
         _ -> error "unsupported expression"
 -- | If the right hand side is not a function, then it is a field
-ppMemberAccessExpression lhs rhs = ppExpression lhs <> ppBinaryOperator MemberAccess <> ppExpression rhs
+ppMemberAccessExpression subs lhs rhs = ppExpression subs lhs <> ppBinaryOperator MemberAccess <> ppExpression subs rhs
 
-ppRelationalNotEqualExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
-ppRelationalNotEqualExpression lhs rhs =
-    let lhsType = getExpType lhs
-        rhsType = getExpType rhs in
+ppRelationalNotEqualExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
+ppRelationalNotEqualExpression subs lhs rhs =
+    let lhsType = getType lhs
+        rhsType = getType rhs in
     case (lhsType, rhsType) of
         -- If both are dynamic subtypes
-        (DynamicSubtype ts', DynamicSubtype _) ->
-            case ts' of
-                (DefinedType identifier) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress lhs,
-                    ppDynamicSubtypeObjectAddress rhs], pretty "==", pretty "0"])
-                _ -> ppDynamicSubtypeObject lhs <> ppBinaryOperator RelationalNotEqual <> ppDynamicSubtypeObject rhs
-        -- If the left hand side is a dynamic subtype and the right hand side is a defined type
-        (DynamicSubtype _, DefinedType identifier) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppDynamicSubtypeObjectAddress lhs,
-                 ppCReferenceExpression (ppExpression rhs)], pretty "==", pretty "0"])
-        -- If the left hand side is a dynamic subtype and the right hand side is another pritimive type
-        (DynamicSubtype _, _) ->
-            ppDynamicSubtypeObject lhs <> ppBinaryOperator RelationalNotEqual <> ppExpression rhs
-        -- If the right hand side is a dynamic subtype and the left hand side is a defined type
-        (DefinedType identifier, DynamicSubtype _) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppCReferenceExpression (ppExpression lhs),
-                 ppDynamicSubtypeObjectAddress rhs], pretty "==", pretty "0"])
-        -- If the right hand side is a dynamic subtype and the left hand side is another primitive type
-        (_, DynamicSubtype _) ->
-            ppExpression lhs <> ppBinaryOperator RelationalNotEqual <> ppDynamicSubtypeObject rhs
-        -- If both are defined types, we need to call the equality function
         (DefinedType identifier, DefinedType _) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppCReferenceExpression (ppExpression lhs),
-                 ppCReferenceExpression (ppExpression rhs)], pretty "==", pretty "0"])
+            case (lhs, rhs) of
+                (Undyn lhs' _, Undyn rhs' _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppDynamicSubtypeObjectAddress subs lhs',
+                    ppDynamicSubtypeObjectAddress subs rhs'], pretty "==", pretty "0"])
+                (Undyn lhs' _, _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppDynamicSubtypeObjectAddress subs lhs',
+                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "0"])
+                (_,  Undyn rhs' _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppCReferenceExpression (ppExpression subs lhs),
+                    ppDynamicSubtypeObjectAddress subs rhs'], pretty "==", pretty "0"])
+                (_, _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppCReferenceExpression (ppExpression subs lhs),
+                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "0"])
         -- Else, we can just compare the values        
-        _ -> ppExpression lhs <> ppBinaryOperator RelationalNotEqual <> ppExpression rhs
+        _ -> ppExpression subs lhs <> ppBinaryOperator RelationalNotEqual <> ppExpression subs rhs
 
-ppRelationalEqualExpression :: Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
-ppRelationalEqualExpression lhs rhs =
-    let lhsType = getExpType lhs
-        rhsType = getExpType rhs in
+ppRelationalEqualExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
+ppRelationalEqualExpression subs lhs rhs =
+    let lhsType = getType lhs
+        rhsType = getType rhs in
     case (lhsType, rhsType) of
-        -- If both are dynamic subtypes
-        (DynamicSubtype ts', DynamicSubtype _) ->
-            case ts' of
-                (DefinedType identifier) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress lhs,
-                    ppDynamicSubtypeObjectAddress rhs], pretty "==", pretty "1"])
-                _ -> ppDynamicSubtypeObject lhs <> ppBinaryOperator RelationalEqual <> ppDynamicSubtypeObject rhs
-        -- If the left hand side is a dynamic subtype and the right hand side is a defined type
-        (DynamicSubtype _, DefinedType identifier) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppDynamicSubtypeObjectAddress lhs,
-                 ppCReferenceExpression (ppExpression rhs)], pretty "==", pretty "1"])
-        -- If the left hand side is a dynamic subtype and the right hand side is another pritimive type
-        (DynamicSubtype _, _) ->
-            ppDynamicSubtypeObject lhs <> ppBinaryOperator RelationalEqual <> ppExpression rhs
-        -- If the right hand side is a dynamic subtype and the left hand side is a defined type
-        (DefinedType identifier, DynamicSubtype _) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppCReferenceExpression (ppExpression lhs),
-                 ppDynamicSubtypeObjectAddress rhs], pretty "==", pretty "1"])
-        -- If the right hand side is a dynamic subtype and the left hand side is another primitive type
-        (_, DynamicSubtype _) ->
-            ppExpression lhs <> ppBinaryOperator RelationalEqual <> ppDynamicSubtypeObject rhs
         -- If both are defined types, we need to call the equality function
         (DefinedType identifier, DefinedType _) ->
-            parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                [ppCReferenceExpression (ppExpression lhs),
-                 ppCReferenceExpression (ppExpression rhs)], pretty "==", pretty "1"])
+            case (lhs, rhs) of
+                (Undyn lhs' _, Undyn rhs' _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppDynamicSubtypeObjectAddress subs lhs',
+                    ppDynamicSubtypeObjectAddress subs rhs'], pretty "==", pretty "1"])
+                (Undyn lhs' _, _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppDynamicSubtypeObjectAddress subs lhs',
+                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "1"])
+                (_,  Undyn rhs' _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppCReferenceExpression (ppExpression subs lhs),
+                    ppDynamicSubtypeObjectAddress subs rhs'], pretty "==", pretty "1"])
+                (_, _) ->
+                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
+                    [ppCReferenceExpression (ppExpression subs lhs),
+                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "1"])
         -- Else, we can just compare the values        
-        _ -> ppExpression lhs <> ppBinaryOperator RelationalEqual <> ppExpression rhs
+        _ -> ppExpression subs lhs <> ppBinaryOperator RelationalEqual <> ppExpression subs rhs
 
-ppExpression' :: Expression SemanticAnns -> DocStyle
-ppExpression' (Variable identifier _) = pretty identifier
-ppExpression' (Constant constant _) =
+-- | Expression pretty printer
+ppExpression :: Substitutions -> Expression SemanticAnns -> DocStyle
+ppExpression subs (ParensExpression expr _) = parens (ppExpression subs expr)
+-- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
+ppExpression subs (ReferenceExpression expr _) =
+    case getType expr of
+        -- | A reference to a dynamic subtype is the address stored in the object
+        (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress subs expr
+        -- | A reference to a vector is the vector itself (no need to create a reference
+        -- to it)
+        (Vector _ _) -> ppExpression subs expr
+        _ -> ppCReferenceExpression (ppExpression subs expr)
+-- | If the expression is a dereference, we need to check if it is to a vector
+ppExpression subs (DereferenceExpression expr _) =
+    case getType expr of
+        -- | A dereference to a vector is printed as the name of the vector
+        (Reference (Vector _ _)) -> ppExpression subs expr
+        _ -> ppCDereferenceExpression (ppExpression subs expr)
+-- | If the expression is a dynamic subtype treated as its base type, we need to
+-- check if it is a vector
+ppExpression subs (Undyn expr _) =
+    case getType expr of
+        -- | If it is a vector, we need to print the address of the datum
+        (DynamicSubtype (Vector _ _)) -> parens (ppDynamicSubtypeObjectAddress subs expr)
+        -- | Else, we print the derefence to the datum
+        (DynamicSubtype _) -> ppDynamicSubtypeObject subs expr
+        -- | An undyn can only be applied to a dynamic subtype. We are not
+        -- supposed to reach here. If we are here, it means that the semantic
+        -- analysis is wrong.
+        _ -> error "Unsupported expression"
+ppExpression subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
+ppExpression _ (Constant constant _) =
     case constant of
         B b -> if b then pretty "1" else pretty "0"
         I ts' integer -> parens (ppPrimitiveType ts') <> pretty integer
         C char -> squotes (pretty char)
-ppExpression' (BinOp RelationalEqual lhs rhs _) = ppRelationalEqualExpression lhs rhs
-ppExpression' (BinOp RelationalNotEqual lhs rhs _) = ppRelationalNotEqualExpression lhs rhs
-ppExpression' (BinOp MemberAccess lhs rhs _) = ppMemberAccessExpression lhs rhs
-ppExpression' (BinOp op expr1 expr2 _) =
-    ppExpression expr1 <> ppBinaryOperator op <> ppExpression expr2
-ppExpression' (Casting expr' ts' _) = 
+ppExpression subs (BinOp RelationalEqual lhs rhs _) = ppRelationalEqualExpression subs lhs rhs
+ppExpression subs (BinOp RelationalNotEqual lhs rhs _) = ppRelationalNotEqualExpression subs lhs rhs
+ppExpression subs (BinOp MemberAccess lhs rhs _) = ppMemberAccessExpression subs lhs rhs
+ppExpression subs (BinOp op expr1 expr2 _) =
+    ppExpression subs expr1 <> ppBinaryOperator op <> ppExpression subs expr2
+ppExpression subs (Casting expr' ts' _) = 
     case expr' of
         (Constant (I _ integer) _) -> parens (ppPrimitiveType ts') <> pretty integer
-        _ -> parens (ppPrimitiveType ts') <> ppExpression expr'
-ppExpression' (FunctionExpression identifier params _) =
-    ppCFunctionCall (pretty identifier) (map ppRootExpression params)
-ppExpression' (VectorIndexExpression vector index _) =
-    ppExpression vector <> brackets (ppExpression index)
-ppExpression' _ = error "unsupported expression"
-
--- | Expression pretty printer
-ppExpression :: Expression SemanticAnns -> DocStyle
-ppExpression (ParensExpression expr _) = parens (ppExpression expr)
--- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
-ppExpression (ReferenceExpression expr _) =
-    case getExpType expr of
-        -- | A reference to a dynamic subtype is the address of the datum
-        (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress expr
-        -- | A reference to a vector is the vector itself  
-        (Vector _ _) -> ppExpression expr
-        _ -> ppCReferenceExpression (ppExpression expr)
-ppExpression (DereferenceExpression expr _) =
-    case getExpType expr of
-        (Reference (Vector _ _)) -> ppExpression expr
-        _ -> ppCDereferenceExpression (ppExpression expr)
-ppExpression expr =
-    case getExpType expr of
-        (DynamicSubtype (Vector _ _)) -> parens (ppDynamicSubtypeObjectAddress expr)
-        (DynamicSubtype _) -> ppDynamicSubtypeObject expr
-        _ -> ppExpression' expr
-
--- | Pretty printer for a root expression
--- This printer is used to print the parameters of a function call or to print
--- single expression statements.
-ppRootExpression :: Expression SemanticAnns -> DocStyle
-ppRootExpression (ParensExpression expr _) = parens (ppRootExpression expr)
-ppRootExpression expr =
-    case expr of
-        (ReferenceExpression _ _) -> ppExpression expr
-        (DereferenceExpression _ _) -> ppExpression expr
-        _ -> ppExpression' expr
+        _ -> parens (ppPrimitiveType ts') <> ppExpression subs expr'
+ppExpression subs (FunctionExpression identifier params _) =
+    ppCFunctionCall (pretty identifier) (ppExpression subs <$> params)
+ppExpression subs (VectorIndexExpression vector index _) =
+    ppExpression subs vector <> brackets (ppExpression subs index)
+ppExpression _ _ = error "unsupported expression"

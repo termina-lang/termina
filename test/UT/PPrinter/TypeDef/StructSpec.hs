@@ -2,7 +2,7 @@ module UT.PPrinter.TypeDef.StructSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import AST
+import SemanAST
 import Parsing
 import Data.Text
 
@@ -98,9 +98,7 @@ spec = do
             "    uint8_t field0;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a struct with two fields" $ do
       renderSingleASTElement structWithTwoFields `shouldBe`
         pack (
@@ -110,9 +108,7 @@ spec = do
             "    uint16_t field1;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a packed struct" $ do
       renderSingleASTElement packedStruct `shouldBe`
         pack (
@@ -123,10 +119,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
-            "                   uint32_t * __field2, uint32_t __field2_n);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints an aligned struct" $ do
       renderSingleASTElement alignedStruct `shouldBe`
         pack (
@@ -137,10 +130,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
-            "                   uint32_t * __field2, uint32_t __field2_n);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
     it "Prints a packet & aligned struct" $ do
       renderSingleASTElement packedAndAlignedStruct `shouldBe`
         pack (
@@ -151,7 +141,4 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
             "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n" ++
-            "\n" ++
-            "void __id0__assign(id0 * __self, uint8_t __field0, uint16_t __field1,\n" ++
-            "                   uint32_t * __field2, uint32_t __field2_n);\n")
+            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")

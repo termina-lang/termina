@@ -4,7 +4,7 @@ module PPrinter where
 
 import Prelude hiding (id)
 
-import AST
+import SemanAST
 -- https://hackage.haskell.org/package/prettyprinter
 import Prettyprinter
 import Prettyprinter.Render.Terminal
