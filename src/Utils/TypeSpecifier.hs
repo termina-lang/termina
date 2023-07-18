@@ -20,6 +20,18 @@ primitiveTypes (DefinedType _) = True
 primitiveTypes (Vector _ _)    = True
 primitiveTypes  _              = False
 
+-- | The following function defines what we consider to be simple types.
+-- Simple types can be used at variable creation, inside arrays and user defined structures.
+-- Also at dynamic object and function returned values.
+-- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
+simpleType :: TypeSpecifier -> Bool
+simpleType Unit = False
+simpleType (DynamicSubtype {}) = False
+simpleType (MsgQueue {}) = False
+simpleType (Pool {}) = False
+simpleType (Reference {}) = False
+simpleType _ = True
+
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True
 boolTy _    = False
@@ -35,6 +47,14 @@ numTy Int16  = True
 numTy Int32  = True
 numTy Int64  = True
 numTy _      = False
+
+numCons :: Cons -> Bool
+numCons (I _ _) = True
+numCons _ = False
+
+numConstExpression :: ConstExpression -> Bool
+numConstExpression (KC c) = numCons c
+numConstExpression _ = error "TODO this is a bit weird."
 
 memberIntCons :: Integer -> TypeSpecifier -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
@@ -52,3 +72,8 @@ identifierType (Struct ident _ _ _) = ident
 identifierType (Union ident _ _ _)  = ident
 identifierType (Enum ident _ _ _)   = ident
 identifierType (Class ident _ _ _)  = ident
+
+referenceType :: TypeSpecifier -> Bool
+referenceType Unit = False
+referenceType (Reference {}) = False
+referenceType _ = True

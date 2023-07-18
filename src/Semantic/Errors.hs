@@ -64,7 +64,7 @@ data Errors a
   -- | Global Object but not a type
   | EGlobalNoType Identifier
   -- | Vectors with dynamic length
-  | EVectorConst ConstExpression
+  | EVectorConst Const
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -88,7 +88,7 @@ data Errors a
   -- | Unique names for types.
   | EUsedTypeName Identifier
   -- | Vector Type Primitive
-  | ENoPrimitiveType TypeSpecifier
+  -- | ENoPrimitiveType TypeSpecifier
   -- | Only option Dyn
   | EOptionDyn TypeSpecifier
   -- | Dynamic a non primitive type
@@ -97,6 +97,10 @@ data Errors a
   | EUsedFunName Identifier
   -- | Error getting type of expressions of objects.
   | EUnboxingObjectExpr
+  -- | Expected Simple Type
+  | EExpectedSimple TypeSpecifier
+  -- | Forbidden Reference Type
+  | EReferenceTy TypeSpecifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

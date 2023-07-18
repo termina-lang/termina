@@ -70,7 +70,9 @@ data AnnASTElement' expr a =
 -- Since we are not implementing it right now, we only have constants.
 -- The idea is to eventually replace it by constant (at compilation time)
 -- expressions. We also annotate them for debbuging purposes.
-data ConstExpression = KC Const | KV Identifier
+data ConstExpression
+  = KC Const -- ^ Literal const expression
+  | KV Identifier (Maybe Const) -- ^ Global constant? We keep the name for debugging process
   deriving (Show)
 
 -- | Modifier data type

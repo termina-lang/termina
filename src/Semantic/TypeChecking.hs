@@ -39,7 +39,7 @@ import           Data.Maybe
 import           Data.Map             as M
 
 import           Control.Arrow
-import Utils.CoreAST (getObjectAnnotations)
+import           Utils.CoreAST        (getObjectAnnotations)
 -- import Parser (Equation(lhs))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
@@ -427,5 +427,9 @@ checkIntConstant loc tyI i =
   then return ()
   else throwError $ annotateError loc (EConstantOutRange (I tyI i))
 
+-- Type definition
 typeDefCheck :: TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
-typeDefCheck _ = _TODO
+typeDefCheck (Struct ident fs mds ann) = _StructDef
+typeDefCheck (Union ident fs mds ann)  = _Union
+typeDefCheck (Enum ident evs mds ann)  = _Enum
+typeDefCheck (Class ident cls mds ann) = _Class

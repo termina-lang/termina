@@ -313,23 +313,37 @@ getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
--- TODO Type definitions, two kind of types, etc
+-- | Function checking that a TypeSpecifier is well-defined.
+-- This is not the same as defining a type, but it is similar.
+-- Some types can be found in the wild, but user defined types are just check
+-- they exist (they were defined preivously).
+-- Note that we do not change the |TypeSpecifier| in any way, that's why this
+-- function return |()|.
 checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
   void (getGlobalTy loc identTy)
-checkTypeDefinition loc (Vector ty _)         =
-  if primitiveTypes ty then checkTypeDefinition loc ty
-  else throwError $ annotateError loc (ENoPrimitiveType ty)
+  -- we assume that only well-formed types are added to globals.
+checkTypeDefinition loc (Vector ty c)         =
+  -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
+  -- Only arrays of simple types.
+  simpleTyorFail loc ty >>
+  -- Numeric contast
+  unless (numConstExpression c) (throwError (annotateError loc (EVectorConst c)))
+  --
+  checkTypeDefinition loc ty
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
 -- Dynamic Subtyping
 checkTypeDefinition loc (Option tyd@(DynamicSubtype ty)) = checkTypeDefinition loc tyd
 checkTypeDefinition loc (Option ty) = throwError $ annotateError loc $ EOptionDyn ty
-checkTypeDefinition loc (Reference ty)        = checkTypeDefinition loc ty
+checkTypeDefinition loc (Reference ty)        =
+  -- Unless we are referencing a reference we are good
+  unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
+  checkTypeDefinition loc ty
 checkTypeDefinition loc (DynamicSubtype ty)   =
-  if primitiveTypes ty then checkTypeDefinition loc ty
-  else throwError $ annotateError loc $ EDynPrim ty
+  simpleTyorFail loc ty >>
+  checkTypeDefinition loc ty
 -- This is explicit just in case
 checkTypeDefinition _ UInt8                   = return ()
 checkTypeDefinition _ UInt16                  = return ()
@@ -342,7 +356,8 @@ checkTypeDefinition _ Int64                   = return ()
 checkTypeDefinition _ Char                    = return ()
 checkTypeDefinition _ Bool                    = return ()
 checkTypeDefinition _ Unit                    = return ()
-
+  where
+    simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
