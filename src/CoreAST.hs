@@ -236,7 +236,8 @@ data ElseIf' expr a = ElseIf
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
-data Object
+-- |Object'| should not be invoked directly.
+data Object'
     (exprI :: * -> *) -- ^ Types returning identifiers
     (exprE :: * -> *) -- ^ Types returning expressions
     (a :: *)
@@ -269,7 +270,7 @@ data Statement' expr a =
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (Object expr a) -- ^ name of the variable
+    (LHSObject expr a) -- ^ name of the variable
     (expr a) -- ^ assignment expression
     a
   | IfElseStmt

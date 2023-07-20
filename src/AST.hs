@@ -14,11 +14,11 @@ import           CoreAST
 
 -- | First AST after parsing
 data Expression a
-  = AccessObject (Object Expression a)
+  = AccessObject (RHSObject Expression a)
   | Constant Const a -- ^ | 24 : i8|
   | ParensExpression (Expression a) a
   | BinOp Op (Expression a) (Expression a) a
-  | ReferenceExpression (Object Expression a) a
+  | ReferenceExpression (RHSObject Expression a) a
   | DereferenceExpression (Expression a) a
   | Casting (Expression a) TypeSpecifier a
   | FunctionExpression Identifier [ Expression a ] a
