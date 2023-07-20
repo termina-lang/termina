@@ -241,25 +241,30 @@ data Object'
     (exprI :: * -> *) -- ^ Types returning identifiers
     (exprE :: * -> *) -- ^ Types returning expressions
     (a :: *)
-  = Variable Identifier a -- ^ Plain identifier |v|
-  | VectorIndexExpression (exprI a) (exprE a) a
+  -- = Variable Identifier a -- ^ Plain identifier |v|
+  = IdentifierExpression (exprI a) a
+  | VectorIndexExpression (Object' exprI exprE a) (exprE a) a
   -- ^ Array indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
-  | MemberAccess (exprI a) Identifier a
+  | MemberAccess (Object' exprI exprE a) Identifier a
   -- ^ Data structure access | eI.name |, same as before |ei :: exprI a| is an
   -- expression identifier.
-  | Dereference (exprI a) a
+  | Dereference (Object' exprI exprE a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
   deriving (Show, Functor)
 
 -- | |RHSObjects| do not make a difference between identifier expressions and
 -- regular expressions.
-newtype RHSObject expr a = RHS {unRHS :: Object expr expr a}
+newtype RHSObject expr a = RHS {unRHS :: Object' expr expr a}
+  deriving (Show, Functor)
 -- | |LHSObjects| only accepts recursive definitions where identifier
 -- expressions are expected, and thus, to solve such recursion we would need to
 -- have a variable name at the end.
-newtype LHSObject expr a = LHS {unLHS :: Object (LHSObject expr) expr a}
+data VariableF a = VariableF Identifier a
+  deriving (Show, Functor)
+newtype LHSObject expr a = LHS {unLHS :: Object' VariableF expr a}
+  deriving (Show, Functor)
 ----------------------------------------
 
 data Statement' expr a =
