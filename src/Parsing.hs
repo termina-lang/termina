@@ -320,14 +320,14 @@ expressionParser :: Parser (Expression Annotation)
 expressionParser = try functionCallParser
   <|> try optionVariantExprParser
   <|> try enumVariantExprParser
-  <|> try (AccessObject <$> vectorIndexParser)
-  <|> try (AccessObject <$> memberAccessParser)
-  <|> try (AccessObject <$> dereferenceParser)
+  <|> try (AccessObject <$> vectorIndexParserRHS)
+  <|> try (AccessObject <$> memberAccessParserRHS)
+  <|> try (AccessObject <$> dereferenceParserRHS)
   <|> expressionParser'
 
 termParser :: Parser (Expression Annotation)
 termParser = vectorInitParser
-  <|> AccessObject <$> variableParser
+  <|> AccessObject <$> variableParserRHS
   <|> constExprParser
   <|> fieldValuesAssignExpressionParser
   <|> parensExprParser
@@ -335,41 +335,72 @@ termParser = vectorInitParser
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
 
-memberAccessParser :: Parser (Object Expression Annotation)
-memberAccessParser = do
+----------------------------------------
+-- Object Parsering
+-- | When traying to parse an |Empty| value, we just fail.
+-- TODO check how users see this, error messages to the user are important.
+emptyParser :: Parser (Empty a)
+emptyParser = fail "Parsing Emtpy elements. Complex Experssions on RHS??"
+
+memberAccessParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+memberAccessParser identifierObjectParser = do
   p <- getPosition
-  object <- expressionParser
+  object <- objectParser identifierObjectParser
   _ <- reservedOp "."
   m <- identifierParser
   return $ MemberAccess object m (Position p)
 
-vectorIndexParser :: Parser (Object Expression Annotation)
-vectorIndexParser = do
+memberAccessParserRHS :: Parser (RHSObject Expression Annotation)
+memberAccessParserRHS = RHS <$> memberAccessParser expressionParser
+
+vectorIndexParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+vectorIndexParser identifierExpressionParser = do
   p <- getPosition
-  object <- expressionParser
+  object <- objectParser identifierExpressionParser
   index <- brackets expressionParser
   return $ VectorIndexExpression object index (Position p)
 
-dereferenceParser :: Parser (Object Expression Annotation)
-dereferenceParser = do
+vectorIndexParserRHS :: Parser (RHSObject Expression Annotation)
+vectorIndexParserRHS = RHS <$> vectorIndexParser expressionParser
+
+dereferenceParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+dereferenceParser identifierExpressionParser = do
   p <- getPosition
   _ <- reservedOp "*"
-  object <- expressionParser
+  object <- objectParser identifierExpressionParser
   return $ Dereference object (Position p)
+
+dereferenceParserRHS :: Parser (RHSObject Expression Annotation)
+dereferenceParserRHS = RHS <$> dereferenceParser expressionParser
 
 -- | This parser is only used to parse object expressions that are used 
 -- as the left hand side of an assignment expression.
-objectParser :: Parser (Object Expression Annotation)
-objectParser = try memberAccessParser
-  <|> try vectorIndexParser
-  <|> dereferenceParser
-  <|> Variable <$> identifierParser <*> (Position <$> getPosition)
-  <|> parens objectParser 
+objectParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+objectParser expressionIdentifierParser
+  = try (memberAccessParser expressionIdentifierParser)
+  <|> try (vectorIndexParser expressionIdentifierParser)
+  <|> dereferenceParser expressionIdentifierParser
+  <|> try (Variable <$> identifierParser <*> (Position <$> getPosition))
+  <|> try (parens (objectParser expressionIdentifierParser))
   -- ^ Just in case we have a parenthesized object.
   -- Should we allow this?
+  <|> IdentifierExpression <$> expressionIdentifierParser <*> (Position <$> getPosition)
 
-variableParser :: Parser (Object Expression Annotation)
+-- Plain variable names belong to whatever |exprI| we want.
+variableParser :: Parser (Object' exprI Expression Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
+
+variableParserRHS :: Parser (RHSObject Expression Annotation)
+variableParserRHS = RHS <$> variableParser
+
+-- | LHS objects cannot have identifier expressions and we note that using
+-- the |Empty| type and its parser |emptyParser|.
+objectParserLHS :: Parser (LHSObject Expression Annotation)
+objectParserLHS = LHS <$> objectParser emptyParser
+
+objectParserRHS :: Parser (RHSObject Expression Annotation)
+objectParserRHS = RHS <$> objectParser expressionParser
+----------------------------------------
 
 vectorInitParser :: Parser (Expression Annotation)
 vectorInitParser = do
@@ -489,7 +520,7 @@ blockItemParser = try ifElseIfStmtParser
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
   p <- getPosition
-  lval <- objectParser
+  lval <- objectParserLHS
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi

@@ -1,8 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE EmptyDataDeriving #-}
 -- | Module defining core AST
 
 module CoreAST where
+
+-- Parametric Emtpy Type
+data Empty (a :: *)
+  deriving (Show, Functor)
 
 data ReturnStmt' expr a
   = ReturnStmt
@@ -241,8 +246,8 @@ data Object'
     (exprI :: * -> *) -- ^ Types returning identifiers
     (exprE :: * -> *) -- ^ Types returning expressions
     (a :: *)
-  -- = Variable Identifier a -- ^ Plain identifier |v|
-  = IdentifierExpression (exprI a) a
+  = Variable Identifier a -- ^ Plain identifier |v|
+  | IdentifierExpression (exprI a) a
   | VectorIndexExpression (Object' exprI exprE a) (exprE a) a
   -- ^ Array indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
@@ -261,9 +266,7 @@ newtype RHSObject expr a = RHS {unRHS :: Object' expr expr a}
 -- | |LHSObjects| only accepts recursive definitions where identifier
 -- expressions are expected, and thus, to solve such recursion we would need to
 -- have a variable name at the end.
-data VariableF a = VariableF Identifier a
-  deriving (Show, Functor)
-newtype LHSObject expr a = LHS {unLHS :: Object' VariableF expr a}
+newtype LHSObject expr a = LHS {unLHS :: Object' Empty expr a}
   deriving (Show, Functor)
 ----------------------------------------
 
