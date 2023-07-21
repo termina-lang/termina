@@ -246,8 +246,11 @@ data Object'
     (exprI :: * -> *) -- ^ Types returning identifiers
     (exprE :: * -> *) -- ^ Types returning expressions
     (a :: *)
-  = Variable Identifier a -- ^ Plain identifier |v|
+  = Variable Identifier a
+  -- ^ Plain identifier |v|
   | IdentifierExpression (exprI a) a
+  -- ^ Complex identifier expressions: objects in runtime.
+  -- Added to have something like `return (f().foo + 3)`
   | VectorIndexExpression (Object' exprI exprE a) (exprE a) a
   -- ^ Array indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
@@ -263,9 +266,8 @@ data Object'
 -- regular expressions.
 newtype RHSObject expr a = RHS {unRHS :: Object' expr expr a}
   deriving (Show, Functor)
--- | |LHSObjects| only accepts recursive definitions where identifier
--- expressions are expected, and thus, to solve such recursion we would need to
--- have a variable name at the end.
+-- | |LHSObjects| do not accept |IdentifierExpressions|, and thus, we use the
+-- (polymorphic) empty type |Empty|
 newtype LHSObject expr a = LHS {unLHS :: Object' Empty expr a}
   deriving (Show, Functor)
 ----------------------------------------
