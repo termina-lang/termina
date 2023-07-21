@@ -3,7 +3,8 @@
 module Semantic.Errors where
 
 -- Termina AST
-import AST
+import AST hiding (TypeDef)
+import SemanAST as SAST
 import Semantic.Types
 -- import qualified Parsing as Parser (Annotation)
 
@@ -15,7 +16,7 @@ import           Control.Monad.Except       (MonadError (..))
 data Errors a
   -- | Expected /similar/ types?
   = EMismatch TypeSpecifier TypeSpecifier
-  | EMismatchIdNotEnum Identifier (TypeDef a)
+  | EMismatchIdNotEnum Identifier (SAST.TypeDef a)
   | ECasteable TypeSpecifier TypeSpecifier
   -- | Expected Numeric Types
   | ENumTs [TypeSpecifier]
@@ -55,7 +56,7 @@ data Errors a
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
-  | EMemberAccessUDef (TypeDef a)
+  | EMemberAccessUDef (SAST.TypeDef a)
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some
@@ -64,7 +65,7 @@ data Errors a
   -- | Global Object but not a type
   | EGlobalNoType Identifier
   -- | Vectors with dynamic length
-  | EVectorConst Const
+  | EVectorConst ConstExpression
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -101,6 +102,8 @@ data Errors a
   | EExpectedSimple TypeSpecifier
   -- | Forbidden Reference Type
   | EReferenceTy TypeSpecifier
+  -- | Complex expression on LHS
+  | ELHSComplex
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

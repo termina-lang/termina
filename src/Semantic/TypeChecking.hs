@@ -10,6 +10,7 @@ module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
 import           AST                  as PAST
+import CoreAST
 import           Utils.AST
 import           Utils.TypeSpecifier
 
@@ -32,14 +33,17 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (foldl', sort, sortOn)
+import           Data.List            (find, foldl', sort, sortOn)
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Data.Map             as M
 
 import           Control.Arrow
+import           Control.Monad
 import           Utils.CoreAST        (getObjectAnnotations)
+import AST (TypeSpecifier)
+import Semantic.Monad (getRHSVarTy, getLHSVarTy)
 -- import Parser (Equation(lhs))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
@@ -107,37 +111,60 @@ paramTy ann (p : ps) (a : as) =
 paramTy ann (p : _) [] = throwError $ annotateError ann EFunParams
 paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 
+
+rhsObject
+  :: RHSObject Expression Parser.Annotation
+  -> SemanticMonad (RHSObject SAST.Expression SemanticAnns, TypeSpecifier)
+rhsObject =  (first RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
+
+lhsObject
+  :: LHSObject Expression Parser.Annotation
+  -> SemanticMonad (LHSObject SAST.Expression SemanticAnns, TypeSpecifier)
+lhsObject =  (first LHS <$>) . typeObject getLHSVarTy failing . unLHS
+  where
+    failing ann _ = throwError $ annotateError ann ELHSComplex
+
 objectType
-  :: Object Expression Parser.Annotation
-  -> SemanticMonad (Object SAST.Expression SemanticAnns)
-objectType (Variable ident ann) =
-  SAST.Variable ident . buildExpAnn ann <$> getRHSVarTy pann ident
-objectType (VectorIndexExpression obj idx ann) =
-  objectType obj >>= \(obj_typed , obj_ty) ->
+  :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
+  -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
+  -> Object' exprIdent Expression Parser.Annotation
+  -> SemanticMonad (Object' exprIdentS SAST.Expression SemanticAnns)
+objectType getVarTy _ (Variable ident ann) =
+  Variable ident . buildExpAnn ann <$> getVarTy ann ident
+objectType  _ exprIdent (IdentifierExpression e ann) =
+  exprIdent ann e >>= \(e_typed, e_ty) -> return (IdentifierExpression e_typed (buildExpAnn ann e_ty))
+objectType  getVarTy typeI (VectorIndexExpression obj idx ann) =
+  typeObject getVarTy typeI obj >>= \(obj_typed , obj_ty) ->
   case obj_ty of
     Vector ty_elems _vexp ->
       typeExpression idx >>= \(idx_typed , idx_ty) ->
         if numTy idx_ty
-        then return $ VectorIndexExpression obj_typed idx_typed $ buildExpAnn pann ty_elems
+        then return $ SAST.VectorIndexExpression obj_typed idx_typed $ buildExpAnn ann ty_elems
         else throwError $ annotateError ann (ENumTs [idx_ty])
     ty -> throwError $ annotateError ann (EVector ty)
-objectType (MemberAccess obj ident ann) =
-  objectType obj >>= \(obj_typed , obj_ty) ->
+objectType getVarTy typeI (MemberAccess obj ident ann) =
+  typeObject getVarTy typeI obj  >>= \(obj_typed , obj_ty) ->
   case obj_ty of
     DefinedType dident -> getGlobalTy ann dident >>=
       \case{
-        Enum _identTy variants _mods _ann ->
-            let mvariant = find ((ident ==) . fieldIdentifier) variants in
+        Struct _identTy fields _mods _ann ->
+            let mfield = find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError ann (EMemberAccessNotMember ident))
-              (return . MemberAccess obj_typed ident . buildExpAnn ann) mvariant
+              (return . MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
+              mfield
         ;
-        ty -> throwError $ annotateError ann (EMemberAccessUDef ty)
+        ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap forgetSemAnn ty))
       }
     ty -> throwError $ annotateError ann (EMemberAccess ty)
+
+typeObject
+  :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
+  -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
+  -> Object' exprIdent Expression Parser.Annotation
+  -> SemanticMonad (Object' exprIdentS SAST.Expression SemanticAnns, TypeSpecifier)
+typeObject identTy eidentTy = (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
-    typeObject :: Object Expression Parser.Annotation -> SemanticMonad (Object SAST.Expression SemanticAnns, TypeSpecifier)
-    typeObject = (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType
     getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getObjectAnnotations
 
 -- | Function |expressionType| takes an expression from the parser, traverse it
@@ -176,24 +203,25 @@ expressionType (Casting e nty pann) = do
   type_exp <- getExpType typed_exp
   -- expressionType e >>= getExpType >>= \ety ->
   if casteableTys type_exp nty -- ety \subseteq nty
-  then return (Casting typed_exp nty (buildExpAnn pann nty)) else throwError (annotateError pann $ ECasteable type_exp nty)
+  then return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
+  else throwError (annotateError pann $ ECasteable type_exp nty)
 expressionType (BinOp op le re pann) = do
   -- | Binary operation typings
   tyle <- expressionType le
   tyre <- expressionType re
   type_le <- getExpType tyle
   type_re <- getExpType tyre
-  BinOp op tyle tyre <$> typeOfOps pann op type_le type_re
-expressionType (ReferenceExpression e pann) =
+  SAST.BinOp op tyle tyre <$> typeOfOps pann op type_le type_re
+expressionType (ReferenceExpression rhs_e pann) =
   -- | Reference Expression
   -- TODO [Q15]
-  expressionType e >>= \ety ->
-  ReferenceExpression ety . buildExpAnn pann . Reference <$> getExpType ety
+  rhsObject rhs_e >>= \(obj_typed, obj_type) ->
+  return (SAST.ReferenceExpression obj_typed (buildExpAnn pann (Reference obj_type)))
 -- Function call?
 expressionType (FunctionExpression fun_name args pann) =
   -- | Function Expression.  A tradicional function call
   getFunctionTy pann fun_name >>= \(params, retty) ->
-  flip (FunctionExpression fun_name) (buildExpAnn pann retty) <$> paramTy pann params args
+  flip (SAST.FunctionExpression fun_name) (buildExpAnn pann retty) <$> paramTy pann params args
 expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
   -- | Field Type
   catchError
@@ -201,11 +229,13 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
     (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
   >>= \case{
    Struct _ ty_fs _mods _ann ->
-       flip (FieldValuesAssignmentsExpression id_ty)
+       flip (SAST.FieldValuesAssignmentsExpression id_ty)
             (buildExpAnn pann (DefinedType id_ty))
-       <$> checkFieldValues pann ty_fs fs;
+       <$>
+       checkFieldValues pann ty_fs fs
+       ;
    Union _ ty_fs _mods _ann ->
-       flip (FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
+       flip (SAST.FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
        <$> checkFieldValues pann ty_fs fs;
    x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap location x));
   }
@@ -215,7 +245,7 @@ expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
   (typed_init , type_init) <- typeExpression iexp
   -- Check that the type is correct
   _ <- checkConstant pann const
-  return (VectorInitExpression typed_init kexp (buildExpAnn pann (Vector type_init kexp)))
+  return (SAST.VectorInitExpression typed_init kexp (buildExpAnn pann (Vector type_init kexp)))
 expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
 -- DONE [Q5]
 -- TODO [Q17]
@@ -236,18 +266,18 @@ checkFieldValue
   :: Parser.Annotation
   -> FieldDefinition
   -> FieldValueAssignment Parser.Annotation
-  -> SemanticMonad (FieldValueAssignment SemanticAnns)
+  -> SemanticMonad (SAST.FieldValueAssignment SemanticAnns)
 checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then
-    FieldValueAssignment faid <$> (expressionType faexp >>= mustByTy fty)
+    SAST.FieldValueAssignment faid <$> (expressionType faexp >>= mustByTy fty)
   else throwError $ annotateError loc (EFieldMissing [fid])
 
 checkFieldValues
   :: Parser.Annotation
-  -> [FieldDefinition ]
+  -> [FieldDefinition]
   -> [FieldValueAssignment Parser.Annotation]
-  -> SemanticMonad [FieldValueAssignment SemanticAnns]
+  -> SemanticMonad [SAST.FieldValueAssignment SemanticAnns]
 checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
   where
     tError = throwError . annotateError loc
@@ -260,22 +290,22 @@ checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
     checkSortedFields (d:ds) (a:as) acc =
       checkFieldValue loc d a >>= checkSortedFields ds as . (:acc)
 
-retStmt :: ReturnStmt Parser.Annotation -> SemanticMonad (ReturnStmt SemanticAnns)
-retStmt (ReturnStmt Nothing anns) = return $ ReturnStmt Nothing (buildExpAnn anns Unit)
+retStmt :: ReturnStmt Parser.Annotation -> SemanticMonad (SAST.ReturnStmt SemanticAnns)
+retStmt (ReturnStmt Nothing anns) = return $ SAST.ReturnStmt Nothing (buildExpAnn anns Unit)
 retStmt (ReturnStmt (Just e) anns)
   = typeExpression e >>= \(typed_e, e_type) ->
   -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExpType ety
   return $ ReturnStmt (Just typed_e) (buildExpAnn anns e_type)
 
-retblockType :: BlockRet Parser.Annotation -> SemanticMonad (BlockRet SemanticAnns)
+retblockType :: BlockRet Parser.Annotation -> SemanticMonad (SAST.BlockRet SemanticAnns)
 retblockType (BlockRet bbody rete) = BlockRet <$> blockType bbody <*> retStmt rete
 
-blockType :: Block Parser.Annotation -> SemanticMonad (Block SemanticAnns)
+blockType :: Block Parser.Annotation -> SemanticMonad (SAST.Block SemanticAnns)
 blockType = mapM statementTySimple
 
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.
-statementTySimple :: Statement Parser.Annotation -> SemanticMonad (Statement SemanticAnns)
+statementTySimple :: Statement Parser.Annotation -> SemanticMonad (SAST.Statement SemanticAnns)
 -- Declaration semantic analysis
 statementTySimple (Declaration lhs_id lhs_type expr anns) =
   -- Check type is alright
@@ -286,11 +316,12 @@ statementTySimple (Declaration lhs_id lhs_type expr anns) =
   insertLocalVar anns lhs_id lhs_type >>
   -- Return annotated declaration
   return (Declaration lhs_id lhs_type ety (buildStmtAnn anns))
-statementTySimple (AssignmentStmt lhs_id rhs_expr anns) =
+statementTySimple (AssignmentStmt lhs_o rhs_expr anns) =
 {- TODO Q19 && Q20 -}
-  getLHSVarTy anns lhs_id >>= \lhs_ty ->
-  expressionType rhs_expr >>= mustByTy lhs_ty >>= \ety ->
-  return $ AssignmentStmt lhs_id ety $ buildStmtAnn anns
+  lhsObject lhs_o >>= \(lhs_o_typed, lhs_o_type) ->
+  -- getLHSVarTy anns lhs_id >>= \lhs_ty ->
+  expressionType rhs_expr >>= mustByTy lhs_o_type >>= \ety ->
+  return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
   -- let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   IfElseStmt
@@ -315,7 +346,7 @@ statementTySimple (ForLoopStmt it_id from_expr to_expr mWhile body_stmt ann) = d
       <$> (case mWhile of
                 Nothing -> return Nothing
                 Just whileC -> typeExpression whileC >>= \(typed_whileC , type_whileC) ->
-                    if sameTy Bool type_whileC
+                    if groundTyEq Bool type_whileC
                     then return (Just typed_whileC)
                     else throwError $ annotateError ann (EForWhileTy type_whileC)
           )
@@ -333,7 +364,7 @@ statementTySimple (SingleExpStmt expr anns) =
 
 -- Keeping only type information
 -- TODO Check ident is not defined?
-globalCheck :: Global Parser.Annotation -> SemanticMonad (Global SemanticAnns)
+globalCheck :: Global Parser.Annotation -> SemanticMonad (SAST.Global SemanticAnns)
 globalCheck (Volatile ident ty addr mods anns) =
   checkTypeDefinition anns ty >>
   -- Check TypeSpecifier is correct
@@ -362,7 +393,7 @@ globalCheck (Const ident ty expr mods anns) =
   <*> pure (buildGlobalAnn anns (SConst ty))
 
 -- Here we actually only need Global
-programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (AnnASTElement SemanticAnns)
+programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
 programSeman (Task ident ps ty bret mods anns) =
   checkTypeDefinition anns ty >>
   (Task ident ps ty
@@ -407,7 +438,7 @@ programSeman (GlobalDeclaration gbl) =
 programSeman (TypeDefinition tydef) = _addType
 programSeman (ModuleInclusion ident _mods anns) = undefined
 
-typeExpression :: Expression Locations -> SemanticMonad (Expression SemanticAnns , TypeSpecifier)
+typeExpression :: Expression Locations -> SemanticMonad (SAST.Expression SemanticAnns , TypeSpecifier)
 typeExpression e = expressionType e >>= \typed_e -> (typed_e, ) <$> getExpType typed_e
 
 -- | Function checking that constant expressions are correct.

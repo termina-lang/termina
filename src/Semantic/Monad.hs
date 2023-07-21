@@ -12,7 +12,9 @@ import           Data.Map                   as M
 -- AST Info
 import           AST
 import           SemanAST                   as SAST
-import           Utils.AST
+-- import           Utils.AST
+import           Utils.AST (groundTyEq)
+import           Utils.SemanAST
 
 import qualified Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
@@ -133,7 +135,7 @@ localScope comp = do
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTy :: Locations -> Identifier -> SemanticMonad (TypeDef SemanticAnns)
+getGlobalTy :: Locations -> Identifier -> SemanticMonad (SAST.TypeDef SemanticAnns)
 getGlobalTy loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
@@ -177,7 +179,7 @@ insertLocalVar loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident ty (local s)})
 
-insertGlobalTy :: Locations -> TypeDef SemanticAnns -> SemanticMonad ()
+insertGlobalTy :: Locations -> SAST.TypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
   insertGlobal type_name (GType tydef) (annotateError loc $ EUsedTypeName type_name)
  where
@@ -291,21 +293,21 @@ isDefined ident = get >>= return . (\st ->
 -- Type |Type| helpers!
 -- | Checks if two type are the same numeric type.
 sameNumTy :: TypeSpecifier -> TypeSpecifier -> Bool
-sameNumTy a b = sameTy a b && numTy a
+sameNumTy a b = groundTyEq a b && numTy a
 
 sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad TypeSpecifier
 sameOrErr loc t1 t2 =
-  if sameTy t1 t2
+  if groundTyEq t1 t2
   then return t1
   else throwError $ annotateError loc $ EMismatch t1 t2
 
-mustByTy :: TypeSpecifier -> Expression SemanticAnns -> SemanticMonad (Expression SemanticAnns)
+mustByTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
 mustByTy ty exp = getExpType exp >>= sameOrErr loc ty >> return exp
   where
     ann_exp = getAnnotations exp
     loc = location ann_exp
 
-blockRetTy :: TypeSpecifier -> BlockRet SemanticAnns -> SemanticMonad ()
+blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
 blockRetTy ty (BlockRet bd (ReturnStmt me ann)) =
   maybe (throwError $ annotateError internalErrorSeman EUnboxingBlockRet)(void . sameOrErr (location ann) ty) (getTySpec $ ty_ann ann)
 
@@ -313,12 +315,17 @@ getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
+-- Helper function failing if a given |TypeSpecifier| is not *simple* |simpleType|.
+simpleTyorFail :: Locations -> TypeSpecifier -> SemanticMonad ()
+simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
+
 -- | Function checking that a TypeSpecifier is well-defined.
 -- This is not the same as defining a type, but it is similar.
 -- Some types can be found in the wild, but user defined types are just check
 -- they exist (they were defined preivously).
 -- Note that we do not change the |TypeSpecifier| in any way, that's why this
 -- function return |()|.
+
 checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
@@ -329,7 +336,7 @@ checkTypeDefinition loc (Vector ty c)         =
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
   -- Numeric contast
-  unless (numConstExpression c) (throwError (annotateError loc (EVectorConst c)))
+  unless (numConstExpression c) (throwError (annotateError loc (EVectorConst c))) >>
   --
   checkTypeDefinition loc ty
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
@@ -356,8 +363,7 @@ checkTypeDefinition _ Int64                   = return ()
 checkTypeDefinition _ Char                    = return ()
 checkTypeDefinition _ Bool                    = return ()
 checkTypeDefinition _ Unit                    = return ()
-  where
-    simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
+
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return

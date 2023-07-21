@@ -5,6 +5,7 @@ module Semantic.Types where
 
 import           AST
 import           Utils.AST
+import SemanAST as SAST
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -50,7 +51,7 @@ data GEntry a
   -- ^ Handlers
   | GGlob SemGlobal
   -- ^ Globals
-  | GType (TypeDef a)
+  | GType (SAST.TypeDef a)
   -- ^ Types
   deriving (Functor,Show)
 

@@ -29,7 +29,7 @@ groundTyEq  _ _ = False
 
 -- | First annotation level.
 getAnnotations :: Expression a -> a
-getAnnotations (Object obj)                             = getObjectAnnotations obj
+getAnnotations (AccessObject (RHS obj))                 = getObjectAnnotations obj
 getAnnotations (Constant _ a)                           = a
 getAnnotations (BinOp _ _ _ a)                          = a
 getAnnotations (ReferenceExpression _ a)                = a
@@ -37,7 +37,6 @@ getAnnotations (Casting _ _ a)                          = a
 getAnnotations (FunctionExpression _ _ a)               = a
 getAnnotations (FieldValuesAssignmentsExpression _ _ a) = a
 getAnnotations (EnumVariantExpression _ _ _ a)          = a
-getAnnotations (VectorIndexExpression _ _ a)            = a
 getAnnotations (VectorInitExpression _ _ a)             = a
 
 getAnnotationGlobal :: Global a -> a

@@ -48,7 +48,7 @@ numTy Int32  = True
 numTy Int64  = True
 numTy _      = False
 
-numCons :: Cons -> Bool
+numCons :: Const -> Bool
 numCons (I _ _) = True
 numCons _ = False
 
@@ -67,7 +67,7 @@ memberIntCons i Int32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
 memberIntCons i Int64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
 memberIntCons _ _      = False
 
-identifierType :: TypeDef a -> Identifier
+identifierType :: TypeDef' expr a -> Identifier
 identifierType (Struct ident _ _ _) = ident
 identifierType (Union ident _ _ _)  = ident
 identifierType (Enum ident _ _ _)   = ident
