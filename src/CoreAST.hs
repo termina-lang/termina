@@ -265,8 +265,10 @@ data Object'
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
   | MemberAccess (Object' exprI exprE a) Identifier a
-  -- ^ Data structure access | eI.name |, same as before |ei :: exprI a| is an
+  -- ^ Data structure/Class access | eI.name |, same as before |ei :: exprI a| is an
   -- expression identifier.
+  | MemberMethodAccess (Object' exprI exprE a) Identifier [exprE a] a
+  -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
   | Dereference (Object' exprI exprE a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
   deriving (Show, Functor)
