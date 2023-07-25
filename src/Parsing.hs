@@ -1,3 +1,4 @@
+{-# Language TupleSections #-}
 -- | Module dedicated to Parsing
 
 module Parsing where
@@ -55,6 +56,8 @@ lexer = Tok.makeTokenParser langDef
       ["true","false"]
       ++ -- Modules
       ["mod"]
+      ++ -- Class methods
+      ["self"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
@@ -642,9 +645,10 @@ globalDeclParser = do
   return $ GlobalDeclaration g
 
 typeDefintionParser :: Parser (AnnASTElement  Annotation)
-typeDefintionParser = do
-  d <- structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser
-  return $ TypeDefinition d
+typeDefintionParser = flip TypeDefinition
+  -- First we get the position, at the beginning of the definition
+  <$> (Position <$> getPosition)
+  <*> (structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser)
 
 fieldDefinitionParser :: Parser FieldDefinition
 fieldDefinitionParser = do
@@ -657,55 +661,65 @@ fieldDefinitionParser = do
 structDefinitionParser :: Parser (TypeDef Annotation)
 structDefinitionParser = do
   modifiers <- many modifierParser
-  p <- getPosition
+  -- p <- getPosition
   reserved "struct"
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ Struct identifier fields modifiers (Position p)
+  return $ Struct identifier fields modifiers -- (Position p)
 
 unionDefinitionParser :: Parser (TypeDef Annotation)
 unionDefinitionParser = do
   modifiers <- many modifierParser
-  p <- getPosition
+  -- p <- getPosition
   reserved "union"
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ Union identifier fields modifiers (Position p)
+  return $ Union identifier fields modifiers -- (Position p)
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
   identifier <- identifierParser
+  p <- getPosition
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  return $ ClassField identifier typeSpecifier
+  return $ ClassField identifier typeSpecifier (Position p)
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
   p <- getPosition
   reserved "fn"
   name <- identifierParser
-  params <- parens (sepBy parameterParser comma)
-  typeSpec <- optionMaybe (do
-    reservedOp "->"
-    typeSpecifierParser)
+  (self, params) <- parens (withSelf <|> withOutSelf)
+  -- All methods are procedure.
+  -- typeSpec <- optionMaybe (do
+  --   reservedOp "->"
+  --   typeSpecifierParser)
   reservedOp "{"
   body <- many blockItemParser
   ret <- returnStmtParser
   reservedOp "}"
-  return $ ClassMethod name params typeSpec (BlockRet body ret) (Position p)
+  return $ ClassMethod name params self (BlockRet body ret) (Position p)
+  where
+    withSelf :: Parser (SelfMethod, [Parameter])
+    withSelf =
+      reserved "self" >> comma >> sepBy parameterParser comma >>= return .(Self,)
+    withOutSelf :: Parser (SelfMethod, [Parameter])
+    withOutSelf = (NoSelf,) <$> sepBy parameterParser comma
+
+
 
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
   modifiers <- many modifierParser
-  p <- getPosition
+  -- p <- getPosition
   reserved "class"
   identifier <- identifierParser
   fields <- braces (many1 $ try classFieldDefinitionParser <|> classMethodParser)
   _ <- semi
-  return $ Class identifier fields modifiers (Position p)
+  return $ Class identifier fields modifiers
 
 variantDefinitionParser :: Parser EnumVariant
 variantDefinitionParser = identifierParser >>= \identifier ->
@@ -715,12 +729,11 @@ variantDefinitionParser = identifierParser >>= \identifier ->
 enumDefinitionParser :: Parser (TypeDef Annotation)
 enumDefinitionParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "enum"
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
   _ <- semi
-  return $ Enum identifier variants modifiers (Position p)
+  return $ Enum identifier variants modifiers
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)

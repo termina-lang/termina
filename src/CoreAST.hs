@@ -62,6 +62,7 @@ data AnnASTElement' expr a =
   -- | Type definition constructor
   | TypeDefinition
     (TypeDef' expr a) -- ^ the type definition (struct, union, etc.)
+    a
 
   -- | Module inclusion constructor
   | ModuleInclusion
@@ -180,19 +181,22 @@ data Global' expr a
 
   deriving (Show, Functor)
 
-data TypeDef' (expr :: * -> *) (a :: *)
-  = Struct Identifier [FieldDefinition]  [ Modifier ] a
-  | Union Identifier [FieldDefinition] [ Modifier ] a
-  | Enum Identifier [EnumVariant] [ Modifier ] a
-  | Class Identifier [ClassMember' expr a] [ Modifier ] a
+-- Extremelly internal type definition
+data TypeDef'' (member :: *)
+  = Struct Identifier [FieldDefinition]  [ Modifier ]
+  | Union Identifier [FieldDefinition] [ Modifier ]
+  | Enum Identifier [EnumVariant] [ Modifier ]
+  | Class Identifier [member] [ Modifier ]
   deriving (Show, Functor)
 
+-- Type Defs are the above when composed with Class members.
+type TypeDef' expr a = TypeDef'' (ClassMember' expr a)
 -------------------------------------------------
 -- Class Member
 data ClassMember' expr a
-  -- ^ Either a Field, basically a variable of the class
-  = ClassField Identifier TypeSpecifier
-  -- ^ Or a method. Methods come in two flavours whether they use themselves
+  -- | Either a Field, basically a variable of the class
+  = ClassField Identifier TypeSpecifier a
+  -- | Or a method. Methods come in two flavours whedata TypeDef' (expr :: * -> *) (a :: *)ther they use themselves
   -- through variable |self| (needed to invoke another method of the same class)
   -- Or not.
   | ClassMethod Identifier [Parameter] SelfMethod (BlockRet' expr a) a

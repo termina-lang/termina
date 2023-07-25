@@ -25,12 +25,12 @@ primitiveTypes  _              = False
 -- Also at dynamic object and function returned values.
 -- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
 simpleType :: TypeSpecifier -> Bool
-simpleType Unit = False
+simpleType Unit                = False
 simpleType (DynamicSubtype {}) = False
-simpleType (MsgQueue {}) = False
-simpleType (Pool {}) = False
-simpleType (Reference {}) = False
-simpleType _ = True
+simpleType (MsgQueue {})       = False
+simpleType (Pool {})           = False
+simpleType (Reference {})      = False
+simpleType _                   = True
 
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True
@@ -50,11 +50,11 @@ numTy _      = False
 
 numCons :: Const -> Bool
 numCons (I _ _) = True
-numCons _ = False
+numCons _       = False
 
 numConstExpression :: ConstExpression -> Bool
 numConstExpression (KC c) = numCons c
-numConstExpression _ = error "TODO this is a bit weird."
+numConstExpression _      = error "TODO this is a bit weird."
 
 memberIntCons :: Integer -> TypeSpecifier -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
@@ -68,12 +68,12 @@ memberIntCons i Int64  = ( -9223372036854775808 <= i ) && ( i <= 922337203685477
 memberIntCons _ _      = False
 
 identifierType :: TypeDef' expr a -> Identifier
-identifierType (Struct ident _ _ _) = ident
-identifierType (Union ident _ _ _)  = ident
-identifierType (Enum ident _ _ _)   = ident
-identifierType (Class ident _ _ _)  = ident
+identifierType (Struct ident _ _) = ident
+identifierType (Union ident _ _)  = ident
+identifierType (Enum ident _ _)   = ident
+identifierType (Class ident _ _)  = ident
 
 referenceType :: TypeSpecifier -> Bool
-referenceType Unit = False
+referenceType Unit           = False
 referenceType (Reference {}) = False
-referenceType _ = True
+referenceType _              = True

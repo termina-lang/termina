@@ -45,7 +45,7 @@ type AnnASTElement = AnnASTElement' Expression
 type FieldValueAssignment = FieldValueAssignment' Expression
 type Global = Global' Expression
 
-type TypeDef = TypeDef' Expression
+type TypeDef a = TypeDef' Expression a
 
 type ClassMember = ClassMember' Expression
 
