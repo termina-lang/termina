@@ -187,12 +187,21 @@ data TypeDef' (expr :: * -> *) (a :: *)
   | Class Identifier [ClassMember' expr a] [ Modifier ] a
   deriving (Show, Functor)
 
--- instance Functor (TypeDef' expr) where
-
+-------------------------------------------------
+-- Class Member
 data ClassMember' expr a
+  -- ^ Either a Field, basically a variable of the class
   = ClassField Identifier TypeSpecifier
-  | ClassMethod Identifier [Parameter] (Maybe TypeSpecifier) (BlockRet' expr a) a
+  -- ^ Or a method. Methods come in two flavours whether they use themselves
+  -- through variable |self| (needed to invoke another method of the same class)
+  -- Or not.
+  | ClassMethod Identifier [Parameter] SelfMethod (BlockRet' expr a) a
   deriving (Show, Functor)
+
+data SelfMethod = Self | NoSelf
+  deriving Show
+
+-------------------------------------------------
 
 ----------------------------------------
 
