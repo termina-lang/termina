@@ -33,7 +33,7 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (find, foldl', sort, sortOn)
+import           Data.List            (find, foldl', sort, sortOn, nub, (\\),map)
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -147,14 +147,14 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
   case obj_ty of
     DefinedType dident -> getGlobalTy ann dident >>=
       \case{
-        Struct _identTy fields _mods _ann ->
+        Struct _identTy fields _mods ->
             let mfield = find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError ann (EMemberAccessNotMember ident))
               (return . MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
               mfield
         ;
-        ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap forgetSemAnn ty))
+        ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
       }
     ty -> throwError $ annotateError ann (EMemberAccess ty)
 
@@ -228,16 +228,16 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
     (getGlobalTy pann id_ty )
     (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
   >>= \case{
-   Struct _ ty_fs _mods _ann ->
+   Struct _ ty_fs _mods  ->
        flip (SAST.FieldValuesAssignmentsExpression id_ty)
             (buildExpAnn pann (DefinedType id_ty))
        <$>
        checkFieldValues pann ty_fs fs
        ;
-   Union _ ty_fs _mods _ann ->
+   Union _ ty_fs _mods ->
        flip (SAST.FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
        <$> checkFieldValues pann ty_fs fs;
-   x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap location x));
+   x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap (fmap forgetSemAnn) x));
   }
 -- IDEA Q4
 expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
@@ -435,7 +435,7 @@ programSeman (Handler ident ps ty bret mods anns) =
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> globalCheck gbl
-programSeman (TypeDefinition tydef) = _addType
+programSeman (TypeDefinition tydef ann) = _addType
 programSeman (ModuleInclusion ident _mods anns) = undefined
 
 typeExpression :: Expression Locations -> SemanticMonad (SAST.Expression SemanticAnns , TypeSpecifier)
@@ -459,8 +459,40 @@ checkIntConstant loc tyI i =
   else throwError $ annotateError loc (EConstantOutRange (I tyI i))
 
 -- Type definition
-typeDefCheck :: TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
-typeDefCheck (Struct ident fs mds ann) = _StructDef
-typeDefCheck (Union ident fs mds ann)  = _Union
-typeDefCheck (Enum ident evs mds ann)  = _Enum
-typeDefCheck (Class ident cls mds ann) = _Class
+typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
+-- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
+typeDefCheck ann (Struct ident fs mds)
+  -- Check every type is well-defined
+  = mapM_ (fieldDefinitionTy ann) fs
+  -- TODO mods?
+  -- Check names are unique
+  >> checkUniqueNames ann (Data.List.map fieldIdentifier fs)
+  >> return (Struct ident fs mds)
+typeDefCheck ann (Union ident fs mds )  = _Union
+typeDefCheck ann (Enum ident evs mds )  = _Enum
+typeDefCheck ann (Class ident cls mds) = _Class
+
+----------------------------------------
+-- Field definition helpers.
+fieldDefinitionTy :: Locations -> FieldDefinition -> SemanticMonad ()
+fieldDefinitionTy ann f
+  -- First we check its type is well-defined
+  = checkTypeDefinition ann tyFD
+  -- and that it is simply (see simple types).
+  >> simpleTyorFail ann tyFD
+  -- we just return it.
+  where
+    tyFD = fieldTypeSpecifier f
+----------------------------------------
+checkUniqueNames :: Locations -> [Identifier] -> SemanticMonad ()
+checkUniqueNames ann is =
+  if allUnique is then return () else throwError $ annotateError ann (EStructDefNotUniqueField (repeated is))
+
+-----------------------------------------
+-- TODO Improve this two functions.
+-- nub is O(n^2)
+allUnique :: Eq a => [a] -> Bool
+allUnique xs = nub xs == xs
+repeated :: Eq a => [a] -> [a]
+repeated xs = nub $ xs Data.List.\\ nub xs
+-----------------------------------------

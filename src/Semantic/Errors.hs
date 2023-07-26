@@ -3,7 +3,7 @@
 module Semantic.Errors where
 
 -- Termina AST
-import AST hiding (TypeDef)
+import AST
 import SemanAST as SAST
 import Semantic.Types
 -- import qualified Parsing as Parser (Annotation)
@@ -46,7 +46,7 @@ data Errors a
   -- Not struct type found with identifier
   | ETyNotStructFound Identifier
   -- Something was found but it is not an identifier
-  | ETyNotStruct Identifier (TypeDef a)
+  | ETyNotStruct Identifier (SAST.TypeDef a)
   -- | Record missing fields
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -104,6 +104,8 @@ data Errors a
   | EReferenceTy TypeSpecifier
   -- | Complex expression on LHS
   | ELHSComplex
+  -- | Struct Definition
+  | EStructDefNotUniqueField [Identifier]
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

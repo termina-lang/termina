@@ -61,6 +61,9 @@ buildGlobalAnn loc = SemAnn loc . GTy . GGlob
 buildGlobal :: Locations -> GEntry SemanticAnns -> SAnns SemanticElems
 buildGlobal loc = SemAnn loc . GTy
 
+buildGlobalTy :: Locations -> SAST.TypeDef SemanticAnns -> SAnns SemanticElems
+buildGlobalTy loc = SemAnn loc . GTy . GType
+
 buildStmtAnn :: Locations -> SAnns SemanticElems
 buildStmtAnn = flip SemAnn STy
 
@@ -149,8 +152,8 @@ getGlobalTy loc tid  = gets global >>=
 -- | From a global name get enum variations
 getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
 getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
-  Enum _ fs _mods _anns -> return fs
-  ty                    -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap location ty)
+  Enum _ fs _mods -> return fs
+  ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap (fmap forgetSemAnn) ty)
 
 getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier)
 getFunctionTy loc iden =
