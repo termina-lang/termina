@@ -18,22 +18,22 @@ data ReturnStmt' expr a
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-data BlockRet' expr a
+data BlockRet' expr lho a
   = BlockRet
   {
-    blockBody :: [Statement' expr a]
+    blockBody :: [Statement' expr lho a]
   , blockRet  :: ReturnStmt' expr a
   }
   deriving (Show, Functor)
 
 -- | Annotated AST element
-data AnnASTElement' expr a =
+data AnnASTElement' expr lho a =
   -- | Task construtor
   Task
     Identifier -- ^ task identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     TypeSpecifier -- ^ returned value type (should be TaskRet)
-    (BlockRet' expr a) -- ^ statements block
+    (BlockRet' expr lho a) -- ^ statements block
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -42,7 +42,7 @@ data AnnASTElement' expr a =
     Identifier -- ^ function identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-    (BlockRet' expr a) -- ^ statements block (with return)
+    (BlockRet' expr lho a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -51,7 +51,7 @@ data AnnASTElement' expr a =
     Identifier -- ^ Handler identifier (name)
     [Parameter] -- ^ list of parameters (TBC)
     TypeSpecifier -- ^ returned value type (should be Result)
-    (BlockRet' expr a) -- ^ statements block (with return)
+    (BlockRet' expr lho a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -61,7 +61,7 @@ data AnnASTElement' expr a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' expr a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' expr lho a) -- ^ the type definition (struct, union, etc.)
     a
 
   -- | Module inclusion constructor
@@ -190,16 +190,16 @@ data TypeDef'' (member :: *)
   deriving (Show, Functor)
 
 -- Type Defs are the above when composed with Class members.
-type TypeDef' expr a = TypeDef'' (ClassMember' expr a)
+type TypeDef' expr lho a = TypeDef'' (ClassMember' expr lho a)
 -------------------------------------------------
 -- Class Member
-data ClassMember' expr a
+data ClassMember' expr lho a
   -- | Either a Field, basically a variable of the class
   = ClassField Identifier TypeSpecifier a
   -- | Or a method. Methods come in two flavours whedata TypeDef' (expr :: * -> *) (a :: *)ther they use themselves
   -- through variable |self| (needed to invoke another method of the same class)
   -- Or not.
-  | ClassMethod Identifier [Parameter] SelfMethod (BlockRet' expr a) a
+  | ClassMethod Identifier [Parameter] SelfMethod (BlockRet' expr lho a) a
   deriving (Show, Functor)
 
 data SelfMethod = Self | NoSelf
@@ -237,57 +237,50 @@ data EnumVariant = EnumVariant {
   , assocData       :: [ TypeSpecifier ]
 } deriving (Show)
 
-data MatchCase' expr a = MatchCase
+data MatchCase' expr lho a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars :: [Identifier]
-  , matchBody :: Block' expr a
+  , matchBody :: Block' expr lho a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
-data ElseIf' expr a = ElseIf
+data ElseIf' expr lho a = ElseIf
   {
     elseIfCond :: expr a
-  , elseIfBody :: Block' expr a
+  , elseIfBody :: Block' expr lho a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
-----------------------------------------
--- | Assignable and /accessable/ values. LHS, referencable and accessable.
--- |Object'| should not be invoked directly.
-data Object'
-    (exprI :: * -> *) -- ^ Types returning identifiers
-    (exprE :: * -> *) -- ^ Types returning expressions
-    (a :: *)
-  = Variable Identifier a
-  -- ^ Plain identifier |v|
-  | IdentifierExpression (exprI a) a
-  -- ^ Complex identifier expressions: objects in runtime.
-  -- Added to have something like `return (f().foo + 3)`
-  | VectorIndexExpression (Object' exprI exprE a) (exprE a) a
-  -- ^ Array indexing | eI [ eIx ]|,
-  -- value |eI :: exprI a| is an identifier expression, could be a name or a
-  -- function call (depending on what |exprI| is)
-  | MemberAccess (Object' exprI exprE a) Identifier a
-  -- ^ Data structure/Class access | eI.name |, same as before |ei :: exprI a| is an
-  -- expression identifier.
-  | MemberMethodAccess (Object' exprI exprE a) Identifier [exprE a] a
-  -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | Dereference (Object' exprI exprE a) a
-  -- ^ Dereference | *eI |, |eI| is an identifier expression.
+
+  -- | First AST after parsing
+data Expression' rho a
+  = AccessObject (rho a)
+  | Constant Const a -- ^ | 24 : i8|
+  | ParensExpression (Expression' rho a) a
+  | BinOp Op (Expression' rho a) (Expression' rho a) a
+  | ReferenceExpression (rho a) a
+  | DereferenceExpression (Expression' rho a) a
+  | Casting (Expression' rho a) TypeSpecifier a
+  | FunctionExpression Identifier [ Expression' rho a ] a
+  -- FunctionExpression (FuncName a) [ Expression a ] a
+  -- These four constructors cannot be used on regular (primitive?) expressions
+  -- These two can only be used as the RHS of an assignment:
+  | VectorInitExpression (Expression' rho a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
+  | FieldValuesAssignmentsExpression
+    Identifier -- ^ Structure type identifier
+    [FieldValueAssignment' (Expression' rho) a] -- ^ Initial value of each field identifier
+    a
+  -- These two can only be used as the RHS of an assignment or as a case of a match expression:
+  | EnumVariantExpression
+    Identifier -- ^ Enum identifier
+    Identifier -- ^ Variant identifier
+    [ Expression' rho a ] -- ^ list of expressions
+    a
+  | OptionVariantExpression (OptionVariant (Expression' rho a)) a
   deriving (Show, Functor)
 
--- | |RHSObjects| do not make a difference between identifier expressions and
--- regular expressions.
-newtype RHSObject expr a = RHS {unRHS :: Object' expr expr a}
-  deriving (Show, Functor)
--- | |LHSObjects| do not accept |IdentifierExpressions|, and thus, we use the
--- (polymorphic) empty type |Empty|
-newtype LHSObject expr a = LHS {unLHS :: Object' Empty expr a}
-  deriving (Show, Functor)
-----------------------------------------
-
-data Statement' expr a =
+data Statement' expr lho a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
@@ -295,14 +288,14 @@ data Statement' expr a =
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (LHSObject expr a) -- ^ name of the variable
+    (lho a) -- ^ name of the variable
     (expr a) -- ^ assignment expression
     a
   | IfElseStmt
     (expr a) -- ^ conditional expression
-    [ Statement' expr a ] -- ^ statements in the if block
-    [ ElseIf' expr a ] -- ^ list of else if blocks
-    [ Statement' expr a ] -- ^ statements in the else block
+    [ Statement' expr lho a ] -- ^ statements in the if block
+    [ ElseIf' expr lho a ] -- ^ list of else if blocks
+    [ Statement' expr lho a ] -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
@@ -310,11 +303,11 @@ data Statement' expr a =
     (expr a) -- ^ initial value of the iterator
     (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)
-    [ Statement' expr a ] -- ^ statements in the for loop
+    [ Statement' expr lho a ] -- ^ statements in the for loop
     a
   | MatchStmt
     (expr a) -- ^ expression to match
-    [ MatchCase' expr a ] -- ^ list of match cases
+    [ MatchCase' expr lho a ] -- ^ list of match cases
     a
   | SingleExpStmt
     (expr a) -- ^ expression
@@ -328,8 +321,8 @@ data Statement' expr a =
 data Const = B Bool | I TypeSpecifier Integer | C Char
   deriving (Show)
 
-type AnnotatedProgram' expr a = [AnnASTElement' expr a]
-type Block' expr a = [Statement' expr a]
+type AnnotatedProgram' expr lho a = [AnnASTElement' expr lho a]
+type Block' expr lho a = [Statement' expr lho a]
 
 -- When annotations are just `()` we get a normal ASTs and Programs
 -- type AST = AnnASTElement : ()

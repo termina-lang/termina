@@ -41,7 +41,7 @@ import           Data.Map             as M
 
 import           Control.Arrow
 import           Control.Monad
-import           Utils.CoreAST        (getObjectAnnotations)
+import           Utils.SemanAST        (getObjectAnnotations)
 import AST (TypeSpecifier)
 import Semantic.Monad (getRHSVarTy, getLHSVarTy)
 -- import Parser (Equation(lhs))
@@ -113,26 +113,26 @@ paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 
 
 rhsObject
-  :: RHSObject Expression Parser.Annotation
-  -> SemanticMonad (RHSObject SAST.Expression SemanticAnns, TypeSpecifier)
-rhsObject =  (first RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
+  :: RHSObject Parser.Annotation
+  -> SemanticMonad (SAST.RHSObject SemanticAnns, TypeSpecifier)
+rhsObject =  (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
 
 lhsObject
-  :: LHSObject Expression Parser.Annotation
-  -> SemanticMonad (LHSObject SAST.Expression SemanticAnns, TypeSpecifier)
-lhsObject =  (first LHS <$>) . typeObject getLHSVarTy failing . unLHS
+  :: LHSObject Parser.Annotation
+  -> SemanticMonad (SAST.LHSObject SemanticAnns, TypeSpecifier)
+lhsObject =  (first SAST.LHS <$>) . typeObject getLHSVarTy failing . unLHS
   where
     failing ann _ = throwError $ annotateError ann ELHSComplex
 
 objectType
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
   -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
-  -> Object' exprIdent Expression Parser.Annotation
-  -> SemanticMonad (Object' exprIdentS SAST.Expression SemanticAnns)
+  -> Object' exprIdent Parser.Annotation
+  -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns)
 objectType getVarTy _ (Variable ident ann) =
-  Variable ident . buildExpAnn ann <$> getVarTy ann ident
+  SAST.Variable ident . buildExpAnn ann <$> getVarTy ann ident
 objectType  _ exprIdent (IdentifierExpression e ann) =
-  exprIdent ann e >>= \(e_typed, e_ty) -> return (IdentifierExpression e_typed (buildExpAnn ann e_ty))
+  exprIdent ann e >>= \(e_typed, e_ty) -> return (SAST.IdentifierExpression e_typed (buildExpAnn ann e_ty))
 objectType  getVarTy typeI (VectorIndexExpression obj idx ann) =
   typeObject getVarTy typeI obj >>= \(obj_typed , obj_ty) ->
   case obj_ty of
@@ -151,7 +151,7 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
             let mfield = find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError ann (EMemberAccessNotMember ident))
-              (return . MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
+              (return . SAST.MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
               mfield
         ;
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
@@ -161,11 +161,11 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
 typeObject
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
   -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
-  -> Object' exprIdent Expression Parser.Annotation
-  -> SemanticMonad (Object' exprIdentS SAST.Expression SemanticAnns, TypeSpecifier)
+  -> Object' exprIdent Parser.Annotation
+  -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns, TypeSpecifier)
 typeObject identTy eidentTy = (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
-    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getObjectAnnotations
+    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . Utils.SemanAST.getObjectAnnotations
 
 -- | Function |expressionType| takes an expression from the parser, traverse it
 -- annotating each node with its type.

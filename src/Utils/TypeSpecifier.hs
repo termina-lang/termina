@@ -67,7 +67,7 @@ memberIntCons i Int32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
 memberIntCons i Int64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
 memberIntCons _ _      = False
 
-identifierType :: TypeDef' expr a -> Identifier
+identifierType :: TypeDef' expr lho a -> Identifier
 identifierType (Struct ident _ _) = ident
 identifierType (Union ident _ _)  = ident
 identifierType (Enum ident _ _)   = ident
