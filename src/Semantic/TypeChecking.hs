@@ -13,6 +13,7 @@ import           AST                  as PAST
 import           CoreAST
 import           Utils.AST
 import           Utils.TypeSpecifier
+import Utils.SemanAST
 
 -- Termina Semantic AST
 import qualified SemanAST             as SAST
@@ -40,13 +41,8 @@ import           Data.Maybe
 -- import Control.Monad.State as ST
 import           Data.Map             as M
 
-import           AST                  (TypeSpecifier)
 import           Control.Arrow
 import           Control.Monad
-import           Utils.SemanAST       (getObjectAnnotations)
-import           Semantic.Monad       (getLHSVarTy, getRHSVarTy)
-import           Utils.CoreAST        (getObjectAnnotations)
--- import Parser (Equation(lhs))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -165,7 +161,8 @@ typeObject
   -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
   -> Object' exprIdent Parser.Annotation
   -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns, TypeSpecifier)
-typeObject identTy eidentTy = (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
+typeObject identTy eidentTy =
+  (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
     getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . Utils.SemanAST.getObjectAnnotations
 
