@@ -345,7 +345,7 @@ parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position 
 emptyParser :: Parser (Empty a)
 emptyParser = fail "Parsing Emtpy elements. Complex Experssions on RHS??"
 
-memberAccessParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+memberAccessParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
 memberAccessParser identifierObjectParser = do
   p <- getPosition
   object <- objectParser identifierObjectParser
@@ -353,32 +353,32 @@ memberAccessParser identifierObjectParser = do
   m <- identifierParser
   return $ MemberAccess object m (Position p)
 
-memberAccessParserRHS :: Parser (RHSObject Expression Annotation)
+memberAccessParserRHS :: Parser (RHSObject Annotation)
 memberAccessParserRHS = RHS <$> memberAccessParser expressionParser
 
-vectorIndexParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+vectorIndexParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
 vectorIndexParser identifierExpressionParser = do
   p <- getPosition
   object <- objectParser identifierExpressionParser
   index <- brackets expressionParser
   return $ VectorIndexExpression object index (Position p)
 
-vectorIndexParserRHS :: Parser (RHSObject Expression Annotation)
+vectorIndexParserRHS :: Parser (RHSObject Annotation)
 vectorIndexParserRHS = RHS <$> vectorIndexParser expressionParser
 
-dereferenceParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+dereferenceParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
 dereferenceParser identifierExpressionParser = do
   p <- getPosition
   _ <- reservedOp "*"
   object <- objectParser identifierExpressionParser
   return $ Dereference object (Position p)
 
-dereferenceParserRHS :: Parser (RHSObject Expression Annotation)
+dereferenceParserRHS :: Parser (RHSObject Annotation)
 dereferenceParserRHS = RHS <$> dereferenceParser expressionParser
 
 -- | This parser is only used to parse object expressions that are used 
 -- as the left hand side of an assignment expression.
-objectParser :: Parser (exprI Annotation) -> Parser (Object' exprI Expression Annotation)
+objectParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
 objectParser expressionIdentifierParser
   = try (memberAccessParser expressionIdentifierParser)
   <|> try (vectorIndexParser expressionIdentifierParser)
@@ -390,18 +390,18 @@ objectParser expressionIdentifierParser
   <|> IdentifierExpression <$> expressionIdentifierParser <*> (Position <$> getPosition)
 
 -- Plain variable names belong to whatever |exprI| we want.
-variableParser :: Parser (Object' exprI Expression Annotation)
+variableParser :: Parser (Object' exprI Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
 
-variableParserRHS :: Parser (RHSObject Expression Annotation)
+variableParserRHS :: Parser (RHSObject Annotation)
 variableParserRHS = RHS <$> variableParser
 
 -- | LHS objects cannot have identifier expressions and we note that using
 -- the |Empty| type and its parser |emptyParser|.
-objectParserLHS :: Parser (LHSObject Expression Annotation)
+objectParserLHS :: Parser (LHSObject Annotation)
 objectParserLHS = LHS <$> objectParser emptyParser
 
-objectParserRHS :: Parser (RHSObject Expression Annotation)
+objectParserRHS :: Parser (RHSObject Annotation)
 objectParserRHS = RHS <$> objectParser expressionParser
 ----------------------------------------
 

@@ -106,6 +106,10 @@ data Errors a
   | ELHSComplex
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
+  | EStructDefEmptyStruct Identifier
+  -- | Union Definition
+  | EUnionDefEmptyUnion Identifier
+  | EUnionDefNotUniqueField [Identifier]
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
