@@ -27,6 +27,13 @@ groundTyEq  _ _ = False
 -- forgetAnnotations :: AnnotatedProgram a -> Program
 -- forgetAnnotations = map (fmap (const ()))
 
+getObjectAnnotations :: Object' exprI a -> a
+getObjectAnnotations (Variable _ a)                = a
+getObjectAnnotations (IdentifierExpression _ a)    = a
+getObjectAnnotations (VectorIndexExpression _ _ a) = a
+getObjectAnnotations (MemberAccess _ _ a)          = a
+getObjectAnnotations (Dereference _ a)             = a
+
 -- | First annotation level.
 getAnnotations :: Expression a -> a
 getAnnotations (AccessObject (RHS obj))                 = getObjectAnnotations obj

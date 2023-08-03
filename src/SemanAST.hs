@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE KindSignatures #-}
 
 module SemanAST
   ( module SemanAST
@@ -7,39 +8,57 @@ module SemanAST
 
 import CoreAST
 
--- | Expression here is same as AST plus |Undyn|
-data Expression a
-  = AccessObject (RHSObject Expression a)
-  | Constant Const a
-  | ParensExpression (Expression a) a
-  | BinOp Op (Expression a) (Expression a) a
-  | ReferenceExpression (RHSObject Expression a) a
-  | DereferenceExpression (Expression a) a
-  | Casting (Expression a) TypeSpecifier a
-  | FunctionExpression  Identifier [ Expression a ] a
-  | VectorInitExpression (Expression a) ConstExpression a -- ^ Vector initializer
-  | FieldValuesAssignmentsExpression Identifier [FieldValueAssignment' Expression a] a
-  | EnumVariantExpression Identifier Identifier [ Expression a ] a
-  | OptionVariantExpression (OptionVariant (Expression a)) a
-  -------
-  -- Added new implicit (from the user pov) constructor.
-  | Undyn (Expression a) a
+----------------------------------------
+-- | Assignable and /accessable/ values. LHS, referencable and accessable.
+-- |Object'| should not be invoked directly.
+data Object'
+    (exprI :: * -> *) -- ^ Types returning identifiers
+    (a :: *)
+  = Variable Identifier a
+  -- ^ Plain identifier |v|
+  | IdentifierExpression (exprI a) a
+  -- ^ Complex identifier expressions: objects in runtime.
+  -- Added to have something like `return (f().foo + 3)`
+  | VectorIndexExpression (Object' exprI a) (Expression a) a
+  -- ^ Array indexing | eI [ eIx ]|,
+  -- value |eI :: exprI a| is an identifier expression, could be a name or a
+  -- function call (depending on what |exprI| is)
+  | MemberAccess (Object' exprI a) Identifier a
+  -- ^ Data structure/Class access | eI.name |, same as before |ei :: exprI a| is an
+  -- expression identifier.
+  | MemberMethodAccess (Object' exprI a) Identifier [Expression a] a
+  -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
+  | Dereference (Object' exprI a) a
+  -- ^ Dereference | *eI |, |eI| is an identifier expression.
+  | Undyn (Object' exprI a)
   deriving (Show, Functor)
 
+-- | |RHSObjects| do not make a difference between identifier expressions and
+-- regular expressions.
+newtype RHSObject a = RHS {unRHS :: Object' Expression a}
+  deriving (Show, Functor)
+-- | |LHSObjects| do not accept |IdentifierExpressions|, and thus, we use the
+-- (polymorphic) empty type |Empty|
+newtype LHSObject a = LHS {unLHS :: Object' Empty a}
+  deriving (Show, Functor)
+----------------------------------------
+
 -- type OptionVariant a = OptionVariant' (Expression a)
+type Expression = Expression' RHSObject
+
 type ReturnStmt = ReturnStmt' Expression
-type BlockRet = BlockRet' Expression
-type AnnASTElement = AnnASTElement' Expression
+type BlockRet = BlockRet' Expression LHSObject
+type AnnASTElement = AnnASTElement' Expression LHSObject
 type FieldValueAssignment = FieldValueAssignment' Expression
 type Global = Global' Expression
 
-type TypeDef a = TypeDef' Expression a
+type TypeDef a = TypeDef' Expression LHSObject a
 
-type ClassMember = ClassMember' Expression
+type ClassMember = ClassMember' Expression LHSObject
 
-type MatchCase = MatchCase' Expression
-type ElseIf = ElseIf' Expression
-type Statement = Statement' Expression
+type MatchCase = MatchCase' Expression LHSObject
+type ElseIf = ElseIf' Expression LHSObject
+type Statement = Statement' Expression LHSObject
 
-type AnnotatedProgram a = [AnnASTElement' Expression a]
-type Block a = Block' Expression a
+type AnnotatedProgram a = [AnnASTElement' Expression LHSObject a]
+type Block a = Block' Expression LHSObject a
