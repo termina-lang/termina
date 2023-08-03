@@ -10,9 +10,10 @@ module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
 import           AST                  as PAST
-import CoreAST
+import           CoreAST
 import           Utils.AST
 import           Utils.TypeSpecifier
+import Utils.SemanAST
 
 -- Termina Semantic AST
 import qualified SemanAST             as SAST
@@ -33,7 +34,8 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (find, foldl', sort, sortOn, nub, (\\),map)
+import           Data.List            (find, foldl', map, nub, sort, sortOn,
+                                       (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -41,10 +43,6 @@ import           Data.Map             as M
 
 import           Control.Arrow
 import           Control.Monad
-import           Utils.SemanAST        (getObjectAnnotations)
-import AST (TypeSpecifier)
-import Semantic.Monad (getRHSVarTy, getLHSVarTy)
--- import Parser (Equation(lhs))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -163,7 +161,8 @@ typeObject
   -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
   -> Object' exprIdent Parser.Annotation
   -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns, TypeSpecifier)
-typeObject identTy eidentTy = (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
+typeObject identTy eidentTy =
+  (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
     getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . Utils.SemanAST.getObjectAnnotations
 
@@ -463,13 +462,22 @@ typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (TypeDef Semanti
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeDefCheck ann (Struct ident fs mds)
   -- Check every type is well-defined
-  = mapM_ (fieldDefinitionTy ann) fs
+  = when (Prelude.null fs) (throwError $ annotateError ann (EStructDefEmptyStruct ident))
+  >> mapM_ (fieldDefinitionTy ann) fs
   -- TODO mods?
   -- Check names are unique
-  >> checkUniqueNames ann (Data.List.map fieldIdentifier fs)
+  >> checkUniqueNames ann EStructDefNotUniqueField (Data.List.map fieldIdentifier fs)
+  -- Return same struct
   >> return (Struct ident fs mds)
-typeDefCheck ann (Union ident fs mds )  = _Union
-typeDefCheck ann (Enum ident evs mds )  = _Enum
+typeDefCheck ann (Union ident fs mds )
+  = when (Prelude.null fs) (throwError $ annotateError ann (EUnionDefEmptyUnion ident))
+  >> mapM_ (fieldDefinitionTy ann) fs
+  -- TODO mods?
+  -- Check names are unique
+  >> checkUniqueNames ann EUnionDefNotUniqueField (Data.List.map fieldIdentifier fs)
+  -- Return same struct
+  >> return (Union ident fs mds)
+typeDefCheck ann (Enum ident evs mds ) = _Enum
 typeDefCheck ann (Class ident cls mds) = _Class
 
 ----------------------------------------
@@ -483,10 +491,13 @@ fieldDefinitionTy ann f
   -- we just return it.
   where
     tyFD = fieldTypeSpecifier f
+
+-- Enum Variant definition helpers.
+
 ----------------------------------------
-checkUniqueNames :: Locations -> [Identifier] -> SemanticMonad ()
-checkUniqueNames ann is =
-  if allUnique is then return () else throwError $ annotateError ann (EStructDefNotUniqueField (repeated is))
+checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
+checkUniqueNames ann err is =
+  if allUnique is then return () else throwError $ annotateError ann (err (repeated is))
 
 -----------------------------------------
 -- TODO Improve this two functions.
