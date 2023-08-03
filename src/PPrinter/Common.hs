@@ -9,7 +9,6 @@ import Semantic.Monad
 type DocStyle = Doc AnsiStyle
 
 getType :: Expression SemanticAnns -> TypeSpecifier
-getType (Variable _ (SemAnn _ (ETy ts))) = ts
 getType (Constant _ (SemAnn _ (ETy ts))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
@@ -19,20 +18,18 @@ getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
 getType (FunctionExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
-getType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
-getType (Undyn _ (SemAnn _ (ETy ts))) = ts
 getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid annotation"
 
 -- | Type of the pretty printers
-type Printer a b =
+type Printer a =
   -- | Function that pretty prints an annotation BEFORE printing the construct
-  (b -> DocStyle) ->
+  (SemanticAnns -> DocStyle) ->
   -- | Function that pretty prints an annotation AFTER printing the construct
-  (b -> DocStyle) ->
+  (SemanticAnns -> DocStyle) ->
   -- | The annotated element to pretty print
-  a b ->
+  a ->
   DocStyle
 
 braces' :: DocStyle -> DocStyle

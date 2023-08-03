@@ -4,6 +4,7 @@ import Prettyprinter
 
 import SemanAST
 import PPrinter.Common
+import Semantic.Monad (SemanticAnns)
 
 
 ppStructField :: FieldDefinition -> DocStyle
@@ -23,7 +24,7 @@ ppClassMethodDeclaration _ _ = error "invalid class membeer"
 -- It takes as argument the class member to print.
 -- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
+ppClassField (ClassField identifier ts _) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 ppClassField _ = error "invalid class member"
 
 -- | Pretty prints a class mutex field
@@ -84,11 +85,11 @@ ppTypeDefEq identifier =
     (ppPrimitiveType <$> Just UInt8)
 
 -- | TypeDef pretty printer.
-ppTypeDef :: Printer TypeDef a
+ppTypeDef :: Printer (TypeDef SemanticAnns)
 ppTypeDef before after typeDef =
   case typeDef of
     -- | Struct declaration pretty printer
-    (Struct identifier fls modifiers anns) ->
+    (Struct identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
         before anns,
