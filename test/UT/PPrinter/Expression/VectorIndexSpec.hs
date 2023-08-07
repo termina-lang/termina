@@ -19,7 +19,7 @@ refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
 refVectorAnn = refSemAnn (Vector UInt32 (KC (I UInt32 10)))
 refTwoDymVectorAnn = refSemAnn (Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10)))
 
-var0, vector0, vector1 :: Expression SemanticAnns
+var0, vector0, vector1 :: Object' Expression SemanticAnns
 var0 = Variable "var0" uint16SemAnn
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
@@ -29,46 +29,48 @@ uint32Index3 = Constant (I UInt32 3) uint32SemAnn
 uint32Index4 = Constant (I UInt32 4) uint32SemAnn
 uint8Const0x8 = Constant (I UInt8 8) uint8SemAnn
 
-dynVector0, dynVector1 :: Expression SemanticAnns
+dynVector0, dynVector1 :: Object' Expression SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
-vector0IndexConstant = VectorIndexExpression vector0 uint8Const0x8 uint32SemAnn
-vector0IndexVar0 = VectorIndexExpression vector0 var0 uint32SemAnn
+vector0IndexConstant = (AccessObject (RHS (VectorIndexExpression vector0 uint8Const0x8 uint32SemAnn)))
+vector0IndexVar0 = (AccessObject (RHS (VectorIndexExpression vector0 (AccessObject (RHS var0)) uint32SemAnn)))
 
 dynVector0IndexConstant, dynVector0IndexVar0 :: Expression SemanticAnns
-dynVector0IndexConstant = VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 uint32SemAnn
-dynVector0IndexVar0 = VectorIndexExpression (Undyn dynVector0 vectorAnn) var0 uint32SemAnn
+dynVector0IndexConstant = (AccessObject (RHS (VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 uint32SemAnn)))
+dynVector0IndexVar0 = (AccessObject (RHS (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject (RHS var0)) uint32SemAnn)))
 
-vector1IndexFirstDym, vector1IndexExpression :: Expression SemanticAnns
+vector1IndexFirstDym :: Object' Expression SemanticAnns
 vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Int64 (I UInt32 5))
-vector1IndexExpression = VectorIndexExpression vector1IndexFirstDym uint32Index4 int64SemAnn
+
+vector1IndexExpression :: Expression SemanticAnns
+vector1IndexExpression = (AccessObject (RHS (VectorIndexExpression vector1IndexFirstDym uint32Index4 int64SemAnn)))
 
 pVector0expr :: Expression SemanticAnns
-pVector0expr = ReferenceExpression vector0 refVectorAnn
+pVector0expr = ReferenceExpression (RHS vector0) refVectorAnn
 
 pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVector0expr = ReferenceExpression dynVector0 refVectorAnn
-pDynVector1expr = ReferenceExpression dynVector1 refTwoDymVectorAnn
+pDynVector0expr = ReferenceExpression (RHS dynVector0) refVectorAnn
+pDynVector1expr = ReferenceExpression (RHS dynVector1) refTwoDymVectorAnn
 
-derefpVector0 :: Expression SemanticAnns
-derefpVector0 = DereferenceExpression pVector0expr vectorAnn
+derefpVector0 :: Object' Expression SemanticAnns
+derefpVector0 = Dereference (IdentifierExpression pVector0expr refVectorAnn) vectorAnn
 
 derefpVector0IndexConstant, derefpVector0IndexVar0 :: Expression SemanticAnns
-derefpVector0IndexConstant = VectorIndexExpression derefpVector0 uint32Index3 uint32SemAnn
-derefpVector0IndexVar0 = VectorIndexExpression derefpVector0 var0 uint32SemAnn
+derefpVector0IndexConstant = (AccessObject (RHS (VectorIndexExpression derefpVector0 uint32Index3 uint32SemAnn)))
+derefpVector0IndexVar0 = (AccessObject (RHS (VectorIndexExpression derefpVector0 (AccessObject (RHS var0)) uint32SemAnn)))
 
-derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVector0expr = DereferenceExpression pDynVector0expr vectorAnn
-derefpDynVector1expr = DereferenceExpression pDynVector1expr twoDymVectorAnn
+derefpDynVector0expr, derefpDynVector1expr :: Object' Expression SemanticAnns
+derefpDynVector0expr = Dereference (IdentifierExpression pDynVector0expr refVectorAnn) vectorAnn
+derefpDynVector1expr = Dereference (IdentifierExpression pDynVector1expr refTwoDymVectorAnn) twoDymVectorAnn
 
 derefpDynVector0IndexExpression :: Expression SemanticAnns
-derefpDynVector0IndexExpression = VectorIndexExpression derefpDynVector0expr uint32Index3 uint32SemAnn
+derefpDynVector0IndexExpression = (AccessObject (RHS (VectorIndexExpression derefpDynVector0expr uint32Index3 uint32SemAnn)))
 
 derefpDynVector1FirstDym, derefpDynVector1IndexExpression :: Expression SemanticAnns
-derefpDynVector1FirstDym = VectorIndexExpression derefpDynVector1expr uint32Index3 (vectorSemAnn Int64 (I UInt32 5))
-derefpDynVector1IndexExpression = VectorIndexExpression derefpDynVector1FirstDym uint32Index4 int64SemAnn
+derefpDynVector1FirstDym = (AccessObject (RHS (VectorIndexExpression derefpDynVector1expr uint32Index3 (vectorSemAnn Int64 (I UInt32 5)))))
+derefpDynVector1IndexExpression = (AccessObject (RHS (VectorIndexExpression (IdentifierExpression derefpDynVector1FirstDym (vectorSemAnn Int64 (I UInt32 5))) uint32Index4 int64SemAnn)))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

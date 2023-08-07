@@ -36,25 +36,25 @@ ppStatement subs (Declaration identifier ts expr _) =
     Vector _ _ -> ppDeclareAndInitialize (ppInitializeVector subs 0) (pretty identifier) ts expr
     _ -> case expr of
         (FieldValuesAssignmentsExpression {}) ->
-            ppDeclareAndInitialize (ppInitializeStruct subs) (pretty identifier) ts expr
+            ppDeclareAndInitialize (ppInitializeStruct subs 0) (pretty identifier) ts expr
         (OptionVariantExpression {}) ->
-            ppDeclareAndInitialize (ppInitializeOption subs) (pretty identifier) ts expr
+            ppDeclareAndInitialize (ppInitializeOption subs 0) (pretty identifier) ts expr
         (EnumVariantExpression {}) ->
-            ppDeclareAndInitialize (ppInitializeEnum subs) (pretty identifier) ts expr
+            ppDeclareAndInitialize (ppInitializeEnum subs 0) (pretty identifier) ts expr
         _ -> ppPrimitiveType ts <+> pretty identifier <+> pretty "=" <+> ppExpression subs expr <> semi
-ppStatement subs (AssignmentStmt identifier expr _) =
-    let ts = getType expr in
+ppStatement subs (AssignmentStmt (LHS obj) expr  _) =
+    let ts = getObjectType obj in
     case ts of
         Vector _ _ ->
-            braces' $ (indentTab . align) $ ppInitializeVector subs 0 (pretty identifier) expr
+            braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject undefined subs obj) expr
         _ -> case expr of
             (FieldValuesAssignmentsExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeStruct subs (pretty identifier) expr
+                braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject undefined subs obj) expr
             (OptionVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeOption subs (pretty identifier) expr
+                braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject undefined subs obj) expr
             (EnumVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeEnum subs (pretty identifier) expr
-            _ -> pretty identifier <+> pretty "=" <+> ppExpression subs expr <> semi
+                braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject undefined subs obj) expr
+            _ -> ppObject undefined subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =
     ppCIfBlock (ppExpression subs cond) (vsep [ppStatement subs s <> line | s <- ifBody])
@@ -103,16 +103,16 @@ ppStatement subs (MatchStmt expr matchCases _) =
                                     (ppMatchCase subs symbol c) <> ppMatchCaseOthers symbol cs
                 [] -> error "empty case list!"
     in
-    case expr of
-        (Variable {}) ->
-            let symbol = ppExpression subs expr in
-                ppMatchCases symbol matchCases
-        _ -> 
-            let symbol = "__match" in
-                braces' $ (indentTab . align) $ vsep [
-                    ppStatement subs (Declaration symbol (getType expr) expr undefined),
-                    emptyDoc,
-                    ppMatchCases (pretty symbol) matchCases
-                ]
+        case expr of
+            (AccessObject (RHS (Variable {}))) ->
+                let symbol = ppExpression subs expr in
+                    ppMatchCases symbol matchCases
+            _ ->
+                let symbol = "__match" in
+                    braces' $ (indentTab . align) $ vsep [
+                        ppStatement subs (Declaration symbol (getType expr) expr undefined),
+                        emptyDoc,
+                        ppMatchCases (pretty symbol) matchCases
+                    ]
 ppStatement subs (SingleExpStmt expr _) =
     ppExpression subs expr <> semi

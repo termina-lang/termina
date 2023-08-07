@@ -22,23 +22,23 @@ vectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
 
 vector0 :: Expression SemanticAnns
-vector0 = Variable "vector0" vectorAnn
+vector0 = AccessObject (RHS (Variable "vector0" vectorAnn))
 
 vector1 :: Statement SemanticAnns
 vector1 = Declaration "vector1" vectorTS vector0 undefined
 
 foo0 :: Expression SemanticAnns
-foo0 = Variable "foo0" uint32SemAnn
+foo0 = AccessObject (RHS (Variable "foo0" uint32SemAnn))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
 uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 
 constToFoo0 :: Statement SemanticAnns
-constToFoo0 = AssignmentStmt "foo0" uint32Const0 undefined
+constToFoo0 = AssignmentStmt (LHS (Variable "foo0" uint32SemAnn)) uint32Const0 undefined
 
 dynVar0 :: Expression SemanticAnns
-dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
+dynVar0 = AccessObject (RHS (Variable "dyn_var0" dynUInt32SemAnn))
 
 option0, option1 :: Statement SemanticAnns
 option0 = Declaration "option0" optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined

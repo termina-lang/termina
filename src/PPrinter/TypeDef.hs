@@ -16,7 +16,7 @@ classMethodName = methodName
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
   ppCFunctionDeclaration (classMethodName classId methodId)
-    (map ppParameterDeclaration parameters) (ppReturnType <$> rTS) <> semi
+    (map ppParameterDeclaration parameters) Nothing <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
 -- | Pretty prints a class field
@@ -85,39 +85,37 @@ ppTypeDefEq identifier =
     (ppPrimitiveType <$> Just UInt8)
 
 -- | TypeDef pretty printer.
-ppTypeDef :: Printer (TypeDef SemanticAnns)
-ppTypeDef before after typeDef =
+ppTypeDef :: TypeDef SemanticAnns -> DocStyle
+ppTypeDef typeDef =
   case typeDef of
-    -- | Struct declaration pretty printer
+    -- | Struct declaration pretty pr_¨^ç+
     (Struct identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
-        before anns,
         typedefC <+> structC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        after anns,
+        emptyDoc,
         ppTypeDefEq identifier <> semi,
         emptyDoc]
     -- | Union declaration pretty printer
-    (Union identifier fls modifiers anns) ->
+    (Union identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
-        before anns,
         typedefC <+> unionC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        after anns,
+        emptyDoc,
         ppTypeDefEq identifier <> semi,
         emptyDoc
       ]
     -- | Enum declaration pretty printer  
-    (Enum identifier variants _ anns) ->
+    (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
       in
-      vsep [ before anns,
+      vsep [
         typedefC <+> enumC <+> braces' (
           indentTab . align $ vsep $ punctuate comma $
             map ppEnumVariant variants
@@ -139,10 +137,10 @@ ppTypeDef before after typeDef =
               ]
           ]
         ) <+> pretty identifier <> semi,
-        after anns,
+        emptyDoc,
         ppTypeDefEq identifier <> semi,
         emptyDoc ]
-    (Class identifier members modifiers anns) ->
+    (Class identifier members modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       let classModifiers = filterClassModifiers modifiers in
       let (fields, methods) =
@@ -155,7 +153,6 @@ ppTypeDef before after typeDef =
         vsep $ (
           if not (null fields) then
             [
-              before anns,
               typedefC <+> structC <+> braces' (
                 indentTab . align $
                 vsep (
@@ -165,22 +162,20 @@ ppTypeDef before after typeDef =
                   -- a mutex sempahore to handle mutual exclusion
                   ([ppClassMutexField | hasNoHandler classModifiers])))
                     <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ]
           else if hasNoHandler classModifiers then
             [
-              before anns,
               typedefC <+> structC <+> braces' (
                   (indentTab . align) ppClassMutexField) <+> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ]
           else
             [
               -- | If the class had no fields, then we must enter a dummy field:
               -- | this is because the C language does not allow empty structs
-              before anns,
               typedefC <+> structC <+> braces' (
                   (indentTab . align) ppClassDummyField) <+> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ])
           ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods

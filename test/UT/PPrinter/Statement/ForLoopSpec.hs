@@ -9,24 +9,21 @@ import Semantic.Monad
 import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 
-vectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (KC (I UInt32 10))
-
 vectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
 
-vector0 :: Expression SemanticAnns
+vector0 :: Object' Expression SemanticAnns
 vector0 = Variable "vector0" vectorAnn
 
 total, i :: Expression SemanticAnns
-total = Variable "total" uint32SemAnn
-i = Variable "i" uint32SemAnn
+total = (AccessObject (RHS (Variable "total" uint32SemAnn)))
+i = (AccessObject (RHS (Variable "i" uint32SemAnn)))
 
 vector0IndexI:: Expression SemanticAnns
-vector0IndexI = VectorIndexExpression vector0 i uint32SemAnn
+vector0IndexI = AccessObject (RHS (VectorIndexExpression vector0 i uint32SemAnn))
 
 forLoopBody :: [Statement SemanticAnns]
-forLoopBody = [AssignmentStmt "total" (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
+forLoopBody = [AssignmentStmt (LHS (Variable "total" uint32SemAnn)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
 
 breakCond :: Expression SemanticAnns
 breakCond = BinOp RelationalNotEqual i (Constant (I UInt32 5) uint32SemAnn) boolSemAnn

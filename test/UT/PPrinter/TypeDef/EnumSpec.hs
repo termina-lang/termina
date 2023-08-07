@@ -5,37 +5,38 @@ import PPrinter
 import SemanAST
 import Parsing
 import Data.Text
+import Semantic.Monad
 
-enumWithOneRegularField :: AnnASTElement Annotation
+enumWithOneRegularField :: AnnASTElement SemanticAnns
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" []
-  ] [] undefined)
+  ] []) undefined
 
-enumWithTwoRegularFields :: AnnASTElement Annotation
+enumWithTwoRegularFields :: AnnASTElement SemanticAnns
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [],
     EnumVariant "variant1" []
-  ] [] undefined)
+  ] []) undefined
 
-enumWithOneParameterizedField :: AnnASTElement Annotation
+enumWithOneParameterizedField :: AnnASTElement SemanticAnns
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32]
-  ] [] undefined)
+  ] []) undefined
 
-enumWithMultipleParameterizedFields :: AnnASTElement Annotation
+enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnns
 enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32],
     EnumVariant "variant1" [],
     EnumVariant "variant2" [UInt64, DefinedType "id1", Char],
     EnumVariant "variant3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
-  ] [] undefined)
+  ] []) undefined
 
-renderSingleASTElement :: AnnASTElement a -> Text
-renderSingleASTElement = render . ppHeaderASTElement ppEmptyDoc ppEmptyDoc
+renderSingleASTElement :: AnnASTElement SemanticAnns -> Text
+renderSingleASTElement = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
@@ -43,7 +44,6 @@ spec = do
     it "Prints an enum with one regular variant" $ do
       renderSingleASTElement enumWithOneRegularField `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0\n" ++
             "} __enum_id0;\n" ++
@@ -58,7 +58,6 @@ spec = do
     it "Prints an enum with two regular variants" $ do
       renderSingleASTElement enumWithTwoRegularFields `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0,\n" ++
             "    variant1\n" ++
@@ -74,7 +73,6 @@ spec = do
     it "Prints an enum with one parameterized variant" $ do
       renderSingleASTElement enumWithOneParameterizedField `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0\n" ++
             "} __enum_id0;\n" ++
@@ -95,7 +93,6 @@ spec = do
     it "Prints an enum with multiple parameterized variants" $ do
       renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0,\n" ++
             "    variant1,\n" ++
