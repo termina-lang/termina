@@ -30,7 +30,7 @@ data Object'
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
   | Dereference (Object' exprI a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
-  | Undyn (Object' exprI a)
+  | Undyn (Object' exprI a) a
   deriving (Show, Functor)
 
 -- | |RHSObjects| do not make a difference between identifier expressions and
