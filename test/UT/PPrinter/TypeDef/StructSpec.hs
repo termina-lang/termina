@@ -84,56 +84,46 @@ packedAndAlignedStruct = TypeDefinition
       Modifier "align" (Just (KC (I UInt32 16)))
     ]) undefined
 
-renderSingleASTElement :: AnnASTElement SemanticAnns -> Text
-renderSingleASTElement = render . ppHeaderASTElement
+renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderSingleASTElement structWithOneField `shouldBe`
+       renderTypedefDeclaration structWithOneField `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints a struct with two fields" $ do
-      renderSingleASTElement structWithTwoFields `shouldBe`
+      renderTypedefDeclaration structWithTwoFields `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints a packed struct" $ do
-      renderSingleASTElement packedStruct `shouldBe`
+      renderTypedefDeclaration packedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed)) id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} __attribute__((packed)) id0;\n")
     it "Prints an aligned struct" $ do
-      renderSingleASTElement alignedStruct `shouldBe`
+      renderTypedefDeclaration alignedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((align(16))) id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} __attribute__((align(16))) id0;\n")
     it "Prints a packet & aligned struct" $ do
-      renderSingleASTElement packedAndAlignedStruct `shouldBe`
+      renderTypedefDeclaration packedAndAlignedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed, align(16))) id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} __attribute__((packed, align(16))) id0;\n")

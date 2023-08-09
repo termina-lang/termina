@@ -14,7 +14,7 @@ classMethodName :: Identifier -> Identifier -> DocStyle
 classMethodName = methodName
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
-ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
+ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =
   ppCFunctionDeclaration (classMethodName classId methodId)
     (map ppParameterDeclaration parameters) Nothing <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
@@ -77,16 +77,9 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
         ppEnumVariantParameter params [0..]
       ) <+> pretty (namefy identifier) <> semi
 
-ppTypeDefEq :: Identifier -> DocStyle
-ppTypeDefEq identifier =
-  ppCFunctionDeclaration (typeDefEqFunctionName identifier)
-    [pretty identifier <+> pretty "*" <+> pretty "__lhs",
-     pretty identifier <+> pretty "*" <+> pretty "__rhs"]
-    (ppPrimitiveType <$> Just UInt8)
-
 -- | TypeDef pretty printer.
-ppTypeDef :: TypeDef SemanticAnns -> DocStyle
-ppTypeDef typeDef =
+ppTypeDefDeclaration :: TypeDef SemanticAnns -> DocStyle
+ppTypeDefDeclaration typeDef =
   case typeDef of
     -- | Struct declaration pretty pr_¨^ç+
     (Struct identifier fls modifiers) ->
@@ -96,10 +89,8 @@ ppTypeDef typeDef =
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        emptyDoc,
-        ppTypeDefEq identifier <> semi,
         emptyDoc]
-    -- | Union declaration pretty printer
+    -- | Union declaration pretty printer (TO BE REMOVED)
     (Union identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
@@ -107,8 +98,6 @@ ppTypeDef typeDef =
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        emptyDoc,
-        ppTypeDefEq identifier <> semi,
         emptyDoc
       ]
     -- | Enum declaration pretty printer  
@@ -137,8 +126,6 @@ ppTypeDef typeDef =
               ]
           ]
         ) <+> pretty identifier <> semi,
-        emptyDoc,
-        ppTypeDefEq identifier <> semi,
         emptyDoc ]
     (Class identifier members modifiers) ->
       let structModifiers = filterStructModifiers modifiers in

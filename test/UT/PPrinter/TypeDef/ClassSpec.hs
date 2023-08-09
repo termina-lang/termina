@@ -3,7 +3,6 @@ module UT.PPrinter.TypeDef.ClassSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Parsing
 import Data.Text
 import Semantic.Monad
 
@@ -96,14 +95,14 @@ packedAndAlignedClass = TypeDefinition
       Modifier "align" (Just (KC (I UInt32 16)))
     ]) undefined
 
-renderSingleASTElement :: AnnASTElement SemanticAnns -> Text
-renderSingleASTElement = render . ppHeaderASTElement
+renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints a class with one method and zero fields" $ do
-      renderSingleASTElement classWithOneMethodAndZeroFields `shouldBe`
+      renderTypedefDeclaration classWithOneMethodAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
           "    uint32_t __dummy;\n" ++
@@ -113,7 +112,7 @@ spec = do
           "                   uint64_t param3, int8_t param4, int16_t param5,\n" ++
           "                   int32_t param6, int64_t param7);\n")
     it "Prints a class with two methods and zero fields" $ do
-      renderSingleASTElement classWithTwoMethodsAndZeroFields `shouldBe`
+      renderTypedefDeclaration classWithTwoMethodsAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
           "    uint32_t __dummy;\n" ++
@@ -123,7 +122,7 @@ spec = do
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one method and zero fields" $ do
-      renderSingleASTElement noHandlerClassWithoutOneMethodAndZeroFields `shouldBe`
+      renderTypedefDeclaration noHandlerClassWithoutOneMethodAndZeroFields `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    __termina_mutex_id_t __mutex_id;\n" ++
@@ -131,7 +130,7 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class marked as no_handler with two fields" $ do
-      renderSingleASTElement noHandlerClassWithOneEmptyMethod `shouldBe`
+      renderTypedefDeclaration noHandlerClassWithOneEmptyMethod `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -141,7 +140,7 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class with one method and two fields" $ do
-      renderSingleASTElement classWithOneMethodAndTwoFields `shouldBe`
+      renderTypedefDeclaration classWithOneMethodAndTwoFields `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -150,7 +149,7 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed class" $ do
-      renderSingleASTElement packedClass `shouldBe`
+      renderTypedefDeclaration packedClass `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
@@ -160,7 +159,7 @@ spec = do
             "\n" ++
             "void __id0_method0(char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
-      renderSingleASTElement alignedClass `shouldBe`
+      renderTypedefDeclaration alignedClass `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
@@ -170,7 +169,7 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed & aligned class" $ do
-      renderSingleASTElement packedAndAlignedClass `shouldBe`
+      renderTypedefDeclaration packedAndAlignedClass `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++

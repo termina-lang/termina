@@ -14,6 +14,7 @@ import Data.Text (Text)
 import PPrinter.Common
 import PPrinter.TypeDef
 import Semantic.Monad (SemanticAnns)
+import PPrinter.Function
 
 render :: DocStyle -> Text
 render = renderStrict . layoutSmart defaultLayoutOptions
@@ -22,7 +23,8 @@ ppEmptyDoc :: a -> Doc ann
 ppEmptyDoc = const emptyDoc
 
 ppHeaderASTElement :: AnnASTElement SemanticAnns -> DocStyle
-ppHeaderASTElement (TypeDefinition t _) = ppTypeDef t
+ppHeaderASTElement (TypeDefinition t _) = ppTypeDefDeclaration t
+ppHeaderASTElement func@(Function {}) = ppFunctionDeclaration func
 ppHeaderASTElement _ = pretty "vaya"
 
 ppHeaderFile :: AnnotatedProgram SemanticAnns -> Text

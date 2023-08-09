@@ -3,7 +3,6 @@ module UT.PPrinter.TypeDef.EnumSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Parsing
 import Data.Text
 import Semantic.Monad
 
@@ -35,14 +34,14 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
   ] []) undefined
 
-renderSingleASTElement :: AnnASTElement SemanticAnns -> Text
-renderSingleASTElement = render . ppHeaderASTElement
+renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderSingleASTElement enumWithOneRegularField `shouldBe`
+      renderTypedefDeclaration enumWithOneRegularField `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    variant0\n" ++
@@ -52,11 +51,9 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with two regular variants" $ do
-      renderSingleASTElement enumWithTwoRegularFields `shouldBe`
+      renderTypedefDeclaration enumWithTwoRegularFields `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    variant0,\n" ++
@@ -67,11 +64,9 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with one parameterized variant" $ do
-      renderSingleASTElement enumWithOneParameterizedField `shouldBe`
+      renderTypedefDeclaration enumWithOneParameterizedField `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    variant0\n" ++
@@ -87,11 +82,9 @@ spec = do
             "        } __variant0;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
+      renderTypedefDeclaration enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    variant0,\n" ++
@@ -119,6 +112,4 @@ spec = do
             "        } __variant3;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n");
+            "} id0;\n");
