@@ -3,10 +3,10 @@ module UT.PPrinter.TypeDef.ClassSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Parsing
 import Data.Text
+import Semantic.Monad
 
-classWithOneMethodAndZeroFields :: AnnASTElement Annotation
+classWithOneMethodAndZeroFields :: AnnASTElement SemanticAnns
 classWithOneMethodAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
       Parameter "param0" UInt8,
@@ -17,94 +17,93 @@ classWithOneMethodAndZeroFields = TypeDefinition (Class "id0" [
       Parameter "param5" Int16,
       Parameter "param6" Int32,
       Parameter "param7" Int64
-    ] Nothing 
+    ] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [] undefined)
+  ] []) undefined
 
-classWithTwoMethodsAndZeroFields :: AnnASTElement Annotation
+classWithTwoMethodsAndZeroFields :: AnnASTElement SemanticAnns
 classWithTwoMethodsAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
       Parameter "param0" UInt8,
       Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
-    ] Nothing 
+    ] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined,
     ClassMethod "method1" [
       Parameter "param0" UInt8,
       Parameter "param1" (Vector UInt8 (KC (I UInt32 32)))
-    ] Nothing 
+    ] NoSelf 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [] undefined)
+  ] []) undefined
 
-noHandlerClassWithoutOneMethodAndZeroFields :: AnnASTElement Annotation
+noHandlerClassWithoutOneMethodAndZeroFields :: AnnASTElement SemanticAnns
 noHandlerClassWithoutOneMethodAndZeroFields = TypeDefinition (Class "id0" [
-    ClassMethod "method0" [] Nothing 
+    ClassMethod "method0" [] NoSelf 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "no_handler" Nothing] undefined)
+  ] [Modifier "no_handler" Nothing]) undefined
 
-classWithOneMethodAndTwoFields :: AnnASTElement Annotation
+classWithOneMethodAndTwoFields :: AnnASTElement SemanticAnns
 classWithOneMethodAndTwoFields = TypeDefinition
   (Class "id0" [
-    ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
-    ClassMethod "method0" [] Nothing 
+    ClassField "field0" UInt8 undefined,
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))) undefined,
+    ClassMethod "method0" [] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [] undefined)
+  ] []) undefined
 
-noHandlerClassWithOneEmptyMethod :: AnnASTElement Annotation
+noHandlerClassWithOneEmptyMethod :: AnnASTElement SemanticAnns
 noHandlerClassWithOneEmptyMethod = TypeDefinition
   (Class "id0" [
-    ClassField "field0" UInt8,
-    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))),
-    ClassMethod "method0" [] Nothing 
+    ClassField "field0" UInt8 undefined,
+    ClassField "field1" (Vector UInt64 (KC (I UInt32 24))) undefined,
+    ClassMethod "method0" [] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "no_handler" Nothing] undefined)
+  ] [Modifier "no_handler" Nothing]) undefined
 
-packedClass :: AnnASTElement Annotation
+packedClass :: AnnASTElement SemanticAnns
 packedClass = TypeDefinition
   (Class "id0" [
-    ClassField "field0" UInt64,
-    ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
+    ClassField "field0" UInt64 undefined,
+    ClassField "field1" UInt16 undefined,
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
     ClassMethod "method0" [
       Parameter "param0" Char,
       Parameter "param1" (Vector UInt8 (KC (I UInt32 16)))
-    ] Nothing 
+    ] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "packed" Nothing] undefined)
+  ] [Modifier "packed" Nothing]) undefined
 
-alignedClass :: AnnASTElement Annotation
+alignedClass :: AnnASTElement SemanticAnns
 alignedClass = TypeDefinition
   (Class "id0" [
-    ClassField "field0" UInt64,
-    ClassField "field1" UInt16,
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
-    ClassMethod "method0" [] Nothing 
+    ClassField "field0" UInt64 undefined,
+    ClassField "field1" UInt16 undefined,
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
+    ClassMethod "method0" [] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
-  ] [Modifier "align" (Just (KC (I UInt32 16)))] undefined)
+  ] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
 
-packedAndAlignedClass :: AnnASTElement Annotation
+packedAndAlignedClass :: AnnASTElement SemanticAnns
 packedAndAlignedClass = TypeDefinition
   (Class "id0" [
-    ClassField "field0" UInt64,
-    ClassField "field1" (DefinedType "TCDescriptor"),
-    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))),
-    ClassMethod "method0" [] Nothing 
+    ClassField "field0" UInt64 undefined,
+    ClassField "field1" (DefinedType "TCDescriptor") undefined,
+    ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
+    ClassMethod "method0" [] Self 
       (BlockRet [] (ReturnStmt Nothing undefined)) undefined
   ] [
       Modifier "packed" Nothing,
       Modifier "align" (Just (KC (I UInt32 16)))
-    ] undefined)
+    ]) undefined
 
-renderSingleASTElement :: AnnASTElement a -> Text
-renderSingleASTElement = render . ppHeaderASTElement ppEmptyDoc ppEmptyDoc
+renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints a class with one method and zero fields" $ do
-      renderSingleASTElement classWithOneMethodAndZeroFields `shouldBe`
+      renderTypedefDeclaration classWithOneMethodAndZeroFields `shouldBe`
         pack (
-          "\n" ++
           "typedef struct {\n" ++
           "    uint32_t __dummy;\n" ++
           "} id0;\n" ++
@@ -113,9 +112,8 @@ spec = do
           "                   uint64_t param3, int8_t param4, int16_t param5,\n" ++
           "                   int32_t param6, int64_t param7);\n")
     it "Prints a class with two methods and zero fields" $ do
-      renderSingleASTElement classWithTwoMethodsAndZeroFields `shouldBe`
+      renderTypedefDeclaration classWithTwoMethodsAndZeroFields `shouldBe`
         pack (
-          "\n" ++
           "typedef struct {\n" ++
           "    uint32_t __dummy;\n" ++
           "} id0;\n" ++
@@ -124,18 +122,16 @@ spec = do
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one method and zero fields" $ do
-      renderSingleASTElement noHandlerClassWithoutOneMethodAndZeroFields `shouldBe`
+      renderTypedefDeclaration noHandlerClassWithoutOneMethodAndZeroFields `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    __termina_mutex_id_t __mutex_id;\n" ++
             "} id0;\n" ++
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class marked as no_handler with two fields" $ do
-      renderSingleASTElement noHandlerClassWithOneEmptyMethod `shouldBe`
+      renderTypedefDeclaration noHandlerClassWithOneEmptyMethod `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
@@ -144,9 +140,8 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a class with one method and two fields" $ do
-      renderSingleASTElement classWithOneMethodAndTwoFields `shouldBe`
+      renderTypedefDeclaration classWithOneMethodAndTwoFields `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
@@ -154,9 +149,8 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed class" $ do
-      renderSingleASTElement packedClass `shouldBe`
+      renderTypedefDeclaration packedClass `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
@@ -165,9 +159,8 @@ spec = do
             "\n" ++
             "void __id0_method0(char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
-      renderSingleASTElement alignedClass `shouldBe`
+      renderTypedefDeclaration alignedClass `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
@@ -176,9 +169,8 @@ spec = do
             "\n" ++
             "void __id0_method0();\n")
     it "Prints a packed & aligned class" $ do
-      renderSingleASTElement packedAndAlignedClass `shouldBe`
+      renderTypedefDeclaration packedAndAlignedClass `shouldBe`
         pack (
-            "\n" ++
             "typedef struct {\n" ++
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++

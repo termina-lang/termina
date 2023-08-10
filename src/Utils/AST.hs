@@ -3,7 +3,6 @@
 module Utils.AST where
 
 import           AST
-import           Utils.CoreAST
 
 -- Ground Type equiality?
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
@@ -33,6 +32,7 @@ getObjectAnnotations (IdentifierExpression _ a)    = a
 getObjectAnnotations (VectorIndexExpression _ _ a) = a
 getObjectAnnotations (MemberAccess _ _ a)          = a
 getObjectAnnotations (Dereference _ a)             = a
+getObjectAnnotations (MemberMethodAccess _ _ _ a)    = a
 
 -- | First annotation level.
 getAnnotations :: Expression a -> a
@@ -45,6 +45,10 @@ getAnnotations (FunctionExpression _ _ a)               = a
 getAnnotations (FieldValuesAssignmentsExpression _ _ a) = a
 getAnnotations (EnumVariantExpression _ _ _ a)          = a
 getAnnotations (VectorInitExpression _ _ a)             = a
+getAnnotations (ParensExpression _ a)                   = a
+getAnnotations (DereferenceExpression _ a)              = a
+getAnnotations (OptionVariantExpression _ a)            = a
+
 
 getAnnotationGlobal :: Global a -> a
 getAnnotationGlobal (Volatile _ _ _ _ a) = a
@@ -63,5 +67,5 @@ getAnnotationsAST (Task _ _ _ _ _ a) = a
 getAnnotationsAST (Function _ _ _ _ _ a) = a
 getAnnotationsAST (Handler _ _ _ _ _ a) = a
 getAnnotationsAST (GlobalDeclaration glb) =  getAnnotationGlobal glb
-getAnnotationsAST (TypeDefinition type_def a) =  a
+getAnnotationsAST (TypeDefinition _ a) =  a
 getAnnotationsAST (ModuleInclusion {}) =  error "Module Inclusion not defined yet "

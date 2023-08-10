@@ -31,18 +31,18 @@ twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 vector0 :: Expression SemanticAnns
-vector0 = Variable "vector0" vectorAnn
+vector0 = AccessObject (RHS (Variable "vector0" vectorAnn))
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnns
 vector1 = Declaration "vector1" vectorTS vector0 undefined
-vector2 = Declaration "vector2" twoDimVectorTS (Variable "vector1" twoDymVectorAnn) undefined
+vector2 = Declaration "vector2" twoDimVectorTS (AccessObject (RHS (Variable "vector1" twoDymVectorAnn))) undefined
 vector3 = Declaration "vector3" vectorTS (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
 vector4 = Declaration "vector4" twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5 = Declaration "vector5" twoDimVectorTS (VectorInitExpression (Variable "vector_row" twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
+vector5 = Declaration "vector5" twoDimVectorTS (VectorInitExpression (AccessObject (RHS (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
 vector6 = Declaration "vector6" vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
 foo0 :: Expression SemanticAnns
-foo0 = Variable "foo0" uint32SemAnn
+foo0 = AccessObject (RHS (Variable "foo0" uint32SemAnn))
 
 foo1, foo2 :: Statement SemanticAnns
 foo1 = Declaration "foo1" UInt32 foo0 undefined
@@ -74,14 +74,14 @@ tmDescriptorFieldsInit0 =
 
 struct0, struct1 :: Statement SemanticAnns
 struct0 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit0 undefined
-struct1 = Declaration "struct1" tmDescriptorTS (Variable "struct0" tmDescriptorSemAnn) undefined
+struct1 = Declaration "struct1" tmDescriptorTS (AccessObject (RHS (Variable "struct0" tmDescriptorSemAnn))) undefined
 
 enum0, enum1 :: Statement SemanticAnns
 enum0 = Declaration "enum0" messageTS (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
 enum1 = Declaration "enum1" messageTS (EnumVariantExpression "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
 dynVar0 :: Expression SemanticAnns
-dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
+dynVar0 = AccessObject (RHS (Variable "dyn_var0" dynUInt32SemAnn))
 
 option0, option1 :: Statement SemanticAnns
 option0 = Declaration "option0" optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
@@ -220,8 +220,8 @@ spec = do
           "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
           "        vector6[__i0].field0 = (uint32_t)0;\n" ++
           "        vector6[__i0].field1.field_a = (uint32_t)0;\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "            vector6[__i0].field1.field_b[__i0] = (uint32_t)0;\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)10; __i1 = __i1 + (uint32_t)1) {\n" ++
+          "            vector6[__i0].field1.field_b[__i1] = (uint32_t)0;\n" ++
           "        }\n" ++
           "        vector6[__i0].field1.field_c = (uint32_t)4294901760;\n" ++
           "    }\n" ++

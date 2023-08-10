@@ -9,12 +9,12 @@ import SemanAST
 import Prettyprinter
 import Prettyprinter.Render.Terminal
 
-import Parsing (Annotation)
-
 import Data.Text (Text)
 
 import PPrinter.Common
 import PPrinter.TypeDef
+import Semantic.Monad (SemanticAnns)
+import PPrinter.Function
 
 render :: DocStyle -> Text
 render = renderStrict . layoutSmart defaultLayoutOptions
@@ -22,12 +22,13 @@ render = renderStrict . layoutSmart defaultLayoutOptions
 ppEmptyDoc :: a -> Doc ann
 ppEmptyDoc = const emptyDoc
 
-ppHeaderASTElement :: Printer AnnASTElement a
-ppHeaderASTElement before after (TypeDefinition t) = ppTypeDef before after t
-ppHeaderASTElement _ _ _ = pretty "vaya"
+ppHeaderASTElement :: AnnASTElement SemanticAnns -> DocStyle
+ppHeaderASTElement (TypeDefinition t _) = ppTypeDefDeclaration t
+ppHeaderASTElement func@(Function {}) = ppFunctionDeclaration func
+ppHeaderASTElement _ = pretty "vaya"
 
-ppHeaderFile :: AnnotatedProgram Annotation -> Text
-ppHeaderFile = render . vsep . map (ppHeaderASTElement ppEmptyDoc ppEmptyDoc)
+ppHeaderFile :: AnnotatedProgram SemanticAnns -> Text
+ppHeaderFile = render . vsep . map ppHeaderASTElement
 
 -- ppProgramDebug :: AnnotatedProgram Annotation -> Text
 -- ppAnnonProgram = render . vsep . map (ppAnnAST (pretty . show))

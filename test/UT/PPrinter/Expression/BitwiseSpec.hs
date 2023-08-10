@@ -9,14 +9,12 @@ import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
-var0, var1 :: Expression SemanticAnns
+var0 :: Expression SemanticAnns
 -- | var0 : u16
-var0 = Variable "var0" uint16SemAnn
--- | var1 : 'dyn u16
-var1 = Variable "var1" dynUInt16SemAnn
+var0 = AccessObject (RHS (Variable "var0" uint16SemAnn))
 
 undynVar1 :: Expression SemanticAnns
-undynVar1 = Undyn var1 uint16SemAnn
+undynVar1 = AccessObject (RHS (Undyn (Variable "var1" dynUInt16SemAnn) uint16SemAnn))
 
 constUInt8, constUInt16 :: Expression SemanticAnns
 constUInt8 = Constant (I UInt8 0x08) uint8SemAnn

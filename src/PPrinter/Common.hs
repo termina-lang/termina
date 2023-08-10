@@ -8,8 +8,18 @@ import Semantic.Monad
 
 type DocStyle = Doc AnsiStyle
 
+getObjectType :: Object' exprI SemanticAnns -> TypeSpecifier
+getObjectType (Variable _ (SemAnn _ (ETy ts)))                = ts
+getObjectType (IdentifierExpression _ (SemAnn _ (ETy ts)))    = ts
+getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
+getObjectType (MemberAccess _ _ (SemAnn _ (ETy ts)))          = ts
+getObjectType (Dereference _ (SemAnn _ (ETy ts)))             = ts
+getObjectType (MemberMethodAccess _ _ _ (SemAnn _ (ETy ts)))  = ts
+getObjectType (Undyn _ (SemAnn _ (ETy ts)))                   = ts
+getObjectType _ = error "invalid object annotation"
+
 getType :: Expression SemanticAnns -> TypeSpecifier
-getType (Variable _ (SemAnn _ (ETy ts))) = ts
+getType (AccessObject (RHS obj)) = getObjectType obj
 getType (Constant _ (SemAnn _ (ETy ts))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
@@ -19,21 +29,9 @@ getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
 getType (FunctionExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
-getType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
-getType (Undyn _ (SemAnn _ (ETy ts))) = ts
 getType (ParensExpression expr _) = getType expr
-getType _ = error "invalid annotation"
-
--- | Type of the pretty printers
-type Printer a b =
-  -- | Function that pretty prints an annotation BEFORE printing the construct
-  (b -> DocStyle) ->
-  -- | Function that pretty prints an annotation AFTER printing the construct
-  (b -> DocStyle) ->
-  -- | The annotated element to pretty print
-  a b ->
-  DocStyle
+getType _ = error "invalid expression annotation"
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
@@ -104,7 +102,6 @@ optionSomeField = pretty (namefy "Some") <> pretty ".__0"
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
 ppPrimitiveType :: TypeSpecifier -> DocStyle
-
 -- |  Unsigned integer types
 ppPrimitiveType UInt8 = uint8C
 ppPrimitiveType UInt16 = uint16C
@@ -169,6 +166,7 @@ ppConst (C char) = pretty "'" <> pretty char <> pretty "'"
 ppModifier :: Modifier -> DocStyle
 ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (ppConst c)
 ppModifier (Modifier identifier Nothing) = pretty identifier
+-- TODO: Support modifiers with non-integer values
 
 methodName :: Identifier -> Identifier -> DocStyle
 methodName identifier method = pretty ("__" ++ identifier ++ "_" ++ method)

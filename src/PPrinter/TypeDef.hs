@@ -4,6 +4,7 @@ import Prettyprinter
 
 import SemanAST
 import PPrinter.Common
+import Semantic.Monad (SemanticAnns)
 
 
 ppStructField :: FieldDefinition -> DocStyle
@@ -13,9 +14,9 @@ classMethodName :: Identifier -> Identifier -> DocStyle
 classMethodName = methodName
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
-ppClassMethodDeclaration classId (ClassMethod methodId parameters rTS _ _) =
+ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =
   ppCFunctionDeclaration (classMethodName classId methodId)
-    (map ppParameterDeclaration parameters) (ppReturnType <$> rTS) <> semi
+    (map ppParameterDeclaration parameters) Nothing <> semi
 ppClassMethodDeclaration _ _ = error "invalid class membeer"
 
 -- | Pretty prints a class field
@@ -23,7 +24,7 @@ ppClassMethodDeclaration _ _ = error "invalid class membeer"
 -- It takes as argument the class member to print.
 -- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
+ppClassField (ClassField identifier ts _) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
 ppClassField _ = error "invalid class member"
 
 -- | Pretty prints a class mutex field
@@ -76,47 +77,34 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
         ppEnumVariantParameter params [0..]
       ) <+> pretty (namefy identifier) <> semi
 
-ppTypeDefEq :: Identifier -> DocStyle
-ppTypeDefEq identifier =
-  ppCFunctionDeclaration (typeDefEqFunctionName identifier)
-    [pretty identifier <+> pretty "*" <+> pretty "__lhs",
-     pretty identifier <+> pretty "*" <+> pretty "__rhs"]
-    (ppPrimitiveType <$> Just UInt8)
-
 -- | TypeDef pretty printer.
-ppTypeDef :: Printer TypeDef a
-ppTypeDef before after typeDef =
+ppTypeDefDeclaration :: TypeDef SemanticAnns -> DocStyle
+ppTypeDefDeclaration typeDef =
   case typeDef of
-    -- | Struct declaration pretty printer
-    (Struct identifier fls modifiers anns) ->
+    -- | Struct declaration pretty pr_¨^ç+
+    (Struct identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
-        before anns,
         typedefC <+> structC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        after anns,
-        ppTypeDefEq identifier <> semi,
         emptyDoc]
-    -- | Union declaration pretty printer
-    (Union identifier fls modifiers anns) ->
+    -- | Union declaration pretty printer (TO BE REMOVED)
+    (Union identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       vsep [
-        before anns,
         typedefC <+> unionC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        after anns,
-        ppTypeDefEq identifier <> semi,
         emptyDoc
       ]
     -- | Enum declaration pretty printer  
-    (Enum identifier variants _ anns) ->
+    (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
       in
-      vsep [ before anns,
+      vsep [
         typedefC <+> enumC <+> braces' (
           indentTab . align $ vsep $ punctuate comma $
             map ppEnumVariant variants
@@ -138,10 +126,8 @@ ppTypeDef before after typeDef =
               ]
           ]
         ) <+> pretty identifier <> semi,
-        after anns,
-        ppTypeDefEq identifier <> semi,
         emptyDoc ]
-    (Class identifier members modifiers anns) ->
+    (Class identifier members modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       let classModifiers = filterClassModifiers modifiers in
       let (fields, methods) =
@@ -154,7 +140,6 @@ ppTypeDef before after typeDef =
         vsep $ (
           if not (null fields) then
             [
-              before anns,
               typedefC <+> structC <+> braces' (
                 indentTab . align $
                 vsep (
@@ -164,22 +149,20 @@ ppTypeDef before after typeDef =
                   -- a mutex sempahore to handle mutual exclusion
                   ([ppClassMutexField | hasNoHandler classModifiers])))
                     <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ]
           else if hasNoHandler classModifiers then
             [
-              before anns,
               typedefC <+> structC <+> braces' (
                   (indentTab . align) ppClassMutexField) <+> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ]
           else
             [
               -- | If the class had no fields, then we must enter a dummy field:
               -- | this is because the C language does not allow empty structs
-              before anns,
               typedefC <+> structC <+> braces' (
                   (indentTab . align) ppClassDummyField) <+> pretty identifier <> semi,
-              after anns
+              emptyDoc
             ])
           ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods

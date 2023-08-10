@@ -3,47 +3,46 @@ module UT.PPrinter.TypeDef.EnumSpec (spec) where
 import Test.Hspec
 import PPrinter
 import SemanAST
-import Parsing
 import Data.Text
+import Semantic.Monad
 
-enumWithOneRegularField :: AnnASTElement Annotation
+enumWithOneRegularField :: AnnASTElement SemanticAnns
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" []
-  ] [] undefined)
+  ] []) undefined
 
-enumWithTwoRegularFields :: AnnASTElement Annotation
+enumWithTwoRegularFields :: AnnASTElement SemanticAnns
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [],
     EnumVariant "variant1" []
-  ] [] undefined)
+  ] []) undefined
 
-enumWithOneParameterizedField :: AnnASTElement Annotation
+enumWithOneParameterizedField :: AnnASTElement SemanticAnns
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32]
-  ] [] undefined)
+  ] []) undefined
 
-enumWithMultipleParameterizedFields :: AnnASTElement Annotation
+enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnns
 enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32],
     EnumVariant "variant1" [],
     EnumVariant "variant2" [UInt64, DefinedType "id1", Char],
     EnumVariant "variant3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
-  ] [] undefined)
+  ] []) undefined
 
-renderSingleASTElement :: AnnASTElement a -> Text
-renderSingleASTElement = render . ppHeaderASTElement ppEmptyDoc ppEmptyDoc
+renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration = render . ppHeaderASTElement
 
 spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderSingleASTElement enumWithOneRegularField `shouldBe`
+      renderTypedefDeclaration enumWithOneRegularField `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0\n" ++
             "} __enum_id0;\n" ++
@@ -52,13 +51,10 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with two regular variants" $ do
-      renderSingleASTElement enumWithTwoRegularFields `shouldBe`
+      renderTypedefDeclaration enumWithTwoRegularFields `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0,\n" ++
             "    variant1\n" ++
@@ -68,13 +64,10 @@ spec = do
             "\n" ++
             "    __enum_id0 __variant;\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with one parameterized variant" $ do
-      renderSingleASTElement enumWithOneParameterizedField `shouldBe`
+      renderTypedefDeclaration enumWithOneParameterizedField `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0\n" ++
             "} __enum_id0;\n" ++
@@ -89,13 +82,10 @@ spec = do
             "        } __variant0;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n")
+            "} id0;\n")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderSingleASTElement enumWithMultipleParameterizedFields `shouldBe`
+      renderTypedefDeclaration enumWithMultipleParameterizedFields `shouldBe`
         pack (
-            "\n" ++
             "typedef enum {\n" ++
             "    variant0,\n" ++
             "    variant1,\n" ++
@@ -122,6 +112,4 @@ spec = do
             "        } __variant3;\n" ++
             "    };\n" ++
             "\n" ++
-            "} id0;\n" ++
-            "\n" ++
-            "uint8_t __id0__eq(id0 * __lhs, id0 * __rhs);\n");
+            "} id0;\n");
