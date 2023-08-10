@@ -110,6 +110,12 @@ data Errors a
   -- | Union Definition
   | EUnionDefEmptyUnion Identifier
   | EUnionDefNotUniqueField [Identifier]
+  -- | Enums Definition
+  | EEnumDefEmpty Identifier
+  | EEnumDefNotUniqueField [Identifier]
+  -- | Class Definition
+  | EClassEmptyMethods Identifier
+  | ENotClassField Identifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

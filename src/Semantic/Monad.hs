@@ -90,6 +90,12 @@ type GlobalEnv = Map Identifier (GEntry SemanticAnns)
 type LocalEnv = Map Identifier TypeSpecifier
 -- | Read Only Environment.
 type ROEnv = Map Identifier TypeSpecifier
+-- | Class Environment
+type ClassEnv = Map Identifier TypeSpecifier
+-- This may seem a bad decision, but each envornment represent something
+-- different.
+-- TODO We can use empty types to disable envirnoments and make Haskell do part
+-- of our work.
 
 -- | Environment required to type expression packed into just one type.
 data ExpressionState
@@ -97,10 +103,11 @@ data ExpressionState
  { global :: GlobalEnv
  , local  :: LocalEnv
  , ro     :: ROEnv
+ , clenv :: ClassEnv
  }
 
 initialExpressionSt :: ExpressionState
-initialExpressionSt = ExprST empty empty empty
+initialExpressionSt = ExprST empty empty empty empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State ExpressionState)
 
@@ -248,7 +255,10 @@ getGlobalGEnTy loc ident =
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
-getLHSVarTy,getRHSVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
+getLHSVarTy,getRHSVarTy,getClassVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
+getClassVarTy loc ident
+  = gets clenv
+  >>= maybe (throwError $ annotateError loc (ENotClassField ident)) return . M.lookup ident
 getLHSVarTy loc ident =
   catchError
     (getLocalVarTy loc ident)
