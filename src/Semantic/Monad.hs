@@ -38,18 +38,21 @@ data SAnns a = SemAnn
     -- | Type after type checking
   , ty_ann   :: a}
 
+instance Annotated SAnns where
+  getAnnotation = ty_ann
+
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
   = ETy TypeSpecifier -- ^ Expressions with their types
   | STy -- ^ Statements with no types
-  | GTy (GEntry SemanticAnns) -- ^ Global elements
+  | GTy (GEntry Locations) -- ^ Global elements
 
 getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
 getTySpec _        = Nothing
 
-getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
+getGEntry :: SemanticElems -> Maybe (GEntry Locations)
 getGEntry (GTy a) = Just a
 getGEntry _       = Nothing
 
@@ -59,10 +62,10 @@ buildExpAnn loc ty = SemAnn loc (ETy ty)
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
 
-buildGlobal :: Locations -> GEntry SemanticAnns -> SAnns SemanticElems
+buildGlobal :: Locations -> GEntry Locations -> SAnns SemanticElems
 buildGlobal loc = SemAnn loc . GTy
 
-buildGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SAnns SemanticElems
+buildGlobalTy :: Locations -> SemanTypeDef Locations -> SAnns SemanticElems
 buildGlobalTy loc = SemAnn loc . GTy . GType
 
 buildStmtAnn :: Locations -> SAnns SemanticElems

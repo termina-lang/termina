@@ -495,12 +495,14 @@ typeDefCheck ann (Class ident cls mds)
   = when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
   -- TODO loop free
   -- let typeClass = _forgetCode cls in
-  >> _classTypeChecking
+  >> mapM classTypeChecking cls
+  >>= \clsCheck ->
+  _ClassCheck (Class ident clsCheck mds)
   -- TODO
   where
-    typeClass = Class ident (Data.List.map kClassMember cls) mds
-    selfEnv annF eff
-      = localScope  (  insertGlobalTy ann _typeClass
+    typeClass clsChecked = Class ident clsChecked mds
+    selfEnv annF eff classCheckedDef
+      = localScope  (  insertGlobalTy ann classCheckedDef
                     >> insertLocalVar annF "self" (Reference (DefinedType ident))
                     >> eff
                     )
@@ -533,19 +535,24 @@ emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMet
 
 -- First pass, checking that types make sense.
 -- We do not do anything with method bodies, we will check that later.
--- classTypeChecking
---   :: PAST.ClassMember Parser.Annotation
---   -> SemanticMonad (SAST.ClassMember (SemanticAnns, [Identifier]))
--- classTypeChecking (ClassField fs_id fs_ty ann)
---   -- First, check that |fs_ty| defines a simple type
---   = checkTypeDefinition ann fs_ty
---   >> simpleTyorFail ann fs_ty
---   -- and return it
---   >> return (ClassField fs_id fs_ty ((,[]) <$> buildExpAnn ann fs_ty))
---   -- I am annotating class fields as expression with its type.
--- classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
---   -- this is very similar to a regular method,
---   = _classMethod
+classTypeChecking
+  :: PAST.ClassMember Parser.Annotation
+  -> SemanticMonad (SemanClassMember Parser.Annotation)
+classTypeChecking (ClassField fs_id fs_ty ann)
+  -- First, check that |fs_ty| defines a simple type
+  = checkTypeDefinition ann fs_ty
+  >> simpleTyorFail ann fs_ty
+  -- and return it
+  >> return (ClassField fs_id fs_ty ann)
+  -- I am annotating class fields as expression with its type.
+classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
+  -- this is very similar to a regular method,
+  = -- First we check that types used are defined and correct.
+  mapM_ ( checkTypeDefinition ann . paramTypeSpecifier ) fm_tys
+  >>
+  return (ClassMethod fm_id fm_tys isSelf emptyBlock ann)
+  where
+    emptyBlock = []
 
 ----------------------------------------
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
