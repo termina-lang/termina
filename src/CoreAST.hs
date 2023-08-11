@@ -199,7 +199,7 @@ data ClassMember' expr lho a
   -- | Or a method. Methods come in two flavours whedata TypeDef' (expr :: * -> *) (a :: *)ther they use themselves
   -- through variable |self| (needed to invoke another method of the same class)
   -- Or not.
-  | ClassMethod Identifier [Parameter] SelfMethod (BlockRet' expr lho a) a
+  | ClassMethod Identifier [Parameter] SelfMethod (Block' expr lho a) a
   deriving (Show, Functor)
 
 data SelfMethod = Self | NoSelf
