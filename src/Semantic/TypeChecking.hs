@@ -10,6 +10,7 @@ module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
 import           AST                  as PAST
+import Annotations
 import           CoreAST
 import           Utils.AST
 import           Utils.TypeSpecifier
@@ -113,20 +114,7 @@ paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 rhsObject
   :: RHSObject Parser.Annotation
   -> SemanticMonad (SAST.RHSObject SemanticAnns, TypeSpecifier)
-rhsObject obj =
-  if selfRhsObject (unRHS obj)
-  then selfRHS obj
-  else noSelfRHS obj
-  where
-    noSelfRHS = (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
-    selfRHS = (first SAST.RHS <$>) . typeObject getClassVarTy (const typeExpression) . unRHS
-
-selfRhsObject :: Object' expr a  -> Bool
-selfRhsObject (MemberAccess (Variable nm _ann) _nm _macc_ann)
-  = nm == "self"
-selfRhsObject (MemberMethodAccess (Variable nm _ann) _nm _args _macc_ann)
-  = nm == "self"
-selfRhsObject _ = False
+rhsObject = (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
 
 lhsObject
   :: LHSObject Parser.Annotation
@@ -177,7 +165,7 @@ typeObject
 typeObject identTy eidentTy =
   (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
-    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . Utils.SemanAST.getObjectAnnotations
+    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getAnnotation
 
 -- | Function |expressionType| takes an expression from the parser, traverse it
 -- annotating each node with its type.
@@ -473,7 +461,7 @@ checkIntConstant loc tyI i =
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
+typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SemanTypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeDefCheck ann (Struct ident fs mds)
   -- Check every type is well-defined
@@ -503,9 +491,19 @@ typeDefCheck ann (Enum ident evs mds)
   >> return (Enum ident evs mds)
 typeDefCheck ann (Class ident cls mds)
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
+  -- check that it defines at least one method.
   = when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
+  -- TODO loop free
+  -- let typeClass = _forgetCode cls in
   >> _classTypeChecking
   -- TODO
+  where
+    typeClass = Class ident (Data.List.map kClassMember cls) mds
+    selfEnv annF eff
+      = localScope  (  insertGlobalTy ann _typeClass
+                    >> insertLocalVar annF "self" (Reference (DefinedType ident))
+                    >> eff
+                    )
 
 ----------------------------------------
 -- Field definition helpers.
@@ -533,26 +531,26 @@ enumDefinitionTy ann ev
 emptyClass :: [ ClassMember' expr lha a ] -> Bool
 emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMethod {} -> False}) True
 
--- Member Fields
-classTypeChecking
-  :: PAST.ClassMember Parser.Annotation
-  -> SemanticMonad (SAST.ClassMember SemanticAnns)
-classTypeChecking (ClassField fs_id fs_ty ann)
-  -- First, check that |fs_ty| defines a simple type
-  = checkTypeDefinition ann fs_ty >> simpleTyorFail ann fs_ty
-  -- Then add it to the local environment
-  >> _insertClassField ann ( _ ) _
-  -- and return it
-  >> return (ClassField fs_id fs_ty (buildExpAnn ann fs_ty))
-  -- I am annotating class fields as expression with its type.
-checkMember (ClassMethod fm_id fm_tys isSelf body ann) = _classMethod
+-- First pass, checking that types make sense.
+-- We do not do anything with method bodies, we will check that later.
+-- classTypeChecking
+--   :: PAST.ClassMember Parser.Annotation
+--   -> SemanticMonad (SAST.ClassMember (SemanticAnns, [Identifier]))
+-- classTypeChecking (ClassField fs_id fs_ty ann)
+--   -- First, check that |fs_ty| defines a simple type
+--   = checkTypeDefinition ann fs_ty
+--   >> simpleTyorFail ann fs_ty
+--   -- and return it
+--   >> return (ClassField fs_id fs_ty ((,[]) <$> buildExpAnn ann fs_ty))
+--   -- I am annotating class fields as expression with its type.
+-- classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
+--   -- this is very similar to a regular method,
+--   = _classMethod
+
 ----------------------------------------
-
-
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return () else throwError $ annotateError ann (err (repeated is))
-
 -----------------------------------------
 -- TODO Improve this two functions.
 -- nub is O(n^2)

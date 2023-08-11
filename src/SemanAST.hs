@@ -7,6 +7,7 @@ module SemanAST
   ) where
 
 import CoreAST
+import Annotations
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
@@ -33,14 +34,38 @@ data Object'
   | Undyn (Object' exprI a) a
   deriving (Show, Functor)
 
+instance Annotated (Object' a) where
+  getAnnotation (Variable _ a)                = a
+  getAnnotation (IdentifierExpression _ a)    = a
+  getAnnotation (VectorIndexExpression _ _ a) = a
+  getAnnotation (MemberAccess _ _ a)          = a
+  getAnnotation (Dereference _ a)             = a
+  getAnnotation (MemberMethodAccess _ _ _ a)  = a
+  getAnnotation (Undyn _ a)                   = a
+
+instance HAnnotated Object' where
+  getHAnnotation (Variable _ a)                = a
+  getHAnnotation (IdentifierExpression _ a)    = a
+  getHAnnotation (VectorIndexExpression _ _ a) = a
+  getHAnnotation (MemberAccess _ _ a)          = a
+  getHAnnotation (Dereference _ a)             = a
+  getHAnnotation (MemberMethodAccess _ _ _ a)  = a
+  getHAnnotation (Undyn _ a)                   = a
+
 -- | |RHSObjects| do not make a difference between identifier expressions and
 -- regular expressions.
 newtype RHSObject a = RHS {unRHS :: Object' Expression a}
   deriving (Show, Functor)
+instance Annotated RHSObject where
+  getAnnotation = getHAnnotation . unRHS
+
 -- | |LHSObjects| do not accept |IdentifierExpressions|, and thus, we use the
 -- (polymorphic) empty type |Empty|
 newtype LHSObject a = LHS {unLHS :: Object' Empty a}
   deriving (Show, Functor)
+
+instance Annotated LHSObject where
+  getAnnotation = getHAnnotation . unLHS
 ----------------------------------------
 
 -- type OptionVariant a = OptionVariant' (Expression a)

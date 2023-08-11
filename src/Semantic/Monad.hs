@@ -12,6 +12,7 @@ import           Data.Map                   as M
 -- AST Info
 import           AST
 import           SemanAST                   as SAST
+import Annotations
 -- import           Utils.AST
 import           Utils.AST (groundTyEq)
 import           Utils.SemanAST
@@ -61,7 +62,7 @@ buildGlobalAnn loc = SemAnn loc . GTy . GGlob
 buildGlobal :: Locations -> GEntry SemanticAnns -> SAnns SemanticElems
 buildGlobal loc = SemAnn loc . GTy
 
-buildGlobalTy :: Locations -> SAST.TypeDef SemanticAnns -> SAnns SemanticElems
+buildGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SAnns SemanticElems
 buildGlobalTy loc = SemAnn loc . GTy . GType
 
 buildStmtAnn :: Locations -> SAnns SemanticElems
@@ -90,8 +91,6 @@ type GlobalEnv = Map Identifier (GEntry SemanticAnns)
 type LocalEnv = Map Identifier TypeSpecifier
 -- | Read Only Environment.
 type ROEnv = Map Identifier TypeSpecifier
--- | Class Environment
-type ClassEnv = Map Identifier TypeSpecifier
 -- This may seem a bad decision, but each envornment represent something
 -- different.
 -- TODO We can use empty types to disable envirnoments and make Haskell do part
@@ -103,11 +102,10 @@ data ExpressionState
  { global :: GlobalEnv
  , local  :: LocalEnv
  , ro     :: ROEnv
- , clenv :: ClassEnv
  }
 
 initialExpressionSt :: ExpressionState
-initialExpressionSt = ExprST empty empty empty empty
+initialExpressionSt = ExprST empty empty empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State ExpressionState)
 
@@ -145,7 +143,7 @@ localScope comp = do
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTy :: Locations -> Identifier -> SemanticMonad (SAST.TypeDef SemanticAnns)
+getGlobalTy :: Locations -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnns)
 getGlobalTy loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
@@ -180,6 +178,7 @@ addTempVars loc newVars ma  =
     addVariables = mapM_ (uncurry (insertLocalVar loc))
 
 -- | Insert varialbe in local scope.
+
 insertLocalVar :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
 insertLocalVar loc ident ty =
   isDefined ident
@@ -189,7 +188,7 @@ insertLocalVar loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident ty (local s)})
 
-insertGlobalTy :: Locations -> SAST.TypeDef SemanticAnns -> SemanticMonad ()
+insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
   insertGlobal type_name (GType tydef) (annotateError loc $ EUsedTypeName type_name)
  where
@@ -255,10 +254,7 @@ getGlobalGEnTy loc ident =
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
-getLHSVarTy,getRHSVarTy,getClassVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getClassVarTy loc ident
-  = gets clenv
-  >>= maybe (throwError $ annotateError loc (ENotClassField ident)) return . M.lookup ident
+getLHSVarTy,getRHSVarTy:: Locations -> Identifier -> SemanticMonad TypeSpecifier
 getLHSVarTy loc ident =
   catchError
     (getLocalVarTy loc ident)
@@ -317,7 +313,7 @@ sameOrErr loc t1 t2 =
 mustByTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
 mustByTy ty exp = getExpType exp >>= sameOrErr loc ty >> return exp
   where
-    ann_exp = getAnnotations exp
+    ann_exp = getAnnotation exp
     loc = location ann_exp
 
 blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
@@ -380,7 +376,7 @@ checkTypeDefinition _ Unit                    = return ()
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
-  . getTySpec . ty_ann . getAnnotations
+  . getTySpec . ty_ann . getAnnotation
 
 runTypeChecking
   :: ExpressionState

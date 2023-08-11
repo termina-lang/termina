@@ -5,6 +5,8 @@
 
 module CoreAST where
 
+import Annotations
+
 -- Parametric Emtpy Type
 data Empty (a :: *)
   deriving (Show, Functor)
@@ -16,6 +18,12 @@ data ReturnStmt' expr a
   , returnAnnotation :: a
   }
   deriving (Show, Functor)
+
+instance Annotated (ReturnStmt' expr) where
+  getAnnotation = returnAnnotation
+
+instance HAnnotated ReturnStmt' where
+  getHAnnotation = returnAnnotation
 
 -- | |BlockRet| represent a body block with its return statement
 data BlockRet' expr lho a
@@ -71,6 +79,14 @@ data AnnASTElement' expr lho a =
     a -- ^ transpiler annotations
 
   deriving (Show,Functor)
+
+instance Annotated (AnnASTElement' expr glb) where
+  getAnnotation (Task _ _ _ _ _ a) = a
+  getAnnotation (Function _ _ _ _ _ a) = a
+  getAnnotation (Handler _ _ _ _ _ a) = a
+  getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
+  getAnnotation (TypeDefinition _ a) =  a
+  getAnnotation (ModuleInclusion {}) =  error "Module Inclusion not defined yet "
 
 -- | This type represents constant expressions.
 -- Since we are not implementing it right now, we only have constants.
@@ -181,6 +197,12 @@ data Global' expr a
 
   deriving (Show, Functor)
 
+instance Annotated (Global' expr) where
+  getAnnotation (Volatile _ _ _ _ a) = a
+  getAnnotation (Static _ _ _ _ a)   = a
+  getAnnotation (Shared _ _ _ _ a)   = a
+  getAnnotation (Const _ _ _ _ a)    = a
+
 -- Extremelly internal type definition
 data TypeDef'' (member :: *)
   = Struct Identifier [FieldDefinition]  [ Modifier ]
@@ -279,6 +301,21 @@ data Expression' rho a
     a
   | OptionVariantExpression (OptionVariant (Expression' rho a)) a
   deriving (Show, Functor)
+
+instance (Annotated rho) => Annotated (Expression' rho) where
+  getAnnotation (AccessObject obj)                 = getAnnotation obj
+  getAnnotation (Constant _ a)                           = a
+  getAnnotation (BinOp _ _ _ a)                          = a
+  getAnnotation (ReferenceExpression _ a)                = a
+  getAnnotation (Casting _ _ a)                          = a
+  getAnnotation (FunctionExpression _ _ a)               = a
+  getAnnotation (FieldValuesAssignmentsExpression _ _ a) = a
+  getAnnotation (EnumVariantExpression _ _ _ a)          = a
+  getAnnotation (VectorInitExpression _ _ a)             = a
+  getAnnotation (ParensExpression _ a)                   = a
+  getAnnotation (DereferenceExpression _ a)              = a
+  getAnnotation (OptionVariantExpression _ a)            = a
+
 
 data Statement' expr lho a =
   -- | Declaration statement

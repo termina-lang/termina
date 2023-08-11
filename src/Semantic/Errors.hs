@@ -4,7 +4,7 @@ module Semantic.Errors where
 
 -- Termina AST
 import AST
-import SemanAST as SAST
+-- import SemanAST as SAST
 import Semantic.Types
 -- import qualified Parsing as Parser (Annotation)
 
@@ -16,7 +16,7 @@ import           Control.Monad.Except       (MonadError (..))
 data Errors a
   -- | Expected /similar/ types?
   = EMismatch TypeSpecifier TypeSpecifier
-  | EMismatchIdNotEnum Identifier (SAST.TypeDef a)
+  | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | ECasteable TypeSpecifier TypeSpecifier
   -- | Expected Numeric Types
   | ENumTs [TypeSpecifier]
@@ -46,7 +46,7 @@ data Errors a
   -- Not struct type found with identifier
   | ETyNotStructFound Identifier
   -- Something was found but it is not an identifier
-  | ETyNotStruct Identifier (SAST.TypeDef a)
+  | ETyNotStruct Identifier (SemanTypeDef a)
   -- | Record missing fields
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -56,7 +56,7 @@ data Errors a
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
-  | EMemberAccessUDef (SAST.TypeDef a)
+  | EMemberAccessUDef (SemanTypeDef a)
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some

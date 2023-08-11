@@ -13,6 +13,7 @@ module AST
 
 -- From |CoreAST| we get all basic blocks.
 import           CoreAST
+import Annotations
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
@@ -38,14 +39,37 @@ data Object'
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
   deriving (Show, Functor)
 
+instance Annotated (Object' e) where
+  getAnnotation (Variable _ a)                = a
+  getAnnotation (IdentifierExpression _ a)    = a
+  getAnnotation (VectorIndexExpression _ _ a) = a
+  getAnnotation (MemberAccess _ _ a)          = a
+  getAnnotation (Dereference _ a)             = a
+  getAnnotation (MemberMethodAccess _ _ _ a)  = a
+
+instance HAnnotated Object' where
+  getHAnnotation (Variable _ a)                = a
+  getHAnnotation (IdentifierExpression _ a)    = a
+  getHAnnotation (VectorIndexExpression _ _ a) = a
+  getHAnnotation (MemberAccess _ _ a)          = a
+  getHAnnotation (Dereference _ a)             = a
+  getHAnnotation (MemberMethodAccess _ _ _ a)  = a
+
+
 -- | |RHSObjects| do not make a difference between identifier expressions and
 -- regular expressions.
 newtype RHSObject a = RHS {unRHS :: Object' Expression a}
   deriving (Show, Functor)
+instance Annotated RHSObject where
+  getAnnotation = getHAnnotation . unRHS
+
 -- | |LHSObjects| do not accept |IdentifierExpressions|, and thus, we use the
 -- (polymorphic) empty type |Empty|
 newtype LHSObject a = LHS {unLHS :: Object' Empty a}
   deriving (Show, Functor)
+instance Annotated LHSObject where
+  getAnnotation = getHAnnotation . unLHS
+
 ----------------------------------------
 
 
