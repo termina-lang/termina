@@ -10,6 +10,7 @@ module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
 import           AST                  as PAST
+import Annotations
 import           CoreAST
 import           Utils.AST
 import           Utils.TypeSpecifier
@@ -113,7 +114,7 @@ paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 rhsObject
   :: RHSObject Parser.Annotation
   -> SemanticMonad (SAST.RHSObject SemanticAnns, TypeSpecifier)
-rhsObject =  (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
+rhsObject = (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
 
 lhsObject
   :: LHSObject Parser.Annotation
@@ -164,7 +165,7 @@ typeObject
 typeObject identTy eidentTy =
   (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
   where
-    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . Utils.SemanAST.getObjectAnnotations
+    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getAnnotation
 
 -- | Function |expressionType| takes an expression from the parser, traverse it
 -- annotating each node with its type.
@@ -458,7 +459,9 @@ checkIntConstant loc tyI i =
   else throwError $ annotateError loc (EConstantOutRange (I tyI i))
 
 -- Type definition
-typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (TypeDef SemanticAnns)
+-- Here I am traversing lists serveral times, I prefer to be clear than
+-- proficient for the time being.
+typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SemanTypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeDefCheck ann (Struct ident fs mds)
   -- Check every type is well-defined
@@ -477,8 +480,32 @@ typeDefCheck ann (Union ident fs mds )
   >> checkUniqueNames ann EUnionDefNotUniqueField (Data.List.map fieldIdentifier fs)
   -- Return same struct
   >> return (Union ident fs mds)
-typeDefCheck ann (Enum ident evs mds ) = _Enum
-typeDefCheck ann (Class ident cls mds) = _Class
+typeDefCheck ann (Enum ident evs mds)
+  -- See https://hackmd.io/@termina-lang/SkglB0mq3#Enumeration-definitions
+  = when (Prelude.null evs) (throwError $ annotateError ann (EEnumDefEmpty ident))
+  -- Type checking
+  >> mapM_ (enumDefinitionTy ann) evs
+  -- Check names are unique.
+  >> checkUniqueNames ann EEnumDefNotUniqueField (Data.List.map variantIdentifier evs)
+  -- Return the same definition.
+  >> return (Enum ident evs mds)
+typeDefCheck ann (Class ident cls mds)
+  -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
+  -- check that it defines at least one method.
+  = when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
+  -- TODO loop free
+  -- let typeClass = _forgetCode cls in
+  >> mapM classTypeChecking cls
+  >>= \clsCheck ->
+  _ClassCheck (Class ident clsCheck mds)
+  -- TODO
+  where
+    typeClass clsChecked = Class ident clsChecked mds
+    selfEnv annF eff classCheckedDef
+      = localScope  (  insertGlobalTy ann classCheckedDef
+                    >> insertLocalVar annF "self" (Reference (DefinedType ident))
+                    >> eff
+                    )
 
 ----------------------------------------
 -- Field definition helpers.
@@ -493,17 +520,50 @@ fieldDefinitionTy ann f
     tyFD = fieldTypeSpecifier f
 
 -- Enum Variant definition helpers.
+enumDefinitionTy :: Locations -> EnumVariant -> SemanticMonad ()
+enumDefinitionTy ann ev
+  = mapM_ (\ty -> checkTypeDefinition ann ty >> simpleTyorFail ann ty) ev_tys
+  where
+    ev_tys = assocData ev
+
+----------------------------------------
+-- Class Definition Helpers
+
+-- Empty Class Methods
+emptyClass :: [ ClassMember' expr lha a ] -> Bool
+emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMethod {} -> False}) True
+
+-- First pass, checking that types make sense.
+-- We do not do anything with method bodies, we will check that later.
+classTypeChecking
+  :: PAST.ClassMember Parser.Annotation
+  -> SemanticMonad (SemanClassMember Parser.Annotation)
+classTypeChecking (ClassField fs_id fs_ty ann)
+  -- First, check that |fs_ty| defines a simple type
+  = checkTypeDefinition ann fs_ty
+  >> simpleTyorFail ann fs_ty
+  -- and return it
+  >> return (ClassField fs_id fs_ty ann)
+  -- I am annotating class fields as expression with its type.
+classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
+  -- this is very similar to a regular method,
+  = -- First we check that types used are defined and correct.
+  mapM_ ( checkTypeDefinition ann . paramTypeSpecifier ) fm_tys
+  >>
+  return (ClassMethod fm_id fm_tys isSelf emptyBlock ann)
+  where
+    emptyBlock = []
 
 ----------------------------------------
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return () else throwError $ annotateError ann (err (repeated is))
-
 -----------------------------------------
 -- TODO Improve this two functions.
 -- nub is O(n^2)
 allUnique :: Eq a => [a] -> Bool
 allUnique xs = nub xs == xs
+
 repeated :: Eq a => [a] -> [a]
 repeated xs = nub $ xs Data.List.\\ nub xs
 -----------------------------------------

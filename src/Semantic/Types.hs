@@ -51,9 +51,24 @@ data GEntry a
   -- ^ Handlers
   | GGlob SemGlobal
   -- ^ Globals
-  | GType (SAST.TypeDef a)
+  | GType (SemanTypeDef a)
   -- ^ Types
   deriving (Functor,Show)
+
+-- Simple TypeDef
+-- It only has type information.
+-- Aux constant type type-constructor
+data K a = K
+  deriving (Functor, Show)
+type SemanTypeDef a = TypeDef'' (SemanClassMember a)
+
+type SemanClassMember = ClassMember' K SAST.LHSObject
+
+-- Forgetfull Class member map
+kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
+kClassMember (ClassField idx tyx a) = ClassField idx tyx a
+kClassMember (ClassMethod idx ps self blk ann) =
+  ClassMethod idx ps self [] ann -- (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet blk))))
 
 -- type GEntry = GEntry' SemAnn
 

@@ -455,6 +455,9 @@ returnStmtParser = do
   _ <- semi
   return $ ReturnStmt ret (Position p)
 
+emptyReturn :: Parser ()
+emptyReturn = returnStmtParser >>= maybe mempty (const (fail "Expected Empty return")) . returnExpression
+
 functionParser :: Parser (AnnASTElement  Annotation)
 functionParser = do
   modifiers <- many modifierParser
@@ -699,9 +702,10 @@ classMethodParser = do
   --   typeSpecifierParser)
   reservedOp "{"
   body <- many blockItemParser
-  ret <- returnStmtParser
+  -- ret <- returnStmtParser
+  emptyReturn
   reservedOp "}"
-  return $ ClassMethod name params self (BlockRet body ret) (Position p)
+  return $ ClassMethod name params self body (Position p)
   where
     withSelf :: Parser (SelfMethod, [Parameter])
     withSelf =

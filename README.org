@@ -266,11 +266,27 @@ Same goes for pattern matching bindings.
 Ground types do not have default values
 Maybe that's enough.
 
-** TODO Q19 We can only change local variable values.
+** DONE Q19 We can only change local variable values.
 Can we assign something to a global variable? I don't think so. See next Question
-** TODO Q20 What globals can be assigned? LHS
+** DONE Q20 What globals can be assigned? LHS
+** TODO Q21 Avoiding recursion through weird class methods.
+The documentation (See hackmd) says that we can access members of classes without restriction.
+However, we should be careful no to introduce recursion
+
+#+begin_src
+class bottom {
+ fn f1(self){
+   self.f2()
+ }
+ fn f2(self){
+   self.f1()
+ }
+}
+#+end_src
+
+To solve this, I only permit syntactic order of use. Meaning, methods can only
+use methods previously defined.
 
 ** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
-
 ** TODO modifiers type check
-** TODO type specifiers check
+** DONE type specifiers check
