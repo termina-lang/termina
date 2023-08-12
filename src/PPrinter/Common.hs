@@ -5,6 +5,7 @@ import Prettyprinter
 import Prettyprinter.Render.Terminal
 import SemanAST
 import Semantic.Monad
+import Semantic.Types
 
 type DocStyle = Doc AnsiStyle
 
@@ -26,12 +27,16 @@ getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
 getType (DereferenceExpression _ (SemAnn _ (ETy ts))) = ts
 getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
-getType (FunctionExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (FunctionExpression _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
 getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid expression annotation"
+
+getFuncParams :: Expression SemanticAnns -> [Parameter]
+getFuncParams (FunctionExpression _ _ (SemAnn _ (GTy (GFun params _)))) = params
+getFuncParams _ = error "not a function expression"
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)

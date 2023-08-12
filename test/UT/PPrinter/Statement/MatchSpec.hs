@@ -8,6 +8,7 @@ import Data.Map
 import Semantic.Monad
 import PPrinter.Statement
 import UT.PPrinter.Expression.Common
+import Semantic.Types
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn UInt32
@@ -67,7 +68,7 @@ matchOption1 :: Statement SemanticAnns
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] undefined
 
 getInteger :: Expression SemanticAnns
-getInteger = FunctionExpression "get_integer" [] optionDynUInt32SemAnn
+getInteger = FunctionExpression "get_integer" [] (SemAnn undefined (GTy (GFun [] (Option (DynamicSubtype UInt32)))))
 
 matchOption2 :: Statement SemanticAnns
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] undefined

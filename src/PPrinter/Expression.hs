@@ -119,60 +119,6 @@ ppMemberAccessExpression subs lhs (FunctionExpression methodId params _) =
 -- | If the right hand side is not a function, then it is a field
 ppMemberAccessExpression subs lhs rhs = ppExpression subs lhs <> pretty "." <> ppExpression subs rhs
 
-ppRelationalNotEqualExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
-ppRelationalNotEqualExpression subs lhs rhs =
-    let lhsType = getType lhs
-        rhsType = getType rhs in
-    case (lhsType, rhsType) of
-        -- If both are dynamic subtypes
-        (DefinedType identifier, DefinedType _) ->
-            case (lhs, rhs) of
-                (AccessObject (RHS (Undyn lhs' _)), AccessObject (RHS (Undyn rhs' _))) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress ppExpression subs lhs',
-                    ppDynamicSubtypeObjectAddress ppExpression subs rhs'], pretty "==", pretty "0"])
-                (AccessObject (RHS (Undyn lhs' _)), _) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress ppExpression subs lhs',
-                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "0"])
-                (_,  AccessObject (RHS (Undyn rhs' _))) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppCReferenceExpression (ppExpression subs lhs),
-                    ppDynamicSubtypeObjectAddress ppExpression subs rhs'], pretty "==", pretty "0"])
-                (_, _) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                            [ppCReferenceExpression (ppExpression subs lhs),
-                            ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "0"])
-        -- Else, we can just compare the values        
-        _ -> ppExpression subs lhs <> ppBinaryOperator RelationalNotEqual <> ppExpression subs rhs
-
-ppRelationalEqualExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
-ppRelationalEqualExpression subs lhs rhs =
-    let lhsType = getType lhs
-        rhsType = getType rhs in
-    case (lhsType, rhsType) of
-        -- If both are defined types, we need to call the equality function
-        (DefinedType identifier, DefinedType _) ->
-            case (lhs, rhs) of
-                (AccessObject (RHS (Undyn lhs' _)), AccessObject (RHS (Undyn rhs' _))) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress ppExpression subs lhs',
-                    ppDynamicSubtypeObjectAddress ppExpression subs rhs'], pretty "==", pretty "1"])
-                (AccessObject (RHS (Undyn lhs' _)), _) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppDynamicSubtypeObjectAddress ppExpression subs lhs',
-                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "1"])
-                (_,  AccessObject (RHS (Undyn rhs' _))) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppCReferenceExpression (ppExpression subs lhs),
-                    ppDynamicSubtypeObjectAddress ppExpression subs rhs'], pretty "==", pretty "1"])
-                (_, _) ->
-                    parens (hsep [ppCFunctionCall (typeDefEqFunctionName identifier)
-                    [ppCReferenceExpression (ppExpression subs lhs),
-                    ppCReferenceExpression (ppExpression subs rhs)], pretty "==", pretty "1"])
-        -- Else, we can just compare the values        
-        _ -> ppExpression subs lhs <> ppBinaryOperator RelationalEqual <> ppExpression subs rhs
- 
 ppObject :: Printer exprI -> Printer (Object' exprI)
 ppObject _ subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
 ppObject printer subs (IdentifierExpression expr _)  = printer subs expr
@@ -258,8 +204,6 @@ ppExpression _ (Constant constant _) =
         B b -> if b then pretty "1" else pretty "0"
         I ts' integer -> parens (ppPrimitiveType ts') <> pretty integer
         C char -> squotes (pretty char)
-ppExpression subs (BinOp RelationalEqual lhs rhs _) = ppRelationalEqualExpression subs lhs rhs
-ppExpression subs (BinOp RelationalNotEqual lhs rhs _) = ppRelationalNotEqualExpression subs lhs rhs
 ppExpression subs (BinOp op expr1 expr2 _) =
     ppExpression subs expr1 <> ppBinaryOperator op <> ppExpression subs expr2
 ppExpression subs (Casting expr' ts' _) = 
