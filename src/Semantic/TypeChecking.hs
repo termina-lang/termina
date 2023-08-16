@@ -153,9 +153,17 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
               (return . SAST.MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
               mfield
         ;
+        Class _identTy cls _mods ->
+          -- TODO Class access?
+          _ClassAccess
+        ;
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
       }
     ty -> throwError $ annotateError ann (EMemberAccess ty)
+objectType getVarTy typeI (MemberMethodAccess obj ident args ann) =
+  _ClassMethodAccess
+objectType getVarTy typeI (Dereference obj ann) =
+  _Dereference
 
 typeObject
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
@@ -494,18 +502,65 @@ typeDefCheck ann (Class ident cls mds)
   -- check that it defines at least one method.
   = when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
   -- TODO loop free
-  -- let typeClass = _forgetCode cls in
-  >> mapM classTypeChecking cls
-  >>= \clsCheck ->
-  _ClassCheck (Class ident clsCheck mds)
-  -- TODO
-  where
-    typeClass clsChecked = Class ident clsChecked mds
-    selfEnv annF eff classCheckedDef
-      = localScope  (  insertGlobalTy ann classCheckedDef
-                    >> insertLocalVar annF "self" (Reference (DefinedType ident))
-                    >> eff
-                    )
+  -- Split definitions in tree, fields, no self reference and self reference.
+  -- plus check that all types are well define (see |classTypeChecking|)
+  >> foldM
+    (\(fs, nsl, sl, res) cl ->
+       classTypeChecking cl >>=
+       return .
+       case cl of
+         ClassField {}
+           -> \fChecked -> (fChecked: fs, nsl,sl, fChecked:res)
+         ClassMethod _ _ NoSelf _ _
+           -> (fs, cl: nsl,sl,) . (:res)
+         ClassMethod _ _ Self _ _
+           -> (fs, nsl, cl:sl,) . (:res)
+        )
+    ([],[],[],[]) cls
+  >>= \(fls -- Fields do not need type checking :shrug:
+       , nsl -- NoSelf methods do not depend on the other ones.
+       , sl -- Self methods can induce undefined behaviour
+       , rev_cty -- Only types annotations.
+       )->
+  -- Define a temporal type to type check everything else.
+  let tempClassTy =  Class ident (reverse rev_cty) mds
+  in do
+  -- Now we can go method by method checking everything is well typed.
+  -- No Self
+    nslChecked <- mapM (\case
+             ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             ClassMethod _ _ Self _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             ClassMethod ident ps NoSelf body ann ->
+               localScope (
+               -- Insert params types
+                 insertLocalVariables ann (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) ps)
+                 >>
+              -- Type check body
+                 flip (ClassMethod ident ps NoSelf) (buildExpAnn ann Unit) <$> blockType body
+                 )
+         ) nsl
+  -- Self
+    slChecked <-
+      localScope ( -- we temporary insert Self.
+              -- First the class type we are defining.
+              insertGlobalTy ann tempClassTy
+              -- Second insert a |self| variables of the class type we are defining
+              >> insertLocalVar ann "self" (Reference (DefinedType ident))
+              -- Third, check each selffull (self awereness) method
+              >> mapM (\case
+             ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             ClassMethod _ _ NoSelf _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             ClassMethod ident ps Self body mann ->
+               localScope (
+               -- Insert Self
+               insertLocalVariables mann (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) ps)
+               >> flip (ClassMethod ident ps Self) (buildExpAnn ann Unit) <$> blockType body
+               )
+               ) sl
+       )
+    -- TODO check loop free between self methods.
+    -- Note, class members are not as the user wrote. I reordered them.
+    return (Class ident (fls ++ _TODO_FIXAnn nslChecked ++ _TODO_FIXAnn slChecked) mds)
 
 ----------------------------------------
 -- Field definition helpers.
@@ -537,22 +592,35 @@ emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMet
 -- We do not do anything with method bodies, we will check that later.
 classTypeChecking
   :: PAST.ClassMember Parser.Annotation
-  -> SemanticMonad (SemanClassMember Parser.Annotation)
+  -> SemanticMonad (SemanClassMember SemanticAnns)
 classTypeChecking (ClassField fs_id fs_ty ann)
   -- First, check that |fs_ty| defines a simple type
   = checkTypeDefinition ann fs_ty
   >> simpleTyorFail ann fs_ty
   -- and return it
-  >> return (ClassField fs_id fs_ty ann)
+  >> return (ClassField fs_id fs_ty (buildExpAnn ann fs_ty))
   -- I am annotating class fields as expression with its type.
 classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
   -- this is very similar to a regular method,
   = -- First we check that types used are defined and correct.
   mapM_ ( checkTypeDefinition ann . paramTypeSpecifier ) fm_tys
   >>
-  return (ClassMethod fm_id fm_tys isSelf emptyBlock ann)
+  return (ClassMethod fm_id fm_tys isSelf emptyBlock (buildExpAnn ann Unit))
   where
     emptyBlock = []
+
+classDependencies
+  :: PAST.ClassMember a
+  -> (Identifier, [ClassDep])
+classDependencies (ClassField fs_id _ty _ann)
+  -- Definition does not depends on anything.
+  = (fs_id , [])
+classDependencies (ClassMethod fm_id _ NoSelf _body _ann)
+  -- No Self methods do not generate dependencies within the same class
+  = (fm_id , [])
+classDependencies (ClassMethod fm_id _ Self bs _ann)
+  -- We need to get all invocations to other methods in self.
+  = (fm_id, getDepBlock bs)
 
 ----------------------------------------
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()

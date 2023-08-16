@@ -286,7 +286,13 @@ class bottom {
 
 To solve this, I only permit syntactic order of use. Meaning, methods can only
 use methods previously defined.
-
+** TODO Q22 Can (IdentifierExpression) dynamic self expressions exist?
+We computing dependency between class methods we can find an object computing a
+reference to self.
+I don't think it should be possible, but I am not sure.
+#+begin_src
+ [[ IdentifierExpression e ann ]] \leadsto Variable "self" ann
+#+end_src
 ** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
 ** TODO modifiers type check
 ** DONE type specifiers check
