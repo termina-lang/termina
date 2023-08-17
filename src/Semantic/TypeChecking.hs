@@ -469,7 +469,7 @@ checkIntConstant loc tyI i =
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SemanTypeDef SemanticAnns)
+typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SAST.TypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeDefCheck ann (Struct ident fs mds)
   -- Check every type is well-defined
@@ -506,21 +506,28 @@ typeDefCheck ann (Class ident cls mds)
   -- plus check that all types are well define (see |classTypeChecking|)
   >> foldM
     (\(fs, nsl, sl, res) cl ->
-       classTypeChecking cl >>=
-       return .
        case cl of
-         ClassField {}
-           -> \fChecked -> (fChecked: fs, nsl,sl, fChecked:res)
-         ClassMethod _ _ NoSelf _ _
-           -> (fs, cl: nsl,sl,) . (:res)
-         ClassMethod _ _ Self _ _
-           -> (fs, nsl, cl:sl,) . (:res)
+         ClassField fs_id fs_ty ann
+           -> checkTypeDefinition ann fs_ty
+           >> simpleTyorFail ann fs_ty
+           >> let checkFs = ClassField fs_id fs_ty (buildExpAnn ann fs_ty)
+              in return (checkFs : fs, nsl ,sl , checkFs:res)
+         nslm@( ClassMethod fm_id fm_tys NoSelf body ann )
+           -> mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
+           -- TODO Check type of class methods, I am adding them as functions.
+           >> let emptyBody = ClassMethod fm_id fm_tys NoSelf [] (buildGlobal ann (GFun fm_tys Unit))
+              in return (fs, nslm : nsl, sl , emptyBody : res )
+         slm@(ClassMethod fm_id fm_tys Self body ann)
+           ->  mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
+           >> let emptyBody = ClassMethod fm_id fm_tys NoSelf [] (buildGlobal ann (GFun fm_tys Unit))
+              in return (fs, nsl, slm : sl , emptyBody : res )
         )
     ([],[],[],[]) cls
-  >>= \(fls -- Fields do not need type checking :shrug:
+  >>= \(fls  -- Fields do not need type checking :shrug:
        , nsl -- NoSelf methods do not depend on the other ones.
-       , sl -- Self methods can induce undefined behaviour
-       , rev_cty -- Only types annotations.
+       , sl  -- Self methods can induce undefined behaviour
+       , rev_cty -- Only types annotations. This is strange, but we need to
+       -- introduce a semi-well formed type.
        )->
   -- Define a temporal type to type check everything else.
   let tempClassTy =  Class ident (reverse rev_cty) mds
@@ -528,8 +535,10 @@ typeDefCheck ann (Class ident cls mds)
   -- Now we can go method by method checking everything is well typed.
   -- No Self
     nslChecked <- mapM (\case
+             -- Filtered cases
              ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
              ClassMethod _ _ Self _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             -- Interesting case
              ClassMethod ident ps NoSelf body ann ->
                localScope (
                -- Insert params types
@@ -548,8 +557,10 @@ typeDefCheck ann (Class ident cls mds)
               >> insertLocalVar ann "self" (Reference (DefinedType ident))
               -- Third, check each selffull (self awereness) method
               >> mapM (\case
+             -- Filtered cases
              ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
              ClassMethod _ _ NoSelf _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
+             -- Interesting case
              ClassMethod ident ps Self body mann ->
                localScope (
                -- Insert Self
@@ -560,7 +571,7 @@ typeDefCheck ann (Class ident cls mds)
        )
     -- TODO check loop free between self methods.
     -- Note, class members are not as the user wrote. I reordered them.
-    return (Class ident (fls ++ _TODO_FIXAnn nslChecked ++ _TODO_FIXAnn slChecked) mds)
+    return (Class ident (fls ++ nslChecked ++ slChecked) mds)
 
 ----------------------------------------
 -- Field definition helpers.
@@ -587,27 +598,6 @@ enumDefinitionTy ann ev
 -- Empty Class Methods
 emptyClass :: [ ClassMember' expr lha a ] -> Bool
 emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMethod {} -> False}) True
-
--- First pass, checking that types make sense.
--- We do not do anything with method bodies, we will check that later.
-classTypeChecking
-  :: PAST.ClassMember Parser.Annotation
-  -> SemanticMonad (SemanClassMember SemanticAnns)
-classTypeChecking (ClassField fs_id fs_ty ann)
-  -- First, check that |fs_ty| defines a simple type
-  = checkTypeDefinition ann fs_ty
-  >> simpleTyorFail ann fs_ty
-  -- and return it
-  >> return (ClassField fs_id fs_ty (buildExpAnn ann fs_ty))
-  -- I am annotating class fields as expression with its type.
-classTypeChecking (ClassMethod fm_id fm_tys isSelf body ann)
-  -- this is very similar to a regular method,
-  = -- First we check that types used are defined and correct.
-  mapM_ ( checkTypeDefinition ann . paramTypeSpecifier ) fm_tys
-  >>
-  return (ClassMethod fm_id fm_tys isSelf emptyBlock (buildExpAnn ann Unit))
-  where
-    emptyBlock = []
 
 classDependencies
   :: PAST.ClassMember a
