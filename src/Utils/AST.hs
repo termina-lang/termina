@@ -37,12 +37,14 @@ data ClassDep
   | Undec
   -- see README/Q22
 
-getRoot :: ClassDep -> Maybe Identifier
-getRoot (SVar i) = Just i
-getRoot (MethodAccess a _) = getRoot a
-getRoot (FieldAccess a _) = getRoot a
-getRoot Undec = Nothing
+depToList :: ClassDep -> Maybe (Identifier, [Identifier])
+depToList (SVar i) = Just (i, [])
+depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
+depToList (FieldAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
+depToList Undec = Nothing
 
+getRoot :: ClassDep -> Maybe Identifier
+getRoot = fmap fst . depToList
 
 -- |getDepObj| is where we compute the use of names and dependencies
 -- The rest is just how we traverse the AST.

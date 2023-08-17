@@ -45,6 +45,9 @@ import           Data.Map             as M
 import           Control.Arrow
 import           Control.Monad
 
+import qualified Data.Graph as Graph
+import Data.Graph (graphFromEdges)
+
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
 ----------------------------------------
@@ -505,33 +508,27 @@ typeDefCheck ann (Class ident cls mds)
   -- Split definitions in tree, fields, no self reference and self reference.
   -- plus check that all types are well define (see |classTypeChecking|)
   >> foldM
-    (\(fs, nsl, sl, res) cl ->
+    (\(fs, nsl, sl) cl ->
        case cl of
          ClassField fs_id fs_ty ann
            -> checkTypeDefinition ann fs_ty
            >> simpleTyorFail ann fs_ty
            >> let checkFs = ClassField fs_id fs_ty (buildExpAnn ann fs_ty)
-              in return (checkFs : fs, nsl ,sl , checkFs:res)
+              in return (checkFs : fs, nsl ,sl )
          nslm@( ClassMethod fm_id fm_tys NoSelf body ann )
            -> mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
-           -- TODO Check type of class methods, I am adding them as functions.
-           >> let emptyBody = ClassMethod fm_id fm_tys NoSelf [] (buildGlobal ann (GFun fm_tys Unit))
-              in return (fs, nslm : nsl, sl , emptyBody : res )
+           >> return (fs, nslm : nsl, sl)
          slm@(ClassMethod fm_id fm_tys Self body ann)
            ->  mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
-           >> let emptyBody = ClassMethod fm_id fm_tys NoSelf [] (buildGlobal ann (GFun fm_tys Unit))
-              in return (fs, nsl, slm : sl , emptyBody : res )
+           >> return (fs, nsl, slm : sl )
         )
-    ([],[],[],[]) cls
+    ([],[],[]) cls
   >>= \(fls  -- Fields do not need type checking :shrug:
        , nsl -- NoSelf methods do not depend on the other ones.
        , sl  -- Self methods can induce undefined behaviour
-       , rev_cty -- Only types annotations. This is strange, but we need to
        -- introduce a semi-well formed type.
        )->
-  -- Define a temporal type to type check everything else.
-  let tempClassTy =  Class ident (reverse rev_cty) mds
-  in do
+  do
   -- Now we can go method by method checking everything is well typed.
   -- No Self
     nslChecked <- mapM (\case
@@ -548,29 +545,56 @@ typeDefCheck ann (Class ident cls mds)
                  flip (ClassMethod ident ps NoSelf) (buildExpAnn ann Unit) <$> blockType body
                  )
          ) nsl
-  -- Self
+  -- Methos with Self references.
+  -- Get depndencies
+    let dependencies = Data.List.map (\case{
+                                         -- This shouldn't happen here but I doesn't add anything
+                                         l@( ClassField ident _ _ ) -> (l, ident, []);
+                                         -- This is the interesting one.
+                                         l@(ClassMethod ident ps _self bs _ann) ->
+                                           (l, ident
+                                           -- This is weird, can we have "self.f1(53).f2"
+                                           , concatMap (\case{ Just ("self", [ ids ]) -> [ ids ];
+                                                               a -> error ("In case the impossible happens >>> " ++ show a);
+                                                              }
+                                                         . depToList
+                                                       )
+                                             (getDepBlock bs) )
+                                         ;
+                                     }) sl
+  -- Build dependency graph and functions from internal Node representations to ClassMembers
+    let (selfMethodDepGraph, vertexF , _KeyF) = Graph.graphFromEdges dependencies
+    let vertexToIdent = (\(n,_,_) -> n) . vertexF
+  -- Generate a solution with possible loops.
+    let topSortOrder = Data.List.map vertexToIdent $ Graph.topSort selfMethodDepGraph
+  -- Type check in order, if a method is missing is because there is a loop.
     slChecked <-
-      localScope ( -- we temporary insert Self.
-              -- First the class type we are defining.
-              insertGlobalTy ann tempClassTy
-              -- Second insert a |self| variables of the class type we are defining
-              >> insertLocalVar ann "self" (Reference (DefinedType ident))
-              -- Third, check each selffull (self awereness) method
-              >> mapM (\case
-             -- Filtered cases
+      foldM (\prevMembers newMember ->
+          -- Intermediate Class type only containing fields, no self methods and
+          -- previous (following the topsort order) to the current method.
+          let clsType = Class ident
+                              -- Function |kClassMember| /erases/ body of methods.
+                              -- When typing, we do not need them
+                              (Data.List.map kClassMember (fls ++ nslChecked ++ prevMembers))
+                              mds  in
+          localScope $
+          insertGlobalTy ann  clsType >>
+          insertLocalVar ann "self" (Reference (DefinedType ident)) >>
+          -- Now analyze new member.
+          case newMember of
+            -- Filtered Cases
              ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
              ClassMethod _ _ NoSelf _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
-             -- Interesting case
-             ClassMethod ident ps Self body mann ->
-               localScope (
-               -- Insert Self
-               insertLocalVariables mann (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) ps)
-               >> flip (ClassMethod ident ps Self) (buildExpAnn ann Unit) <$> blockType body
-               )
-               ) sl
-       )
-    -- TODO check loop free between self methods.
-    -- Note, class members are not as the user wrote. I reordered them.
+            -- Interesting case
+             ClassMethod mIdent mps Self mbody mann ->
+               -- Insert method arguments as local variables.
+               insertLocalVariables
+                    mann
+                    (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps)
+               -- Type check body and build the class method back.
+               >>
+              (:prevMembers) . flip (ClassMethod mIdent mps Self) (buildExpAnn mann Unit) <$> blockType mbody
+      ) [] topSortOrder
     return (Class ident (fls ++ nslChecked ++ slChecked) mds)
 
 ----------------------------------------
