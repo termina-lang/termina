@@ -34,9 +34,9 @@ getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid expression annotation"
 
-getFuncParams :: Expression SemanticAnns -> [Parameter]
-getFuncParams (FunctionExpression _ _ (SemAnn _ (GTy (GFun params _)))) = params
-getFuncParams _ = error "not a function expression"
+getParameters :: Expression SemanticAnns -> [Parameter]
+getParameters (FunctionExpression _ _ (SemAnn _ (GTy (GFun params _)))) = params
+getParameters _ = error "invalid expression annotation"
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
@@ -132,16 +132,40 @@ ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts
 ppDimension _ = emptyDoc
 
-ppReturnType :: TypeSpecifier -> DocStyle
-ppReturnType (Vector ts _) = ppPrimitiveType ts <+> pretty "*"
-ppReturnType ts = ppPrimitiveType ts
+ppReturnVectorValueStructure :: DocStyle -> DocStyle
+ppReturnVectorValueStructure identifier =
+  pretty "__ret__" <> identifier <> pretty "_t"
 
-ppParameterDeclaration :: Parameter -> DocStyle
-ppParameterDeclaration (Parameter identifier (Reference ts)) =
+ppReturnVectorValueStructureDecl :: DocStyle -> TypeSpecifier -> DocStyle
+ppReturnVectorValueStructureDecl identifier ts =
+  typedefC <+> structC <+> braces' (
+          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi) 
+      <+> ppReturnVectorValueStructure identifier <> semi
+
+ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
+ppParameterVectorValueStructure prefix identifier =
+  pretty "__param__" <> prefix <> pretty "__" <> identifier <> pretty "_t"
+
+ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
+ppParameterVectorValueStructureDecl prefix identifier ts =
+  typedefC <+> structC <+> braces' (
+          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi) 
+      <+> ppParameterVectorValueStructure prefix identifier <> semi
+
+ppReturnType :: DocStyle -> TypeSpecifier -> DocStyle
+ppReturnType identifier (Vector _ _) = ppReturnVectorValueStructure identifier
+ppReturnType _ ts = ppPrimitiveType ts
+
+ppParameterDeclaration :: DocStyle -> Parameter -> DocStyle
+ppParameterDeclaration _ (Parameter identifier (Reference ts)) =
   case ts of
-    (Vector _ _) -> ppPrimitiveType ts <+> pretty ("__ref__" ++ identifier) <> ppDimension ts
+    (Vector _ _) -> ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
     _ -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
-ppParameterDeclaration (Parameter identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
+-- | If a vector is passed as parameter, the a structure must  be declared and used instead
+-- This way, we guarantee that the array is copied by value when passed to the function
+ppParameterDeclaration prefix (Parameter identifier (Vector _ _)) =
+  ppParameterVectorValueStructure prefix (pretty identifier) <+> pretty identifier
+ppParameterDeclaration _ (Parameter identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
 
 -- | Pretty print a C function declaration
 ppCFunctionDeclaration ::

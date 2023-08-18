@@ -2,6 +2,7 @@ module UT.PPrinter.Expression.Common where
 
 import SemanAST
 import Semantic.Monad
+import Semantic.Types
 
 tySemAnn :: TypeSpecifier -> SemanticAnns
 tySemAnn ts = SemAnn undefined (ETy ts)
@@ -107,7 +108,10 @@ refDefinedTypeSemAnn :: Identifier -> SemanticAnns
 refDefinedTypeSemAnn name = refSemAnn (DefinedType name)
 
 poolSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-poolSemAnn ts size = tySemAnn (Pool ts (K size))
+poolSemAnn ts size = tySemAnn (Pool ts (SemanAST.K size))
 
 msgQueueSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-msgQueueSemAnn ts size = tySemAnn (MsgQueue ts (K size))
+msgQueueSemAnn ts size = tySemAnn (MsgQueue ts (SemanAST.K size))
+
+funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
+funSemAnn params ts = SemAnn undefined (GTy (GFun params ts))
