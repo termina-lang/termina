@@ -69,17 +69,19 @@ ppInitializeVector subs level target expr =
         _ -> ppInitializeVectorFromExpression level target (ppExpression subs expr) (getType expr)
 
 ppFieldInitializer :: Substitutions ->  Integer -> DocStyle -> DocStyle -> Expression SemanticAnns -> DocStyle
+ppFieldInitializer subs level identifier field expr@(FieldValuesAssignmentsExpression {}) =
+  ppInitializeStruct subs level (identifier <> pretty "." <> field) expr
+ppFieldInitializer subs level identifier field expr@(OptionVariantExpression {}) =
+  ppInitializeOption subs level (identifier <> pretty "." <> field) expr
+ppFieldInitializer subs level identifier field expr@(VectorInitExpression {}) =
+  ppInitializeVector subs level (identifier <> pretty "." <> field) expr
+ppFieldInitializer subs level identifier field expr@(EnumVariantExpression {}) =
+  ppInitializeEnum subs level (identifier <> pretty "." <> field) expr
 ppFieldInitializer subs level identifier field expr =
-  case expr of
-    (FieldValuesAssignmentsExpression {}) ->
-      ppInitializeStruct subs level (identifier <> pretty "." <> field) expr
-    (OptionVariantExpression {}) ->
-      ppInitializeOption subs level (identifier <> pretty "." <> field) expr
-    (VectorInitExpression {}) ->
-      ppInitializeVector subs level (identifier <> pretty "." <> field) expr
-    (EnumVariantExpression {}) ->
-      ppInitializeEnum subs level (identifier <> pretty "." <> field) expr
-    _ -> identifier <> pretty "." <> field <+> pretty "=" <+> ppExpression subs expr <> semi
+    let ts = getType expr in
+    case ts of
+        Vector _ _ -> ppInitializeVector subs level (identifier <> pretty "." <> field) expr
+        _ -> identifier <> pretty "." <> field <+> pretty "=" <+> ppExpression subs expr <> semi
 
 -- | This function initializes a struct using a field values assignments expression
 -- as initializer. The name of sthe struct is passed as argument.

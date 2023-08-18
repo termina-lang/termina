@@ -6,6 +6,7 @@ import SemanAST
 import Data.Text
 import Semantic.Monad
 
+
 classWithOneMethodAndZeroFields :: AnnASTElement SemanticAnns
 classWithOneMethodAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
@@ -17,8 +18,7 @@ classWithOneMethodAndZeroFields = TypeDefinition (Class "id0" [
       Parameter "param5" Int16,
       Parameter "param6" Int32,
       Parameter "param7" Int64
-    ] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ] Self [] undefined
   ] []) undefined
 
 classWithTwoMethodsAndZeroFields :: AnnASTElement SemanticAnns
@@ -26,19 +26,16 @@ classWithTwoMethodsAndZeroFields = TypeDefinition (Class "id0" [
     ClassMethod "method0" [
       Parameter "param0" UInt8,
       Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
-    ] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined,
+    ] Self [] undefined,
     ClassMethod "method1" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Vector UInt8 (KC (I UInt32 32)))
-    ] NoSelf 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+      Parameter "param1" (Reference  (Vector UInt8 (KC (I UInt32 32))))
+    ] NoSelf [] undefined
   ] []) undefined
 
 noHandlerClassWithoutOneMethodAndZeroFields :: AnnASTElement SemanticAnns
 noHandlerClassWithoutOneMethodAndZeroFields = TypeDefinition (Class "id0" [
-    ClassMethod "method0" [] NoSelf 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ClassMethod "method0" [] NoSelf [] undefined
   ] [Modifier "no_handler" Nothing]) undefined
 
 classWithOneMethodAndTwoFields :: AnnASTElement SemanticAnns
@@ -46,8 +43,7 @@ classWithOneMethodAndTwoFields = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8 undefined,
     ClassField "field1" (Vector UInt64 (KC (I UInt32 24))) undefined,
-    ClassMethod "method0" [] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ClassMethod "method0" [] Self [] undefined
   ] []) undefined
 
 noHandlerClassWithOneEmptyMethod :: AnnASTElement SemanticAnns
@@ -55,8 +51,7 @@ noHandlerClassWithOneEmptyMethod = TypeDefinition
   (Class "id0" [
     ClassField "field0" UInt8 undefined,
     ClassField "field1" (Vector UInt64 (KC (I UInt32 24))) undefined,
-    ClassMethod "method0" [] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ClassMethod "method0" [] Self [] undefined
   ] [Modifier "no_handler" Nothing]) undefined
 
 packedClass :: AnnASTElement SemanticAnns
@@ -67,9 +62,8 @@ packedClass = TypeDefinition
     ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
     ClassMethod "method0" [
       Parameter "param0" Char,
-      Parameter "param1" (Vector UInt8 (KC (I UInt32 16)))
-    ] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+      Parameter "param1" (Reference (Vector UInt8 (KC (I UInt32 16))))
+    ] Self [] undefined
   ] [Modifier "packed" Nothing]) undefined
 
 alignedClass :: AnnASTElement SemanticAnns
@@ -78,8 +72,7 @@ alignedClass = TypeDefinition
     ClassField "field0" UInt64 undefined,
     ClassField "field1" UInt16 undefined,
     ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
-    ClassMethod "method0" [] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ClassMethod "method0" [] Self [] undefined
   ] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
 
 packedAndAlignedClass :: AnnASTElement SemanticAnns
@@ -88,8 +81,7 @@ packedAndAlignedClass = TypeDefinition
     ClassField "field0" UInt64 undefined,
     ClassField "field1" (DefinedType "TCDescriptor") undefined,
     ClassField "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32))) undefined,
-    ClassMethod "method0" [] Self 
-      (BlockRet [] (ReturnStmt Nothing undefined)) undefined
+    ClassMethod "method0" [] Self [] undefined
   ] [
       Modifier "packed" Nothing,
       Modifier "align" (Just (KC (I UInt32 16)))

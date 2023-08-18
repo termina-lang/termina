@@ -5,7 +5,7 @@ import PPrinter.Expression
 import Prettyprinter
 import SemanAST
 import Semantic.Monad
-import Data.Map (union, fromList)
+import Data.Map (union, fromList, empty)
 
 import PPrinter.Statement.VariableInitialization
 
@@ -30,10 +30,19 @@ ppMatchCase subs symbol (MatchCase identifier params body _) =
     in
         vsep [ppStatement newSubs s <> line | s <- body]
 
+ppReturnStmt :: DocStyle -> ReturnStmt SemanticAnns -> DocStyle
+ppReturnStmt identifier (ReturnStmt (Just expr) _) =
+    case getType expr of
+        (Vector {}) -> returnC <+> 
+            parens (ppReturnVectorValueStructure identifier <+> pretty "*") <> ppExpression empty expr <> semi
+        _ -> returnC <+> ppExpression empty expr <> semi
+ppReturnStmt _ (ReturnStmt Nothing _) = returnC <> semi
+
 ppStatement :: Substitutions -> Statement SemanticAnns -> DocStyle
 ppStatement subs (Declaration identifier ts expr _) =
   case ts of
-    Vector _ _ -> ppDeclareAndInitialize (ppInitializeVector subs 0) (pretty identifier) ts expr
+    Vector _ _ -> 
+        ppDeclareAndInitialize (ppInitializeVector subs 0) (pretty identifier) ts expr
     _ -> case expr of
         (FieldValuesAssignmentsExpression {}) ->
             ppDeclareAndInitialize (ppInitializeStruct subs 0) (pretty identifier) ts expr
@@ -54,6 +63,8 @@ ppStatement subs (AssignmentStmt (LHS obj) expr  _) =
                 braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject undefined subs obj) expr
             (EnumVariantExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject undefined subs obj) expr
+            (FunctionExpression {}) -> 
+                ppCDereferenceExpression  (ppObject undefined subs obj)
             _ -> ppObject undefined subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =

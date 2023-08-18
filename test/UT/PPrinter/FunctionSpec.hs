@@ -24,6 +24,9 @@ vectorTMDescriptorAnn = vectorSemAnn tmDescriptorTS (I UInt32 20)
 twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
+refVectorAnn :: SemanticAnns
+refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
+
 foo0 :: Expression SemanticAnns
 foo0 = AccessObject (RHS (Variable "foo0" uint32SemAnn))
 
@@ -48,14 +51,56 @@ structAFieldsInit0 =
          FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
+structAFieldsInit1 :: Expression SemanticAnns
+structAFieldsInit1 = 
+    FieldValuesAssignmentsExpression "StructA"
+        [FieldValueAssignment "field_a" (AccessObject (RHS (Variable "param0" uint32SemAnn))),
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
+
+structAFieldsInit2 :: Expression SemanticAnns
+structAFieldsInit2 = 
+    FieldValuesAssignmentsExpression "StructA"
+        [FieldValueAssignment "field_a" (AccessObject (RHS (Variable "param0" uint32SemAnn))),
+         FieldValueAssignment "field_b" (AccessObject (RHS (Variable "param1" vectorAnn))),
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
+
+structAFieldsInit3 :: Expression SemanticAnns
+structAFieldsInit3 = 
+    FieldValuesAssignmentsExpression "StructA"
+        [FieldValueAssignment "field_a" (AccessObject (RHS (Variable "param0" uint32SemAnn))),
+         FieldValueAssignment "field_b" (DereferenceExpression (AccessObject (RHS (Variable "param1" refVectorAnn))) vectorAnn),
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
+
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
 tmDescriptorFieldsInit0 = 
     FieldValuesAssignmentsExpression "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0,
          FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
 
-struct0Declaration, struct1Declaration :: Statement SemanticAnns
-struct0Declaration = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit0 undefined
+tmDescriptorFieldsInit1 :: Expression SemanticAnns
+tmDescriptorFieldsInit1 = 
+    FieldValuesAssignmentsExpression "TMDescriptor"
+        [FieldValueAssignment "field0" uint32Const0,
+         FieldValueAssignment "field1" structAFieldsInit1] tmDescriptorSemAnn
+
+tmDescriptorFieldsInit2 :: Expression SemanticAnns
+tmDescriptorFieldsInit2 = 
+    FieldValuesAssignmentsExpression "TMDescriptor"
+        [FieldValueAssignment "field0" uint32Const0,
+         FieldValueAssignment "field1" structAFieldsInit2] tmDescriptorSemAnn
+
+tmDescriptorFieldsInit3 :: Expression SemanticAnns
+tmDescriptorFieldsInit3 = 
+    FieldValuesAssignmentsExpression "TMDescriptor"
+        [FieldValueAssignment "field0" uint32Const0,
+         FieldValueAssignment "field1" structAFieldsInit3] tmDescriptorSemAnn
+
+struct0Declaration0, struct0Declaration1, struct0Declaration2, struct0Declaration3, struct1Declaration :: Statement SemanticAnns
+struct0Declaration0 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit0 undefined
+struct0Declaration1 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit1 undefined
+struct0Declaration2 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit2 undefined
+struct0Declaration3 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit3 undefined
 struct1Declaration = Declaration "struct1" tmDescriptorTS (AccessObject (RHS (Variable "struct0" tmDescriptorSemAnn))) undefined
 
 struct0 :: Object' Expression SemanticAnns
@@ -64,8 +109,8 @@ struct0 = Variable "struct0" tmDescriptorSemAnn
 struct0field0 :: Expression SemanticAnns
 struct0field0 = AccessObject (RHS (MemberAccess struct0 "field0" uint32SemAnn))
 
-struct0Assignment :: Statement SemanticAnns
-struct0Assignment = AssignmentStmt (LHS (MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
+struct0Assignment0 :: Statement SemanticAnns
+struct0Assignment0 = AssignmentStmt (LHS (MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
 
 returnVoid :: ReturnStmt SemanticAnns
 returnVoid = ReturnStmt Nothing unitSemAnn
@@ -74,11 +119,33 @@ returnStructField0 :: ReturnStmt SemanticAnns
 returnStructField0 = ReturnStmt (Just struct0field0) uint32SemAnn
 
 function0 :: AnnASTElement SemanticAnns
-function0 = Function "function0" [] Nothing (BlockRet [struct0Declaration, struct1Declaration, struct0Assignment] returnVoid) [] unitSemAnn
+function0 = Function "function0" [] Nothing (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnVoid) [] unitSemAnn
 
 function1 :: AnnASTElement SemanticAnns
-function1 = Function "function1" [] (Just UInt32) (BlockRet [struct0Declaration, struct1Declaration, struct0Assignment] returnStructField0) [] unitSemAnn
+function1 = Function "function1" [] (Just UInt32) (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnStructField0) [] unitSemAnn
 
+function2 :: AnnASTElement SemanticAnns
+function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
+  (BlockRet [
+    struct0Declaration1, 
+    struct1Declaration, 
+    struct0Assignment0] returnStructField0) [] unitSemAnn
+
+function3 :: AnnASTElement SemanticAnns
+function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (KC (I UInt32 10)))] (Just UInt32) 
+  (BlockRet [
+    struct0Declaration2, 
+    struct1Declaration, 
+    struct0Assignment0
+    ] returnStructField0) [] unitSemAnn
+
+function4 :: AnnASTElement SemanticAnns
+function4 = Function "function4" [Parameter "param0" UInt32, Parameter "param1" (Reference (Vector UInt32 (KC (I UInt32 10))))] (Just UInt32) 
+  (BlockRet [
+    struct0Declaration3, 
+    struct1Declaration, 
+    struct0Assignment0
+    ] returnStructField0) [] unitSemAnn
 
 renderFunctionDeclaration :: AnnASTElement SemanticAnns -> Text
 renderFunctionDeclaration = render . ppFunctionDeclaration
@@ -95,6 +162,19 @@ spec = do
     it "Prints fuction1 declaration" $ do
       renderFunctionDeclaration function1 `shouldBe`
         pack "uint32_t function1();"
+    it "Prints fuction2 declaration" $ do
+      renderFunctionDeclaration function2 `shouldBe`
+        pack "uint32_t function2(uint32_t param0);"
+    it "Prints fuction3 declaration" $ do
+      renderFunctionDeclaration function3 `shouldBe`
+        pack ("typedef struct {\n" ++
+              "    uint32_t array;\n" ++
+              "} __param__function3__param1_t;\n" ++
+              "\n" ++
+              "uint32_t function3(uint32_t param0, __param__function3__param1_t param1);")
+    it "Prints fuction4 declaration" $ do
+      renderFunctionDeclaration function4 `shouldBe`
+        pack "uint32_t function4(uint32_t param0, uint32_t param1[10]);"
   describe "Pretty printing function definitions" $ do
     it "Prints fuction0 definition" $ do
       renderFunction function0 `shouldBe`
@@ -129,6 +209,72 @@ spec = do
               "        struct0.field1.field_a = (uint32_t)0;\n" ++
               "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
               "            struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+              "        }\n" ++
+              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    TMDescriptor struct1 = struct0;\n" ++
+              "\n" ++
+              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "\n" ++
+              "    return struct0.field0;\n" ++
+              "\n" ++
+              "}")
+    it "Prints fuction2 definition" $ do
+      renderFunction function2 `shouldBe`
+        pack ("uint32_t function2(uint32_t param0) {\n" ++
+              "    \n" ++
+              "    TMDescriptor struct0;\n" ++
+              "\n" ++
+              "    {\n" ++
+              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field1.field_a = param0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "            struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+              "        }\n" ++
+              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    TMDescriptor struct1 = struct0;\n" ++
+              "\n" ++
+              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "\n" ++
+              "    return struct0.field0;\n" ++
+              "\n" ++
+              "}")
+    it "Prints fuction3 definition" $ do
+      renderFunction function3 `shouldBe`
+        pack ("uint32_t function3(uint32_t param0, __param__function3__param1_t param1) {\n" ++
+              "    \n" ++
+              "    TMDescriptor struct0;\n" ++
+              "\n" ++
+              "    {\n" ++
+              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field1.field_a = param0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "            struct0.field1.field_b[__i0] = param1.array[__i0];\n" ++
+              "        }\n" ++
+              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    TMDescriptor struct1 = struct0;\n" ++
+              "\n" ++
+              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "\n" ++
+              "    return struct0.field0;\n" ++
+              "\n" ++
+              "}")
+    it "Prints fuction4 definition" $ do
+      renderFunction function4 `shouldBe`
+        pack ("uint32_t function4(uint32_t param0, uint32_t param1[10]) {\n" ++
+              "    \n" ++
+              "    TMDescriptor struct0;\n" ++
+              "\n" ++
+              "    {\n" ++
+              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field1.field_a = param0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "            struct0.field1.field_b[__i0] = param1[__i0];\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
               "    }\n" ++
