@@ -690,3 +690,13 @@ allUnique xs = nub xs == xs
 repeated :: Eq a => [a] -> [a]
 repeated xs = nub $ xs Data.List.\\ nub xs
 -----------------------------------------
+
+
+--- Exectuing Type Checking
+typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation
+  -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns) , ExpressionState)
+typeCheckRunE = runTypeChecking initialExpressionSt  . mapM programSeman
+
+typeCheckRun :: PAST.AnnotatedProgram Parser.Annotation
+  -> Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
+typeCheckRun = fst . typeCheckRunE

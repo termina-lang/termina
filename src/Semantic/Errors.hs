@@ -132,6 +132,7 @@ withError = flip catchError . (throwError .)
 ----------------------------------------
 
 data AnnotatedErrors a = AnnError {semError :: Errors a , annError :: a }
+  deriving Show
 
 annotateError :: a -> Errors a -> AnnotatedErrors a
 annotateError = flip AnnError

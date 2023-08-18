@@ -5,6 +5,7 @@ import Parsing
 import Options
 import PPrinter
 -- import Control.Applicative
+import Semantic.TypeChecking
 
 import Text.Parsec (runParser)
 
@@ -45,7 +46,9 @@ main = runCommand $ \opts args ->
                 Right ast ->
                   output
                   (if optPrintAST opts then
-                     T.pack " TODO : ppHeaderFile ast "
+                     case typeCheckRun ast of
+                       Left err -> T.pack $ "ERRORRRRRRRRR:: " ++ show err
+                       Right tast -> ppHeaderFile tast
                   else
                     T.pack "Ok!" )
             _ -> ioError $ userError "Too much arguments king!"
