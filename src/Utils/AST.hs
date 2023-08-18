@@ -21,51 +21,96 @@ groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspe
 groundTyEq  _ _ = False
 
 ----------------------------------------
--- Annotations helpers
+-- The following function defines a traversal..
+-- I am not going to abstract the traverse parttern right now, but we should do
+-- it next time we need it.
 
--- forgetAnnotations :: AnnotatedProgram a -> Program
--- forgetAnnotations = map (fmap (const ()))
+-- What dependencies we are interested right now
+data ClassDep
+  -- Variables
+  = SVar Identifier
+  -- Method accesses
+  | MethodAccess ClassDep Identifier
+  -- Field accesses
+  | FieldAccess ClassDep Identifier
+  -- We mark as undec objects defined through expressions.
+  | Undec
+  -- see README/Q22
 
--- getObjectAnnotations :: Object' exprI a -> a
--- getObjectAnnotations (Variable _ a)                = a
--- getObjectAnnotations (IdentifierExpression _ a)    = a
--- getObjectAnnotations (VectorIndexExpression _ _ a) = a
--- getObjectAnnotations (MemberAccess _ _ a)          = a
--- getObjectAnnotations (Dereference _ a)             = a
--- getObjectAnnotations (MemberMethodAccess _ _ _ a)    = a
+depToList :: ClassDep -> Maybe (Identifier, [Identifier])
+depToList (SVar i) = Just (i, [])
+depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
+depToList (FieldAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
+depToList Undec = Nothing
 
--- | First annotation level.
--- getAnnotations :: Expression a -> a
--- getAnnotations (AccessObject (RHS obj))                 = getObjectAnnotations obj
--- getAnnotations (Constant _ a)                           = a
--- getAnnotations (BinOp _ _ _ a)                          = a
--- getAnnotations (ReferenceExpression _ a)                = a
--- getAnnotations (Casting _ _ a)                          = a
--- getAnnotations (FunctionExpression _ _ a)               = a
--- getAnnotations (FieldValuesAssignmentsExpression _ _ a) = a
--- getAnnotations (EnumVariantExpression _ _ _ a)          = a
--- getAnnotations (VectorInitExpression _ _ a)             = a
--- getAnnotations (ParensExpression _ a)                   = a
--- getAnnotations (DereferenceExpression _ a)              = a
--- getAnnotations (OptionVariantExpression _ a)            = a
+getRoot :: ClassDep -> Maybe Identifier
+getRoot = fmap fst . depToList
+
+-- |getDepObj| is where we compute the use of names and dependencies
+-- The rest is just how we traverse the AST.
+-- Here we collect two things:
+-- the name of the object the argument is defining
+-- and the extra dependencies we may need.
+getDepObj :: RHSObject a -> (ClassDep, [ ClassDep ])
+getDepObj = getDepObj' . unRHS
+  where
+    getDepObj' (Variable ident _ann) = (SVar ident, [])
+    -----------
+    -- TODO Q22
+    getDepObj' (IdentifierExpression e _ann) = (Undec, getDepExp e)
+    -----------
+    getDepObj' (VectorIndexExpression obj eix _ann)
+      = let (dnm, deps) = getDepObj' obj in (dnm, deps ++ getDepExp eix)
+    getDepObj' (MemberAccess obj ident _ann)
+      = let (dnm,deps) = getDepObj' obj
+      in (FieldAccess dnm ident , deps)
+    getDepObj' (MemberMethodAccess obj ident es _ann)
+      = let (dnm, deps) = getDepObj' obj
+      in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
+    getDepObj' (Dereference obj _ann ) = getDepObj' obj
+
+getDepBlock :: Block a -> [ClassDep]
+getDepBlock = concatMap getDepStmt
+
+getDepStmt :: Statement a -> [ClassDep]
+getDepStmt (Declaration _ _ e _)
+  = getDepExp e
+getDepStmt (AssignmentStmt _ e _)
+  = getDepExp e
+getDepStmt (IfElseStmt ec tB eB fB _)
+  = getDepExp ec
+  ++ concatMap getDepStmt tB
+  ++ concatMap
+      (\eC -> getDepExp (elseIfCond eC) ++ concatMap getDepStmt (elseIfBody eC) )
+      eB
+  ++ concatMap getDepStmt fB
+getDepStmt (ForLoopStmt _ initE lastE breakE body _)
+  = concatMap getDepExp [initE, lastE]
+  ++ maybe [] getDepExp breakE
+  ++ concatMap getDepStmt body
+getDepStmt (MatchStmt e mBody _)
+  = getDepExp e
+  ++ concatMap (concatMap getDepStmt . matchBody) mBody
+getDepStmt (SingleExpStmt e _)
+  = getDepExp e
 
 
--- getAnnotationGlobal :: Global a -> a
--- getAnnotationGlobal (Volatile _ _ _ _ a) = a
--- getAnnotationGlobal (Static _ _ _ _ a)   = a
--- getAnnotationGlobal (Shared _ _ _ _ a)   = a
--- getAnnotationGlobal (Const _ _ _ _ a)    = a
-
--- getAnnotationType :: TypeDef a -> a
--- getAnnotationType (Struct _ _ _ a) = a
--- getAnnotationType (Union _ _ _ a)  = a
--- getAnnotationType (Enum _ _ _ a)   = a
--- getAnnotationType (Class _ _ _ a)  = a
-
--- getAnnotationsAST :: AnnASTElement a -> a
--- getAnnotationsAST (Task _ _ _ _ _ a) = a
--- getAnnotationsAST (Function _ _ _ _ _ a) = a
--- getAnnotationsAST (Handler _ _ _ _ _ a) = a
--- getAnnotationsAST (GlobalDeclaration glb) =  getAnnotationGlobal glb
--- getAnnotationsAST (TypeDefinition _ a) =  a
--- getAnnotationsAST (ModuleInclusion {}) =  error "Module Inclusion not defined yet "
+getDepExp :: Expression a -> [ClassDep]
+getDepExp (AccessObject obj) =
+  let (dnm, deps) = getDepObj obj in (dnm : deps)
+getDepExp (Constant {}) = []
+getDepExp ( ParensExpression e _ ) = getDepExp e
+getDepExp ( BinOp _op le re _ann ) = getDepExp le ++ getDepExp re
+getDepExp ( ReferenceExpression obj _ann ) =
+  let (dnm, deps) = getDepObj obj in (dnm : deps)
+getDepExp ( DereferenceExpression e _ann ) = getDepExp e
+getDepExp ( Casting e _ty _ann ) = getDepExp e
+getDepExp ( FunctionExpression _id args _ann) = concatMap getDepExp args
+getDepExp ( VectorInitExpression iE _const _ann ) = getDepExp iE
+getDepExp ( FieldValuesAssignmentsExpression _id fs _ann )
+  = concatMap (getDepExp . fieldAssigExpression) fs
+getDepExp (EnumVariantExpression _i1 _i2 es _ann) = concatMap getDepExp es
+getDepExp (OptionVariantExpression os _ann)
+  =  case os of
+       None -> []
+       Some e -> getDepExp e

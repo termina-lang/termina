@@ -116,6 +116,7 @@ data Errors a
   -- | Class Definition
   | EClassEmptyMethods Identifier
   | ENotClassField Identifier
+  | ClassSelfNoSelf
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a
