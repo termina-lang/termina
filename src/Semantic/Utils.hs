@@ -12,5 +12,5 @@ import Annotations
 getExpType :: Expression SemanticAnns -> Maybe TypeSpecifier
 getExpType = getTySpec . ty_ann . getAnnotation
 
-getElemSemanticInfo :: AnnASTElement SemanticAnns -> Maybe (GEntry Annotation)
+getElemSemanticInfo :: AnnASTElement SemanticAnns -> Maybe (GEntry SemanticAnns)
 getElemSemanticInfo = getGEntry . ty_ann . getAnnotation

@@ -55,8 +55,14 @@ data Errors a
   | EVector TypeSpecifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
+  | EMethodAccessNotClass TypeSpecifier
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
+  | EMemberAccessNotMethod Identifier
   | EMemberAccessUDef (SemanTypeDef a)
+  | EMemberMethodUDef (SemanTypeDef a)
+  | EMemberMethodType
+  | EMemberMethodExtraParams
+  | EMemberMethodMissingParams
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some
@@ -117,6 +123,8 @@ data Errors a
   | EClassEmptyMethods Identifier
   | ENotClassField Identifier
   | ClassSelfNoSelf
+  -- Dereference Object
+  | ETypeNotReference TypeSpecifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

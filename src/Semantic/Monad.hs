@@ -46,13 +46,13 @@ instance Annotated SAnns where
 data SemanticElems
   = ETy TypeSpecifier -- ^ Expressions with their types
   | STy -- ^ Statements with no types
-  | GTy (GEntry Locations) -- ^ Global elements
+  | GTy (GEntry SemanticAnns) -- ^ Global elements
 
 getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
 getTySpec _        = Nothing
 
-getGEntry :: SemanticElems -> Maybe (GEntry Locations)
+getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
 getGEntry (GTy a) = Just a
 getGEntry _       = Nothing
 
@@ -62,10 +62,10 @@ buildExpAnn loc ty = SemAnn loc (ETy ty)
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
 
-buildGlobal :: Locations -> GEntry Locations -> SAnns SemanticElems
+buildGlobal :: Locations -> GEntry SemanticAnns -> SAnns SemanticElems
 buildGlobal loc = SemAnn loc . GTy
 
-buildGlobalTy :: Locations -> SemanTypeDef Locations -> SAnns SemanticElems
+buildGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SAnns SemanticElems
 buildGlobalTy loc = SemAnn loc . GTy . GType
 
 buildStmtAnn :: Locations -> SAnns SemanticElems
@@ -76,6 +76,9 @@ type SemanticAnns = SAnns SemanticElems
 
 forgetSemAnn :: SAnns a -> Locations
 forgetSemAnn = location
+
+getTypeSAnns :: SemanticAnns -> Maybe TypeSpecifier
+getTypeSAnns  = getTySpec . ty_ann
 
 -- -- | Global Definitions
 -- type GlobalsSemantic = SAnns (GEntry ())

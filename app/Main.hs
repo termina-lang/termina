@@ -45,7 +45,7 @@ main = runCommand $ \opts args ->
                 Right ast ->
                   output
                   (if optPrintAST opts then
-                    ppHeaderFile ast
+                     T.pack " TODO : ppHeaderFile ast "
                   else
                     T.pack "Ok!" )
             _ -> ioError $ userError "Too much arguments king!"

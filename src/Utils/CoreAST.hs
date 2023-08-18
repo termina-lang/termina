@@ -1,28 +1,16 @@
+{-# Language LambdaCase #-}
 -- | Util functions related to CoreAST
 
 module Utils.CoreAST where
 
 import           CoreAST
+import Data.List
 
--- traversalAnnotatedExp
---   -- AccessObject
---   :: (rho a -> b)
---   -- Constants
---   -> (Const -> a -> b)
---   -- ParensExpression
---   -> (b -> a -> b)
---   -- BinOp
---   -> (op -> b -> b -> a -> b)
---   -- Reference
---   -> (rho a -> a -> b)
---   -- DereferenceExpression
---   -> (b -> a -> b)
---   -- Casting
---   -> (b -> TypeSpecifier -> a -> b)
---   -- Function Expression
---   -> (Identifier -> [b] -> a -> b)
---   -- VectorInit
---   -> (b -> ConstExpression -> a -> b)
---   -- FieldValue
---   -> (Identifier -> [FieldValueAssignment' _b a])
---   Expression' rho a -> b
+findClassField :: Identifier -> [ ClassMember' expr lho a ] -> Maybe (TypeSpecifier, a)
+findClassField i = fmap (\case {ClassMethod {} -> error "Impossible after find 1"; ClassField _ t a -> (t, a)}) . find (\case { ClassMethod {} -> False; ClassField ident _ _ -> ident == i;})
+
+findClassMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], a)
+findClassMethod i
+  = fmap (\case {ClassField {} -> error "Impossible after find 2"; ClassMethod _ ps _ _ a -> (ps,a)}
+         ) .
+  find (\case{ClassField {} -> False; ClassMethod ident _ _ _ _ -> (ident == i)})

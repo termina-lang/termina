@@ -13,6 +13,7 @@ import           AST                  as PAST
 import Annotations
 import           CoreAST
 import           Utils.AST
+import           Utils.CoreAST
 import           Utils.TypeSpecifier
 import Utils.SemanAST
 
@@ -145,10 +146,13 @@ objectType  getVarTy typeI (VectorIndexExpression obj idx ann) =
         else throwError $ annotateError ann (ENumTs [idx_ty])
     ty -> throwError $ annotateError ann (EVector ty)
 objectType getVarTy typeI (MemberAccess obj ident ann) =
+  --
   typeObject getVarTy typeI obj  >>= \(obj_typed , obj_ty) ->
+  -- Only complex types are the ones defined by the user
   case obj_ty of
     DefinedType dident -> getGlobalTy ann dident >>=
       \case{
+        -- Either a struct
         Struct _identTy fields _mods ->
             let mfield = find ((ident ==) . fieldIdentifier) fields in
               maybe
@@ -156,17 +160,46 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
               (return . SAST.MemberAccess obj_typed ident . buildExpAnn ann . fieldTypeSpecifier)
               mfield
         ;
+        -- Or a class
         Class _identTy cls _mods ->
           -- TODO Class access?
-          _ClassAccess
+          -- Find |ident| field in the class.
+          case findClassField ident cls of
+            Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
+            -- type |t| and the type inside |a| should be the same, no?
+            Just (t , a) -> return (SAST.MemberAccess obj_typed ident (buildExpAnn ann t))
         ;
+        -- Other types do not have members.
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
       }
     ty -> throwError $ annotateError ann (EMemberAccess ty)
 objectType getVarTy typeI (MemberMethodAccess obj ident args ann) =
-  _ClassMethodAccess
+  typeObject getVarTy typeI obj  >>= \(obj_typed , obj_ty) ->
+  case obj_ty of
+    DefinedType dident -> getGlobalTy ann dident >>=
+      \case{
+         Class _identTy cls _mods ->
+         case findClassMethod ident cls of
+           Nothing -> throwError $ annotateError ann (EMemberAccessNotMethod ident)
+           Just (ps, anns) ->
+             let (psLen , asLen ) = (length ps, length args) in
+             if psLen == asLen
+             then SAST.MemberMethodAccess obj_typed ident
+                 <$> zipWithM (\p e -> mustByTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnn ann) (getTypeSAnns anns)
+             else if psLen < asLen
+             then throwError $ annotateError ann EMemberMethodExtraParams
+             else throwError $ annotateError ann EMemberMethodMissingParams
+         ;
+         -- Other User defined types do not define methods
+         ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
 objectType getVarTy typeI (Dereference obj ann) =
-  _Dereference
+  typeObject getVarTy typeI obj >>= \(obj_typed , obj_ty ) ->
+  case obj_ty of
+   Reference ty -> return $ SAST.Dereference obj_typed $ buildExpAnn ann ty
+   ty -> throwError $ annotateError ann $ ETypeNotReference ty
 
 typeObject
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
@@ -190,7 +223,7 @@ expressionType
 --   -- | Assign type to a variable found in the wild (RHS variables).
 --   -- The type of a variable is whatever the environment says.
 --   SAST.Variable vident . buildExpAnn pann <$> getRHSVarTy pann vident
-expressionType (AccessObject obj) = _TypeAccess
+expressionType (AccessObject obj) = AccessObject . fst <$> rhsObject obj
 expressionType (Constant c pann) =
   -- | Constants
   SAST.Constant c . buildExpAnn pann <$>
@@ -446,8 +479,16 @@ programSeman (Handler ident ps ty bret mods anns) =
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> globalCheck gbl
-programSeman (TypeDefinition tydef ann) = _addType
+programSeman (TypeDefinition tydef ann) =
+  typeDefCheck ann tydef >>= \t ->
+  return $ TypeDefinition t (buildGlobalTy ann (semanticTypeDef t))
 programSeman (ModuleInclusion ident _mods anns) = undefined
+
+semanticTypeDef :: SAST.TypeDef SemanticAnns -> SemanTypeDef SemanticAnns
+semanticTypeDef (Struct i f m) = Struct i f m
+semanticTypeDef (Union i f m) = Union i f m
+semanticTypeDef (Enum i e m) = Enum i e m
+semanticTypeDef (Class i cls m) = Class i (Data.List.map kClassMember cls) m
 
 typeExpression :: Expression Locations -> SemanticMonad (SAST.Expression SemanticAnns , TypeSpecifier)
 typeExpression e = expressionType e >>= \typed_e -> (typed_e, ) <$> getExpType typed_e
