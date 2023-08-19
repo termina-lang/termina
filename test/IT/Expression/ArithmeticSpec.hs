@@ -35,4 +35,4 @@ spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints function test0" $ do
       renderInput test0 `shouldBe`
-        pack "test0"
+        pack "void test0();"
