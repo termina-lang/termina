@@ -4,7 +4,7 @@ module Utils.AST where
 
 import           AST
 
--- Ground Type equiality?
+-- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
 groundTyEq  UInt8  UInt8 = True
 groundTyEq  UInt16  UInt16 = True
@@ -15,6 +15,7 @@ groundTyEq  Int16  Int16 = True
 groundTyEq  Int32  Int32 = True
 groundTyEq  Int64  Int64 = True
 groundTyEq  Bool  Bool = True
+groundTyEq  Unit Unit = True
 groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
@@ -38,10 +39,10 @@ data ClassDep
   -- see README/Q22
 
 depToList :: ClassDep -> Maybe (Identifier, [Identifier])
-depToList (SVar i) = Just (i, [])
+depToList (SVar i)           = Just (i, [])
 depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
-depToList (FieldAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
-depToList Undec = Nothing
+depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) <$> depToList a
+depToList Undec              = Nothing
 
 getRoot :: ClassDep -> Maybe Identifier
 getRoot = fmap fst . depToList
@@ -112,5 +113,5 @@ getDepExp ( FieldValuesAssignmentsExpression _id fs _ann )
 getDepExp (EnumVariantExpression _i1 _i2 es _ann) = concatMap getDepExp es
 getDepExp (OptionVariantExpression os _ann)
   =  case os of
-       None -> []
+       None   -> []
        Some e -> getDepExp e
