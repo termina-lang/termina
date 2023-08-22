@@ -279,7 +279,7 @@ expressionParser' = Ex.buildExpressionParser
     ,[binaryInfix "&&" LogicalAnd Ex.AssocLeft]
     ,[binaryInfix "||" LogicalOr Ex.AssocLeft]
     ]
-    termParser
+    expressionTermParser
   where binaryInfix s f = Ex.Infix (do
           _ <- reservedOp s
           p <- getPosition
@@ -320,19 +320,30 @@ enumVariantExprParser = do
   return $ EnumVariantExpression enum variant parameterList (Position p)
 
 expressionParser :: Parser (Expression Annotation)
-expressionParser = try functionCallParser
-  <|> try optionVariantExprParser
+expressionParser = try optionVariantExprParser
   <|> try enumVariantExprParser
-  <|> try (AccessObject <$> vectorIndexParserRHS)
-  <|> try (AccessObject <$> memberAccessParserRHS)
-  <|> try (AccessObject <$> dereferenceParserRHS)
+  <|> referenceExprParser
+  <|> vectorInitParser
+  <|> fieldValuesAssignExpressionParser
   <|> expressionParser'
 
-termParser :: Parser (Expression Annotation)
-termParser = vectorInitParser
-  <|> AccessObject <$> variableParserRHS
-  <|> constExprParser
-  <|> fieldValuesAssignExpressionParser
+referenceExprParser :: Parser (Expression Annotation)
+referenceExprParser = do
+  p <- getPosition
+  _ <- reservedOp "&"
+  object <- objectParser rhsObjectTermParser
+  return $ ReferenceExpression (RHS object) (Position p)
+
+objectParserRHS :: Parser (RHSObject Annotation)
+objectParserRHS = RHS <$> objectParser rhsObjectTermParser
+
+rhsObjectTermParser :: Parser (Object' Expression Annotation)
+rhsObjectTermParser = try variableParser
+  <|> IdentifierExpression <$> functionCallParser <*> (Position <$> getPosition)
+
+expressionTermParser :: Parser (Expression Annotation)
+expressionTermParser = constExprParser
+  <|> AccessObject <$> objectParserRHS
   <|> parensExprParser
 
 parensExprParser :: Parser (Expression Annotation)
@@ -345,64 +356,45 @@ parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position 
 emptyParser :: Parser (Empty a)
 emptyParser = fail "Parsing Emtpy elements. Complex Experssions on RHS??"
 
-memberAccessParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
-memberAccessParser identifierObjectParser = do
-  p <- getPosition
-  object <- objectParser identifierObjectParser
-  _ <- reservedOp "."
-  m <- identifierParser
-  return $ MemberAccess object m (Position p)
-
-memberAccessParserRHS :: Parser (RHSObject Annotation)
-memberAccessParserRHS = RHS <$> memberAccessParser expressionParser
-
-vectorIndexParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
-vectorIndexParser identifierExpressionParser = do
-  p <- getPosition
-  object <- objectParser identifierExpressionParser
-  index <- brackets expressionParser
-  return $ VectorIndexExpression object index (Position p)
-
-vectorIndexParserRHS :: Parser (RHSObject Annotation)
-vectorIndexParserRHS = RHS <$> vectorIndexParser expressionParser
-
-dereferenceParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
-dereferenceParser identifierExpressionParser = do
+dereferenceParser :: Parser (Object' exprI Annotation) -> Parser (Object' exprI Annotation)
+dereferenceParser termParser = do
   p <- getPosition
   _ <- reservedOp "*"
-  object <- objectParser identifierExpressionParser
+  object <- objectParser termParser
   return $ Dereference object (Position p)
 
-dereferenceParserRHS :: Parser (RHSObject Annotation)
-dereferenceParserRHS = RHS <$> dereferenceParser expressionParser
+--  dereferenceParserRHS :: Parser (RHSObject Annotation)
+-- dereferenceParserRHS = RHS <$> dereferenceParser expressionParser
 
--- | This parser is only used to parse object expressions that are used 
--- as the left hand side of an assignment expression.
-objectParser :: Parser (exprI Annotation) -> Parser (Object' exprI Annotation)
-objectParser expressionIdentifierParser
-  = try (memberAccessParser expressionIdentifierParser)
-  <|> try (vectorIndexParser expressionIdentifierParser)
-  <|> dereferenceParser expressionIdentifierParser
-  <|> try (Variable <$> identifierParser <*> (Position <$> getPosition))
-  <|> try (parens (objectParser expressionIdentifierParser))
-  -- ^ Just in case we have a parenthesized object.
-  -- Should we allow this?
-  <|> IdentifierExpression <$> expressionIdentifierParser <*> (Position <$> getPosition)
+objectParser :: Parser (Object' exprI Annotation) -> Parser (Object' exprI Annotation)
+objectParser = Ex.buildExpressionParser
+    [[vectorIndexPostfix]
+    ,[memberAccessPostfix]
+    ,[dereferencePrefix]
+    ]
+  where vectorIndexPostfix = Ex.Postfix (do
+          index <- brackets expressionParser
+          p <- getPosition
+          return $ \parent ->  VectorIndexExpression parent index (Position p))
+        memberAccessPostfix = Ex.Postfix (do
+          _ <- reservedOp "."
+          p <- getPosition
+          member <- identifierParser
+          return $ \parent ->  MemberAccess parent member (Position p))
+        dereferencePrefix = Ex.Prefix (do
+          p <- getPosition
+          _ <- reservedOp "*"
+          return $ flip Dereference (Position p))
 
 -- Plain variable names belong to whatever |exprI| we want.
 variableParser :: Parser (Object' exprI Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
 
-variableParserRHS :: Parser (RHSObject Annotation)
-variableParserRHS = RHS <$> variableParser
-
 -- | LHS objects cannot have identifier expressions and we note that using
 -- the |Empty| type and its parser |emptyParser|.
 objectParserLHS :: Parser (LHSObject Annotation)
-objectParserLHS = LHS <$> objectParser emptyParser
+objectParserLHS = LHS <$> objectParser variableParser
 
-objectParserRHS :: Parser (RHSObject Annotation)
-objectParserRHS = RHS <$> objectParser expressionParser
 ----------------------------------------
 
 vectorInitParser :: Parser (Expression Annotation)
@@ -418,9 +410,7 @@ vectorInitParser = do
 -- -- Task Definition
 
 blockParser :: Parser (BlockRet Annotation)
-blockParser = BlockRet <$> many blockItemParser <*> returnStmtParser
-  -- body <- many blockItemParser
-  -- ret <- returnStmtParser
+blockParser = BlockRet  <$> many blockItemParser <*> returnStmtParser
 
 -- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
 taskParser :: Parser (AnnASTElement  Annotation)
