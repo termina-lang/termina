@@ -2,37 +2,88 @@ module IT.Expression.ArithmeticSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
 import Data.Text hiding (empty)
-import Semantic.Monad
-import PPrinter.Expression
-import UT.PPrinter.Expression.Common
-import Data.Map
 import Parsing
 import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn test() {\n" ++
+test0 = "fn test0() {\n" ++
         "    var foo : u16 = 0 : u16;\n" ++
+        "    foo = foo + 1024 : u16;\n" ++
+        "    foo = 1024 : u16 + foo;\n" ++
+        "    foo = foo - 1024 : u16;\n" ++
+        "    foo = 1024 : u16 - foo;\n" ++
+        "    foo = foo * 1024 : u16;\n" ++
+        "    foo = 1024 : u16 * foo;\n" ++
+        "    foo = foo / 1024 : u16;\n" ++
+        "    foo = 1024 : u16 / foo;\n" ++
         "    return;\n" ++
         "}"
 
-renderInput :: String -> Text
-renderInput input = case parse (contents topLevel) "" input of
+test1 :: String
+test1 = "fn test1(foo : 'dyn u16) {\n" ++
+        "    foo = foo + 1024 : u16;\n" ++
+        "    foo = 1024 : u16 + foo;\n" ++
+        "    foo = foo - 1024 : u16;\n" ++
+        "    foo = 1024 : u16 - foo;\n" ++
+        "    foo = foo * 1024 : u16;\n" ++
+        "    foo = 1024 : u16 * foo;\n" ++
+        "    foo = foo / 1024 : u16;\n" ++
+        "    foo = 1024 : u16 / foo;\n" ++
+        "    return;\n" ++
+        "}"
+
+renderHeader :: String -> Text
+renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
       Right tast -> ppHeaderFile tast
-    
-{-- case typeCheckRun ast of
-    Left err -> error $ "Type Error: " ++ show err
-    Right tast -> ppHeaderFile tast --}
+
+renderSource :: String -> Text
+renderSource input = case parse (contents topLevel) "" input of
+  Left err -> error $ "Parser Error: " ++ show err
+  Right ast -> 
+    case typeCheckRun ast of
+      Left err -> pack $ "Type error: " ++ show err
+      Right tast -> ppSourceFile tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
-    it "Prints function test0" $ do
-      renderInput test0 `shouldBe`
-        pack "void test();"
+    it "Prints declaration of function test0" $ do
+      renderHeader test0 `shouldBe`
+        pack "void test0();"
+    it "Prints definition of function test0" $ do
+      renderSource test0 `shouldBe`
+        pack ("void test0() {\n" ++
+              "    \n" ++
+              "    uint16_t foo = (uint16_t)0;\n" ++ 
+              "\n" ++
+              "    foo = foo + (uint16_t)1024;\n" ++
+              "\n" ++
+              "    foo = (uint16_t)1024 + foo;\n" ++ 
+              "\n" ++
+              "    foo = foo - (uint16_t)1024;\n" ++ 
+              "\n" ++
+              "    foo = (uint16_t)1024 - foo;\n" ++
+              "\n" ++
+              "    foo = foo * (uint16_t)1024;\n" ++
+              "\n" ++
+              "    foo = (uint16_t)1024 * foo;\n" ++
+              "\n" ++
+              "    foo = foo / (uint16_t)1024;\n" ++
+              "\n" ++
+              "    foo = (uint16_t)1024 / foo;\n" ++
+              "\n" ++
+              "    return;\n" ++
+              "\n" ++
+              "}")    
+--    it "Prints declaration of function test1" $ do
+--      renderHeader test1 `shouldBe`
+--        pack "void test1();"
+--    it "Prints definition of function test1" $ do
+--      renderSource test1 `shouldBe`
+--        pack "void test1();"

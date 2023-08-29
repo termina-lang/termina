@@ -25,10 +25,17 @@ ppEmptyDoc = const emptyDoc
 ppHeaderASTElement :: AnnASTElement SemanticAnns -> DocStyle
 ppHeaderASTElement (TypeDefinition t _) = ppTypeDefDeclaration t
 ppHeaderASTElement func@(Function {}) = ppFunctionDeclaration func
-ppHeaderASTElement _ = pretty "vaya"
+ppHeaderASTElement _ = pretty "unsupported"
+
+ppSourceASTElement :: AnnASTElement SemanticAnns -> DocStyle
+ppSourceASTElement func@(Function {}) = ppFunction func
+ppSourceASTElement _ = pretty "unsupported"
 
 ppHeaderFile :: AnnotatedProgram SemanticAnns -> Text
 ppHeaderFile = render . vsep . map ppHeaderASTElement
+
+ppSourceFile :: AnnotatedProgram SemanticAnns -> Text
+ppSourceFile = render . vsep . map ppSourceASTElement
 
 -- ppProgramDebug :: AnnotatedProgram Annotation -> Text
 -- ppAnnonProgram = render . vsep . map (ppAnnAST (pretty . show))

@@ -252,7 +252,7 @@ referenceParser :: Parser TypeSpecifier
 referenceParser = reservedOp "&" >> Reference <$> typeSpecifierParser
 
 dynamicSubtypeParser :: Parser TypeSpecifier
-dynamicSubtypeParser = reservedOp "'dyn" >> Reference <$> typeSpecifierParser
+dynamicSubtypeParser = reservedOp "'dyn" >> DynamicSubtype <$> typeSpecifierParser
 
 optionParser :: Parser TypeSpecifier
 optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
