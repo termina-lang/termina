@@ -115,29 +115,29 @@ paramTy ann (p : _) [] = throwError $ annotateError ann EFunParams
 paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 
 
-rhsObject
-  :: RHSObject Parser.Annotation
-  -> SemanticMonad (SAST.RHSObject SemanticAnns, TypeSpecifier)
-rhsObject = (first SAST.RHS <$>) . typeObject getRHSVarTy (const typeExpression) . unRHS
+-- objectType
+--   :: Object Parser.Annotation
+--   -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
+-- objectType = typeObject getRHSVarTy (const typeExpression) . unRHS
 
-lhsObject
-  :: LHSObject Parser.Annotation
-  -> SemanticMonad (SAST.LHSObject SemanticAnns, TypeSpecifier)
-lhsObject =  (first SAST.LHS <$>) . typeObject getLHSVarTy failing . unLHS
-  where
-    failing ann _ = throwError $ annotateError ann ELHSComplex
+-- lhsObject
+--   :: LHSObject Parser.Annotation
+--   -> SemanticMonad (SAST.LHSObject SemanticAnns, TypeSpecifier)
+-- lhsObject =  (first SAST.LHS <$>) . typeObject getLHSVarTy failing . unLHS
+--   where
+--     failing ann _ = throwError $ annotateError ann ELHSComplex
 
+  --   (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
+  -- -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
 objectType
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
-  -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
-  -> Object' exprIdent Parser.Annotation
-  -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns)
-objectType getVarTy _ (Variable ident ann) =
+  -- ^ Scope of variables
+  -> Object Parser.Annotation
+  -> SemanticMonad (SAST.Object SemanticAnns)
+objectType getVarTy (Variable ident ann) =
   SAST.Variable ident . buildExpAnn ann <$> getVarTy ann ident
-objectType  _ exprIdent (IdentifierExpression e ann) =
-  exprIdent ann e >>= \(e_typed, e_ty) -> return (SAST.IdentifierExpression e_typed (buildExpAnn ann e_ty))
-objectType  getVarTy typeI (VectorIndexExpression obj idx ann) =
-  typeObject getVarTy typeI obj >>= \(obj_typed , obj_ty) ->
+objectType getVarTy (VectorIndexExpression obj idx ann) =
+  typeObject getVarTy obj >>= \(obj_typed , obj_ty) ->
   case obj_ty of
     Vector ty_elems _vexp ->
       typeExpression idx >>= \(idx_typed , idx_ty) ->
@@ -145,9 +145,9 @@ objectType  getVarTy typeI (VectorIndexExpression obj idx ann) =
         then return $ SAST.VectorIndexExpression obj_typed idx_typed $ buildExpAnn ann ty_elems
         else throwError $ annotateError ann (ENumTs [idx_ty])
     ty -> throwError $ annotateError ann (EVector ty)
-objectType getVarTy typeI (MemberAccess obj ident ann) =
+objectType getVarTy (MemberAccess obj ident ann) =
   --
-  typeObject getVarTy typeI obj  >>= \(obj_typed , obj_ty) ->
+  typeObject getVarTy obj  >>= \(obj_typed , obj_ty) ->
   -- Only complex types are the ones defined by the user
   case obj_ty of
     DefinedType dident -> getGlobalTy ann dident >>=
@@ -173,41 +173,26 @@ objectType getVarTy typeI (MemberAccess obj ident ann) =
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
       }
     ty -> throwError $ annotateError ann (EMemberAccess ty)
-objectType getVarTy typeI (MemberMethodAccess obj ident args ann) =
-  typeObject getVarTy typeI obj  >>= \(obj_typed , obj_ty) ->
-  case obj_ty of
-    DefinedType dident -> getGlobalTy ann dident >>=
-      \case{
-         Class _identTy cls _mods ->
-         case findClassMethod ident cls of
-           Nothing -> throwError $ annotateError ann (EMemberAccessNotMethod ident)
-           Just (ps, anns) ->
-             let (psLen , asLen ) = (length ps, length args) in
-             if psLen == asLen
-             then SAST.MemberMethodAccess obj_typed ident
-                 <$> zipWithM (\p e -> mustByTy (paramTypeSpecifier p) =<< expressionType e) ps args
-                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnn ann) (getTypeSAnns anns)
-             else if psLen < asLen
-             then throwError $ annotateError ann EMemberMethodExtraParams
-             else throwError $ annotateError ann EMemberMethodMissingParams
-         ;
-         -- Other User defined types do not define methods
-         ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
-      }
-    ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
-objectType getVarTy typeI (Dereference obj ann) =
-  typeObject getVarTy typeI obj >>= \(obj_typed , obj_ty ) ->
+objectType getVarTy (Dereference obj ann) =
+  typeObject getVarTy obj >>= \(obj_typed , obj_ty ) ->
   case obj_ty of
    Reference ty -> return $ SAST.Dereference obj_typed $ buildExpAnn ann ty
    ty -> throwError $ annotateError ann $ ETypeNotReference ty
 
+rhsObject :: Object Parser.Annotation
+  -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
+rhsObject = typeObject getRHSVarTy
+
+lhsObject :: Object Parser.Annotation
+  -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
+lhsObject = typeObject getLHSVarTy
+
 typeObject
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
-  -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
-  -> Object' exprIdent Parser.Annotation
-  -> SemanticMonad (SAST.Object' exprIdentS SemanticAnns, TypeSpecifier)
-typeObject identTy eidentTy =
-  (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy eidentTy
+  -> Object Parser.Annotation
+  -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
+typeObject identTy =
+  (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy
   where
     getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getAnnotation
 
@@ -266,6 +251,28 @@ expressionType (FunctionExpression fun_name args pann) =
   -- | Function Expression.  A tradicional function call
   getFunctionTy pann fun_name >>= \(params, retty) ->
   flip (SAST.FunctionExpression fun_name) (buildExpAnn pann retty) <$> paramTy pann params args
+expressionType (MemberMethodAccess obj ident args ann) =
+  rhsObject obj  >>= \(obj_typed , obj_ty) ->
+  case obj_ty of
+    DefinedType dident -> getGlobalTy ann dident >>=
+      \case{
+         Class _identTy cls _mods ->
+         case findClassMethod ident cls of
+           Nothing -> throwError $ annotateError ann (EMemberAccessNotMethod ident)
+           Just (ps, anns) ->
+             let (psLen , asLen ) = (length ps, length args) in
+             if psLen == asLen
+             then SAST.MemberMethodAccess obj_typed ident
+                 <$> zipWithM (\p e -> mustByTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnn ann) (getTypeSAnns anns)
+             else if psLen < asLen
+             then throwError $ annotateError ann EMemberMethodExtraParams
+             else throwError $ annotateError ann EMemberMethodMissingParams
+         ;
+         -- Other User defined types do not define methods
+         ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
 expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
   -- | Field Type
   catchError
@@ -595,7 +602,7 @@ typeDefCheck ann (Class ident cls mds)
                                          l@(ClassMethod ident ps _self bs _ann) ->
                                            (l, ident
                                            -- This is weird, can we have "self.f1(53).f2"
-                                           , concatMap (\case{ Just ("self", [ ids ]) -> [ ids ];
+                                           , concatMap (\case{ ("self", [ ids ]) -> [ ids ];
                                                                a -> error ("In case the impossible happens >>> " ++ show a);
                                                               }
                                                          . depToList

@@ -62,7 +62,7 @@ data K a = K
   deriving (Functor, Show)
 type SemanTypeDef a = TypeDef'' (SemanClassMember a)
 
-type SemanClassMember = ClassMember' K SAST.LHSObject
+type SemanClassMember = ClassMember' K SAST.Object
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a

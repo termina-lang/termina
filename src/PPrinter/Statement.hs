@@ -51,21 +51,21 @@ ppStatement subs (Declaration identifier ts expr _) =
         (EnumVariantExpression {}) ->
             ppDeclareAndInitialize (ppInitializeEnum subs 0) (pretty identifier) ts expr
         _ -> ppPrimitiveType ts <+> pretty identifier <+> pretty "=" <+> ppExpression subs expr <> semi
-ppStatement subs (AssignmentStmt (LHS obj) expr  _) =
+ppStatement subs (AssignmentStmt obj expr  _) =
     let ts = getObjectType obj in
     case ts of
         Vector _ _ ->
-            braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject undefined subs obj) expr
+            braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject subs obj) expr
         _ -> case expr of
             (FieldValuesAssignmentsExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject undefined subs obj) expr
+                braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr
             (OptionVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject undefined subs obj) expr
+                braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject subs obj) expr
             (EnumVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject undefined subs obj) expr
+                braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject subs obj) expr
             (FunctionExpression {}) -> 
-                ppCDereferenceExpression  (ppObject undefined subs obj)
-            _ -> ppObject undefined subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
+                ppCDereferenceExpression  (ppObject subs obj)
+            _ -> ppObject subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =
     ppCIfBlock (ppExpression subs cond) (vsep [ppStatement subs s <> line | s <- ifBody])
@@ -115,7 +115,7 @@ ppStatement subs (MatchStmt expr matchCases _) =
                 [] -> error "empty case list!"
     in
         case expr of
-            (AccessObject (RHS (Variable {}))) ->
+            (AccessObject (Variable {})) ->
                 let symbol = ppExpression subs expr in
                     ppMatchCases symbol matchCases
             _ ->

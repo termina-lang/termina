@@ -1,11 +1,11 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE EmptyDataDeriving #-}
+{-# LANGUAGE KindSignatures    #-}
 -- | Module defining core AST
 
 module CoreAST where
 
-import Annotations
+import           Annotations
 
 -- Parametric Emtpy Type
 data Empty (a :: *)
@@ -262,15 +262,15 @@ data EnumVariant = EnumVariant {
 data MatchCase' expr lho a = MatchCase
   {
     matchIdentifier :: Identifier
-  , matchBVars :: [Identifier]
-  , matchBody :: Block' expr lho a
+  , matchBVars      :: [Identifier]
+  , matchBody       :: Block' expr lho a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
 data ElseIf' expr lho a = ElseIf
   {
-    elseIfCond :: expr a
-  , elseIfBody :: Block' expr lho a
+    elseIfCond       :: expr a
+  , elseIfBody       :: Block' expr lho a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
@@ -284,8 +284,11 @@ data Expression' rho a
   | ReferenceExpression (rho a) a
   | DereferenceExpression (Expression' rho a) a
   | Casting (Expression' rho a) TypeSpecifier a
+  -- Invocation expressions
   | FunctionExpression Identifier [ Expression' rho a ] a
-  -- FunctionExpression (FuncName a) [ Expression a ] a
+  | MemberMethodAccess (rho a) Identifier [Expression' rho a] a
+  -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
+  --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
   | VectorInitExpression (Expression' rho a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
@@ -303,7 +306,7 @@ data Expression' rho a
   deriving (Show, Functor)
 
 instance (Annotated rho) => Annotated (Expression' rho) where
-  getAnnotation (AccessObject obj)                 = getAnnotation obj
+  getAnnotation (AccessObject obj)                       = getAnnotation obj
   getAnnotation (Constant _ a)                           = a
   getAnnotation (BinOp _ _ _ a)                          = a
   getAnnotation (ReferenceExpression _ a)                = a
