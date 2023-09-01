@@ -21,28 +21,28 @@ vectorTMDescriptorAnn = vectorSemAnn tmDescriptorTS (I UInt32 20)
 twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
-vector1, vector2, vector3, vector4, vector5, vector6 :: LHSObject SemanticAnns
-vector1 = LHS (Variable "vector1" vectorAnn)
-vector2 = LHS (Variable "vector2" twoDymVectorAnn)
-vector3 = LHS (Variable "vector3" vectorAnn)
-vector4 = LHS (Variable "vector4" twoDymVectorAnn)
-vector5 = LHS (Variable "vector5" twoDymVectorAnn)
-vector6 = LHS (Variable "vector6" vectorTMDescriptorAnn)
+vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
+vector1 =  (Variable "vector1" vectorAnn)
+vector2 =  (Variable "vector2" twoDymVectorAnn)
+vector3 =  (Variable "vector3" vectorAnn)
+vector4 =  (Variable "vector4" twoDymVectorAnn)
+vector5 =  (Variable "vector5" twoDymVectorAnn)
+vector6 =  (Variable "vector6" vectorTMDescriptorAnn)
 
 vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnns
-vector1Assign = AssignmentStmt vector1 (AccessObject (RHS (Variable "vector0" vectorAnn))) undefined
-vector2Assign = AssignmentStmt vector2 (AccessObject (RHS (Variable "vector1" twoDymVectorAnn))) undefined
+vector1Assign = AssignmentStmt vector1 (AccessObject ( (Variable "vector0" vectorAnn))) undefined
+vector2Assign = AssignmentStmt vector2 (AccessObject ( (Variable "vector1" twoDymVectorAnn))) undefined
 vector3Assign = AssignmentStmt vector3 (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
 vector4Assign = AssignmentStmt vector4 (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (RHS (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
+vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject ( (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
 vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
-foo1, foo2 :: LHSObject SemanticAnns
-foo1 = LHS (Variable "foo1" uint32SemAnn)
-foo2 = LHS (Variable "foo2" uint32SemAnn)
+foo1, foo2 :: Object SemanticAnns
+foo1 =  (Variable "foo1" uint32SemAnn)
+foo2 =  (Variable "foo2" uint32SemAnn)
 
 foo1Assign, foo2Assign :: Statement SemanticAnns
-foo1Assign = AssignmentStmt foo1 (AccessObject (RHS (Variable "foo0" uint32SemAnn))) undefined
+foo1Assign = AssignmentStmt foo1 (AccessObject ( (Variable "foo0" uint32SemAnn))) undefined
 foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
 
 structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnns
@@ -70,28 +70,28 @@ tmDescriptorFieldsInit0 =
          FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
 
 
-struct0, struct1 :: LHSObject SemanticAnns
-struct0 = LHS (Variable "struct0" tmDescriptorSemAnn)
-struct1 = LHS (Variable "struct1" tmDescriptorSemAnn)
+struct0, struct1 :: Object SemanticAnns
+struct0 =  (Variable "struct0" tmDescriptorSemAnn)
+struct1 =  (Variable "struct1" tmDescriptorSemAnn)
 
 struct0Assign, struct1Assign :: Statement SemanticAnns
 struct0Assign = AssignmentStmt struct0 tmDescriptorFieldsInit0 undefined
-struct1Assign = AssignmentStmt struct1 (AccessObject (RHS (Variable "struct0" tmDescriptorSemAnn))) undefined
+struct1Assign = AssignmentStmt struct1 (AccessObject ( (Variable "struct0" tmDescriptorSemAnn))) undefined
 
-enum0, enum1 :: LHSObject SemanticAnns
-enum0 = LHS (Variable "enum0" messageSemAnn)
-enum1 = LHS (Variable "enum1" messageSemAnn)
+enum0, enum1 :: Object SemanticAnns
+enum0 =  (Variable "enum0" messageSemAnn)
+enum1 =  (Variable "enum1" messageSemAnn)
 
 enum0Assign, enum1Assign :: Statement SemanticAnns
 enum0Assign = AssignmentStmt enum0 (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
 enum1Assign = AssignmentStmt enum1 (EnumVariantExpression "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
 dynVar0 :: Expression SemanticAnns
-dynVar0 = AccessObject (RHS (Variable "dyn_var0" dynUInt32SemAnn))
+dynVar0 = AccessObject ( (Variable "dyn_var0" dynUInt32SemAnn))
 
-option0 :: LHSObject SemanticAnns
-option0 = LHS (Variable "option0" optionDynUInt32SemAnn) 
-option1 = LHS (Variable "option1" optionDynUInt32SemAnn) 
+option0 :: Object SemanticAnns
+option0 =  (Variable "option0" optionDynUInt32SemAnn)
+option1 =  (Variable "option1" optionDynUInt32SemAnn)
 
 option0Assign, option1Assign :: Statement SemanticAnns
 option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined

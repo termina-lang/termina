@@ -110,7 +110,7 @@ struct0field0 :: Expression SemanticAnns
 struct0field0 = AccessObject ((MemberAccess struct0 "field0" uint32SemAnn))
 
 struct0Assignment0 :: Statement SemanticAnns
-struct0Assignment0 = AssignmentStmt (LHS (MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
+struct0Assignment0 = AssignmentStmt ((MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
 
 returnVoid :: ReturnStmt SemanticAnns
 returnVoid = ReturnStmt Nothing unitSemAnn

@@ -24,7 +24,7 @@ var0 = Variable "var0" uint16SemAnn
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
 
-dynVar0, dynVector0, dynVector1 :: Object' Expression SemanticAnns
+dynVar0, dynVector0, dynVector1 :: Object SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
