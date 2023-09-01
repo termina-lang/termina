@@ -1,4 +1,4 @@
-{-# Language TupleSections #-}
+{-# LANGUAGE TupleSections #-}
 -- | Module dedicated to Parsing
 
 module Parsing where
@@ -331,70 +331,49 @@ referenceExprParser :: Parser (Expression Annotation)
 referenceExprParser = do
   p <- getPosition
   _ <- reservedOp "&"
-  object <- objectParser rhsObjectTermParser
-  return $ ReferenceExpression (RHS object) (Position p)
-
-objectParserRHS :: Parser (RHSObject Annotation)
-objectParserRHS = RHS <$> objectParser rhsObjectTermParser
-
-rhsObjectTermParser :: Parser (Object' Expression Annotation)
-rhsObjectTermParser = try variableParser
-  <|> IdentifierExpression <$> functionCallParser <*> (Position <$> getPosition)
+  object <- objectParser
+  return $ ReferenceExpression object (Position p)
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
-  <|> AccessObject <$> objectParserRHS
+  <|> AccessObject <$> objectParser
   <|> parensExprParser
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
 
 ----------------------------------------
--- Object Parsering
--- | When traying to parse an |Empty| value, we just fail.
--- TODO check how users see this, error messages to the user are important.
-emptyParser :: Parser (Empty a)
-emptyParser = fail "Parsing Emtpy elements. Complex Experssions on RHS??"
-
-dereferenceParser :: Parser (Object' exprI Annotation) -> Parser (Object' exprI Annotation)
-dereferenceParser termParser = do
-  p <- getPosition
-  _ <- reservedOp "*"
-  object <- objectParser termParser
-  return $ Dereference object (Position p)
-
---  dereferenceParserRHS :: Parser (RHSObject Annotation)
--- dereferenceParserRHS = RHS <$> dereferenceParser expressionParser
-
-objectParser :: Parser (Object' exprI Annotation) -> Parser (Object' exprI Annotation)
-objectParser = Ex.buildExpressionParser
-    [[vectorIndexPostfix]
-    ,[memberAccessPostfix]
-    ,[dereferencePrefix]
-    ]
-  where vectorIndexPostfix = Ex.Postfix (do
-          index <- brackets expressionParser
-          p <- getPosition
-          return $ \parent ->  VectorIndexExpression parent index (Position p))
-        memberAccessPostfix = Ex.Postfix (do
-          _ <- reservedOp "."
-          p <- getPosition
-          member <- identifierParser
-          return $ \parent ->  MemberAccess parent member (Position p))
-        dereferencePrefix = Ex.Prefix (do
-          p <- getPosition
-          _ <- reservedOp "*"
-          return $ flip Dereference (Position p))
+-- Object Parsing
 
 -- Plain variable names belong to whatever |exprI| we want.
-variableParser :: Parser (Object' exprI Annotation)
+variableParser :: Parser (Object Annotation)
 variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
 
--- | LHS objects cannot have identifier expressions and we note that using
--- the |Empty| type and its parser |emptyParser|.
-objectParserLHS :: Parser (LHSObject Annotation)
-objectParserLHS = LHS <$> objectParser variableParser
-
+objectParser :: Parser (Object  Annotation)
+objectParser = objectParser' variableParser
+  where
+    objectParser'
+      = Ex.buildExpressionParser
+      [[vectorIndexPostfix]
+      ,[memberAccessPostfix]
+      ,[dereferencePrefix]]
+    vectorIndexPostfix
+      = Ex.Postfix (do
+            index <- brackets expressionParser
+            p <- getPosition
+            return $ \parent ->  VectorIndexExpression parent index (Position p)
+            )
+    memberAccessPostfix
+      = Ex.Postfix (do
+      _ <- reservedOp "."
+      p <- getPosition
+      member <- identifierParser
+      return $ \parent ->  MemberAccess parent member (Position p))
+    dereferencePrefix
+      = Ex.Prefix (do
+      p <- getPosition
+      _ <- reservedOp "*"
+      return $ flip Dereference (Position p))
 ----------------------------------------
 
 vectorInitParser :: Parser (Expression Annotation)
@@ -516,7 +495,7 @@ blockItemParser = try ifElseIfStmtParser
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
   p <- getPosition
-  lval <- objectParserLHS
+  lval <- objectParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi

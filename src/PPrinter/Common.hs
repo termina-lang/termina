@@ -1,26 +1,24 @@
 module PPrinter.Common where
 
-import Data.Maybe
-import Prettyprinter
-import Prettyprinter.Render.Terminal
-import SemanAST
-import Semantic.Monad
-import Semantic.Types
+import           Data.Maybe
+import           Prettyprinter
+import           Prettyprinter.Render.Terminal
+import           SemanAST
+import           Semantic.Monad
+import           Semantic.Types
 
 type DocStyle = Doc AnsiStyle
 
-getObjectType :: Object' exprI SemanticAnns -> TypeSpecifier
+getObjectType :: Object SemanticAnns -> TypeSpecifier
 getObjectType (Variable _ (SemAnn _ (ETy ts)))                = ts
-getObjectType (IdentifierExpression _ (SemAnn _ (ETy ts)))    = ts
 getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
 getObjectType (MemberAccess _ _ (SemAnn _ (ETy ts)))          = ts
 getObjectType (Dereference _ (SemAnn _ (ETy ts)))             = ts
-getObjectType (MemberMethodAccess _ _ _ (SemAnn _ (ETy ts)))  = ts
 getObjectType (Undyn _ (SemAnn _ (ETy ts)))                   = ts
 getObjectType _ = error "invalid object annotation"
 
 getType :: Expression SemanticAnns -> TypeSpecifier
-getType (AccessObject (RHS obj)) = getObjectType obj
+getType (AccessObject obj) = getObjectType obj
 getType (Constant _ (SemAnn _ (ETy ts))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
@@ -28,6 +26,7 @@ getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
 getType (DereferenceExpression _ (SemAnn _ (ETy ts))) = ts
 getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
 getType (FunctionExpression _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
+getType (MemberMethodAccess _ _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
 getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
@@ -108,29 +107,29 @@ optionSomeField = pretty (namefy "Some") <> pretty ".__0"
 -- This function is used to pretty print the type of a variable
 ppPrimitiveType :: TypeSpecifier -> DocStyle
 -- |  Unsigned integer types
-ppPrimitiveType UInt8 = uint8C
-ppPrimitiveType UInt16 = uint16C
-ppPrimitiveType UInt32 = uint32C
-ppPrimitiveType UInt64 = uint64C
+ppPrimitiveType UInt8                        = uint8C
+ppPrimitiveType UInt16                       = uint16C
+ppPrimitiveType UInt32                       = uint32C
+ppPrimitiveType UInt64                       = uint64C
 -- \| Signed integer types
-ppPrimitiveType Int8 = int8C
-ppPrimitiveType Int16 = int16C
-ppPrimitiveType Int32 = int32C
-ppPrimitiveType Int64 = int64C
-ppPrimitiveType Bool = uint8C
-ppPrimitiveType Char = charC
+ppPrimitiveType Int8                         = int8C
+ppPrimitiveType Int16                        = int16C
+ppPrimitiveType Int32                        = int32C
+ppPrimitiveType Int64                        = int64C
+ppPrimitiveType Bool                         = uint8C
+ppPrimitiveType Char                         = charC
 ppPrimitiveType (DefinedType typeIdentifier) = pretty typeIdentifier
 -- \| Vector type
 -- The type of the vector is the type of the elements
-ppPrimitiveType (Vector ts _) = ppPrimitiveType ts
+ppPrimitiveType (Vector ts _)                = ppPrimitiveType ts
 -- \| Option type
-ppPrimitiveType (Option (DynamicSubtype _)) = optionDyn
+ppPrimitiveType (Option (DynamicSubtype _))  = optionDyn
 -- Non-primitive types:
-ppPrimitiveType _ = error "unsupported type"
+ppPrimitiveType _                            = error "unsupported type"
 
 ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts
-ppDimension _ = emptyDoc
+ppDimension _                     = emptyDoc
 
 ppReturnVectorValueStructure :: DocStyle -> DocStyle
 ppReturnVectorValueStructure identifier =
@@ -139,7 +138,7 @@ ppReturnVectorValueStructure identifier =
 ppReturnVectorValueStructureDecl :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnVectorValueStructureDecl identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi) 
+          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi)
       <+> ppReturnVectorValueStructure identifier <> semi
 
 ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
@@ -149,18 +148,18 @@ ppParameterVectorValueStructure prefix identifier =
 ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi) 
+          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi)
       <+> ppParameterVectorValueStructure prefix identifier <> semi
 
 ppReturnType :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnType identifier (Vector _ _) = ppReturnVectorValueStructure identifier
-ppReturnType _ ts = ppPrimitiveType ts
+ppReturnType _ ts                    = ppPrimitiveType ts
 
 ppParameterDeclaration :: DocStyle -> Parameter -> DocStyle
 ppParameterDeclaration _ (Parameter identifier (Reference ts)) =
   case ts of
     (Vector _ _) -> ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
-    _ -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
+    _            -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
 -- | If a vector is passed as parameter, the a structure must  be declared and used instead
 -- This way, we guarantee that the array is copied by value when passed to the function
 ppParameterDeclaration prefix (Parameter identifier (Vector _ _)) =
@@ -188,9 +187,9 @@ ppCFunctionCall identifier parameters =
     <> parens (align (fillSep (punctuate comma parameters)))
 
 ppConst :: Const -> DocStyle
-ppConst (B b) = if b then pretty "1" else pretty "0"
+ppConst (B b)         = if b then pretty "1" else pretty "0"
 ppConst (I _ integer) = pretty integer
-ppConst (C char) = pretty "'" <> pretty char <> pretty "'"
+ppConst (C char)      = pretty "'" <> pretty char <> pretty "'"
 
 ppModifier :: Modifier -> DocStyle
 ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (ppConst c)
@@ -235,12 +234,11 @@ ppCForLoop initializer cond incr body =
     <+> parens
       (initializer <> semi <+> cond <> semi <+> incr)
     <+> braces'
-      ( (indentTab . align) body
-      )
+      ((indentTab . align) body)
 
 ppCIfBlock ::
   -- | Conditional expression
-  DocStyle 
+  DocStyle
   -- | Body
   -> DocStyle ->
   DocStyle
@@ -249,7 +247,7 @@ ppCIfBlock cond body =
 
 ppCElseIfBlock ::
   -- | Conditional expression
-  DocStyle 
+  DocStyle
   -- | Body
   -> DocStyle ->
   DocStyle

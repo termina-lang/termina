@@ -11,10 +11,10 @@ import Data.Map
 
 var0 :: Expression SemanticAnns
 -- | var0 : u16
-var0 = AccessObject (RHS (Variable "var0" uint16SemAnn))
+var0 = AccessObject ( (Variable "var0" uint16SemAnn))
 
 undynVar1 :: Expression SemanticAnns
-undynVar1 = AccessObject (RHS (Undyn (Variable "var1" dynUInt16SemAnn) uint16SemAnn))
+undynVar1 = AccessObject ( (Undyn (Variable "var1" dynUInt16SemAnn) uint16SemAnn))
 
 constUInt16 :: Expression SemanticAnns
 -- | 1024 : u16

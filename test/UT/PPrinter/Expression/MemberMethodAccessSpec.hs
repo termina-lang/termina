@@ -9,7 +9,7 @@ import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
-resource0, tmChannel, tmPool, bar0, bar1 :: Object' Expression SemanticAnns
+resource0, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnns
 resource0 = Variable "resource0" (definedTypeSemAnn "Resource")
 tmChannel = Variable "tm_channel" (msgQueueSemAnn (DefinedType "TMDescriptor") 10)
 tmPool = Variable "tm_pool" (poolSemAnn UInt32 10)
@@ -17,11 +17,11 @@ bar0 = Variable "bar0" uint16SemAnn
 bar1 = Variable "bar1" dynUInt16SemAnn
 
 tmPoolAlloc :: Expression SemanticAnns
-tmPoolAlloc = AccessObject (RHS (MemberMethodAccess tmPool "alloc" [] unitSemAnn))
+tmPoolAlloc = AccessObject (MemberMethodAccess tmPool "alloc" [] unitSemAnn)
 
 tmChannelsend, resource0foo0 :: Expression SemanticAnns
-tmChannelsend = AccessObject (RHS (MemberMethodAccess tmChannel "send" [AccessObject (RHS bar0)] unitSemAnn))
-resource0foo0 = AccessObject (RHS (MemberMethodAccess resource0 "foo0" [AccessObject (RHS bar0), AccessObject (RHS bar1)] unitSemAnn))
+tmChannelsend = AccessObject (MemberMethodAccess tmChannel "send" [AccessObject bar0] unitSemAnn)
+resource0foo0 = AccessObject (MemberMethodAccess resource0 "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn)
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

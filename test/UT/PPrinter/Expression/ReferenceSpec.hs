@@ -19,35 +19,35 @@ refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
 refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
 refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
-var0, vector0, vector1 :: Object' Expression SemanticAnns
+var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" uint16SemAnn
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
 
-dynVar0, dynVector0, dynVector1 :: Object' Expression SemanticAnns
+dynVar0, dynVector0, dynVector1 :: Object SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
 
 pVar0expr, pVector0expr, pVector1expr :: Expression SemanticAnns
-pVar0expr = ReferenceExpression (RHS var0) refUInt16SemAnn
-pVector0expr = ReferenceExpression (RHS vector0) refVectorAnn
-pVector1expr = ReferenceExpression (RHS vector1) refTwoDymVectorAnn
+pVar0expr = ReferenceExpression ( var0) refUInt16SemAnn
+pVector0expr = ReferenceExpression ( vector0) refVectorAnn
+pVector1expr = ReferenceExpression ( vector1) refTwoDymVectorAnn
 
 pDynVar0expr, pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVar0expr = ReferenceExpression (RHS dynVar0) refUInt16SemAnn
-pDynVector0expr = ReferenceExpression (RHS dynVector0) refVectorAnn
-pDynVector1expr = ReferenceExpression (RHS dynVector1) refTwoDymVectorAnn
+pDynVar0expr = ReferenceExpression ( dynVar0) refUInt16SemAnn
+pDynVector0expr = ReferenceExpression ( dynVector0) refVectorAnn
+pDynVector1expr = ReferenceExpression ( dynVector1) refTwoDymVectorAnn
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
-derefpVar0 = (AccessObject (RHS (Dereference (IdentifierExpression pVar0expr refUInt16SemAnn) uint16SemAnn)))
-derefpVector0 = (AccessObject (RHS (Dereference (IdentifierExpression pVector0expr refVectorAnn) vectorAnn)))
-derefpVector1 = (AccessObject (RHS (Dereference (IdentifierExpression pVector1expr refTwoDymVectorAnn) twoDymVectorAnn)))
+derefpVar0 = AccessObject (Dereference (IdentifierExpression pVar0expr refUInt16SemAnn) uint16SemAnn)
+derefpVector0 = AccessObject (Dereference (IdentifierExpression pVector0expr refVectorAnn) vectorAnn)
+derefpVector1 = (AccessObject (Dereference (IdentifierExpression pVector1expr refTwoDymVectorAnn) twoDymVectorAnn))
 
 derefpDynVar0expr, derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVar0expr = (AccessObject (RHS (Dereference (IdentifierExpression pDynVar0expr refUInt16SemAnn) uint16SemAnn)))
-derefpDynVector0expr = (AccessObject (RHS (Dereference (IdentifierExpression pDynVector0expr refVectorAnn) vectorAnn)))
-derefpDynVector1expr = (AccessObject (RHS (Dereference (IdentifierExpression pDynVector1expr refTwoDymVectorAnn) twoDymVectorAnn)))
+derefpDynVar0expr = (AccessObject ((Dereference (IdentifierExpression pDynVar0expr refUInt16SemAnn) uint16SemAnn)))
+derefpDynVector0expr = (AccessObject ((Dereference (IdentifierExpression pDynVector0expr refVectorAnn) vectorAnn)))
+derefpDynVector1expr = (AccessObject ((Dereference (IdentifierExpression pDynVector1expr refTwoDymVectorAnn) twoDymVectorAnn)))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

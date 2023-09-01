@@ -35,40 +35,40 @@ data ClassDep
   -- Field accesses
   | FieldAccess ClassDep Identifier
   -- We mark as undec objects defined through expressions.
-  | Undec
+  -- | Undec
   -- see README/Q22
 
-depToList :: ClassDep -> Maybe (Identifier, [Identifier])
-depToList (SVar i)           = Just (i, [])
-depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) <$> depToList a
-depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) <$> depToList a
-depToList Undec              = Nothing
+depToList :: ClassDep -> (Identifier, [Identifier])
+depToList (SVar i)           = (i, [])
+depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) $ depToList a
+depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) $ depToList a
+-- depToList Undec              = Nothing
 
-getRoot :: ClassDep -> Maybe Identifier
-getRoot = fmap fst . depToList
+getRoot :: ClassDep -> Identifier
+getRoot = fst . depToList
 
 -- |getDepObj| is where we compute the use of names and dependencies
 -- The rest is just how we traverse the AST.
 -- Here we collect two things:
 -- the name of the object the argument is defining
 -- and the extra dependencies we may need.
-getDepObj :: RHSObject a -> (ClassDep, [ ClassDep ])
-getDepObj = getDepObj' . unRHS
+getDepObj :: Object a -> (ClassDep, [ ClassDep ])
+getDepObj = getDepObj'
   where
     getDepObj' (Variable ident _ann) = (SVar ident, [])
     -----------
     -- TODO Q22
-    getDepObj' (IdentifierExpression e _ann) = (Undec, getDepExp e)
+    -- getDepObj' (IdentifierExpression e _ann) = (Undec, getDepExp e)
     -----------
     getDepObj' (VectorIndexExpression obj eix _ann)
       = let (dnm, deps) = getDepObj' obj in (dnm, deps ++ getDepExp eix)
     getDepObj' (MemberAccess obj ident _ann)
       = let (dnm,deps) = getDepObj' obj
       in (FieldAccess dnm ident , deps)
-    getDepObj' (MemberMethodAccess obj ident es _ann)
-      = let (dnm, deps) = getDepObj' obj
-      in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
     getDepObj' (Dereference obj _ann ) = getDepObj' obj
+    -- getDepObj' (MemberMethodAccess obj ident es _ann)
+    --   = let (dnm, deps) = getDepObj' obj
+    --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
 
 getDepBlock :: Block a -> [ClassDep]
 getDepBlock = concatMap getDepStmt
@@ -115,3 +115,5 @@ getDepExp (OptionVariantExpression os _ann)
   =  case os of
        None   -> []
        Some e -> getDepExp e
+getDepExp (MemberMethodAccess obj ident es _ann) =
+  let (dnm, deps) = getDepObj obj in MethodAccess dnm ident : deps ++ concatMap getDepExp es

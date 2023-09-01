@@ -17,7 +17,7 @@ vectorAnn, dynVectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
 dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
 
-param0, param1 :: Object' Expression SemanticAnns
+param0, param1 :: Object SemanticAnns
 param0 = Variable "param0" dynUInt32SemAnn
 param1 = Variable "param1" dynVectorAnn
 
@@ -28,16 +28,16 @@ uint8Const0x8 :: Expression SemanticAnns
 uint8Const0x8 = Constant (I UInt8 8) uint8SemAnn
 
 optionVar :: Expression SemanticAnns
-optionVar = AccessObject (RHS (Variable "option_var" optionDynUInt32SemAnn))
+optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
 
 vector0IndexConstant :: Expression SemanticAnns
-vector0IndexConstant = AccessObject (RHS (VectorIndexExpression (Undyn param1 vectorAnn) uint8Const0x8 uint32SemAnn))
+vector0IndexConstant = AccessObject (VectorIndexExpression (Undyn param1 vectorAnn) uint8Const0x8 uint32SemAnn)
 
-foo1 :: LHSObject SemanticAnns
-foo1 = LHS (Variable "foo1" uint32SemAnn)
+foo1 :: Object SemanticAnns
+foo1 = Variable "foo1" uint32SemAnn
 
 param0ToFoo1, constToFoo1 :: Statement SemanticAnns
-param0ToFoo1 = AssignmentStmt foo1 (AccessObject (RHS (Undyn param0 uint32SemAnn))) undefined
+param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Undyn param0 uint32SemAnn)) undefined
 constToFoo1 = AssignmentStmt foo1 uint32Const0 undefined
 
 matchCaseSome0 :: MatchCase SemanticAnns
