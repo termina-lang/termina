@@ -24,7 +24,7 @@ data Object
   -- expression identifier.
   | Dereference (Object a) a
   -- ^ Dereference | *eI |, |eI| is an ~identifier~ expression.
-  | Undyn (Expression a) a
+  | Undyn (Object a) a
   deriving (Show, Functor)
 
 instance Annotated Object where
