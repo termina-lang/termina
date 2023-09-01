@@ -29,25 +29,25 @@ dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
 
-pVar0expr, pVector0expr, pVector1expr :: Expression SemanticAnns
-pVar0expr = ReferenceExpression ( var0) refUInt16SemAnn
-pVector0expr = ReferenceExpression ( vector0) refVectorAnn
-pVector1expr = ReferenceExpression ( vector1) refTwoDymVectorAnn
+pVar0, pVector0, pVector1 :: Object SemanticAnns
+pVar0 = Variable "p_var0" refUInt16SemAnn
+pVector0 = Variable "p_vector0" refVectorAnn
+pVector1 = Variable "p_vector1" refTwoDymVectorAnn
 
-pDynVar0expr, pDynVector0expr, pDynVector1expr :: Expression SemanticAnns
-pDynVar0expr = ReferenceExpression ( dynVar0) refUInt16SemAnn
-pDynVector0expr = ReferenceExpression ( dynVector0) refVectorAnn
-pDynVector1expr = ReferenceExpression ( dynVector1) refTwoDymVectorAnn
+refVar0expr, refVector0expr, refVector1expr :: Expression SemanticAnns
+refVar0expr = ReferenceExpression var0 refUInt16SemAnn
+refVector0expr = ReferenceExpression vector0 refVectorAnn
+refVector1expr = ReferenceExpression vector1 refTwoDymVectorAnn
+
+refDynVar0expr, refDynVector0expr, refDynVector1expr :: Expression SemanticAnns
+refDynVar0expr = ReferenceExpression dynVar0 refUInt16SemAnn
+refDynVector0expr = ReferenceExpression dynVector0 refVectorAnn
+refDynVector1expr = ReferenceExpression dynVector1 refTwoDymVectorAnn
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
-derefpVar0 = AccessObject (Dereference (IdentifierExpression pVar0expr refUInt16SemAnn) uint16SemAnn)
-derefpVector0 = AccessObject (Dereference (IdentifierExpression pVector0expr refVectorAnn) vectorAnn)
-derefpVector1 = (AccessObject (Dereference (IdentifierExpression pVector1expr refTwoDymVectorAnn) twoDymVectorAnn))
-
-derefpDynVar0expr, derefpDynVector0expr, derefpDynVector1expr :: Expression SemanticAnns
-derefpDynVar0expr = (AccessObject ((Dereference (IdentifierExpression pDynVar0expr refUInt16SemAnn) uint16SemAnn)))
-derefpDynVector0expr = (AccessObject ((Dereference (IdentifierExpression pDynVector0expr refVectorAnn) vectorAnn)))
-derefpDynVector1expr = (AccessObject ((Dereference (IdentifierExpression pDynVector1expr refTwoDymVectorAnn) twoDymVectorAnn)))
+derefpVar0 = AccessObject (Dereference pVar0 uint16SemAnn) -- | *p_var0 |
+derefpVector0 = AccessObject (Dereference pVector0 vectorAnn) -- | *p_vector0 |
+derefpVector1 = AccessObject (Dereference pVector1 twoDymVectorAnn) -- | *p_vector1 |
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty
@@ -56,40 +56,30 @@ spec :: Spec
 spec = do
   describe "Pretty printing reference expressions" $ do
     it "Prints the expression: &var0" $ do
-      renderExpression pVar0expr `shouldBe`
+      renderExpression refVar0expr `shouldBe`
         pack "&var0"
     it "Prints the expression: &vector0" $ do
-      renderExpression pVector0expr `shouldBe`
+      renderExpression refVector0expr `shouldBe`
         pack "vector0"
     it "Prints the expression: &vector1" $ do
-      renderExpression pVector1expr `shouldBe`
+      renderExpression refVector1expr `shouldBe`
         pack "vector1"
     it "Prints the expression: &dyn_var0" $ do
-      renderExpression pDynVar0expr `shouldBe`
+      renderExpression refDynVar0expr `shouldBe`
         pack "(uint16_t *)dyn_var0.datum"
     it "Prints the expression: &dyn_vector0" $ do
-      renderExpression pDynVector0expr `shouldBe`
+      renderExpression refDynVector0expr `shouldBe`
         pack "(uint32_t *)dyn_vector0.datum"
     it "Prints the expression: &dyn_vector1" $ do
-      renderExpression pDynVector1expr `shouldBe`
+      renderExpression refDynVector1expr `shouldBe`
         pack "(int64_t (*)[5])dyn_vector1.datum"
   describe "Pretty printing dereference expressions" $ do
-    it "Prints the expression: *(&var0)" $ do
+    it "Prints the expression: *p_var0" $ do
       renderExpression derefpVar0 `shouldBe`
-        pack "*(&var0)"
-    it "Prints the expression: *(&vector0)" $ do
+        pack "*(p_var0)"
+    it "Prints the expression: *p_vector0" $ do
       renderExpression derefpVector0 `shouldBe`
-        pack "vector0"
-    it "Prints the expression: *(&vector1)" $ do
+        pack "p_vector0"
+    it "Prints the expression: *p_vector1" $ do
       renderExpression derefpVector1 `shouldBe`
-        pack "vector1"
-    it "Prints the expression: *&dyn_var0" $ do
-      renderExpression derefpDynVar0expr `shouldBe`
-        pack "*((uint16_t *)dyn_var0.datum)"
-    it "Prints the expression: *&dyn_vector0" $ do
-      renderExpression derefpDynVector0expr `shouldBe`
-        pack "(uint32_t *)dyn_vector0.datum"
-    it "Prints the expression: *&dyn_vector1" $ do
-      renderExpression derefpDynVector1expr `shouldBe`
-        pack "(int64_t (*)[5])dyn_vector1.datum"
-
+        pack "p_vector1"
