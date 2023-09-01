@@ -17,11 +17,11 @@ bar0 = Variable "bar0" uint16SemAnn
 bar1 = Variable "bar1" dynUInt16SemAnn
 
 tmPoolAlloc :: Expression SemanticAnns
-tmPoolAlloc = AccessObject (MemberMethodAccess tmPool "alloc" [] unitSemAnn)
+tmPoolAlloc = MemberMethodAccess tmPool "alloc" [] unitSemAnn
 
 tmChannelsend, resource0foo0 :: Expression SemanticAnns
-tmChannelsend = AccessObject (MemberMethodAccess tmChannel "send" [AccessObject bar0] unitSemAnn)
-resource0foo0 = AccessObject (MemberMethodAccess resource0 "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn)
+tmChannelsend = MemberMethodAccess tmChannel "send" [AccessObject bar0] unitSemAnn
+resource0foo0 = MemberMethodAccess resource0 "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

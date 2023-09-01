@@ -88,7 +88,7 @@ spec = do
         pack "var0 << *((uint16_t *)var1.datum)"
     it "Prints the expression: var0 << var1 << 8 : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "var0 << *((uint16_t *)var1.datum) << (uint8_t)8"
+        pack "(uint16_t)(var0 << *((uint16_t *)var1.datum)) << (uint8_t)8"
     it "Prints the expression: var0 >> 8 : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
         pack "var0 >> (uint8_t)8"

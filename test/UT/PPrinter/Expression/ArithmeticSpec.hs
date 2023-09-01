@@ -85,7 +85,7 @@ spec = do
         pack "var0 + *((uint16_t *)var1.datum)"
     it "Prints the expression: var0 + var1 + 1024 : u16" $ do
       renderExpression var0PlusVar1PlusConstant `shouldBe`
-        pack "var0 + *((uint16_t *)var1.datum) + (uint16_t)1024"
+        pack "(uint16_t)(var0 + *((uint16_t *)var1.datum)) + (uint16_t)1024"
     it "Prints the expression: var0 - 1024 : u16" $ do
       renderExpression var0MinusConstant `shouldBe`
         pack "var0 - (uint16_t)1024"
