@@ -219,6 +219,7 @@ ppCReferenceExpression :: DocStyle -> DocStyle
 ppCReferenceExpression expr = pretty "&" <> expr
 
 -- | Pretty print a dereference expression
+-- TODO: Remove parens and let the upper level decide if they are necessary
 ppCDereferenceExpression :: DocStyle -> DocStyle
 ppCDereferenceExpression expr = pretty "*" <> parens expr
 
