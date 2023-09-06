@@ -293,6 +293,7 @@ I don't think it should be possible, but I am not sure.
 #+begin_src
  [[ IdentifierExpression e ann ]] \leadsto Variable "self" ann
 #+end_src
+** TODO Q23 Can we have dynamic of dynamic of dynamic ??
 ** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
 ** TODO modifiers type check
 ** DONE type specifiers check

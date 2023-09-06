@@ -16,7 +16,9 @@ import           Control.Monad.Except       (MonadError (..))
 data Errors a
   -- | Expected /similar/ types?
   = EMismatch TypeSpecifier TypeSpecifier
+  | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
+  | EMismatchDyn TypeSpecifier TypeSpecifier
   | ECasteable TypeSpecifier TypeSpecifier
   -- | Expected Numeric Types
   | ENumTs [TypeSpecifier]
@@ -125,6 +127,8 @@ data Errors a
   | ClassSelfNoSelf
   -- Dereference Object
   | ETypeNotReference TypeSpecifier
+  -- Error while forcing Undyn
+  | EUndynForcingError
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

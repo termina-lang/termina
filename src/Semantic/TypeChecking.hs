@@ -9,13 +9,13 @@
 module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
+import           Annotations
 import           AST                  as PAST
-import Annotations
 import           CoreAST
 import           Utils.AST
 import           Utils.CoreAST
+import           Utils.SemanAST
 import           Utils.TypeSpecifier
-import Utils.SemanAST
 
 -- Termina Semantic AST
 import qualified SemanAST             as SAST
@@ -46,8 +46,8 @@ import           Data.Map             as M
 import           Control.Arrow
 import           Control.Monad
 
-import qualified Data.Graph as Graph
-import Data.Graph (graphFromEdges)
+import           Data.Graph           (graphFromEdges)
+import qualified Data.Graph           as Graph
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -59,7 +59,7 @@ typeOfOps locs op lty rty =
   either
   -- | Check if there was an error, if not, returns the first type.
   (return . SemAnn locs . ETy)
-  (throwError . annotateError locs . uncurry EMismatch)
+  (throwError . annotateError locs . uncurry (EOpMismatch op))
   $ typeOfOps' op lty rty
   where
     typeOfOps' :: Op -> TypeSpecifier -> TypeSpecifier -> Either TypeSpecifier (TypeSpecifier,TypeSpecifier)
@@ -114,21 +114,6 @@ paramTy ann (p : ps) (a : as) =
 paramTy ann (p : _) [] = throwError $ annotateError ann EFunParams
 paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
 
-
--- objectType
---   :: Object Parser.Annotation
---   -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
--- objectType = typeObject getRHSVarTy (const typeExpression) . unRHS
-
--- lhsObject
---   :: LHSObject Parser.Annotation
---   -> SemanticMonad (SAST.LHSObject SemanticAnns, TypeSpecifier)
--- lhsObject =  (first SAST.LHS <$>) . typeObject getLHSVarTy failing . unLHS
---   where
---     failing ann _ = throwError $ annotateError ann ELHSComplex
-
-  --   (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
-  -- -> (Parser.Annotation -> exprIdent Parser.Annotation -> SemanticMonad (exprIdentS SemanticAnns, TypeSpecifier))
 objectType
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
   -- ^ Scope of variables
@@ -177,8 +162,11 @@ objectType getVarTy (Dereference obj ann) =
   typeObject getVarTy obj >>= \(obj_typed , obj_ty ) ->
   case obj_ty of
    Reference ty -> return $ SAST.Dereference obj_typed $ buildExpAnn ann ty
-   ty -> throwError $ annotateError ann $ ETypeNotReference ty
+   ty           -> throwError $ annotateError ann $ ETypeNotReference ty
 
+----------------------------------------
+-- These two functions are useful, one lookups in read+write environments,
+-- the other one in write+environments
 rhsObject :: Object Parser.Annotation
   -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
 rhsObject = typeObject getRHSVarTy
@@ -186,6 +174,7 @@ rhsObject = typeObject getRHSVarTy
 lhsObject :: Object Parser.Annotation
   -> SemanticMonad (SAST.Object SemanticAnns, TypeSpecifier)
 lhsObject = typeObject getLHSVarTy
+----------------------------------------
 
 typeObject
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
@@ -196,6 +185,10 @@ typeObject identTy =
   where
     getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getAnnotation
 
+data BoxedExpression
+  = Objects (SAST.Object SemanticAnns) TypeSpecifier
+  | Expr (SAST.Expression SemanticAnns) TypeSpecifier
+
 -- | Function |expressionType| takes an expression from the parser, traverse it
 -- annotating each node with its type.
 -- Since we are also creating new nodes (|Undyn| annotations), instead of just
@@ -204,11 +197,9 @@ typeObject identTy =
 expressionType
   :: Expression Parser.Annotation
   -> SemanticMonad (SAST.Expression SemanticAnns)
--- expressionType (Variable vident pann) =
---   -- | Assign type to a variable found in the wild (RHS variables).
---   -- The type of a variable is whatever the environment says.
---   SAST.Variable vident . buildExpAnn pann <$> getRHSVarTy pann vident
-expressionType (AccessObject obj) = AccessObject . fst <$> rhsObject obj
+-- Object access
+expressionType (AccessObject obj)
+  = AccessObject . fst <$> rhsObject obj
 expressionType (Constant c pann) =
   -- | Constants
   SAST.Constant c . buildExpAnn pann <$>
@@ -237,10 +228,12 @@ expressionType (Casting e nty pann) = do
 expressionType (BinOp op le re pann) = do
   -- | Binary operation typings
   tyle <- expressionType le
-  tyre <- expressionType re
   type_le <- getExpType tyle
+  tyre <- expressionType re
   type_re <- getExpType tyre
-  SAST.BinOp op tyle tyre <$> typeOfOps pann op type_le type_re
+  let undyn_le = cleanDyn type_le
+  let undyn_re = cleanDyn type_re
+  SAST.BinOp op <$> mustByTy undyn_le tyle <*> mustByTy undyn_re tyre <*> typeOfOps pann op undyn_le undyn_re
 expressionType (ReferenceExpression rhs_e pann) =
   -- | Reference Expression
   -- TODO [Q15]
@@ -371,8 +364,13 @@ statementTySimple (AssignmentStmt lhs_o rhs_expr anns) =
 {- TODO Q19 && Q20 -}
   lhsObject lhs_o >>= \(lhs_o_typed, lhs_o_type) ->
   -- getLHSVarTy anns lhs_id >>= \lhs_ty ->
-  expressionType rhs_expr >>= mustByTy lhs_o_type >>= \ety ->
-  return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
+  let (lhs, lhs_ty) =
+        case isDyn lhs_o_type of
+          Just t -> (unDyn lhs, t)
+          Nothing -> (lhs_o_typed, lhs_o_type)
+  in
+  expressionType rhs_expr >>= mustByTy lhs_ty >>= \ety ->
+  return $ AssignmentStmt lhs ety $ buildStmtAnn anns
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
   -- let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   IfElseStmt
@@ -492,9 +490,9 @@ programSeman (TypeDefinition tydef ann) =
 programSeman (ModuleInclusion ident _mods anns) = undefined
 
 semanticTypeDef :: SAST.TypeDef SemanticAnns -> SemanTypeDef SemanticAnns
-semanticTypeDef (Struct i f m) = Struct i f m
-semanticTypeDef (Union i f m) = Union i f m
-semanticTypeDef (Enum i e m) = Enum i e m
+semanticTypeDef (Struct i f m)  = Struct i f m
+semanticTypeDef (Union i f m)   = Union i f m
+semanticTypeDef (Enum i e m)    = Enum i e m
 semanticTypeDef (Class i cls m) = Class i (Data.List.map kClassMember cls) m
 
 typeExpression :: Expression Locations -> SemanticMonad (SAST.Expression SemanticAnns , TypeSpecifier)
@@ -563,7 +561,7 @@ typeDefCheck ann (Class ident cls mds)
            >> simpleTyorFail ann fs_ty
            >> let checkFs = ClassField fs_id fs_ty (buildExpAnn ann fs_ty)
               in return (checkFs : fs, nsl ,sl )
-         nslm@( ClassMethod fm_id fm_tys NoSelf body ann )
+         nslm@(ClassMethod fm_id fm_tys NoSelf body ann)
            -> mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
            >> return (fs, nslm : nsl, sl)
          slm@(ClassMethod fm_id fm_tys Self body ann)
@@ -597,7 +595,7 @@ typeDefCheck ann (Class ident cls mds)
   -- Get depndencies
     let dependencies = Data.List.map (\case{
                                          -- This shouldn't happen here but I doesn't add anything
-                                         l@( ClassField ident _ _ ) -> (l, ident, []);
+                                         l@(ClassField ident _ _) -> (l, ident, []);
                                          -- This is the interesting one.
                                          l@(ClassMethod ident ps _self bs _ann) ->
                                            (l, ident

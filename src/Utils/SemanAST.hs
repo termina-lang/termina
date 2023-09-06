@@ -2,29 +2,16 @@
 
 module Utils.SemanAST where
 
+import Utils.AST
 import           SemanAST
 
--- getObjectAnnotations :: Object' exprI a -> a
--- getObjectAnnotations (Variable _ a)                = a
--- getObjectAnnotations (IdentifierExpression _ a)    = a
--- getObjectAnnotations (VectorIndexExpression _ _ a) = a
--- getObjectAnnotations (MemberAccess _ _ a)          = a
--- getObjectAnnotations (Dereference _ a)             = a
--- getObjectAnnotations (MemberMethodAccess _ _ _ a)  = a
--- getObjectAnnotations (Undyn _ a)                   = a
+-- A relation of type specifier.
+dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
+dynPromotion (DynamicSubtype t) (DynamicSubtype t') = groundTyEq t t'
+dynPromotion (DynamicSubtype t) q = groundTyEq t q
+dynPromotion t (DynamicSubtype q) = groundTyEq t q
+-- TODO Q23
 
-
--- | First annotation level.
--- getAnnotations :: Expression a -> a
--- getAnnotations (AccessObject (RHS obj))                 = getObjectAnnotations obj
--- getAnnotations (Constant _ a)                           = a
--- getAnnotations (BinOp _ _ _ a)                          = a
--- getAnnotations (ReferenceExpression _ a)                = a
--- getAnnotations (Casting _ _ a)                          = a
--- getAnnotations (FunctionExpression _ _ a)               = a
--- getAnnotations (FieldValuesAssignmentsExpression _ _ a) = a
--- getAnnotations (EnumVariantExpression _ _ _ a)          = a
--- getAnnotations (VectorInitExpression _ _ a)             = a
--- getAnnotations (ParensExpression _ a)                   = a
--- getAnnotations (DereferenceExpression _ a)              = a
--- getAnnotations (OptionVariantExpression _ a)            = a
+cleanDyn :: TypeSpecifier -> TypeSpecifier
+cleanDyn (DynamicSubtype t) = cleanDyn t
+cleanDyn t = t

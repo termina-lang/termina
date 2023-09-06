@@ -77,3 +77,7 @@ referenceType :: TypeSpecifier -> Bool
 referenceType Unit           = False
 referenceType (Reference {}) = False
 referenceType _              = True
+
+isDyn :: TypeSpecifier -> Maybe TypeSpecifier
+isDyn (DynamicSubtype t) = Just t
+isDyn _ = Nothing

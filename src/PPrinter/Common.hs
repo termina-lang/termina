@@ -125,7 +125,7 @@ ppPrimitiveType (Vector ts _)                = ppPrimitiveType ts
 -- \| Option type
 ppPrimitiveType (Option (DynamicSubtype _))  = optionDyn
 -- Non-primitive types:
-ppPrimitiveType _                            = error "unsupported type"
+ppPrimitiveType t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts

@@ -81,9 +81,9 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}")    
---    it "Prints declaration of function test1" $ do
---      renderHeader test1 `shouldBe`
---        pack "void test1();"
---    it "Prints definition of function test1" $ do
---      renderSource test1 `shouldBe`
---        pack "void test1();"
+    it "Prints declaration of function test1" $ do
+     renderHeader test1 `shouldBe`
+       pack "void test1();"
+    it "Prints definition of function test1" $ do
+     renderSource test1 `shouldBe`
+       pack "void test1();"

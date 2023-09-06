@@ -38,6 +38,7 @@ data SAnns a = SemAnn
     -- | Type after type checking
   , ty_ann   :: a}
 
+
 instance Annotated SAnns where
   getAnnotation = ty_ann
 
@@ -79,6 +80,10 @@ forgetSemAnn = location
 
 getTypeSAnns :: SemanticAnns -> Maybe TypeSpecifier
 getTypeSAnns  = getTySpec . ty_ann
+
+undynTypeAnn :: SemanticAnns -> SemanticAnns
+undynTypeAnn (SemAnn p (ETy (DynamicSubtype ty))) = SemAnn p (ETy ty)
+undynTypeAnn _ = error "impossible 888"
 
 -- -- | Global Definitions
 -- type GlobalsSemantic = SAnns (GEntry ())
@@ -316,8 +321,22 @@ sameOrErr loc t1 t2 =
   then return t1
   else throwError $ annotateError loc $ EMismatch t1 t2
 
+unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
+unDyn t =  Undyn t (undynTypeAnn (getAnnotation t))
+
 mustByTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
-mustByTy ty exp = getExpType exp >>= sameOrErr loc ty >> return exp
+mustByTy ty exp = getExpType exp >>=
+  \ty_exp ->
+    maybe
+    (sameOrErr loc ty ty_exp >> return exp)
+    (\ty_subD ->
+       if groundTyEq ty ty_subD then
+         case exp of
+           (AccessObject obj) -> return (AccessObject (unDyn obj))
+           _ -> throwError $ annotateError internalErrorSeman EUndynForcingError
+       else throwError $ annotateError loc $ EMismatchDyn ty ty_subD
+        )
+    (isDyn ty_exp)
   where
     ann_exp = getAnnotation exp
     loc = location ann_exp
