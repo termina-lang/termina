@@ -81,15 +81,15 @@ typeOfOps locs op lty rty =
     typeOfOps' RelationalEqual tyl tyr    = sameTyOne tyl tyr
     typeOfOps' RelationalNotEqual tyl tyr = sameTyOne tyl tyr
     -- Bitwise. I guess this is like C so nums?
-    typeOfOps' BitwiseAnd tyl tyr         = cmpNumTy Bool tyl tyr
-    typeOfOps' BitwiseOr  tyl tyr         = cmpNumTy Bool tyl tyr
-    typeOfOps' BitwiseXor tyl tyr         = cmpNumTy Bool tyl tyr
+    typeOfOps' BitwiseAnd tyl tyr         = cmpNumTy tyl tyl tyr
+    typeOfOps' BitwiseOr  tyl tyr         = cmpNumTy tyl tyl tyr
+    typeOfOps' BitwiseXor tyl tyr         = cmpNumTy tyl tyl tyr
     -- Logical And/Or bool
     typeOfOps' LogicalAnd tyl tyr         = justBoolTy tyl tyr
     typeOfOps' LogicalOr  tyl tyr         = justBoolTy tyl tyr
     sameTyOne t t' =
       if groundTyEq t t'
-      then Left t
+      then Left Bool
       else Right (t,t')
     cmpNumTy tres t t' =
       if groundTyEq t t'
@@ -293,6 +293,8 @@ expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
 expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
 -- DONE [Q5]
 -- TODO [Q17]
+expressionType (ParensExpression e anns) =
+  typeExpression e >>= \(typed_e, type_e) -> return $ ParensExpression typed_e $ buildExpAnn anns type_e
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
