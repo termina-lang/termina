@@ -11,10 +11,10 @@ import UT.PPrinter.Expression.Common
 
 var0 :: Expression SemanticAnns
 -- | var0 : u16
-var0 = AccessObject ( (Variable "var0" uint16SemAnn))
+var0 = AccessObject (Variable "var0" uint16SemAnn)
 
 undynVar1 :: Expression SemanticAnns
-undynVar1 = AccessObject ( (Undyn (Variable "var1" dynUInt16SemAnn) uint16SemAnn))
+undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) uint16SemAnn)
 
 constUInt8, constUInt16 :: Expression SemanticAnns
 constUInt8 = Constant (I UInt8 0x08) uint8SemAnn
