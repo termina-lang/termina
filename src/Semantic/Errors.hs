@@ -129,6 +129,11 @@ data Errors a
   | ETypeNotReference TypeSpecifier
   -- Error while forcing Undyn
   | EUndynForcingError
+  -- Error using a method different than alloc on a pool
+  | EPoolsMethods Identifier
+  | EPoolsWrongNumArgs
+  | EPoolsWrongArgType TypeSpecifier
+  | EPoolsWrongArgTypeW TypeSpecifier
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

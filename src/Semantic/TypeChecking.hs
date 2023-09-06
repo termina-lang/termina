@@ -265,6 +265,19 @@ expressionType (MemberMethodAccess obj ident args ann) =
          -- Other User defined types do not define methods
          ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
       }
+    Pool ty_pool _sz ->
+      case ident of
+        "alloc" -> case args of
+                      [refM] ->
+                        typeExpression refM >>= \(typed_ref , type_ref) ->
+                        case type_ref of
+                          (Reference (Option (DynamicSubtype tyref))) ->
+                            if groundTyEq ty_pool tyref
+                            then return $ SAST.MemberMethodAccess obj_typed ident [typed_ref] (buildExpAnn ann Unit)
+                            else throwError $ annotateError ann (EPoolsWrongArgType tyref)
+                          _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
+                      _ -> throwError $ annotateError ann EPoolsWrongNumArgs
+        _ -> throwError $ annotateError ann (EPoolsMethods ident)
     ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
 expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
   -- | Field Type
