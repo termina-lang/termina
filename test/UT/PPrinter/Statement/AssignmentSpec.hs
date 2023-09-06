@@ -96,8 +96,10 @@ option1 =  Variable "option1" optionDynUInt32SemAnn
 undynVar0 :: Object SemanticAnns
 undynVar0 = Undyn dynVar0 uint32SemAnn
 
-undynVar0Assign :: Statement SemanticAnns
-undynVar0Assign = AssignmentStmt undynVar0 (AccessObject foo1) undefined
+undynVar0AssignFoo1 :: Statement SemanticAnns
+undynVar0AssignFoo1 = AssignmentStmt undynVar0 (AccessObject foo1) undefined
+undynVar0AssignConst = AssignmentStmt undynVar0 (Constant (I UInt32 1024) uint32SemAnn) undefined
+
 
 option0Assign, option1Assign :: Statement SemanticAnns
 option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some (AccessObject dynVar0)) optionDynUInt32SemAnn) undefined
@@ -222,5 +224,8 @@ spec = do
           "}")
   describe "Pretty printing undyn assignments" $ do
     it "Prints the statement dyn_var0 = foo1" $ do
-      renderStatement undynVar0Assign `shouldBe`
+      renderStatement undynVar0AssignFoo1 `shouldBe`
         pack "*((uint32_t *)dyn_var0.datum) = foo1;"
+    it "Prints the statement dyn_var0 = 1024 : u32" $ do
+      renderStatement undynVar0AssignConst `shouldBe`
+        pack "*((uint32_t *)dyn_var0.datum) = (uint32_t)1024;"
