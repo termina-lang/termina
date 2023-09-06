@@ -39,9 +39,9 @@ ppBinaryOperator LogicalOr = space <> pretty  "||" <> space
 ppDynamicSubtypeCast :: TypeSpecifier -> DocStyle
 ppDynamicSubtypeCast (Vector ts _) =
     case ts of
-        (Vector _ _) -> ppPrimitiveType ts <+> parens (pretty "*") <> ppDynamicSubtypeCast' ts
-        _ -> ppPrimitiveType ts <+> pretty "*"
-ppDynamicSubtypeCast ts = ppPrimitiveType ts <+> pretty "*"
+        (Vector _ _) -> ppTypeSpecifier ts <+> parens (pretty "*") <> ppDynamicSubtypeCast' ts
+        _ -> ppTypeSpecifier ts <+> pretty "*"
+ppDynamicSubtypeCast ts = ppTypeSpecifier ts <+> pretty "*"
 
 ppDynamicSubtypeCast' :: TypeSpecifier -> DocStyle
 ppDynamicSubtypeCast' (Vector ts (KC vs)) =
@@ -148,31 +148,31 @@ ppObject subs (Undyn obj _) =
 ppExpression' :: Printer Expression
 ppExpression' subs expr@(BinOp Addition expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Addition <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Addition <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Subtraction expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Subtraction <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Subtraction <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Multiplication expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Multiplication <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Multiplication <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Division expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Division <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Division <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseLeftShift expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseLeftShift <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseLeftShift <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseRightShift expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseRightShift <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseRightShift <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseAnd expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseAnd <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseAnd <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseOr expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseOr <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseOr <> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseXor expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppPrimitiveType ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseXor <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseXor <> ppExpression' subs expr2)
 ppExpression' subs (BinOp op expr1 expr2 _) =
     ppExpression' subs expr1 <> ppBinaryOperator op <> ppExpression' subs expr2
 ppExpression' subs expr = ppExpression subs expr
@@ -199,14 +199,14 @@ ppExpression subs (DereferenceExpression expr _) =
 ppExpression _ (Constant constant _) =
     case constant of
         B b -> if b then pretty "1" else pretty "0"
-        I ts' integer -> parens (ppPrimitiveType ts') <> pretty integer
+        I ts' integer -> parens (ppTypeSpecifier ts') <> pretty integer
         C char -> squotes (pretty char)
 ppExpression subs (BinOp op expr1 expr2 _) =
     ppExpression' subs expr1 <> ppBinaryOperator op <> ppExpression' subs expr2
 ppExpression subs (Casting expr' ts' _) =
     case expr' of
-        (Constant (I _ integer) _) -> parens (ppPrimitiveType ts') <> pretty integer
-        _ -> parens (ppPrimitiveType ts') <> ppExpression subs expr'
+        (Constant (I _ integer) _) -> parens (ppTypeSpecifier ts') <> pretty integer
+        _ -> parens (ppTypeSpecifier ts') <> ppExpression subs expr'
 ppExpression subs expr@(FunctionExpression identifier params _) =
     let
         paramAnns = getParameters expr

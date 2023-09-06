@@ -38,8 +38,8 @@ vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject ( (Va
 vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
 foo1, foo2 :: Object SemanticAnns
-foo1 =  (Variable "foo1" uint32SemAnn)
-foo2 =  (Variable "foo2" uint32SemAnn)
+foo1 = Variable "foo1" uint32SemAnn
+foo2 = Variable "foo2" uint32SemAnn
 
 foo1Assign, foo2Assign :: Statement SemanticAnns
 foo1Assign = AssignmentStmt foo1 (AccessObject ( (Variable "foo0" uint32SemAnn))) undefined
@@ -86,15 +86,21 @@ enum0Assign, enum1Assign :: Statement SemanticAnns
 enum0Assign = AssignmentStmt enum0 (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
 enum1Assign = AssignmentStmt enum1 (EnumVariantExpression "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
-dynVar0 :: Expression SemanticAnns
-dynVar0 = AccessObject ( (Variable "dyn_var0" dynUInt32SemAnn))
+dynVar0 :: Object SemanticAnns
+dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
 
-option0 :: Object SemanticAnns
-option0 =  (Variable "option0" optionDynUInt32SemAnn)
-option1 =  (Variable "option1" optionDynUInt32SemAnn)
+option0, option1 :: Object SemanticAnns
+option0 =  Variable "option0" optionDynUInt32SemAnn
+option1 =  Variable "option1" optionDynUInt32SemAnn
+
+undynVar0 :: Object SemanticAnns
+undynVar0 = Undyn dynVar0 uint32SemAnn
+
+undynVar0Assign :: Statement SemanticAnns
+undynVar0Assign = AssignmentStmt undynVar0 (AccessObject foo1) undefined
 
 option0Assign, option1Assign :: Statement SemanticAnns
-option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
+option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some (AccessObject dynVar0)) optionDynUInt32SemAnn) undefined
 option1Assign = AssignmentStmt option1 (OptionVariantExpression None optionDynUInt32SemAnn) undefined
 
 renderStatement :: Statement SemanticAnns -> Text
@@ -214,3 +220,7 @@ spec = do
           "        vector6[__i0].field1.field_c = (uint32_t)4294901760;\n" ++
           "    }\n" ++
           "}")
+  describe "Pretty printing undyn assignments" $ do
+    it "Prints the statement dyn_var0 = foo1" $ do
+      renderStatement undynVar0Assign `shouldBe`
+        pack "*((uint32_t *)dyn_var0.datum) = foo1;"

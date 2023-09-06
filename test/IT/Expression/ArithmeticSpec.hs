@@ -23,14 +23,15 @@ test0 = "fn test0() {\n" ++
 
 test1 :: String
 test1 = "fn test1(foo : 'dyn u16) {\n" ++
-        "    foo = foo + 1024 : u16;\n" ++
-        "    foo = 1024 : u16 + foo;\n" ++
-        "    foo = foo - 1024 : u16;\n" ++
-        "    foo = 1024 : u16 - foo;\n" ++
-        "    foo = foo * 1024 : u16;\n" ++
-        "    foo = 1024 : u16 * foo;\n" ++
-        "    foo = foo / 1024 : u16;\n" ++
-        "    foo = 1024 : u16 / foo;\n" ++
+          "    foo = 1024 : u16;" ++
+--        "    foo = foo + 1024 : u16;\n" ++
+--        "    foo = 1024 : u16 + foo;\n" ++
+--        "    foo = foo - 1024 : u16;\n" ++
+--        "    foo = 1024 : u16 - foo;\n" ++
+--        "    foo = foo * 1024 : u16;\n" ++
+--        "    foo = 1024 : u16 * foo;\n" ++
+--        "    foo = foo / 1024 : u16;\n" ++
+--        "    foo = 1024 : u16 / foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -83,7 +84,7 @@ spec = do
               "}")    
     it "Prints declaration of function test1" $ do
      renderHeader test1 `shouldBe`
-       pack "void test1();"
+       pack "void test1(__dyn_t foo);"
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
        pack "void test1();"

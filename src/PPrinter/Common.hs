@@ -82,11 +82,12 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, mutex, optionDyn :: DocStyle
+pool, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
 pool = pretty "__termina_pool_t"
 msgQueue = pretty "__termina_msg_queue_id_t"
 mutex = pretty "__termina_mutex_id_t"
 optionDyn = pretty "__Option_dyn_t"
+dynamicStruct = pretty "__dyn_t"
 
 enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
@@ -105,27 +106,29 @@ optionSomeField = pretty (namefy "Some") <> pretty ".__0"
 
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
-ppPrimitiveType :: TypeSpecifier -> DocStyle
+ppTypeSpecifier :: TypeSpecifier -> DocStyle
 -- |  Unsigned integer types
-ppPrimitiveType UInt8                        = uint8C
-ppPrimitiveType UInt16                       = uint16C
-ppPrimitiveType UInt32                       = uint32C
-ppPrimitiveType UInt64                       = uint64C
--- \| Signed integer types
-ppPrimitiveType Int8                         = int8C
-ppPrimitiveType Int16                        = int16C
-ppPrimitiveType Int32                        = int32C
-ppPrimitiveType Int64                        = int64C
-ppPrimitiveType Bool                         = uint8C
-ppPrimitiveType Char                         = charC
-ppPrimitiveType (DefinedType typeIdentifier) = pretty typeIdentifier
--- \| Vector type
+ppTypeSpecifier UInt8                        = uint8C
+ppTypeSpecifier UInt16                       = uint16C
+ppTypeSpecifier UInt32                       = uint32C
+ppTypeSpecifier UInt64                       = uint64C
+-- | Signed integer types
+ppTypeSpecifier Int8                         = int8C
+ppTypeSpecifier Int16                        = int16C
+ppTypeSpecifier Int32                        = int32C
+ppTypeSpecifier Int64                        = int64C
+ppTypeSpecifier Bool                         = uint8C
+ppTypeSpecifier Char                         = charC
+ppTypeSpecifier (DefinedType typeIdentifier) = pretty typeIdentifier
+-- | Vector type
 -- The type of the vector is the type of the elements
-ppPrimitiveType (Vector ts _)                = ppPrimitiveType ts
--- \| Option type
-ppPrimitiveType (Option (DynamicSubtype _))  = optionDyn
+ppTypeSpecifier (Vector ts _)                = ppTypeSpecifier ts
+-- | Option type
+ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
 -- Non-primitive types:
-ppPrimitiveType t                            = error $ "unsupported type: " ++ show t
+-- | Dynamic subtype
+ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
+ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts
@@ -138,7 +141,7 @@ ppReturnVectorValueStructure identifier =
 ppReturnVectorValueStructureDecl :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnVectorValueStructureDecl identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi)
+          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> semi)
       <+> ppReturnVectorValueStructure identifier <> semi
 
 ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
@@ -148,23 +151,23 @@ ppParameterVectorValueStructure prefix identifier =
 ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppPrimitiveType ts <+> pretty "array" <> semi)
+          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> semi)
       <+> ppParameterVectorValueStructure prefix identifier <> semi
 
 ppReturnType :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnType identifier (Vector _ _) = ppReturnVectorValueStructure identifier
-ppReturnType _ ts                    = ppPrimitiveType ts
+ppReturnType _ ts                    = ppTypeSpecifier ts
 
 ppParameterDeclaration :: DocStyle -> Parameter -> DocStyle
 ppParameterDeclaration _ (Parameter identifier (Reference ts)) =
   case ts of
-    (Vector _ _) -> ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
-    _            -> ppPrimitiveType ts <+> pretty "*" <+> pretty identifier
+    (Vector _ _) -> ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts
+    _            -> ppTypeSpecifier ts <+> pretty "*" <+> pretty identifier
 -- | If a vector is passed as parameter, the a structure must  be declared and used instead
 -- This way, we guarantee that the array is copied by value when passed to the function
 ppParameterDeclaration prefix (Parameter identifier (Vector _ _)) =
   ppParameterVectorValueStructure prefix (pretty identifier) <+> pretty identifier
-ppParameterDeclaration _ (Parameter identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts
+ppParameterDeclaration _ (Parameter identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts
 
 -- | Pretty print a C function declaration
 ppCFunctionDeclaration ::
@@ -201,12 +204,6 @@ methodName identifier method = pretty ("__" ++ identifier ++ "_" ++ method)
 
 typeDefEqFunctionName :: Identifier -> DocStyle
 typeDefEqFunctionName identifier = methodName identifier "_eq"
-
-structAssignAnonymFunctionName :: Identifier -> DocStyle
-structAssignAnonymFunctionName identifier = methodName identifier "_assign"
-
-enumAssignAnonymFunctionName :: Identifier -> Identifier -> DocStyle
-enumAssignAnonymFunctionName identifier variant = methodName identifier (variant ++ "__assign")
 
 poolMethodName :: Identifier -> DocStyle
 poolMethodName = methodName "pool"
