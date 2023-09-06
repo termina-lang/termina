@@ -6,6 +6,7 @@ module Semantic.Types where
 import           AST
 import           Utils.AST
 import SemanAST as SAST
+import Utils.TypeSpecifier
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -76,26 +77,27 @@ kClassMember (ClassMethod idx ps self blk ann) =
 -- Subtyping.
 -- This fuction says what types can be casted into others.
 casteableTys :: TypeSpecifier -> TypeSpecifier-> Bool
-casteableTys UInt8 UInt16  = True
-casteableTys UInt8 UInt32  = True
-casteableTys UInt8 UInt64  = True
+casteableTys a b = numTy a && numTy b
+-- casteableTys UInt8 UInt16  = True
+-- casteableTys UInt8 UInt32  = True
+-- casteableTys UInt8 UInt64  = True
 --
-casteableTys UInt16 UInt32 = True
-casteableTys UInt16 UInt64 = True
+-- casteableTys UInt16 UInt32 = True
+-- casteableTys UInt16 UInt64 = True
 --
-casteableTys UInt32 UInt64 = True
+-- casteableTys UInt32 UInt64 = True
 --
-casteableTys Int8 Int16    = True
-casteableTys Int8 Int32    = True
-casteableTys Int8 Int64    = True
+-- casteableTys Int8 Int16    = True
+-- casteableTys Int8 Int32    = True
+-- casteableTys Int8 Int64    = True
 --
-casteableTys Int16 Int32   = True
-casteableTys Int16 Int64   = True
+-- casteableTys Int16 Int32   = True
+-- casteableTys Int16 Int64   = True
 --
-casteableTys Int32 Int64   = True
+-- casteableTys Int32 Int64   = True
 -- Last option being the same.
 -- This is a trivial casting :muscle:
-casteableTys a b           = groundTyEq a b
+-- casteableTys a b           = groundTyEq a b
 
 -- Relation between types
 -- we use to define (dyn A \subseteq A)
