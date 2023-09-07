@@ -134,6 +134,8 @@ data Errors a
   | EPoolsWrongNumArgs
   | EPoolsWrongArgType TypeSpecifier
   | EPoolsWrongArgTypeW TypeSpecifier
+  -- Internal Undyn
+  | EUnDynExpression
   deriving Show
 
 withError :: MonadError e m => (e -> e) -> m a -> m a

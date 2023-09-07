@@ -12,11 +12,14 @@ import Text.Parsec (runParser)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
+import Control.Monad
+
 -- data Mode = Transpiler | Interpreter
 
 data MainOptions = MainOptions
   {optREPL :: Bool
   , optPrintAST :: Bool
+  , optPrintASTTyped :: Bool
   , optOutput :: Maybe String
   }
 
@@ -26,6 +29,8 @@ instance Options MainOptions where
             "Choose Termina transpiler mode: Transpiler or Interpreter."
         <*> simpleOption "print" False
             "Prints AST after parsed"
+        <*> simpleOption "printTyped" False
+            "Prints AST after parsed + type"
         <*> simpleOption "output" Nothing
             "Output file"
 
@@ -44,11 +49,11 @@ main = runCommand $ \opts args ->
               case runParser (contents topLevel) () filepath src_code of
                 Left err -> ioError $ userError $ "Parser Error: " ++ show err
                 Right ast ->
-                  output
-                  (if optPrintAST opts then
-                     case typeCheckRun ast of
-                       Left err -> T.pack $ "ERRORRRRRRRRR:: " ++ show err
-                       Right tast -> ppHeaderFile tast
-                  else
-                    T.pack "Ok!" )
+                  case typeCheckRun ast of
+                    Left err -> output $ T.pack $ "ERRORRRRRRRRR:: " ++ show err
+                    Right tast ->
+                      when (optPrintAST opts) (print ast) >>
+                      when (optPrintASTTyped opts) (print tast) >>
+                      output (ppHeaderFile tast)
+                    -- output $ T.pack "Ok!"
             _ -> ioError $ userError "Too much arguments king!"

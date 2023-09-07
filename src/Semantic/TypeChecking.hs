@@ -8,6 +8,9 @@
 
 module Semantic.TypeChecking where
 
+-- Debugging
+import Debugging
+
 -- Termina Ast and Utils
 import           Annotations
 import           AST                  as PAST
@@ -225,15 +228,15 @@ expressionType (Casting e nty pann) = do
   if casteableTys type_exp nty -- ety \subseteq nty
   then return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
   else throwError (annotateError pann $ ECasteable type_exp nty)
-expressionType (BinOp op le re pann) = do
+expressionType a@(BinOp op le re pann) = do
   -- | Binary operation typings
-  tyle <- expressionType le
-  type_le <- getExpType tyle
-  tyre <- expressionType re
-  type_re <- getExpType tyre
-  let undyn_le = cleanDyn type_le
-  let undyn_re = cleanDyn type_re
-  SAST.BinOp op <$> mustByTy undyn_le tyle <*> mustByTy undyn_re tyre <*> typeOfOps pann op undyn_le undyn_re
+  tyle' <- expressionType le
+  type_le' <- getExpType tyle'
+  tyre' <- expressionType re
+  type_re' <- getExpType tyre'
+  (tyle, type_le) <- maybe (return (tyle', type_le')) (\t -> (,t) <$> unDynExp tyle') (isDyn type_le')
+  (tyre, type_re) <- maybe (return (tyre', type_re')) (\t -> (,t) <$> unDynExp tyre') (isDyn type_re')
+  SAST.BinOp op tyle tyre <$> typeOfOps pann op type_le type_re
 expressionType (ReferenceExpression rhs_e pann) =
   -- | Reference Expression
   -- TODO [Q15]
@@ -378,10 +381,9 @@ statementTySimple (Declaration lhs_id lhs_type expr anns) =
 statementTySimple (AssignmentStmt lhs_o rhs_expr anns) =
 {- TODO Q19 && Q20 -}
   lhsObject lhs_o >>= \(lhs_o_typed, lhs_o_type) ->
-  -- getLHSVarTy anns lhs_id >>= \lhs_ty ->
   let (lhs, lhs_ty) =
         case isDyn lhs_o_type of
-          Just t -> (unDyn lhs, t)
+          Just t -> (unDyn lhs_o_typed, t)
           Nothing -> (lhs_o_typed, lhs_o_type)
   in
   expressionType rhs_expr >>= mustByTy lhs_ty >>= \ety ->

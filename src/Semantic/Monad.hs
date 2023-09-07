@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE TupleSections #-}
 
+
 -- | Semantic Monad.
 -- Here lives the monad we use to handle semantic pass effects.
 -- It should be something like Exceptions + State
@@ -8,6 +9,9 @@
 module Semantic.Monad where
 
 import           Data.Map                   as M
+
+-- Debugging
+import Debugging
 
 -- AST Info
 import           AST
@@ -37,6 +41,7 @@ data SAnns a = SemAnn
     location :: Locations
     -- | Type after type checking
   , ty_ann   :: a}
+  deriving Show
 
 
 instance Annotated SAnns where
@@ -48,6 +53,7 @@ data SemanticElems
   = ETy TypeSpecifier -- ^ Expressions with their types
   | STy -- ^ Statements with no types
   | GTy (GEntry SemanticAnns) -- ^ Global elements
+  deriving Show
 
 getTySpec :: SemanticElems -> Maybe TypeSpecifier
 getTySpec (ETy ty) = Just ty
@@ -322,21 +328,17 @@ sameOrErr loc t1 t2 =
   else throwError $ annotateError loc $ EMismatch t1 t2
 
 unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
-unDyn t =  Undyn t (undynTypeAnn (getAnnotation t))
+unDyn t = Undyn t (undynTypeAnn (getAnnotation t))
+
+unDynExp :: SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
+unDynExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unDyn obj)
+unDynExp _ = throwError $ annotateError internalErrorSeman EUnDynExpression
 
 mustByTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
-mustByTy ty exp = getExpType exp >>=
-  \ty_exp ->
-    maybe
-    (sameOrErr loc ty ty_exp >> return exp)
-    (\ty_subD ->
-       if groundTyEq ty ty_subD then
-         case exp of
-           (AccessObject obj) -> return (AccessObject (unDyn obj))
-           _ -> throwError $ annotateError internalErrorSeman EUndynForcingError
-       else throwError $ annotateError loc $ EMismatchDyn ty ty_subD
-        )
-    (isDyn ty_exp)
+mustByTy ty exp =
+  getExpType exp >>=
+  sameOrErr loc ty
+  >> return exp
   where
     ann_exp = getAnnotation exp
     loc = location ann_exp
