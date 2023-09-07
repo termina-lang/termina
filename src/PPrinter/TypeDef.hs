@@ -8,7 +8,7 @@ import Semantic.Monad (SemanticAnns)
 
 
 ppStructField :: FieldDefinition -> DocStyle
-ppStructField (FieldDefinition identifier ts) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
+ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
 
 classMethodName :: Identifier -> Identifier -> DocStyle
 classMethodName = methodName
@@ -24,7 +24,7 @@ ppClassMethodDeclaration _ _ = error "invalid class membeer"
 -- It takes as argument the class member to print.
 -- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts _) = ppPrimitiveType ts <+> pretty identifier <> ppDimension ts <> semi
+ppClassField (ClassField identifier ts _) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
 ppClassField _ = error "invalid class member"
 
 -- | Pretty prints a class mutex field
@@ -67,7 +67,7 @@ ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDo
 
 ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
-  ppPrimitiveType ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
+  ppTypeSpecifier ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
 
 ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
 ppEnumVariantParameterStruct (EnumVariant identifier params) =

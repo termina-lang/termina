@@ -19,15 +19,15 @@ ppInitializeVectorFromExpression level target source ts =
         (Vector ts' (KC (I indexTS size))) ->
           let initExpr =
                 ppCForLoopInitExpression
-                  (ppPrimitiveType indexTS)
+                  (ppTypeSpecifier indexTS)
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
               condExpr =
-                  pretty iterator <+> pretty "<" <+> parens (ppPrimitiveType indexTS) <> pretty size
+                  pretty iterator <+> pretty "<" <+> parens (ppTypeSpecifier indexTS) <> pretty size
               incrExpr =
                   ppCForLoopIncrExpression
                   (pretty iterator)
-                  (parens (ppPrimitiveType indexTS) <> pretty (show (1 :: Integer)))
+                  (parens (ppTypeSpecifier indexTS) <> pretty (show (1 :: Integer)))
               in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets (pretty iterator)) (source <> brackets (pretty iterator)) ts')
         _ -> target <+> pretty "=" <+> source <> semi
 
@@ -50,15 +50,15 @@ ppInitializeVector subs level target expr =
         (VectorInitExpression expr' (KC (I indexTS size)) _) ->
           let initExpr =
                 ppCForLoopInitExpression
-                  (ppPrimitiveType indexTS)
+                  (ppTypeSpecifier indexTS)
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
            in let condExpr =
-                    pretty iterator <+> pretty "<" <+> parens (ppPrimitiveType indexTS) <> pretty size
+                    pretty iterator <+> pretty "<" <+> parens (ppTypeSpecifier indexTS) <> pretty size
                in let incrExpr =
                         ppCForLoopIncrExpression
                           (pretty iterator)
-                          (parens (ppPrimitiveType indexTS) <> pretty (show (1 :: Integer)))
+                          (parens (ppTypeSpecifier indexTS) <> pretty (show (1 :: Integer)))
                    in ppCForLoop
                         initExpr
                         condExpr

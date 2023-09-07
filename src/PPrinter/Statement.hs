@@ -17,7 +17,7 @@ ppDeclareAndInitialize ::
 ppDeclareAndInitialize initializer identifier ts expr =
     vsep
         [
-            ppPrimitiveType ts <+> identifier <> ppDimension ts <> semi,
+            ppTypeSpecifier ts <+> identifier <> ppDimension ts <> semi,
             emptyDoc,
             braces' $ (indentTab . align) $ initializer identifier expr
         ]
@@ -50,7 +50,7 @@ ppStatement subs (Declaration identifier ts expr _) =
             ppDeclareAndInitialize (ppInitializeOption subs 0) (pretty identifier) ts expr
         (EnumVariantExpression {}) ->
             ppDeclareAndInitialize (ppInitializeEnum subs 0) (pretty identifier) ts expr
-        _ -> ppPrimitiveType ts <+> pretty identifier <+> pretty "=" <+> ppExpression subs expr <> semi
+        _ -> ppTypeSpecifier ts <+> pretty identifier <+> pretty "=" <+> ppExpression subs expr <> semi
 ppStatement subs (AssignmentStmt obj expr  _) =
     let ts = getObjectType obj in
     case ts of
@@ -76,14 +76,14 @@ ppStatement subs (ForLoopStmt iterator initValue endValue breakCond body _ ) =
         endSymbol = "__end"
         iteratorTS = getType initValue
         initExpr = ppCForLoopInitExpression
-            (ppPrimitiveType iteratorTS)
+            (ppTypeSpecifier iteratorTS)
             (pretty iterator)
             (pretty startSymbol)
         condExpr = pretty iterator <+> pretty "<" <+> pretty endSymbol <>
             maybe emptyDoc (\e -> emptyDoc <+> pretty "&&" <+> parens (ppExpression subs e)) breakCond
         incrExpr = ppCForLoopIncrExpression
             (pretty iterator)
-            (parens (ppPrimitiveType iteratorTS) <> pretty (show (1 :: Integer)))
+            (parens (ppTypeSpecifier iteratorTS) <> pretty (show (1 :: Integer)))
     in
     braces' $ (indentTab . align) $ vsep [
         ppStatement subs (Declaration startSymbol iteratorTS initValue undefined),
