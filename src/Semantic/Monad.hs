@@ -276,7 +276,17 @@ getLHSVarTy loc ident =
   catchError
     (getLocalVarTy loc ident)
     (\case{
-        AnnError (ENotNamedVar _) _loc -> getGlobalVarTyLhs loc ident;
+        AnnError (ENotNamedVar _) _loc ->
+        catchError (getGlobalVarTyLhs loc ident)
+        ( \error ->
+            case semError error of {
+                  ENotNamedGlobal errvar ->
+                  if errvar == ident then
+                    throwError $ annotateError loc (ENotNamedVar ident);
+                  else
+                    throwError error;
+              }
+        );
         l                              -> throwError l;
           })
 getRHSVarTy loc ident =
@@ -284,20 +294,32 @@ getRHSVarTy loc ident =
   catchError
     (getLocalVarTy loc ident)
   -- | If it is not defined there, check ro environment
-    (\case {
+    (\errorLocal ->
+       case semError errorLocal of {
         ENotNamedVar _ ->
-        catchError (getROVarTy loc ident)
-        (\case {
-            ENotNamedVar _ -> getGlobalGEnTy loc ident >>=
-              (\case{
-                  GGlob sG -> return (getTySemGlobal sG);
-                  _ -> throwError $ annotateError loc (ENotNamedVar ident);
-                  });
-            _              -> throwError $ annotateError loc ERHSCatch;
-               } . semError)
-        ;
-        _              -> throwError $ annotateError loc ERHSCatch
-           } . semError)
+          catchError (getROVarTy loc ident)
+          (\errorRO ->
+             case semError errorRO of {
+              ENotNamedVar _ -> catchError (getGlobalGEnTy loc ident)
+                (\errorGlobal ->
+                  case semError errorGlobal of {
+                    ENotNamedGlobal errvar ->
+                    if errvar == ident then
+                      throwError $ annotateError loc (ENotNamedVar ident);
+                    else
+                      throwError errorGlobal;
+                    _  -> throwError errorGlobal;
+                      })
+                >>=
+                  (\case{
+                      GGlob sG -> return (getTySemGlobal sG);
+                      _ -> throwError $ annotateError loc (ENotNamedVar ident);
+                      });
+                _              -> throwError errorRO;
+                  })
+          ;
+        _              -> throwError errorLocal;
+           })
 
 -- | Lookups |idenfitier| in local scope first (I assuming this is the most
 -- frequent case) and then the global scope.

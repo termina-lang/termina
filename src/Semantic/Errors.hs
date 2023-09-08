@@ -138,6 +138,11 @@ data Errors a
   | EUnDynExpression
   deriving Show
 
+instance Eq (Errors a) where
+  (ENotNamedVar idls) == (ENotNamedVar idrs) = idls == idrs
+  _ == _ = False
+
+
 withError :: MonadError e m => (e -> e) -> m a -> m a
 withError = flip catchError . (throwError .)
 ----------------------------------------
