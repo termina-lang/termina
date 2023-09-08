@@ -1,0 +1,12 @@
+fn test0() {
+var foo : u16 = 0 : u16;
+foo = foo + 1024 : u16;
+foo = 1024 : u16 + foo;
+foo = foo - 1024 : u16;
+foo = 1024 : u16 - foo;
+foo = foo * 1024 : u16;
+foo = 1024 : u16 * foo;
+foo = foo / 1024 : u16;
+foo = 1024 : u16 / foo;
+return;
+}

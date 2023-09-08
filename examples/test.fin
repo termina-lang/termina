@@ -1,0 +1,11 @@
+fn test1(foo : 'dyn u16) {
+foo = foo + 1024 : u16;
+foo = 1024 : u16 + foo;
+foo = foo - 1024 : u16;
+foo = 1024 : u16 - foo;
+foo = foo * 1024 : u16;
+foo = 1024 : u16 * foo;
+foo = foo / 1024 : u16;
+foo = 1024 : u16 / foo;
+return;
+}
