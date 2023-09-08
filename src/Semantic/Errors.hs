@@ -37,7 +37,7 @@ data Errors a
   -- | Not Function found
   | ENotFoundFun Identifier (GEntry a)
   -- | Type Id not found
-  | ENoTyFound Identifier a
+  | ENoTyFound Identifier
   -- | Not a function
   | ENotAFun Identifier
   -- | Parameter and argument type mismatch
@@ -136,6 +136,15 @@ data Errors a
   | EPoolsWrongArgTypeW TypeSpecifier
   -- Internal Undyn
   | EUnDynExpression
+  -- Match
+  | EMatchNotEnum Identifier
+  | EMatchWrongType TypeSpecifier
+  | EMatchOptionBadArgs
+  | EMatchOptionBadSome
+  | EMatchOptionBad
+  | EMatchCaseInternalError
+  | EMatchCaseBadName Identifier Identifier
+  | EMatchExtraCases
   deriving Show
 
 instance Eq (Errors a) where

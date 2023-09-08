@@ -422,6 +422,48 @@ statementTySimple (ForLoopStmt it_id from_expr to_expr mWhile body_stmt ann) = d
     throwError $ annotateError ann EBadRange
 statementTySimple (SingleExpStmt expr anns) =
   flip SingleExpStmt (buildStmtAnn anns) <$> expressionType expr
+statementTySimple (MatchStmt matchE cases ann) =
+  typeExpression matchE >>= \(typed_matchE , type_matchE) ->
+  case type_matchE of
+    DefinedType t -> getGlobalTy ann t >>=
+        \case {
+          Enum _ident flsDef _mods ->
+          -- Sort both lists by identifiers
+          let ord_flsDef = sortOn variantIdentifier flsDef in
+          let ord_cases = sortOn matchIdentifier cases in
+          case zipSameLength
+                (const (annotateError ann EMatchExtraCases))
+                (const (annotateError ann EMatchExtraCases))
+                matchCaseType ord_cases ord_flsDef of
+            Left e -> throwError e
+            Right cs -> flip (MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
+          ;
+          _ -> throwError $ annotateError ann $ EMatchNotEnum t
+        }
+    Option t ->
+      optionCases cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
+      >>
+      MatchStmt typed_matchE <$> zipWithM matchCaseType cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
+    _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
+    where
+      optionCases [a,b] = return $ (optionNone a && optionSome b) || (optionSome a && optionNone b)
+      optionCases _ = throwError $ annotateError ann EMatchOptionBadArgs
+      optionNone c =
+        matchIdentifier c == "None"
+          && Prelude.null (matchBVars c)
+      optionSome c =
+        matchIdentifier c == "Some"
+           && length (matchBVars c) == 1
+
+matchCaseType :: MatchCase Parser.Annotation -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnns)
+matchCaseType c (EnumVariant vId vData) = matchCaseType' c vId vData
+  where
+    matchCaseType' (MatchCase cIdent bVars bd ann) supIdent tVars
+      | cIdent == supIdent =
+        if length bVars == length tVars then
+        flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addTempVars ann (zip bVars tVars) (blockType bd)
+        else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
+      | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
 
 ----------------------------------------
 -- Programs Semantic Analyzer

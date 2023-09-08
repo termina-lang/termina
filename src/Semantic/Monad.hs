@@ -164,7 +164,7 @@ getGlobalTy :: Locations -> Identifier -> SemanticMonad (SemanTypeDef SemanticAn
 getGlobalTy loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
-  (throwError $ annotateError loc (ENoTyFound tid loc))
+  (throwError $ annotateError loc (ENoTyFound tid))
   -- if so, return its type
   (\case {
       GType tydef -> return tydef;
