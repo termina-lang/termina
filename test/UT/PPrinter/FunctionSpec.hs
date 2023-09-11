@@ -4,35 +4,22 @@ import Test.Hspec
 import PPrinter
 import SemanAST
 import Data.Text hiding (empty)
-import Data.Map
 import Semantic.Monad
-import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 import PPrinter.Function
 
-tmDescriptorTS, messageTS :: TypeSpecifier
+tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
-messageTS = DefinedType "Message"
 
 constUInt32 :: Expression SemanticAnns
 -- | 1024 : u32
 constUInt32 = Constant (I UInt32 1024) uint32SemAnn
 
-vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
+vectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
-vectorTMDescriptorAnn = vectorSemAnn tmDescriptorTS (I UInt32 20)
-twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
-twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 refVectorAnn :: SemanticAnns
 refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
-
-foo0 :: Expression SemanticAnns
-foo0 = AccessObject ((Variable "foo0" uint32SemAnn))
-
-foo1, foo2 :: Statement SemanticAnns
-foo1 = Declaration "foo1" UInt32 foo0 undefined
-foo2 = Declaration "foo2" UInt32 uint32Const0 undefined
 
 structASemAnn, tmDescriptorSemAnn :: SemanticAnns
 structASemAnn = definedTypeSemAnn "StructA"
@@ -54,22 +41,22 @@ structAFieldsInit0 =
 structAFieldsInit1 :: Expression SemanticAnns
 structAFieldsInit1 = 
     FieldValuesAssignmentsExpression "StructA"
-        [FieldValueAssignment "field_a" (AccessObject ((Variable "param0" uint32SemAnn))),
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" uint32SemAnn)),
          FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 structAFieldsInit2 :: Expression SemanticAnns
 structAFieldsInit2 = 
     FieldValuesAssignmentsExpression "StructA"
-        [FieldValueAssignment "field_a" (AccessObject ((Variable "param0" uint32SemAnn))),
-         FieldValueAssignment "field_b" (AccessObject ((Variable "param1" vectorAnn))),
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" uint32SemAnn)),
+         FieldValueAssignment "field_b" (AccessObject (Variable "param1" vectorAnn)),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 structAFieldsInit3 :: Expression SemanticAnns
 structAFieldsInit3 = 
     FieldValuesAssignmentsExpression "StructA"
-        [FieldValueAssignment "field_a" (AccessObject ((Variable "param0" uint32SemAnn))),
-         FieldValueAssignment "field_b" (DereferenceExpression (AccessObject ((Variable "param1" refVectorAnn))) vectorAnn),
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" uint32SemAnn)),
+         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refVectorAnn) vectorAnn)),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
@@ -101,16 +88,16 @@ struct0Declaration0 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsIni
 struct0Declaration1 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit1 undefined
 struct0Declaration2 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit2 undefined
 struct0Declaration3 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit3 undefined
-struct1Declaration = Declaration "struct1" tmDescriptorTS (AccessObject ((Variable "struct0" tmDescriptorSemAnn))) undefined
+struct1Declaration = Declaration "struct1" tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorSemAnn)) undefined
 
 struct0 :: Object SemanticAnns
 struct0 = Variable "struct0" tmDescriptorSemAnn
 
 struct0field0 :: Expression SemanticAnns
-struct0field0 = AccessObject ((MemberAccess struct0 "field0" uint32SemAnn))
+struct0field0 = AccessObject (MemberAccess struct0 "field0" uint32SemAnn)
 
 struct0Assignment0 :: Statement SemanticAnns
-struct0Assignment0 = AssignmentStmt ((MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
+struct0Assignment0 = AssignmentStmt (MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" uint32SemAnn) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
 
 returnVoid :: ReturnStmt SemanticAnns
 returnVoid = ReturnStmt Nothing unitSemAnn

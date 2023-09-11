@@ -134,6 +134,8 @@ data Errors a
   | EPoolsWrongNumArgs
   | EPoolsWrongArgType TypeSpecifier
   | EPoolsWrongArgTypeW TypeSpecifier
+  -- Error when constructing an option variant expression with a non-dynamic type
+  | EOptionVariantNotDynamic TypeSpecifier
   -- Internal Undyn
   | EUnDynExpression
   -- Match
@@ -145,6 +147,13 @@ data Errors a
   | EMatchCaseInternalError
   | EMatchCaseBadName Identifier Identifier
   | EMatchExtraCases
+  -- Enum variant expressions
+  | ETyNotEnumFound Identifier
+  | EEnumVariantNotFound Identifier
+  | EEnumVariantType
+  | EEnumVariantExtraParams
+  | EEnumVariantMissingParams
+  | ETyNotEnum Identifier (SemanTypeDef a)
   deriving Show
 
 instance Eq (Errors a) where

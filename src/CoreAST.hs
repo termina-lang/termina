@@ -282,7 +282,6 @@ data Expression' rho a
   | ParensExpression (Expression' rho a) a
   | BinOp Op (Expression' rho a) (Expression' rho a) a
   | ReferenceExpression (rho a) a
-  | DereferenceExpression (Expression' rho a) a
   | Casting (Expression' rho a) TypeSpecifier a
   -- Invocation expressions
   | FunctionExpression Identifier [ Expression' rho a ] a
@@ -316,8 +315,8 @@ instance (Annotated rho) => Annotated (Expression' rho) where
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (VectorInitExpression _ _ a)             = a
   getAnnotation (ParensExpression _ a)                   = a
-  getAnnotation (DereferenceExpression _ a)              = a
   getAnnotation (OptionVariantExpression _ a)            = a
+  getAnnotation (MemberMethodAccess _ _ _ a)             = a
 
 
 data Statement' expr lho a =

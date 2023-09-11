@@ -23,7 +23,6 @@ getType (Constant _ (SemAnn _ (ETy ts))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
 getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
-getType (DereferenceExpression _ (SemAnn _ (ETy ts))) = ts
 getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
 getType (FunctionExpression _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
 getType (MemberMethodAccess _ _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts

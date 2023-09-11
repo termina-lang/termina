@@ -14,10 +14,8 @@ import Debugging
 -- Termina Ast and Utils
 import           Annotations
 import           AST                  as PAST
-import           CoreAST
 import           Utils.AST
 import           Utils.CoreAST
-import           Utils.SemanAST
 import           Utils.TypeSpecifier
 
 -- Termina Semantic AST
@@ -39,17 +37,13 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (find, foldl', map, nub, sort, sortOn,
+import           Data.List            (find, foldl', map, nub, sortOn,
                                        (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
-import           Data.Map             as M
-
-import           Control.Arrow
 import           Control.Monad
 
-import           Data.Graph           (graphFromEdges)
 import qualified Data.Graph           as Graph
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
@@ -294,10 +288,27 @@ expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
        <$>
        checkFieldValues pann ty_fs fs
        ;
-   Union _ ty_fs _mods ->
-       flip (SAST.FieldValuesAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
-       <$> checkFieldValues pann ty_fs fs;
    x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap (fmap forgetSemAnn) x));
+  }
+expressionType (EnumVariantExpression id_ty variant args pann) =
+  -- | Enum Variant
+  catchError
+    (getGlobalTy pann id_ty)
+    (\_ -> throwError $ annotateError pann (ETyNotEnumFound id_ty))
+  >>= \case{
+   Enum _ ty_vs _mods ->
+     case find ((variant ==) . variantIdentifier) ty_vs of
+       Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant)
+       Just (EnumVariant _ ps) ->
+         let (psLen , asLen ) = (length ps, length args) in
+         if psLen == asLen
+         then flip (SAST.EnumVariantExpression id_ty variant) (buildExpAnn pann (DefinedType id_ty))
+             <$> zipWithM (\p e -> mustByTy p =<< expressionType e) ps args
+         else if psLen < asLen
+         then throwError $ annotateError pann EEnumVariantExtraParams
+         else throwError $ annotateError pann EEnumVariantMissingParams
+    ;
+   x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap (fmap forgetSemAnn) x))
   }
 -- IDEA Q4
 expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
@@ -311,6 +322,14 @@ expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError p
 -- TODO [Q17]
 expressionType (ParensExpression e anns) =
   typeExpression e >>= \(typed_e, type_e) -> return $ ParensExpression typed_e $ buildExpAnn anns type_e
+expressionType (OptionVariantExpression vexp anns) =
+  case vexp of
+    None -> return $ OptionVariantExpression None (buildExpAnn anns (Option Unit))
+    Some e -> do
+      (typed_e, type_e) <- typeExpression e
+      case type_e of
+          DynamicSubtype _ -> return $ SAST.OptionVariantExpression (Some typed_e) (buildExpAnn anns (Option type_e))
+          _ -> throwError $ annotateError anns (EOptionVariantNotDynamic type_e)
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
@@ -378,16 +397,15 @@ statementTySimple (Declaration lhs_id lhs_type expr anns) =
   insertLocalVar anns lhs_id lhs_type >>
   -- Return annotated declaration
   return (Declaration lhs_id lhs_type ety (buildStmtAnn anns))
-statementTySimple (AssignmentStmt lhs_o rhs_expr anns) =
+statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
 {- TODO Q19 && Q20 -}
-  lhsObject lhs_o >>= \(lhs_o_typed, lhs_o_type) ->
-  let (lhs, lhs_ty) =
-        case isDyn lhs_o_type of
-          Just t -> (unDyn lhs_o_typed, t)
-          Nothing -> (lhs_o_typed, lhs_o_type)
-  in
-  expressionType rhs_expr >>= mustByTy lhs_ty >>= \ety ->
-  return $ AssignmentStmt lhs ety $ buildStmtAnn anns
+  (lhs_o_typed', lhs_o_type') <- lhsObject lhs_o
+  (lhs_o_typed, lhs_o_type) <- maybe (return (lhs_o_typed', lhs_o_type')) (\t -> return (unDyn lhs_o_typed', t)) (isDyn lhs_o_type')
+  rhs_expr_typed' <- expressionType rhs_expr
+  type_rhs' <- getExpType rhs_expr_typed'
+  rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
+  ety <- mustByTy lhs_o_type rhs_expr_typed
+  return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
   -- let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   IfElseStmt

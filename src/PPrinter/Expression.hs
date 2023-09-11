@@ -190,12 +190,6 @@ ppExpression subs (ReferenceExpression obj _) =
         -- to it)
         (Vector _ _) -> ppObject subs obj
         _ -> ppCReferenceExpression (ppObject subs obj)
--- | If the expression is a dereference, we need to check if it is to a vector
-ppExpression subs (DereferenceExpression expr _) =
-    case getType expr of
-        -- | A dereference to a vector is printed as the name of the vector
-        (Reference (Vector _ _)) -> ppExpression subs expr
-        _ -> ppCDereferenceExpression (ppExpression subs expr)
 ppExpression _ (Constant constant _) =
     case constant of
         B b -> if b then pretty "1" else pretty "0"
