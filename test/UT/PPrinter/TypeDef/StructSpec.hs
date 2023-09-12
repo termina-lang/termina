@@ -5,6 +5,7 @@ import PPrinter
 import SemanAST
 import Data.Text
 import Semantic.Monad
+import Data.Maybe
 
 {- | Struct type with a single field.
 In Termina's context sytax:
@@ -85,7 +86,7 @@ packedAndAlignedStruct = TypeDefinition
     ]) undefined
 
 renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration = render . ppHeaderASTElement
+renderTypedefDeclaration = render . fromJust . ppHeaderASTElement
 
 spec :: Spec
 spec = do

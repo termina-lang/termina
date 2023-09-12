@@ -94,7 +94,8 @@ lexer = Tok.makeTokenParser langDef
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
                       ,"#" -- Attribute
-                      ,"::" -- EnumVariant
+                      ,":" -- Type annotation
+                      ,"::" -- Enum variant
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -316,7 +317,7 @@ enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
   p <- getPosition
   enum <- identifierParser
-  _ <- reserved "::"
+  _ <- reservedOp "::"
   variant <- identifierParser
   parameterList <-
     option [] (parens (sepBy (try expressionParser) comma))
@@ -396,8 +397,7 @@ objectParser = objectParser' objectTermParser
   where
     objectParser'
       = buildPrattParser -- New parser
-      [[vectorIndexPostfix]
-      ,[memberAccessPostfix]
+      [[memberAccessPostfix, vectorIndexPostfix]
       ,[dereferencePrefix]]
     vectorIndexPostfix
       = Ex.Postfix (do

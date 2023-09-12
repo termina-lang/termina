@@ -5,6 +5,7 @@ import PPrinter
 import SemanAST
 import Data.Text
 import Semantic.Monad
+import Data.Maybe
 
 enumWithOneRegularField :: AnnASTElement SemanticAnns
 enumWithOneRegularField = TypeDefinition
@@ -35,7 +36,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
   ] []) undefined
 
 renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration = render . ppHeaderASTElement
+renderTypedefDeclaration = render . fromJust .ppHeaderASTElement
 
 spec :: Spec
 spec = do

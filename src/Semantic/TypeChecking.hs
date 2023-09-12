@@ -461,9 +461,10 @@ statementTySimple (MatchStmt matchE cases ann) =
           _ -> throwError $ annotateError ann $ EMatchNotEnum t
         }
     Option t ->
-      optionCases cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
+      let ord_cases = sortOn matchIdentifier cases in
+      optionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
       >>
-      MatchStmt typed_matchE <$> zipWithM matchCaseType cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
+      MatchStmt typed_matchE <$> zipWithM matchCaseType ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
     where
       optionCases [a,b] = return $ (optionNone a && optionSome b) || (optionSome a && optionNone b)
@@ -565,7 +566,10 @@ programSeman (GlobalDeclaration gbl) =
   GlobalDeclaration <$> globalCheck gbl
 programSeman (TypeDefinition tydef ann) =
   typeDefCheck ann tydef >>= \t ->
-  return $ TypeDefinition t (buildGlobalTy ann (semanticTypeDef t))
+    let stdef = semanticTypeDef t in
+    -- If we have reached this point, it means that the type is well defined
+    -- and we can add it to the global environment.
+    insertGlobalTy ann stdef >> return (TypeDefinition t (buildGlobalTy ann stdef))
 programSeman (ModuleInclusion ident _mods anns) = undefined
 
 semanticTypeDef :: SAST.TypeDef SemanticAnns -> SemanTypeDef SemanticAnns

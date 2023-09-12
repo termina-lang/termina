@@ -21,7 +21,10 @@ groundTyEq  (Option Unit) (Option _) = True
 groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
+-- TODO: These are considered complex types and should be handled differently
 groundTyEq  (Vector typespecl sizeel) (Vector typespecr sizer) = groundTyEq typespecl typespecr && constExprEq sizeel sizer
+groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
+--
 groundTyEq  _ _ = False
 
 constExprEq :: ConstExpression -> ConstExpression -> Bool
@@ -76,6 +79,7 @@ getDepObj = getDepObj'
       = let (dnm,deps) = getDepObj' obj
       in (FieldAccess dnm ident , deps)
     getDepObj' (Dereference obj _ann ) = getDepObj' obj
+    getDepObj' (ParensObject obj _ann) = getDepObj' obj
     -- getDepObj' (MemberMethodAccess obj ident es _ann)
     --   = let (dnm, deps) = getDepObj' obj
     --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)

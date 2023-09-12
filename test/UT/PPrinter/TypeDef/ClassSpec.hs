@@ -5,6 +5,7 @@ import PPrinter
 import SemanAST
 import Data.Text
 import Semantic.Monad
+import Data.Maybe
 
 
 classWithOneMethodAndZeroFields :: AnnASTElement SemanticAnns
@@ -88,7 +89,7 @@ packedAndAlignedClass = TypeDefinition
     ]) undefined
 
 renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration = render . ppHeaderASTElement
+renderTypedefDeclaration = render . fromJust . ppHeaderASTElement
 
 spec :: Spec
 spec = do
