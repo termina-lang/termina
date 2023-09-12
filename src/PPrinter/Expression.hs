@@ -141,6 +141,7 @@ ppObject subs (Undyn obj _) =
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
         _ -> error "Unsupported expression"
+ppObject subs (ParensObject obj _) = parens (ppObject subs obj)
 
 -- | Pretty prints binary expressions casted to the type of the expression
 -- This function is only used for subexpressions of binary expressions.

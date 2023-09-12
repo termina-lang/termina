@@ -155,7 +155,7 @@ spec = do
     it "Prints fuction3 declaration" $ do
       renderFunctionDeclaration function3 `shouldBe`
         pack ("typedef struct {\n" ++
-              "    uint32_t array;\n" ++
+              "    uint32_t array[10];\n" ++
               "} __param__function3__param1_t;\n" ++
               "\n" ++
               "uint32_t function3(uint32_t param0, __param__function3__param1_t param1);")

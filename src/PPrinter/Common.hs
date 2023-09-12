@@ -76,6 +76,10 @@ int64C = pretty "int64_t"
 charC :: DocStyle
 charC = pretty "char"
 
+-- C pretty bool
+boolC :: DocStyle
+boolC = pretty "_Bool"
+
 -- C attribute pragma
 attribute :: DocStyle
 attribute = pretty "__attribute__"
@@ -116,7 +120,7 @@ ppTypeSpecifier Int8                         = int8C
 ppTypeSpecifier Int16                        = int16C
 ppTypeSpecifier Int32                        = int32C
 ppTypeSpecifier Int64                        = int64C
-ppTypeSpecifier Bool                         = uint8C
+ppTypeSpecifier Bool                         = boolC
 ppTypeSpecifier Char                         = charC
 ppTypeSpecifier (DefinedType typeIdentifier) = pretty typeIdentifier
 -- | Vector type
@@ -150,7 +154,7 @@ ppParameterVectorValueStructure prefix identifier =
 ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> semi)
+          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> ppDimension ts <> semi)
       <+> ppParameterVectorValueStructure prefix identifier <> semi
 
 ppReturnType :: DocStyle -> TypeSpecifier -> DocStyle

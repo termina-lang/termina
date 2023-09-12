@@ -15,6 +15,9 @@ import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
 import           Data.Functor
+import Text.Parsec.Expr
+import Data.List
+import Control.Monad
 
 {- | Type of the parsing annotations
 
@@ -259,7 +262,7 @@ optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
 
 -- Expression Parser
 expressionParser' :: Parser (Expression Annotation)
-expressionParser' = Ex.buildExpressionParser
+expressionParser' = buildPrattParser -- New parser
     [[castingPostfix]
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft]
@@ -336,24 +339,63 @@ referenceExprParser = do
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
-  <|> AccessObject <$> objectParser
+  <|> try (AccessObject <$> objectParser)
   <|> parensExprParser
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
 
+parensObjectParser :: Parser (Object  Annotation)
+parensObjectParser = parens $ ParensObject <$> objectParser <*> (Position <$> getPosition)
+
 ----------------------------------------
 -- Object Parsing
 
--- Plain variable names belong to whatever |exprI| we want.
-variableParser :: Parser (Object Annotation)
-variableParser = Variable <$> identifierParser <*> (Position <$> getPosition)
+-- Object term parser.
+objectTermParser :: Parser (Object Annotation)
+objectTermParser = Variable <$> identifierParser <*> (Position <$> getPosition)
+  <|> parensObjectParser
+
+-- Expression parser
+-- This parser is a variation of the original parser that allows us to chain
+-- two or more unary expressions together. This is useful when parsing expressions
+-- such as vector[0][1], where the postfix operator [] is used twice. This code
+-- has been directly extracted from this StackOverflow answer:
+-- https://stackoverflow.com/questions/33214163/parsec-expr-repeated-prefix-with-different-priority/33534426#33534426
+-- We now use it to parse expressions and object operations.
+buildPrattParser :: (Stream s m t)
+                      => OperatorTable s u m a
+                      -> ParsecT s u m a
+                      -> ParsecT s u m a
+buildPrattParser table termP = parser precs where
+  precs = reverse table
+  prefixP = choice prefixPs <|> termP where
+    prefixPs = do
+      precsR@(ops:_) <- tails precs 
+      Prefix opP <- ops
+      return $ opP <*> parser precsR
+  infixP precs' lhs = choice infixPs <|> pure lhs where
+    infixPs = do
+      precsR@(ops:precsL) <- tails precs'
+      op <- ops
+      p <- case op of
+        Infix opP assoc -> do
+          let p precs'' = opP <*> pure lhs <*> parser precs''
+          return $ case assoc of
+            AssocNone  -> error "Non associative operators are not supported"
+            AssocLeft  -> p precsL
+            AssocRight -> p precsR
+        Postfix opP ->
+          return $ opP <*> pure lhs
+        Prefix _ -> mzero
+      return $ p >>= infixP precs'
+  parser precs' = prefixP >>= infixP precs'
 
 objectParser :: Parser (Object  Annotation)
-objectParser = objectParser' variableParser
+objectParser = objectParser' objectTermParser
   where
     objectParser'
-      = Ex.buildExpressionParser
+      = buildPrattParser -- New parser
       [[vectorIndexPostfix]
       ,[memberAccessPostfix]
       ,[dereferencePrefix]]

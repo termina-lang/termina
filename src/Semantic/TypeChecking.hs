@@ -160,6 +160,8 @@ objectType getVarTy (Dereference obj ann) =
   case obj_ty of
    Reference ty -> return $ SAST.Dereference obj_typed $ buildExpAnn ann ty
    ty           -> throwError $ annotateError ann $ ETypeNotReference ty
+objectType getVarTy (ParensObject obj anns) =
+  typeObject getVarTy obj >>= \(obj_typed, obj_ty) -> return $ SAST.ParensObject obj_typed $ buildExpAnn anns obj_ty
 
 ----------------------------------------
 -- These two functions are useful, one lookups in read+write environments,
