@@ -6,34 +6,35 @@ import           Prettyprinter.Render.Terminal
 import           SemanAST
 import           Semantic.Monad
 import           Semantic.Types
+import System.FilePath (extSeparator)
 
 type DocStyle = Doc AnsiStyle
 
 getObjectType :: Object SemanticAnns -> TypeSpecifier
-getObjectType (Variable _ (SemAnn _ (ETy ts)))                = ts
-getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy ts))) = ts
-getObjectType (MemberAccess _ _ (SemAnn _ (ETy ts)))          = ts
-getObjectType (Dereference _ (SemAnn _ (ETy ts)))             = ts
-getObjectType (Undyn _ (SemAnn _ (ETy ts)))                   = ts
+getObjectType (Variable _ (SemAnn _ (ETy (SimpleType ts))))   = ts
+getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getObjectType (MemberAccess _ _ (SemAnn _ (ETy (SimpleType ts))))          = ts
+getObjectType (Dereference _ (SemAnn _ (ETy (SimpleType ts))))             = ts
+getObjectType (Undyn _ (SemAnn _ (ETy (SimpleType ts))))                   = ts
 getObjectType _ = error "invalid object annotation"
 
 getType :: Expression SemanticAnns -> TypeSpecifier
 getType (AccessObject obj) = getObjectType obj
-getType (Constant _ (SemAnn _ (ETy ts))) = ts
-getType (OptionVariantExpression _ (SemAnn _ (ETy ts))) = ts
-getType (BinOp _ _ _ (SemAnn _ (ETy ts))) = ts
-getType (ReferenceExpression _ (SemAnn _ (ETy ts))) = ts
-getType (Casting _ _ (SemAnn _ (ETy ts))) = ts
-getType (FunctionExpression _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
-getType (MemberMethodAccess _ _ _ (SemAnn _ (GTy (GFun _ ts)))) = ts
-getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy ts))) = ts
-getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy ts))) = ts
-getType (VectorInitExpression _ _ (SemAnn _ (ETy ts))) = ts
+getType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (ReferenceExpression _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (FunctionExpression _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
+getType (MemberMethodAccess _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
+getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (VectorInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid expression annotation"
 
 getParameters :: Expression SemanticAnns -> [Parameter]
-getParameters (FunctionExpression _ _ (SemAnn _ (GTy (GFun params _)))) = params
+getParameters (FunctionExpression _ _ (SemAnn _ (ETy (AppType params _)))) = params
 getParameters ann = error $ "invalid expression annotation: " ++ show ann
 
 braces' :: DocStyle -> DocStyle
@@ -80,13 +81,17 @@ charC = pretty "char"
 boolC :: DocStyle
 boolC = pretty "_Bool"
 
+-- C pretty extern
+externC :: DocStyle
+externC = pretty "extern"
+
 -- C attribute pragma
 attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
-pool = pretty "__termina_pool_t"
+poolC, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
+poolC = pretty "__termina_pool_t"
 msgQueue = pretty "__termina_msg_queue_id_t"
 mutex = pretty "__termina_mutex_id_t"
 optionDyn = pretty "__Option_dyn_t"
@@ -131,6 +136,8 @@ ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
 -- Non-primitive types:
 -- | Dynamic subtype
 ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
+-- | Pool type
+ppTypeSpecifier (Pool _ _)                   = poolC
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle

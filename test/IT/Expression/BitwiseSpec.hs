@@ -44,7 +44,7 @@ spec = do
   describe "Pretty printing bitwise shifting expressions" $ do
     it "Prints declaration of function bitwise_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void bitwise_test0(uint16_t foo);"
+        pack "void bitwise_test0(uint16_t foo);\n"
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void bitwise_test0(uint16_t foo) {\n" ++
@@ -73,4 +73,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    

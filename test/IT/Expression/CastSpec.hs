@@ -44,7 +44,7 @@ spec = do
   describe "Pretty printing casting expressions" $ do
     it "Prints declaration of function casting_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void casting_test0();"
+        pack "void casting_test0();\n"
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void casting_test0() {\n" ++
@@ -73,4 +73,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    

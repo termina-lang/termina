@@ -352,9 +352,19 @@ referenceExprParser = do
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
+  <|> try memberMethodAccessParser
   <|> try functionCallParser
   <|> try (AccessObject <$> objectParser)
   <|> parensExprParser
+
+memberMethodAccessParser :: Parser (Expression Annotation)
+memberMethodAccessParser = do
+  p <- getPosition
+  object <- identifierParser
+  _ <- reservedOp "."
+  method <- identifierParser
+  params <- parens (sepBy (try expressionParser) comma)
+  return $ MemberMethodAccess (Variable object (Position p)) method params (Position p)
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
@@ -417,7 +427,7 @@ objectParser = objectParser' objectTermParser
             index <- brackets expressionParser
             p <- getPosition
             return $ \parent ->  VectorIndexExpression parent index (Position p)
-            )
+            )     
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."

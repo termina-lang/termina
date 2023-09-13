@@ -145,23 +145,23 @@ spec = do
   describe "Pretty printing function declarations" $ do
     it "Prints fuction0 declaration" $ do
       renderFunctionDeclaration function0 `shouldBe`
-        pack "void function0();"
+        pack "void function0();\n"
     it "Prints fuction1 declaration" $ do
       renderFunctionDeclaration function1 `shouldBe`
-        pack "uint32_t function1();"
+        pack "uint32_t function1();\n"
     it "Prints fuction2 declaration" $ do
       renderFunctionDeclaration function2 `shouldBe`
-        pack "uint32_t function2(uint32_t param0);"
+        pack "uint32_t function2(uint32_t param0);\n"
     it "Prints fuction3 declaration" $ do
       renderFunctionDeclaration function3 `shouldBe`
         pack ("typedef struct {\n" ++
               "    uint32_t array[10];\n" ++
               "} __param__function3__param1_t;\n" ++
               "\n" ++
-              "uint32_t function3(uint32_t param0, __param__function3__param1_t param1);")
+              "uint32_t function3(uint32_t param0, __param__function3__param1_t param1);\n")
     it "Prints fuction4 declaration" $ do
       renderFunctionDeclaration function4 `shouldBe`
-        pack "uint32_t function4(uint32_t param0, uint32_t param1[10]);"
+        pack "uint32_t function4(uint32_t param0, uint32_t param1[10]);\n"
   describe "Pretty printing function definitions" $ do
     it "Prints fuction0 definition" $ do
       renderFunction function0 `shouldBe`
@@ -184,7 +184,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints fuction1 definition" $ do
       renderFunction function1 `shouldBe`
         pack ("uint32_t function1() {\n" ++
@@ -206,7 +206,7 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints fuction2 definition" $ do
       renderFunction function2 `shouldBe`
         pack ("uint32_t function2(uint32_t param0) {\n" ++
@@ -228,7 +228,7 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints fuction3 definition" $ do
       renderFunction function3 `shouldBe`
         pack ("uint32_t function3(uint32_t param0, __param__function3__param1_t param1) {\n" ++
@@ -250,7 +250,7 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints fuction4 definition" $ do
       renderFunction function4 `shouldBe`
         pack ("uint32_t function4(uint32_t param0, uint32_t param1[10]) {\n" ++
@@ -272,4 +272,4 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}")
+              "}\n")

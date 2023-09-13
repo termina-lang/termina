@@ -5,7 +5,7 @@ import Semantic.Monad
 import Semantic.Types
 
 tySemAnn :: TypeSpecifier -> SemanticAnns
-tySemAnn ts = SemAnn undefined (ETy ts)
+tySemAnn ts = SemAnn undefined (ETy (SimpleType ts))
 
 unitSemAnn :: SemanticAnns
 unitSemAnn = tySemAnn Unit
@@ -114,4 +114,4 @@ msgQueueSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
 msgQueueSemAnn ts size = tySemAnn (MsgQueue ts (SemanAST.K size))
 
 funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
-funSemAnn params ts = SemAnn undefined (GTy (GFun params ts))
+funSemAnn params ts = SemAnn undefined (ETy (AppType params ts))

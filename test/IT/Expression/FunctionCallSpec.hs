@@ -38,12 +38,21 @@ spec = do
   describe "Pretty printing function call expressions" $ do
     it "Prints declaration of functions test0 and test1" $ do
       renderHeader test0 `shouldBe`
-        pack ("uint16_t test0(uint16_t a);\n" ++
-              "uint16_t test1(uint16_t a);")
+        pack ("uint16_t test0(uint16_t a);\n\n" ++
+              "uint16_t test1(uint16_t a);\n")
     it "Prints definition of functions test0 and test1" $ do
       renderSource test0 `shouldBe`
         pack ("uint16_t test0(uint16_t a) {\n" ++
               "    \n" ++
-              "    return;\n" ++
               "\n" ++
-              "}")    
+              "    return (a + ((uint16_t)1));\n" ++
+              "\n" ++
+              "}\n" ++
+              "\n" ++
+              "uint16_t test1(uint16_t a) {\n" ++
+              "    \n" ++
+              "    uint16_t foo = test0((uint16_t)2);\n" ++
+              "\n" ++
+              "    return (foo * ((uint16_t)2));\n" ++
+              "\n" ++
+              "}\n")    

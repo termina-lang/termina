@@ -47,7 +47,7 @@ spec = do
   describe "Pretty printing relational expressions" $ do
     it "Prints declaration of function relational_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void relational_test0(uint16_t foo);"
+        pack "void relational_test0(uint16_t foo);\n"
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void relational_test0(uint16_t foo) {\n" ++
@@ -82,4 +82,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")

@@ -1,13 +1,13 @@
 module PPrinter.Statement where
 
 import PPrinter.Common
-import PPrinter.Expression
 import Prettyprinter
 import SemanAST
 import Semantic.Monad
 import Data.Map (union, fromList, empty)
-
+import PPrinter.Expression
 import PPrinter.Statement.VariableInitialization
+
 
 ppDeclareAndInitialize ::
     (DocStyle -> Expression SemanticAnns -> DocStyle)

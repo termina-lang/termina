@@ -55,7 +55,7 @@ spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints declaration of function test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void test0();"
+        pack "void test0();\n"
     it "Prints definition of function test0" $ do
       renderSource test0 `shouldBe`
         pack ("void test0() {\n" ++
@@ -80,10 +80,10 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of function test1" $ do
      renderHeader test1 `shouldBe`
-       pack "void test1(__dyn_t foo);"
+       pack "void test1(__dyn_t foo);\n"
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
        pack ("void test1(__dyn_t foo) {\n" ++
@@ -106,4 +106,4 @@ spec = do
              "\n" ++
              "    return;\n" ++
              "\n" ++
-             "}")
+             "}\n")

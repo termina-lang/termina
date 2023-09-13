@@ -83,7 +83,7 @@ spec = do
   describe "Pretty printing match statements" $ do
     it "Prints declaration of function match_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "uint32_t match_test0(__Option_dyn_t option0);"
+        pack "uint32_t match_test0(__Option_dyn_t option0);\n"
     it "Prints definition of function match_test0" $ do
       renderSource test0 `shouldBe`
         pack ("uint32_t match_test0(__Option_dyn_t option0) {\n" ++
@@ -102,10 +102,10 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of function match_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "uint32_t match_test1(__Option_dyn_t option0);"
+        pack "uint32_t match_test1(__Option_dyn_t option0);\n"
     it "Prints definition of function match_test1" $ do
       renderSource test1 `shouldBe`
         pack ("uint32_t match_test1(__Option_dyn_t option0) {\n" ++
@@ -123,7 +123,7 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of function match_test2" $ do
       renderHeader test2 `shouldBe`
         pack ("typedef enum {\n" ++
@@ -149,7 +149,7 @@ spec = do
               "\n" ++
               "} Message;\n" ++
               "\n" ++
-              "uint32_t match_test1();")
+              "uint32_t match_test1();\n")
     it "Prints definition of function match_test1" $ do
       renderSource test2 `shouldBe`
         pack ("uint32_t match_test1() {\n" ++
@@ -183,4 +183,4 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}")
+              "}\n")

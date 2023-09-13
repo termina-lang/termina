@@ -15,7 +15,7 @@ ppBlockRet subs identifier (BlockRet body ret) =
     indentTab . align $
       line <> vsep [ppStatement subs s <> line | s <- body]
       <> line <> ppReturnStmt identifier ret <> line
-  )
+  ) <> line
 
 ppParameterSubstitutions :: [Parameter] -> Substitutions
 ppParameterSubstitutions parameters =
@@ -36,6 +36,7 @@ ppFunctionDeclaration (Function identifier parameters rTS _ _ _) =
   [
     ppCFunctionDeclaration (pretty identifier)
       (ppParameterDeclaration (pretty identifier) <$> parameters)
-      (ppReturnType (pretty identifier) <$> rTS) <> semi
+      (ppReturnType (pretty identifier) <$> rTS) <> semi,
+    emptyDoc
   ]
 ppFunctionDeclaration _ = error "AST element is not a function"

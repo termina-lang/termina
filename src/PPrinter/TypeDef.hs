@@ -17,7 +17,7 @@ ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =
   ppCFunctionDeclaration (classMethodName classId methodId)
     (map (ppParameterDeclaration (pretty (classId ++ "_" ++ methodId))) parameters) Nothing <> semi
-ppClassMethodDeclaration _ _ = error "invalid class membeer"
+ppClassMethodDeclaration _ _ = error "invalid class member"
 
 -- | Pretty prints a class field
 -- This function is only used when generating the class structure.

@@ -52,7 +52,7 @@ spec = do
               "    uint16_t array[10];\n" ++
               "} __param__for_loop_test0__array0_t;\n" ++
               "\n" ++
-              "uint16_t for_loop_test0(__param__for_loop_test0__array0_t array0);")
+              "uint16_t for_loop_test0(__param__for_loop_test0__array0_t array0);\n")
     it "Prints definition of function for_loop_test0_test0" $ do
       renderSource test0 `shouldBe`
         pack ("uint16_t for_loop_test0(__param__for_loop_test0__array0_t array0) {\n" ++
@@ -72,10 +72,10 @@ spec = do
               "\n" ++
               "    return total;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of function for_loop_test0_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "_Bool for_loop_test1(uint16_t array0[10]);"
+        pack "_Bool for_loop_test1(uint16_t array0[10]);\n"
     it "Prints definition of function assignment_test1" $ do
       renderSource test1 `shouldBe`
         pack ("_Bool for_loop_test1(uint16_t array0[10]) {\n" ++
@@ -99,4 +99,4 @@ spec = do
               "\n" ++
               "    return found;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    

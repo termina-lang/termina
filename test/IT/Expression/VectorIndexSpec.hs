@@ -47,7 +47,7 @@ spec = do
   describe "Pretty printing vector index expressions" $ do
     it "Prints declaration of function vector_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void vector_test0();"
+        pack "void vector_test0();\n"
     it "Prints definition of function vector_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void vector_test0() {\n" ++
@@ -80,10 +80,10 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of function vector_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "void vector_test1(uint32_t p_vector0[10]);"
+        pack "void vector_test1(uint32_t p_vector0[10]);\n"
     it "Prints definition of function vector_test1" $ do
       renderSource test1 `shouldBe`
         pack ("void vector_test1(uint32_t p_vector0[10]) {\n" ++
@@ -96,4 +96,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")   
+              "}\n")   

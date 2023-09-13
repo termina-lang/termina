@@ -256,7 +256,7 @@ expressionType (MemberMethodAccess obj ident args ann) =
              if psLen == asLen
              then SAST.MemberMethodAccess obj_typed ident
                  <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
-                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnn ann) (getTypeSAnns anns)
+                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnnApp ann ps) (getTypeSAnns anns)
              else if psLen < asLen
              then throwError $ annotateError ann EMemberMethodExtraParams
              else throwError $ annotateError ann EMemberMethodMissingParams
@@ -272,7 +272,7 @@ expressionType (MemberMethodAccess obj ident args ann) =
                         case type_ref of
                           (Reference (Option (DynamicSubtype tyref))) ->
                             if groundTyEq ty_pool tyref
-                            then return $ SAST.MemberMethodAccess obj_typed ident [typed_ref] (buildExpAnn ann Unit)
+                            then return $ SAST.MemberMethodAccess obj_typed ident [typed_ref] (buildExpAnnApp ann [Parameter "item" type_ref] Unit)
                             else throwError $ annotateError ann (EPoolsWrongArgType tyref)
                           _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
                       _ -> throwError $ annotateError ann EPoolsWrongNumArgs
