@@ -8,7 +8,10 @@ import AST
 import Annotations
 
 getExpType :: Expression SemanticAnns -> Maybe TypeSpecifier
-getExpType = getTySpec . ty_ann . getAnnotation
+getExpType = getResultingType . ty_ann . getAnnotation
+
+getExpSemType :: Expression SemanticAnns -> Maybe ESeman
+getExpSemType = getEType . ty_ann . getAnnotation
 
 getElemSemanticInfo :: AnnASTElement SemanticAnns -> Maybe (GEntry SemanticAnns)
 getElemSemanticInfo = getGEntry . ty_ann . getAnnotation

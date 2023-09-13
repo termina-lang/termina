@@ -54,7 +54,7 @@ typeOfOps :: Locations -> PAST.Op -> PAST.TypeSpecifier -> PAST.TypeSpecifier ->
 typeOfOps locs op lty rty =
   either
   -- | Check if there was an error, if not, returns the first type.
-  (return . SemAnn locs . ETy)
+  (return . SemAnn locs . ETy . SimpleType)
   (throwError . annotateError locs . uncurry (EOpMismatch op))
   $ typeOfOps' op lty rty
   where
@@ -181,7 +181,7 @@ typeObject
 typeObject identTy =
   (\typed_o -> (typed_o , ) <$> getObjType typed_o) <=< objectType identTy
   where
-    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getTySpec . ty_ann . getAnnotation
+    getObjType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getResultingType . ty_ann . getAnnotation
 
 data BoxedExpression
   = Objects (SAST.Object SemanticAnns) TypeSpecifier
@@ -241,7 +241,8 @@ expressionType (ReferenceExpression rhs_e pann) =
 expressionType (FunctionExpression fun_name args pann) =
   -- | Function Expression.  A tradicional function call
   getFunctionTy pann fun_name >>= \(params, retty) ->
-  flip (SAST.FunctionExpression fun_name) (buildExpAnn pann retty) <$> paramTy pann params args
+  flip (SAST.FunctionExpression fun_name) (buildExpAnnApp pann params retty)
+  <$> paramTy pann params args
 expressionType (MemberMethodAccess obj ident args ann) =
   rhsObject obj  >>= \(obj_typed , obj_ty) ->
   case obj_ty of

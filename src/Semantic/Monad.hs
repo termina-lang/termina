@@ -9,15 +9,16 @@
 module Semantic.Monad where
 
 import           Data.Map                   as M
+import           Data.Maybe
 
 -- Debugging
 -- import Debugging
 
 -- AST Info
+import           Annotations
 import           AST
 import           SemanAST                   as SAST
-import Annotations
-import           Utils.AST (groundTyEq)
+import           Utils.AST                  (groundTyEq)
 
 import qualified Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
@@ -44,24 +45,45 @@ data SAnns a = SemAnn
 instance Annotated SAnns where
   getAnnotation = ty_ann
 
+data ESeman
+  = SimpleType TypeSpecifier
+  | AppType [Parameter] TypeSpecifier
+  deriving Show
+
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
-  = ETy TypeSpecifier -- ^ Expressions with their types
+  = ETy ESeman -- ^ Expressions with their types
   | STy -- ^ Statements with no types
   | GTy (GEntry SemanticAnns) -- ^ Global elements
   deriving Show
 
-getTySpec :: SemanticElems -> Maybe TypeSpecifier
-getTySpec (ETy ty) = Just ty
-getTySpec _        = Nothing
+----------------------------------------
+getEType :: SemanticElems -> Maybe ESeman
+getEType (ETy t) = Just t
+getEType _ = Nothing
+
+getResultingType :: SemanticElems -> Maybe TypeSpecifier
+getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; AppType _ t -> t})
+getResultingType _        = Nothing
+
+getArgumentsType :: SemanticElems -> Maybe [Parameter]
+getArgumentsType (ETy (AppType ts _)) = Just ts
+getArgumentsType _                    = Nothing
+
+isResultFromApp :: SemanticElems -> Bool
+isResultFromApp = isJust . getArgumentsType
+----------------------------------------
 
 getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
 getGEntry (GTy a) = Just a
 getGEntry _       = Nothing
 
 buildExpAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnn loc ty = SemAnn loc (ETy ty)
+buildExpAnn loc = SemAnn loc . ETy . SimpleType
+
+buildExpAnnApp :: Locations -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnnApp loc tys = SemAnn loc . ETy . AppType tys
 
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
@@ -82,11 +104,15 @@ forgetSemAnn :: SAnns a -> Locations
 forgetSemAnn = location
 
 getTypeSAnns :: SemanticAnns -> Maybe TypeSpecifier
-getTypeSAnns  = getTySpec . ty_ann
+getTypeSAnns  = getResultingType . ty_ann
 
+undynExpType :: ESeman -> ESeman
+undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
+undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
+undynExpType _ = error "impossible 888+1"
 undynTypeAnn :: SemanticAnns -> SemanticAnns
-undynTypeAnn (SemAnn p (ETy (DynamicSubtype ty))) = SemAnn p (ETy ty)
-undynTypeAnn _ = error "impossible 888"
+undynTypeAnn (SemAnn p (ETy en)) = SemAnn p (ETy (undynExpType en))
+undynTypeAnn _                                    = error "impossible 888"
 
 -- -- | Global Definitions
 -- type GlobalsSemantic = SAnns (GEntry ())
@@ -123,7 +149,7 @@ data ExpressionState
  -- standard library. For the time being, initial type definitions such as
  -- "TaskRet" and "Result" are defined here.
 initialGlobalEnv :: GlobalEnv
-initialGlobalEnv = fromList 
+initialGlobalEnv = fromList
   [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] [])),
    ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" []] [])),
    ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
@@ -380,7 +406,7 @@ blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
   (throwError (annotateError internalErrorSeman EUnboxingBlockRet))
-  (void . sameOrErr (location ann) ty) (getTySpec (ty_ann ann))
+  (void . sameOrErr (location ann) ty) (getResultingType (ty_ann ann))
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
@@ -438,7 +464,7 @@ checkTypeDefinition _ Unit                    = return ()
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
-  . getTySpec . ty_ann . getAnnotation
+  . getResultingType . ty_ann . getAnnotation
 
 runTypeChecking
   :: ExpressionState
