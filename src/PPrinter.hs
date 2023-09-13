@@ -15,6 +15,8 @@ import PPrinter.Common
 import PPrinter.TypeDef
 import Semantic.Monad (SemanticAnns)
 import PPrinter.Function
+import Data.Maybe
+import PPrinter.Task
 
 render :: DocStyle -> Text
 render = renderStrict . layoutSmart defaultLayoutOptions
@@ -22,20 +24,26 @@ render = renderStrict . layoutSmart defaultLayoutOptions
 ppEmptyDoc :: a -> Doc ann
 ppEmptyDoc = const emptyDoc
 
-ppHeaderASTElement :: AnnASTElement SemanticAnns -> DocStyle
-ppHeaderASTElement (TypeDefinition t _) = ppTypeDefDeclaration t
-ppHeaderASTElement func@(Function {}) = ppFunctionDeclaration func
-ppHeaderASTElement _ = pretty "unsupported"
+ppHeaderASTElement :: AnnASTElement SemanticAnns -> Maybe DocStyle
+ppHeaderASTElement (TypeDefinition t _) = Just (ppTypeDefDeclaration t)
+ppHeaderASTElement func@(Function {}) = Just (ppFunctionDeclaration func)
+ppHeaderASTElement task@(Task {}) = Just (ppTaskDeclaration task)
+ppHeaderASTElement _ = Nothing
 
-ppSourceASTElement :: AnnASTElement SemanticAnns -> DocStyle
-ppSourceASTElement func@(Function {}) = ppFunction func
-ppSourceASTElement _ = pretty "unsupported"
+ppSourceASTElement :: AnnASTElement SemanticAnns -> Maybe DocStyle
+ppSourceASTElement (TypeDefinition (Struct {}) _) = Nothing
+ppSourceASTElement (TypeDefinition (Enum {}) _) = Nothing
+ppSourceASTElement (TypeDefinition (Class {}) _) = Nothing
+ppSourceASTElement func@(Function {}) = Just (ppFunction func)
+ppSourceASTElement task@(Task {}) = Just (ppTask task)
+ppSourceASTElement _ = Nothing
 
 ppHeaderFile :: AnnotatedProgram SemanticAnns -> Text
-ppHeaderFile = render . vsep . map ppHeaderASTElement
+-- Print only the elements that are not nothing
+ppHeaderFile = render . vsep . mapMaybe ppHeaderASTElement
 
 ppSourceFile :: AnnotatedProgram SemanticAnns -> Text
-ppSourceFile = render . vsep . map ppSourceASTElement
+ppSourceFile = render . vsep . mapMaybe ppSourceASTElement
 
 -- ppProgramDebug :: AnnotatedProgram Annotation -> Text
 -- ppAnnonProgram = render . vsep . map (ppAnnAST (pretty . show))

@@ -9,15 +9,13 @@ import Semantic.Monad
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
-vectorAnn, dynVectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn :: SemanticAnns
+vectorAnn, dynVectorAnn, twoDymVectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
 dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
-dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
-refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
+refVectorAnn :: SemanticAnns
 refVectorAnn = refSemAnn (Vector UInt32 (KC (I UInt32 10)))
-refTwoDymVectorAnn = refSemAnn (Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10)))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" uint16SemAnn
@@ -32,9 +30,8 @@ uint32Index3 = Constant (I UInt32 3) uint32SemAnn
 uint32Index4 = Constant (I UInt32 4) uint32SemAnn
 uint8Const0x8 = Constant (I UInt8 8) uint8SemAnn
 
-dynVector0, dynVector1 :: Object SemanticAnns
+dynVector0 :: Object SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
-dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
 vector0IndexConstant = AccessObject (VectorIndexExpression vector0 uint8Const0x8 uint32SemAnn)
@@ -42,7 +39,7 @@ vector0IndexVar0 = AccessObject (VectorIndexExpression vector0 (AccessObject var
 
 dynVector0IndexConstant, dynVector0IndexVar0 :: Expression SemanticAnns
 dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 uint32SemAnn)
-dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject (var0)) uint32SemAnn)
+dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) uint32SemAnn)
 
 vector1IndexFirstDym :: Object SemanticAnns
 vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Int64 (I UInt32 5))

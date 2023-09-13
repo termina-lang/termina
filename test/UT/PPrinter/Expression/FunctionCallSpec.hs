@@ -18,55 +18,53 @@ var1 = Variable "var1" dynUInt16SemAnn
 pVar = Variable "p_var" refUInt16SemAnn
 
 undynVar1 :: Expression SemanticAnns
-undynVar1 = AccessObject ( (Undyn var1 uint16SemAnn))
+undynVar1 = AccessObject (Undyn var1 uint16SemAnn)
 
 referenceVar0, referenceVar1 :: Expression SemanticAnns
 -- | &var0 : &u16
-referenceVar0 = ReferenceExpression ( var0) refUInt16SemAnn
+referenceVar0 = ReferenceExpression var0 refUInt16SemAnn
 -- | &var1 : &u16
-referenceVar1 = ReferenceExpression ( var1) refUInt16SemAnn
+referenceVar1 = ReferenceExpression var1 refUInt16SemAnn
 
-dereferencepVar, derefRefDynVar1 :: Expression SemanticAnns
+dereferencepVar :: Object SemanticAnns
 -- | *p_var : u16
-dereferencepVar = DereferenceExpression (AccessObject ( pVar)) uint16SemAnn
--- | *&var1 : u16
-derefRefDynVar1 = DereferenceExpression referenceVar1 uint16SemAnn
+dereferencepVar = Dereference pVar uint16SemAnn
 
 vector0, dynVector0 :: Object SemanticAnns
 vector0 = Variable "vector0" (vectorSemAnn UInt32 (I UInt32 10))
 dynVector0 = Variable "dynVector0" (dynVectorSemAnn UInt32 (I UInt32 10))
 
 pVector1 :: Expression SemanticAnns
-pVector1 = AccessObject ( (Variable "p_vector1" (refVectorSemAnn UInt32 (I UInt32 10))))
+pVector1 = AccessObject (Variable "p_vector1" (refVectorSemAnn UInt32 (I UInt32 10)))
 
 referenceVector0 :: Expression SemanticAnns
-referenceVector0 = ReferenceExpression ( vector0) (refVectorSemAnn UInt32 (I UInt32 10))
+referenceVector0 = ReferenceExpression vector0 (refVectorSemAnn UInt32 (I UInt32 10))
 
 uint16Const :: Expression SemanticAnns
 uint16Const = Constant (I UInt16 1024) uint16SemAnn
 
 var0PlusConstant, var1PlusConstant :: Expression SemanticAnns
-var0PlusConstant = BinOp Addition (AccessObject ( var0)) uint16Const uint16SemAnn
+var0PlusConstant = BinOp Addition (AccessObject var0) uint16Const uint16SemAnn
 var1PlusConstant = BinOp Addition undynVar1 uint16Const uint16SemAnn
 
 dereferencepVarPlusConstant :: Expression SemanticAnns
-dereferencepVarPlusConstant = BinOp Addition dereferencepVar uint16Const uint16SemAnn
+dereferencepVarPlusConstant = BinOp Addition (AccessObject dereferencepVar) uint16Const uint16SemAnn
 
-var0PlusVar1, dereferencepVar2PlusderefRefVar1 :: Expression SemanticAnns
-var0PlusVar1 = BinOp Addition (AccessObject ( var0)) undynVar1 uint16SemAnn
-dereferencepVar2PlusderefRefVar1 = BinOp Addition dereferencepVar derefRefDynVar1 uint16SemAnn
+var0PlusVar1, dereferencepVar2PlusVar1 :: Expression SemanticAnns
+var0PlusVar1 = BinOp Addition (AccessObject var0) undynVar1 uint16SemAnn
+dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) undynVar1 uint16SemAnn
 
 functionCallSingleVar0, functionCallSingleDynVar1,
   functionCallSinglepVar :: Expression SemanticAnns
-functionCallSingleVar0 = FunctionExpression "foo" [AccessObject ( var0)] (funSemAnn [Parameter "param0" UInt16] UInt16)
-functionCallSingleDynVar1 = FunctionExpression "foo" [AccessObject ( var1)] (funSemAnn [Parameter "param0" (DynamicSubtype UInt16)] Unit)
-functionCallSinglepVar = FunctionExpression "foo" [AccessObject ( pVar)] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
+functionCallSingleVar0 = FunctionExpression "foo" [AccessObject var0] (funSemAnn [Parameter "param0" UInt16] UInt16)
+functionCallSingleDynVar1 = FunctionExpression "foo" [AccessObject var1] (funSemAnn [Parameter "param0" (DynamicSubtype UInt16)] Unit)
+functionCallSinglepVar = FunctionExpression "foo" [AccessObject pVar] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
   functionCallSingleDerefpVar :: Expression SemanticAnns
 functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
 functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceVar1] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
-functionCallSingleDerefpVar = FunctionExpression "foo" [dereferencepVar] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleDerefpVar = FunctionExpression "foo" [AccessObject dereferencepVar] (funSemAnn [Parameter "param0" UInt16] Unit)
 
 functionCallRetArray :: Expression SemanticAnns
 functionCallRetArray = FunctionExpression "foo" [] (funSemAnn [] (Vector UInt32 (KC (I UInt32 10))))
@@ -79,12 +77,12 @@ functionCallSingleVar0PlusConstant = FunctionExpression "foo" [var0PlusConstant]
 functionCallSingleDynVar1PlusConstant = FunctionExpression "foo" [var1PlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleVar0PlusVar1 = FunctionExpression "foo" [var0PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleDerefpVarPlusConstant = FunctionExpression "foo" [dereferencepVarPlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
-functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionExpression "foo" [dereferencepVar2PlusderefRefVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionExpression "foo" [dereferencepVar2PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
 
 functionCallSingleVector0, functionCallSingleDynVector0,
   functionCallSinglepVector1 :: Expression SemanticAnns
-functionCallSingleVector0 = FunctionExpression "foo" [AccessObject ( vector0)] (funSemAnn [Parameter "param0" (Vector UInt32 (KC (I UInt32 10)))] Unit)
-functionCallSingleDynVector0 = FunctionExpression "foo" [AccessObject ( dynVector0)] (funSemAnn [Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10))))] Unit)
+functionCallSingleVector0 = FunctionExpression "foo" [AccessObject vector0] (funSemAnn [Parameter "param0" (Vector UInt32 (KC (I UInt32 10)))] Unit)
+functionCallSingleDynVector0 = FunctionExpression "foo" [AccessObject dynVector0] (funSemAnn [Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10))))] Unit)
 functionCallSinglepVector1 = FunctionExpression "foo" [pVector1] (funSemAnn [Parameter "param0" (Reference (Vector UInt32 (KC (I UInt32 10))))] Unit)
 
 functionCallSingleRefVector0 :: Expression SemanticAnns
@@ -92,26 +90,26 @@ functionCallSingleRefVector0 = FunctionExpression "foo" [referenceVector0] (funS
 
 call2Parameters, call3Parameters, call4Parameters :: Expression SemanticAnns
 call2Parameters = FunctionExpression "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
-call3Parameters = FunctionExpression "foo3" 
+call3Parameters = FunctionExpression "foo3"
   [
-    referenceVar0, 
-    AccessObject ( vector0), 
+    referenceVar0,
+    AccessObject vector0,
     var1PlusConstant
   ] (funSemAnn [
-    Parameter "param0" (Reference UInt16), 
+    Parameter "param0" (Reference UInt16),
     Parameter "param1" (Vector UInt32 (KC (I UInt32 10))),
     Parameter "param2" UInt16
     ] Unit)
-call4Parameters = FunctionExpression "foo4" 
+call4Parameters = FunctionExpression "foo4"
   [
-    AccessObject ( dynVector0), 
-    referenceVar1, 
-    functionCallSingleVar0, 
+    AccessObject dynVector0,
+    referenceVar1,
+    functionCallSingleVar0,
     call2Parameters
   ] (funSemAnn [
-    Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10)))), 
+    Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10)))),
     Parameter "param1" (Reference UInt16),
-    Parameter "param2" UInt16, 
+    Parameter "param2" UInt16,
     Parameter "param3" UInt16
     ] Unit)
 
@@ -131,7 +129,7 @@ spec = do
       renderExpression functionCallSinglepVar `shouldBe`
         pack "foo(p_var)"
     it "Prints the expression: foo(&var0)" $ do
-      renderExpression functionCallSingleRefVar0 `shouldBe` 
+      renderExpression functionCallSingleRefVar0 `shouldBe`
         pack "foo(&var0)"
     it "Prints the expression: foo(&var1)" $ do
       renderExpression functionCallSingleRefDynVar1 `shouldBe`
@@ -182,4 +180,4 @@ spec = do
   describe "Pretty printing functions returning and receiving arrays" $ do
     it "Prints the expression foo() with a function returning an array" $ do
       renderExpression functionCallRetArray `shouldBe`
-        pack ("foo()")
+        pack "foo()"

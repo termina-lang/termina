@@ -22,19 +22,19 @@ twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
 twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
-vector1 =  (Variable "vector1" vectorAnn)
-vector2 =  (Variable "vector2" twoDymVectorAnn)
-vector3 =  (Variable "vector3" vectorAnn)
-vector4 =  (Variable "vector4" twoDymVectorAnn)
-vector5 =  (Variable "vector5" twoDymVectorAnn)
-vector6 =  (Variable "vector6" vectorTMDescriptorAnn)
+vector1 = Variable "vector1" vectorAnn
+vector2 = Variable "vector2" twoDymVectorAnn
+vector3 = Variable "vector3" vectorAnn
+vector4 = Variable "vector4" twoDymVectorAnn
+vector5 = Variable "vector5" twoDymVectorAnn
+vector6 = Variable "vector6" vectorTMDescriptorAnn
 
 vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnns
-vector1Assign = AssignmentStmt vector1 (AccessObject ( (Variable "vector0" vectorAnn))) undefined
-vector2Assign = AssignmentStmt vector2 (AccessObject ( (Variable "vector1" twoDymVectorAnn))) undefined
+vector1Assign = AssignmentStmt vector1 (AccessObject (Variable "vector0" vectorAnn)) undefined
+vector2Assign = AssignmentStmt vector2 (AccessObject (Variable "vector1" twoDymVectorAnn)) undefined
 vector3Assign = AssignmentStmt vector3 (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
 vector4Assign = AssignmentStmt vector4 (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject ( (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
+vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (KC (I UInt32 10)) twoDymVectorAnn) undefined
 vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
 foo1, foo2 :: Object SemanticAnns
@@ -42,7 +42,7 @@ foo1 = Variable "foo1" uint32SemAnn
 foo2 = Variable "foo2" uint32SemAnn
 
 foo1Assign, foo2Assign :: Statement SemanticAnns
-foo1Assign = AssignmentStmt foo1 (AccessObject ( (Variable "foo0" uint32SemAnn))) undefined
+foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" uint32SemAnn)) undefined
 foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
 
 structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnns
@@ -71,16 +71,16 @@ tmDescriptorFieldsInit0 =
 
 
 struct0, struct1 :: Object SemanticAnns
-struct0 =  (Variable "struct0" tmDescriptorSemAnn)
-struct1 =  (Variable "struct1" tmDescriptorSemAnn)
+struct0 = Variable "struct0" tmDescriptorSemAnn
+struct1 = Variable "struct1" tmDescriptorSemAnn
 
 struct0Assign, struct1Assign :: Statement SemanticAnns
 struct0Assign = AssignmentStmt struct0 tmDescriptorFieldsInit0 undefined
-struct1Assign = AssignmentStmt struct1 (AccessObject ( (Variable "struct0" tmDescriptorSemAnn))) undefined
+struct1Assign = AssignmentStmt struct1 (AccessObject (Variable "struct0" tmDescriptorSemAnn)) undefined
 
 enum0, enum1 :: Object SemanticAnns
-enum0 =  (Variable "enum0" messageSemAnn)
-enum1 =  (Variable "enum1" messageSemAnn)
+enum0 = Variable "enum0" messageSemAnn
+enum1 = Variable "enum1" messageSemAnn
 
 enum0Assign, enum1Assign :: Statement SemanticAnns
 enum0Assign = AssignmentStmt enum0 (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
@@ -96,10 +96,9 @@ option1 =  Variable "option1" optionDynUInt32SemAnn
 undynVar0 :: Object SemanticAnns
 undynVar0 = Undyn dynVar0 uint32SemAnn
 
-undynVar0AssignFoo1 :: Statement SemanticAnns
+undynVar0AssignFoo1, undynVar0AssignConst :: Statement SemanticAnns
 undynVar0AssignFoo1 = AssignmentStmt undynVar0 (AccessObject foo1) undefined
 undynVar0AssignConst = AssignmentStmt undynVar0 (Constant (I UInt32 1024) uint32SemAnn) undefined
-
 
 option0Assign, option1Assign :: Statement SemanticAnns
 option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some (AccessObject dynVar0)) optionDynUInt32SemAnn) undefined

@@ -141,6 +141,7 @@ ppObject subs (Undyn obj _) =
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
         _ -> error "Unsupported expression"
+ppObject subs (ParensObject obj _) = parens (ppObject subs obj)
 
 -- | Pretty prints binary expressions casted to the type of the expression
 -- This function is only used for subexpressions of binary expressions.
@@ -190,12 +191,6 @@ ppExpression subs (ReferenceExpression obj _) =
         -- to it)
         (Vector _ _) -> ppObject subs obj
         _ -> ppCReferenceExpression (ppObject subs obj)
--- | If the expression is a dereference, we need to check if it is to a vector
-ppExpression subs (DereferenceExpression expr _) =
-    case getType expr of
-        -- | A dereference to a vector is printed as the name of the vector
-        (Reference (Vector _ _)) -> ppExpression subs expr
-        _ -> ppCDereferenceExpression (ppExpression subs expr)
 ppExpression _ (Constant constant _) =
     case constant of
         B b -> if b then pretty "1" else pretty "0"

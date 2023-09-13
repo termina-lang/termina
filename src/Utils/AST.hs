@@ -16,10 +16,23 @@ groundTyEq  Int32  Int32 = True
 groundTyEq  Int64  Int64 = True
 groundTyEq  Bool  Bool = True
 groundTyEq  Unit Unit = True
+groundTyEq  (Option _) (Option Unit) = True
+groundTyEq  (Option Unit) (Option _) = True
 groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
+-- TODO: These are considered complex types and should be handled differently
+groundTyEq  (Vector typespecl sizeel) (Vector typespecr sizer) = groundTyEq typespecl typespecr && constExprEq sizeel sizer
+groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
+--
 groundTyEq  _ _ = False
+
+constExprEq :: ConstExpression -> ConstExpression -> Bool
+constExprEq (KC ((I tyspecl intl))) (KC ((I tyspecr intr))) = groundTyEq tyspecl tyspecr && intl == intr
+constExprEq (KC (B vall)) (KC (B valr)) = vall == valr
+constExprEq (KC (C charl)) (KC (C charr)) = charl == charr
+constExprEq _ _ = False
+
 
 ----------------------------------------
 -- The following function defines a traversal..
@@ -66,6 +79,7 @@ getDepObj = getDepObj'
       = let (dnm,deps) = getDepObj' obj
       in (FieldAccess dnm ident , deps)
     getDepObj' (Dereference obj _ann ) = getDepObj' obj
+    getDepObj' (ParensObject obj _ann) = getDepObj' obj
     -- getDepObj' (MemberMethodAccess obj ident es _ann)
     --   = let (dnm, deps) = getDepObj' obj
     --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
@@ -104,7 +118,6 @@ getDepExp ( ParensExpression e _ ) = getDepExp e
 getDepExp ( BinOp _op le re _ann ) = getDepExp le ++ getDepExp re
 getDepExp ( ReferenceExpression obj _ann ) =
   let (dnm, deps) = getDepObj obj in (dnm : deps)
-getDepExp ( DereferenceExpression e _ann ) = getDepExp e
 getDepExp ( Casting e _ty _ann ) = getDepExp e
 getDepExp ( FunctionExpression _id args _ann) = concatMap getDepExp args
 getDepExp ( VectorInitExpression iE _const _ann ) = getDepExp iE

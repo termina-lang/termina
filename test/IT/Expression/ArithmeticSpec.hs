@@ -11,27 +11,26 @@ test0 :: String
 test0 = "fn test0() {\n" ++
         "    var foo : u16 = 0 : u16;\n" ++
         "    foo = foo + 1024 : u16;\n" ++
-        "    foo = 1024 : u16 + foo;\n" ++
+        "    1024 : u16 + foo;\n" ++
         "    foo = foo - 1024 : u16;\n" ++
-        "    foo = 1024 : u16 - foo;\n" ++
+        "    1024 : u16 - foo;\n" ++
         "    foo = foo * 1024 : u16;\n" ++
-        "    foo = 1024 : u16 * foo;\n" ++
+        "    1024 : u16 * foo;\n" ++
         "    foo = foo / 1024 : u16;\n" ++
-        "    foo = 1024 : u16 / foo;\n" ++
+        "    1024 : u16 / foo;\n" ++
         "    return;\n" ++
         "}"
 
 test1 :: String
 test1 = "fn test1(foo : 'dyn u16) {\n" ++
-          "    foo = 1024 : u16;" ++
---        "    foo = foo + 1024 : u16;\n" ++
---        "    foo = 1024 : u16 + foo;\n" ++
---        "    foo = foo - 1024 : u16;\n" ++
---        "    foo = 1024 : u16 - foo;\n" ++
---        "    foo = foo * 1024 : u16;\n" ++
---        "    foo = 1024 : u16 * foo;\n" ++
---        "    foo = foo / 1024 : u16;\n" ++
---        "    foo = 1024 : u16 / foo;\n" ++
+        "    foo = foo + 1024 : u16;\n" ++
+        "    1024 : u16 + foo;\n" ++
+        "    foo = foo - 1024 : u16;\n" ++
+        "    1024 : u16 - foo;\n" ++
+        "    foo = foo * 1024 : u16;\n" ++
+        "    1024 : u16 * foo;\n" ++
+        "    foo = foo / 1024 : u16;\n" ++
+        "    1024 : u16 / foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -65,19 +64,19 @@ spec = do
               "\n" ++
               "    foo = foo + (uint16_t)1024;\n" ++
               "\n" ++
-              "    foo = (uint16_t)1024 + foo;\n" ++ 
+              "    (uint16_t)1024 + foo;\n" ++ 
               "\n" ++
               "    foo = foo - (uint16_t)1024;\n" ++ 
               "\n" ++
-              "    foo = (uint16_t)1024 - foo;\n" ++
+              "    (uint16_t)1024 - foo;\n" ++
               "\n" ++
               "    foo = foo * (uint16_t)1024;\n" ++
               "\n" ++
-              "    foo = (uint16_t)1024 * foo;\n" ++
+              "    (uint16_t)1024 * foo;\n" ++
               "\n" ++
               "    foo = foo / (uint16_t)1024;\n" ++
               "\n" ++
-              "    foo = (uint16_t)1024 / foo;\n" ++
+              "    (uint16_t)1024 / foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -87,4 +86,24 @@ spec = do
        pack "void test1(__dyn_t foo);"
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
-       pack "void test1();"
+       pack ("void test1(__dyn_t foo) {\n" ++
+             "    \n" ++
+             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) + (uint16_t)1024;\n" ++
+             "\n" ++
+             "    (uint16_t)1024 + *((uint16_t *)foo.datum);\n" ++
+             "\n" ++
+             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) - (uint16_t)1024;\n" ++
+             "\n" ++
+             "    (uint16_t)1024 - *((uint16_t *)foo.datum);\n" ++
+             "\n" ++
+             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) * (uint16_t)1024;\n" ++
+             "\n" ++
+             "    (uint16_t)1024 * *((uint16_t *)foo.datum);\n" ++
+             "\n" ++
+             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) / (uint16_t)1024;\n" ++
+             "\n" ++
+             "    (uint16_t)1024 / *((uint16_t *)foo.datum);\n" ++
+             "\n" ++
+             "    return;\n" ++
+             "\n" ++
+             "}")
