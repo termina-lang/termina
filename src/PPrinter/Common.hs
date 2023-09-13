@@ -205,9 +205,6 @@ ppModifier (Modifier identifier Nothing) = pretty identifier
 methodName :: Identifier -> Identifier -> DocStyle
 methodName identifier method = pretty ("__" ++ identifier ++ "_" ++ method)
 
-typeDefEqFunctionName :: Identifier -> DocStyle
-typeDefEqFunctionName identifier = methodName identifier "_eq"
-
 poolMethodName :: Identifier -> DocStyle
 poolMethodName = methodName "pool"
 
