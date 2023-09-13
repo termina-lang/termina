@@ -34,7 +34,7 @@ getType _ = error "invalid expression annotation"
 
 getParameters :: Expression SemanticAnns -> [Parameter]
 getParameters (FunctionExpression _ _ (SemAnn _ (GTy (GFun params _)))) = params
-getParameters _ = error "invalid expression annotation"
+getParameters ann = error $ "invalid expression annotation: " ++ show ann
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)

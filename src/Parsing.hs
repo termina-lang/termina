@@ -96,6 +96,15 @@ lexer = Tok.makeTokenParser langDef
                       ,"#" -- Attribute
                       ,":" -- Type annotation
                       ,"::" -- Enum variant
+                      ,"=" -- Assignment
+                      ,"->" -- Function return type
+                      ,"=>" -- Match case
+                      ,"[" -- Vector init
+                      ,"]" -- Vector init
+                      ,"{" -- Field values assignments
+                      ,"}" -- Field values assignments
+                      ,"(" -- Parens
+                      ,")" -- Parens
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -343,6 +352,7 @@ referenceExprParser = do
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
+  <|> try functionCallParser
   <|> try (AccessObject <$> objectParser)
   <|> parensExprParser
 
