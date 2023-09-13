@@ -9,7 +9,6 @@ import Semantic.TypeChecking
 
 import Text.Parsec (runParser)
 
-import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
 import Control.Monad
@@ -36,9 +35,6 @@ instance Options MainOptions where
 
 main :: IO ()
 main = runCommand $ \opts args ->
-    let
-      output = maybe print TIO.writeFile (optOutput opts)
-    in
     if optREPL opts then
         putStrLn "Not Implemented yet"
     else
@@ -47,13 +43,18 @@ main = runCommand $ \opts args ->
             [filepath] -> do
               src_code <- readFile filepath
               case runParser (contents topLevel) () filepath src_code of
-                Left err -> ioError $ userError $ "Parser Error: " ++ show err
+                Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
                 Right ast ->
                   case typeCheckRun ast of
-                    Left err -> output $ T.pack $ "ERRORRRRRRRRR:: " ++ show err
+                    Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
                     Right tast ->
                       when (optPrintAST opts) (print ast) >>
                       when (optPrintASTTyped opts) (print tast) >>
-                      output (ppHeaderFile tast)
-                    -- output $ T.pack "Ok!"
-            _ -> ioError $ userError "Too much arguments king!"
+                      case optOutput opts of
+                        Nothing -> print (ppHeaderFile tast)
+                        Just fn ->
+                          let header = fn ++ ".h" in
+                          let source = fn ++ ".c" in
+                            TIO.writeFile header (ppHeaderFile tast)
+                            >> TIO.writeFile source (ppSourceFile tast)
+            _ -> ioError $ userError "Arguments error"
