@@ -1,0 +1,8 @@
+fn test0(a : u16) -> u16 {
+   return (a + (1 : u16));
+}
+
+fn test1(a : u16) -> u16 {
+   var foo : u16 = test0(2 : u16);
+   return (foo * (2:u16))
+}
