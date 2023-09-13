@@ -11,15 +11,13 @@ module Semantic.Monad where
 import           Data.Map                   as M
 
 -- Debugging
-import Debugging
+-- import Debugging
 
 -- AST Info
 import           AST
 import           SemanAST                   as SAST
 import Annotations
--- import           Utils.AST
 import           Utils.AST (groundTyEq)
-import           Utils.SemanAST
 
 import qualified Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
@@ -28,7 +26,6 @@ import           Utils.TypeSpecifier
 
 -- Monads
 import           Control.Monad.Except
-import           Control.Monad.Identity
 import qualified Control.Monad.State.Strict as ST
 
 type Locations = Parser.Annotation
@@ -290,13 +287,15 @@ getLHSVarTy loc ident =
     (\case{
         AnnError (ENotNamedVar _) _loc ->
         catchError (getGlobalVarTyLhs loc ident)
-        ( \error ->
-            case semError error of {
+        ( \excep ->
+            case semError excep of {
                   ENotNamedGlobal errvar ->
                   if errvar == ident then
                     throwError $ annotateError loc (ENotNamedVar ident);
                   else
-                    throwError error;
+                    throwError excep;
+                  -- Other errors keep failing
+                  _ -> throwError excep;
               }
         );
         l                              -> throwError l;
@@ -368,18 +367,20 @@ unDynExp :: SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression Seman
 unDynExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unDyn obj)
 unDynExp _ = throwError $ annotateError internalErrorSeman EUnDynExpression
 
-mustByTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
-mustByTy ty exp =
-  getExpType exp >>=
+mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
+mustBeTy ty expression =
+  getExpType expression >>=
   sameOrErr loc ty
-  >> return exp
+  >> return expression
   where
-    ann_exp = getAnnotation exp
+    ann_exp = getAnnotation expression
     loc = location ann_exp
 
 blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
-blockRetTy ty (BlockRet bd (ReturnStmt me ann)) =
-  maybe (throwError $ annotateError internalErrorSeman EUnboxingBlockRet)(void . sameOrErr (location ann) ty) (getTySpec $ ty_ann ann)
+blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
+  maybe
+  (throwError (annotateError internalErrorSeman EUnboxingBlockRet))
+  (void . sameOrErr (location ann) ty) (getTySpec (ty_ann ann))
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I _ i) = return i
@@ -412,7 +413,7 @@ checkTypeDefinition loc (Vector ty c)         =
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
 -- Dynamic Subtyping
-checkTypeDefinition loc (Option tyd@(DynamicSubtype ty)) = checkTypeDefinition loc tyd
+checkTypeDefinition loc (Option tyd@(DynamicSubtype _ty)) = checkTypeDefinition loc tyd
 checkTypeDefinition loc (Option ty) = throwError $ annotateError loc $ EOptionDyn ty
 checkTypeDefinition loc (Reference ty)        =
   -- Unless we are referencing a reference we are good

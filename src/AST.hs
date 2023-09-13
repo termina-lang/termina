@@ -18,8 +18,7 @@ import           CoreAST
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
 -- |Object| should not be invoked directly.
-data Object
-    (a :: *)
+data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
   | VectorIndexExpression (Object a) (Expression a) a

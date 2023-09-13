@@ -9,7 +9,7 @@
 module Semantic.TypeChecking where
 
 -- Debugging
-import Debugging
+-- import           Debugging
 
 -- Termina Ast and Utils
 import           Annotations
@@ -37,8 +37,7 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (find, foldl', map, nub, sortOn,
-                                       (\\))
+import           Data.List            (find, foldl', map, nub, sortOn, (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -107,9 +106,9 @@ paramTy _ann [] [] = return []
 paramTy ann (p : ps) (a : as) =
   checkParamTy (paramTypeSpecifier p) a
   >>= \tyed_exp -> (tyed_exp :) <$> paramTy ann ps as
-  where checkParamTy pTy exp = mustByTy pTy =<< expressionType exp
-paramTy ann (p : _) [] = throwError $ annotateError ann EFunParams
-paramTy ann [] (a : _) = throwError $ annotateError ann EFunParams
+  where checkParamTy pTy expression = mustBeTy pTy =<< expressionType expression
+paramTy ann (_p : _) [] = throwError $ annotateError ann EFunParams
+paramTy ann [] (_a : _) = throwError $ annotateError ann EFunParams
 
 objectType
   :: (Parser.Annotation -> Identifier -> SemanticMonad TypeSpecifier)
@@ -149,7 +148,7 @@ objectType getVarTy (MemberAccess obj ident ann) =
           case findClassField ident cls of
             Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
             -- type |t| and the type inside |a| should be the same, no?
-            Just (t , a) -> return (SAST.MemberAccess obj_typed ident (buildExpAnn ann t))
+            Just (t , _a) -> return (SAST.MemberAccess obj_typed ident (buildExpAnn ann t))
         ;
         -- Other types do not have members.
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
@@ -204,7 +203,7 @@ expressionType (Constant c pann) =
   SAST.Constant c . buildExpAnn pann <$>
   case c of
     -- Rules *(eConstTrue)* and *(eConstFalse)*
-    B b -> return Bool
+    B _b -> return Bool
     -- Typing constant integers
     I tyI i ->
       -- DONE Q8
@@ -215,7 +214,7 @@ expressionType (Constant c pann) =
         return tyI
       else throwError (annotateError pann $ ENumTs [tyI])
     -- Rule *(eConstChar)*
-    C c -> return Char
+    C _c -> return Char
 expressionType (Casting e nty pann) = do
   -- | Casting Expressions.
   typed_exp <- expressionType e
@@ -224,7 +223,7 @@ expressionType (Casting e nty pann) = do
   if casteableTys type_exp nty -- ety \subseteq nty
   then return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
   else throwError (annotateError pann $ ECasteable type_exp nty)
-expressionType a@(BinOp op le re pann) = do
+expressionType (BinOp op le re pann) = do
   -- | Binary operation typings
   tyle' <- expressionType le
   type_le' <- getExpType tyle'
@@ -255,7 +254,7 @@ expressionType (MemberMethodAccess obj ident args ann) =
              let (psLen , asLen ) = (length ps, length args) in
              if psLen == asLen
              then SAST.MemberMethodAccess obj_typed ident
-                 <$> zipWithM (\p e -> mustByTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                 <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
                  <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnn ann) (getTypeSAnns anns)
              else if psLen < asLen
              then throwError $ annotateError ann EMemberMethodExtraParams
@@ -305,7 +304,7 @@ expressionType (EnumVariantExpression id_ty variant args pann) =
          let (psLen , asLen ) = (length ps, length args) in
          if psLen == asLen
          then flip (SAST.EnumVariantExpression id_ty variant) (buildExpAnn pann (DefinedType id_ty))
-             <$> zipWithM (\p e -> mustByTy p =<< expressionType e) ps args
+             <$> zipWithM (\p e -> mustBeTy p =<< expressionType e) ps args
          else if psLen < asLen
          then throwError $ annotateError pann EEnumVariantExtraParams
          else throwError $ annotateError pann EEnumVariantMissingParams
@@ -313,11 +312,11 @@ expressionType (EnumVariantExpression id_ty variant args pann) =
    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap (fmap forgetSemAnn) x))
   }
 -- IDEA Q4
-expressionType (VectorInitExpression iexp kexp@(KC const) pann) = do
+expressionType (VectorInitExpression iexp kexp@(KC constE) pann) = do
 -- | Vector Initialization
   (typed_init , type_init) <- typeExpression iexp
   -- Check that the type is correct
-  _ <- checkConstant pann const
+  _ <- checkConstant pann constE
   return (SAST.VectorInitExpression typed_init kexp (buildExpAnn pann (Vector type_init kexp)))
 expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
 -- DONE [Q5]
@@ -335,14 +334,14 @@ expressionType (OptionVariantExpression vexp anns) =
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-zipSameLength ea eb f as bs = zipSameLength' ea eb f as bs []
+zipSameLength = zipSameLength' []
   where
     -- Tail recursive version
-    zipSameLength' :: ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> [c] -> Either e [c]
-    zipSameLength' _ _ _ [] [] acc = Right acc
-    zipSameLength' ea eb f (a : as) (b : bs) acc = zipSameLength' ea eb f as bs (f a b : acc)
-    zipSameLength' ea _ _ [] bs _ = Left (ea bs)
-    zipSameLength' _ eb _ as [] _ = Left (eb as)
+    zipSameLength' :: [c] -> ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
+    zipSameLength' acc _ _ _ [] [] = Right acc
+    zipSameLength' acc erra errb f (a : as) (b : bs) = zipSameLength' (f a b : acc) erra errb f as bs
+    zipSameLength' _ erra _ _ [] bs = Left (erra bs)
+    zipSameLength' _ _ errb _ as [] = Left (errb as)
 --
 
 checkFieldValue
@@ -353,7 +352,7 @@ checkFieldValue
 checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) =
   if fid == faid
   then
-    SAST.FieldValueAssignment faid <$> (expressionType faexp >>= mustByTy fty)
+    SAST.FieldValueAssignment faid <$> (expressionType faexp >>= mustBeTy fty)
   else throwError $ annotateError loc (EFieldMissing [fid])
 
 checkFieldValues
@@ -394,7 +393,7 @@ statementTySimple (Declaration lhs_id lhs_type expr anns) =
   -- Check type is alright
   checkTypeDefinition anns lhs_type >>
   -- Expression and type must match
-  expressionType expr >>= mustByTy lhs_type >>= \ety ->
+  expressionType expr >>= mustBeTy lhs_type >>= \ety ->
   -- Insert variables in the local environment
   insertLocalVar anns lhs_id lhs_type >>
   -- Return annotated declaration
@@ -402,20 +401,19 @@ statementTySimple (Declaration lhs_id lhs_type expr anns) =
 statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
 {- TODO Q19 && Q20 -}
   (lhs_o_typed', lhs_o_type') <- lhsObject lhs_o
-  (lhs_o_typed, lhs_o_type) <- maybe (return (lhs_o_typed', lhs_o_type')) (\t -> return (unDyn lhs_o_typed', t)) (isDyn lhs_o_type')
+  let (lhs_o_typed, lhs_o_type) = maybe (lhs_o_typed', lhs_o_type') (unDyn lhs_o_typed',) (isDyn lhs_o_type')
   rhs_expr_typed' <- expressionType rhs_expr
   type_rhs' <- getExpType rhs_expr_typed'
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
-  ety <- mustByTy lhs_o_type rhs_expr_typed
+  ety <- mustBeTy lhs_o_type rhs_expr_typed
   return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
-  -- let (cs, bds) = unzip (Prelude.map (\c -> (elseIfCond c, elseIfBody c)) elifs) in
   IfElseStmt
-    <$> (mustByTy Bool =<< expressionType cond_expr)
+    <$> (mustBeTy Bool =<< expressionType cond_expr)
     <*> localScope (blockType tt_branch)
     <*> mapM (\case {
                  ElseIf eCond eBd ann ->
-                   ElseIf <$> (mustByTy Bool =<< expressionType eCond)
+                   ElseIf <$> (mustBeTy Bool =<< expressionType eCond)
                           <*> localScope (blockType eBd)
                           <*> return (buildStmtAnn ann)
                     }) elifs
@@ -499,7 +497,7 @@ globalCheck (Volatile ident ty addr mods anns) =
   -- Check TypeSpecifier is correct
   return (Volatile ident ty addr mods (buildGlobalAnn anns (SVolatile ty)))
 -- DONE [Q13]
-globalCheck (Static ident ty (Just sexp@(Constant address a)) mods anns) =
+globalCheck (Static ident ty (Just sexp@(Constant _address _a)) mods anns) =
   checkTypeDefinition anns ty >>
   expressionType sexp >>= \sexp_ty ->
   return (Static ident ty (Just sexp_ty) mods (buildGlobalAnn anns (SStatic ty)))
@@ -509,7 +507,7 @@ globalCheck (Shared ident ty mexpr mods anns) = do
   checkTypeDefinition anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> (mustByTy ty =<< expressionType expr)
+              Just expr -> Just <$> (mustBeTy ty =<< expressionType expr)
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (Shared ident ty exprty mods (buildGlobalAnn anns (SShared ty)))
@@ -517,7 +515,7 @@ globalCheck (Shared ident ty mexpr mods anns) = do
 globalCheck (Const ident ty expr mods anns) =
   checkTypeDefinition anns ty >>
   Const ident ty
-  <$> (mustByTy ty =<< expressionType expr)
+  <$> (mustBeTy ty =<< expressionType expr)
   <*> pure mods
   <*> pure (buildGlobalAnn anns (SConst ty))
 
@@ -566,11 +564,11 @@ programSeman (GlobalDeclaration gbl) =
   GlobalDeclaration <$> globalCheck gbl
 programSeman (TypeDefinition tydef ann) =
   typeDefCheck ann tydef >>= \t ->
-    let stdef = semanticTypeDef t in
-    -- If we have reached this point, it means that the type is well defined
+    -- let stdef = semanticTypeDef t in
     -- and we can add it to the global environment.
-    insertGlobalTy ann stdef >> return (TypeDefinition t (buildGlobalTy ann stdef))
-programSeman (ModuleInclusion ident _mods anns) = undefined
+    -- insertGlobalTy ann stdef >>
+    return (TypeDefinition t (buildGlobalTy ann (semanticTypeDef t)))
+programSeman (ModuleInclusion _ident _mods _anns) = undefined
 
 semanticTypeDef :: SAST.TypeDef SemanticAnns -> SemanTypeDef SemanticAnns
 semanticTypeDef (Struct i f m)  = Struct i f m
@@ -639,16 +637,16 @@ typeDefCheck ann (Class ident cls mds)
   >> foldM
     (\(fs, nsl, sl) cl ->
        case cl of
-         ClassField fs_id fs_ty ann
-           -> checkTypeDefinition ann fs_ty
-           >> simpleTyorFail ann fs_ty
-           >> let checkFs = ClassField fs_id fs_ty (buildExpAnn ann fs_ty)
+         ClassField fs_id fs_ty annCF
+           -> checkTypeDefinition annCF fs_ty
+           >> simpleTyorFail annCF fs_ty
+           >> let checkFs = ClassField fs_id fs_ty (buildExpAnn annCF fs_ty)
               in return (checkFs : fs, nsl ,sl )
-         nslm@(ClassMethod fm_id fm_tys NoSelf body ann)
-           -> mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
+         nslm@(ClassMethod _fm_id fm_tys NoSelf _body annCM)
+           -> mapM_ (checkTypeDefinition annCM . paramTypeSpecifier) fm_tys
            >> return (fs, nslm : nsl, sl)
-         slm@(ClassMethod fm_id fm_tys Self body ann)
-           ->  mapM_ (checkTypeDefinition ann . paramTypeSpecifier) fm_tys
+         slm@(ClassMethod _fm_id fm_tys Self _body annCM)
+           ->  mapM_ (checkTypeDefinition annCM . paramTypeSpecifier) fm_tys
            >> return (fs, nsl, slm : sl )
         )
     ([],[],[]) cls
@@ -665,23 +663,23 @@ typeDefCheck ann (Class ident cls mds)
              ClassField {} -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
              ClassMethod _ _ Self _ _ -> throwError (annotateError internalErrorSeman ClassSelfNoSelf)
              -- Interesting case
-             ClassMethod ident ps NoSelf body ann ->
+             ClassMethod identCM ps NoSelf body annCM ->
                localScope (
                -- Insert params types
-                 insertLocalVariables ann (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) ps)
+                 insertLocalVariables annCM (Data.List.map (\p -> (paramIdentifier p, paramTypeSpecifier p)) ps)
                  >>
               -- Type check body
-                 flip (ClassMethod ident ps NoSelf) (buildExpAnn ann Unit) <$> blockType body
+                 flip (ClassMethod identCM ps NoSelf) (buildExpAnn annCM Unit) <$> blockType body
                  )
          ) nsl
   -- Methos with Self references.
   -- Get depndencies
     let dependencies = Data.List.map (\case{
                                          -- This shouldn't happen here but I doesn't add anything
-                                         l@(ClassField ident _ _) -> (l, ident, []);
+                                         l@(ClassField identCF _ _) -> (l, identCF, []);
                                          -- This is the interesting one.
-                                         l@(ClassMethod ident ps _self bs _ann) ->
-                                           (l, ident
+                                         l@(ClassMethod identCM _ps _self bs _ann) ->
+                                           (l, identCM
                                            -- This is weird, can we have "self.f1(53).f2"
                                            , concatMap (\case{ ("self", [ ids ]) -> [ ids ];
                                                                a -> error ("In case the impossible happens >>> " ++ show a);
@@ -779,11 +777,47 @@ repeated :: Eq a => [a] -> [a]
 repeated xs = nub $ xs Data.List.\\ nub xs
 -----------------------------------------
 
+-- Adding Global elements to the environment.
+programAdd :: SAST.AnnASTElement SemanticAnns -> SemanticMonad ()
+programAdd (Task ident args retType _bd _mods anns) =
+  insertGlobal ident (GTask args retType)
+  (annotateError (location anns) (EUsedTaskName ident))
+programAdd (Function ident args mretType _bd _mods anns) =
+  insertGlobal ident (GFun args (fromMaybe Unit mretType))
+  (annotateError (location anns) (EUsedFunName ident))
+programAdd (Handler ident ps ty _bd _mods anns) =
+  insertGlobal ident (GHand ps ty)
+  (annotateError (location anns) (EUsedHandlerName ident))
+programAdd (GlobalDeclaration glb) =
+  let (global_name, sem) =
+        case glb of
+          Volatile ident type_spec _me _mod _ann ->
+            (ident, SVolatile type_spec)
+          Static ident type_spec _me _mod _ann ->
+            (ident, SStatic type_spec)
+          Shared ident type_spec _me _mod _ann ->
+            (ident, SShared type_spec)
+          Const ident type_spec _e _mod _ann ->
+            (ident, SConst type_spec)
+          in
+  insertGlobal global_name (GGlob sem)
+  (annotateError (location (getAnnotation glb)) (EUsedGlobalName global_name))
+programAdd (TypeDefinition ty anns) =
+  let type_name = identifierType ty in
+    case ty_ann anns of
+      GTy semTy@(GType _) ->
+        insertGlobal
+          type_name semTy
+          (annotateError (location anns) $ EUsedTypeName type_name)
+      _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
+programAdd (ModuleInclusion {}) = error "TODO"
 
 --- Exectuing Type Checking
 typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation
   -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns) , ExpressionState)
-typeCheckRunE = runTypeChecking initialExpressionSt  . mapM programSeman
+typeCheckRunE = runTypeChecking initialExpressionSt  . mapM checkAndAdd
+    where
+      checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
 
 typeCheckRun :: PAST.AnnotatedProgram Parser.Annotation
   -> Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)

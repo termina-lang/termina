@@ -10,6 +10,7 @@ dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
 dynPromotion (DynamicSubtype t) (DynamicSubtype t') = groundTyEq t t'
 dynPromotion (DynamicSubtype t) q = groundTyEq t q
 dynPromotion t (DynamicSubtype q) = groundTyEq t q
+dynPromotion _ _ = False
 -- TODO Q23
 
 cleanDyn :: TypeSpecifier -> TypeSpecifier

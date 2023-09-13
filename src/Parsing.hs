@@ -16,7 +16,7 @@ import qualified Text.Parsec.Token    as Tok
 
 import           Data.Functor
 import Text.Parsec.Expr
-import Data.List
+import qualified Data.List as L
 import Control.Monad
 
 {- | Type of the parsing annotations
@@ -141,6 +141,9 @@ identifierParser = Tok.identifier lexer
 
 hexa :: Parser Integer
 hexa = char '0' >> Tok.hexadecimal lexer
+
+tails :: [a] -> [[a]]
+tails = L.tails
 
 -- | Parser for natural numbers (positive integers + 0)
 -- This parser is used solely when declaring a new vector to specify

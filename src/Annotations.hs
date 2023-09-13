@@ -3,11 +3,13 @@
 
 module Annotations where
 
-class Annotated (d :: * -> *) where
+import Data.Kind
+
+class Annotated (d :: Type -> Type) where
   getAnnotation :: d a -> a
 
-class HAnnotated (d :: ( * -> * ) -> * -> *) where
+class HAnnotated (d :: ( Type -> Type ) -> Type -> Type) where
   getHAnnotation :: d exp a -> a
 
-class HHAnnotated (d :: ( * -> * ) -> (* -> *) -> * -> *) where
+class HHAnnotated (d :: ( Type -> Type ) -> (Type -> Type) -> Type -> Type) where
   getHHAnnotation :: d e lr a -> a

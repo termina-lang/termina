@@ -4,9 +4,9 @@
 module Semantic.Types where
 
 import           AST
+import           SemanAST            as SAST
 import           Utils.AST
-import SemanAST as SAST
-import Utils.TypeSpecifier
+import           Utils.TypeSpecifier
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -35,20 +35,11 @@ getTySemGlobal (SConst ty)    = ty
 
 -- | General global entities
 data GEntry a
-  = GFun
-    { funArgs :: [Parameter]
-    , funRet  :: TypeSpecifier
-    }
+  = GFun [Parameter] TypeSpecifier
   -- ^ Functions
-  | GTask
-    { taskArgs :: [Parameter]
-    , taskRet  :: TypeSpecifier
-    }
+  | GTask [Parameter] TypeSpecifier
   -- ^ Tasks
-  | GHand
-  { handlerArgs :: [Parameter]
-  , handlerRet  :: TypeSpecifier
-  }
+  | GHand [Parameter] TypeSpecifier
   -- ^ Handlers
   | GGlob SemGlobal
   -- ^ Globals
@@ -68,7 +59,7 @@ type SemanClassMember = ClassMember' K SAST.Object
 -- Forgetfull Class member map
 kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
 kClassMember (ClassField idx tyx a) = ClassField idx tyx a
-kClassMember (ClassMethod idx ps self blk ann) =
+kClassMember (ClassMethod idx ps self _blk ann) =
   ClassMethod idx ps self [] ann -- (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet blk))))
 
 -- type GEntry = GEntry' SemAnn
@@ -103,7 +94,7 @@ casteableTys a b = numTy a && numTy b
 -- we use to define (dyn A \subseteq A)
 subTypes :: TypeSpecifier -> TypeSpecifier -> Bool
 subTypes (DynamicSubtype a) (DynamicSubtype b) = groundTyEq a b
-subTypes (DynamicSubtype a) b = groundTyEq a b
-subTypes a (DynamicSubtype b) = groundTyEq a b
+subTypes (DynamicSubtype a) b                  = groundTyEq a b
+subTypes a (DynamicSubtype b)                  = groundTyEq a b
 -- Id \subseteq Subtypes
-subTypes a b = groundTyEq a b
+subTypes a b                                   = groundTyEq a b

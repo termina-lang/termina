@@ -96,6 +96,12 @@ data Errors a
   | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
   | EUsedTypeName Identifier
+  -- | Unique names for Global
+  | EUsedGlobalName Identifier
+  -- | Unique names Handler
+  | EUsedHandlerName Identifier
+  -- | Unique names Taks
+  | EUsedTaskName Identifier
   -- | Vector Type Primitive
   -- | ENoPrimitiveType TypeSpecifier
   -- | Only option Dyn
@@ -154,6 +160,9 @@ data Errors a
   | EEnumVariantExtraParams
   | EEnumVariantMissingParams
   | ETyNotEnum Identifier (SemanTypeDef a)
+  -- | Unexpected Global element unboxing.
+  | EInternalNoGTY
+
   deriving Show
 
 instance Eq (Errors a) where

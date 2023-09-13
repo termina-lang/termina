@@ -8,7 +8,7 @@ module CoreAST where
 import           Annotations
 
 -- Parametric Emtpy Type
-data Empty (a :: *)
+data Empty a
   deriving (Show, Functor)
 
 data ReturnStmt' expr a
@@ -204,7 +204,7 @@ instance Annotated (Global' expr) where
   getAnnotation (Const _ _ _ _ a)    = a
 
 -- Extremelly internal type definition
-data TypeDef'' (member :: *)
+data TypeDef'' member
   = Struct Identifier [FieldDefinition]  [ Modifier ]
   | Union Identifier [FieldDefinition] [ Modifier ]
   | Enum Identifier [EnumVariant] [ Modifier ]
