@@ -389,6 +389,12 @@ blockType = mapM statementTySimple
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.
 statementTySimple :: Statement Parser.Annotation -> SemanticMonad (SAST.Statement SemanticAnns)
+-- Free statement semantic
+statementTySimple (Free obj anns) =
+  rhsObject obj >>= \(typed_obj, type_obj) ->
+  if isJust (isDyn type_obj)
+  then return (Free typed_obj (buildStmtAnn anns))
+  else throwError (annotateError anns (EFreeNotDyn type_obj))
 -- Declaration semantic analysis
 statementTySimple (Declaration lhs_id lhs_type expr anns) =
   -- Check type is alright

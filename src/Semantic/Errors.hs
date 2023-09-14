@@ -162,6 +162,8 @@ data Errors a
   | ETyNotEnum Identifier (SemanTypeDef a)
   -- | Unexpected Global element unboxing.
   | EInternalNoGTY
+  -- | Free not dyn type
+  | EFreeNotDyn TypeSpecifier
 
   deriving Show
 

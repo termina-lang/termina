@@ -108,6 +108,8 @@ getDepStmt (MatchStmt e mBody _)
   ++ concatMap (concatMap getDepStmt . matchBody) mBody
 getDepStmt (SingleExpStmt e _)
   = getDepExp e
+getDepStmt (Free obj _) =
+  let (dnm, deps) = getDepObj obj in (dnm : deps)
 
 
 getDepExp :: Expression a -> [ClassDep]

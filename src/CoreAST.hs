@@ -26,22 +26,22 @@ instance HAnnotated ReturnStmt' where
   getHAnnotation = returnAnnotation
 
 -- | |BlockRet| represent a body block with its return statement
-data BlockRet' expr lho a
+data BlockRet' expr obj a
   = BlockRet
   {
-    blockBody :: [Statement' expr lho a]
+    blockBody :: [Statement' expr obj a]
   , blockRet  :: ReturnStmt' expr a
   }
   deriving (Show, Functor)
 
 -- | Annotated AST element
-data AnnASTElement' expr lho a =
+data AnnASTElement' expr obj a =
   -- | Task construtor
   Task
     Identifier -- ^ task identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     TypeSpecifier -- ^ returned value type (should be TaskRet)
-    (BlockRet' expr lho a) -- ^ statements block
+    (BlockRet' expr obj a) -- ^ statements block
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -50,7 +50,7 @@ data AnnASTElement' expr lho a =
     Identifier -- ^ function identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-    (BlockRet' expr lho a) -- ^ statements block (with return)
+    (BlockRet' expr obj a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -59,7 +59,7 @@ data AnnASTElement' expr lho a =
     Identifier -- ^ Handler identifier (name)
     [Parameter] -- ^ list of parameters (TBC)
     TypeSpecifier -- ^ returned value type (should be Result)
-    (BlockRet' expr lho a) -- ^ statements block (with return)
+    (BlockRet' expr obj a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -69,7 +69,7 @@ data AnnASTElement' expr lho a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' expr lho a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' expr obj a) -- ^ the type definition (struct, union, etc.)
     a
 
   -- | Module inclusion constructor
@@ -212,16 +212,16 @@ data TypeDef'' member
   deriving (Show, Functor)
 
 -- Type Defs are the above when composed with Class members.
-type TypeDef' expr lho a = TypeDef'' (ClassMember' expr lho a)
+type TypeDef' expr obj a = TypeDef'' (ClassMember' expr obj a)
 -------------------------------------------------
 -- Class Member
-data ClassMember' expr lho a
+data ClassMember' expr obj a
   -- | Either a Field, basically a variable of the class
   = ClassField Identifier TypeSpecifier a
   -- | Or a method. Methods come in two flavours whedata TypeDef' (expr :: * -> *) (a :: *)ther they use themselves
   -- through variable |self| (needed to invoke another method of the same class)
   -- Or not.
-  | ClassMethod Identifier [Parameter] SelfMethod (Block' expr lho a) a
+  | ClassMethod Identifier [Parameter] SelfMethod (Block' expr obj a) a
   deriving (Show, Functor)
 
 data SelfMethod = Self | NoSelf
@@ -259,52 +259,54 @@ data EnumVariant = EnumVariant {
   , assocData       :: [ TypeSpecifier ]
 } deriving (Show)
 
-data MatchCase' expr lho a = MatchCase
+data MatchCase' expr obj a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars      :: [Identifier]
-  , matchBody       :: Block' expr lho a
+  , matchBody       :: Block' expr obj a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
-data ElseIf' expr lho a = ElseIf
+data ElseIf' expr obj a = ElseIf
   {
     elseIfCond       :: expr a
-  , elseIfBody       :: Block' expr lho a
+  , elseIfBody       :: Block' expr obj a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
 
   -- | First AST after parsing
-data Expression' rho a
-  = AccessObject (rho a)
+data Expression'
+    obj -- ^ objects type
+    a -- ^ Annotations
+  = AccessObject (obj a)
   | Constant Const a -- ^ | 24 : i8|
-  | ParensExpression (Expression' rho a) a
-  | BinOp Op (Expression' rho a) (Expression' rho a) a
-  | ReferenceExpression (rho a) a
-  | Casting (Expression' rho a) TypeSpecifier a
+  | ParensExpression (Expression' obj a) a
+  | BinOp Op (Expression' obj a) (Expression' obj a) a
+  | ReferenceExpression (obj a) a
+  | Casting (Expression' obj a) TypeSpecifier a
   -- Invocation expressions
-  | FunctionExpression Identifier [ Expression' rho a ] a
-  | MemberMethodAccess (rho a) Identifier [Expression' rho a] a
+  | FunctionExpression Identifier [ Expression' obj a ] a
+  | MemberMethodAccess (obj a) Identifier [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | VectorInitExpression (Expression' rho a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
+  | VectorInitExpression (Expression' obj a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
   | FieldValuesAssignmentsExpression
     Identifier -- ^ Structure type identifier
-    [FieldValueAssignment' (Expression' rho) a] -- ^ Initial value of each field identifier
+    [FieldValueAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantExpression
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier
-    [ Expression' rho a ] -- ^ list of expressions
+    [ Expression' obj a ] -- ^ list of expressions
     a
-  | OptionVariantExpression (OptionVariant (Expression' rho a)) a
+  | OptionVariantExpression (OptionVariant (Expression' obj a)) a
   deriving (Show, Functor)
 
-instance (Annotated rho) => Annotated (Expression' rho) where
+instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (AccessObject obj)                       = getAnnotation obj
   getAnnotation (Constant _ a)                           = a
   getAnnotation (BinOp _ _ _ a)                          = a
@@ -319,7 +321,7 @@ instance (Annotated rho) => Annotated (Expression' rho) where
   getAnnotation (MemberMethodAccess _ _ _ a)             = a
 
 
-data Statement' expr lho a =
+data Statement' expr obj a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
@@ -327,14 +329,14 @@ data Statement' expr lho a =
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (lho a) -- ^ name of the variable
+    (obj a) -- ^ name of the variable
     (expr a) -- ^ assignment expression
     a
   | IfElseStmt
     (expr a) -- ^ conditional expression
-    [ Statement' expr lho a ] -- ^ statements in the if block
-    [ ElseIf' expr lho a ] -- ^ list of else if blocks
-    [ Statement' expr lho a ] -- ^ statements in the else block
+    [ Statement' expr obj a ] -- ^ statements in the if block
+    [ ElseIf' expr obj a ] -- ^ list of else if blocks
+    [ Statement' expr obj a ] -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
@@ -342,15 +344,16 @@ data Statement' expr lho a =
     (expr a) -- ^ initial value of the iterator
     (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)
-    [ Statement' expr lho a ] -- ^ statements in the for loop
+    [ Statement' expr obj a ] -- ^ statements in the for loop
     a
   | MatchStmt
     (expr a) -- ^ expression to match
-    [ MatchCase' expr lho a ] -- ^ list of match cases
+    [ MatchCase' expr obj a ] -- ^ list of match cases
     a
   | SingleExpStmt
     (expr a) -- ^ expression
     a
+  | Free (obj a) a
   deriving (Show, Functor)
 
 -- | Constant values:
@@ -360,8 +363,8 @@ data Statement' expr lho a =
 data Const = B Bool | I TypeSpecifier Integer | C Char
   deriving (Show)
 
-type AnnotatedProgram' expr lho a = [AnnASTElement' expr lho a]
-type Block' expr lho a = [Statement' expr lho a]
+type AnnotatedProgram' expr obj a = [AnnASTElement' expr obj a]
+type Block' expr obj a = [Statement' expr obj a]
 
 -- When annotations are just `()` we get a normal ASTs and Programs
 -- type AST = AnnASTElement : ()

@@ -26,9 +26,11 @@ elements of the AST. In this case, the annotations will only include
 the position in the source file where the element is located.
 
 -}
+
 data Annotation =
   Position SourcePos -- ^ Source code position
   | Internal
+  -- ^ Internal error position. Used for debugging, internals shoulnd't happen
   deriving Show
 
 ----------------------------------------
@@ -55,6 +57,8 @@ lexer = Tok.makeTokenParser langDef
       ["task","function","handler", "at"]
       ++ -- Stmt
       ["var", "match", "for", "if", "else", "return", "while"]
+      ++ -- Free
+      ["free"]
       ++ -- Constants
       ["true","false"]
       ++ -- Modules
@@ -313,6 +317,7 @@ functionCallParser =
   <*> parens (sepBy (try expressionParser) comma)
   <*> (Position <$> getPosition)
 
+
 optionVariantExprParser :: Parser (Expression Annotation)
 optionVariantExprParser =
   (do
@@ -549,12 +554,20 @@ singleExprStmtParser = do
   _ <- semi
   return $ SingleExpStmt expression (Position p)
 
+freeStmtParser :: Parser (Statement Annotation)
+freeStmtParser = reserved "free" >>
+ Free <$> parens objectParser <*> (Position <$> getPosition)
+ >>= \t -> semi >> return t
+
+
 blockItemParser :: Parser (Statement Annotation)
-blockItemParser = try ifElseIfStmtParser
+blockItemParser
+  =   try ifElseIfStmtParser
   <|> try declarationParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
+  <|> try freeStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
