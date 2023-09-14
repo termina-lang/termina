@@ -11,7 +11,10 @@ ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
 
 classMethodName :: Identifier -> Identifier -> DocStyle
-classMethodName = methodName
+classMethodName ident = pretty . (("__" ++ ident ++ "_") ++)
+
+classMethodNameAOp :: Identifier -> AccessOp -> DocStyle
+classMethodNameAOp ident = (pretty ("__" ++ ident ++ "_") <>) . methodAccessOp
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =

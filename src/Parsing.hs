@@ -367,9 +367,18 @@ memberMethodAccessParser = do
   p <- getPosition
   object <- identifierParser
   _ <- reservedOp "."
-  method <- identifierParser
+  -- method <- identifierParser
+  method <- accessOpParser
   params <- parens (sepBy (try expressionParser) comma)
   return $ MemberMethodAccess (Variable object (Position p)) method params (Position p)
+
+accessOpParser :: Parser AccessOp
+accessOpParser
+  = try (reserved "alloc" >> pure Alloc)
+  <|> try (reserved "send" >> pure Send)
+  <|> try (reserved "receive" >> pure Receive)
+  <|> (UserDef <$> identifierParser)
+
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
@@ -438,6 +447,7 @@ objectParser = objectParser' objectTermParser
       _ <- reservedOp "."
       p <- getPosition
       member <- identifierParser
+      -- member <- accessOpParser
       return $ \parent ->  MemberAccess parent member (Position p))
     dereferencePrefix
       = Ex.Prefix (do
@@ -445,6 +455,7 @@ objectParser = objectParser' objectTermParser
       _ <- reservedOp "*"
       return $ flip Dereference (Position p))
 ----------------------------------------
+
 
 vectorInitParser :: Parser (Expression Annotation)
 vectorInitParser = do

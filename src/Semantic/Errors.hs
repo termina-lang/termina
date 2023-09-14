@@ -136,7 +136,9 @@ data Errors a
   -- Error while forcing Undyn
   | EUndynForcingError
   -- Error using a method different than alloc on a pool
+  | EPoolsAllocArgs
   | EPoolsMethods Identifier
+  | EPoolsNoPool TypeSpecifier
   | EPoolsWrongNumArgs
   | EPoolsWrongArgType TypeSpecifier
   | EPoolsWrongArgTypeW TypeSpecifier
@@ -164,7 +166,14 @@ data Errors a
   | EInternalNoGTY
   -- | Free not dyn type
   | EFreeNotDyn TypeSpecifier
-
+  -- | MsgQueue operations errors
+  | ENoMsgQueueSend TypeSpecifier
+  | ENoMsgQueueRcv TypeSpecifier
+  | ENoMsgQueueSendWrongArgs
+  | ENoMsgQueueRcvWrongArgs
+  | EMsgQueueSendArgNotDyn TypeSpecifier
+  | EMsgQueueWrongType TypeSpecifier TypeSpecifier
+  | EMsgQueueRcvWrongArgTy TypeSpecifier
   deriving Show
 
 instance Eq (Errors a) where

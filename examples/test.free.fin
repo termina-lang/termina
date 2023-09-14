@@ -1,0 +1,4 @@
+fn test0(t : 'dyn uint16){
+  free(t);
+  return;
+}

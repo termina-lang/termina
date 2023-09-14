@@ -224,34 +224,34 @@ ppExpression subs (MemberMethodAccess obj methodId params _) =
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
                     ppCFunctionCall
-                        (classMethodName classId methodId)
+                        (classMethodNameAOp classId methodId)
                         (ppObject subs obj : (ppExpression subs <$> params))
                 -- | If the left hand side is a pool:
                 (Pool _ _) ->
                     ppCFunctionCall
-                        (poolMethodName methodId)
+                        (poolMethodNameAOp methodId)
                         (ppObject subs obj : (ppExpression subs <$> params))
                 -- | If the left hand side is a message queue:
                 (MsgQueue _ _) ->
                     ppCFunctionCall
-                        (msgQueueMethodName methodId)
+                        (msgQueueMethodNameAOp methodId)
                         (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
                 -- | Anything else should not happen
                 _ -> error "unsupported expression"
         -- | If the left hand size is a class:
         (DefinedType classId) ->
             ppCFunctionCall
-                (classMethodName classId methodId)
+                (classMethodNameAOp classId methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
         (Pool _ _) ->
             ppCFunctionCall
-                (poolMethodName methodId)
+                (poolMethodNameAOp methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
         (MsgQueue _ _) ->
             ppCFunctionCall
-                (msgQueueMethodName methodId)
+                (msgQueueMethodNameAOp methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | Anything else should not happen
         _ -> error "unsupported expression"

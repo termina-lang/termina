@@ -274,6 +274,17 @@ data ElseIf' expr obj a = ElseIf
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
+----------------------------------------
+-- Operators to member acesses.
+-- Either a user defined function
+-- or alloc, send and receive
+data AccessOp
+ = UserDef Identifier
+ | Alloc
+ | Send
+ | Receive
+ deriving (Show, Eq)
+----------------------------------------
 
   -- | First AST after parsing
 data Expression'
@@ -287,7 +298,7 @@ data Expression'
   | Casting (Expression' obj a) TypeSpecifier a
   -- Invocation expressions
   | FunctionExpression Identifier [ Expression' obj a ] a
-  | MemberMethodAccess (obj a) Identifier [Expression' obj a] a
+  | MemberMethodAccess (obj a) AccessOp [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions

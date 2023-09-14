@@ -7,6 +7,7 @@ import           SemanAST
 import           Semantic.Monad
 import           Semantic.Types
 import System.FilePath (extSeparator)
+import AST (AccessOp)
 
 type DocStyle = Doc AnsiStyle
 
@@ -209,13 +210,28 @@ ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (pp
 ppModifier (Modifier identifier Nothing) = pretty identifier
 -- TODO: Support modifiers with non-integer values
 
-methodName :: Identifier -> Identifier -> DocStyle
-methodName identifier method = pretty ("__" ++ identifier ++ "_" ++ method)
+methodAccessOp :: AccessOp -> DocStyle
+methodAccessOp (UserDef ident) = pretty ident
+methodAccessOp Alloc = pretty "alloc"
+methodAccessOp Send = pretty "send"
+methodAccessOp Receive = pretty "receive"
 
-poolMethodName :: Identifier -> DocStyle
+methodNameAOp :: Identifier -> AccessOp -> DocStyle
+methodNameAOp identifier = (pretty ("__" ++ identifier ++ "_") <>) . methodAccessOp
+
+methodName :: Identifier -> Identifier -> DocStyle
+methodName ident = (pretty ("__" ++ ident ++ "_") <>) . pretty
+
+poolMethodNameAOp :: AccessOp -> DocStyle
+poolMethodNameAOp = methodNameAOp "pool"
+
+poolMethodName :: String -> DocStyle
 poolMethodName = methodName "pool"
 
-msgQueueMethodName :: Identifier -> DocStyle
+msgQueueMethodNameAOp :: AccessOp -> DocStyle
+msgQueueMethodNameAOp = methodNameAOp "msg_queue"
+
+msgQueueMethodName :: String -> DocStyle
 msgQueueMethodName = methodName "msg_queue"
 
 -- | Pretty print a reference expression

@@ -44,7 +44,7 @@ data ClassDep
   -- Variables
   = SVar Identifier
   -- Method accesses
-  | MethodAccess ClassDep Identifier
+  | MethodAccess ClassDep AccessOp
   -- Field accesses
   | FieldAccess ClassDep Identifier
   -- We mark as undec objects defined through expressions.
@@ -53,7 +53,8 @@ data ClassDep
 
 depToList :: ClassDep -> (Identifier, [Identifier])
 depToList (SVar i)           = (i, [])
-depToList (MethodAccess a i) = (\(r,as) -> (r, i : as)) $ depToList a
+depToList (MethodAccess a (UserDef i)) = (\(r,as) -> (r, i : as)) $ depToList a
+depToList (MethodAccess a _ ) = depToList a
 depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) $ depToList a
 -- depToList Undec              = Nothing
 
@@ -130,5 +131,5 @@ getDepExp (OptionVariantExpression os _ann)
   =  case os of
        None   -> []
        Some e -> getDepExp e
-getDepExp (MemberMethodAccess obj ident es _ann) =
-  let (dnm, deps) = getDepObj obj in MethodAccess dnm ident : deps ++ concatMap getDepExp es
+getDepExp (MemberMethodAccess obj accop es _ann) =
+  let (dnm, deps) = getDepObj obj in MethodAccess dnm accop : deps ++ concatMap getDepExp es

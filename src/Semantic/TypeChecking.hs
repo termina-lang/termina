@@ -243,7 +243,8 @@ expressionType (FunctionExpression fun_name args pann) =
   getFunctionTy pann fun_name >>= \(params, retty) ->
   flip (SAST.FunctionExpression fun_name) (buildExpAnnApp pann params retty)
   <$> paramTy pann params args
-expressionType (MemberMethodAccess obj ident args ann) =
+----------------------------------------
+expressionType (MemberMethodAccess obj mop@(UserDef ident) args ann) =
   rhsObject obj  >>= \(obj_typed , obj_ty) ->
   case obj_ty of
     DefinedType dident -> getGlobalTy ann dident >>=
@@ -254,7 +255,7 @@ expressionType (MemberMethodAccess obj ident args ann) =
            Just (ps, anns) ->
              let (psLen , asLen ) = (length ps, length args) in
              if psLen == asLen
-             then SAST.MemberMethodAccess obj_typed ident
+             then SAST.MemberMethodAccess obj_typed mop
                  <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
                  <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnnApp ann ps) (getTypeSAnns anns)
              else if psLen < asLen
@@ -264,20 +265,52 @@ expressionType (MemberMethodAccess obj ident args ann) =
          -- Other User defined types do not define methods
          ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
       }
+    ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
+expressionType (MemberMethodAccess obj Alloc args ann) =
+  rhsObject obj  >>= \(obj_typed , obj_ty) ->
+  case obj_ty of
     Pool ty_pool _sz ->
-      case ident of
-        "alloc" -> case args of
-                      [refM] ->
-                        typeExpression refM >>= \(typed_ref , type_ref) ->
+       case args of
+         [refM] ->
+           typeExpression refM >>= \(typed_ref , type_ref) ->
                         case type_ref of
                           (Reference (Option (DynamicSubtype tyref))) ->
                             if groundTyEq ty_pool tyref
-                            then return $ SAST.MemberMethodAccess obj_typed ident [typed_ref] (buildExpAnnApp ann [Parameter "item" type_ref] Unit)
+                            then return $ SAST.MemberMethodAccess obj_typed Alloc [typed_ref] (buildExpAnnApp ann [Parameter "item" type_ref] Unit)
                             else throwError $ annotateError ann (EPoolsWrongArgType tyref)
                           _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
-                      _ -> throwError $ annotateError ann EPoolsWrongNumArgs
-        _ -> throwError $ annotateError ann (EPoolsMethods ident)
-    ty -> throwError $ annotateError ann (EMethodAccessNotClass ty)
+         _ -> throwError $ annotateError ann EPoolsWrongNumArgs
+    ty -> throwError $ annotateError ann (EPoolsNoPool ty)
+expressionType (MemberMethodAccess obj Send args ann) =
+  rhsObject obj  >>= \(obj_typed , obj_ty) ->
+  case obj_ty of
+    MsgQueue ty _size ->
+      case args of
+        [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
+          case isDyn arg_type of
+            Just t ->
+              if groundTyEq t ty
+              then return $ MemberMethodAccess obj_typed Send [arg_typed] (buildExpAnn ann Unit)
+              else throwError $ annotateError ann $ EMsgQueueWrongType t ty
+            _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotDyn arg_type
+        _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
+    _ -> throwError $ annotateError ann $ ENoMsgQueueSend obj_ty
+expressionType (MemberMethodAccess obj Receive args ann) =
+  rhsObject obj  >>= \(obj_typed , obj_ty) ->
+  case obj_ty of
+    MsgQueue ty _size ->
+      case args of
+        [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
+          case arg_type of
+            -- & Option<'dyn T>
+            Reference (Option (DynamicSubtype t)) ->
+              if groundTyEq t ty
+              then return $ MemberMethodAccess obj_typed Receive [arg_typed] (buildExpAnn ann Unit)
+              else throwError $ annotateError ann $ EMsgQueueWrongType t ty
+            _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy arg_type
+        _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
+    _ -> throwError $ annotateError ann $ ENoMsgQueueRcv obj_ty
+----------------------------------------
 expressionType (FieldValuesAssignmentsExpression id_ty fs pann) =
   -- | Field Type
   catchError
