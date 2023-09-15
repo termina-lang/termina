@@ -77,12 +77,12 @@ spec = do
               "}\n")    
     it "Prints declaration of function assignment_test1" $ do
      renderHeader test1 `shouldBe`
-       pack "void assignment_test1(__dyn_t dyn_var0);\n"
+       pack "void assignment_test1(__termina_dyn_t dyn_var0);\n"
     it "Prints definition of function assignment_test1" $ do
      renderSource test1 `shouldBe`
-        pack ("void assignment_test1(__dyn_t dyn_var0) {\n" ++
+        pack ("void assignment_test1(__termina_dyn_t dyn_var0) {\n" ++
               "    \n" ++
-              "    __Option_dyn_t option;\n" ++
+              "    __termina_option_dyn_t option;\n" ++
               "\n" ++
               "    {\n" ++
               "        option.__variant = None;\n" ++
@@ -98,28 +98,28 @@ spec = do
               "}\n")  
     it "Prints declaration of function assignment_test2" $ do
      renderHeader test2 `shouldBe`
-       pack "void assignment_test2(__dyn_t dyn_var0, __dyn_t dyn_var1);\n"
+       pack "void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n"
     it "Prints definition of function assignment_test2" $ do
      renderSource test2 `shouldBe`
-        pack ("void assignment_test2(__dyn_t dyn_var0, __dyn_t dyn_var1) {\n" ++
+        pack ("void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
               "    \n" ++
               "    uint32_t foo = (uint32_t)0;\n" ++
               "\n" ++
-              "    *((uint32_t *)dyn_var0.datum) = foo;\n" ++
+              "    *((uint32_t *)dyn_var0.data) = foo;\n" ++
               "\n" ++
-              "    foo = *((uint32_t *)dyn_var1.datum);\n" ++
+              "    foo = *((uint32_t *)dyn_var1.data);\n" ++
               "\n" ++
-              "    *((uint32_t *)dyn_var1.datum) = *((uint32_t *)dyn_var0.datum);\n" ++
+              "    *((uint32_t *)dyn_var1.data) = *((uint32_t *)dyn_var0.data);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")  
     it "Prints declaration of function assignment_test3" $ do
      renderHeader test3 `shouldBe`
-       pack "void assignment_test3(__dyn_t dyn_var0, __dyn_t dyn_var1);\n"
+       pack "void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n"
     it "Prints definition of function assignment_test2" $ do
      renderSource test3 `shouldBe`
-        pack ("void assignment_test3(__dyn_t dyn_var0, __dyn_t dyn_var1) {\n" ++
+        pack ("void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
               "    \n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++
@@ -131,19 +131,19 @@ spec = do
               "\n" ++
               "    {\n" ++
               "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            ((uint32_t *)dyn_var0.datum)[__i0] = foo[__i0];\n" ++
+              "            ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
               "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            foo[__i0] = ((uint32_t *)dyn_var1.datum)[__i0];\n" ++
+              "            foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
               "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            ((uint32_t *)dyn_var1.datum)[__i0] = ((uint32_t *)dyn_var0.datum)[__i0];\n" ++
+              "            ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++

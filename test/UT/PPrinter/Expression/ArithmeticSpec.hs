@@ -73,19 +73,19 @@ spec = do
         pack "var0 + (uint16_t)1024"
     it "Prints the expression: var1 + 1024 : u16" $ do
       renderExpression var1PlusConstant `shouldBe`
-        pack "*((uint16_t *)var1.datum) + (uint16_t)1024"
+        pack "*((uint16_t *)var1.data) + (uint16_t)1024"
     it "Prints the expression: 1024 : u16 + var0" $ do
       renderExpression constantPlusVar0 `shouldBe`
         pack "(uint16_t)1024 + var0"
     it "Prints the expression: 1024 : u16 + var1" $ do
       renderExpression constantPlusVar1 `shouldBe`
-        pack "(uint16_t)1024 + *((uint16_t *)var1.datum)"
+        pack "(uint16_t)1024 + *((uint16_t *)var1.data)"
     it "Prints the expression: var0 + var1 : u16" $ do
       renderExpression var0PlusVar1 `shouldBe`
-        pack "var0 + *((uint16_t *)var1.datum)"
+        pack "var0 + *((uint16_t *)var1.data)"
     it "Prints the expression: var0 + var1 + 1024 : u16" $ do
       renderExpression var0PlusVar1PlusConstant `shouldBe`
-        pack "(uint16_t)(var0 + *((uint16_t *)var1.datum)) + (uint16_t)1024"
+        pack "(uint16_t)(var0 + *((uint16_t *)var1.data)) + (uint16_t)1024"
     it "Prints the expression: var0 - 1024 : u16" $ do
       renderExpression var0MinusConstant `shouldBe`
         pack "var0 - (uint16_t)1024"
@@ -100,11 +100,11 @@ spec = do
         pack "(uint16_t)1024 * var0"
     it "Prints the expression: var0 * var1 : u16" $ do
       renderExpression var0MultVar1 `shouldBe`
-        pack "var0 * *((uint16_t *)var1.datum)"
+        pack "var0 * *((uint16_t *)var1.data)"
     it "Prints the expression: var1 / 1024 : u16" $ do
       renderExpression var1Divconstant `shouldBe`
-        pack "*((uint16_t *)var1.datum) / (uint16_t)1024"
+        pack "*((uint16_t *)var1.data) / (uint16_t)1024"
     it "Prints the expression: var0 / var1 : u16" $ do
       renderExpression var0DivVar1 `shouldBe`
-        pack "var0 / *((uint16_t *)var1.datum)"
+        pack "var0 / *((uint16_t *)var1.data)"
 

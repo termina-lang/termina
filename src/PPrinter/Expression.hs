@@ -17,23 +17,23 @@ type Printer a =
   DocStyle
 
 ppBinaryOperator :: Op -> DocStyle
-ppBinaryOperator Multiplication = space <> pretty "*" <> space
-ppBinaryOperator Division = space <> pretty "/" <> space
-ppBinaryOperator Addition = space <> pretty "+" <> space
-ppBinaryOperator Subtraction = space <> pretty  "-" <> space
-ppBinaryOperator BitwiseLeftShift = space <> pretty  "<<" <> space
-ppBinaryOperator BitwiseRightShift = space <> pretty  ">>" <> space
-ppBinaryOperator RelationalLT = space <> pretty  "<" <> space
-ppBinaryOperator RelationalLTE = space <> pretty  "<=" <> space
-ppBinaryOperator RelationalGT = space <> pretty  ">" <> space
-ppBinaryOperator RelationalGTE = space <> pretty  ">=" <> space
-ppBinaryOperator RelationalEqual = space <> pretty  "==" <> space
-ppBinaryOperator RelationalNotEqual = space <> pretty  "!=" <> space
-ppBinaryOperator BitwiseAnd = space <> pretty  "&" <> space
-ppBinaryOperator BitwiseOr = space <> pretty  "|" <> space
-ppBinaryOperator BitwiseXor = space <> pretty  "^" <> space
-ppBinaryOperator LogicalAnd = space <> pretty  "&&" <> space
-ppBinaryOperator LogicalOr = space <> pretty  "||" <> space
+ppBinaryOperator Multiplication = pretty "*"
+ppBinaryOperator Division = pretty "/"
+ppBinaryOperator Addition = pretty "+"
+ppBinaryOperator Subtraction = pretty  "-"
+ppBinaryOperator BitwiseLeftShift = pretty  "<<"
+ppBinaryOperator BitwiseRightShift = pretty  ">>"
+ppBinaryOperator RelationalLT = pretty  "<"
+ppBinaryOperator RelationalLTE = pretty  "<="
+ppBinaryOperator RelationalGT = pretty  ">"
+ppBinaryOperator RelationalGTE = pretty  ">="
+ppBinaryOperator RelationalEqual = pretty  "=="
+ppBinaryOperator RelationalNotEqual = pretty  "!="
+ppBinaryOperator BitwiseAnd = pretty  "&"
+ppBinaryOperator BitwiseOr = pretty  "|"
+ppBinaryOperator BitwiseXor = pretty  "^"
+ppBinaryOperator LogicalAnd = pretty  "&&"
+ppBinaryOperator LogicalOr = pretty  "||"
 
 -- | Pretty prints the casting expression of a dynamic subtype
 ppDynamicSubtypeCast :: TypeSpecifier -> DocStyle
@@ -56,7 +56,7 @@ ppDynamicSubtypeObjectAddress :: Printer Object
 ppDynamicSubtypeObjectAddress subs obj =
     case getObjectType obj of
         DynamicSubtype ts ->
-            parens (ppDynamicSubtypeCast ts) <> ppObject subs obj <> pretty ".datum"
+            parens (ppDynamicSubtypeCast ts) <> ppObject subs obj <> pretty ".data"
         _ -> error "unsupported expression"
 
 ppRefDynamicSubtypeObjectAddress :: Printer Expression
@@ -67,7 +67,7 @@ ppRefDynamicSubtypeObjectAddress subs expr =
                 case expr of
                     (ReferenceExpression _ _) ->  parens (ppExpression subs expr)
                     _ -> ppExpression subs expr
-            ) <> pretty "->datum"
+            ) <> pretty "->data"
         _ -> error "unsupported expression"
 
 ppDynamicSubtypeObject :: Printer Object
@@ -133,9 +133,9 @@ ppObject subs (Dereference obj _) =
 -- check if it is a vector
 ppObject subs (Undyn obj _) =
     case getObjectType obj of
-        -- | If it is a vector, we need to print the address of the datum
+        -- | If it is a vector, we need to print the address of the data
         (DynamicSubtype (Vector _ _)) -> parens (ppDynamicSubtypeObjectAddress subs obj)
-        -- | Else, we print the derefence to the datum
+        -- | Else, we print the derefence to the data
         (DynamicSubtype _) -> ppDynamicSubtypeObject subs obj
         -- | An undyn can only be applied to a dynamic subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic
@@ -149,33 +149,33 @@ ppObject subs (ParensObject obj _) = parens (ppObject subs obj)
 ppExpression' :: Printer Expression
 ppExpression' subs expr@(BinOp Addition expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Addition <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator Addition <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Subtraction expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Subtraction <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator Subtraction <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Multiplication expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Multiplication <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator Multiplication <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp Division expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator Division <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator Division <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseLeftShift expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseLeftShift <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator BitwiseLeftShift <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseRightShift expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseRightShift <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator BitwiseRightShift <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseAnd expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseAnd <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator BitwiseAnd <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseOr expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseOr <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator BitwiseOr <+> ppExpression' subs expr2)
 ppExpression' subs expr@(BinOp BitwiseXor expr1 expr2 _) =
     let ts = getType expr in
-        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <> ppBinaryOperator BitwiseXor <> ppExpression' subs expr2)
+        parens (ppTypeSpecifier ts) <> parens (ppExpression' subs expr1 <+> ppBinaryOperator BitwiseXor <+> ppExpression' subs expr2)
 ppExpression' subs (BinOp op expr1 expr2 _) =
-    ppExpression' subs expr1 <> ppBinaryOperator op <> ppExpression' subs expr2
+    ppExpression' subs expr1 <+> ppBinaryOperator op <+> ppExpression' subs expr2
 ppExpression' subs expr = ppExpression subs expr
 
 -- | Expression pretty printer
@@ -197,7 +197,7 @@ ppExpression _ (Constant constant _) =
         I ts' integer -> parens (ppTypeSpecifier ts') <> pretty integer
         C char -> squotes (pretty char)
 ppExpression subs (BinOp op expr1 expr2 _) =
-    ppExpression' subs expr1 <> ppBinaryOperator op <> ppExpression' subs expr2
+    ppExpression' subs expr1 <+> ppBinaryOperator op <+> ppExpression' subs expr2
 ppExpression subs (Casting expr' ts' _) =
     case expr' of
         (Constant (I _ integer) _) -> parens (ppTypeSpecifier ts') <> pretty integer
@@ -216,7 +216,9 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
                             (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> parens (ppExpression subs p))
                     (_, _) -> ppExpression subs p) params paramAnns
     in
-    ppCFunctionCall (pretty identifier) ins
+        case getType expr of
+            Vector {} -> ppCFunctionCall (pretty identifier) ins <> pretty ".array"
+            _ -> ppCFunctionCall (pretty identifier) ins
 ppExpression subs (MemberMethodAccess obj methodId params _) =
     case getObjectType obj of
         (Reference ts) ->

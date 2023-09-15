@@ -50,12 +50,12 @@ spec = do
       renderHeader test0 `shouldBe`
         pack ("typedef struct {\n" ++
               "    uint16_t array[10];\n" ++
-              "} __param__for_loop_test0__array0_t;\n" ++
+              "} __param_for_loop_test0_array0_t;\n" ++
               "\n" ++
-              "uint16_t for_loop_test0(__param__for_loop_test0__array0_t array0);\n")
+              "uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0);\n")
     it "Prints definition of function for_loop_test0_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("uint16_t for_loop_test0(__param__for_loop_test0__array0_t array0) {\n" ++
+        pack ("uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0) {\n" ++
               "    \n" ++
               "    uint16_t total = (uint16_t)0;\n" ++
               "\n" ++

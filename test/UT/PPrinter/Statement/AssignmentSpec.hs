@@ -224,7 +224,7 @@ spec = do
   describe "Pretty printing undyn assignments" $ do
     it "Prints the statement dyn_var0 = foo1" $ do
       renderStatement undynVar0AssignFoo1 `shouldBe`
-        pack "*((uint32_t *)dyn_var0.datum) = foo1;"
+        pack "*((uint32_t *)dyn_var0.data) = foo1;"
     it "Prints the statement dyn_var0 = 1024 : u32" $ do
       renderStatement undynVar0AssignConst `shouldBe`
-        pack "*((uint32_t *)dyn_var0.datum) = (uint32_t)1024;"
+        pack "*((uint32_t *)dyn_var0.data) = (uint32_t)1024;"

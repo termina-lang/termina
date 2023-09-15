@@ -111,7 +111,7 @@ spec = do
           "    uint32_t __dummy;\n" ++
           "} id0;\n" ++
           "\n" ++
-          "void __id0_method0(uint8_t param0, __Option_dyn_t param1);\n" ++
+          "void __id0_method0(uint8_t param0, __termina_option_dyn_t param1);\n" ++
           "\n" ++
           "void __id0_method1(uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one method and zero fields" $ do

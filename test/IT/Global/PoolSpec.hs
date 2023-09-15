@@ -23,6 +23,7 @@ test0 = "enum Message {\n" ++
         "    match alloc_msg {\n" ++
         "        case Some(msg) => {\n" ++
         "            msg = Message::In(in0, in1);\n" ++
+        "            free(msg);\n" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
@@ -81,13 +82,13 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void test0(uint32_t in0, uint32_t in1) {\n" ++
               "    \n" ++
-              "    __Option_dyn_t alloc_msg;\n" ++
+              "    __termina_option_dyn_t alloc_msg;\n" ++
               "\n" ++
               "    {\n" ++
               "        alloc_msg.__variant = None;\n" ++
               "    }\n" ++
               "\n" ++
-              "    __pool_alloc(&message_pool, &alloc_msg);\n" ++
+              "    __termina_pool_alloc(&message_pool, &alloc_msg);\n" ++
               "\n" ++
               "    if (alloc_msg.__variant == None) {\n" ++
               "\n" ++
@@ -95,10 +96,12 @@ spec = do
               "    } else {\n" ++
               "\n" ++
               "        {\n" ++
-              "            *((Message *)alloc_msg.__Some.__0.datum).__variant = In;\n" ++
-              "            *((Message *)alloc_msg.__Some.__0.datum).__In.__0 = in0;\n" ++
-              "            *((Message *)alloc_msg.__Some.__0.datum).__In.__1 = in1;\n" ++
+              "            *((Message *)alloc_msg.__Some.__0.data).__variant = In;\n" ++
+              "            *((Message *)alloc_msg.__Some.__0.data).__In.__0 = in0;\n" ++
+              "            *((Message *)alloc_msg.__Some.__0.data).__In.__1 = in1;\n" ++
               "        }\n" ++
+              "\n" ++
+              "        __termina_pool_free(alloc_msg.__Some.__0);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

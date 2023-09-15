@@ -31,4 +31,4 @@ spec = do
         pack "tm_descriptor0.field0"
     it "Prints the expression: tm_descriptor1.field0" $ do
       renderExpression tmDescriptor1field0 `shouldBe`
-        pack "*((TMDescriptor *)tm_descriptor1.datum).field0"
+        pack "*((TMDescriptor *)tm_descriptor1.data).field0"

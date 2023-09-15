@@ -88,7 +88,7 @@ spec = do
           "        }\n" ++
           "    }\n" ++
           "\n" ++
-          "    __Option_dyn_t option0;\n" ++
+          "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
           "    {\n" ++
           "        option0.__variant = Some;\n" ++
@@ -109,7 +109,7 @@ spec = do
           "        }\n" ++
           "    }\n" ++
           "\n" ++
-          "    __Option_dyn_t option0;\n" ++
+          "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
           "    {\n" ++
           "        option0.__variant = Some;\n" ++
@@ -118,7 +118,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    __Option_dyn_t option1;\n" ++
+          "    __termina_option_dyn_t option1;\n" ++
           "\n" ++
           "    {\n" ++
           "        option1.__variant = None;\n" ++
@@ -138,7 +138,7 @@ spec = do
           "        }\n" ++
           "    }\n" ++
           "\n" ++
-          "    __Option_dyn_t option0;\n" ++
+          "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
           "    {\n" ++
           "        option0.__variant = Some;\n" ++
@@ -151,7 +151,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    __Option_dyn_t option1;\n" ++
+          "    __termina_option_dyn_t option1;\n" ++
           "\n" ++
           "    {\n" ++
           "        option1.__variant = None;\n" ++

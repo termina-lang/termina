@@ -66,6 +66,11 @@ ppInitializeVector subs level target expr =
                         ( ppInitializeVector subs (level + 1) (target <> brackets (pretty iterator)) expr'
                         )
         (EnumVariantExpression {}) -> ppInitializeEnum subs level target expr
+        (FunctionExpression identifier _ _) ->
+          ppCDereferenceExpression
+            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens target)
+            <+> pretty "=" <+> ppCDereferenceExpression
+            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppExpression subs expr)) <> semi
         _ -> ppInitializeVectorFromExpression level target (ppExpression subs expr) (getType expr)
 
 ppFieldInitializer :: Substitutions ->  Integer -> DocStyle -> DocStyle -> Expression SemanticAnns -> DocStyle

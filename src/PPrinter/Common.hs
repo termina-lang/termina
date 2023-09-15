@@ -5,9 +5,6 @@ import           Prettyprinter
 import           Prettyprinter.Render.Terminal
 import           SemanAST
 import           Semantic.Monad
-import           Semantic.Types
-import System.FilePath (extSeparator)
-import AST (AccessOp)
 
 type DocStyle = Doc AnsiStyle
 
@@ -91,12 +88,12 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-poolC, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
-poolC = pretty "__termina_pool_t"
-msgQueue = pretty "__termina_msg_queue_id_t"
-mutex = pretty "__termina_mutex_id_t"
-optionDyn = pretty "__Option_dyn_t"
-dynamicStruct = pretty "__dyn_t"
+pool, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
+pool = pretty $ namefy "termina_pool_t"
+msgQueue = pretty $ namefy "termina_msg_queue_id_t"
+mutex = pretty $ namefy "termina_mutex_id_t"
+optionDyn = pretty $ namefy "termina_option_dyn_t"
+dynamicStruct = pretty $ namefy "termina_dyn_t"
 
 enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
@@ -138,7 +135,7 @@ ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
 -- | Dynamic subtype
 ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
 -- | Pool type
-ppTypeSpecifier (Pool _ _)                   = poolC
+ppTypeSpecifier (Pool _ _)                   = pool
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
@@ -147,17 +144,17 @@ ppDimension _                     = emptyDoc
 
 ppReturnVectorValueStructure :: DocStyle -> DocStyle
 ppReturnVectorValueStructure identifier =
-  pretty "__ret__" <> identifier <> pretty "_t"
+  pretty "__ret_" <> identifier <> pretty "_t"
 
 ppReturnVectorValueStructureDecl :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnVectorValueStructureDecl identifier ts =
   typedefC <+> structC <+> braces' (
-          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> semi)
+          indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> ppDimension ts <> semi)
       <+> ppReturnVectorValueStructure identifier <> semi
 
 ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
 ppParameterVectorValueStructure prefix identifier =
-  pretty "__param__" <> prefix <> pretty "__" <> identifier <> pretty "_t"
+  pretty "__param_" <> prefix <> pretty "_" <> identifier <> pretty "_t"
 
 ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
@@ -180,8 +177,8 @@ ppParameterDeclaration prefix (Parameter identifier (Vector _ _)) =
   ppParameterVectorValueStructure prefix (pretty identifier) <+> pretty identifier
 ppParameterDeclaration _ (Parameter identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts
 
--- | Pretty print a C function declaration
-ppCFunctionDeclaration ::
+-- | Pretty print a C function prototype
+ppCFunctionPrototype ::
   -- | function identifier (name)
   DocStyle ->
   -- | list of parameters (possibly empty)
@@ -189,7 +186,7 @@ ppCFunctionDeclaration ::
   -- | type of the return value (optional)
   Maybe DocStyle ->
   DocStyle
-ppCFunctionDeclaration identifier parameters rTS =
+ppCFunctionPrototype identifier parameters rTS =
   fromMaybe voidC rTS
     <+> identifier
       <> parens (align (fillSep (punctuate comma parameters)))
@@ -209,6 +206,7 @@ ppModifier :: Modifier -> DocStyle
 ppModifier (Modifier identifier (Just (KC c))) = pretty identifier <> parens (ppConst c)
 ppModifier (Modifier identifier Nothing) = pretty identifier
 -- TODO: Support modifiers with non-integer values
+ppModifier m = error $ "unsupported modifier: " ++ show m
 
 methodAccessOp :: AccessOp -> DocStyle
 methodAccessOp (UserDef ident) = pretty ident
@@ -223,18 +221,22 @@ methodName :: Identifier -> Identifier -> DocStyle
 methodName ident = (pretty ("__" ++ ident ++ "_") <>) . pretty
 
 poolMethodNameAOp :: AccessOp -> DocStyle
-poolMethodNameAOp = methodNameAOp "pool"
+poolMethodNameAOp = methodNameAOp "termina_pool"
 
 poolMethodName :: String -> DocStyle
-poolMethodName = methodName "pool"
+poolMethodName = methodName "termina_pool"
 
 msgQueueMethodNameAOp :: AccessOp -> DocStyle
-msgQueueMethodNameAOp = methodNameAOp "msg_queue"
+msgQueueMethodNameAOp = methodNameAOp "termina_msg_queue"
 
 msgQueueMethodName :: String -> DocStyle
-msgQueueMethodName = methodName "msg_queue"
+msgQueueMethodName = methodName "termina_msg_queue"
 
--- | Pretty print a reference expression
+-- | Prints the name of the function that frees an objet to the pool
+poolFree :: DocStyle
+poolFree = poolMethodName "free"
+
+-- | Pretty prints a C reference expression
 ppCReferenceExpression :: DocStyle -> DocStyle
 ppCReferenceExpression expr = pretty "&" <> expr
 
