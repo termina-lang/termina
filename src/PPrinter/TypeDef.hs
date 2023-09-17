@@ -18,7 +18,7 @@ classMethodNameAOp ident = (pretty ("__" ++ ident ++ "_") <>) . methodAccessOp
 
 ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
 ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =
-  ppCFunctionDeclaration (classMethodName classId methodId)
+  ppCFunctionPrototype (classMethodName classId methodId)
     (map (ppParameterDeclaration (pretty (classId ++ "_" ++ methodId))) parameters) Nothing <> semi
 ppClassMethodDeclaration _ _ = error "invalid class member"
 

@@ -83,10 +83,10 @@ spec = do
   describe "Pretty printing match statements" $ do
     it "Prints declaration of function match_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "uint32_t match_test0(__Option_dyn_t option0);\n"
+        pack "uint32_t match_test0(__termina_option_dyn_t option0);\n"
     it "Prints definition of function match_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("uint32_t match_test0(__Option_dyn_t option0) {\n" ++
+        pack ("uint32_t match_test0(__termina_option_dyn_t option0) {\n" ++
               "    \n" ++
               "    uint32_t ret = (uint32_t)0;\n" ++
               "\n" ++
@@ -96,7 +96,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)option0.__Some.__0.datum);\n" ++
+              "        ret = *((uint32_t *)option0.__Some.__0.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -105,10 +105,10 @@ spec = do
               "}\n")
     it "Prints declaration of function match_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "uint32_t match_test1(__Option_dyn_t option0);\n"
+        pack "uint32_t match_test1(__termina_option_dyn_t option0);\n"
     it "Prints definition of function match_test1" $ do
       renderSource test1 `shouldBe`
-        pack ("uint32_t match_test1(__Option_dyn_t option0) {\n" ++
+        pack ("uint32_t match_test1(__termina_option_dyn_t option0) {\n" ++
               "    \n" ++
               "    uint32_t ret = (uint32_t)0;\n" ++
               "\n" ++
@@ -117,7 +117,7 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)option0.__Some.__0.datum);\n" ++
+              "        ret = *((uint32_t *)option0.__Some.__0.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

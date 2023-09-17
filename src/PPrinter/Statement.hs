@@ -8,12 +8,6 @@ import Data.Map (union, fromList, empty)
 import PPrinter.Expression
 import PPrinter.Statement.VariableInitialization
 
-----------------------------------------
--- Convention
-freeWord :: DocStyle
-freeWord = pretty "__pool__free"
-----------------------------------------
-
 
 ppDeclareAndInitialize ::
     (DocStyle -> Expression SemanticAnns -> DocStyle)
@@ -40,15 +34,13 @@ ppReturnStmt :: DocStyle -> ReturnStmt SemanticAnns -> DocStyle
 ppReturnStmt identifier (ReturnStmt (Just expr) _) =
     case getType expr of
         (Vector {}) -> returnC <+> 
-            parens (ppReturnVectorValueStructure identifier <+> pretty "*") <> ppExpression empty expr <> semi
+            ppCDereferenceExpression (parens (ppReturnVectorValueStructure identifier <+> pretty "*") <> ppExpression empty expr) <> semi
         _ -> returnC <+> ppExpression empty expr <> semi
 ppReturnStmt _ (ReturnStmt Nothing _) = returnC <> semi
 
 ppStatement :: Substitutions -> Statement SemanticAnns -> DocStyle
--- TODO Pablo check it out please
 ppStatement subs (Free obj _) =
-  freeWord <+> parens (ppObject subs obj) <> semi
-----------------------------------------
+    ppCFunctionCall poolFree [ppObject subs obj] <> semi
 ppStatement subs (Declaration identifier ts expr _) =
   case ts of
     Vector _ _ -> 
@@ -65,7 +57,13 @@ ppStatement subs (AssignmentStmt obj expr  _) =
     let ts = getObjectType obj in
     case ts of
         Vector _ _ ->
-            braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject subs obj) expr
+            case expr of 
+                (FunctionExpression identifier _ _) -> 
+                    ppCDereferenceExpression
+                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppObject subs obj))
+                    <+> pretty "=" <+> ppCDereferenceExpression
+                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppExpression subs expr)) <> semi
+                _ -> braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject subs obj) expr
         _ -> case expr of
             (FieldValuesAssignmentsExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr

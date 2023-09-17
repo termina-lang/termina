@@ -83,26 +83,26 @@ spec = do
               "}\n")    
     it "Prints declaration of function test1" $ do
      renderHeader test1 `shouldBe`
-       pack "void test1(__dyn_t foo);\n"
+       pack "void test1(__termina_dyn_t foo);\n"
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
-       pack ("void test1(__dyn_t foo) {\n" ++
+       pack ("void test1(__termina_dyn_t foo) {\n" ++
              "    \n" ++
-             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) + (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + (uint16_t)1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 + *((uint16_t *)foo.datum);\n" ++
+             "    (uint16_t)1024 + *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) - (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) - (uint16_t)1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 - *((uint16_t *)foo.datum);\n" ++
+             "    (uint16_t)1024 - *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) * (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) * (uint16_t)1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 * *((uint16_t *)foo.datum);\n" ++
+             "    (uint16_t)1024 * *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.datum) = *((uint16_t *)foo.datum) / (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) / (uint16_t)1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 / *((uint16_t *)foo.datum);\n" ++
+             "    (uint16_t)1024 / *((uint16_t *)foo.data);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

@@ -9,7 +9,7 @@ import PPrinter.Function
 
 ppTask :: AnnASTElement SemanticAnns -> DocStyle
 ppTask (Task identifier parameters rTS blk _ _) =
-  ppCFunctionDeclaration (pretty identifier)
+  ppCFunctionPrototype (pretty identifier)
     (ppParameterDeclaration (pretty identifier) <$> parameters)
     (Just (ppReturnType (pretty identifier) rTS))
     <+> ppBlockRet (ppParameterSubstitutions parameters) (pretty identifier) blk
@@ -20,7 +20,7 @@ ppTaskDeclaration (Task identifier parameters rTS _ _ _) =
   vsep $ 
   ([ppParameterVectorValueStructureDecl (pretty identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++ 
   [
-    ppCFunctionDeclaration (pretty identifier)
+    ppCFunctionPrototype (pretty identifier)
       (ppParameterDeclaration (pretty identifier) <$> parameters)
       (Just (ppReturnType (pretty identifier) rTS)) <> semi
   ]

@@ -8,7 +8,6 @@ import Data.Map
 import Semantic.Monad
 import PPrinter.Statement
 import UT.PPrinter.Expression.Common
-import Semantic.Types
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn UInt32
@@ -84,7 +83,7 @@ spec = do
         pack (
           "if (option_var.__variant == Some) {\n" ++
           "\n" ++
-          "    foo1 = *((uint32_t *)option_var.__Some.__0.datum);\n" ++
+          "    foo1 = *((uint32_t *)option_var.__Some.__0.data);\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++
@@ -100,18 +99,18 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    foo1 = ((uint32_t *)option_var.__Some.__0.datum)[(uint8_t)8];\n" ++
+          "    foo1 = ((uint32_t *)option_var.__Some.__0.data)[(uint8_t)8];\n" ++
           "\n" ++
           "}")
     it "Prints a match option statement with a complex expression" $ do
       renderStatement matchOption2 `shouldBe`
         pack (
           "{\n" ++
-          "    __Option_dyn_t __match = get_integer();\n" ++
+          "    __termina_option_dyn_t __match = get_integer();\n" ++
           "\n" ++
           "    if (__match.__variant == Some) {\n" ++
           "\n" ++
-          "        foo1 = *((uint32_t *)__match.__Some.__0.datum);\n" ++
+          "        foo1 = *((uint32_t *)__match.__Some.__0.data);\n" ++
           "\n" ++
           "    } else {\n" ++
           "\n" ++

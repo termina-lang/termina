@@ -103,7 +103,7 @@ spec = do
     it "Prints the statement var option0 : Option <'dyn u32> = Some(dyn_var0);" $ do
       renderStatement option0 `shouldBe`
         pack (
-          "__Option_dyn_t option0;\n" ++
+          "__termina_option_dyn_t option0;\n" ++
           "\n" ++
           "{\n" ++
           "    option0.__variant = Some;\n" ++
@@ -112,7 +112,7 @@ spec = do
     it "Prints the statement var option1 : Option <'dyn u32> = None;" $ do
       renderStatement option1 `shouldBe`
         pack (
-          "__Option_dyn_t option1;\n" ++
+          "__termina_option_dyn_t option1;\n" ++
           "\n" ++
           "{\n" ++
           "    option1.__variant = None;\n" ++

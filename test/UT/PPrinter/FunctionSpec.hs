@@ -156,9 +156,9 @@ spec = do
       renderFunctionDeclaration function3 `shouldBe`
         pack ("typedef struct {\n" ++
               "    uint32_t array[10];\n" ++
-              "} __param__function3__param1_t;\n" ++
+              "} __param_function3_param1_t;\n" ++
               "\n" ++
-              "uint32_t function3(uint32_t param0, __param__function3__param1_t param1);\n")
+              "uint32_t function3(uint32_t param0, __param_function3_param1_t param1);\n")
     it "Prints fuction4 declaration" $ do
       renderFunctionDeclaration function4 `shouldBe`
         pack "uint32_t function4(uint32_t param0, uint32_t param1[10]);\n"
@@ -231,7 +231,7 @@ spec = do
               "}\n")
     it "Prints fuction3 definition" $ do
       renderFunction function3 `shouldBe`
-        pack ("uint32_t function3(uint32_t param0, __param__function3__param1_t param1) {\n" ++
+        pack ("uint32_t function3(uint32_t param0, __param_function3_param1_t param1) {\n" ++
               "    \n" ++
               "    TMDescriptor struct0;\n" ++
               "\n" ++

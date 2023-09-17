@@ -71,10 +71,10 @@ spec = do
         pack "vector1[(uint32_t)3][(uint32_t)4]"
     it "Prints the expression: dyn_vector0[0x08 : u8]" $ do
       renderExpression dynVector0IndexConstant `shouldBe`
-        pack "((uint32_t *)dyn_vector0.datum)[(uint8_t)8]"
+        pack "((uint32_t *)dyn_vector0.data)[(uint8_t)8]"
     it "Prints the expression: dyn_vector0[var0]" $ do
       renderExpression dynVector0IndexVar0 `shouldBe`
-        pack "((uint32_t *)dyn_vector0.datum)[var0]"
+        pack "((uint32_t *)dyn_vector0.data)[var0]"
     it "Prints the expression: *vector0[3 : u32]" $ do
       renderExpression derefpVector0IndexConstant `shouldBe`
         pack "p_vector0[(uint32_t)3]"
