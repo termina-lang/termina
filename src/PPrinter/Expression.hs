@@ -7,6 +7,7 @@ import PPrinter.Common
 import Semantic.Monad
 import PPrinter.TypeDef
 import Data.Map
+import Control.Exception (bracket)
 
 type Substitutions = Map Identifier DocStyle
 
@@ -123,6 +124,11 @@ ppObject :: Printer Object
 ppObject subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
 -- ppObject subs (IdentifierExpression expr _)  = printer subs expr
 ppObject subs (VectorIndexExpression vector index _) = ppObject subs vector <> brackets (ppExpression subs index)
+ppObject subs (VectorSliceExpression vector lower _ _) = 
+    case lower of
+        KC (I lowTy lowInteger) ->
+            parens $ ppCReferenceExpression (ppObject subs vector <> brackets (parens (ppTypeSpecifier lowTy) <> pretty lowInteger))
+        _ -> error $ "Invalid constant expression: " ++ show lower
 ppObject subs (MemberAccess obj identifier _) = ppObject subs obj <> pretty "." <> pretty identifier
 ppObject subs (Dereference obj _) =
         case getObjectType obj of
@@ -257,4 +263,4 @@ ppExpression subs (MemberMethodAccess obj methodId params _) =
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | Anything else should not happen
         _ -> error "unsupported expression"
-ppExpression _ _ = error "unsupported expression"
+ppExpression _ expr = error $  "unsupported expression" ++ show expr
