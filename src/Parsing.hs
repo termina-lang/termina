@@ -109,6 +109,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"}" -- Field values assignments
                       ,"(" -- Parens
                       ,")" -- Parens
+                      ,".." -- Vector slice and for loop range
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -434,14 +435,22 @@ objectParser = objectParser' objectTermParser
   where
     objectParser'
       = buildPrattParser -- New parser
-      [[memberAccessPostfix, vectorIndexPostfix]
+      [[memberAccessPostfix, vectorOpPostfix]
       ,[dereferencePrefix]]
-    vectorIndexPostfix
-      = Ex.Postfix (do
+    vectorOpPostfix 
+      = Ex.Postfix (try (do 
+            _ <- reservedOp "["
+            low <- KC <$> constExprParser'
+            _ <- reservedOp ".."
+            up <- KC <$> constExprParser'
+            _ <- reservedOp "]"
+            p <- getPosition
+            return $ \parent ->  VectorSliceExpression parent low up (Position p)
+          ) <|> (do
             index <- brackets expressionParser
             p <- getPosition
             return $ \parent ->  VectorIndexExpression parent index (Position p)
-            )     
+          ))
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."

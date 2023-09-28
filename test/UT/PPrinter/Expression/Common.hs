@@ -2,7 +2,6 @@ module UT.PPrinter.Expression.Common where
 
 import SemanAST
 import Semantic.Monad
-import Semantic.Types
 
 tySemAnn :: TypeSpecifier -> SemanticAnns
 tySemAnn ts = SemAnn undefined (ETy (SimpleType ts))

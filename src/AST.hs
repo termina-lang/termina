@@ -33,6 +33,11 @@ data Object a
   | ParensObject (Object a) a
   -- ^ Object in parenthesis | (eI) |. This operation is needed to be able to
   -- use references to vectors as objects: (*vector)[i].
+  | VectorSliceExpression (Object a) ConstExpression ConstExpression a
+  -- ^ Array slicing | eI [ cEx .. cEy ]|,
+  -- value |eI :: exprI a| is an identifier expression
+  -- |cEx| is an expression for the lower bound
+  -- |cEx| is an expression for the upper bound
   deriving (Show, Functor)
 
 instance Annotated Object where
@@ -41,6 +46,7 @@ instance Annotated Object where
   getAnnotation (MemberAccess _ _ a)          = a
   getAnnotation (Dereference _ a)             = a
   getAnnotation (ParensObject _ a)            = a
+  getAnnotation (VectorSliceExpression _ _ _ a) = a
 
 ----------------------------------------
 

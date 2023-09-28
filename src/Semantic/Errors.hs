@@ -174,6 +174,13 @@ data Errors a
   | EMsgQueueSendArgNotDyn TypeSpecifier
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
+  -- | Vector slicing
+  | ELowerBoundConst ConstExpression -- | Lower bound is not a numeric constant expression
+  | EUpperBoundConst ConstExpression -- | Upper bound is not a numeric constant expression
+  | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type
+  | EBoundsAndVectorTypeMismatch TypeSpecifier TypeSpecifier -- | Bounds are not of the same type as the vector
+  | EBoundsLowerGTUpper Integer Integer -- | Lower bound is greater than upper bound
+  | EUpperBoundGTSize Integer Integer -- | Upper bound is greater than the size of the vector
   deriving Show
 
 instance Eq (Errors a) where

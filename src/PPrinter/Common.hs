@@ -9,12 +9,14 @@ import           Semantic.Monad
 type DocStyle = Doc AnsiStyle
 
 getObjectType :: Object SemanticAnns -> TypeSpecifier
-getObjectType (Variable _ (SemAnn _ (ETy (SimpleType ts))))   = ts
-getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
-getObjectType (MemberAccess _ _ (SemAnn _ (ETy (SimpleType ts))))          = ts
-getObjectType (Dereference _ (SemAnn _ (ETy (SimpleType ts))))             = ts
-getObjectType (Undyn _ (SemAnn _ (ETy (SimpleType ts))))                   = ts
-getObjectType _ = error "invalid object annotation"
+getObjectType (Variable _ (SemAnn _ (ETy (SimpleType ts))))                  = ts
+getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (SimpleType ts))))   = ts
+getObjectType (MemberAccess _ _ (SemAnn _ (ETy (SimpleType ts))))            = ts
+getObjectType (Dereference _ (SemAnn _ (ETy (SimpleType ts))))               = ts
+getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getObjectType (Undyn _ (SemAnn _ (ETy (SimpleType ts))))                     = ts
+getObjectType (ParensObject _ (SemAnn _ (ETy (SimpleType ts))))              = ts
+getObjectType obj = error $ "invalid object annotation: " ++ show obj
 
 getType :: Expression SemanticAnns -> TypeSpecifier
 getType (AccessObject obj) = getObjectType obj

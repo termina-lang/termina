@@ -161,6 +161,28 @@ objectType getVarTy (Dereference obj ann) =
    ty           -> throwError $ annotateError ann $ ETypeNotReference ty
 objectType getVarTy (ParensObject obj anns) =
   typeObject getVarTy obj >>= \(obj_typed, obj_ty) -> return $ SAST.ParensObject obj_typed $ buildExpAnn anns obj_ty
+objectType getVarTy (VectorSliceExpression obj lower upper anns) =
+  typeObject getVarTy obj >>= \(obj_typed, obj_ty) ->
+    unless (numConstExpression lower) (throwError (annotateError anns (ELowerBoundConst lower))) >>
+    unless (numConstExpression upper) (throwError (annotateError anns (EUpperBoundConst upper))) >>
+    case obj_ty of
+      Vector ty_elems (KC (I sizeTy size)) ->
+        case (lower, upper) of
+          (KC (I lwTy lowerInt), KC (I upTy upperInt)) ->
+            if not (groundTyEq lwTy upTy)
+            then throwError $ annotateError anns (EBoundsTypeMismatch lwTy upTy)
+            else
+              if not (groundTyEq sizeTy lwTy)
+              then throwError $ annotateError anns (EBoundsAndVectorTypeMismatch lwTy upTy)
+              else
+                if lowerInt > upperInt
+                then throwError $ annotateError anns (EBoundsLowerGTUpper lowerInt upperInt)
+                else
+                  if upperInt > size
+                  then  throwError $ annotateError anns (EUpperBoundGTSize upperInt size)
+                  else return $ SAST.VectorSliceExpression obj_typed lower upper $ buildExpAnn anns (Vector ty_elems (KC (I lwTy (upperInt - lowerInt))))
+          _ -> error "This should not happen, we already checked that the bounds are constant integers."
+      ty -> throwError $ annotateError anns (EVector ty)
 
 ----------------------------------------
 -- These two functions are useful, one lookups in read+write environments,
