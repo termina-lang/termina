@@ -78,8 +78,6 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                 braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject subs obj) expr
             (EnumVariantExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject subs obj) expr
-            (FunctionExpression {}) -> 
-                ppCDereferenceExpression  (ppObject subs obj)
             _ -> ppObject subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =
