@@ -80,7 +80,6 @@ getDepObj = getDepObj'
       = let (dnm,deps) = getDepObj' obj
       in (FieldAccess dnm ident , deps)
     getDepObj' (Dereference obj _ann ) = getDepObj' obj
-    getDepObj' (ParensObject obj _ann) = getDepObj' obj
     -- getDepObj' (MemberMethodAccess obj ident es _ann)
     --   = let (dnm, deps) = getDepObj' obj
     --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
@@ -117,7 +116,6 @@ getDepExp :: Expression a -> [ClassDep]
 getDepExp (AccessObject obj) =
   let (dnm, deps) = getDepObj obj in (dnm : deps)
 getDepExp (Constant {}) = []
-getDepExp ( ParensExpression e _ ) = getDepExp e
 getDepExp ( BinOp _op le re _ann ) = getDepExp le ++ getDepExp re
 getDepExp ( ReferenceExpression obj _ann ) =
   let (dnm, deps) = getDepObj obj in (dnm : deps)

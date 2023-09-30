@@ -382,10 +382,10 @@ accessOpParser
 
 
 parensExprParser :: Parser (Expression Annotation)
-parensExprParser = parens $ ParensExpression <$> expressionParser <*> (Position <$> getPosition)
+parensExprParser = parens expressionParser
 
 parensObjectParser :: Parser (Object  Annotation)
-parensObjectParser = parens $ ParensObject <$> objectParser <*> (Position <$> getPosition)
+parensObjectParser = parens objectParser
 
 ----------------------------------------
 -- Object Parsing

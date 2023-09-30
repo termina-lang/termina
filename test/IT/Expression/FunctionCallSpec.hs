@@ -58,7 +58,7 @@ spec = do
         pack ("uint16_t func_test0_0(uint16_t a) {\n" ++
               "    \n" ++
               "\n" ++
-              "    return (a + ((uint16_t)1));\n" ++
+              "    return a + (uint16_t)1;\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++
@@ -66,7 +66,7 @@ spec = do
               "    \n" ++
               "    uint16_t foo = func_test0_0((uint16_t)2);\n" ++
               "\n" ++
-              "    return (foo * ((uint16_t)2));\n" ++
+              "    return foo * (uint16_t)2;\n" ++
               "\n" ++
               "}\n")    
     it "Prints declaration of functions test0 and test1" $ do
@@ -104,12 +104,12 @@ spec = do
               "        }\n" ++
               "    }\n" ++
               "\n" ++
-              "    *((__ret_func_test1_0_t *)(bar0)) = *((__ret_func_test1_0_t *)(func_test1_0().array));\n" ++
+              "    *((__ret_func_test1_0_t *)bar0) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
               "\n" ++
               "    uint32_t bar1[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        *((__ret_func_test1_0_t *)(bar1)) = *((__ret_func_test1_0_t *)(func_test1_0().array));\n" ++
+              "        *((__ret_func_test1_0_t *)bar1) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
               "    }\n" ++
               "\n" ++
               "    return bar0[(uint32_t)1] + bar1[(uint32_t)2];\n" ++

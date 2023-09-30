@@ -65,9 +65,12 @@ ppRefDynamicSubtypeObjectAddress subs expr =
     case getType expr of
         Reference (DynamicSubtype ts) ->
             parens (ppDynamicSubtypeCast ts) <> (
-                case expr of
-                    (ReferenceExpression _ _) ->  parens (ppExpression subs expr)
-                    _ -> ppExpression subs expr
+                -- If the expression has a precedence lower than the cast (2), we need
+                -- to add parenthesis
+                if getExpPrecedence expr > 2 then
+                    parens (ppExpression subs expr)
+                else
+                    ppExpression subs expr
             ) <> pretty "->data"
         _ -> error "unsupported expression"
 
@@ -147,7 +150,6 @@ ppObject subs (Undyn obj _) =
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
         _ -> error "Unsupported expression"
-ppObject subs (ParensObject obj _) = parens (ppObject subs obj)
 
 -- | Pretty prints binary expressions casted to the type of the expression
 -- This function is only used for subexpressions of binary expressions.
@@ -187,7 +189,6 @@ ppExpression' subs expr = ppExpression subs expr
 -- | Expression pretty printer
 ppExpression :: Printer Expression
 ppExpression subs (AccessObject obj) = ppObject subs obj
-ppExpression subs (ParensExpression expr _) = parens (ppExpression subs expr)
 -- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
 ppExpression subs (ReferenceExpression obj _) =
     case getObjectType obj of
@@ -214,12 +215,13 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
         ins = zipWith
             (\p (Parameter pid ts) ->
                 case (p, ts) of
-                    (AccessObject (Variable {}), Vector {}) ->
-                        ppCDereferenceExpression
-                            (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> ppExpression subs p)
                     (_, Vector {}) ->
-                        ppCDereferenceExpression
-                            (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> parens (ppExpression subs p))
+                        if getExpPrecedence p > 2 then
+                            ppCReferenceExpression
+                                (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> parens (ppExpression subs p))
+                        else
+                            ppCDereferenceExpression
+                                (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> ppExpression subs p)
                     (_, _) -> ppExpression subs p) params paramAnns
     in
         case getType expr of

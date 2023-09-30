@@ -59,10 +59,17 @@ ppStatement subs (AssignmentStmt obj expr  _) =
         Vector _ _ ->
             case expr of 
                 (FunctionExpression identifier _ _) -> 
+                    -- Here we are assuming that the target object will always have a precedence greater than
+                    -- the precedence of the casting. This should be true, since the target will always be either
+                    -- a variable, a member access, or a vector index objet.
                     ppCDereferenceExpression
-                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppObject subs obj))
-                    <+> pretty "=" <+> ppCDereferenceExpression
-                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppExpression subs expr)) <> semi
+                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppObject subs obj)
+                    <+> pretty "=" <+> 
+                    -- Here we are also assuming that the function call will alwayys have a precendence greater than
+                    -- the casting.
+                    ppCDereferenceExpression
+                            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppExpression subs expr)
+                    <> semi
                 _ -> braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject subs obj) expr
         _ -> case expr of
             (FieldValuesAssignmentsExpression {}) ->

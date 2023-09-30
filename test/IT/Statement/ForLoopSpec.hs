@@ -88,7 +88,7 @@ spec = do
               "\n" ++
               "        for (uint32_t i = __start; i < __end && (found == 0); i = i + (uint32_t)1) {\n" ++
               "            \n" ++
-              "            if ((array0)[i] == (uint16_t)1024) {\n" ++
+              "            if (array0[i] == (uint16_t)1024) {\n" ++
               "\n" ++
               "                found = 1;\n" ++
               "\n" ++

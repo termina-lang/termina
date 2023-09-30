@@ -61,15 +61,15 @@ spec = do
               "\n" ++
               "    int32_t bar_i32 = (int32_t)0;\n" ++
               "\n" ++
-              "    bar_u8 = ((uint8_t)((uint32_t)4294901760));\n" ++
+              "    bar_u8 = (uint8_t)4294901760;\n" ++
               "\n" ++
-              "    bar_u16 = ((uint16_t)bar_u8);\n" ++
+              "    bar_u16 = (uint16_t)bar_u8;\n" ++
               "\n" ++
-              "    bar_u32 = ((uint32_t)bar_u8) + ((uint32_t)bar_i8);\n" ++
+              "    bar_u32 = (uint32_t)bar_u8 + (uint32_t)bar_i8;\n" ++
               "\n" ++
-              "    bar_i16 = bar_i16 * ((int16_t)bar_u8);\n" ++
+              "    bar_i16 = bar_i16 * (int16_t)bar_u8;\n" ++
               "\n" ++
-              "    bar_i32 = (int32_t)((int32_t)((int32_t)bar_i8 * ((int32_t)bar_i16)) * (int32_t)bar_u8) * ((int32_t)bar_u16);\n" ++
+              "    bar_i32 = (int32_t)((int32_t)((int32_t)bar_i8 * (int32_t)bar_i16) * (int32_t)bar_u8) * (int32_t)bar_u16;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
