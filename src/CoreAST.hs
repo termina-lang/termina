@@ -292,7 +292,6 @@ data Expression'
     a -- ^ Annotations
   = AccessObject (obj a)
   | Constant Const a -- ^ | 24 : i8|
-  | ParensExpression (Expression' obj a) a
   | BinOp Op (Expression' obj a) (Expression' obj a) a
   | ReferenceExpression (obj a) a
   | Casting (Expression' obj a) TypeSpecifier a
@@ -327,7 +326,6 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (FieldValuesAssignmentsExpression _ _ a) = a
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (VectorInitExpression _ _ a)             = a
-  getAnnotation (ParensExpression _ a)                   = a
   getAnnotation (OptionVariantExpression _ a)            = a
   getAnnotation (MemberMethodAccess _ _ _ a)             = a
 

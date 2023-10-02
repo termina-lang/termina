@@ -90,9 +90,9 @@ spec = do
               "    \n" ++
               "    uint32_t foo = (uint32_t)0;\n" ++
               "\n" ++
-              "    (p_vector0)[(uint32_t)3] = (uint32_t)10;\n" ++
+              "    p_vector0[(uint32_t)3] = (uint32_t)10;\n" ++
               "\n" ++
-              "    (p_vector0)[foo] = (uint32_t)1024;\n" ++
+              "    p_vector0[foo] = (uint32_t)1024;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

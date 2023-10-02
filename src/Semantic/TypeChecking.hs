@@ -159,8 +159,6 @@ objectType getVarTy (Dereference obj ann) =
   case obj_ty of
    Reference ty -> return $ SAST.Dereference obj_typed $ buildExpAnn ann ty
    ty           -> throwError $ annotateError ann $ ETypeNotReference ty
-objectType getVarTy (ParensObject obj anns) =
-  typeObject getVarTy obj >>= \(obj_typed, obj_ty) -> return $ SAST.ParensObject obj_typed $ buildExpAnn anns obj_ty
 objectType getVarTy (VectorSliceExpression obj lower upper anns) =
   typeObject getVarTy obj >>= \(obj_typed, obj_ty) ->
     unless (numConstExpression lower) (throwError (annotateError anns (ELowerBoundConst lower))) >>
@@ -377,8 +375,6 @@ expressionType (VectorInitExpression iexp kexp@(KC constE) pann) = do
 expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
 -- DONE [Q5]
 -- TODO [Q17]
-expressionType (ParensExpression e anns) =
-  typeExpression e >>= \(typed_e, type_e) -> return $ ParensExpression typed_e $ buildExpAnn anns type_e
 expressionType (OptionVariantExpression vexp anns) =
   case vexp of
     None -> return $ OptionVariantExpression None (buildExpAnn anns (Option Unit))

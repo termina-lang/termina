@@ -96,7 +96,7 @@ spec = do
               "        for (uint32_t __i0 = 0; __i0 < (uint32_t)5; __i0 = __i0 + (uint32_t)1) {\n" ++
               "            for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
               "                for (uint32_t __i2 = 0; __i2 < (uint32_t)3; __i2 = __i2 + (uint32_t)1) {\n" ++
-              "                    (&(vector0)[(uint32_t)3])[__i0][__i1][__i2] = (uint32_t)10;\n" ++
+              "                    (&vector0[(uint32_t)3])[__i0][__i1][__i2] = (uint32_t)10;\n" ++
               "                }\n" ++
               "            }\n" ++
               "        }\n" ++
@@ -120,7 +120,7 @@ spec = do
               "\n" ++
               "        for (uint32_t i = __start; i < __end; i = i + (uint32_t)1) {\n" ++
               "            \n" ++
-              "            (input)[i] = (input)[i] + (uint32_t)1;\n" ++
+              "            input[i] = input[i] + (uint32_t)1;\n" ++
               "\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -131,7 +131,7 @@ spec = do
               "\n" ++
               "void slice_test2(uint32_t vector0[10][5]) {\n" ++
               "    \n" ++
-              "    add_one((&(vector0)[(uint32_t)2])[(uint32_t)0]);\n" ++
+              "    add_one((&vector0[(uint32_t)2])[(uint32_t)0]);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -166,7 +166,7 @@ spec = do
               "\n" ++
               "void slice_test3(uint32_t vector0[10][5]) {\n" ++
               "    \n" ++
-              "    add_two(*((__param_add_two_input_t *)((&(vector0)[(uint32_t)2])[(uint32_t)0])));\n" ++
+              "    add_two(*((__param_add_two_input_t *)(&vector0[(uint32_t)2])[(uint32_t)0]));\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

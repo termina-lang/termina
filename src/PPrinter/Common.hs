@@ -15,7 +15,6 @@ getObjectType (MemberAccess _ _ (SemAnn _ (ETy (SimpleType ts))))            = t
 getObjectType (Dereference _ (SemAnn _ (ETy (SimpleType ts))))               = ts
 getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getObjectType (Undyn _ (SemAnn _ (ETy (SimpleType ts))))                     = ts
-getObjectType (ParensObject _ (SemAnn _ (ETy (SimpleType ts))))              = ts
 getObjectType obj = error $ "invalid object annotation: " ++ show obj
 
 getType :: Expression SemanticAnns -> TypeSpecifier
@@ -30,8 +29,47 @@ getType (MemberMethodAccess _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
 getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
-getType (ParensExpression expr _) = getType expr
 getType _ = error "invalid expression annotation"
+
+getBinOpPrecedence :: Op -> Int
+getBinOpPrecedence Multiplication = 3
+getBinOpPrecedence Division = 3
+getBinOpPrecedence Addition = 4
+getBinOpPrecedence Subtraction = 4
+getBinOpPrecedence BitwiseAnd = 8
+getBinOpPrecedence BitwiseOr = 10
+getBinOpPrecedence BitwiseXor = 9
+getBinOpPrecedence LogicalAnd = 11
+getBinOpPrecedence LogicalOr = 12
+getBinOpPrecedence RelationalEqual = 7
+getBinOpPrecedence RelationalNotEqual = 7
+getBinOpPrecedence RelationalLT = 6
+getBinOpPrecedence RelationalGT = 6
+getBinOpPrecedence RelationalLTE = 6
+getBinOpPrecedence RelationalGTE = 6
+getBinOpPrecedence BitwiseLeftShift = 5
+getBinOpPrecedence BitwiseRightShift = 5
+
+getObjPrecedence :: Object SemanticAnns -> Int
+getObjPrecedence (Variable _ _) = 0
+getObjPrecedence (VectorIndexExpression {}) = 1
+getObjPrecedence (MemberAccess {}) = 1
+getObjPrecedence (Dereference _ _) = 2
+getObjPrecedence (VectorSliceExpression {}) = 1
+getObjPrecedence (Undyn obj _) = getObjPrecedence obj
+
+getExpPrecedence :: Expression SemanticAnns -> Int
+getExpPrecedence (AccessObject obj) = getObjPrecedence obj
+getExpPrecedence (Constant _ _) = 0
+getExpPrecedence (OptionVariantExpression _ _) = 0
+getExpPrecedence (BinOp op _ _ _) = getBinOpPrecedence op
+getExpPrecedence (ReferenceExpression _ _) = 2
+getExpPrecedence (Casting {}) = 2
+getExpPrecedence (FunctionExpression {}) = 0
+getExpPrecedence (MemberMethodAccess {}) = 1
+getExpPrecedence (FieldValuesAssignmentsExpression {}) = 0
+getExpPrecedence (EnumVariantExpression {}) = 0
+getExpPrecedence (VectorInitExpression {}) = 0
 
 getParameters :: Expression SemanticAnns -> [Parameter]
 getParameters (FunctionExpression _ _ (SemAnn _ (ETy (AppType params _)))) = params
