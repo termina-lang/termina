@@ -70,13 +70,13 @@ ppInitializeVector subs level target expr =
           -- Here we are assuming that the "target" expression will always have a precedence greater than
           -- the precedence of the casting. This should be true, since the target will always be either
           -- a variable, a member access, or a vector index objet.
-          ppCDereferenceExpression
-            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> target)
+          ppCDereferenceExpression (parens
+            (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> target))
             <+> pretty "=" <+> 
             (if getExpPrecedence expr > 2 then
-              ppCDereferenceExpression (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppExpression subs expr))
+              ppCDereferenceExpression (parens (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> parens (ppExpression subs expr)))
             else
-              ppCDereferenceExpression (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppExpression subs expr)
+              ppCDereferenceExpression (parens (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppExpression subs expr))
             ) <> semi
         _ -> ppInitializeVectorFromExpression level target (ppExpression subs expr) (getType expr)
 

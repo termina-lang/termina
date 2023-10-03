@@ -283,7 +283,7 @@ ppCReferenceExpression expr = pretty "&" <> expr
 -- | Pretty print a dereference expression
 -- TODO: Remove parens and let the upper level decide if they are necessary
 ppCDereferenceExpression :: DocStyle -> DocStyle
-ppCDereferenceExpression expr = pretty "*" <> parens expr
+ppCDereferenceExpression expr = pretty "*" <> expr
 
 ppCForLoopInitExpression :: DocStyle -> DocStyle -> DocStyle -> DocStyle
 ppCForLoopInitExpression ts identifier initValue = ts <+> identifier <+> pretty "=" <+> initValue

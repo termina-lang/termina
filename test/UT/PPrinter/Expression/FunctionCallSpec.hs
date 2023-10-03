@@ -136,7 +136,7 @@ spec = do
         pack "foo((uint16_t *)var1.data)"
     it "Prints the expression: foo(*p_var)" $ do
       renderExpression functionCallSingleDerefpVar `shouldBe`
-        pack "foo(*(p_var))"
+        pack "foo(*p_var)"
     it "Prints the expression: foo(var0 + 1024 : u16)" $ do
       renderExpression functionCallSingleVar0PlusConstant `shouldBe`
         pack "foo(var0 + (uint16_t)1024)"
@@ -148,10 +148,10 @@ spec = do
         pack "foo(var0 + *((uint16_t *)var1.data))"
     it "Prints the expression: foo(*p_var + 1024 : u16)" $ do
       renderExpression functionCallSingleDerefpVarPlusConstant `shouldBe`
-        pack "foo(*(p_var) + (uint16_t)1024)"
+        pack "foo(*p_var + (uint16_t)1024)"
     it "Prints the expression: foo(*p_var + *p_dynVar3)" $ do
       renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
-        pack "foo(*(p_var) + *((uint16_t *)var1.data))"
+        pack "foo(*p_var + *((uint16_t *)var1.data))"
     it "Prints the expression: foo(vector0)" $ do
       renderExpression functionCallSingleVector0 `shouldBe`
         pack "foo(*((__param_foo_param0_t *)vector0))"

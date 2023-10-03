@@ -7,7 +7,6 @@ import PPrinter.Common
 import Semantic.Monad
 import PPrinter.TypeDef
 import Data.Map
-import Control.Exception (bracket)
 
 type Substitutions = Map Identifier DocStyle
 
@@ -75,10 +74,10 @@ ppRefDynamicSubtypeObjectAddress subs expr =
         _ -> error "unsupported expression"
 
 ppDynamicSubtypeObject :: Printer Object
-ppDynamicSubtypeObject subs obj = ppCDereferenceExpression (ppDynamicSubtypeObjectAddress subs obj)
+ppDynamicSubtypeObject subs obj = ppCDereferenceExpression $ parens (ppDynamicSubtypeObjectAddress subs obj)
 
 ppRefDynamicSubtypeObject :: Printer Expression
-ppRefDynamicSubtypeObject subs expr = ppCDereferenceExpression (ppRefDynamicSubtypeObjectAddress subs expr)
+ppRefDynamicSubtypeObject subs expr = ppCDereferenceExpression $ parens (ppRefDynamicSubtypeObjectAddress subs expr)
 
 ppMemberAccessExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
 -- | If the right hand side is a function, then it is a method call
@@ -137,7 +136,11 @@ ppObject subs (Dereference obj _) =
         case getObjectType obj of
         -- | A dereference to a vector is printed as the name of the vector
         (Reference (Vector _ _)) -> ppObject subs obj
-        _ -> ppCDereferenceExpression (ppObject subs obj)
+        _ -> 
+            if getObjPrecedence obj > 2 then
+                ppCDereferenceExpression $ parens (ppObject subs obj)
+            else
+                ppCDereferenceExpression (ppObject subs obj)
 -- | If the expression is a dynamic subtype treated as its base type, we need to
 -- check if it is a vector
 ppObject subs (Undyn obj _) =
@@ -217,10 +220,10 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
                 case (p, ts) of
                     (_, Vector {}) ->
                         if getExpPrecedence p > 2 then
-                            ppCReferenceExpression
+                            ppCReferenceExpression $ parens
                                 (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> parens (ppExpression subs p))
                         else
-                            ppCDereferenceExpression
+                            ppCDereferenceExpression $ parens
                                 (parens (ppParameterVectorValueStructure (pretty identifier) (pretty pid) <+> pretty "*") <> ppExpression subs p)
                     (_, _) -> ppExpression subs p) params paramAnns
     in

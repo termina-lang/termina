@@ -76,7 +76,7 @@ spec = do
   describe "Pretty printing dereference expressions" $ do
     it "Prints the expression: *p_var0" $ do
       renderExpression derefpVar0 `shouldBe`
-        pack "*(p_var0)"
+        pack "*p_var0"
     it "Prints the expression: *p_vector0" $ do
       renderExpression derefpVector0 `shouldBe`
         pack "p_vector0"
