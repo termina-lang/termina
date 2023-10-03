@@ -120,7 +120,16 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                     ppCDereferenceExpression (parens
                             (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppExpression subs expr))
                     <> semi
-                _ -> braces' $ (indentTab . align) $ ppInitializeVector subs 0 (ppObject subs obj) expr
+                _ -> braces' $ (indentTab . align) $ ppInitializeVector subs 0 (
+                    -- | If we are here, it means that we will be assigning the array to another array 
+                    -- using a for loop. Since we are going to use a vector index expression on the assignments
+                    -- we need to first check that the precedence of the target object is greater than 1.
+                    -- If not, we must surround it in parenthesis.
+                        if getObjPrecedence obj > 1 then 
+                            parens (ppObject subs obj)
+                        else
+                            ppObject subs obj
+                    ) expr
         _ -> case expr of
             (FieldValuesAssignmentsExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr
@@ -153,7 +162,7 @@ ppStatement subs (ForLoopStmt iterator initValue endValue breakCond body _ ) =
             maybe emptyDoc (\e -> emptyDoc <+> pretty "&&" <+> parens (ppExpression subs e)) breakCond
         incrExpr = ppCForLoopIncrExpression
             (pretty iterator)
-            (parens (ppTypeSpecifier iteratorTS) <> pretty (show (1 :: Integer)))
+            (pretty (show (1 :: Integer)))
 ppStatement subs (MatchStmt expr matchCases _) =
     let ppMatchCaseOthers symbol cls =
             case cls of

@@ -57,13 +57,13 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0) {\n" ++
               "    \n" ++
-              "    uint16_t total = (uint16_t)0;\n" ++
+              "    uint16_t total = 0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = (uint32_t)0;\n" ++
-              "        uint32_t __end = (uint32_t)10;\n" ++
+              "        uint32_t __start = 0;\n" ++
+              "        uint32_t __end = 10;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + (uint32_t)1) {\n" ++
+              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
               "            total = total + array0.array[i];\n" ++
               "\n" ++
@@ -83,12 +83,12 @@ spec = do
               "    _Bool found = 0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = (uint32_t)0;\n" ++
-              "        uint32_t __end = (uint32_t)10;\n" ++
+              "        uint32_t __start = 0;\n" ++
+              "        uint32_t __end = 10;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end && (found == 0); i = i + (uint32_t)1) {\n" ++
+              "        for (uint32_t i = __start; i < __end && (found == 0); i = i + 1) {\n" ++
               "            \n" ++
-              "            if (array0[i] == (uint16_t)1024) {\n" ++
+              "            if (array0[i] == 1024) {\n" ++
               "\n" ++
               "                found = 1;\n" ++
               "\n" ++

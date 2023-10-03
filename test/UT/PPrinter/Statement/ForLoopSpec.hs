@@ -44,10 +44,10 @@ spec = do
       renderStatement forLoop0 `shouldBe`
         pack (
           "{\n" ++
-          "    uint32_t __start = (uint32_t)0;\n" ++
-          "    uint32_t __end = (uint32_t)10;\n" ++
+          "    uint32_t __start = 0;\n" ++
+          "    uint32_t __end = 10;\n" ++
           "\n" ++
-          "    for (uint32_t i = __start; i < __end; i = i + (uint32_t)1) {\n" ++
+          "    for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
           "        \n" ++
           "        total = total + vector0[i];\n" ++
           "\n" ++
@@ -57,10 +57,10 @@ spec = do
       renderStatement forLoop1 `shouldBe`
         pack (
           "{\n" ++
-          "    uint32_t __start = (uint32_t)0;\n" ++
-          "    uint32_t __end = (uint32_t)10;\n" ++
+          "    uint32_t __start = 0;\n" ++
+          "    uint32_t __end = 10;\n" ++
           "\n" ++
-          "    for (uint32_t i = __start; i < __end && (i != (uint32_t)5); i = i + (uint32_t)1) {\n" ++
+          "    for (uint32_t i = __start; i < __end && (i != 5); i = i + 1) {\n" ++
           "        \n" ++
           "        total = total + vector0[i];\n" ++
           "\n" ++

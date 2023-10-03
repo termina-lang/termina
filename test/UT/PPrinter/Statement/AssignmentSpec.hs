@@ -115,7 +115,7 @@ spec = do
         pack "foo1 = foo0;"
     it "Prints the statement foo2 = 0 : u32; where foo2 : u32" $ do
       renderStatement foo2Assign `shouldBe`
-        pack "foo2 = (uint32_t)0;"
+        pack "foo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
     it "Prints the statement option0 = Some(dyn_var0); where option0 : Option <'dyn u32>" $ do
       renderStatement option0Assign `shouldBe`
@@ -142,20 +142,20 @@ spec = do
         pack (
           "{\n" ++
           "    enum1.__variant = In;\n" ++
-          "    enum1.__In.__0 = (uint32_t)0;\n" ++
-          "    enum1.__In.__1 = (uint32_t)0;\n" ++
+          "    enum1.__In.__0 = 0;\n" ++
+          "    enum1.__In.__1 = 0;\n" ++
           "}")
   describe "Pretty printing struct variable declarations" $ do
     it "Prints the statement struct0 = {field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; where struct0 : TMDescriptor" $ do
       renderStatement struct0Assign `shouldBe`
         pack (
         "{\n" ++
-        "    struct0.field0 = (uint32_t)0;\n" ++
-        "    struct0.field1.field_a = (uint32_t)0;\n" ++
-        "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-        "        struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+        "    struct0.field0 = 0;\n" ++
+        "    struct0.field1.field_a = 0;\n" ++
+        "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+        "        struct0.field1.field_b[__i0] = 0;\n" ++
         "    }\n" ++
-        "    struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+        "    struct0.field1.field_c = 4294901760;\n" ++
         "}")
     it "Prints the statement struct1 = struct0; where struct1 : TMDescriptor" $ do
       renderStatement struct1Assign `shouldBe`
@@ -165,7 +165,7 @@ spec = do
       renderStatement vector1Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "}")
@@ -173,8 +173,8 @@ spec = do
       renderStatement vector2Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -183,17 +183,17 @@ spec = do
       renderStatement vector3Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        vector3[__i0] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector3[__i0] = 0;\n" ++
           "    }\n" ++
           "}")
     it "Prints the statement vector4 = [[0 : u32; 5 : u32]; 10 : u32]; where vector4 : [[u32; 5 : u32]; 10 : u32]s" $ do
       renderStatement vector4Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
-          "            vector4[__i0][__i1] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "            vector4[__i0][__i1] = 0;\n" ++
           "        }\n" ++
           "    }\n" ++
           "}")
@@ -201,8 +201,8 @@ spec = do
       renderStatement vector5Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -212,13 +212,13 @@ spec = do
       renderStatement vector6Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        vector6[__i0].field0 = (uint32_t)0;\n" ++
-          "        vector6[__i0].field1.field_a = (uint32_t)0;\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)10; __i1 = __i1 + (uint32_t)1) {\n" ++
-          "            vector6[__i0].field1.field_b[__i1] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector6[__i0].field0 = 0;\n" ++
+          "        vector6[__i0].field1.field_a = 0;\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
+          "            vector6[__i0].field1.field_b[__i1] = 0;\n" ++
           "        }\n" ++
-          "        vector6[__i0].field1.field_c = (uint32_t)4294901760;\n" ++
+          "        vector6[__i0].field1.field_c = 4294901760;\n" ++
           "    }\n" ++
           "}")
   describe "Pretty printing undyn assignments" $ do
@@ -227,4 +227,4 @@ spec = do
         pack "*((uint32_t *)dyn_var0.data) = foo1;"
     it "Prints the statement dyn_var0 = 1024 : u32" $ do
       renderStatement undynVar0AssignConst `shouldBe`
-        pack "*((uint32_t *)dyn_var0.data) = (uint32_t)1024;"
+        pack "*((uint32_t *)dyn_var0.data) = 1024;"

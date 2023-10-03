@@ -49,27 +49,27 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void bitwise_test0(uint16_t foo) {\n" ++
               "    \n" ++
-              "    uint8_t bar = (uint8_t)0;\n" ++ 
+              "    uint8_t bar = 0;\n" ++ 
               "\n" ++
-              "    foo = foo << (uint8_t)8;\n" ++
+              "    foo = foo << 8;\n" ++
               "\n" ++
-              "    bar = (uint8_t)8 << foo;\n" ++ 
+              "    bar = 8 << foo;\n" ++ 
               "\n" ++
-              "    foo = foo >> (uint8_t)8;\n" ++ 
+              "    foo = foo >> 8;\n" ++ 
               "\n" ++
-              "    (uint8_t)8 << foo;\n" ++
+              "    8 << foo;\n" ++
               "\n" ++
-              "    foo = foo & (uint16_t)1024;\n" ++
+              "    foo = foo & 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 & foo;\n" ++
+              "    1024 & foo;\n" ++
               "\n" ++
-              "    foo = foo | (uint16_t)1024;\n" ++
+              "    foo = foo | 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 | foo;\n" ++
+              "    1024 | foo;\n" ++
               "\n" ++
-              "    foo = foo ^ (uint16_t)1024;\n" ++
+              "    foo = foo ^ 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 ^ foo;\n" ++
+              "    1024 ^ foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

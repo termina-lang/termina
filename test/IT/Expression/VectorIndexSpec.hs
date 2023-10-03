@@ -52,31 +52,31 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void vector_test0() {\n" ++
               "    \n" ++
-              "    uint32_t foo = (uint32_t)0;\n" ++
+              "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    uint32_t vector0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            vector0[__i0] = (uint32_t)0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            vector0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    int64_t vector1[10][5];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint16_t __i0 = 0; __i0 < (uint16_t)10; __i0 = __i0 + (uint16_t)1) {\n" ++
-              "            for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
-              "                vector1[__i0][__i1] = (int64_t)0;\n" ++
+              "        for (uint16_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+              "                vector1[__i0][__i1] = 0;\n" ++
               "            }\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
-              "    vector0[(uint32_t)3] = (uint32_t)10;\n" ++
+              "    vector0[3] = 10;\n" ++
               "\n" ++
-              "    vector0[foo] = (uint32_t)1024;\n" ++
+              "    vector0[foo] = 1024;\n" ++
               "\n" ++
-              "    vector1[(uint16_t)3][(uint32_t)4] = (int64_t)1024;\n" ++
+              "    vector1[3][4] = 1024;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -88,11 +88,11 @@ spec = do
       renderSource test1 `shouldBe`
         pack ("void vector_test1(uint32_t p_vector0[10]) {\n" ++
               "    \n" ++
-              "    uint32_t foo = (uint32_t)0;\n" ++
+              "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    p_vector0[(uint32_t)3] = (uint32_t)10;\n" ++
+              "    p_vector0[3] = 10;\n" ++
               "\n" ++
-              "    p_vector0[foo] = (uint32_t)1024;\n" ++
+              "    p_vector0[foo] = 1024;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

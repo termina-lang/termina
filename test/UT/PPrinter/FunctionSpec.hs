@@ -170,17 +170,17 @@ spec = do
               "    TMDescriptor struct0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        struct0.field0 = (uint32_t)0;\n" ++
-              "        struct0.field1.field_a = (uint32_t)0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+              "        struct0.field0 = 0;\n" ++
+              "        struct0.field1.field_a = 0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
-              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "        struct0.field1.field_c = 4294901760;\n" ++
               "    }\n" ++
               "\n" ++
               "    TMDescriptor struct1 = struct0;\n" ++
               "\n" ++
-              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "    struct0.field0 = struct0.field0 + 1024;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -192,17 +192,17 @@ spec = do
               "    TMDescriptor struct0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        struct0.field0 = (uint32_t)0;\n" ++
-              "        struct0.field1.field_a = (uint32_t)0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+              "        struct0.field0 = 0;\n" ++
+              "        struct0.field1.field_a = 0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
-              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "        struct0.field1.field_c = 4294901760;\n" ++
               "    }\n" ++
               "\n" ++
               "    TMDescriptor struct1 = struct0;\n" ++
               "\n" ++
-              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "    struct0.field0 = struct0.field0 + 1024;\n" ++
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
@@ -214,17 +214,17 @@ spec = do
               "    TMDescriptor struct0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
-              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "        struct0.field1.field_c = 4294901760;\n" ++
               "    }\n" ++
               "\n" ++
               "    TMDescriptor struct1 = struct0;\n" ++
               "\n" ++
-              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "    struct0.field0 = struct0.field0 + 1024;\n" ++
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
@@ -236,17 +236,17 @@ spec = do
               "    TMDescriptor struct0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = param1.array[__i0];\n" ++
               "        }\n" ++
-              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "        struct0.field1.field_c = 4294901760;\n" ++
               "    }\n" ++
               "\n" ++
               "    TMDescriptor struct1 = struct0;\n" ++
               "\n" ++
-              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "    struct0.field0 = struct0.field0 + 1024;\n" ++
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
@@ -258,17 +258,17 @@ spec = do
               "    TMDescriptor struct0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        struct0.field0 = (uint32_t)0;\n" ++
+              "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = param1[__i0];\n" ++
               "        }\n" ++
-              "        struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+              "        struct0.field1.field_c = 4294901760;\n" ++
               "    }\n" ++
               "\n" ++
               "    TMDescriptor struct1 = struct0;\n" ++
               "\n" ++
-              "    struct0.field0 = struct0.field0 + (uint32_t)1024;\n" ++
+              "    struct0.field0 = struct0.field0 + 1024;\n" ++
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++

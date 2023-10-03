@@ -66,9 +66,9 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void assignment_test0() {\n" ++
               "    \n" ++
-              "    uint32_t foo0 = (uint32_t)0;\n" ++
+              "    uint32_t foo0 = 0;\n" ++
               "\n" ++
-              "    uint32_t foo1 = (uint32_t)0;\n" ++
+              "    uint32_t foo1 = 0;\n" ++
               "\n" ++
               "    foo1 = foo0;\n" ++
               "\n" ++
@@ -103,7 +103,7 @@ spec = do
      renderSource test2 `shouldBe`
         pack ("void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
               "    \n" ++
-              "    uint32_t foo = (uint32_t)0;\n" ++
+              "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    *((uint32_t *)dyn_var0.data) = foo;\n" ++
               "\n" ++
@@ -124,25 +124,25 @@ spec = do
               "    uint32_t foo[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            foo[__i0] = (uint32_t)0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            foo[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++

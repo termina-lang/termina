@@ -88,11 +88,11 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("uint32_t match_test0(__termina_option_dyn_t option0) {\n" ++
               "    \n" ++
-              "    uint32_t ret = (uint32_t)0;\n" ++
+              "    uint32_t ret = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
               "\n" ++
-              "        ret = (uint32_t)0;\n" ++
+              "        ret = 0;\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
@@ -110,7 +110,7 @@ spec = do
       renderSource test1 `shouldBe`
         pack ("uint32_t match_test1(__termina_option_dyn_t option0) {\n" ++
               "    \n" ++
-              "    uint32_t ret = (uint32_t)0;\n" ++
+              "    uint32_t ret = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
               "\n" ++
@@ -154,22 +154,22 @@ spec = do
       renderSource test2 `shouldBe`
         pack ("uint32_t match_test1() {\n" ++
               "    \n" ++
-              "    uint32_t ret = (uint32_t)0;\n" ++
+              "    uint32_t ret = 0;\n" ++
               "\n    Message msg;\n" ++
               "\n" ++
               "    {\n" ++
               "        msg.__variant = In;\n" ++
-              "        msg.__In.__0 = (uint32_t)10;\n" ++
-              "        msg.__In.__1 = (uint32_t)10;\n" ++
+              "        msg.__In.__0 = 10;\n" ++
+              "        msg.__In.__1 = 10;\n" ++
               "    }\n" ++
               "\n" ++
               "    if (msg.__variant == Stop) {\n" ++
               "\n" ++
-              "        ret = (uint32_t)0;\n" ++
+              "        ret = 0;\n" ++
               "\n" ++
               "    } else if (msg.__variant == Reset) {\n" ++
               "\n" ++
-              "        ret = (uint32_t)1;\n" ++
+              "        ret = 1;\n" ++
               "\n" ++
               "    } else if (msg.__variant == Out) {\n" ++
               "\n" ++

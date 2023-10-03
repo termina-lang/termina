@@ -60,23 +60,23 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void test0() {\n" ++
               "    \n" ++
-              "    uint16_t foo = (uint16_t)0;\n" ++ 
+              "    uint16_t foo = 0;\n" ++ 
               "\n" ++
-              "    foo = foo + (uint16_t)1024;\n" ++
+              "    foo = foo + 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 + foo;\n" ++ 
+              "    1024 + foo;\n" ++ 
               "\n" ++
-              "    foo = foo - (uint16_t)1024;\n" ++ 
+              "    foo = foo - 1024;\n" ++ 
               "\n" ++
-              "    (uint16_t)1024 - foo;\n" ++
+              "    1024 - foo;\n" ++
               "\n" ++
-              "    foo = foo * (uint16_t)1024;\n" ++
+              "    foo = foo * 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 * foo;\n" ++
+              "    1024 * foo;\n" ++
               "\n" ++
-              "    foo = foo / (uint16_t)1024;\n" ++
+              "    foo = foo / 1024;\n" ++
               "\n" ++
-              "    (uint16_t)1024 / foo;\n" ++
+              "    1024 / foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -88,21 +88,21 @@ spec = do
      renderSource test1 `shouldBe`
        pack ("void test1(__termina_dyn_t foo) {\n" ++
              "    \n" ++
-             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + 1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 + *((uint16_t *)foo.data);\n" ++
+             "    1024 + *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) - (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) - 1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 - *((uint16_t *)foo.data);\n" ++
+             "    1024 - *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) * (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) * 1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 * *((uint16_t *)foo.data);\n" ++
+             "    1024 * *((uint16_t *)foo.data);\n" ++
              "\n" ++
-             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) / (uint16_t)1024;\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) / 1024;\n" ++
              "\n" ++
-             "    (uint16_t)1024 / *((uint16_t *)foo.data);\n" ++
+             "    1024 / *((uint16_t *)foo.data);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

@@ -87,7 +87,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    foo1 = (uint32_t)0;\n" ++
+          "    foo1 = 0;\n" ++
           "\n" ++
           "}")
     it "Prints a match option vector statement" $ do
@@ -95,11 +95,11 @@ spec = do
         pack (
           "if (option_var.__variant == None) {\n" ++
           "\n" ++
-          "    foo1 = (uint32_t)0;\n" ++
+          "    foo1 = 0;\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    foo1 = ((uint32_t *)option_var.__Some.__0.data)[(uint8_t)8];\n" ++
+          "    foo1 = ((uint32_t *)option_var.__Some.__0.data)[8];\n" ++
           "\n" ++
           "}")
     it "Prints a match option statement with a complex expression" $ do
@@ -114,7 +114,7 @@ spec = do
           "\n" ++
           "    } else {\n" ++
           "\n" ++
-          "        foo1 = (uint32_t)0;\n" ++
+          "        foo1 = 0;\n" ++
           "\n" ++
           "    }\n" ++
           "}")

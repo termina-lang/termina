@@ -129,11 +129,15 @@ ppMemberAccessExpression subs lhs rhs =
 ppObject :: Printer Object
 ppObject subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
 -- ppObject subs (IdentifierExpression expr _)  = printer subs expr
-ppObject subs (VectorIndexExpression vector index _) = ppObject subs vector <> brackets (ppExpression subs index)
+ppObject subs (VectorIndexExpression obj index _) = 
+    if getObjPrecedence obj > 1 then 
+        parens (ppObject subs obj) <> brackets (ppExpression subs index)
+    else
+        ppObject subs obj <> brackets (ppExpression subs index)
 ppObject subs (VectorSliceExpression vector lower _ _) = 
     case lower of
-        KC (I lowTy lowInteger) ->
-            parens $ ppCReferenceExpression (ppObject subs vector <> brackets (parens (ppTypeSpecifier lowTy) <> pretty lowInteger))
+        KC (I _ lowInteger) ->
+            ppCReferenceExpression (ppObject subs vector <> brackets (pretty lowInteger))
         _ -> error $ "Invalid constant expression: " ++ show lower
 ppObject subs (MemberAccess obj identifier _) = 
     if getObjPrecedence obj > 1 then
@@ -212,14 +216,16 @@ ppExpression subs (ReferenceExpression obj _) =
 ppExpression _ (Constant constant _) =
     case constant of
         B b -> if b then pretty "1" else pretty "0"
-        I ts' integer -> parens (ppTypeSpecifier ts') <> pretty integer
+        I _ integer -> pretty integer
         C char -> squotes (pretty char)
 ppExpression subs (BinOp op expr1 expr2 _) =
     ppExpression' subs expr1 <+> ppBinaryOperator op <+> ppExpression' subs expr2
 ppExpression subs (Casting expr' ts' _) =
-    case expr' of
-        (Constant (I _ integer) _) -> parens (ppTypeSpecifier ts') <> pretty integer
-        _ -> parens (ppTypeSpecifier ts') <> ppExpression subs expr'
+    parens (ppTypeSpecifier ts') <> 
+        if getExpPrecedence expr' > 2 then
+            parens (ppExpression subs expr')
+        else
+            ppExpression subs expr'
 ppExpression subs expr@(FunctionExpression identifier params _) =
     let
         paramAnns = getParameters expr

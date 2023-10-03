@@ -23,11 +23,11 @@ ppInitializeVectorFromExpression level target source ts =
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
               condExpr =
-                  pretty iterator <+> pretty "<" <+> parens (ppTypeSpecifier indexTS) <> pretty size
+                  pretty iterator <+> pretty "<" <+> pretty size
               incrExpr =
                   ppCForLoopIncrExpression
                   (pretty iterator)
-                  (parens (ppTypeSpecifier indexTS) <> pretty (show (1 :: Integer)))
+                  (pretty (show (1 :: Integer)))
               in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets (pretty iterator)) (source <> brackets (pretty iterator)) ts')
         _ -> target <+> pretty "=" <+> source <> semi
 
@@ -54,11 +54,11 @@ ppInitializeVector subs level target expr =
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
            in let condExpr =
-                    pretty iterator <+> pretty "<" <+> parens (ppTypeSpecifier indexTS) <> pretty size
+                    pretty iterator <+> pretty "<" <+> pretty size
                in let incrExpr =
                         ppCForLoopIncrExpression
                           (pretty iterator)
-                          (parens (ppTypeSpecifier indexTS) <> pretty (show (1 :: Integer)))
+                          (pretty (show (1 :: Integer)))
                    in ppCForLoop
                         initExpr
                         condExpr

@@ -54,8 +54,11 @@ getObjPrecedence :: Object SemanticAnns -> Int
 getObjPrecedence (Variable _ _) = 0
 getObjPrecedence (VectorIndexExpression {}) = 1
 getObjPrecedence (MemberAccess {}) = 1
-getObjPrecedence (Dereference _ _) = 2
-getObjPrecedence (VectorSliceExpression {}) = 1
+getObjPrecedence obj@(Dereference _ _) = 
+  case getObjectType obj of
+    (Vector _ _) -> 1
+    _            -> 2
+getObjPrecedence (VectorSliceExpression {}) = 2
 getObjPrecedence (Undyn obj _) = getObjPrecedence obj
 
 getExpPrecedence :: Expression SemanticAnns -> Int

@@ -98,7 +98,7 @@ spec = do
         pack "uint32_t foo1 = foo0;"
     it "Prints the statement var foo2 : u32 = 0 : u32;" $ do
       renderStatement foo2 `shouldBe`
-        pack "uint32_t foo2 = (uint32_t)0;"
+        pack "uint32_t foo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
     it "Prints the statement var option0 : Option <'dyn u32> = Some(dyn_var0);" $ do
       renderStatement option0 `shouldBe`
@@ -133,8 +133,8 @@ spec = do
           "\n" ++
           "{\n" ++
           "    enum1.__variant = In;\n" ++
-          "    enum1.__In.__0 = (uint32_t)0;\n" ++
-          "    enum1.__In.__1 = (uint32_t)0;\n" ++
+          "    enum1.__In.__0 = 0;\n" ++
+          "    enum1.__In.__1 = 0;\n" ++
           "}")
   describe "Pretty printing struct variable declarations" $ do
     it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor;" $ do
@@ -143,12 +143,12 @@ spec = do
         "TMDescriptor struct0;\n" ++
         "\n" ++
         "{\n" ++
-        "    struct0.field0 = (uint32_t)0;\n" ++
-        "    struct0.field1.field_a = (uint32_t)0;\n" ++
-        "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-        "        struct0.field1.field_b[__i0] = (uint32_t)0;\n" ++
+        "    struct0.field0 = 0;\n" ++
+        "    struct0.field1.field_a = 0;\n" ++
+        "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+        "        struct0.field1.field_b[__i0] = 0;\n" ++
         "    }\n" ++
-        "    struct0.field1.field_c = (uint32_t)4294901760;\n" ++
+        "    struct0.field1.field_c = 4294901760;\n" ++
         "}")
     it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
       renderStatement struct1 `shouldBe`
@@ -160,7 +160,7 @@ spec = do
           "uint32_t vector1[10];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "}")
@@ -170,8 +170,8 @@ spec = do
           "int64_t vector2[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -182,8 +182,8 @@ spec = do
           "uint32_t vector3[10];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        vector3[__i0] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector3[__i0] = 0;\n" ++
           "    }\n" ++
           "}")
     it "Prints the statement var vector4 : [[u32; 5 : u32]; 10 : u32] = [[0 : u32; 5 : u32]; 10 : u32];" $ do
@@ -192,9 +192,9 @@ spec = do
           "int64_t vector4[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
-          "            vector4[__i0][__i1] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "            vector4[__i0][__i1] = 0;\n" ++
           "        }\n" ++
           "    }\n" ++
           "}")
@@ -204,8 +204,8 @@ spec = do
           "int64_t vector5[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -217,12 +217,12 @@ spec = do
           "TMDescriptor vector6[20];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-          "        vector6[__i0].field0 = (uint32_t)0;\n" ++
-          "        vector6[__i0].field1.field_a = (uint32_t)0;\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < (uint32_t)10; __i1 = __i1 + (uint32_t)1) {\n" ++
-          "            vector6[__i0].field1.field_b[__i1] = (uint32_t)0;\n" ++
+          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector6[__i0].field0 = 0;\n" ++
+          "        vector6[__i0].field1.field_a = 0;\n" ++
+          "        for (uint32_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
+          "            vector6[__i0].field1.field_b[__i1] = 0;\n" ++
           "        }\n" ++
-          "        vector6[__i0].field1.field_c = (uint32_t)4294901760;\n" ++
+          "        vector6[__i0].field1.field_c = 4294901760;\n" ++
           "    }\n" ++
           "}")

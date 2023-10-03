@@ -78,12 +78,12 @@ spec = do
     it "Prints a single if statement" $ do
       renderStatement singleIf `shouldBe`
         pack (
-          "if (foo0 == (uint32_t)0) {\n" ++
+          "if (foo0 == 0) {\n" ++
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -99,12 +99,12 @@ spec = do
     it "Prints an if-else statement" $ do
       renderStatement ifElse `shouldBe`
         pack (
-          "if (foo0 != (uint32_t)4294901760) {\n" ++
+          "if (foo0 != 4294901760) {\n" ++
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -128,12 +128,12 @@ spec = do
     it "Prints an if-else-if-else statement" $ do
       renderStatement ifElseIf `shouldBe`
         pack (
-          "if (foo0 != (uint32_t)4294901760) {\n" ++
+          "if (foo0 != 4294901760) {\n" ++
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
+          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -145,9 +145,9 @@ spec = do
           "        option0.__Some.__0 = dyn_var0;\n" ++
           "    }\n" ++
           "\n" ++
-          "} else if (foo0 == (uint32_t)0) {\n" ++
+          "} else if (foo0 == 0) {\n" ++
           "\n" ++
-          "    foo0 = (uint32_t)0;\n" ++
+          "    foo0 = 0;\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++

@@ -58,15 +58,15 @@ spec = do
         pack ("uint16_t func_test0_0(uint16_t a) {\n" ++
               "    \n" ++
               "\n" ++
-              "    return a + (uint16_t)1;\n" ++
+              "    return a + 1;\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++
               "uint16_t func_test0_1(uint16_t a) {\n" ++
               "    \n" ++
-              "    uint16_t foo = func_test0_0((uint16_t)2);\n" ++
+              "    uint16_t foo = func_test0_0(2);\n" ++
               "\n" ++
-              "    return foo * (uint16_t)2;\n" ++
+              "    return foo * 2;\n" ++
               "\n" ++
               "}\n")    
     it "Prints declaration of functions test0 and test1" $ do
@@ -85,8 +85,8 @@ spec = do
               "    uint32_t foo[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            foo[__i0] = (uint32_t)1024;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            foo[__i0] = 1024;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
@@ -99,8 +99,8 @@ spec = do
               "    uint32_t bar0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            bar0[__i0] = (uint32_t)0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            bar0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
@@ -112,6 +112,6 @@ spec = do
               "        *((__ret_func_test1_0_t *)bar1) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
               "    }\n" ++
               "\n" ++
-              "    return bar0[(uint32_t)1] + bar1[(uint32_t)2];\n" ++
+              "    return bar0[1] + bar1[2];\n" ++
               "\n" ++
               "}\n")    

@@ -75,12 +75,12 @@ spec = do
               "    uint32_t vector0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)10; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            vector0[__i0] = (uint32_t)0;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            vector0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
-              "    (&vector0[(uint32_t)3])[(uint32_t)1] = (uint32_t)10;\n" ++
+              "    (&vector0[3])[1] = 10;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -93,10 +93,10 @@ spec = do
         pack ("void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
               "    \n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < (uint32_t)5; __i0 = __i0 + (uint32_t)1) {\n" ++
-              "            for (uint32_t __i1 = 0; __i1 < (uint32_t)5; __i1 = __i1 + (uint32_t)1) {\n" ++
-              "                for (uint32_t __i2 = 0; __i2 < (uint32_t)3; __i2 = __i2 + (uint32_t)1) {\n" ++
-              "                    (&vector0[(uint32_t)3])[__i0][__i1][__i2] = (uint32_t)10;\n" ++
+              "        for (uint32_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
+              "            for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+              "                for (uint32_t __i2 = 0; __i2 < 3; __i2 = __i2 + 1) {\n" ++
+              "                    (&vector0[3])[__i0][__i1][__i2] = 10;\n" ++
               "                }\n" ++
               "            }\n" ++
               "        }\n" ++
@@ -115,12 +115,12 @@ spec = do
         pack ("void add_one(uint32_t input[5]) {\n" ++
               "    \n" ++
               "    {\n" ++
-              "        uint32_t __start = (uint32_t)0;\n" ++
-              "        uint32_t __end = (uint32_t)5;\n" ++
+              "        uint32_t __start = 0;\n" ++
+              "        uint32_t __end = 5;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + (uint32_t)1) {\n" ++
+              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
-              "            input[i] = input[i] + (uint32_t)1;\n" ++
+              "            input[i] = input[i] + 1;\n" ++
               "\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -131,7 +131,7 @@ spec = do
               "\n" ++
               "void slice_test2(uint32_t vector0[10][5]) {\n" ++
               "    \n" ++
-              "    add_one((&vector0[(uint32_t)2])[(uint32_t)0]);\n" ++
+              "    add_one((&vector0[2])[0]);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -150,12 +150,12 @@ spec = do
         pack ("void add_two(__param_add_two_input_t input) {\n" ++
               "    \n" ++
               "    {\n" ++
-              "        uint32_t __start = (uint32_t)0;\n" ++
-              "        uint32_t __end = (uint32_t)5;\n" ++
+              "        uint32_t __start = 0;\n" ++
+              "        uint32_t __end = 5;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + (uint32_t)1) {\n" ++
+              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
-              "            input.array[i] = input.array[i] + (uint32_t)2;\n" ++
+              "            input.array[i] = input.array[i] + 2;\n" ++
               "\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -166,7 +166,7 @@ spec = do
               "\n" ++
               "void slice_test3(uint32_t vector0[10][5]) {\n" ++
               "    \n" ++
-              "    add_two(*((__param_add_two_input_t *)(&vector0[(uint32_t)2])[(uint32_t)0]));\n" ++
+              "    add_two(*((__param_add_two_input_t *)(&vector0[2])[0]));\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
