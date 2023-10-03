@@ -120,7 +120,11 @@ ppMemberAccessExpression subs lhs (FunctionExpression methodId params _) =
         -- | Anything else should not happen
         _ -> error "unsupported expression"
 -- | If the right hand side is not a function, then it is a field
-ppMemberAccessExpression subs lhs rhs = ppExpression subs lhs <> pretty "." <> ppExpression subs rhs
+ppMemberAccessExpression subs lhs rhs = 
+    if getExpPrecedence lhs > 1 then
+        parens (ppExpression subs lhs) <> pretty "." <> ppExpression subs rhs
+    else
+        ppExpression subs lhs <> pretty "." <> ppExpression subs rhs
 
 ppObject :: Printer Object
 ppObject subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
@@ -131,7 +135,11 @@ ppObject subs (VectorSliceExpression vector lower _ _) =
         KC (I lowTy lowInteger) ->
             parens $ ppCReferenceExpression (ppObject subs vector <> brackets (parens (ppTypeSpecifier lowTy) <> pretty lowInteger))
         _ -> error $ "Invalid constant expression: " ++ show lower
-ppObject subs (MemberAccess obj identifier _) = ppObject subs obj <> pretty "." <> pretty identifier
+ppObject subs (MemberAccess obj identifier _) = 
+    if getObjPrecedence obj > 1 then
+        parens (ppObject subs obj) <> pretty "." <> pretty identifier
+    else
+        ppObject subs obj <> pretty "." <> pretty identifier
 ppObject subs (Dereference obj _) =
         case getObjectType obj of
         -- | A dereference to a vector is printed as the name of the vector
