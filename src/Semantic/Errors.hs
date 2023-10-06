@@ -3,7 +3,7 @@
 module Semantic.Errors where
 
 -- Termina AST
-import AST
+import AST.Parser
 -- import SemanAST as SAST
 import Semantic.Types
 -- import qualified Parsing as Parser (Annotation)

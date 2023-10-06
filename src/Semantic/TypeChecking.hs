@@ -13,16 +13,16 @@ module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
 import           Annotations
-import           AST                  as PAST
-import           Utils.AST
-import           Utils.CoreAST
+import           AST.Parser                  as PAST
+import           Utils.AST.Parser
+import           Utils.AST.Core
 import           Utils.TypeSpecifier
 
 -- Termina Semantic AST
-import qualified SemanAST             as SAST
+import qualified AST.Seman as SAST
 
 -- Just annotations from Parser
-import qualified Parsing              as Parser (Annotation (..))
+import qualified Parser.Parsing              as Parser (Annotation (..))
 
 ----------------------------------------
 -- Internal modules to the semantic phase.

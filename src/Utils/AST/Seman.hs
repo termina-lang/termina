@@ -1,9 +1,9 @@
 -- | Utilities for Semantic AST
 
-module Utils.SemanAST where
+module Utils.AST.Seman where
 
-import Utils.AST
-import           SemanAST
+import Utils.AST.Parser
+import           AST.Seman
 
 -- A relation of type specifier.
 dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool

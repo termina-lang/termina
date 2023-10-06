@@ -2,7 +2,7 @@ module PPrinter.Expression where
 
 import Prettyprinter
 
-import SemanAST
+import AST.Seman
 import PPrinter.Common
 import Semantic.Monad
 import PPrinter.TypeDef

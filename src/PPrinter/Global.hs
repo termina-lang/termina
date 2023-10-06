@@ -2,7 +2,7 @@ module PPrinter.Global where
 
 import Prettyprinter
 
-import SemanAST
+import AST.Seman
 import PPrinter.Common
 import Semantic.Monad (SemanticAnns)
 

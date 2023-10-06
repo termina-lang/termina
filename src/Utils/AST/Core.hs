@@ -1,9 +1,9 @@
 {-# Language LambdaCase #-}
--- | Util functions related to CoreAST
+-- | Util functions related to AST.Core
 
-module Utils.CoreAST where
+module Utils.AST.Core where
 
-import           CoreAST
+import           AST.Core
 import qualified Data.List as L
 
 findClassField :: Identifier -> [ ClassMember' expr lho a ] -> Maybe (TypeSpecifier, a)

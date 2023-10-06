@@ -1,7 +1,7 @@
 module Main (main) where
 
 -- import AST
-import Parsing
+import Parser.Parsing
 import Options
 import PPrinter
 -- import Control.Applicative

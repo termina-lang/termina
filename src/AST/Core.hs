@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE KindSignatures    #-}
+
 -- | Module defining core AST
 
-module CoreAST where
+module AST.Core where
 
 import           Annotations
 

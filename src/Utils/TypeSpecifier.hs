@@ -2,7 +2,7 @@
 
 module Utils.TypeSpecifier where
 
-import           AST
+import           AST.Parser
 
 -- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
 primitiveTypes :: TypeSpecifier -> Bool

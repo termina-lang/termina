@@ -1,4 +1,24 @@
 * Termina Language/Transpiler Implementation
+** Module System
+Inside termina: each file is a module maybe referring to other modules.
+Each module may refer to /internal modules/, following a tree-like structure
+defined by the file system itself.
+
+Names follows perioded-relative file paths.
+#+begin_src sh :noeval
+touch src.fin
+mkdir -p A
+touch A/src.fin
+mkdir -p B
+touch B/src.fin
+mkdir -p C/S
+touch C/S/src.fin
+#+end_src
+
+So we have:
+...
+
+In ~./src.fin~, we can import ~module A;~, ~module B;~, ~module C.S;~.
 
 * Example
 
@@ -8,7 +28,6 @@ stack run -- --print --output=examples/res.c examples/datadefs.fin
 
 * Type Rules
 https://hackmd.io/@parraman/BkFRR09Y2
-
 
 * Meta TODOs!
 ** TODO Haddock include semantics package?

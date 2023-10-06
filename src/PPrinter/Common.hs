@@ -3,7 +3,7 @@ module PPrinter.Common where
 import           Data.Maybe
 import           Prettyprinter
 import           Prettyprinter.Render.Terminal
-import           SemanAST
+import           AST.Seman
 import           Semantic.Monad
 
 type DocStyle = Doc AnsiStyle

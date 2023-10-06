@@ -3,7 +3,7 @@ module PPrinter.Statement.VariableInitialization where
 import PPrinter.Common
 import PPrinter.Expression
 import Prettyprinter
-import SemanAST
+import AST.Seman
 import Semantic.Monad
 
 ppInitializeVectorFromExpression ::

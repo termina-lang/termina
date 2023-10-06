@@ -3,9 +3,9 @@
 
 module Semantic.Types where
 
-import           AST
-import           SemanAST            as SAST
-import           Utils.AST
+import           AST.Parser
+import           AST.Seman            as SAST
+import           Utils.AST.Parser
 import           Utils.TypeSpecifier
 
 ----------------------------------------

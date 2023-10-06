@@ -1,9 +1,9 @@
 {-# LANGUAGE TupleSections #-}
 -- | Module dedicated to Parsing
 
-module Parsing where
+module Parser.Parsing where
 
-import           AST                  hiding (blockRet)
+import           AST.Parser                  hiding (blockRet)
 -- Importing position from Parsec
 import           Text.Parsec.Pos
 -- Importing parser combinators

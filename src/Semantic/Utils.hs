@@ -4,7 +4,7 @@ module Semantic.Utils where
 
 import Semantic.Monad
 import Semantic.Types
-import AST
+import AST.Parser
 import Annotations
 
 getExpType :: Expression SemanticAnns -> Maybe TypeSpecifier

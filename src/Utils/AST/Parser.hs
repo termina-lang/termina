@@ -1,8 +1,8 @@
 -- | Utility AST functions
 
-module Utils.AST where
+module Utils.AST.Parser where
 
-import           AST
+import           AST.Parser
 
 -- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool

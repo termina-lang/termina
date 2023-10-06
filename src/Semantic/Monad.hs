@@ -16,11 +16,11 @@ import           Data.Maybe
 
 -- AST Info
 import           Annotations
-import           AST
-import           SemanAST                   as SAST
-import           Utils.AST                  (groundTyEq)
+import           AST.Parser
+import           AST.Seman                   as SAST
+import           Utils.AST.Parser                  (groundTyEq)
 
-import qualified Parsing                    as Parser (Annotation (..))
+import qualified Parser.Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
 import           Semantic.Types
 import           Utils.TypeSpecifier

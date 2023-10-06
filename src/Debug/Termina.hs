@@ -1,6 +1,6 @@
 -- | Debugging Module
 
-module Debugging (
+module Debug.Termina (
   showMsg,
   module Debug.Trace
 ) where
