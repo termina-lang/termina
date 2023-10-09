@@ -2,7 +2,7 @@ module UT.PPrinter.FunctionSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
+import AST.Seman
 import Data.Text hiding (empty)
 import Semantic.Monad
 import UT.PPrinter.Expression.Common

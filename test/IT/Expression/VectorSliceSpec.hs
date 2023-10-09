@@ -3,7 +3,7 @@ module IT.Expression.VectorSliceSpec (spec) where
 import Test.Hspec
 import PPrinter
 import Data.Text hiding (empty)
-import Parsing
+import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
 

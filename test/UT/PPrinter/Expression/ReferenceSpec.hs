@@ -2,7 +2,7 @@ module UT.PPrinter.Expression.ReferenceSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
+import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import PPrinter.Expression

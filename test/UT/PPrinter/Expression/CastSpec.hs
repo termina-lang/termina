@@ -2,10 +2,10 @@ module UT.PPrinter.Expression.CastSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
+import AST.Seman
 import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 

@@ -3,7 +3,7 @@ module Neg.VarNotDefSpec (spec) where
 import Test.Hspec
 
 import Text.Parsec
-import Parsing
+import Parser.Parsing
 
 import qualified Semantic.TypeChecking as TypeChecking
 import Semantic.Errors as SemanErrors

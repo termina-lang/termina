@@ -1,7 +1,7 @@
 module IT.Expression.FunctionCallSpec (spec) where
 
 import Test.Hspec
-import Parsing
+import Parser.Parsing
 import PPrinter
 import Data.Text hiding (empty)
 import Text.Parsec

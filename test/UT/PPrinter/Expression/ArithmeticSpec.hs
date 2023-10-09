@@ -2,7 +2,7 @@ module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
+import AST.Seman
 import Data.Text hiding (empty)
 import Semantic.Monad
 import PPrinter.Expression

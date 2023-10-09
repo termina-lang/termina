@@ -2,7 +2,7 @@ module UT.PPrinter.TypeDef.EnumSpec (spec) where
 
 import Test.Hspec
 import PPrinter
-import SemanAST
+import AST.Seman
 import Data.Text
 import Semantic.Monad
 import Data.Maybe

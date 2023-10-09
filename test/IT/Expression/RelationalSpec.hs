@@ -3,7 +3,7 @@ module IT.Expression.RelationalSpec (spec) where
 import Test.Hspec
 import PPrinter
 import Data.Text hiding (empty)
-import Parsing
+import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
 
