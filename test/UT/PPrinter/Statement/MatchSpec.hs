@@ -10,10 +10,10 @@ import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 
 optionDynUInt32SemAnn :: SemanticAnns
-optionDynUInt32SemAnn = optionDynSemAnn UInt32
+optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, dynVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
 dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
 
 param0, param1 :: Object SemanticAnns
@@ -33,7 +33,7 @@ vector0IndexConstant :: Expression SemanticAnns
 vector0IndexConstant = AccessObject (VectorIndexExpression (Undyn param1 vectorAnn) uint8Const0x8 uint32SemAnn)
 
 foo1 :: Object SemanticAnns
-foo1 = Variable "foo1" uint32SemAnn
+foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
 
 param0ToFoo1, constToFoo1 :: Statement SemanticAnns
 param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Undyn param0 uint32SemAnn)) undefined

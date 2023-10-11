@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn vector_test0() {\n" ++
+test0 = "function vector_test0() {\n" ++
         "    var foo : u32 = 0 : u32;\n" ++
         "    var vector0 : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
         "    var vector1 : [[i64; 5 : u32]; 10 : u16] = [[0 : i64; 5 : u32]; 10 : u16];\n" ++
@@ -19,7 +19,7 @@ test0 = "fn vector_test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "fn vector_test1(p_vector0 : & [u32; 10 : u32]) {\n" ++
+test1 = "function vector_test1(p_vector0 : & [u32; 10 : u32]) {\n" ++
         "    var foo : u32 = 0 : u32;\n" ++
         "    (*p_vector0)[3 : u32] = 10 : u32;\n" ++
         "    (*p_vector0)[foo] = 1024 : u32;\n" ++

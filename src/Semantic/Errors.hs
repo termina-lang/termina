@@ -26,7 +26,7 @@ data Errors a
   | EReferenceGlobal Identifier
   -- | Not Variable found
   | ENotVar
-  | ENotNamedVar Identifier
+  | ENotNamedObject Identifier
   -- | Not Global Variable found
   | ENotNamedGlobal Identifier
   | EGlobalOtherType Identifier
@@ -53,11 +53,13 @@ data Errors a
   | EFieldMissing [Identifier]
   -- | Record extra fields
   | EFieldExtra [Identifier]
+  -- | Field does not have a fixed location
+  | EFieldAddress Identifier
   -- | Expecting a Vecotor got
   | EVector TypeSpecifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
-  | EMethodAccessNotClass TypeSpecifier
+  | EFunctionAccessNotResource TypeSpecifier
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
   | EMemberAccessNotMethod Identifier
   | EMemberAccessUDef (SemanTypeDef a)
@@ -83,6 +85,7 @@ data Errors a
   | EMCMissingArgs [TypeSpecifier]
   | EMCEmpty
   -- | ForLoop
+  | EForIteratorWrongType TypeSpecifier
   | EBadRange -- ^ Range conditions are not met
   | EForWhileTy TypeSpecifier -- ^ Type of while is not Bool
   -- | Static not literal constant
@@ -121,16 +124,13 @@ data Errors a
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
-  -- | Union Definition
-  | EUnionDefEmptyUnion Identifier
-  | EUnionDefNotUniqueField [Identifier]
   -- | Enums Definition
   | EEnumDefEmpty Identifier
   | EEnumDefNotUniqueField [Identifier]
   -- | Class Definition
   | EClassEmptyMethods Identifier
   | ENotClassField Identifier
-  | ClassSelfNoSelf
+  | EClassTyping
   -- Dereference Object
   | ETypeNotReference TypeSpecifier
   -- Error while forcing Undyn
@@ -138,7 +138,7 @@ data Errors a
   -- Error using a method different than alloc on a pool
   | EPoolsAllocArgs
   | EPoolsMethods Identifier
-  | EPoolsNoPool TypeSpecifier
+  | EPoolsWrongProcedure Identifier
   | EPoolsWrongNumArgs
   | EPoolsWrongArgType TypeSpecifier
   | EPoolsWrongArgTypeW TypeSpecifier
@@ -167,8 +167,7 @@ data Errors a
   -- | Free not dyn type
   | EFreeNotDyn TypeSpecifier
   -- | MsgQueue operations errors
-  | ENoMsgQueueSend TypeSpecifier
-  | ENoMsgQueueRcv TypeSpecifier
+  | EMsgQueueWrongProcedure Identifier
   | ENoMsgQueueSendWrongArgs
   | ENoMsgQueueRcvWrongArgs
   | EMsgQueueSendArgNotDyn TypeSpecifier
@@ -184,7 +183,7 @@ data Errors a
   deriving Show
 
 instance Eq (Errors a) where
-  (ENotNamedVar idls) == (ENotNamedVar idrs) = idls == idrs
+  (ENotNamedObject idls) == (ENotNamedObject idrs) = idls == idrs
   _ == _ = False
 
 

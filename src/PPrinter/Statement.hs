@@ -91,12 +91,12 @@ ppStatement ::
 -- The printer prints the corresponding free() function call.
 ppStatement subs (Free obj _) =
     ppCFunctionCall poolFree [ppObject subs obj] <> semi
-ppStatement subs (Declaration identifier ts expr _) =
+ppStatement subs (Declaration identifier _ ts expr _) =
   case ts of
     Vector _ _ ->
         ppDeclareAndInitialize (ppInitializeVector subs 0) (pretty identifier) ts expr
     _ -> case expr of
-        (FieldValuesAssignmentsExpression {}) ->
+        (FieldAssignmentsExpression {}) ->
             ppDeclareAndInitialize (ppInitializeStruct subs 0) (pretty identifier) ts expr
         (OptionVariantExpression {}) ->
             ppDeclareAndInitialize (ppInitializeOption subs 0) (pretty identifier) ts expr
@@ -131,7 +131,7 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                             ppObject subs obj
                     ) expr
         _ -> case expr of
-            (FieldValuesAssignmentsExpression {}) ->
+            (FieldAssignmentsExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr
             (OptionVariantExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject subs obj) expr
@@ -143,17 +143,16 @@ ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =
     ppCIfBlock (ppExpression subs cond) (vsep [ppStatement subs s <> line | s <- ifBody])
         <> foldr (\(ElseIf c b _) acc -> acc <+> ppCElseIfBlock (ppExpression subs c) (vsep [ppStatement subs s <> line | s <- b])) emptyDoc elifs
         <> if null elseBody then emptyDoc else space <> ppCElseBlock (vsep [ppStatement subs s <> line | s <- elseBody])
-ppStatement subs (ForLoopStmt iterator initValue endValue breakCond body _ ) =
+ppStatement subs (ForLoopStmt iterator iteratorTS initValue endValue breakCond body _ ) =
     braces' $ (indentTab . align) $ vsep [
-        ppStatement subs (Declaration startSymbol iteratorTS initValue undefined),
-        ppStatement subs (Declaration endSymbol iteratorTS endValue undefined),
+        ppStatement subs (Declaration startSymbol Immutable iteratorTS initValue undefined),
+        ppStatement subs (Declaration endSymbol Immutable iteratorTS endValue undefined),
         emptyDoc,
         ppCForLoop initExpr condExpr incrExpr (line <> vsep [ppStatement subs s <> line | s <- body])
     ]
     where
         startSymbol = "__start"
         endSymbol = "__end"
-        iteratorTS = getType initValue
         initExpr = ppCForLoopInitExpression
             (ppTypeSpecifier iteratorTS)
             (pretty iterator)
@@ -195,7 +194,7 @@ ppStatement subs (MatchStmt expr matchCases _) =
             _ ->
                 let symbol = "__match" in
                     braces' $ (indentTab . align) $ vsep [
-                        ppStatement subs (Declaration symbol (getType expr) expr undefined),
+                        ppStatement subs (Declaration symbol Immutable (getType expr) expr undefined),
                         emptyDoc,
                         ppMatchCases (pretty symbol) matchCases
                     ]

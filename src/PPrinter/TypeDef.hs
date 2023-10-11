@@ -13,14 +13,11 @@ ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty id
 classMethodName :: Identifier -> Identifier -> DocStyle
 classMethodName ident = pretty . (("__" ++ ident ++ "_") ++)
 
-classMethodNameAOp :: Identifier -> AccessOp -> DocStyle
-classMethodNameAOp ident = (pretty ("__" ++ ident ++ "_") <>) . methodAccessOp
-
-ppClassMethodDeclaration :: Identifier -> ClassMember a -> DocStyle
-ppClassMethodDeclaration classId (ClassMethod methodId parameters _ _ _) =
+ppClassFunctionDeclaration :: Identifier -> ClassMember a -> DocStyle
+ppClassFunctionDeclaration classId (ClassProcedure methodId parameters _ _ _) =
   ppCFunctionPrototype (classMethodName classId methodId)
     (map (ppParameterDeclaration (pretty (classId ++ "_" ++ methodId))) parameters) Nothing <> semi
-ppClassMethodDeclaration _ _ = error "invalid class member"
+ppClassFunctionDeclaration _ _ = error "invalid class member"
 
 -- | Pretty prints a class field
 -- This function is only used when generating the class structure.
@@ -93,16 +90,6 @@ ppTypeDefDeclaration typeDef =
             map ppStructField fls
             ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
         emptyDoc]
-    -- | Union declaration pretty printer (TO BE REMOVED)
-    (Union identifier fls modifiers) ->
-      let structModifiers = filterStructModifiers modifiers in
-      vsep [
-        typedefC <+> unionC <+> braces' (
-          indentTab . align $ vsep $
-            map ppStructField fls
-            ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        emptyDoc
-      ]
     -- | Enum declaration pretty printer  
     (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
@@ -130,15 +117,17 @@ ppTypeDefDeclaration typeDef =
           ]
         ) <+> pretty identifier <> semi,
         emptyDoc ]
-    (Class identifier members modifiers) ->
+    (Class _ identifier members modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
       let classModifiers = filterClassModifiers modifiers in
-      let (fields, methods) =
-              foldr (\member (fs,ms) ->
+      let (fields, methods, procedures, viewers) = 
+              foldr (\member (fs,ms,prs,vws) ->
                   case member of
-                    ClassField {} -> (member : fs, ms)
-                    ClassMethod {} -> (fs, member : ms)
-              ) ([],[]) members
+                    ClassField {} -> (member : fs, ms, prs, vws)
+                    ClassMethod {} -> (fs, member : ms, prs, vws)
+                    ClassProcedure {} -> (fs, ms, member : prs, vws)
+                    ClassViewer {} -> (fs, ms, prs, member : vws)
+              ) ([],[], [], []) members
       in
         vsep $ (
           if not (null fields) then
@@ -168,4 +157,4 @@ ppTypeDefDeclaration typeDef =
                   (indentTab . align) ppClassDummyField) <+> pretty identifier <> semi,
               emptyDoc
             ])
-          ++ map (\m -> ppClassMethodDeclaration identifier m <> line) methods
+          ++ map (\m -> ppClassFunctionDeclaration identifier m <> line) procedures

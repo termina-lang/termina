@@ -10,15 +10,21 @@ import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
 tmDescriptor0, tmDescriptor1 :: Object SemanticAnns
-tmDescriptor0 = Variable "tm_descriptor0" (definedTypeSemAnn "TMDescriptor")
+tmDescriptor0 = Variable "tm_descriptor0" (definedTypeSemAnn Mutable "TMDescriptor")
 tmDescriptor1 = Variable "tm_descriptor1" (dynDefinedTypeSemAnn "TMDescriptor")
 
+pTMDescriptor0 :: Object SemanticAnns
+pTMDescriptor0 = Variable "p_tm_descriptor0" (refDefinedTypeSemAnn "TMDescriptor")
+
 undynTMDescriptor1 :: Object SemanticAnns
-undynTMDescriptor1 = Undyn tmDescriptor1 (definedTypeSemAnn "TMDescriptor")
+undynTMDescriptor1 = Undyn tmDescriptor1 (definedTypeSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnns
 tmDescriptor0field0 = AccessObject ((MemberAccess tmDescriptor0 "field0" uint32SemAnn))
 tmDescriptor1field0 = AccessObject ((MemberAccess undynTMDescriptor1 "field0" uint32SemAnn))
+
+pTMDescriptor0field0 :: Expression SemanticAnns
+pTMDescriptor0field0 = AccessObject ((DereferenceMemberAccess pTMDescriptor0 "field0" uint32SemAnn))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty
@@ -32,3 +38,6 @@ spec = do
     it "Prints the expression: tm_descriptor1.field0" $ do
       renderExpression tmDescriptor1field0 `shouldBe`
         pack "*((TMDescriptor *)tm_descriptor1.data).field0"
+    it "Prints the expression: p_tm_descriptor0->field0" $ do
+      renderExpression pTMDescriptor0field0 `shouldBe`
+        pack "p_tm_descriptor0->field0"

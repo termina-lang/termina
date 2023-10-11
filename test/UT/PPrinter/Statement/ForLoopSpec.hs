@@ -10,29 +10,29 @@ import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
 
 vector0 :: Object SemanticAnns
 vector0 = Variable "vector0" vectorAnn
 
 total, i :: Expression SemanticAnns
-total = AccessObject (Variable "total" uint32SemAnn)
-i = AccessObject (Variable "i" uint32SemAnn)
+total = AccessObject (Variable "total" (objSemAnn Mutable UInt32))
+i = AccessObject (Variable "i" (objSemAnn Mutable UInt32))
 
 vector0IndexI:: Expression SemanticAnns
 vector0IndexI = AccessObject (VectorIndexExpression vector0 i uint32SemAnn)
 
 forLoopBody :: [Statement SemanticAnns]
-forLoopBody = [AssignmentStmt (Variable "total" uint32SemAnn) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
+forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
 
 breakCond :: Expression SemanticAnns
 breakCond = BinOp RelationalNotEqual i (Constant (I UInt32 5) uint32SemAnn) boolSemAnn
 
 forLoop0 :: Statement SemanticAnns
-forLoop0 = ForLoopStmt "i" (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) Nothing forLoopBody undefined
+forLoop0 = ForLoopStmt "i" UInt32 (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) Nothing forLoopBody undefined
 
 forLoop1 :: Statement SemanticAnns
-forLoop1 = ForLoopStmt "i" (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
+forLoop1 = ForLoopStmt "i" UInt32 (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement = render . ppStatement empty

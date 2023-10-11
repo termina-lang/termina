@@ -8,40 +8,40 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn slice_test0() {\n" ++
+test0 = "function slice_test0() {\n" ++
         "    var vector0 : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
         "    vector0[3 : u32..10 : u32][1 : u32] = 10 : u32;\n" ++
         "    return;\n" ++
         "}"
 
 test1 :: String
-test1 = "fn slice_test1(vector0 : & [[[u32; 3 : u32]; 5 : u32]; 10 : u32]) {\n" ++
+test1 = "function slice_test1(vector0 : & [[[u32; 3 : u32]; 5 : u32]; 10 : u32]) {\n" ++
         "    (*vector0)[3 : u32 .. 8 : u32] = [[[10 : u32; 3 : u32]; 5 : u32]; 5 : u32];\n" ++
         "    return;\n" ++
         "}"
 
 test2 :: String
-test2 = "fn add_one(input : & [u32; 5 : u32]) {\n" ++ 
-        "    for i in 0 : u32 .. 5 : u32 {\n" ++
+test2 = "function add_one(input : & [u32; 5 : u32]) {\n" ++ 
+        "    for i : u32 in 0 : u32 .. 5 : u32 {\n" ++
         "        (*input)[i] = (*input)[i] + 1 : u32;\n" ++
         "    }\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "fn slice_test2(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
+        "function slice_test2(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
         "    add_one(&(*vector0)[2 : u32 .. 3 : u32][0 : u32]);\n" ++
         "    return;\n" ++
         "}"
 
 test3 :: String
-test3 = "fn add_two(input : [u32; 5 : u32]) {\n" ++ 
-        "    for i in 0 : u32 .. 5 : u32 {\n" ++
+test3 = "function add_two(input : [u32; 5 : u32]) {\n" ++ 
+        "    for i : u32 in 0 : u32 .. 5 : u32 {\n" ++
         "        input[i] = input[i] + 2 : u32;\n" ++
         "    }\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "fn slice_test3(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
+        "function slice_test3(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
         "    add_two((*vector0)[2 : u32 .. 3 : u32][0 : u32]);\n" ++
         "    return;\n" ++
         "}"

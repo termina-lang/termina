@@ -17,18 +17,18 @@ import           Utils.TypeSpecifier
 
 -- | Global type information
 data SemGlobal
-  = SVolatile TypeSpecifier
-  | SStatic TypeSpecifier
-  | SShared TypeSpecifier
+  = STask TypeSpecifier
+  | SResource TypeSpecifier
+  | SHandler TypeSpecifier
   | SConst TypeSpecifier
   deriving Show
 
 -- type SemGlobal = SemGlobal' SemAnn
 
 getTySemGlobal :: SemGlobal -> TypeSpecifier
-getTySemGlobal (SVolatile ty) = ty
-getTySemGlobal (SStatic ty)   = ty
-getTySemGlobal (SShared ty)   = ty
+getTySemGlobal (STask ty) = ty
+getTySemGlobal (SResource ty)   = ty
+getTySemGlobal (SHandler ty)   = ty
 getTySemGlobal (SConst ty)    = ty
 
 ----------------------------------------
@@ -37,10 +37,6 @@ getTySemGlobal (SConst ty)    = ty
 data GEntry a
   = GFun [Parameter] TypeSpecifier
   -- ^ Functions
-  | GTask [Parameter] TypeSpecifier
-  -- ^ Tasks
-  | GHand [Parameter] TypeSpecifier
-  -- ^ Handlers
   | GGlob SemGlobal
   -- ^ Globals
   | GType (SemanTypeDef a)
@@ -59,8 +55,12 @@ type SemanClassMember = ClassMember' K SAST.Object
 -- Forgetfull Class member map
 kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
 kClassMember (ClassField idx tyx a) = ClassField idx tyx a
-kClassMember (ClassMethod idx ps self _blk ann) =
-  ClassMethod idx ps self [] ann -- (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet blk))))
+kClassMember (ClassMethod idx ps _blk ann) =
+  ClassMethod idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+kClassMember (ClassProcedure idx ps ty _blk ann) =
+  ClassProcedure idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+kClassMember (ClassViewer idx ps ty _blk ann) =
+  ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 
 -- type GEntry = GEntry' SemAnn
 

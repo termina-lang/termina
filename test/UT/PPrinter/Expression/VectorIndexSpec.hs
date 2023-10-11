@@ -10,9 +10,9 @@ import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
 dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
-twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
 
 refVectorAnn :: SemanticAnns
 refVectorAnn = refSemAnn (Vector UInt32 (KC (I UInt32 10)))
@@ -42,7 +42,7 @@ dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 
 dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) uint32SemAnn)
 
 vector1IndexFirstDym :: Object SemanticAnns
-vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Int64 (I UInt32 5))
+vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Mutable Int64 (I UInt32 5))
 
 vector1IndexExpression :: Expression SemanticAnns
 vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym uint32Index4 int64SemAnn)

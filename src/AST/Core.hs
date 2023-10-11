@@ -37,29 +37,12 @@ data BlockRet' expr obj a
 
 -- | Annotated AST element
 data AnnASTElement' expr obj a =
-  -- | Task construtor
-  Task
-    Identifier -- ^ task identifier (name)
-    [Parameter] -- ^ list of parameters (possibly empty)
-    TypeSpecifier -- ^ returned value type (should be TaskRet)
-    (BlockRet' expr obj a) -- ^ statements block
-    [ Modifier ] -- ^ list of possible modifiers
-    a -- ^ transpiler annotations
 
   -- | Function constructor
-  | Function
+  Function
     Identifier -- ^ function identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-    (BlockRet' expr obj a) -- ^ statements block (with return)
-    [ Modifier ] -- ^ list of possible modifiers
-    a -- ^ transpiler annotations
-
-  -- | Handler constructor
-  | Handler
-    Identifier -- ^ Handler identifier (name)
-    [Parameter] -- ^ list of parameters (TBC)
-    TypeSpecifier -- ^ returned value type (should be Result)
     (BlockRet' expr obj a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
@@ -82,9 +65,7 @@ data AnnASTElement' expr obj a =
   deriving (Show,Functor)
 
 instance Annotated (AnnASTElement' expr glb) where
-  getAnnotation (Task _ _ _ _ _ a) = a
   getAnnotation (Function _ _ _ _ _ a) = a
-  getAnnotation (Handler _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
   getAnnotation (ModuleInclusion {}) =  error "Module Inclusion not defined yet "
@@ -121,10 +102,14 @@ data TypeSpecifier
   -- Non-primitive types
   | MsgQueue TypeSpecifier Size
   | Pool TypeSpecifier Size
-  | Reference TypeSpecifier
+  | Reference AccessKind TypeSpecifier
   | DynamicSubtype TypeSpecifier
+  | Location TypeSpecifier
   -- See Q9
   | Unit
+  deriving (Show)
+
+data AccessKind = Immutable | Mutable | Private
   deriving (Show)
 
 newtype Size = K Integer
@@ -158,30 +143,28 @@ data OptionVariant expr = None | Some expr
 ----------------------------------------
 -- | Datatype representing Global Declarations.
 -- There are three types of global declarations:
--- - volatile
--- - static
--- - shared
--- - const
+-- - global objects  (tasks, resources or handlers)
+-- - constants
 data Global' expr a
   =
-    -- | Volatile global variable constructor
-    Volatile
-      Identifier -- ^ name of the variable
+    -- | Task global variable constructor
+    Task
+      Identifier -- ^ name of the task
       TypeSpecifier -- ^ type of the variable
-      Address -- ^ address where the variable is located
+      (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
-    -- | Static global variable constructor
-    | Static
+    -- | Shared resource global variable constructor
+    | Resource
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
-    -- | Shared global variable constructor
-    | Shared
+    -- | Handler global variable constructor
+    | Handler
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
@@ -199,36 +182,56 @@ data Global' expr a
   deriving (Show, Functor)
 
 instance Annotated (Global' expr) where
-  getAnnotation (Volatile _ _ _ _ a) = a
-  getAnnotation (Static _ _ _ _ a)   = a
-  getAnnotation (Shared _ _ _ _ a)   = a
+  getAnnotation (Task _ _ _ _ a) = a
+  getAnnotation (Resource _ _ _ _ a)   = a
+  getAnnotation (Handler _ _ _ _ a)   = a
   getAnnotation (Const _ _ _ _ a)    = a
 
 -- Extremelly internal type definition
 data TypeDef'' member
   = Struct Identifier [FieldDefinition]  [ Modifier ]
-  | Union Identifier [FieldDefinition] [ Modifier ]
   | Enum Identifier [EnumVariant] [ Modifier ]
-  | Class Identifier [member] [ Modifier ]
+  | Class ClassKind Identifier [member] [ Modifier ]
   deriving (Show, Functor)
+
+data ClassKind = TaskClass | ResourceClass | HandlerClass
+  deriving (Show)
 
 -- Type Defs are the above when composed with Class members.
 type TypeDef' expr obj a = TypeDef'' (ClassMember' expr obj a)
 -------------------------------------------------
 -- Class Member
 data ClassMember' expr obj a
-  -- | Either a Field, basically a variable of the class
-  = ClassField Identifier TypeSpecifier a
-  -- | Or a method. Methods come in two flavours whedata TypeDef' (expr :: * -> *) (a :: *)ther they use themselves
-  -- through variable |self| (needed to invoke another method of the same class)
-  -- Or not.
-  | ClassMethod Identifier [Parameter] SelfMethod (Block' expr obj a) a
+  = 
+    -- | Fields. They form the state  of the object
+    ClassField 
+      Identifier -- ^ name of the field
+      TypeSpecifier -- ^ type of the field
+      a -- ^ transpiler annotation
+    -- | Methods. Methods are internal functions that can privately access the state of the
+    -- object and call other methods of the same class.
+    | ClassMethod 
+      Identifier  -- ^ name of the method
+      (Maybe TypeSpecifier) -- ^ type of the return value (optional)
+      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      a -- ^ transpiler annotation
+    -- | Procedures. They can only be used on shared resources, and constitute their
+    -- interface with the outside world. They define a list of parameters and a block
+    -- of statements. They do not return any value.
+    | ClassProcedure
+      Identifier -- ^ name of the procedure
+      [Parameter] -- ^ list of parameters (possibly empty)
+      (Maybe TypeSpecifier) -- ^ type of the return value (optional)
+      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      a -- ^ transpiler annotation
+    | ClassViewer
+      Identifier -- ^ name of the procedure
+      [Parameter] -- ^ list of parameters (possibly empty)
+      TypeSpecifier -- ^ return type of the viewer
+      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      a -- ^ transpiler annotation
   deriving (Show, Functor)
 
-data SelfMethod = Self | NoSelf
-  deriving Show
-
--------------------------------------------------
 
 ----------------------------------------
 
@@ -245,10 +248,10 @@ data Parameter = Parameter {
   , paramTypeSpecifier :: TypeSpecifier -- ^ type of the parameter
 } deriving (Show)
 
-data FieldValueAssignment' expr a = FieldValueAssignment {
-  fieldAssigIdentifier   :: Identifier
-  , fieldAssigExpression :: expr a
-} deriving (Show, Functor)
+data FieldAssignment' expr a =
+  FieldValueAssignment Identifier (expr a)
+  | FieldAddressAssignment Identifier Address
+  deriving (Show, Functor)
 
 data FieldDefinition = FieldDefinition {
   fieldIdentifier      :: Identifier
@@ -275,18 +278,6 @@ data ElseIf' expr obj a = ElseIf
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
-----------------------------------------
--- Operators to member acesses.
--- Either a user defined function
--- or alloc, send and receive
-data AccessOp
- = UserDef Identifier
- | Alloc
- | Send
- | Receive
- deriving (Show, Eq)
-----------------------------------------
-
   -- | First AST after parsing
 data Expression'
     obj -- ^ objects type
@@ -294,19 +285,19 @@ data Expression'
   = AccessObject (obj a)
   | Constant Const a -- ^ | 24 : i8|
   | BinOp Op (Expression' obj a) (Expression' obj a) a
-  | ReferenceExpression (obj a) a
+  | ReferenceExpression AccessKind (obj a) a
   | Casting (Expression' obj a) TypeSpecifier a
   -- Invocation expressions
   | FunctionExpression Identifier [ Expression' obj a ] a
-  | MemberMethodAccess (obj a) AccessOp [Expression' obj a] a
+  | MemberFunctionAccess (obj a) Identifier [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
   | VectorInitExpression (Expression' obj a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
-  | FieldValuesAssignmentsExpression
+  | FieldAssignmentsExpression
     Identifier -- ^ Structure type identifier
-    [FieldValueAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
+    [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantExpression
@@ -321,20 +312,21 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (AccessObject obj)                       = getAnnotation obj
   getAnnotation (Constant _ a)                           = a
   getAnnotation (BinOp _ _ _ a)                          = a
-  getAnnotation (ReferenceExpression _ a)                = a
+  getAnnotation (ReferenceExpression _ _ a)                = a
   getAnnotation (Casting _ _ a)                          = a
   getAnnotation (FunctionExpression _ _ a)               = a
-  getAnnotation (FieldValuesAssignmentsExpression _ _ a) = a
+  getAnnotation (FieldAssignmentsExpression _ _ a) = a
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (VectorInitExpression _ _ a)             = a
   getAnnotation (OptionVariantExpression _ a)            = a
-  getAnnotation (MemberMethodAccess _ _ _ a)             = a
+  getAnnotation (MemberFunctionAccess _ _ _ a)             = a
 
 
 data Statement' expr obj a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
+    AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
     TypeSpecifier -- ^ type of the variable
     (expr a) -- ^ initialization expression
     a
@@ -351,6 +343,7 @@ data Statement' expr obj a =
   -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
+    TypeSpecifier -- ^ type of iterator variable
     (expr a) -- ^ initial value of the iterator
     (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)

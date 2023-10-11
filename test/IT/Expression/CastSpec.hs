@@ -8,7 +8,7 @@ import Text.Parsec
 import Semantic.TypeChecking
 
 test0 :: String
-test0 = "fn casting_test0() {\n" ++
+test0 = "function casting_test0() {\n" ++
         "    var bar_u8 : u8 = 0 : u8;\n" ++
         "    var bar_u16 : u16 = 0 : u16;\n" ++
         "    var bar_u32 : u32 = 0 : u32;\n" ++

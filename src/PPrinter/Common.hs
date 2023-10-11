@@ -9,24 +9,24 @@ import           Semantic.Monad
 type DocStyle = Doc AnsiStyle
 
 getObjectType :: Object SemanticAnns -> TypeSpecifier
-getObjectType (Variable _ (SemAnn _ (ETy (SimpleType ts))))                  = ts
-getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (SimpleType ts))))   = ts
-getObjectType (MemberAccess _ _ (SemAnn _ (ETy (SimpleType ts))))            = ts
-getObjectType (Dereference _ (SemAnn _ (ETy (SimpleType ts))))               = ts
-getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
-getObjectType (Undyn _ (SemAnn _ (ETy (SimpleType ts))))                     = ts
-getObjectType obj = error $ "invalid object annotation: " ++ show obj
+getObjectType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = ts
+getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))   = ts
+getObjectType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = ts
+getObjectType (Dereference _ (SemAnn _ (ETy (ObjectType _ ts))))               = ts
+getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = ts
+getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = ts
+getObjectType ann = error $ "invalid object annotation: " ++ show ann
 
 getType :: Expression SemanticAnns -> TypeSpecifier
 getType (AccessObject obj) = getObjectType obj
 getType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
-getType (ReferenceExpression _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (ReferenceExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (FunctionExpression _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
-getType (MemberMethodAccess _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
-getType (FieldValuesAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
+getType (MemberFunctionAccess _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = ts
+getType (FieldAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType (VectorInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = ts
 getType _ = error "invalid expression annotation"
@@ -54,6 +54,7 @@ getObjPrecedence :: Object SemanticAnns -> Int
 getObjPrecedence (Variable _ _) = 0
 getObjPrecedence (VectorIndexExpression {}) = 1
 getObjPrecedence (MemberAccess {}) = 1
+getObjPrecedence (DereferenceMemberAccess {}) = 1
 getObjPrecedence obj@(Dereference _ _) = 
   case getObjectType obj of
     (Vector _ _) -> 1
@@ -66,11 +67,11 @@ getExpPrecedence (AccessObject obj) = getObjPrecedence obj
 getExpPrecedence (Constant _ _) = 0
 getExpPrecedence (OptionVariantExpression _ _) = 0
 getExpPrecedence (BinOp op _ _ _) = getBinOpPrecedence op
-getExpPrecedence (ReferenceExpression _ _) = 2
+getExpPrecedence (ReferenceExpression {}) = 2
 getExpPrecedence (Casting {}) = 2
 getExpPrecedence (FunctionExpression {}) = 0
-getExpPrecedence (MemberMethodAccess {}) = 1
-getExpPrecedence (FieldValuesAssignmentsExpression {}) = 0
+getExpPrecedence (MemberFunctionAccess {}) = 1
+getExpPrecedence (FieldAssignmentsExpression {}) = 0
 getExpPrecedence (EnumVariantExpression {}) = 0
 getExpPrecedence (VectorInitExpression {}) = 0
 
@@ -210,7 +211,7 @@ ppReturnType identifier (Vector _ _) = ppReturnVectorValueStructure identifier
 ppReturnType _ ts                    = ppTypeSpecifier ts
 
 ppParameterDeclaration :: DocStyle -> Parameter -> DocStyle
-ppParameterDeclaration _ (Parameter identifier (Reference ts)) =
+ppParameterDeclaration _ (Parameter identifier (Reference _ ts)) =
   case ts of
     (Vector _ _) -> ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts
     _            -> ppTypeSpecifier ts <+> pretty "*" <+> pretty identifier
@@ -251,28 +252,13 @@ ppModifier (Modifier identifier Nothing) = pretty identifier
 -- TODO: Support modifiers with non-integer values
 ppModifier m = error $ "unsupported modifier: " ++ show m
 
-methodAccessOp :: AccessOp -> DocStyle
-methodAccessOp (UserDef ident) = pretty ident
-methodAccessOp Alloc = pretty "alloc"
-methodAccessOp Send = pretty "send"
-methodAccessOp Receive = pretty "receive"
-
-methodNameAOp :: Identifier -> AccessOp -> DocStyle
-methodNameAOp identifier = (pretty ("__" ++ identifier ++ "_") <>) . methodAccessOp
-
 methodName :: Identifier -> Identifier -> DocStyle
 methodName ident = (pretty ("__" ++ ident ++ "_") <>) . pretty
 
-poolMethodNameAOp :: AccessOp -> DocStyle
-poolMethodNameAOp = methodNameAOp "termina_pool"
-
-poolMethodName :: String -> DocStyle
+poolMethodName :: Identifier -> DocStyle
 poolMethodName = methodName "termina_pool"
 
-msgQueueMethodNameAOp :: AccessOp -> DocStyle
-msgQueueMethodNameAOp = methodNameAOp "termina_msg_queue"
-
-msgQueueMethodName :: String -> DocStyle
+msgQueueMethodName :: Identifier -> DocStyle
 msgQueueMethodName = methodName "termina_msg_queue"
 
 -- | Prints the name of the function that frees an objet to the pool

@@ -11,34 +11,34 @@ import UT.PPrinter.Expression.Common
 
 var0, var1, pVar :: Object SemanticAnns
 -- | var0 : u16
-var0 = Variable "var0" uint16SemAnn
+var0 = Variable "var0" (objSemAnn Mutable UInt16)
 -- | dynVar1 : 'dyn u16
 var1 = Variable "var1" dynUInt16SemAnn
 -- | p_var : &u16
 pVar = Variable "p_var" refUInt16SemAnn
 
 undynVar1 :: Expression SemanticAnns
-undynVar1 = AccessObject (Undyn var1 uint16SemAnn)
+undynVar1 = AccessObject (Undyn var1 (objSemAnn Mutable UInt16))
 
 referenceVar0, referenceVar1 :: Expression SemanticAnns
--- | &var0 : &u16
-referenceVar0 = ReferenceExpression var0 refUInt16SemAnn
--- | &var1 : &u16
-referenceVar1 = ReferenceExpression var1 refUInt16SemAnn
+-- | &mut var0 : &u16
+referenceVar0 = ReferenceExpression Mutable var0 refUInt16SemAnn
+-- | &mut var1 : &u16
+referenceVar1 = ReferenceExpression Mutable var1 refUInt16SemAnn
 
 dereferencepVar :: Object SemanticAnns
 -- | *p_var : u16
 dereferencepVar = Dereference pVar uint16SemAnn
 
 vector0, dynVector0 :: Object SemanticAnns
-vector0 = Variable "vector0" (vectorSemAnn UInt32 (I UInt32 10))
+vector0 = Variable "vector0" (vectorSemAnn Mutable UInt32 (I UInt32 10))
 dynVector0 = Variable "dynVector0" (dynVectorSemAnn UInt32 (I UInt32 10))
 
 pVector1 :: Expression SemanticAnns
 pVector1 = AccessObject (Variable "p_vector1" (refVectorSemAnn UInt32 (I UInt32 10)))
 
 referenceVector0 :: Expression SemanticAnns
-referenceVector0 = ReferenceExpression vector0 (refVectorSemAnn UInt32 (I UInt32 10))
+referenceVector0 = ReferenceExpression Mutable vector0 (refVectorSemAnn UInt32 (I UInt32 10))
 
 uint16Const :: Expression SemanticAnns
 uint16Const = Constant (I UInt16 1024) uint16SemAnn
@@ -58,12 +58,12 @@ functionCallSingleVar0, functionCallSingleDynVar1,
   functionCallSinglepVar :: Expression SemanticAnns
 functionCallSingleVar0 = FunctionExpression "foo" [AccessObject var0] (funSemAnn [Parameter "param0" UInt16] UInt16)
 functionCallSingleDynVar1 = FunctionExpression "foo" [AccessObject var1] (funSemAnn [Parameter "param0" (DynamicSubtype UInt16)] Unit)
-functionCallSinglepVar = FunctionExpression "foo" [AccessObject pVar] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
+functionCallSinglepVar = FunctionExpression "foo" [AccessObject pVar] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
   functionCallSingleDerefpVar :: Expression SemanticAnns
-functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
-functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceVar1] (funSemAnn [Parameter "param0" (Reference UInt16)] Unit)
+functionCallSingleRefVar0 = FunctionExpression "foo" [referenceVar0] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
+functionCallSingleRefDynVar1 = FunctionExpression "foo" [referenceVar1] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 functionCallSingleDerefpVar = FunctionExpression "foo" [AccessObject dereferencepVar] (funSemAnn [Parameter "param0" UInt16] Unit)
 
 functionCallRetArray :: Expression SemanticAnns
@@ -83,10 +83,10 @@ functionCallSingleVector0, functionCallSingleDynVector0,
   functionCallSinglepVector1 :: Expression SemanticAnns
 functionCallSingleVector0 = FunctionExpression "foo" [AccessObject vector0] (funSemAnn [Parameter "param0" (Vector UInt32 (KC (I UInt32 10)))] Unit)
 functionCallSingleDynVector0 = FunctionExpression "foo" [AccessObject dynVector0] (funSemAnn [Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10))))] Unit)
-functionCallSinglepVector1 = FunctionExpression "foo" [pVector1] (funSemAnn [Parameter "param0" (Reference (Vector UInt32 (KC (I UInt32 10))))] Unit)
+functionCallSinglepVector1 = FunctionExpression "foo" [pVector1] (funSemAnn [Parameter "param0" (Reference Mutable (Vector UInt32 (KC (I UInt32 10))))] Unit)
 
 functionCallSingleRefVector0 :: Expression SemanticAnns
-functionCallSingleRefVector0 = FunctionExpression "foo" [referenceVector0] (funSemAnn [Parameter "param0" (Reference (Vector UInt32 (KC (I UInt32 10))))] Unit)
+functionCallSingleRefVector0 = FunctionExpression "foo" [referenceVector0] (funSemAnn [Parameter "param0" (Reference Mutable (Vector UInt32 (KC (I UInt32 10))))] Unit)
 
 call2Parameters, call3Parameters, call4Parameters :: Expression SemanticAnns
 call2Parameters = FunctionExpression "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
@@ -96,7 +96,7 @@ call3Parameters = FunctionExpression "foo3"
     AccessObject vector0,
     var1PlusConstant
   ] (funSemAnn [
-    Parameter "param0" (Reference UInt16),
+    Parameter "param0" (Reference Mutable UInt16),
     Parameter "param1" (Vector UInt32 (KC (I UInt32 10))),
     Parameter "param2" UInt16
     ] Unit)
@@ -108,7 +108,7 @@ call4Parameters = FunctionExpression "foo4"
     call2Parameters
   ] (funSemAnn [
     Parameter "param0" (DynamicSubtype (Vector UInt32 (KC (I UInt32 10)))),
-    Parameter "param1" (Reference UInt16),
+    Parameter "param1" (Reference Mutable UInt16),
     Parameter "param2" UInt16,
     Parameter "param3" UInt16
     ] Unit)
