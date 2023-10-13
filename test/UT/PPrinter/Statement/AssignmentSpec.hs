@@ -13,13 +13,13 @@ tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
 
 optionDynUInt32SemAnn :: SemanticAnns
-optionDynUInt32SemAnn = optionDynSemAnn UInt32
+optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
-vectorTMDescriptorAnn = vectorSemAnn tmDescriptorTS (I UInt32 20)
-twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
-twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
+vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (I UInt32 20)
+twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (I UInt32 5)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
 vector1 = Variable "vector1" vectorAnn
@@ -38,17 +38,17 @@ vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (Vari
 vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
 foo1, foo2 :: Object SemanticAnns
-foo1 = Variable "foo1" uint32SemAnn
-foo2 = Variable "foo2" uint32SemAnn
+foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
+foo2 = Variable "foo2" (objSemAnn Mutable UInt32)
 
 foo1Assign, foo2Assign :: Statement SemanticAnns
-foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" uint32SemAnn)) undefined
+foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))) undefined
 foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
 
 structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnns
-structASemAnn = definedTypeSemAnn "StructA"
-tmDescriptorSemAnn = definedTypeSemAnn "TMDescriptor"
-messageSemAnn = definedTypeSemAnn "Message"
+structASemAnn = definedTypeSemAnn Mutable "StructA"
+tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
+messageSemAnn = definedTypeSemAnn Mutable "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
@@ -58,14 +58,14 @@ uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
 structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
-    FieldValuesAssignmentsExpression "StructA"
+    FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0,
          FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
 tmDescriptorFieldsInit0 = 
-    FieldValuesAssignmentsExpression "TMDescriptor"
+    FieldAssignmentsExpression "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0,
          FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
 
@@ -94,7 +94,7 @@ option0 =  Variable "option0" optionDynUInt32SemAnn
 option1 =  Variable "option1" optionDynUInt32SemAnn
 
 undynVar0 :: Object SemanticAnns
-undynVar0 = Undyn dynVar0 uint32SemAnn
+undynVar0 = Undyn dynVar0 (objSemAnn Mutable UInt32)
 
 undynVar0AssignFoo1, undynVar0AssignConst :: Statement SemanticAnns
 undynVar0AssignFoo1 = AssignmentStmt undynVar0 (AccessObject foo1) undefined

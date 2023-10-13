@@ -69,9 +69,8 @@ memberIntCons _ _      = False
 
 identifierType :: TypeDef' expr lho a -> Identifier
 identifierType (Struct ident _ _) = ident
-identifierType (Union ident _ _)  = ident
 identifierType (Enum ident _ _)   = ident
-identifierType (Class ident _ _)  = ident
+identifierType (Class _ ident _ _)  = ident
 
 referenceType :: TypeSpecifier -> Bool
 referenceType Unit           = False

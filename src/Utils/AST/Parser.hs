@@ -19,7 +19,8 @@ groundTyEq  Unit Unit = True
 groundTyEq  (Option _) (Option Unit) = True
 groundTyEq  (Option Unit) (Option _) = True
 groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (Reference tyspecl) (Reference tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
 -- TODO: These are considered complex types and should be handled differently
 groundTyEq  (Vector typespecl sizeel) (Vector typespecr sizer) = groundTyEq typespecl typespecr && constExprEq sizeel sizer
@@ -44,7 +45,7 @@ data ClassDep
   -- Variables
   = SVar Identifier
   -- Method accesses
-  | MethodAccess ClassDep AccessOp
+  | FunctionAccess ClassDep Identifier
   -- Field accesses
   | FieldAccess ClassDep Identifier
   -- We mark as undec objects defined through expressions.
@@ -53,8 +54,7 @@ data ClassDep
 
 depToList :: ClassDep -> (Identifier, [Identifier])
 depToList (SVar i)           = (i, [])
-depToList (MethodAccess a (UserDef i)) = (\(r,as) -> (r, i : as)) $ depToList a
-depToList (MethodAccess a _ ) = depToList a
+depToList (FunctionAccess a i) = (\(r,as) -> (r, i : as)) $ depToList a
 depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) $ depToList a
 -- depToList Undec              = Nothing
 
@@ -84,11 +84,12 @@ getDepObj = getDepObj'
     --   = let (dnm, deps) = getDepObj' obj
     --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
 
-getDepBlock :: Block a -> [ClassDep]
-getDepBlock = concatMap getDepStmt
+getDepBlock :: BlockRet a -> [ClassDep]
+getDepBlock (BlockRet bs (ReturnStmt (Just expr) _)) = concatMap getDepStmt bs ++ getDepExp expr
+getDepBlock (BlockRet bs (ReturnStmt Nothing _)) = concatMap getDepStmt bs
 
 getDepStmt :: Statement a -> [ClassDep]
-getDepStmt (Declaration _ _ e _)
+getDepStmt (Declaration _ _ _ e _)
   = getDepExp e
 getDepStmt (AssignmentStmt _ e _)
   = getDepExp e
@@ -99,7 +100,7 @@ getDepStmt (IfElseStmt ec tB eB fB _)
       (\eC -> getDepExp (elseIfCond eC) ++ concatMap getDepStmt (elseIfBody eC) )
       eB
   ++ concatMap getDepStmt fB
-getDepStmt (ForLoopStmt _ initE lastE breakE body _)
+getDepStmt (ForLoopStmt _ _ initE lastE breakE body _)
   = concatMap getDepExp [initE, lastE]
   ++ maybe [] getDepExp breakE
   ++ concatMap getDepStmt body
@@ -116,18 +117,18 @@ getDepExp :: Expression a -> [ClassDep]
 getDepExp (AccessObject obj) =
   let (dnm, deps) = getDepObj obj in (dnm : deps)
 getDepExp (Constant {}) = []
-getDepExp ( BinOp _op le re _ann ) = getDepExp le ++ getDepExp re
-getDepExp ( ReferenceExpression obj _ann ) =
+getDepExp (BinOp _op le re _ann) = getDepExp le ++ getDepExp re
+getDepExp (ReferenceExpression _ obj _ann) =
   let (dnm, deps) = getDepObj obj in (dnm : deps)
-getDepExp ( Casting e _ty _ann ) = getDepExp e
-getDepExp ( FunctionExpression _id args _ann) = concatMap getDepExp args
-getDepExp ( VectorInitExpression iE _const _ann ) = getDepExp iE
-getDepExp ( FieldValuesAssignmentsExpression _id fs _ann )
-  = concatMap (getDepExp . fieldAssigExpression) fs
+getDepExp (Casting e _ty _ann ) = getDepExp e
+getDepExp (FunctionExpression _id args _ann) = concatMap getDepExp args
+getDepExp (VectorInitExpression iE _const _ann) = getDepExp iE
+getDepExp (FieldAssignmentsExpression _id fs _ann)
+  = concat [getDepExp expr | FieldValueAssignment _ expr <- fs]
 getDepExp (EnumVariantExpression _i1 _i2 es _ann) = concatMap getDepExp es
 getDepExp (OptionVariantExpression os _ann)
   =  case os of
        None   -> []
        Some e -> getDepExp e
-getDepExp (MemberMethodAccess obj accop es _ann) =
-  let (dnm, deps) = getDepObj obj in MethodAccess dnm accop : deps ++ concatMap getDepExp es
+getDepExp (MemberFunctionAccess obj accop es _ann) =
+  let (dnm, deps) = getDepObj obj in FunctionAccess dnm accop : deps ++ concatMap getDepExp es

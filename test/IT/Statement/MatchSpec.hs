@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn match_test0(option0 : Option<'dyn u32>) -> u32 {\n" ++
+test0 = "function match_test0(option0 : Option<dyn u32>) : u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    match option0 {\n" ++
         "        case Some(value) => {\n" ++
@@ -22,7 +22,7 @@ test0 = "fn match_test0(option0 : Option<'dyn u32>) -> u32 {\n" ++
         "}"
 
 test1 :: String
-test1 = "fn match_test1(option0 : Option<'dyn u32>) -> u32 {\n" ++
+test1 = "function match_test1(option0 : Option<dyn u32>) : u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    match option0 {\n" ++
         "        case None => {\n" ++
@@ -42,7 +42,7 @@ test2 = "enum Message {\n" ++
         "    Reset\n" ++
         "};\n" ++
         "\n" ++
-        "fn match_test1() -> u32 {\n" ++
+        "function match_test1() : u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    var msg : Message = Message::In(10 : u32, 10 : u32);\n" ++
         "    match msg {\n" ++

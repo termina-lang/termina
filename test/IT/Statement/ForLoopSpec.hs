@@ -8,18 +8,18 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn for_loop_test0(array0 : [u16; 10 : u32]) -> u16 {\n" ++
+test0 = "function for_loop_test0(array0 : [u16; 10 : u32]) : u16 {\n" ++
         "    var total : u16 = 0 : u16;\n" ++
-        "    for i in 0 : u32 .. 10 : u32 {\n" ++
+        "    for i : u32 in 0 : u32 .. 10 : u32 {\n" ++
         "        total = total + array0[i];\n" ++  
         "    }\n" ++
         "    return total;\n" ++
         "}"
 
 test1 :: String
-test1 = "fn for_loop_test1(array0 : & [u16; 10 : u32]) -> bool {\n" ++
+test1 = "function for_loop_test1(array0 : & [u16; 10 : u32]) : bool {\n" ++
         "    var found : bool = false;\n" ++
-        "    for i in 0 : u32 .. 10 : u32 while found == false {\n" ++
+        "    for i : u32 in 0 : u32 .. 10 : u32 while found == false {\n" ++
         "        if (*array0)[i] == 1024 : u16 {\n" ++
         "            found = true;\n" ++
         "        }\n" ++   

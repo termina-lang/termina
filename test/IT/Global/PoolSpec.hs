@@ -15,10 +15,10 @@ test0 = "enum Message {\n" ++
         "    Reset\n" ++
         "};\n" ++
         "\n" ++
-        "protected message_pool : Pool<Message; 10>;\n" ++
+        "resource message_pool : Pool<Message; 10>;\n" ++
         "\n" ++
-        "fn test0(in0 : u32, in1 : u32) {\n" ++
-        "    var alloc_msg : Option<'dyn Message> = None;\n" ++
+        "function test0(in0 : u32, in1 : u32) {\n" ++
+        "    var alloc_msg : Option<dyn Message> = None;\n" ++
         "    message_pool.alloc(&alloc_msg);\n" ++
         "    match alloc_msg {\n" ++
         "        case Some(msg) => {\n" ++

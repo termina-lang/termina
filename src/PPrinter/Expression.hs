@@ -62,7 +62,7 @@ ppDynamicSubtypeObjectAddress subs obj =
 ppRefDynamicSubtypeObjectAddress :: Printer Expression
 ppRefDynamicSubtypeObjectAddress subs expr =
     case getType expr of
-        Reference (DynamicSubtype ts) ->
+        Reference _ (DynamicSubtype ts) ->
             parens (ppDynamicSubtypeCast ts) <> (
                 -- If the expression has a precedence lower than the cast (2), we need
                 -- to add parenthesis
@@ -83,7 +83,7 @@ ppMemberAccessExpression :: Substitutions -> Expression SemanticAnns -> Expressi
 -- | If the right hand side is a function, then it is a method call
 ppMemberAccessExpression subs lhs (FunctionExpression methodId params _) =
     case getType lhs of
-        (Reference ts) ->
+        (Reference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
@@ -144,10 +144,15 @@ ppObject subs (MemberAccess obj identifier _) =
         parens (ppObject subs obj) <> pretty "." <> pretty identifier
     else
         ppObject subs obj <> pretty "." <> pretty identifier
+ppObject subs (DereferenceMemberAccess obj identifier _) = 
+    if getObjPrecedence obj > 1 then
+        parens (ppObject subs obj) <> pretty "->" <> pretty identifier
+    else
+        ppObject subs obj <> pretty "->" <> pretty identifier
 ppObject subs (Dereference obj _) =
         case getObjectType obj of
         -- | A dereference to a vector is printed as the name of the vector
-        (Reference (Vector _ _)) -> ppObject subs obj
+        (Reference _ (Vector _ _)) -> ppObject subs obj
         _ -> 
             if getObjPrecedence obj > 2 then
                 ppCDereferenceExpression $ parens (ppObject subs obj)
@@ -205,7 +210,7 @@ ppExpression' subs expr = ppExpression subs expr
 ppExpression :: Printer Expression
 ppExpression subs (AccessObject obj) = ppObject subs obj
 -- | If the expresssion is a referece, we need to check if it is to a dynamic subtype
-ppExpression subs (ReferenceExpression obj _) =
+ppExpression subs (ReferenceExpression _ obj _) =
     case getObjectType obj of
         -- | A reference to a dynamic subtype is the address stored in the object
         (DynamicSubtype _) -> ppDynamicSubtypeObjectAddress subs obj
@@ -244,41 +249,41 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
         case getType expr of
             Vector {} -> ppCFunctionCall (pretty identifier) ins <> pretty ".array"
             _ -> ppCFunctionCall (pretty identifier) ins
-ppExpression subs (MemberMethodAccess obj methodId params _) =
+ppExpression subs (MemberFunctionAccess obj methodId params _) =
     case getObjectType obj of
-        (Reference ts) ->
+        (Reference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
                     ppCFunctionCall
-                        (classMethodNameAOp classId methodId)
+                        (classMethodName classId methodId)
                         (ppObject subs obj : (ppExpression subs <$> params))
                 -- | If the left hand side is a pool:
                 (Pool _ _) ->
                     ppCFunctionCall
-                        (poolMethodNameAOp methodId)
+                        (poolMethodName methodId)
                         (ppObject subs obj : (ppExpression subs <$> params))
                 -- | If the left hand side is a message queue:
                 (MsgQueue _ _) ->
                     ppCFunctionCall
-                        (msgQueueMethodNameAOp methodId)
+                        (msgQueueMethodName methodId)
                         (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
                 -- | Anything else should not happen
                 _ -> error "unsupported expression"
         -- | If the left hand size is a class:
         (DefinedType classId) ->
             ppCFunctionCall
-                (classMethodNameAOp classId methodId)
+                (classMethodName classId methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
         (Pool _ _) ->
             ppCFunctionCall
-                (poolMethodNameAOp methodId)
+                (poolMethodName methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
         (MsgQueue _ _) ->
             ppCFunctionCall
-                (msgQueueMethodNameAOp methodId)
+                (msgQueueMethodName methodId)
                 (ppCReferenceExpression (ppObject subs obj) : (ppExpression subs <$> params))
         -- | Anything else should not happen
         _ -> error "unsupported expression"

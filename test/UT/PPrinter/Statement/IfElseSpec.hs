@@ -16,33 +16,33 @@ vectorTS :: TypeSpecifier
 vectorTS = Vector UInt32 (KC (I UInt32 10))
 
 optionDynUInt32SemAnn :: SemanticAnns
-optionDynUInt32SemAnn = optionDynSemAnn UInt32
+optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
 
 vector0 :: Expression SemanticAnns
-vector0 = AccessObject ( (Variable "vector0" vectorAnn))
+vector0 = AccessObject (Variable "vector0" vectorAnn)
 
 vector1 :: Statement SemanticAnns
-vector1 = Declaration "vector1" vectorTS vector0 undefined
+vector1 = Declaration "vector1" Mutable vectorTS vector0 undefined
 
 foo0 :: Expression SemanticAnns
-foo0 = AccessObject ( (Variable "foo0" uint32SemAnn))
+foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
 uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 
 constToFoo0 :: Statement SemanticAnns
-constToFoo0 = AssignmentStmt ((Variable "foo0" uint32SemAnn)) uint32Const0 undefined
+constToFoo0 = AssignmentStmt ((Variable "foo0" (objSemAnn Mutable UInt32))) uint32Const0 undefined
 
 dynVar0 :: Expression SemanticAnns
-dynVar0 = AccessObject ( (Variable "dyn_var0" dynUInt32SemAnn))
+dynVar0 = AccessObject (Variable "dyn_var0" dynUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnns
-option0 = Declaration "option0" optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
-option1 = Declaration "option1" optionDynUInt32TS (OptionVariantExpression None optionDynUInt32SemAnn) undefined
+option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
+option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantExpression None optionDynUInt32SemAnn) undefined
 
 twoDeclarations :: [Statement SemanticAnns]
 twoDeclarations = [vector1, option0]

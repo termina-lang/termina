@@ -22,36 +22,36 @@ vectorTMDescriptorTS = Vector tmDescriptorTS (KC (I UInt32 20))
 twoDimVectorTS = Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10))
 
 optionDynUInt32SemAnn :: SemanticAnns
-optionDynUInt32SemAnn = optionDynSemAnn UInt32
+optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
-vectorTMDescriptorAnn = vectorSemAnn tmDescriptorTS (I UInt32 20)
-twoDymVectorRowAnn = vectorSemAnn Int64 (I UInt32 5)
-twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
+vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (I UInt32 20)
+twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (I UInt32 5)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
 
 vector0 :: Expression SemanticAnns
 vector0 = AccessObject ( (Variable "vector0" vectorAnn))
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnns
-vector1 = Declaration "vector1" vectorTS vector0 undefined
-vector2 = Declaration "vector2" twoDimVectorTS (AccessObject ( (Variable "vector1" twoDymVectorAnn))) undefined
-vector3 = Declaration "vector3" vectorTS (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
-vector4 = Declaration "vector4" twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5 = Declaration "vector5" twoDimVectorTS (VectorInitExpression (AccessObject ( (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector6 = Declaration "vector6" vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
+vector1 = Declaration "vector1" Mutable vectorTS vector0 undefined
+vector2 = Declaration "vector2" Mutable twoDimVectorTS (AccessObject ( (Variable "vector1" twoDymVectorAnn))) undefined
+vector3 = Declaration "vector3" Mutable vectorTS (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
+vector4 = Declaration "vector4" Mutable twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
+vector5 = Declaration "vector5" Mutable twoDimVectorTS (VectorInitExpression (AccessObject ( (Variable "vector_row" twoDymVectorRowAnn))) (KC (I UInt32 10)) twoDymVectorAnn) undefined
+vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
 
 foo0 :: Expression SemanticAnns
 foo0 = AccessObject ( (Variable "foo0" uint32SemAnn))
 
 foo1, foo2 :: Statement SemanticAnns
-foo1 = Declaration "foo1" UInt32 foo0 undefined
-foo2 = Declaration "foo2" UInt32 uint32Const0 undefined
+foo1 = Declaration "foo1" Mutable UInt32 foo0 undefined
+foo2 = Declaration "foo2" Mutable UInt32 uint32Const0 undefined
 
 structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnns
-structASemAnn = definedTypeSemAnn "StructA"
-tmDescriptorSemAnn = definedTypeSemAnn "TMDescriptor"
-messageSemAnn = definedTypeSemAnn "Message"
+structASemAnn = definedTypeSemAnn Mutable "StructA"
+tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
+messageSemAnn = definedTypeSemAnn Mutable "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
@@ -61,31 +61,31 @@ uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
 structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
-    FieldValuesAssignmentsExpression "StructA"
+    FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0,
          FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
 tmDescriptorFieldsInit0 = 
-    FieldValuesAssignmentsExpression "TMDescriptor"
+    FieldAssignmentsExpression "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0,
          FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
 
 struct0, struct1 :: Statement SemanticAnns
-struct0 = Declaration "struct0" tmDescriptorTS tmDescriptorFieldsInit0 undefined
-struct1 = Declaration "struct1" tmDescriptorTS (AccessObject ( (Variable "struct0" tmDescriptorSemAnn))) undefined
+struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 undefined
+struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject ( (Variable "struct0" tmDescriptorSemAnn))) undefined
 
 enum0, enum1 :: Statement SemanticAnns
-enum0 = Declaration "enum0" messageTS (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
-enum1 = Declaration "enum1" messageTS (EnumVariantExpression "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
+enum0 = Declaration "enum0" Mutable messageTS (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined
+enum1 = Declaration "enum1" Mutable messageTS (EnumVariantExpression "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
 dynVar0 :: Expression SemanticAnns
 dynVar0 = AccessObject ( (Variable "dyn_var0" dynUInt32SemAnn))
 
 option0, option1 :: Statement SemanticAnns
-option0 = Declaration "option0" optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
-option1 = Declaration "option1" optionDynUInt32TS (OptionVariantExpression None optionDynUInt32SemAnn) undefined
+option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) undefined
+option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantExpression None optionDynUInt32SemAnn) undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement = render . ppStatement empty

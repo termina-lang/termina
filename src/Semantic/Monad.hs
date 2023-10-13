@@ -41,12 +41,18 @@ data SAnns a = SemAnn
   , ty_ann   :: a}
   deriving Show
 
+data ObjectAnn = ObjectAnn
+  {
+    accessKind :: AccessKind
+  , objTy      :: TypeSpecifier
+  } deriving Show
 
 instance Annotated SAnns where
   getAnnotation = ty_ann
 
 data ESeman
   = SimpleType TypeSpecifier
+  | ObjectType AccessKind TypeSpecifier
   | AppType [Parameter] TypeSpecifier
   deriving Show
 
@@ -64,8 +70,12 @@ getEType (ETy t) = Just t
 getEType _ = Nothing
 
 getResultingType :: SemanticElems -> Maybe TypeSpecifier
-getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; AppType _ t -> t})
+getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ t -> t})
 getResultingType _        = Nothing
+
+getObjectSAnns :: SemanticAnns -> Maybe (AccessKind, TypeSpecifier)
+getObjectSAnns (SemAnn _ (ETy (ObjectType ak ty))) = Just (ak, ty)
+getObjectSAnns _                                   = Nothing
 
 getArgumentsType :: SemanticElems -> Maybe [Parameter]
 getArgumentsType (ETy (AppType ts _)) = Just ts
@@ -81,6 +91,9 @@ getGEntry _       = Nothing
 
 buildExpAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnn loc = SemAnn loc . ETy . SimpleType
+
+buildExpAnnObj :: Locations -> AccessKind -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnnObj loc ak = SemAnn loc . ETy . ObjectType ak
 
 buildExpAnnApp :: Locations -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnnApp loc tys = SemAnn loc . ETy . AppType tys
@@ -108,8 +121,10 @@ getTypeSAnns  = getResultingType . ty_ann
 
 undynExpType :: ESeman -> ESeman
 undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
+undynExpType (ObjectType ak (DynamicSubtype ty)) = ObjectType ak ty
 undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
 undynExpType _ = error "impossible 888+1"
+
 undynTypeAnn :: SemanticAnns -> SemanticAnns
 undynTypeAnn (SemAnn p (ETy en)) = SemAnn p (ETy (undynExpType en))
 undynTypeAnn _                                    = error "impossible 888"
@@ -128,9 +143,9 @@ type SemanticErrors = AnnotatedErrors Locations
 type GlobalEnv = Map Identifier (GEntry SemanticAnns)
 -- | Local env
 -- variables to their type
-type LocalEnv = Map Identifier TypeSpecifier
+type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
 -- | Read Only Environment.
-type ROEnv = Map Identifier TypeSpecifier
+type ROEnv = Map Identifier (AccessKind, TypeSpecifier)
 -- This may seem a bad decision, but each envornment represent something
 -- different.
 -- TODO We can use empty types to disable envirnoments and make Haskell do part
@@ -221,24 +236,32 @@ getFunctionTy loc iden =
 
 
 
--- | Adding new *local* variables.
--- Computation is executed in a new local environment.
-addTempVars :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
-addTempVars loc newVars ma  =
+-- | Add new *local* immutable objects and execute computation in the
+-- new local environment.
+addLocalMutObjs :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
+addLocalMutObjs loc newVars ma  =
   localScope (addVariables newVars >> ma)
   where
-    addVariables = mapM_ (uncurry (insertLocalVar loc))
+    addVariables = mapM_ (uncurry (insertLocalMutObj loc))
 
--- | Insert varialbe in local scope.
-
-insertLocalVar :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
-insertLocalVar loc ident ty =
+-- | Insert mutable object (variable) in local scope.
+insertLocalMutObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
+insertLocalMutObj loc ident ty =
   isDefined ident
   >>= \b -> if b
   then -- | if there is throw error
   throwError $ annotateError loc $ EVarDefined ident
   else -- | If there is no variable named |ident|
-  modify (\s -> s{local = M.insert ident ty (local s)})
+  modify (\s -> s{local = M.insert ident (Mutable, ty) (local s)})
+
+insertROImmObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
+insertROImmObj loc ident ty =
+  isDefined ident
+  >>= \b -> if b
+  then -- | if there is throw error
+  throwError $ annotateError loc $ EVarDefined ident
+  else -- | If there is no variable named |ident|
+  modify (\s -> s{local = M.insert ident (Immutable, ty) (ro s)})
 
 insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
@@ -257,46 +280,26 @@ insertGlobal ident entry err =
   else modify (\s -> s{global = M.insert ident entry (global s)})
 
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
-insertLocalVariables loc = mapM_ (uncurry (insertLocalVar loc))
+insertLocalVariables loc = mapM_ (uncurry (insertROImmObj loc))
 
--- | Get the Type of a local (already) defined variable. If it is not defined throw an error.
-getLocalVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getLocalVarTy loc ident =
-  -- | Get local variables map and check if |ident| is a member of that map
+-- | Get the type of a local (already) defined object. If it is not defined throw an error.
+getLocalObjTy :: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
+getLocalObjTy loc ident =
+  -- | Get local objects map and check if |ident| is a member of that map
   maybe
-   (throwError $ annotateError loc (ENotNamedVar ident))
-  -- ^ if |ident| is not a member throw error |ENotNamedVar|
-   return
-  -- ^ if |ident| is a member return its type
-  . M.lookup ident
-  =<< gets local
-
--- | Get the Type of a global defined variable. If it is not defined throw an error.
-getGlobalVarTyLhs :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getGlobalVarTyLhs loc ident =
-  maybe (throwError $ annotateError loc (ENotNamedGlobal ident))
-  (\case{
-      GGlob glb ->
-      if lhsGlobal glb then return (getTySemGlobal glb)
-      else throwError (annotateError loc (EGlobalNotLHS ident))
-      ;
-      _ -> throwError (annotateError loc (EGlobalOtherType ident));
-        })
-  . M.lookup ident =<< gets global
-  where
-    -- TODO [Q20]
-    lhsGlobal (SVolatile {}) = True
-    lhsGlobal (SStatic {})   = True
-    lhsGlobal (SShared {})   = True
-    lhsGlobal (SConst {})    = False
+    -- | if |ident| is not a member throw error |ENotNamedObject|
+    (throwError $ annotateError loc (ENotNamedObject ident))
+    -- | if |ident| is a member return its type and access kind
+    return . M.lookup ident =<< gets local
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
-getROVarTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getROVarTy loc ident =
-  (M.lookup ident <$> gets ro)
-  -- | Get local variables map and check if |ident| is a member of that map
-  >>= maybe (throwError (annotateError loc (ENotNamedVar ident))) return
-  -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
+getROObjTy :: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
+getROObjTy loc ident =
+  maybe
+    -- | if |ident| is not a member throw error |ENotNamedObject|
+    (throwError $ annotateError loc (ENotNamedObject ident))
+    -- | if |ident| is a member return its type
+    return . M.lookup ident =<< gets ro
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)
@@ -306,51 +309,33 @@ getGlobalGEnTy loc ident =
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
-getLHSVarTy,getRHSVarTy:: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getLHSVarTy loc ident =
-  catchError
-    (getLocalVarTy loc ident)
-    (\case{
-        AnnError (ENotNamedVar _) _loc ->
-        catchError (getGlobalVarTyLhs loc ident)
-        ( \excep ->
-            case semError excep of {
-                  ENotNamedGlobal errvar ->
-                  if errvar == ident then
-                    throwError $ annotateError loc (ENotNamedVar ident);
-                  else
-                    throwError excep;
-                  -- Other errors keep failing
-                  _ -> throwError excep;
-              }
-        );
-        l                              -> throwError l;
-          })
+getLHSVarTy, getRHSVarTy:: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
+getLHSVarTy = getLocalObjTy
 getRHSVarTy loc ident =
   -- | Try first local environment
   catchError
-    (getLocalVarTy loc ident)
+    (getLocalObjTy loc ident)
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
        case semError errorLocal of {
-        ENotNamedVar _ ->
-          catchError (getROVarTy loc ident)
+        ENotNamedObject _ ->
+          catchError (getROObjTy loc ident)
           (\errorRO ->
              case semError errorRO of {
-              ENotNamedVar _ -> catchError (getGlobalGEnTy loc ident)
+              ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
                     ENotNamedGlobal errvar ->
                     if errvar == ident then
-                      throwError $ annotateError loc (ENotNamedVar ident);
+                      throwError $ annotateError loc (ENotNamedObject ident);
                     else
                       throwError errorGlobal;
                     _  -> throwError errorGlobal;
                       })
                 >>=
                   (\case{
-                      GGlob sG -> return (getTySemGlobal sG);
-                      _ -> throwError $ annotateError loc (ENotNamedVar ident);
+                      GGlob sG -> return (Immutable, getTySemGlobal sG);
+                      _ -> throwError $ annotateError loc (ENotNamedObject ident);
                       });
                 _              -> throwError errorRO;
                   })
@@ -368,11 +353,10 @@ isDefinedIn :: Identifier -> M.Map Identifier a -> Bool
 isDefinedIn = M.member
 
 isDefined :: Identifier -> SemanticMonad Bool
-isDefined ident = get >>= return . (\st ->
-                             (isDefinedIn ident (global st))
-                             || (isDefinedIn ident (local st))
-                             || (isDefinedIn ident (ro st))
-                          )
+isDefined ident = 
+  get >>= return . (\st -> isDefinedIn ident (global st)
+                            || isDefinedIn ident (local st)
+                            || isDefinedIn ident (ro st))
 
 -------------
 -- Type |Type| helpers!
@@ -441,13 +425,14 @@ checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
 -- Dynamic Subtyping
 checkTypeDefinition loc (Option tyd@(DynamicSubtype _ty)) = checkTypeDefinition loc tyd
 checkTypeDefinition loc (Option ty) = throwError $ annotateError loc $ EOptionDyn ty
-checkTypeDefinition loc (Reference ty)        =
+checkTypeDefinition loc (Reference _ ty)        =
   -- Unless we are referencing a reference we are good
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
   checkTypeDefinition loc ty
 checkTypeDefinition loc (DynamicSubtype ty)   =
   simpleTyorFail loc ty >>
   checkTypeDefinition loc ty
+checkTypeDefinition loc (Location ty)         = checkTypeDefinition loc ty
 -- This is explicit just in case
 checkTypeDefinition _ UInt8                   = return ()
 checkTypeDefinition _ UInt16                  = return ()

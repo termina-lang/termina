@@ -41,20 +41,22 @@ lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser langDef
   where
     reservedNames =
-      -- Globals
-      ["volatile","static","protected", "const"]
-      ++ -- Basic Types
+      -- Basic Types
       ["u8","u16","u32","u64"
       ,"i8","i16","i32","i64"
       ,"bool","char"]
       ++ -- Polymorphic Types
-      ["MsgQueue","Pool", "Option"]
+      ["MsgQueue", "Pool", "Option"]
       ++ -- Struct and Union Types
       ["struct","union"]
       ++ -- Dynamic Subtyping
-      ["'dyn"]
-      ++ -- Declarations
-      ["task","function","handler", "at"]
+      ["dyn"]
+      ++ -- Fixed Location Subtyping
+      ["loc"]
+      ++ -- Private reference typing
+      ["&priv"]
+      ++ -- Global declarations
+      ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
       ["var", "match", "for", "if", "else", "return", "while"]
       ++ -- Free
@@ -92,7 +94,7 @@ lexer = Tok.makeTokenParser langDef
                       ,">=" -- RelationalGTE
                       ,"==" -- RelationalEqual
                       ,"!=" -- RelationalNotEqual
-                      ,"&" -- BitwiseAnd
+                      ,"&" -- BitwiseAnd / reference creation
                       ,"|" -- BitwiseOr
                       ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
@@ -110,6 +112,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"(" -- Parens
                       ,")" -- Parens
                       ,".." -- Vector slice and for loop range
+                      ,"&mut" -- Mutable reference creation
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -182,8 +185,10 @@ typeSpecifierParser =
   msgQueueParser
   <|> poolParser
   <|> vectorParser
+  <|> mutableReferenceParser
   <|> referenceParser
   <|> dynamicSubtypeParser
+  <|> locationSubtypeParser
   <|> optionParser
   <|> (DefinedType <$> identifierParser)
   <|> (reserved "u8" >> return UInt8)
@@ -208,18 +213,22 @@ parameterParser = do
 -- hand side of an assignment expression.
 -- Examples of this expression:
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
-fieldValuesAssignExpressionParser :: Parser (Expression Annotation)
-fieldValuesAssignExpressionParser = do
-    assignments <- braces (sepBy flValues comma)
+fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
+fieldAssignmentsExpressionParser = do
+    assignments <- braces (sepBy (try flValues <|> flAddresses) comma)
     p <- getPosition
     _ <- reservedOp ":"
     identifier <- identifierParser
-    return $ FieldValuesAssignmentsExpression identifier assignments (Position p)
+    return $ FieldAssignmentsExpression identifier assignments (Position p)
     where
       flValues = do
             identifier <- identifierParser
             _ <- reservedOp "="
             FieldValueAssignment identifier <$> expressionParser
+      flAddresses = do
+            identifier <- identifierParser
+            _ <- reservedOp "@"
+            FieldAddressAssignment identifier <$> hexa
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -270,10 +279,16 @@ vectorParser = do
   return $ Vector typeSpecifier size
 
 referenceParser :: Parser TypeSpecifier
-referenceParser = reservedOp "&" >> Reference <$> typeSpecifierParser
+referenceParser = reservedOp "&" >> Reference Immutable <$> typeSpecifierParser
+
+mutableReferenceParser :: Parser TypeSpecifier
+mutableReferenceParser = reservedOp "&mut" >> Reference Mutable <$> typeSpecifierParser
 
 dynamicSubtypeParser :: Parser TypeSpecifier
-dynamicSubtypeParser = reservedOp "'dyn" >> DynamicSubtype <$> typeSpecifierParser
+dynamicSubtypeParser = reservedOp "dyn" >> DynamicSubtype <$> typeSpecifierParser
+
+locationSubtypeParser :: Parser TypeSpecifier
+locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser
 
 optionParser :: Parser TypeSpecifier
 optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
@@ -344,17 +359,25 @@ enumVariantExprParser = do
 expressionParser :: Parser (Expression Annotation)
 expressionParser = try optionVariantExprParser
   <|> try enumVariantExprParser
+  <|> try mutableReferenceExprParser
   <|> referenceExprParser
   <|> vectorInitParser
-  <|> fieldValuesAssignExpressionParser
+  <|> fieldAssignmentsExpressionParser
   <|> expressionParser'
+
+mutableReferenceExprParser :: Parser (Expression Annotation)
+mutableReferenceExprParser = do
+  p <- getPosition
+  _ <- reservedOp "&mut"
+  object <- objectParser
+  return $ ReferenceExpression Mutable object (Position p)
 
 referenceExprParser :: Parser (Expression Annotation)
 referenceExprParser = do
   p <- getPosition
   _ <- reservedOp "&"
   object <- objectParser
-  return $ ReferenceExpression object (Position p)
+  return $ ReferenceExpression Immutable object (Position p)
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
@@ -368,18 +391,9 @@ memberMethodAccessParser = do
   p <- getPosition
   object <- identifierParser
   _ <- reservedOp "."
-  -- method <- identifierParser
-  method <- accessOpParser
+  method <- identifierParser
   params <- parens (sepBy (try expressionParser) comma)
-  return $ MemberMethodAccess (Variable object (Position p)) method params (Position p)
-
-accessOpParser :: Parser AccessOp
-accessOpParser
-  = try (reserved "alloc" >> pure Alloc)
-  <|> try (reserved "send" >> pure Send)
-  <|> try (reserved "receive" >> pure Receive)
-  <|> (UserDef <$> identifierParser)
-
+  return $ MemberFunctionAccess (Variable object (Position p)) method params (Position p)
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens expressionParser
@@ -410,7 +424,7 @@ buildPrattParser table termP = parser precs where
   precs = reverse table
   prefixP = choice prefixPs <|> termP where
     prefixPs = do
-      precsR@(ops:_) <- tails precs 
+      precsR@(ops:_) <- tails precs
       Prefix opP <- ops
       return $ opP <*> parser precsR
   infixP precs' lhs = choice infixPs <|> pure lhs where
@@ -437,8 +451,8 @@ objectParser = objectParser' objectTermParser
       = buildPrattParser -- New parser
       [[memberAccessPostfix, vectorOpPostfix]
       ,[dereferencePrefix]]
-    vectorOpPostfix 
-      = Ex.Postfix (try (do 
+    vectorOpPostfix
+      = Ex.Postfix (try (do
             _ <- reservedOp "["
             low <- KC <$> constExprParser'
             _ <- reservedOp ".."
@@ -456,7 +470,6 @@ objectParser = objectParser' objectTermParser
       _ <- reservedOp "."
       p <- getPosition
       member <- identifierParser
-      -- member <- accessOpParser
       return $ \parent ->  MemberAccess parent member (Position p))
     dereferencePrefix
       = Ex.Prefix (do
@@ -481,31 +494,6 @@ vectorInitParser = do
 blockParser :: Parser (BlockRet Annotation)
 blockParser = BlockRet  <$> many blockItemParser <*> returnStmtParser
 
--- <task-definition> ::= 'task' <identifier> '(' <input-parameter> ')' <compound-statement>
-taskParser :: Parser (AnnASTElement  Annotation)
-taskParser = do
-  modifiers <- many modifierParser
-  p <- getPosition
-  reserved "task"
-  name <- identifierParser
-  params <- parens (sepBy parameterParser comma)
-  reservedOp "->"
-  typeSpec <- typeSpecifierParser
-  blockRet <- braces blockParser
-  return $ Task name params typeSpec blockRet modifiers (Position p)
-
-handlerParser :: Parser (AnnASTElement  Annotation)
-handlerParser = do
-  modifiers <- many modifierParser
-  p <- getPosition
-  reserved "handler"
-  name <- identifierParser
-  params <- parens (sepBy parameterParser comma)
-  reservedOp "->"
-  typeSpec <- typeSpecifierParser
-  blockRet <- braces blockParser
-  return $ Handler name params typeSpec blockRet modifiers (Position p)
-
 returnStmtParser :: Parser (ReturnStmt Annotation)
 returnStmtParser = do
   p <- getPosition
@@ -521,11 +509,11 @@ functionParser :: Parser (AnnASTElement  Annotation)
 functionParser = do
   modifiers <- many modifierParser
   p <- getPosition
-  reserved "fn"
+  reserved "function"
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
-    reservedOp "->"
+    reservedOp ":"
     typeSpecifierParser)
   blockRet <- braces blockParser
   return $ Function name params typeSpec blockRet modifiers (Position p)
@@ -555,8 +543,8 @@ constExprParser :: Parser (Expression Annotation)
 constExprParser = flip Constant . Position  <$> getPosition <*> constExprParser'
     -- parseLitString = S <$> stringLit
 
-declarationParser :: Parser (Statement Annotation)
-declarationParser = do
+mutableObjDeclarationParser :: Parser (Statement Annotation)
+mutableObjDeclarationParser = do
   p <- getPosition
   reserved "var"
   name <- identifierParser
@@ -565,7 +553,19 @@ declarationParser = do
   _ <- reservedOp "="
   initializer <-  expressionParser
   _ <- semi
-  return $ Declaration name ty initializer (Position p)
+  return $ Declaration name Mutable ty initializer (Position p)
+
+immutableObjDeclarationParser :: Parser (Statement Annotation)
+immutableObjDeclarationParser = do
+  p <- getPosition
+  reserved "let"
+  name <- identifierParser
+  reservedOp ":"
+  ty <- typeSpecifierParser
+  _ <- reservedOp "="
+  initializer <-  expressionParser
+  _ <- semi
+  return $ Declaration name Immutable ty initializer (Position p)
 
 singleExprStmtParser :: Parser (Statement Annotation)
 singleExprStmtParser = do
@@ -583,7 +583,8 @@ freeStmtParser = reserved "free" >>
 blockItemParser :: Parser (Statement Annotation)
 blockItemParser
   =   try ifElseIfStmtParser
-  <|> try declarationParser
+  <|> try mutableObjDeclarationParser
+  <|> try immutableObjDeclarationParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
@@ -643,6 +644,8 @@ forLoopStmtParser = do
   p <- getPosition
   _ <- reserved "for"
   identifier <- identifierParser
+  reservedOp ":"
+  ty <- typeSpecifierParser
   _ <- reserved "in"
   start <- expressionParser
   _ <- reservedOp ".."
@@ -651,28 +654,13 @@ forLoopStmtParser = do
     reserved "while"
     expressionParser)
   compound <- braces $ many blockItemParser
-  return $ ForLoopStmt identifier start end breakCondition compound (Position p)
+  return $ ForLoopStmt identifier ty start end breakCondition compound (Position p)
 
-volatileDeclParser :: Parser (Global Annotation)
-volatileDeclParser = do
+taskDeclParser :: Parser (Global Annotation)
+taskDeclParser = do
   modifiers <- many modifierParser
   p <- getPosition
-  reserved "volatile"
-  identifier <- identifierParser
-  reservedOp ":"
-  typeSpecifier <- typeSpecifierParser
-  reserved "at"
-  -- From doc: Parses a non-negative whole number in the hexadecimal system.
-  -- https://hackage.haskell.org/package/parsec-3.1.15.1/docs/Text-Parsec-Token.html
-  addr <- hexa
-  _ <- semi
-  return $ Volatile identifier typeSpecifier addr modifiers (Position p)
-
-staticDeclParser :: Parser (Global Annotation)
-staticDeclParser = do
-  modifiers <- many modifierParser
-  p <- getPosition
-  reserved "static"
+  reserved "task"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -680,13 +668,13 @@ staticDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Static identifier typeSpecifier initializer modifiers (Position p)
+  return $ Task identifier typeSpecifier initializer modifiers (Position p)
 
-protectedDeclParser :: Parser (Global Annotation)
-protectedDeclParser = do
+resourceDeclParser :: Parser (Global Annotation)
+resourceDeclParser = do
   modifiers <- many modifierParser
   p <- getPosition
-  reserved "protected"
+  reserved "resource"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -694,7 +682,21 @@ protectedDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Shared identifier typeSpecifier initializer modifiers (Position p)
+  return $ Resource identifier typeSpecifier initializer modifiers (Position p)
+
+handlerDeclParser :: Parser (Global Annotation)
+handlerDeclParser = do
+  modifiers <- many modifierParser
+  p <- getPosition
+  reserved "handler"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  _ <- semi
+  return $ Handler identifier typeSpecifier initializer modifiers (Position p)
 
 constDeclParser :: Parser (Global Annotation)
 constDeclParser = do
@@ -711,14 +713,14 @@ constDeclParser = do
 
 globalDeclParser :: Parser (AnnASTElement  Annotation)
 globalDeclParser = do
-  g <- volatileDeclParser <|> staticDeclParser <|> protectedDeclParser <|> constDeclParser
+  g <- taskDeclParser <|> resourceDeclParser <|> handlerDeclParser <|> constDeclParser
   return $ GlobalDeclaration g
 
 typeDefintionParser :: Parser (AnnASTElement  Annotation)
 typeDefintionParser = flip TypeDefinition
   -- First we get the position, at the beginning of the definition
   <$> (Position <$> getPosition)
-  <*> (structDefinitionParser <|> unionDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser)
+  <*> (structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser)
 
 fieldDefinitionParser :: Parser FieldDefinition
 fieldDefinitionParser = do
@@ -738,16 +740,6 @@ structDefinitionParser = do
   _ <- semi
   return $ Struct identifier fields modifiers -- (Position p)
 
-unionDefinitionParser :: Parser (TypeDef Annotation)
-unionDefinitionParser = do
-  modifiers <- many modifierParser
-  -- p <- getPosition
-  reserved "union"
-  identifier <- identifierParser
-  fields <- braces (many1 $ try fieldDefinitionParser)
-  _ <- semi
-  return $ Union identifier fields modifiers -- (Position p)
-
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
   identifier <- identifierParser
@@ -760,37 +752,66 @@ classFieldDefinitionParser = do
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
   p <- getPosition
-  reserved "fn"
+  reserved "method"
   name <- identifierParser
-  (self, params) <- parens (withSelf <|> withOutSelf)
-  -- All methods are procedure.
-  -- typeSpec <- optionMaybe (do
-  --   reservedOp "->"
-  --   typeSpecifierParser)
+  parens (reserved "&priv" >> reserved "self")
+  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
   reservedOp "{"
-  body <- many blockItemParser
-  -- ret <- returnStmtParser
-  emptyReturn
+  blockRet <- braces blockParser
+  -- emptyReturn
   reservedOp "}"
-  return $ ClassMethod name params self body (Position p)
+  return $ ClassMethod name typeSpec blockRet (Position p)
+      
+classProcedureParser :: Parser (ClassMember Annotation)
+classProcedureParser = do
+  p <- getPosition
+  reserved "procedure"
+  name <- identifierParser
+  params <- parens procedureParamsParser
+  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
+  reservedOp "{"
+  blockRet <- braces blockParser
+  -- emptyReturn
+  reservedOp "}"
+  return $ ClassProcedure name params typeSpec blockRet (Position p)
   where
-    withSelf :: Parser (SelfMethod, [Parameter])
-    withSelf =
-      reserved "self" >> comma >> sepBy parameterParser comma >>= return .(Self,)
-    withOutSelf :: Parser (SelfMethod, [Parameter])
-    withOutSelf = (NoSelf,) <$> sepBy parameterParser comma
+    procedureParamsParser :: Parser [Parameter]
+    procedureParamsParser =
+      reserved "&priv" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
 
-
+classViewerParser :: Parser (ClassMember Annotation)
+classViewerParser = do
+  p <- getPosition
+  reserved "viewer"
+  name <- identifierParser
+  params <- parens viewerParamsParser
+  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
+  reservedOp "{"
+  blockRet <- braces blockParser
+  -- emptyReturn
+  reservedOp "}"
+  return $ ClassProcedure name params typeSpec blockRet (Position p)
+  where
+    viewerParamsParser :: Parser [Parameter]
+    viewerParamsParser =
+      reserved "&self" >> option [] (comma >> sepBy parameterParser comma)
 
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
   modifiers <- many modifierParser
+  classKind <- classKindParser
   -- p <- getPosition
   reserved "class"
   identifier <- identifierParser
-  fields <- braces (many1 $ try classFieldDefinitionParser <|> classMethodParser)
+  fields <- braces (many1 $ try classFieldDefinitionParser <|> classMethodParser <|> classViewerParser)
   _ <- semi
-  return $ Class identifier fields modifiers
+  return $ Class classKind identifier fields modifiers
+  where
+    classKindParser :: Parser ClassKind
+    classKindParser = 
+      (reserved "task" >> return TaskClass)
+      <|> (reserved "resource" >> return ResourceClass)
+      <|> (reserved "handler" >> return HandlerClass)
 
 variantDefinitionParser :: Parser EnumVariant
 variantDefinitionParser = identifierParser >>= \identifier ->
@@ -809,8 +830,7 @@ enumDefinitionParser = do
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
-  try taskParser <|> try handlerParser
-  <|> try functionParser <|> try globalDeclParser
+  try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
   <|> moduleInclusionParser
 

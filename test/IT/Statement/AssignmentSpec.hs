@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn assignment_test0() {\n" ++
+test0 = "function assignment_test0() {\n" ++
         "    var foo0 : u32 = 0 : u32;\n" ++
         "    var foo1 : u32 = 0 : u32;\n" ++
         "    foo1 = foo0;\n" ++
@@ -16,14 +16,14 @@ test0 = "fn assignment_test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "fn assignment_test1(dyn_var0 : 'dyn u32) {\n" ++
-        "    var option : Option<'dyn u32> = None;\n" ++
+test1 = "function assignment_test1(dyn_var0 : dyn u32) {\n" ++
+        "    var option : Option<dyn u32> = None;\n" ++
         "    option = Some(dyn_var0);\n" ++
         "    return;\n" ++
         "}"
 
 test2 :: String
-test2 = "fn assignment_test2(dyn_var0 : 'dyn u32, dyn_var1 : 'dyn u32) {\n" ++
+test2 = "function assignment_test2(dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" ++
         "    var foo : u32 = 0 : u32;\n" ++
         "    dyn_var0 = foo;\n" ++
         "    foo = dyn_var1;\n" ++
@@ -32,7 +32,7 @@ test2 = "fn assignment_test2(dyn_var0 : 'dyn u32, dyn_var1 : 'dyn u32) {\n" ++
         "}"
 
 test3 :: String
-test3 = "fn assignment_test3(dyn_var0 : 'dyn [u32; 10 : u32], dyn_var1 : 'dyn [u32; 10 : u32]) {\n" ++
+test3 = "function assignment_test3(dyn_var0 : dyn [u32; 10 : u32], dyn_var1 : dyn [u32; 10 : u32]) {\n" ++
         "    var foo : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
         "    dyn_var0 = foo;\n" ++
         "    foo = dyn_var1;\n" ++

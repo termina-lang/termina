@@ -23,6 +23,8 @@ data Object a
   -- expression identifier.
   | Dereference (Object a) a
   -- ^ Dereference | *eI |, |eI| is an ~identifier~ expression.
+  | DereferenceMemberAccess (Object a) Identifier a
+  -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
   | VectorSliceExpression (Object a) ConstExpression ConstExpression a
   -- ^ Array slicing | eI [ cEx .. cEy ]|,
   -- value |eI :: exprI a| is an identifier expression
@@ -36,6 +38,7 @@ instance Annotated Object where
   getAnnotation (VectorIndexExpression _ _ a) = a
   getAnnotation (MemberAccess _ _ a)          = a
   getAnnotation (Dereference _ a)             = a
+  getAnnotation (DereferenceMemberAccess _ _ a) = a
   getAnnotation (VectorSliceExpression _ _ _ a) = a
   getAnnotation (Undyn _ a)                   = a
 ----------------------------------------
@@ -46,7 +49,7 @@ type Expression = Expression' Object
 type ReturnStmt = ReturnStmt' Expression
 type BlockRet = BlockRet' Expression Object
 type AnnASTElement = AnnASTElement' Expression Object
-type FieldValueAssignment = FieldValueAssignment' Expression
+type FieldAssignment = FieldAssignment' Expression
 type Global = Global' Expression
 
 type TypeDef a = TypeDef' Expression Object a

@@ -8,7 +8,7 @@ import Text.Parsec
 import Semantic.TypeChecking
 
 test0 :: String
-test0 = "fn bitwise_test0(foo : u16) {\n" ++
+test0 = "function bitwise_test0(foo : u16) {\n" ++
         "    var bar : u8 = 0 : u8;\n" ++
         "    foo = foo << 8 : u8;\n" ++
         "    bar = 8 : u8 << foo;\n" ++

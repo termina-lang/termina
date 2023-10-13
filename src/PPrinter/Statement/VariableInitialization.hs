@@ -45,7 +45,7 @@ ppInitializeVector ::
 ppInitializeVector subs level target expr =
   let iterator = namefy ("i" ++ show level)
    in case expr of
-        (FieldValuesAssignmentsExpression {}) -> ppInitializeStruct subs level target expr
+        (FieldAssignmentsExpression {}) -> ppInitializeStruct subs level target expr
         (OptionVariantExpression {}) -> ppInitializeOption subs level target expr
         (VectorInitExpression expr' (KC (I indexTS size)) _) ->
           let initExpr =
@@ -81,7 +81,7 @@ ppInitializeVector subs level target expr =
         _ -> ppInitializeVectorFromExpression level target (ppExpression subs expr) (getType expr)
 
 ppFieldInitializer :: Substitutions ->  Integer -> DocStyle -> DocStyle -> Expression SemanticAnns -> DocStyle
-ppFieldInitializer subs level identifier field expr@(FieldValuesAssignmentsExpression {}) =
+ppFieldInitializer subs level identifier field expr@(FieldAssignmentsExpression {}) =
   ppInitializeStruct subs level (identifier <> pretty "." <> field) expr
 ppFieldInitializer subs level identifier field expr@(OptionVariantExpression {}) =
   ppInitializeOption subs level (identifier <> pretty "." <> field) expr
@@ -111,7 +111,7 @@ ppInitializeStruct ::
 ppInitializeStruct subs level target expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
-    (FieldValuesAssignmentsExpression _ vas _) ->
+    (FieldAssignmentsExpression _ vas _) ->
         vsep $
             map (\(FieldValueAssignment field expr') -> ppFieldInitializer subs level target (pretty field) expr') vas
     _ -> error "Incorrect expression"

@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn relational_test0(foo : u16) {\n" ++
+test0 = "function relational_test0(foo : u16) {\n" ++
         "    var res : bool = false;\n" ++
         "    res = foo == 1024 : u16;\n" ++
         "    res = 1024 : u16 == foo;\n" ++

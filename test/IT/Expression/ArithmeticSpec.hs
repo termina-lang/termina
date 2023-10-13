@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "fn test0() {\n" ++
+test0 = "function test0() {\n" ++
         "    var foo : u16 = 0 : u16;\n" ++
         "    foo = foo + 1024 : u16;\n" ++
         "    1024 : u16 + foo;\n" ++
@@ -22,7 +22,7 @@ test0 = "fn test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "fn test1(foo : 'dyn u16) {\n" ++
+test1 = "function test1(foo : dyn u16) {\n" ++
         "    foo = foo + 1024 : u16;\n" ++
         "    1024 : u16 + foo;\n" ++
         "    foo = foo - 1024 : u16;\n" ++

@@ -10,9 +10,9 @@ import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
 dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
-twoDymVectorAnn = twoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
 dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
@@ -20,7 +20,7 @@ refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
 refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 
 var0, vector0, vector1 :: Object SemanticAnns
-var0 = Variable "var0" uint16SemAnn
+var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
 
@@ -35,14 +35,14 @@ pVector0 = Variable "p_vector0" refVectorAnn
 pVector1 = Variable "p_vector1" refTwoDymVectorAnn
 
 refVar0expr, refVector0expr, refVector1expr :: Expression SemanticAnns
-refVar0expr = ReferenceExpression var0 refUInt16SemAnn
-refVector0expr = ReferenceExpression vector0 refVectorAnn
-refVector1expr = ReferenceExpression vector1 refTwoDymVectorAnn
+refVar0expr = ReferenceExpression Mutable var0 refUInt16SemAnn
+refVector0expr = ReferenceExpression Mutable vector0 refVectorAnn
+refVector1expr = ReferenceExpression Mutable vector1 refTwoDymVectorAnn
 
 refDynVar0expr, refDynVector0expr, refDynVector1expr :: Expression SemanticAnns
-refDynVar0expr = ReferenceExpression dynVar0 refUInt16SemAnn
-refDynVector0expr = ReferenceExpression dynVector0 refVectorAnn
-refDynVector1expr = ReferenceExpression dynVector1 refTwoDymVectorAnn
+refDynVar0expr = ReferenceExpression Mutable dynVar0 refUInt16SemAnn
+refDynVector0expr = ReferenceExpression Mutable dynVector0 refVectorAnn
+refDynVector1expr = ReferenceExpression Mutable dynVector1 refTwoDymVectorAnn
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
 derefpVar0 = AccessObject (Dereference pVar0 uint16SemAnn) -- | *p_var0 |
