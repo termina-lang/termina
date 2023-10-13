@@ -36,6 +36,8 @@ dependencies:
 #
 - containers
 - mtl >= 2.3.1
+# File Paths
+- paths
 
 ghc-options:
 - -Wall

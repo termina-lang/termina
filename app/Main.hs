@@ -12,6 +12,7 @@ import Text.Parsec (runParser)
 import qualified Data.Text.IO as TIO
 
 import Control.Monad
+import Parser.Parsing (terminaProgram)
 
 -- data Mode = Transpiler | Interpreter
 
@@ -42,19 +43,19 @@ main = runCommand $ \opts args ->
             [] -> ioError $ userError "No file?"
             [filepath] -> do
               src_code <- readFile filepath
-              case runParser (contents topLevel) () filepath src_code of
+              case runParser terminaProgram () filepath src_code of
                 Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-                Right ast ->
-                  case typeCheckRun ast of
-                    Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
-                    Right tast ->
-                      when (optPrintAST opts) (print ast) >>
-                      when (optPrintASTTyped opts) (print tast) >>
-                      case optOutput opts of
-                        Nothing -> print (ppHeaderFile tast)
-                        Just fn ->
-                          let header = fn ++ ".h" in
-                          let source = fn ++ ".c" in
-                            TIO.writeFile header (ppHeaderFile tast)
-                            >> TIO.writeFile source (ppSourceFile tast)
+                Right ast -> print ast
+                  -- case typeCheckRun ast of
+                  --   Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
+                  --   Right tast ->
+                  --     when (optPrintAST opts) (print ast) >>
+                  --     when (optPrintASTTyped opts) (print tast) >>
+                  --     case optOutput opts of
+                  --       Nothing -> print (ppHeaderFile tast)
+                  --       Just fn ->
+                  --         let header = fn ++ ".h" in
+                  --         let source = fn ++ ".c" in
+                  --           TIO.writeFile header (ppHeaderFile tast)
+                  --           >> TIO.writeFile source (ppSourceFile tast)
             _ -> ioError $ userError "Arguments error"
