@@ -829,14 +829,14 @@ topLevel = many1 $
   <|> try typeDefintionParser
   -- <|> moduleInclusionParser
 
-moduleIdentifierParser :: Parser [ Identifier ]
+moduleIdentifierParser :: Parser [ String ]
 moduleIdentifierParser = sepBy1 firstCapital dot
   where
     firstCapital = (:)
       <$> (upper <?> "Module paths begin with capital letters.")
       <*> (many letter <?> "Module names only accept letters.")
 
-singleModule :: Parser ([ Modifier ], [ Identifier ], Annotation )
+singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
 
 moduleInclusionParser :: Parser [ Module Annotation]

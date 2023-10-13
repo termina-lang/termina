@@ -10,9 +10,15 @@ import Semantic.TypeChecking
 import Text.Parsec (runParser)
 
 import qualified Data.Text.IO as TIO
+import qualified Data.Text as T
 
 import Control.Monad
-import Parser.Parsing (terminaProgram)
+
+import Modules.Modules
+import AST.Core
+
+import System.Path
+import System.Path.IO
 
 -- data Mode = Transpiler | Interpreter
 
@@ -34,6 +40,19 @@ instance Options MainOptions where
         <*> simpleOption "output" Nothing
             "Output file"
 
+-- Relative file path!
+loadFile :: Path Unrooted -> IO () --(TerminaProgram Annotation)
+loadFile pathFile = do
+  absHere <- makeAbsolute (fromFilePath "")
+  let absPathFile = absHere </> pathFile
+  eFile <- doesFileExist absPathFile
+  unless eFile (fail ("File \"" ++ toFilePath absPathFile ++ "\" does not exist :@."))
+  src_code <- readStrictText absPathFile
+  case runParser terminaProgram () (toFilePath absPathFile) (T.unpack src_code) of
+    Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
+    Right _ -> print "ok"
+
+
 main :: IO ()
 main = runCommand $ \opts args ->
     if optREPL opts then
@@ -45,7 +64,9 @@ main = runCommand $ \opts args ->
               src_code <- readFile filepath
               case runParser terminaProgram () filepath src_code of
                 Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-                Right ast -> print ast
+                Right (Termina mdls frags) ->
+                  let mdlsPF = map moduleStringToPath mdls in
+                    mapM_ loadFile  (map moduleIdentifier mdlsPF)
                   -- case typeCheckRun ast of
                   --   Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
                   --   Right tast ->
