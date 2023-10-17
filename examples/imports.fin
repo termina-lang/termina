@@ -1,0 +1,5 @@
+import { Hola.Fin.Mundo , Vamos.Que.Sha.Lo.Tenemos }
+
+function test0(){
+         return;
+}

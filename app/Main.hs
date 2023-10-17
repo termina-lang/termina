@@ -16,9 +16,14 @@ import Control.Monad
 
 import Modules.Modules
 import AST.Core
+import qualified AST.Parser as PAST
 
+-- FilePath and IO
 import System.Path
 import System.Path.IO
+
+-- Containers
+import qualified Data.Map.Strict as M
 
 -- data Mode = Transpiler | Interpreter
 
@@ -40,18 +45,21 @@ instance Options MainOptions where
         <*> simpleOption "output" Nothing
             "Output file"
 
--- Relative file path!
-loadFile :: Path Unrooted -> IO () --(TerminaProgram Annotation)
-loadFile pathFile = do
-  absHere <- makeAbsolute (fromFilePath "")
-  let absPathFile = absHere </> pathFile
+-- Load File takes an absolute path (could be something else but whatev)
+loadFile :: Path Absolute -> IO (PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
+loadFile absPathFile = do
+  -- Check if file exists
   eFile <- doesFileExist absPathFile
   unless eFile (fail ("File \"" ++ toFilePath absPathFile ++ "\" does not exist :@."))
+  unless (terminaFile absPathFile) (fail ("File \"" ++ toFilePath absPathFile ++ "\" is not a Termina File :|."))
+  -- read it and parse it.
   src_code <- readStrictText absPathFile
   case runParser terminaProgram () (toFilePath absPathFile) (T.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-    Right _ -> print "ok"
+    Right term -> return term
 
+routeToMain :: Path Absolute -> Path Absolute
+routeToMain = takeDirectory
 
 main :: IO ()
 main = runCommand $ \opts args ->
@@ -59,14 +67,26 @@ main = runCommand $ \opts args ->
         putStrLn "Not Implemented yet"
     else
         case args of
-            [] -> ioError $ userError "No file?"
             [filepath] -> do
-              src_code <- readFile filepath
-              case runParser terminaProgram () filepath src_code of
-                Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-                Right (Termina mdls frags) ->
-                  let mdlsPF = map moduleStringToPath mdls in
-                    mapM_ loadFile  (map moduleIdentifier mdlsPF)
+              -- Get root File Path
+              let fspath = fromFilePath filepath
+              absPath <- makeAbsolute fspath
+              -- Main is special
+              rootFile <- loadFile absPath
+              --
+              mapProject <- loadProject (routeToMain absPath) (M.insert absPath rootFile M.empty) loadFile (terminaFilePaths rootFile)
+              print (map fst $ processProjectOrdered mapProject)
+            -- Wrong arguments Errors
+            [] -> ioError $ userError "No file?"
+            _ -> ioError $ userError "Arguments error"
+
+
+              -- src_code <- readFile filepath
+              -- case runParser terminaProgram () filepath src_code of
+              --   Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
+              --   Right (Termina mdls frags) ->
+              --     let mdlsPF = map moduleStringToPath mdls in
+              --       mapM_ loadFile  (map moduleIdentifier mdlsPF)
                   -- case typeCheckRun ast of
                   --   Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
                   --   Right tast ->
@@ -79,4 +99,3 @@ main = runCommand $ \opts args ->
                   --         let source = fn ++ ".c" in
                   --           TIO.writeFile header (ppHeaderFile tast)
                   --           >> TIO.writeFile source (ppSourceFile tast)
-            _ -> ioError $ userError "Arguments error"

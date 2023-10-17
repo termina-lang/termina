@@ -1,0 +1,20 @@
+#+title: Modules Report
+
+* DONE Termina programs are imports + declarations
+
+#+begin_src termina
+imports { ... }
+[declarations]
+#+end_src
+
+Parser + ParserAST
+* TODO Analyze order.
+** TODO First POC. Á la C
+There is a main (root) file and we load files in demand.
+** TODO Project File. Á la all-modern-compilers.
+There is a project file YAML,JSon or whatever, where there is a file noted as
+main and then we do something similar to the previous approach.
+
+* IDEA Lazy Read files first.
+Optimization (I know, it smells like poop already). Open each file as stream and
+before anything sort them, and after that, continue processing each file.
