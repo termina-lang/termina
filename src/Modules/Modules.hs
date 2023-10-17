@@ -47,5 +47,18 @@ loadProject dirProject fsLoaded loadFile (fs:fss) =
     termina <- loadFile fsAbs
     loadProject dirProject (M.insert fsAbs termina fsLoaded) loadFile (fss ++ terminaFilePaths termina)
 
-processProjectOrdered :: M.Map (Path Absolute) (PAST.TerminaProgram Annotation) -> [(Path Absolute, PAST.TerminaProgram Annotation)]
-processProjectOrdered = M.toAscList
+-- | Return the list of module in ascending order...
+-- This may not be the correct order. We can detect a cycle before hand or just
+-- try and detect it on the fly.
+processProject :: M.Map (Path Absolute) (PAST.TerminaProgram Annotation)
+  -> [(Path Absolute, PAST.TerminaProgram Annotation)]
+processProject = M.toAscList
+
+-- | Given a map, it returns each path with its dependencies.
+-- This is what we need in case we want to detect cycles before hand.
+-- Detecting them before hand is better if typing and everyting is slow.
+processProjectDeps
+  :: Path Absolute
+  ->  M.Map (Path Absolute) (PAST.TerminaProgram Annotation)
+  -> [(Path Absolute, [Path Absolute])]
+processProjectDeps rootDir = M.toList . M.map (map (rootDir </>) . terminaFilePaths)

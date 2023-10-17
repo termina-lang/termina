@@ -75,7 +75,8 @@ main = runCommand $ \opts args ->
               rootFile <- loadFile absPath
               --
               mapProject <- loadProject (routeToMain absPath) (M.insert absPath rootFile M.empty) loadFile (terminaFilePaths rootFile)
-              print (map fst $ processProjectOrdered mapProject)
+              mapM_ print (processProjectOrdered (routeToMain absPath) mapProject)
+              -- print (map fst $ )
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
             _ -> ioError $ userError "Arguments error"

@@ -9,8 +9,9 @@ imports { ... }
 
 Parser + ParserAST
 * TODO Analyze order.
-** TODO First POC. Á la C
+** DONE First POC. Á la C
 There is a main (root) file and we load files in demand.
+** TODO Semantic Analyze each module
 ** TODO Project File. Á la all-modern-compilers.
 There is a project file YAML,JSon or whatever, where there is a file noted as
 main and then we do something similar to the previous approach.
