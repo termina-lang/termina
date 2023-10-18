@@ -62,7 +62,7 @@ topSort graph = case evalState (runExceptT computation) emptyTopS of
   -- Left (EEnd _a) -> error "[Top Sort] Impossible Behaviour: Only one endpoint of a loop found."
   Left (ENotFound a) -> error ("[Top Sort] Impossible Behaviour: Node (" ++ show a ++ ") not found in " ++ show nodes)
   Left (ELoop loop ) -> Left loop
-  Right res -> Right (reverse res)
+  Right res -> Right res
   where
     nodes = M.keys graph
     computation = topSortInternal graph nodes

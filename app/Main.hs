@@ -96,7 +96,9 @@ main = runCommand $ \opts args ->
               -- Termina Map from paths to Parser ASTs.
               mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               --
-              print (sortOrLoop $ M.map fst mapProject)
+              case sortOrLoop (M.map fst mapProject) of
+                Left loop -> fail ("Cycle between modules: " ++ show loop)
+                Right orderedModules -> print orderedModules
             ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
