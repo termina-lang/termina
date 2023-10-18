@@ -45,7 +45,7 @@ refDynVector0expr = ReferenceExpression Mutable dynVector0 refVectorAnn
 refDynVector1expr = ReferenceExpression Mutable dynVector1 refTwoDymVectorAnn
 
 derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
-derefpVar0 = AccessObject (Dereference pVar0 uint16SemAnn) -- | *p_var0 |
+derefpVar0 = AccessObject (Dereference pVar0 (objSemAnn Mutable UInt16)) -- | *p_var0 |
 derefpVector0 = AccessObject (Dereference pVector0 vectorAnn) -- | *p_vector0 |
 derefpVector1 = AccessObject (Dereference pVector1 twoDymVectorAnn) -- | *p_vector1 |
 

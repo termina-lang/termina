@@ -28,7 +28,7 @@ referenceVar1 = ReferenceExpression Mutable var1 refUInt16SemAnn
 
 dereferencepVar :: Object SemanticAnns
 -- | *p_var : u16
-dereferencepVar = Dereference pVar uint16SemAnn
+dereferencepVar = Dereference pVar (objSemAnn Mutable UInt16)
 
 vector0, dynVector0 :: Object SemanticAnns
 vector0 = Variable "vector0" (vectorSemAnn Mutable UInt32 (I UInt32 10))
@@ -52,7 +52,7 @@ dereferencepVarPlusConstant = BinOp Addition (AccessObject dereferencepVar) uint
 
 var0PlusVar1, dereferencepVar2PlusVar1 :: Expression SemanticAnns
 var0PlusVar1 = BinOp Addition (AccessObject var0) undynVar1 uint16SemAnn
-dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) undynVar1 uint16SemAnn
+dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) undynVar1 (objSemAnn Mutable UInt16)
 
 functionCallSingleVar0, functionCallSingleDynVar1,
   functionCallSinglepVar :: Expression SemanticAnns

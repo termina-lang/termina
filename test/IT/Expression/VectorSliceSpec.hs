@@ -71,7 +71,7 @@ spec = do
     it "Prints definition of function slice_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void slice_test0() {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t vector0[10];\n" ++
               "\n" ++
               "    {\n" ++
@@ -91,7 +91,7 @@ spec = do
     it "Prints definition of function slice_test0" $ do
       renderSource test1 `shouldBe`
         pack ("void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    {\n" ++
               "        for (uint32_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
               "            for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
@@ -113,7 +113,7 @@ spec = do
     it "Prints definition of function slice_test2" $ do
       renderSource test2 `shouldBe`
         pack ("void add_one(uint32_t input[5]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    {\n" ++
               "        uint32_t __start = 0;\n" ++
               "        uint32_t __end = 5;\n" ++
@@ -130,7 +130,7 @@ spec = do
               "}\n" ++
               "\n" ++
               "void slice_test2(uint32_t vector0[10][5]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    add_one((&vector0[2])[0]);\n" ++
               "\n" ++
               "    return;\n" ++
@@ -148,7 +148,7 @@ spec = do
     it "Prints definition of function slice_test3" $ do
       renderSource test3 `shouldBe`
         pack ("void add_two(__param_add_two_input_t input) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    {\n" ++
               "        uint32_t __start = 0;\n" ++
               "        uint32_t __end = 5;\n" ++
@@ -165,7 +165,7 @@ spec = do
               "}\n" ++
               "\n" ++
               "void slice_test3(uint32_t vector0[10][5]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    add_two(*((__param_add_two_input_t *)(&vector0[2])[0]));\n" ++
               "\n" ++
               "    return;\n" ++

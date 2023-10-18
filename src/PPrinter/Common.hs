@@ -15,6 +15,7 @@ getObjectType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            =
 getObjectType (Dereference _ (SemAnn _ (ETy (ObjectType _ ts))))               = ts
 getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = ts
 getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = ts
+getObjectType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = ts
 getObjectType ann = error $ "invalid object annotation: " ++ show ann
 
 getType :: Expression SemanticAnns -> TypeSpecifier
@@ -127,17 +128,29 @@ boolC = pretty "_Bool"
 externC :: DocStyle
 externC = pretty "extern"
 
+-- C pretty volatile
+volatileC :: DocStyle
+volatileC = pretty "volatile"
+
 -- C attribute pragma
 attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, mutex, optionDyn, dynamicStruct :: DocStyle
+pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID :: DocStyle
 pool = pretty $ namefy "termina_pool_t"
 msgQueue = pretty $ namefy "termina_msg_queue_id_t"
-mutex = pretty $ namefy "termina_mutex_id_t"
 optionDyn = pretty $ namefy "termina_option_dyn_t"
 dynamicStruct = pretty $ namefy "termina_dyn_t"
+taskID = pretty $ namefy "termina_task_id_t"
+resourceID = pretty $ namefy "termina_resource_id_t"
+handlerID = pretty $ namefy "termina_handler_id_t"
+
+-- | Pretty prints the ID field of the resource, task and handler classes
+ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle
+ppResourceClassIDField = pretty "__resource_id"
+ppTaskClassIDField = pretty "__task_id"
+ppHandlerClassIDField = pretty "__handler_id"
 
 enumIdentifier :: Identifier -> DocStyle
 enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
@@ -180,6 +193,8 @@ ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
 ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
 -- | Pool type
 ppTypeSpecifier (Pool _ _)                   = pool
+ppTypeSpecifier (Location ts)                = volatileC <+> ppTypeSpecifier ts <+> pretty "*"
+ppTypeSpecifier (Port ts)                    = ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
@@ -200,7 +215,14 @@ ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
 ppParameterVectorValueStructure prefix identifier =
   pretty "__param_" <> prefix <> pretty "_" <> identifier <> pretty "_t"
 
-ppParameterVectorValueStructureDecl :: DocStyle -> DocStyle -> TypeSpecifier -> DocStyle
+-- | Pretty print the declaration of a structure that will be used to pass a vector as parameter
+ppParameterVectorValueStructureDecl :: 
+  -- | prefix used as part of the function's name
+  DocStyle 
+  -- | parameter identifier
+  -> DocStyle 
+  -- | type specifier of the parameter
+  -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
   typedefC <+> structC <+> braces' (
           indentTab . align $ ppTypeSpecifier ts <+> pretty "array" <> ppDimension ts <> semi)
@@ -252,14 +274,20 @@ ppModifier (Modifier identifier Nothing) = pretty identifier
 -- TODO: Support modifiers with non-integer values
 ppModifier m = error $ "unsupported modifier: " ++ show m
 
-methodName :: Identifier -> Identifier -> DocStyle
-methodName ident = (pretty ("__" ++ ident ++ "_") <>) . pretty
+classFunctionName :: Identifier -> Identifier -> DocStyle
+classFunctionName ident = pretty . namefy . ((ident ++ "_") ++)
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName = methodName "termina_pool"
+poolMethodName = classFunctionName "termina_pool"
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName = methodName "termina_msg_queue"
+msgQueueMethodName = classFunctionName "termina_msg_queue"
+
+resourceLock :: DocStyle
+resourceLock = classFunctionName "termina_resource" "lock"
+
+resourceUnlock :: DocStyle
+resourceUnlock = classFunctionName "termina_resource" "unlock"
 
 -- | Prints the name of the function that frees an objet to the pool
 poolFree :: DocStyle

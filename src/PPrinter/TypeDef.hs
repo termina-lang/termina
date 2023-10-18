@@ -4,56 +4,129 @@ import Prettyprinter
 
 import AST.Seman
 import PPrinter.Common
+import PPrinter.Statement
 import Semantic.Monad (SemanticAnns)
+import Data.Map (empty)
 
 
 ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
-
-classMethodName :: Identifier -> Identifier -> DocStyle
-classMethodName ident = pretty . (("__" ++ ident ++ "_") ++)
-
-ppClassFunctionDeclaration :: Identifier -> ClassMember a -> DocStyle
-ppClassFunctionDeclaration classId (ClassProcedure methodId parameters _ _ _) =
-  ppCFunctionPrototype (classMethodName classId methodId)
-    (map (ppParameterDeclaration (pretty (classId ++ "_" ++ methodId))) parameters) Nothing <> semi
-ppClassFunctionDeclaration _ _ = error "invalid class member"
 
 -- | Pretty prints a class field
 -- This function is only used when generating the class structure.
 -- It takes as argument the class member to print.
 -- It returns the pretty printed class field.
 ppClassField :: ClassMember a -> DocStyle
-ppClassField (ClassField identifier ts _) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
+ppClassField (ClassField (FieldDefinition identifier ts) _) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
 ppClassField _ = error "invalid class member"
 
--- | Pretty prints a class mutex field
--- This function is only used when generating the class structure.
--- It returns the pretty printed class mutex field.
--- This field is only generated if the no_handler modifier is set.
-ppClassMutexField :: DocStyle
-ppClassMutexField = mutex <+> pretty "__mutex_id" <> semi
-
-ppClassDummyField :: DocStyle
-ppClassDummyField = uint32C <+> pretty "__dummy" <> semi
+-- | Pretty prints the ID field of a class depending on its kind
+ppClassIDFieldDeclaration :: ClassKind -> DocStyle
+ppClassIDFieldDeclaration ResourceClass = resourceID <+> ppResourceClassIDField <> semi
+ppClassIDFieldDeclaration TaskClass = taskID <+> ppTaskClassIDField <> semi
+ppClassIDFieldDeclaration HandlerClass = handlerID <+> ppHandlerClassIDField <> semi
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
       Modifier "align" _ -> True
       _ -> False)
-    
-filterClassModifiers :: [Modifier] -> [Modifier]
-filterClassModifiers = filter (\case
-      Modifier "no_handler" Nothing -> True
-      _ -> False)
 
-hasNoHandler :: [Modifier] -> Bool
-hasNoHandler modifiers = case modifiers of
-  [] -> False
-  (m : ms) -> case m of
-    Modifier "no_handler" Nothing -> True
-    _ -> hasNoHandler ms
+ppClassProcedureOnEntry :: DocStyle
+ppClassProcedureOnEntry = ppCFunctionCall resourceLock [pretty "self->__resource_id"] <> semi
+
+ppClassProcedureOnExit :: DocStyle
+ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [pretty "self->__resource_id"] <> semi
+
+ppSelfParameter :: Identifier -> DocStyle
+ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "self"
+
+ppClassFunctionDefinition :: Identifier -> ClassMember SemanticAnns -> DocStyle
+ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
+    -- | Function prototype
+    ppCFunctionPrototype (classFunctionName classId identifier)
+      (
+        -- | Print the self parameter
+        [ppSelfParameter classId] ++ 
+        -- | Print the rest of the function parameters
+        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
+      ) 
+      -- | Class procedures do not return anything
+      Nothing 
+    <+>
+    -- | Function body
+    braces' (line <> 
+      (indentTab . align $
+        vsep (
+          -- | Print the resource lock call
+          [ppClassProcedureOnEntry, emptyDoc] ++
+          -- | Print the function body
+          [ppStatement subs s <> line | s <- blk] ++
+          -- | Print the resource unlock call
+          [ppClassProcedureOnExit, emptyDoc]
+        )
+        -- | Print the empty return statement
+        <> line <> returnC <> semi <> line)
+    ) <> line
+  where
+    subs = ppParameterSubstitutions parameters
+ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _) =
+    -- | Function prototype
+    ppCFunctionPrototype (classFunctionName classId identifier)
+      (
+        -- | Print the self parameter
+        [ppSelfParameter classId] ++ 
+        -- | Print the rest of the function parameters
+        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
+      ) 
+      -- | Class viewer return type
+      (Just (ppReturnType (pretty identifier) rts))
+    <+> ppBlockRet (ppParameterSubstitutions parameters) (classFunctionName classId identifier) body <> line
+ppClassFunctionDefinition classId (ClassMethod identifier mrts body _) =
+    -- | Function prototype
+    ppCFunctionPrototype (classFunctionName classId identifier)
+      -- | Print the self parameter
+      [ppSelfParameter classId]
+      -- | Class viewer return type
+      (ppReturnType (pretty identifier) <$> mrts)
+    <+> ppBlockRet empty (classFunctionName classId identifier) body <> line
+ppClassFunctionDefinition _ _ = error "invalid class member"
+
+ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
+ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
+  vsep $ 
+  ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
+  [
+    ppCFunctionPrototype (classFunctionName classId identifier)
+      ([ppSelfParameter classId] ++ (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)) Nothing <> semi,
+    emptyDoc
+  ]
+ppClassFunctionDeclaration classId (ClassMethod identifier mrts _ _) =
+  vsep $ 
+  (case mrts of
+    Just ts@(Vector {}) -> 
+      [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) ts <> line]
+    _ -> []) ++
+  [
+    ppCFunctionPrototype (classFunctionName classId identifier) 
+      [ppSelfParameter classId] 
+      (ppReturnType (classFunctionName classId identifier) <$> mrts) <> semi,
+    emptyDoc
+  ]
+ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
+  vsep $ 
+  ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
+  (case rts of
+    Vector {} -> [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) rts <> line]
+    _ -> []) ++
+  [
+    ppCFunctionPrototype (pretty identifier)
+      ([ppSelfParameter classId] ++ ((ppParameterDeclaration (pretty identifier)) <$> parameters))
+      (Just (ppReturnType (pretty identifier) rts)) <> semi,
+    emptyDoc
+  ]
+ppClassFunctionDeclaration classId member = error $ "member of class " ++ classId ++ " not a function: " ++ show member
+
 
 -- | Pretty prints an enum variant
 -- This function is only used when generating the variant enumeration
@@ -76,6 +149,20 @@ ppEnumVariantParameterStruct (EnumVariant identifier params) =
       zipWith
         ppEnumVariantParameter params [0..]
       ) <+> pretty (namefy identifier) <> semi
+
+ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
+ppClassDefinition (Class _ identifier members _) =
+  let (_fields, methods, procedures, viewers) =
+          foldr (\member (fs,ms,prs,vws) ->
+              case member of
+                ClassField {} -> (member : fs, ms, prs, vws)
+                ClassMethod {} -> (fs, member : ms, prs, vws)
+                ClassProcedure {} -> (fs, ms, member : prs, vws)
+                ClassViewer {} -> (fs, ms, prs, member : vws)
+          ) ([],[], [], []) members
+  in
+    vsep $ map (\m -> ppClassFunctionDefinition identifier m) (methods ++ procedures ++ viewers)
+ppClassDefinition _ = error "AST element is not a class"
 
 -- | TypeDef pretty printer.
 ppTypeDefDeclaration :: TypeDef SemanticAnns -> DocStyle
@@ -117,10 +204,9 @@ ppTypeDefDeclaration typeDef =
           ]
         ) <+> pretty identifier <> semi,
         emptyDoc ]
-    (Class _ identifier members modifiers) ->
+    (Class clsKind identifier members modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
-      let classModifiers = filterClassModifiers modifiers in
-      let (fields, methods, procedures, viewers) = 
+      let (fields, methods, procedures, viewers) =
               foldr (\member (fs,ms,prs,vws) ->
                   case member of
                     ClassField {} -> (member : fs, ms, prs, vws)
@@ -129,9 +215,7 @@ ppTypeDefDeclaration typeDef =
                     ClassViewer {} -> (fs, ms, prs, member : vws)
               ) ([],[], [], []) members
       in
-        vsep $ (
-          if not (null fields) then
-            [
+        vsep $ [
               typedefC <+> structC <+> braces' (
                 indentTab . align $
                 vsep (
@@ -139,22 +223,8 @@ ppTypeDefDeclaration typeDef =
                   map ppClassField fields ++
                   -- | If the no_handler modifier is set, then we may use
                   -- a mutex sempahore to handle mutual exclusion
-                  ([ppClassMutexField | hasNoHandler classModifiers])))
+                  [ppClassIDFieldDeclaration clsKind]))
                     <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
               emptyDoc
-            ]
-          else if hasNoHandler classModifiers then
-            [
-              typedefC <+> structC <+> braces' (
-                  (indentTab . align) ppClassMutexField) <+> pretty identifier <> semi,
-              emptyDoc
-            ]
-          else
-            [
-              -- | If the class had no fields, then we must enter a dummy field:
-              -- | this is because the C language does not allow empty structs
-              typedefC <+> structC <+> braces' (
-                  (indentTab . align) ppClassDummyField) <+> pretty identifier <> semi,
-              emptyDoc
-            ])
-          ++ map (\m -> ppClassFunctionDeclaration identifier m <> line) procedures
+          ]
+          ++ map (\m -> ppClassFunctionDeclaration identifier m) (methods ++ procedures ++ viewers)

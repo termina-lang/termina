@@ -59,7 +59,7 @@ spec = do
     it "Prints definition of function test0" $ do
       renderSource test0 `shouldBe`
         pack ("void test0() {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint16_t foo = 0;\n" ++ 
               "\n" ++
               "    foo = foo + 1024;\n" ++
@@ -87,7 +87,7 @@ spec = do
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
        pack ("void test1(__termina_dyn_t foo) {\n" ++
-             "    \n" ++
+             "\n" ++
              "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + 1024;\n" ++
              "\n" ++
              "    1024 + *((uint16_t *)foo.data);\n" ++

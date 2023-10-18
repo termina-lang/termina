@@ -65,7 +65,7 @@ spec = do
     it "Prints definition of function assignment_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void assignment_test0() {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t foo0 = 0;\n" ++
               "\n" ++
               "    uint32_t foo1 = 0;\n" ++
@@ -81,7 +81,7 @@ spec = do
     it "Prints definition of function assignment_test1" $ do
      renderSource test1 `shouldBe`
         pack ("void assignment_test1(__termina_dyn_t dyn_var0) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    __termina_option_dyn_t option;\n" ++
               "\n" ++
               "    {\n" ++
@@ -102,7 +102,7 @@ spec = do
     it "Prints definition of function assignment_test2" $ do
      renderSource test2 `shouldBe`
         pack ("void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    *((uint32_t *)dyn_var0.data) = foo;\n" ++
@@ -120,7 +120,7 @@ spec = do
     it "Prints definition of function assignment_test2" $ do
      renderSource test3 `shouldBe`
         pack ("void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++
               "    {\n" ++

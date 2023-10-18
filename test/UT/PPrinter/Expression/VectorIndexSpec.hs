@@ -18,7 +18,7 @@ refVectorAnn :: SemanticAnns
 refVectorAnn = refSemAnn (Vector UInt32 (KC (I UInt32 10)))
 
 var0, vector0, vector1 :: Object SemanticAnns
-var0 = Variable "var0" uint16SemAnn
+var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
 
@@ -34,25 +34,25 @@ dynVector0 :: Object SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
-vector0IndexConstant = AccessObject (VectorIndexExpression vector0 uint8Const0x8 uint32SemAnn)
-vector0IndexVar0 = AccessObject (VectorIndexExpression vector0 (AccessObject var0) uint32SemAnn)
+vector0IndexConstant = AccessObject (VectorIndexExpression vector0 uint8Const0x8 (objSemAnn Mutable UInt32))
+vector0IndexVar0 = AccessObject (VectorIndexExpression vector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 dynVector0IndexConstant, dynVector0IndexVar0 :: Expression SemanticAnns
-dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 uint32SemAnn)
-dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) uint32SemAnn)
+dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 (objSemAnn Mutable UInt32))
+dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
 vector1IndexFirstDym :: Object SemanticAnns
 vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Mutable Int64 (I UInt32 5))
 
 vector1IndexExpression :: Expression SemanticAnns
-vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym uint32Index4 int64SemAnn)
+vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym uint32Index4 (objSemAnn Mutable Int64))
 
 derefpVector0 :: Object SemanticAnns
 derefpVector0 = Dereference pVector0 vectorAnn
 
 derefpVector0IndexConstant, derefpVector0IndexVar0 :: Expression SemanticAnns
-derefpVector0IndexConstant = AccessObject (VectorIndexExpression derefpVector0 uint32Index3 uint32SemAnn)
-derefpVector0IndexVar0 = AccessObject (VectorIndexExpression derefpVector0 (AccessObject var0) uint32SemAnn)
+derefpVector0IndexConstant = AccessObject (VectorIndexExpression derefpVector0 uint32Index3 (objSemAnn Mutable UInt32))
+derefpVector0IndexVar0 = AccessObject (VectorIndexExpression derefpVector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

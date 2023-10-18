@@ -53,6 +53,8 @@ lexer = Tok.makeTokenParser langDef
       ["dyn"]
       ++ -- Fixed Location Subtyping
       ["loc"]
+      ++ -- Port Subtyping
+      ["port"]
       ++ -- Private reference typing
       ["&priv"]
       ++ -- Global declarations
@@ -62,11 +64,11 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Free
       ["free"]
       ++ -- Constants
-      ["true","false"]
+      ["true", "false"]
       ++ -- Modules
       ["mod"]
       ++ -- Class methods
-      ["self"]
+      ["procedure", "viewer", "method"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
@@ -113,6 +115,8 @@ lexer = Tok.makeTokenParser langDef
                       ,")" -- Parens
                       ,".." -- Vector slice and for loop range
                       ,"&mut" -- Mutable reference creation
+                      ,"@" -- Field address assignment
+                      ,"<-" -- Field connection assignment
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -189,6 +193,7 @@ typeSpecifierParser =
   <|> referenceParser
   <|> dynamicSubtypeParser
   <|> locationSubtypeParser
+  <|> portSubtypeParser
   <|> optionParser
   <|> (DefinedType <$> identifierParser)
   <|> (reserved "u8" >> return UInt8)
@@ -215,7 +220,7 @@ parameterParser = do
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
 fieldAssignmentsExpressionParser = do
-    assignments <- braces (sepBy (try flValues <|> flAddresses) comma)
+    assignments <- braces (sepBy (try flValues <|> try flAddresses <|> flConnection) comma)
     p <- getPosition
     _ <- reservedOp ":"
     identifier <- identifierParser
@@ -229,6 +234,10 @@ fieldAssignmentsExpressionParser = do
             identifier <- identifierParser
             _ <- reservedOp "@"
             FieldAddressAssignment identifier <$> hexa
+      flConnection = do
+            identifier <- identifierParser
+            _ <- reservedOp "<-"
+            FieldPortConnection identifier <$> identifierParser
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -289,6 +298,9 @@ dynamicSubtypeParser = reservedOp "dyn" >> DynamicSubtype <$> typeSpecifierParse
 
 locationSubtypeParser :: Parser TypeSpecifier
 locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser
+
+portSubtypeParser :: Parser TypeSpecifier
+portSubtypeParser = reservedOp "port" >> Port <$> typeSpecifierParser
 
 optionParser :: Parser TypeSpecifier
 optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
@@ -381,19 +393,9 @@ referenceExprParser = do
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = constExprParser
-  <|> try memberMethodAccessParser
   <|> try functionCallParser
-  <|> try (AccessObject <$> objectParser)
+  <|> try accessObjectParser
   <|> parensExprParser
-
-memberMethodAccessParser :: Parser (Expression Annotation)
-memberMethodAccessParser = do
-  p <- getPosition
-  object <- identifierParser
-  _ <- reservedOp "."
-  method <- identifierParser
-  params <- parens (sepBy (try expressionParser) comma)
-  return $ MemberFunctionAccess (Variable object (Position p)) method params (Position p)
 
 parensExprParser :: Parser (Expression Annotation)
 parensExprParser = parens expressionParser
@@ -444,12 +446,12 @@ buildPrattParser table termP = parser precs where
       return $ p >>= infixP precs'
   parser precs' = prefixP >>= infixP precs'
 
-objectParser :: Parser (Object  Annotation)
+objectParser :: Parser (Object Annotation)
 objectParser = objectParser' objectTermParser
   where
     objectParser'
       = buildPrattParser -- New parser
-      [[memberAccessPostfix, vectorOpPostfix]
+      [[dereferenceMemberAccessPostfix, memberAccessPostfix, vectorOpPostfix]
       ,[dereferencePrefix]]
     vectorOpPostfix
       = Ex.Postfix (try (do
@@ -465,6 +467,12 @@ objectParser = objectParser' objectTermParser
             p <- getPosition
             return $ \parent ->  VectorIndexExpression parent index (Position p)
           ))
+    dereferenceMemberAccessPostfix
+      = Ex.Postfix (do
+      _ <- reservedOp "->"
+      p <- getPosition
+      member <- identifierParser
+      return $ \parent ->   DereferenceMemberAccess parent member (Position p))
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."
@@ -478,6 +486,56 @@ objectParser = objectParser' objectTermParser
       return $ flip Dereference (Position p))
 ----------------------------------------
 
+accessObjectParser :: Parser (Expression Annotation)
+accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
+  where
+    accessObjectParser'
+      = buildPrattParser -- New parser
+      [[dereferenceMemberAccessPostfix, memberAccessPostfix, vectorOpPostfix]
+      ,[dereferencePrefix]]
+    vectorOpPostfix
+      = Ex.Postfix (try (do
+            _ <- reservedOp "["
+            low <- KC <$> constExprParser'
+            _ <- reservedOp ".."
+            up <- KC <$> constExprParser'
+            _ <- reservedOp "]"
+            p <- getPosition
+            return $ \parent -> case parent of
+              AccessObject obj -> (AccessObject (VectorSliceExpression obj low up (Position p)))
+              _ -> error "Unexpected member access to a non object"
+          ) <|> (do
+            index <- brackets expressionParser
+            p <- getPosition
+            return $ \parent -> case parent of
+              AccessObject obj -> (AccessObject (VectorIndexExpression obj index (Position p)))
+              _ -> error "Unexpected member access to a non object"
+          ))
+    dereferenceMemberAccessPostfix
+      = Ex.Postfix (do
+      _ <- reservedOp "->"
+      p <- getPosition
+      member <- identifierParser
+      return (\parent -> case parent of
+        AccessObject obj -> (AccessObject (DereferenceMemberAccess obj member (Position p)))
+        _ -> error "Unexpected member access to a non object"))
+    memberAccessPostfix
+      = Ex.Postfix (do
+      _ <- reservedOp "."
+      p <- getPosition
+      member <- identifierParser
+      params <- optionMaybe (parens (sepBy (try expressionParser) comma))
+      return (\parent -> case parent of
+        AccessObject obj ->
+          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionAccess obj member) (Position p)) params
+        _ -> error "Unexpected member access to a non object"))
+    dereferencePrefix
+      = Ex.Prefix (do
+      p <- getPosition
+      _ <- reservedOp "*"
+      return (\parent -> case parent of
+        AccessObject obj -> (AccessObject (Dereference obj (Position p)))
+        _ -> error "Unexpected member access to a non object"))
 
 vectorInitParser :: Parser (Expression Annotation)
 vectorInitParser = do
@@ -513,7 +571,7 @@ functionParser = do
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
-    reservedOp ":"
+    reservedOp "->"
     typeSpecifierParser)
   blockRet <- braces blockParser
   return $ Function name params typeSpec blockRet modifiers (Position p)
@@ -742,12 +800,9 @@ structDefinitionParser = do
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
-  identifier <- identifierParser
   p <- getPosition
-  _ <- reservedOp ":"
-  typeSpecifier <- typeSpecifierParser
-  _ <- semi
-  return $ ClassField identifier typeSpecifier (Position p)
+  field <- fieldDefinitionParser
+  return $ ClassField field (Position p)
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
@@ -755,11 +810,8 @@ classMethodParser = do
   reserved "method"
   name <- identifierParser
   parens (reserved "&priv" >> reserved "self")
-  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
-  reservedOp "{"
+  typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
-  -- emptyReturn
-  reservedOp "}"
   return $ ClassMethod name typeSpec blockRet (Position p)
       
 classProcedureParser :: Parser (ClassMember Annotation)
@@ -768,12 +820,11 @@ classProcedureParser = do
   reserved "procedure"
   name <- identifierParser
   params <- parens procedureParamsParser
-  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
   reservedOp "{"
-  blockRet <- braces blockParser
-  -- emptyReturn
+  block <- many blockItemParser
+  emptyReturn
   reservedOp "}"
-  return $ ClassProcedure name params typeSpec blockRet (Position p)
+  return $ ClassProcedure name params block (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -785,12 +836,9 @@ classViewerParser = do
   reserved "viewer"
   name <- identifierParser
   params <- parens viewerParamsParser
-  typeSpec <- optionMaybe (reservedOp ":" >>  typeSpecifierParser)
-  reservedOp "{"
+  typeSpec <- reservedOp "->" >> typeSpecifierParser
   blockRet <- braces blockParser
-  -- emptyReturn
-  reservedOp "}"
-  return $ ClassProcedure name params typeSpec blockRet (Position p)
+  return $ ClassViewer name params typeSpec blockRet (Position p)
   where
     viewerParamsParser :: Parser [Parameter]
     viewerParamsParser =
@@ -803,7 +851,7 @@ classDefinitionParser = do
   -- p <- getPosition
   reserved "class"
   identifier <- identifierParser
-  fields <- braces (many1 $ try classFieldDefinitionParser <|> classMethodParser <|> classViewerParser)
+  fields <- braces (many1 $ classMethodParser <|> classViewerParser <|> classProcedureParser <|> classFieldDefinitionParser)
   _ <- semi
   return $ Class classKind identifier fields modifiers
   where

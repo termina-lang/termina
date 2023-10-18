@@ -34,6 +34,7 @@ ppHeaderASTElement _ = Nothing
 ppSourceASTElement :: AnnASTElement SemanticAnns -> Maybe DocStyle
 ppSourceASTElement (TypeDefinition (Struct {}) _) = Nothing
 ppSourceASTElement (TypeDefinition (Enum {}) _) = Nothing
+ppSourceASTElement (TypeDefinition cls@(Class {}) _) = Just (ppClassDefinition cls)
 ppSourceASTElement func@(Function {}) = Just (ppFunction func)
 ppSourceASTElement _ = Nothing
 

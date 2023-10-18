@@ -51,7 +51,7 @@ spec = do
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void relational_test0(uint16_t foo) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    _Bool res = 0;\n" ++
               "\n" ++
               "    res = foo == 1024;\n" ++

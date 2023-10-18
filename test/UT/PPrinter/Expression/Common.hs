@@ -111,10 +111,10 @@ refDefinedTypeSemAnn :: Identifier -> SemanticAnns
 refDefinedTypeSemAnn name = refSemAnn (DefinedType name)
 
 poolSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-poolSemAnn ts size = objSemAnn Immutable (Pool ts (K size))
+poolSemAnn ts size = objSemAnn Mutable (Port (Pool ts (K size)))
 
 msgQueueSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-msgQueueSemAnn ts size = objSemAnn Immutable (MsgQueue ts (K size))
+msgQueueSemAnn ts size = objSemAnn Mutable (Port (MsgQueue ts (K size)))
 
 funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
 funSemAnn params ts = SemAnn undefined (ETy (AppType params ts))

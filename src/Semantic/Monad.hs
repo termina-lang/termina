@@ -310,18 +310,17 @@ getGlobalGEnTy loc ident =
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
 getLHSVarTy, getRHSVarTy:: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
-getLHSVarTy = getLocalObjTy
-getRHSVarTy loc ident =
+getLHSVarTy loc ident =
   -- | Try first local environment
   catchError
     (getLocalObjTy loc ident)
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
-       case semError errorLocal of {
+      case semError errorLocal of {
         ENotNamedObject _ ->
           catchError (getROObjTy loc ident)
           (\errorRO ->
-             case semError errorRO of {
+            case semError errorRO of {
               ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
@@ -331,17 +330,46 @@ getRHSVarTy loc ident =
                     else
                       throwError errorGlobal;
                     _  -> throwError errorGlobal;
-                      })
-                >>=
-                  (\case{
-                      GGlob sG -> return (Immutable, getTySemGlobal sG);
-                      _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                  }
+                ) >>= (\case{
+                        GGlob _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        _ -> throwError $ annotateError loc (ENotNamedObject ident);
                       });
-                _              -> throwError errorRO;
-                  })
+              _ -> throwError errorRO;
+            }) >> throwError (annotateError loc (EObjectIsReadOnly ident))
           ;
-        _              -> throwError errorLocal;
-           })
+        _  -> throwError errorLocal;
+      })
+getRHSVarTy loc ident =
+  -- | Try first local environment
+  catchError
+    (getLocalObjTy loc ident)
+  -- | If it is not defined there, check ro environment
+    (\errorLocal ->
+      case semError errorLocal of {
+        ENotNamedObject _ ->
+          catchError (getROObjTy loc ident)
+          (\errorRO ->
+            case semError errorRO of {
+              ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
+                (\errorGlobal ->
+                  case semError errorGlobal of {
+                    ENotNamedGlobal errvar ->
+                    if errvar == ident then
+                      throwError $ annotateError loc (ENotNamedObject ident);
+                    else
+                      throwError errorGlobal;
+                    _  -> throwError errorGlobal;
+                  }
+                ) >>= (\case{
+                        GGlob _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                      });
+              _ -> throwError errorRO;
+            })
+          ;
+        _  -> throwError errorLocal;
+      })
 
 -- | Lookups |idenfitier| in local scope first (I assuming this is the most
 -- frequent case) and then the global scope.
@@ -353,7 +381,7 @@ isDefinedIn :: Identifier -> M.Map Identifier a -> Bool
 isDefinedIn = M.member
 
 isDefined :: Identifier -> SemanticMonad Bool
-isDefined ident = 
+isDefined ident =
   get >>= return . (\st -> isDefinedIn ident (global st)
                             || isDefinedIn ident (local st)
                             || isDefinedIn ident (ro st))
@@ -400,6 +428,10 @@ getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 simpleTyorFail :: Locations -> TypeSpecifier -> SemanticMonad ()
 simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
 
+-- Helper function failing if a given |TypeSpecifier| cannot be used to define a class field.
+classFieldTyorFail :: Locations -> TypeSpecifier -> SemanticMonad ()
+classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
+
 -- | Function checking that a TypeSpecifier is well-defined.
 -- This is not the same as defining a type, but it is similar.
 -- Some types can be found in the wild, but user defined types are just check
@@ -432,7 +464,19 @@ checkTypeDefinition loc (Reference _ ty)        =
 checkTypeDefinition loc (DynamicSubtype ty)   =
   simpleTyorFail loc ty >>
   checkTypeDefinition loc ty
-checkTypeDefinition loc (Location ty)         = checkTypeDefinition loc ty
+checkTypeDefinition loc (Location ty)         =
+  simpleTyorFail loc ty >>
+  checkTypeDefinition loc ty
+checkTypeDefinition loc (Port ty)             =
+  case ty of
+    (MsgQueue ty' _)      -> checkTypeDefinition loc ty'
+    (Pool ty' _)          -> checkTypeDefinition loc ty'
+    (DefinedType identTy) ->
+      getGlobalTy loc identTy >>=
+        \case
+          (Class ResourceClass _ _ _) -> return ()
+          _ -> throwError $ annotateError loc $ EPortNotResource ty
+    _                -> throwError $ annotateError loc $ EPortNotResource ty
 -- This is explicit just in case
 checkTypeDefinition _ UInt8                   = return ()
 checkTypeDefinition _ UInt16                  = return ()

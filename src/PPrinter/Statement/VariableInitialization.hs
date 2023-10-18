@@ -114,7 +114,7 @@ ppInitializeStruct subs level target expr =
     (FieldAssignmentsExpression _ vas _) ->
         vsep $
             map (\(FieldValueAssignment field expr') -> ppFieldInitializer subs level target (pretty field) expr') vas
-    _ -> error "Incorrect expression"
+    _ -> error $ "Incorrect initialization expression: " ++ show expr
 
 ppInitializeEnum ::
   Substitutions ->

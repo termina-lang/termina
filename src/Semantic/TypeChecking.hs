@@ -172,7 +172,7 @@ objectType _ (MemberAccess obj ident ann) = do
           case findClassField ident cls of
             Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
             -- type |t| and the type inside |a| should be the same, no?
-            Just (t , _a) -> return (SAST.MemberAccess typed_obj ident (buildExpAnn ann t))
+            Just (t , _a) -> return (SAST.MemberAccess typed_obj ident (buildExpAnnObj ann obj_ak t))
         ;
         -- Other types do not have members.
         ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
@@ -304,11 +304,33 @@ expressionType (MemberFunctionAccess obj ident args ann) = do
   obj_typed <- rhsObjectType obj
   (_, obj_ty) <- unboxObjectSAnns obj_typed
   case obj_ty of
+    -- | Calling a self method or viewer. We must not allow calling a procedure.
     DefinedType dident -> getGlobalTy ann dident >>=
       \case{
          Class _ _identTy cls _mods ->
          case findClassProcedure ident cls of
-           Nothing -> throwError $ annotateError ann (EMemberAccessNotMethod ident)
+          Just (_, _) -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
+          Nothing ->
+            case findClassViewerOrMethod ident cls of
+              Just (ps, _, anns) ->
+                let (psLen , asLen ) = (length ps, length args) in
+                if psLen == asLen
+                then SAST.MemberFunctionAccess obj_typed ident
+                    <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                    <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnnApp ann ps) (getTypeSAnns anns)
+                else if psLen < asLen
+                then throwError $ annotateError ann EMemberMethodExtraParams
+                else throwError $ annotateError ann EMemberMethodMissingParams
+              Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
+        ;
+        -- Other User defined types do not define methods
+        ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    Port (DefinedType dident) -> getGlobalTy ann dident >>=
+      \case{
+         Class _ _identTy cls _mods ->
+         case findClassProcedure ident cls of
+           Nothing -> throwError $ annotateError ann (EMemberAccessNotProcedure ident)
            Just (ps, anns) ->
              let (psLen , asLen ) = (length ps, length args) in
              if psLen == asLen
@@ -320,9 +342,9 @@ expressionType (MemberFunctionAccess obj ident args ann) = do
              else throwError $ annotateError ann EMemberMethodMissingParams
          ;
          -- Other User defined types do not define methods
-         ty -> throwError $ annotateError ann (EMemberMethodUDef (fmap (fmap forgetSemAnn) ty))
-      }
-    Pool ty_pool _sz ->
+         ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
+      }    
+    Port (Pool ty_pool _sz) ->
       case ident of
         "alloc" ->
           case args of
@@ -336,7 +358,7 @@ expressionType (MemberFunctionAccess obj ident args ann) = do
                               _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
         _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
-    MsgQueue ty _size ->
+    Port (MsgQueue ty _size) ->
       case ident of
         "send" ->
           case args of
@@ -368,12 +390,19 @@ expressionType (FieldAssignmentsExpression id_ty fs pann) =
     (getGlobalTy pann id_ty )
     (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
   >>= \case{
-   Struct _ ty_fs _mods  ->
-       flip (SAST.FieldAssignmentsExpression id_ty)
+    Struct _ ty_fs _mods  ->
+        flip (SAST.FieldAssignmentsExpression id_ty)
             (buildExpAnn pann (DefinedType id_ty))
-       <$>
-       checkFieldValues pann ty_fs fs
-       ;
+        <$>
+        checkFieldValues pann ty_fs fs
+        ;
+    Class _clsKind _ident members _mods ->
+      let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
+        flip (SAST.FieldAssignmentsExpression id_ty)
+            (buildExpAnn pann (DefinedType id_ty))
+        <$>
+        checkFieldValues pann fields fs
+        ;
    x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap (fmap forgetSemAnn) x));
   }
 expressionType (EnumVariantExpression id_ty variant args pann) =
@@ -442,7 +471,14 @@ checkFieldValue loc (FieldDefinition fid fty) (FieldAddressAssignment faid addr)
   then
     case fty of 
       Location _ -> return $ SAST.FieldAddressAssignment faid addr
-      _ -> throwError $ annotateError loc (EFieldAddress fid)
+      _ -> throwError $ annotateError loc (EFieldNotFixedLocation fid)
+  else throwError $ annotateError loc (EFieldMissing [fid])
+checkFieldValue loc (FieldDefinition fid fty) (FieldPortConnection pid sid) =
+  if fid == pid
+  then
+    case fty of 
+      Port _ -> return $ SAST.FieldPortConnection pid sid
+      _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 
 checkFieldValues
@@ -456,6 +492,7 @@ checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
     getFid = \case {
       FieldValueAssignment fid _ -> fid;
       FieldAddressAssignment fid _ -> fid;
+      FieldPortConnection fid _ -> fid;
     }
     sorted_fds = sortOn fieldIdentifier fds
     sorted_fas = sortOn getFid fas
@@ -724,14 +761,13 @@ typeDefCheck ann (Class kind ident members mds)
   foldM
     (\(fs, prcs, mths, vws) cl ->
         case cl of
-          ClassField fs_id fs_ty annCF
+          ClassField fld@(FieldDefinition _fs_id fs_ty) annCF
             -> checkTypeDefinition annCF fs_ty
-              >> simpleTyorFail annCF fs_ty
-              >> let checkFs = SAST.ClassField fs_id fs_ty (buildExpAnn annCF fs_ty)
+              >> classFieldTyorFail annCF fs_ty
+              >> let checkFs = SAST.ClassField fld (buildExpAnn annCF fs_ty)
                 in return (checkFs : fs, prcs, mths, vws)
-          prc@(ClassProcedure _fp_id fp_tys mty _body annCP)
-            -> maybe (return ()) (checkTypeDefinition annCP) mty 
-              >> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) fp_tys >>
+          prc@(ClassProcedure _fp_id fp_tys _body annCP)
+            -> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) fp_tys >>
               return (fs, prc : prcs, mths, vws)
           mth@(ClassMethod _fm_id mty _body annCM)
             -> maybe (return ()) (checkTypeDefinition annCM) mty
@@ -751,35 +787,42 @@ typeDefCheck ann (Class kind ident members mds)
   do
   -- Now we can go function by function checking everything is well typed.
   -- Get depndencies
+  {-
     let dependencies = 
           Data.List.map (
             \case{
               -- This shouldn't happen here but I doesn't add anything
-              l@(ClassField identCF _ _) -> (l, identCF, []);
-              l@(ClassProcedure identCM _ps _mty bs _ann) ->
+              l@(ClassField (FieldDefinition identCF _) _) -> (l, identCF, []);
+              l@(ClassProcedure identCM _ps bs _ann) ->
                   (l, identCM
                   , concatMap (
                     \case { ("self", [ ids ]) -> [ ids ];
+                            (_, []) -> [];
                             a -> error ("In case the impossible happens >>> " ++ show a);
                           } . depToList) (getDepBlock bs));
               l@(ClassMethod identCM _mty bs _ann) ->
                   (l, identCM
                   , concatMap (
                     \case { ("self", [ ids ]) -> [ ids ];
+                            (_, []) -> [];
                             a -> error ("In case the impossible happens >>> " ++ show a);
-                          } . depToList) (getDepBlock bs));
+                          } . depToList) (getDepBlockRet bs));
               l@(ClassViewer identCV _ps _mty bs _ann) ->
                   (l, identCV
                   , concatMap (
                     \case { ("self", [ ids ]) -> [ ids ];
+                            (_, []) -> [];
                             a -> error ("In case the impossible happens >>> " ++ show a);
-                          } . depToList) (getDepBlock bs));
+                          } . depToList) (getDepBlockRet bs));
             }) (prcs ++ mths ++ vws)
+    
   -- Build dependency graph and functions from internal Node representations to ClassMembers
     let (dependencyGraph, vertexF , _KeyF) = Graph.graphFromEdges dependencies
     let vertexToIdent = (\(n,_,_) -> n) . vertexF
   -- Generate a solution with possible loops.
     let topSortOrder = Data.List.map vertexToIdent $ Graph.topSort dependencyGraph
+    --}
+    let topSortOrder = (prcs ++ mths ++ vws)
   -- Type check in order, if a method is missing is because there is a loop.
     fnChecked <-
       foldM (\prevMembers newMember ->
@@ -798,10 +841,9 @@ typeDefCheck ann (Class kind ident members mds)
             -- Filtered Cases
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
-            ClassProcedure mIdent mps mty mbody mann -> do
-              typed_bret <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType mbody)
-              maybe (blockRetTy Unit) blockRetTy mty typed_bret
-              let newPrc = SAST.ClassProcedure mIdent mps mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
+            ClassProcedure mIdent mps blk mann -> do
+              typed_blk <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
+              let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
               typed_bret <- retblockType mbody 
@@ -845,18 +887,18 @@ enumDefinitionTy ann ev
 classDependencies
   :: PAST.ClassMember a
   -> (Identifier, [ClassDep])
-classDependencies (ClassField fs_id _ty _ann)
+classDependencies (ClassField (FieldDefinition fs_id _ty) _ann)
   -- Definition does not depends on anything.
   = (fs_id , [])
-classDependencies (ClassMethod fm_id _ blk _ann)
+classDependencies (ClassMethod fm_id _ body _ann)
   -- We need to get all invocations to other methods in self.
-  = (fm_id, getDepBlock blk)
-classDependencies (ClassProcedure fp_id _ _ blk _ann)
+  = (fm_id, getDepBlockRet body)
+classDependencies (ClassProcedure fp_id _ blk _ann)
   -- Procedures do not depend on anything.
   = (fp_id, getDepBlock blk)
-classDependencies (ClassViewer fp_id _ _ blk _ann)
+classDependencies (ClassViewer fp_id _ _ body _ann)
   -- Procedures do not depend on anything.
-  = (fp_id, getDepBlock blk)
+  = (fp_id, getDepBlockRet body)
 
 ----------------------------------------
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()

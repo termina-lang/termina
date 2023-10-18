@@ -48,7 +48,7 @@ spec = do
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void bitwise_test0(uint16_t foo) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint8_t bar = 0;\n" ++ 
               "\n" ++
               "    foo = foo << 8;\n" ++

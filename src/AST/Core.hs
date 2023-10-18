@@ -104,7 +104,10 @@ data TypeSpecifier
   | Pool TypeSpecifier Size
   | Reference AccessKind TypeSpecifier
   | DynamicSubtype TypeSpecifier
+  -- | Fixed-location types
   | Location TypeSpecifier
+  -- | Port types
+  | Port TypeSpecifier
   -- See Q9
   | Unit
   deriving (Show)
@@ -205,8 +208,7 @@ data ClassMember' expr obj a
   = 
     -- | Fields. They form the state  of the object
     ClassField 
-      Identifier -- ^ name of the field
-      TypeSpecifier -- ^ type of the field
+      FieldDefinition -- ^ the field
       a -- ^ transpiler annotation
     -- | Methods. Methods are internal functions that can privately access the state of the
     -- object and call other methods of the same class.
@@ -221,8 +223,7 @@ data ClassMember' expr obj a
     | ClassProcedure
       Identifier -- ^ name of the procedure
       [Parameter] -- ^ list of parameters (possibly empty)
-      (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      (Block' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the procedure
@@ -251,6 +252,7 @@ data Parameter = Parameter {
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a)
   | FieldAddressAssignment Identifier Address
+  | FieldPortConnection Identifier Identifier
   deriving (Show, Functor)
 
 data FieldDefinition = FieldDefinition {
