@@ -7,45 +7,74 @@ import qualified AST.Parser as PAST
 import Parser.Parsing (Annotation)
 import System.Path
 import Data.List
+import Extras.TopSort
+
+import Control.Arrow
 
 -- Containers
 import qualified Data.Map.Strict as M
 
--- Imported name ++ "/src.fin"
-stringToPath :: [String] -> Path Unrooted
-stringToPath strs = fragments strs </> fragment "src" <.> FileExt "fin"
+-- /Folder1/Folder2/../ModName
+type ModuleName = Path Unrooted
+-- AbsProjectRoute/Folder1/Folder2/.../ModName/src.fin
+type ModuleSrc = Path Absolute
+type ProjectDir = Path Absolute
 
-moduleStringToPath :: Module' [String] a -> Module' (Path Unrooted) a
-moduleStringToPath = modulePath stringToPath
 
-terminaFilePaths
-  :: TerminaProgram' expr glb [String] a b
-  -> [Path Unrooted]
-terminaFilePaths
-  = map ( fragments . moduleIdentifier ) . modules
+data ModuleData = MData
+  { moduleName :: ModuleName
+  , moduleSrc :: ModuleSrc
+  }
 
-terminaFile :: Path a -> Bool
-terminaFile = isExtensionOf (FileExt "fin")
+isTerminaFile :: Path a -> Bool
+isTerminaFile = (Just terminaExt ==)  . takeExtension
 
-loadProject :: Monad m
-  -- Project root directory
-  => Path Absolute
+terminaExt :: FileExt
+terminaExt = FileExt "fin"
+
+-- Let [projDir] be the route to the "project" and [nm]  a module name.
+-- [moduleSrcFromName projDir nm] = "projDir/nm/src.fin"
+-- moduleSrcFromName :: ProjectDir -> ModuleName -> [ ModuleSrc ]
+-- moduleSrcFromName dirProject mName = dirProject </> mName <.> terminaExt
+
+-- moduleStringToPath
+--   :: ProjectDir -> Module' [String] a -> Module' ModuleData a
+-- moduleStringToPath pDir
+--   = modulePath (\strs -> let nm = fragments strs in MData nm (moduleSrcFromName pDir nm))
+
+terminaProgramImports :: PAST.TerminaProgram Annotation -> [ ModuleName ]
+terminaProgramImports = map ( fragments . moduleIdentifier) . modules
+
+loadProject
+  :: Monad m
+  -- ModuleName
+  => (ModuleName -> m (PAST.TerminaProgram Annotation))
+  -> [ModuleName]
+  -> m (M.Map ModuleName ([ModuleName],PAST.TerminaProgram Annotation))
+loadProject = loadProject' M.empty
+
+loadProject' :: Monad m
   -- Map loading every file imported
-  -> M.Map (Path Absolute) (PAST.TerminaProgram Annotation)
+  => M.Map ModuleName ([ModuleName], PAST.TerminaProgram Annotation)
   -- Loading function
-  -> (Path Absolute -> m (PAST.TerminaProgram Annotation))
+  -> (ModuleName -> m (PAST.TerminaProgram Annotation))
   -- Modules to load
-  -> [Path Unrooted]
-  -> m (M.Map (Path Absolute) (PAST.TerminaProgram Annotation))
-loadProject _dirProject fsLoaded _loadFile [] = return fsLoaded
-loadProject dirProject fsLoaded loadFile (fs:fss) =
-  let fsAbs = dirProject </> fs </> fragment "src" <.> FileExt "fin" in
-  if M.member fsAbs fsLoaded
-  -- Nothing to do, skip to the next one.
-  then loadProject dirProject fsLoaded loadFile fss
+  -> [ModuleName]
+  -> m (M.Map ModuleName ([ModuleName],PAST.TerminaProgram Annotation))
+loadProject' fsLoaded _loadFile [] = return fsLoaded
+loadProject' fsLoaded loadFile (fs:fss) =
+  if M.member fs fsLoaded
+  -- Nothing to do, skip to the next one. It could be the case of a module
+  -- imported from several files.
+  then loadProject' fsLoaded loadFile fss
+  -- Import and load it.
   else do
-    termina <- loadFile fsAbs
-    loadProject dirProject (M.insert fsAbs termina fsLoaded) loadFile (fss ++ terminaFilePaths termina)
+    terminaProg <- loadFile fs
+    let deps = terminaProgramImports terminaProg
+    loadProject'
+      (M.insert fs (deps,terminaProg) fsLoaded)
+      loadFile
+      (fss ++ deps)
 
 -- | Return the list of module in ascending order...
 -- This may not be the correct order. We can detect a cycle before hand or just
@@ -58,7 +87,14 @@ processProject = M.toAscList
 -- This is what we need in case we want to detect cycles before hand.
 -- Detecting them before hand is better if typing and everyting is slow.
 processProjectDeps
-  :: Path Absolute
-  ->  M.Map (Path Absolute) (PAST.TerminaProgram Annotation)
-  -> [(Path Absolute, [Path Absolute])]
-processProjectDeps rootDir = M.toList . M.map (map (rootDir </>) . terminaFilePaths)
+  :: M.Map ModuleName [ModuleName]
+  -> [(ModuleName, [ModuleName])]
+processProjectDeps
+  = M.toList
+
+-- | Given project dir and map, returns either a detected loop or a way to load
+-- them in order.
+sortOrLoop
+  :: M.Map ModuleName [ModuleName]
+  -> Either [ModuleName] [ModuleName]
+sortOrLoop = topSortFromDepList . processProjectDeps

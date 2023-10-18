@@ -45,15 +45,33 @@ instance Options MainOptions where
         <*> simpleOption "output" Nothing
             "Output file"
 
+getFileSrc :: Path Absolute -> IO (Path Absolute)
+getFileSrc path =
+  doesDirectoryExist path >>= \isDir ->
+  if isDir then
+    let srcFile = (path </> fragment "src" <.> terminaExt) in
+      do
+        isSrcFile <- doesFileExist srcFile
+        unless
+          isSrcFile
+          (fail ("Module name ("++ show path ++") is a directory but src found:" ++ show srcFile))
+        return srcFile
+  else
+    let filePath = path <.> terminaExt in
+    do
+      isFile <- doesFileExist filePath
+      unless isFile (fail ("File not found:" ++ show filePath ++"."))
+      return filePath
+
+-- We need to Module names and File Paths
 -- Load File takes an absolute path (could be something else but whatev)
 loadFile :: Path Absolute -> IO (PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
-loadFile absPathFile = do
-  -- Check if file exists
-  eFile <- doesFileExist absPathFile
-  unless eFile (fail ("File \"" ++ toFilePath absPathFile ++ "\" does not exist :@."))
-  unless (terminaFile absPathFile) (fail ("File \"" ++ toFilePath absPathFile ++ "\" is not a Termina File :|."))
-  -- read it and parse it.
+loadFile absPath = do
+  -- Get file name
+  absPathFile <- getFileSrc absPath
+  -- read it
   src_code <- readStrictText absPathFile
+  -- parse it
   case runParser terminaProgram () (toFilePath absPathFile) (T.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
     Right term -> return term
@@ -71,12 +89,15 @@ main = runCommand $ \opts args ->
               -- Get root File Path
               let fspath = fromFilePath filepath
               absPath <- makeAbsolute fspath
+              let rootDir = routeToMain absPath
               -- Main is special
-              rootFile <- loadFile absPath
+              terminaMain <- loadFile absPath
+              -- let mainName = takeBaseName fspath
+              -- Termina Map from paths to Parser ASTs.
+              mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               --
-              mapProject <- loadProject (routeToMain absPath) (M.insert absPath rootFile M.empty) loadFile (terminaFilePaths rootFile)
-              mapM_ print (processProjectOrdered (routeToMain absPath) mapProject)
-              -- print (map fst $ )
+              print (sortOrLoop $ M.map fst mapProject)
+            ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
             _ -> ioError $ userError "Arguments error"

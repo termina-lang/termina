@@ -34,19 +34,13 @@ rmTemp :: Ord a => a -> TopSt a -> TopSt a
 rmTemp a (St temp perm) = St (S.delete a temp) perm
 
 data TopE a
-  = EEnd a
-  | ELoop (a,a)
+  = ELoop [a]
   | ENotFound a
 
 type TopSort a = ExceptT (TopE a) (State (TopSt a))
 
 lmodify :: (s -> s) -> ExceptT e (State s) ()
 lmodify = lift . modify
-
--- lError :: e -> StateT a (Except e) b
--- lError = lift . throwError
-
--- lCatch :: StateT a (Except e) l -> (e -> StateT a (Except e) b) -> StateT a (Except e) b
 
 -- Adj map
 type Graph a = M.Map a [a]
@@ -59,22 +53,22 @@ type Graph a = M.Map a [a]
 -------------------------------------------------
 -- | Main function giving a solution to all contraints or a loop.
 topSort
-  :: Ord a
+  :: (Ord a , Show a)
   -- | Takes a dependency graph
   => Graph a
   -- Returns either a loop between elements [0] or an ordered list of them.
-  -> Either (a,a) [a]
+  -> Either [a] [a]
 topSort graph = case evalState (runExceptT computation) emptyTopS of
-  Left (EEnd _a) -> error "[Top Sort] Impossible Behaviour: Only one endpoint of a loop found."
-  Left (ENotFound _a) -> error "[Top Sort] Impossible Behaviour: Node not found in node list."
-  Left (ELoop lpair) -> Left lpair
-  Right res -> Right res
+  -- Left (EEnd _a) -> error "[Top Sort] Impossible Behaviour: Only one endpoint of a loop found."
+  Left (ENotFound a) -> error ("[Top Sort] Impossible Behaviour: Node (" ++ show a ++ ") not found in " ++ show nodes)
+  Left (ELoop loop ) -> Left loop
+  Right res -> Right (reverse res)
   where
     nodes = M.keys graph
-    computation = topSortInternal graph nodes []
+    computation = topSortInternal graph nodes
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: Ord a => [(a, [a])] -> Either (a,a) [a]
+topSortFromDepList :: (Ord a, Show a) => [(a, [a])] -> Either [a] [a]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
@@ -83,20 +77,18 @@ topSortInternal
   => Graph a
   -- Nodes
   -> [a]
-  -- Accum ordered list
-  -> [a]
   -- Result
   -> TopSort a [a]
-topSortInternal _graph [] acc = return acc
-topSortInternal graph (a:as) acc =
+topSortInternal _graph [] = return []
+topSortInternal graph (a:as) =
   gets getPerm >>= \permSet ->
   if S.member a permSet
-  then topSortInternal graph as acc
+  then topSortInternal graph as
   else
-    catchError
-         (visit graph a)
-         (\case {EEnd s -> throwError (ELoop (a, s)); s -> throwError s})
-    <&> (++ acc)
+    (++) <$>
+    (reverse <$> visit graph a)
+    <*>
+    topSortInternal graph as
 
 visit :: Ord a => Graph a -> a -> TopSort a [a]
 visit graph src
@@ -105,7 +97,7 @@ visit graph src
   else
     do
       tempSet <- gets getTemp
-      when (S.member src tempSet) (throwError (EEnd src))
+      when (S.member src tempSet) (throwError (ELoop (S.toList tempSet)))
       -- temp mark |src|
       lmodify (addTemp src)
       accms <- case M.lookup src graph of
