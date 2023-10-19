@@ -25,6 +25,10 @@ groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspe
 -- TODO: These are considered complex types and should be handled differently
 groundTyEq  (Vector typespecl sizeel) (Vector typespecr sizer) = groundTyEq typespecl typespecr && constExprEq sizeel sizer
 groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
+-- Location subtypes
+groundTyEq  (Location tyspecl) (Location tyspecr) = groundTyEq tyspecl tyspecr
+groundTyEq  (Location tyspecl) tyspecr = groundTyEq tyspecl tyspecr
+groundTyEq  tyspecl (Location tyspecr) = groundTyEq tyspecl tyspecr
 --
 groundTyEq  _ _ = False
 
@@ -79,14 +83,20 @@ getDepObj = getDepObj'
     getDepObj' (MemberAccess obj ident _ann)
       = let (dnm,deps) = getDepObj' obj
       in (FieldAccess dnm ident , deps)
+    getDepObj' (DereferenceMemberAccess obj ident _ann)
+      = let (dnm,deps) = getDepObj' obj
+      in (FieldAccess dnm ident , deps)
     getDepObj' (Dereference obj _ann ) = getDepObj' obj
     -- getDepObj' (MemberMethodAccess obj ident es _ann)
     --   = let (dnm, deps) = getDepObj' obj
     --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
 
-getDepBlock :: BlockRet a -> [ClassDep]
-getDepBlock (BlockRet bs (ReturnStmt (Just expr) _)) = concatMap getDepStmt bs ++ getDepExp expr
-getDepBlock (BlockRet bs (ReturnStmt Nothing _)) = concatMap getDepStmt bs
+getDepBlockRet :: BlockRet a -> [ClassDep]
+getDepBlockRet (BlockRet bs (ReturnStmt (Just expr) _)) = getDepBlock bs ++ getDepExp expr
+getDepBlockRet (BlockRet bs (ReturnStmt Nothing _)) = getDepBlock bs
+
+getDepBlock :: Block a -> [ClassDep]
+getDepBlock = concatMap getDepStmt
 
 getDepStmt :: Statement a -> [ClassDep]
 getDepStmt (Declaration _ _ _ e _)
@@ -95,18 +105,18 @@ getDepStmt (AssignmentStmt _ e _)
   = getDepExp e
 getDepStmt (IfElseStmt ec tB eB fB _)
   = getDepExp ec
-  ++ concatMap getDepStmt tB
+  ++ getDepBlock tB
   ++ concatMap
-      (\eC -> getDepExp (elseIfCond eC) ++ concatMap getDepStmt (elseIfBody eC) )
+      (\eC -> getDepExp (elseIfCond eC) ++ getDepBlock (elseIfBody eC) )
       eB
-  ++ concatMap getDepStmt fB
+  ++ getDepBlock fB
 getDepStmt (ForLoopStmt _ _ initE lastE breakE body _)
   = concatMap getDepExp [initE, lastE]
   ++ maybe [] getDepExp breakE
-  ++ concatMap getDepStmt body
+  ++ getDepBlock body
 getDepStmt (MatchStmt e mBody _)
   = getDepExp e
-  ++ concatMap (concatMap getDepStmt . matchBody) mBody
+  ++ concatMap (getDepBlock . matchBody) mBody
 getDepStmt (SingleExpStmt e _)
   = getDepExp e
 getDepStmt (Free obj _) =

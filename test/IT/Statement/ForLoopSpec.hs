@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "function for_loop_test0(array0 : [u16; 10 : u32]) : u16 {\n" ++
+test0 = "function for_loop_test0(array0 : [u16; 10 : u32]) -> u16 {\n" ++
         "    var total : u16 = 0 : u16;\n" ++
         "    for i : u32 in 0 : u32 .. 10 : u32 {\n" ++
         "        total = total + array0[i];\n" ++  
@@ -17,7 +17,7 @@ test0 = "function for_loop_test0(array0 : [u16; 10 : u32]) : u16 {\n" ++
         "}"
 
 test1 :: String
-test1 = "function for_loop_test1(array0 : & [u16; 10 : u32]) : bool {\n" ++
+test1 = "function for_loop_test1(array0 : & [u16; 10 : u32]) -> bool {\n" ++
         "    var found : bool = false;\n" ++
         "    for i : u32 in 0 : u32 .. 10 : u32 while found == false {\n" ++
         "        if (*array0)[i] == 1024 : u16 {\n" ++
@@ -56,7 +56,7 @@ spec = do
     it "Prints definition of function for_loop_test0_test0" $ do
       renderSource test0 `shouldBe`
         pack ("uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint16_t total = 0;\n" ++
               "\n" ++
               "    {\n" ++
@@ -79,7 +79,7 @@ spec = do
     it "Prints definition of function assignment_test1" $ do
       renderSource test1 `shouldBe`
         pack ("_Bool for_loop_test1(uint16_t array0[10]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    _Bool found = 0;\n" ++
               "\n" ++
               "    {\n" ++

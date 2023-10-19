@@ -13,11 +13,11 @@ uint16Const1024 :: Expression SemanticAnns
 uint16Const1024 = Constant (I UInt16 1024) uint16SemAnn
 
 var0, var1 :: Object SemanticAnns
-var0 = Variable "var0" uint16SemAnn
+var0 = Variable "var0" (objSemAnn Mutable UInt16)
 var1 = Variable "var1" dynUInt16SemAnn
 
 undynVar1 :: Object SemanticAnns
-undynVar1 = Undyn var1 uint16SemAnn
+undynVar1 = Undyn var1 (objSemAnn Mutable UInt16)
 
 trueBool, falseBool :: Expression SemanticAnns
 trueBool = Constant (B True) boolSemAnn
@@ -25,19 +25,19 @@ falseBool = Constant (B False) boolSemAnn
 
 var0EqConstant, constantEqVar0, var1EqConstant, 
   constantEqVar1, var0EqVar1 :: Expression SemanticAnns
-var0EqConstant = BinOp RelationalEqual (AccessObject (var0)) uint16Const1024 boolSemAnn
-constantEqVar0 = BinOp RelationalEqual uint16Const1024 (AccessObject (var0)) boolSemAnn
-var1EqConstant = BinOp RelationalEqual (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
-constantEqVar1 = BinOp RelationalEqual uint16Const1024 (AccessObject (undynVar1)) boolSemAnn
-var0EqVar1 = BinOp RelationalEqual (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
+var0EqConstant = BinOp RelationalEqual (AccessObject var0) uint16Const1024 boolSemAnn
+constantEqVar0 = BinOp RelationalEqual uint16Const1024 (AccessObject var0) boolSemAnn
+var1EqConstant = BinOp RelationalEqual (AccessObject undynVar1) uint16Const1024 boolSemAnn
+constantEqVar1 = BinOp RelationalEqual uint16Const1024 (AccessObject undynVar1) boolSemAnn
+var0EqVar1 = BinOp RelationalEqual (AccessObject var0) (AccessObject undynVar1) boolSemAnn
 
 var0NeqConstant, constantNeqVar0, var1NeqConstant, 
   constantNeqVar1, var0NeqVar1 :: Expression SemanticAnns
-var0NeqConstant = BinOp RelationalNotEqual (AccessObject (var0)) uint16Const1024 boolSemAnn
-constantNeqVar0 = BinOp RelationalNotEqual uint16Const1024 (AccessObject (var0)) boolSemAnn
-var1NeqConstant = BinOp RelationalNotEqual (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
-constantNeqVar1 = BinOp RelationalNotEqual uint16Const1024 (AccessObject (undynVar1)) boolSemAnn
-var0NeqVar1 = BinOp RelationalNotEqual (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
+var0NeqConstant = BinOp RelationalNotEqual (AccessObject var0) uint16Const1024 boolSemAnn
+constantNeqVar0 = BinOp RelationalNotEqual uint16Const1024 (AccessObject var0) boolSemAnn
+var1NeqConstant = BinOp RelationalNotEqual (AccessObject undynVar1) uint16Const1024 boolSemAnn
+constantNeqVar1 = BinOp RelationalNotEqual uint16Const1024 (AccessObject undynVar1) boolSemAnn
+var0NeqVar1 = BinOp RelationalNotEqual (AccessObject var0) (AccessObject undynVar1) boolSemAnn
 
 var0GTConstant, constantGTVar0, var1GTConstant, 
   constantGTVar1, var0GTVar1 :: Expression SemanticAnns

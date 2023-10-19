@@ -30,7 +30,17 @@ simpleType (DynamicSubtype {}) = False
 simpleType (MsgQueue {})       = False
 simpleType (Pool {})           = False
 simpleType (Reference {})      = False
+simpleType (Location {})       = False
+simpleType (Port {})           = False
 simpleType _                   = True
+
+classFieldType :: TypeSpecifier -> Bool
+classFieldType Unit                = False
+classFieldType (DynamicSubtype {}) = False
+classFieldType (MsgQueue {})       = False
+classFieldType (Pool {})           = False
+classFieldType (Reference {})      = False
+classFieldType _                   = True
 
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True

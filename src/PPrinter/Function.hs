@@ -6,20 +6,6 @@ import AST.Seman
 import PPrinter.Common
 import Semantic.Monad (SemanticAnns)
 import PPrinter.Statement
-import PPrinter.Expression (Substitutions)
-import Data.Map
-
-ppBlockRet :: Substitutions -> DocStyle -> BlockRet SemanticAnns -> DocStyle
-ppBlockRet subs identifier (BlockRet body ret) =
-  braces' (
-    indentTab . align $
-      line <> vsep [ppStatement subs s <> line | s <- body]
-      <> line <> ppReturnStmt identifier ret <> line
-  ) <> line
-
-ppParameterSubstitutions :: [Parameter] -> Substitutions
-ppParameterSubstitutions parameters =
-  fromList [(pid, pretty pid <> pretty ".array") | (Parameter pid (Vector {})) <- parameters]
 
 ppFunction :: AnnASTElement SemanticAnns -> DocStyle
 ppFunction (Function identifier parameters rTS blk _ _) =

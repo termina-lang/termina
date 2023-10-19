@@ -54,11 +54,11 @@ type SemanClassMember = ClassMember' K SAST.Object
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
-kClassMember (ClassField idx tyx a) = ClassField idx tyx a
+kClassMember (ClassField fld a) = ClassField fld a
 kClassMember (ClassMethod idx ps _blk ann) =
   ClassMethod idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
-kClassMember (ClassProcedure idx ps ty _blk ann) =
-  ClassProcedure idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+kClassMember (ClassProcedure idx ps _blk ann) =
+  ClassProcedure idx ps [] ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
   ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 

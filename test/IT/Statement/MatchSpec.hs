@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "function match_test0(option0 : Option<dyn u32>) : u32 {\n" ++
+test0 = "function match_test0(option0 : Option<dyn u32>) -> u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    match option0 {\n" ++
         "        case Some(value) => {\n" ++
@@ -22,7 +22,7 @@ test0 = "function match_test0(option0 : Option<dyn u32>) : u32 {\n" ++
         "}"
 
 test1 :: String
-test1 = "function match_test1(option0 : Option<dyn u32>) : u32 {\n" ++
+test1 = "function match_test1(option0 : Option<dyn u32>) -> u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    match option0 {\n" ++
         "        case None => {\n" ++
@@ -42,7 +42,7 @@ test2 = "enum Message {\n" ++
         "    Reset\n" ++
         "};\n" ++
         "\n" ++
-        "function match_test1() : u32 {\n" ++
+        "function match_test1() -> u32 {\n" ++
         "    var ret : u32 = 0 : u32;\n" ++
         "    var msg : Message = Message::In(10 : u32, 10 : u32);\n" ++
         "    match msg {\n" ++
@@ -87,7 +87,7 @@ spec = do
     it "Prints definition of function match_test0" $ do
       renderSource test0 `shouldBe`
         pack ("uint32_t match_test0(__termina_option_dyn_t option0) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t ret = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
@@ -109,7 +109,7 @@ spec = do
     it "Prints definition of function match_test1" $ do
       renderSource test1 `shouldBe`
         pack ("uint32_t match_test1(__termina_option_dyn_t option0) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t ret = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
@@ -153,7 +153,7 @@ spec = do
     it "Prints definition of function match_test1" $ do
       renderSource test2 `shouldBe`
         pack ("uint32_t match_test1() {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t ret = 0;\n" ++
               "\n    Message msg;\n" ++
               "\n" ++

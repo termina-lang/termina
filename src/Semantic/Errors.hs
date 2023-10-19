@@ -26,6 +26,10 @@ data Errors a
   | EReferenceGlobal Identifier
   -- | Not Variable found
   | ENotVar
+  -- | Invalid access to global object
+  | EInvalidAccessToGlobal Identifier
+  -- | Invalid writing access to read only object
+  | EObjectIsReadOnly Identifier
   | ENotNamedObject Identifier
   -- | Not Global Variable found
   | ENotNamedGlobal Identifier
@@ -53,17 +57,22 @@ data Errors a
   | EFieldMissing [Identifier]
   -- | Record extra fields
   | EFieldExtra [Identifier]
+  -- | Field is not a fixed location
+  | EFieldNotFixedLocation Identifier
   -- | Field does not have a fixed location
-  | EFieldAddress Identifier
+  | EFieldNotPort Identifier
   -- | Expecting a Vecotor got
   | EVector TypeSpecifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
   | EFunctionAccessNotResource TypeSpecifier
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
-  | EMemberAccessNotMethod Identifier
+  -- | Calling a procedure within another member function
+  | EMemberAccessInvalidProcedureCall Identifier
+  | EMemberAccessNotProcedure Identifier
+  | EMemberAccessNotFunction Identifier
   | EMemberAccessUDef (SemanTypeDef a)
-  | EMemberMethodUDef (SemanTypeDef a)
+  | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
@@ -109,6 +118,8 @@ data Errors a
   -- | ENoPrimitiveType TypeSpecifier
   -- | Only option Dyn
   | EOptionDyn TypeSpecifier
+  -- | Port specifier not a shared resource
+  | EPortNotResource TypeSpecifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
   -- | Function Declaration error,
@@ -117,6 +128,8 @@ data Errors a
   | EUnboxingObjectExpr
   -- | Expected Simple Type
   | EExpectedSimple TypeSpecifier
+  -- | Invalid class field type
+  | EInvalidClassFieldType TypeSpecifier
   -- | Forbidden Reference Type
   | EReferenceTy TypeSpecifier
   -- | Complex expression on LHS

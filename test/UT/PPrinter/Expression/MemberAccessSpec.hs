@@ -20,11 +20,11 @@ undynTMDescriptor1 :: Object SemanticAnns
 undynTMDescriptor1 = Undyn tmDescriptor1 (definedTypeSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnns
-tmDescriptor0field0 = AccessObject ((MemberAccess tmDescriptor0 "field0" uint32SemAnn))
-tmDescriptor1field0 = AccessObject ((MemberAccess undynTMDescriptor1 "field0" uint32SemAnn))
+tmDescriptor0field0 = AccessObject (MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable UInt32))
+tmDescriptor1field0 = AccessObject (MemberAccess undynTMDescriptor1 "field0" (objSemAnn Mutable UInt32))
 
 pTMDescriptor0field0 :: Expression SemanticAnns
-pTMDescriptor0field0 = AccessObject ((DereferenceMemberAccess pTMDescriptor0 "field0" uint32SemAnn))
+pTMDescriptor0field0 = AccessObject (DereferenceMemberAccess pTMDescriptor0 "field0" (objSemAnn Mutable UInt32))
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty

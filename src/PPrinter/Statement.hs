@@ -130,6 +130,11 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                         else
                             ppObject subs obj
                     ) expr
+        (Location _) -> 
+            if getObjPrecedence obj > 2 then
+                ppCDereferenceExpression $ parens (ppObject subs obj)
+            else
+                ppCDereferenceExpression (ppObject subs obj)
         _ -> case expr of
             (FieldAssignmentsExpression {}) ->
                 braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr
@@ -184,8 +189,8 @@ ppStatement subs (MatchStmt expr matchCases _) =
                 [] -> error "empty case list!"
     in
         case expr of
-            -- | If the expression is a variable, we can use it directly
-            (AccessObject (Variable {})) ->
+            -- | If the expression is an object, we can use it directly
+            (AccessObject {}) ->
                 let symbol = ppExpression subs expr in
                     ppMatchCases symbol matchCases
             -- | If the expression is a complex expression, we have to evaluate it first
@@ -200,3 +205,19 @@ ppStatement subs (MatchStmt expr matchCases _) =
                     ]
 ppStatement subs (SingleExpStmt expr _) =
     ppExpression subs expr <> semi
+
+ppBlockRet :: Substitutions -> DocStyle -> BlockRet SemanticAnns -> DocStyle
+ppBlockRet _ identifier (BlockRet [] ret) =
+  braces' (line <> 
+    (indentTab . align $ ppReturnStmt identifier ret <> line)
+  ) <> line
+ppBlockRet subs identifier (BlockRet body ret) =
+  braces' (line <> 
+    (indentTab . align $
+      vsep [ppStatement subs s <> line | s <- body]
+      <> line <> ppReturnStmt identifier ret <> line)
+  ) <> line
+
+ppParameterSubstitutions :: [Parameter] -> Substitutions
+ppParameterSubstitutions parameters =
+  fromList [(pid, pretty pid <> pretty ".array") | (Parameter pid (Vector {})) <- parameters]

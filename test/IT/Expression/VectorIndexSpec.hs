@@ -51,7 +51,7 @@ spec = do
     it "Prints definition of function vector_test0" $ do
       renderSource test0 `shouldBe`
         pack ("void vector_test0() {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    uint32_t vector0[10];\n" ++
@@ -87,7 +87,7 @@ spec = do
     it "Prints definition of function vector_test1" $ do
       renderSource test1 `shouldBe`
         pack ("void vector_test1(uint32_t p_vector0[10]) {\n" ++
-              "    \n" ++
+              "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    p_vector0[3] = 10;\n" ++

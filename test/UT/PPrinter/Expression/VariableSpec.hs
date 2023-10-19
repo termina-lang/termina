@@ -16,7 +16,7 @@ dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (I UInt32 5) (I UInt32 10)
 dynThreeDymVectorAnn = dynThreeDymVectorSemAnn Char (I UInt32 40) (I UInt32 5) (I UInt32 10)
 
 var0, vector0, vector1 :: Object SemanticAnns
-var0 = Variable "var0" uint16SemAnn
+var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymVectorAnn
 
@@ -45,7 +45,7 @@ spec = do
       renderExpression (AccessObject dynVar0) `shouldBe`
         pack "dyn_var0"
     it "Prints the undyned variable dyn_var0 : 'dyn u16" $ do
-      renderExpression (AccessObject (Undyn dynVar0 uint16SemAnn)) `shouldBe`
+      renderExpression (AccessObject (Undyn dynVar0 (objSemAnn Mutable UInt16))) `shouldBe`
         pack "*((uint16_t *)dyn_var0.data)"
     it "Prints the variable dyn_vector1 : 'dyn [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject dynVector1) `shouldBe`
