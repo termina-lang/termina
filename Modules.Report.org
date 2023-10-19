@@ -26,9 +26,11 @@ import { D1.D2.Mod }
 ...
 #+end_src
 If ~./D1/D2/Mod.fin~ exists, read file ~./D1/D2/Mod.fin~
+
 * TODO Semantic Analyze each module
 ** TODO Homogeneous inclusion
-I am inventing the name. Everything seems to be as if the whole project were in a single file.
+I am inventing the name. Everything seems to be as if the whole project were in
+a single file.
 ** TODO Add meta-data to improve errors
 
 * TODO Project File. Á la all-modern-compilers.
@@ -36,5 +38,8 @@ There is a project file YAML,JSon or whatever, where there is a file noted as
 main and then we do something similar to the previous approach.
 
 * IDEA Lazy Read files first.
-Optimization (I know, it smells like poop already). Open each file as stream and
-before anything sort them, and after that, continue processing each file.
+Optimization (I know, it smells like poop already). Open each file as lazy
+streams and before anything sort them, and after that, continue processing each
+file.
+So, we first set and order, and only then, read files, parse and type them.
+By doing so, we do not need to load the whole project on memory.
