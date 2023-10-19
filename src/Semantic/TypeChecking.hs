@@ -699,7 +699,6 @@ programSeman (TypeDefinition tydef ann) =
     -- and we can add it to the global environment.
     -- insertGlobalTy ann stdef >>
     return (TypeDefinition t (buildGlobalTy ann (semanticTypeDef t)))
-programSeman (ModuleInclusion _ident _mods _anns) = undefined
 
 semanticTypeDef :: SAST.TypeDef SemanticAnns -> SemanTypeDef SemanticAnns
 semanticTypeDef (Struct i f m)  = Struct i f m
@@ -941,7 +940,6 @@ programAdd (TypeDefinition ty anns) =
           type_name semTy
           (annotateError (location anns) $ EUsedTypeName type_name)
       _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
-programAdd (ModuleInclusion {}) = error "TODO"
 
 --- Exectuing Type Checking
 typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation

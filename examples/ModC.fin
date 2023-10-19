@@ -1,0 +1,4 @@
+import { Hola.Fin.Mundo}
+function f() {
+    return;
+}

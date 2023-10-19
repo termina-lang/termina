@@ -37,7 +37,6 @@ data BlockRet' expr obj a
 
 -- | Annotated AST element
 data AnnASTElement' expr obj a =
-
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
@@ -55,20 +54,24 @@ data AnnASTElement' expr obj a =
   | TypeDefinition
     (TypeDef' expr obj a) -- ^ the type definition (struct, union, etc.)
     a
-
-  -- | Module inclusion constructor
-  | ModuleInclusion
-    Identifier -- ^ identifier of the module
-    [ Modifier ] -- ^ list of possible modifiers
-    a -- ^ transpiler annotations
-
   deriving (Show,Functor)
 
 instance Annotated (AnnASTElement' expr glb) where
   getAnnotation (Function _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
-  getAnnotation (ModuleInclusion {}) =  error "Module Inclusion not defined yet "
+
+data Module' pf a = ModInclusion
+  { moduleIdentifier ::  pf  -- Filepath!
+  , moduleMods :: [ Modifier ]
+  , moduleAnns :: a}
+  deriving Show
+
+modulePath :: (a -> b) -> Module' a c -> Module' b c
+modulePath f m = m{moduleIdentifier = f (moduleIdentifier m)}
+
+instance Annotated (Module' pf) where
+  getAnnotation = moduleAnns
 
 -- | This type represents constant expressions.
 -- Since we are not implementing it right now, we only have constants.
@@ -140,8 +143,6 @@ data Op
 
 data OptionVariant expr = None | Some expr
   deriving (Show, Functor)
-
--- type FuncName = Annotated Identifier
 
 ----------------------------------------
 -- | Datatype representing Global Declarations.
@@ -368,9 +369,15 @@ data Statement' expr obj a =
 data Const = B Bool | I TypeSpecifier Integer | C Char
   deriving (Show)
 
-type AnnotatedProgram' expr obj a = [AnnASTElement' expr obj a]
+----------------------------------------
+-- Termina Programs definitions
+
+-- Blocks are just list of statements
 type Block' expr obj a = [Statement' expr obj a]
 
--- When annotations are just `()` we get a normal ASTs and Programs
--- type AST = AnnASTElement : ()
--- type Program = AnnotatedProgram ()
+data TerminaProgram' expr glb pf a b = Termina
+  { modules :: [ Module' pf a]
+  , frags :: [ AnnASTElement' expr glb b ] }
+  deriving Show
+
+type AnnotatedProgram' expr obj a = [AnnASTElement' expr obj a]

@@ -9,6 +9,7 @@ import           Text.Parsec.Pos
 -- Importing parser combinators
 import           Text.Parsec
 import           Text.Parsec.String
+import Text.Parsec.Char
 -- Importing tokenizer
 import qualified Text.Parsec.Expr     as Ex
 import qualified Text.Parsec.Language as Lang
@@ -66,7 +67,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Constants
       ["true", "false"]
       ++ -- Modules
-      ["mod"]
+      ["import"]
       ++ -- Class methods
       ["procedure", "viewer", "method"]
 
@@ -144,6 +145,9 @@ comma = Tok.comma lexer
 
 semi :: Parser String
 semi = Tok.semi lexer
+
+dot :: Parser String
+dot = Tok.dot lexer
 
 stringLit :: Parser String
 stringLit = Tok.stringLiteral lexer
@@ -576,15 +580,6 @@ functionParser = do
   blockRet <- braces blockParser
   return $ Function name params typeSpec blockRet modifiers (Position p)
 
-moduleInclusionParser :: Parser (AnnASTElement  Annotation)
-moduleInclusionParser = do
-  modifiers <- many modifierParser
-  p <- getPosition
-  reserved "mod"
-  name <- identifierParser
-  _ <- semi
-  return $ ModuleInclusion name modifiers (Position p)
-
 constExprParser' :: Parser Const
 constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
   where
@@ -880,10 +875,29 @@ topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
   try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
-  <|> moduleInclusionParser
+  -- <|> moduleInclusionParser
+
+moduleIdentifierParser :: Parser [ String ]
+moduleIdentifierParser = sepBy1 firstCapital dot
+  where
+    firstCapital = (:)
+      <$> (upper <?> "Module paths begin with capital letters.")
+      <*> (many letter <?> "Module names only accept letters.")
+
+singleModule :: Parser ([ Modifier ], [String], Annotation )
+singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
+
+moduleInclusionParser :: Parser [ Module Annotation]
+moduleInclusionParser = do
+  reserved "import"
+  modules <- braces (sepBy1 (wspcs *> singleModule <* wspcs) comma)
+  return $ map (\(mod, ident, ann) -> ModInclusion ident mod ann) modules
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
+
+terminaProgram :: Parser (TerminaProgram Annotation)
+terminaProgram = Termina <$> option [] moduleInclusionParser <*> contents topLevel
 
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram Annotation)
