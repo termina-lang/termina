@@ -62,3 +62,6 @@ type Statement = Statement' Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' Expression Object a]
 type Block a = Block' Expression Object a
+
+type Module = Module' ()
+type TerminaProgram a = TerminaProgram' Expression Object () a a

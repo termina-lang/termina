@@ -8,9 +8,12 @@ module Modules.Typing where
 
 import Modules.Modules
 import qualified AST.Parser as PAST
+import Parser.Parsing (Annotation)
 import qualified AST.Seman as SAST
+
+import qualified Data.Map.Strict as M
 
 typeProject :: Monad m =>
   M.Map ModuleName ([ModuleName], PAST.TerminaProgram Annotation)
   -> m (M.Map ModuleName ([ModuleName], SAST.TerminaProgram Annotation))
-typeProject = _
+typeProject = undefined
