@@ -16,10 +16,10 @@ optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
-vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (I UInt32 20)
-twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (I UInt32 5)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K 20)
+twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (K 5)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
 vector1 = Variable "vector1" vectorAnn
@@ -32,10 +32,10 @@ vector6 = Variable "vector6" vectorTMDescriptorAnn
 vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnns
 vector1Assign = AssignmentStmt vector1 (AccessObject (Variable "vector0" vectorAnn)) undefined
 vector2Assign = AssignmentStmt vector2 (AccessObject (Variable "vector1" twoDymVectorAnn)) undefined
-vector3Assign = AssignmentStmt vector3 (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
-vector4Assign = AssignmentStmt vector4 (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
+vector3Assign = AssignmentStmt vector3 (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined
+vector4Assign = AssignmentStmt vector4 (VectorInitExpression (VectorInitExpression uint32Const0 (K 5) twoDymVectorRowAnn) (K 10) twoDymVectorAnn) undefined
+vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (K 10) twoDymVectorAnn) undefined
+vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (K 10) vectorTMDescriptorAnn) undefined
 
 foo1, foo2 :: Object SemanticAnns
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
@@ -60,7 +60,7 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
@@ -152,7 +152,7 @@ spec = do
         "{\n" ++
         "    struct0.field0 = 0;\n" ++
         "    struct0.field1.field_a = 0;\n" ++
-        "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+        "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
         "        struct0.field1.field_b[__i0] = 0;\n" ++
         "    }\n" ++
         "    struct0.field1.field_c = 4294901760;\n" ++
@@ -165,7 +165,7 @@ spec = do
       renderStatement vector1Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "}")
@@ -173,8 +173,8 @@ spec = do
       renderStatement vector2Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -183,7 +183,7 @@ spec = do
       renderStatement vector3Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector3[__i0] = 0;\n" ++
           "    }\n" ++
           "}")
@@ -191,8 +191,8 @@ spec = do
       renderStatement vector4Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector4[__i0][__i1] = 0;\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -201,8 +201,8 @@ spec = do
       renderStatement vector5Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -212,10 +212,10 @@ spec = do
       renderStatement vector6Assign `shouldBe`
         pack (
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector6[__i0].field0 = 0;\n" ++
           "        vector6[__i0].field1.field_a = 0;\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
           "            vector6[__i0].field1.field_b[__i1] = 0;\n" ++
           "        }\n" ++
           "        vector6[__i0].field1.field_c = 4294901760;\n" ++

@@ -18,16 +18,16 @@ test0 = "function func_test0_0(a : u16) -> u16 {\n" ++
         "}"
 
 test1 :: String
-test1 = "function func_test1_0() -> [u32; 10 : u32] {\n" ++
-        "    var foo : [u32; 10 : u32] = [1024 : u32; 10 : u32];\n" ++
+test1 = "function func_test1_0() -> [u32; 10] {\n" ++
+        "    var foo : [u32; 10] = [1024 : u32; 10];\n" ++
         "    return foo;\n" ++
         "}\n" ++
         "\n" ++
         "function func_test1_1() -> u32 {\n" ++
-        "    var bar0 : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
+        "    var bar0 : [u32; 10] = [0 : u32; 10];\n" ++
         "    bar0 = func_test1_0();\n" ++
-        "    var bar1 : [u32; 10 : u32] = func_test1_0();\n" ++
-        "    return bar0[1 : u32] + bar1[2 : u32];\n" ++
+        "    var bar1 : [u32; 10] = func_test1_0();\n" ++
+        "    return bar0[1 : usize] + bar1[2 : usize];\n" ++
         "}"
 
 renderHeader :: String -> Text
@@ -84,7 +84,7 @@ spec = do
               "    uint32_t foo[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            foo[__i0] = 1024;\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -98,7 +98,7 @@ spec = do
               "    uint32_t bar0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            bar0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++

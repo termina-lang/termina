@@ -17,18 +17,18 @@ optionDynUInt32TS :: TypeSpecifier
 optionDynUInt32TS = Option (DynamicSubtype UInt32)
 
 vectorTS, vectorTMDescriptorTS, twoDimVectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (KC (I UInt32 10))
-vectorTMDescriptorTS = Vector tmDescriptorTS (KC (I UInt32 20))
-twoDimVectorTS = Vector (Vector Int64 (KC (I UInt32 5))) (KC (I UInt32 10))
+vectorTS = Vector UInt32 (K 10)
+vectorTMDescriptorTS = Vector tmDescriptorTS (K 20)
+twoDimVectorTS = Vector (Vector Int64 (K 5)) (K 10)
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
-vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (I UInt32 20)
-twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (I UInt32 5)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K 20)
+twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (K 5)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
 
 vector0 :: Expression SemanticAnns
 vector0 = AccessObject (Variable "vector0" vectorAnn)
@@ -36,10 +36,10 @@ vector0 = AccessObject (Variable "vector0" vectorAnn)
 vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnns
 vector1 = Declaration "vector1" Mutable vectorTS vector0 undefined
 vector2 = Declaration "vector2" Mutable twoDimVectorTS (AccessObject (Variable "vector1" twoDymVectorAnn)) undefined
-vector3 = Declaration "vector3" Mutable vectorTS (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn) undefined
-vector4 = Declaration "vector4" Mutable twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (KC (I UInt32 5)) twoDymVectorRowAnn) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector5 = Declaration "vector5" Mutable twoDimVectorTS (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (KC (I UInt32 10)) twoDymVectorAnn) undefined
-vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (KC (I UInt32 10)) vectorTMDescriptorAnn) undefined
+vector3 = Declaration "vector3" Mutable vectorTS (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined
+vector4 = Declaration "vector4" Mutable twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (K 5) twoDymVectorRowAnn) (K 10) twoDymVectorAnn) undefined
+vector5 = Declaration "vector5" Mutable twoDimVectorTS (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (K 10) twoDymVectorAnn) undefined
+vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (K 10) vectorTMDescriptorAnn) undefined
 
 foo0 :: Expression SemanticAnns
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -63,7 +63,7 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
@@ -145,7 +145,7 @@ spec = do
         "{\n" ++
         "    struct0.field0 = 0;\n" ++
         "    struct0.field1.field_a = 0;\n" ++
-        "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+        "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
         "        struct0.field1.field_b[__i0] = 0;\n" ++
         "    }\n" ++
         "    struct0.field1.field_c = 4294901760;\n" ++
@@ -160,7 +160,7 @@ spec = do
           "uint32_t vector1[10];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "}")
@@ -170,8 +170,8 @@ spec = do
           "int64_t vector2[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -182,7 +182,7 @@ spec = do
           "uint32_t vector3[10];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector3[__i0] = 0;\n" ++
           "    }\n" ++
           "}")
@@ -192,8 +192,8 @@ spec = do
           "int64_t vector4[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector4[__i0][__i1] = 0;\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -204,8 +204,8 @@ spec = do
           "int64_t vector5[10][5];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "            vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -217,10 +217,10 @@ spec = do
           "TMDescriptor vector6[20];\n" ++
           "\n" ++
           "{\n" ++
-          "    for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "        vector6[__i0].field0 = 0;\n" ++
           "        vector6[__i0].field1.field_a = 0;\n" ++
-          "        for (uint32_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
+          "        for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
           "            vector6[__i0].field1.field_b[__i1] = 0;\n" ++
           "        }\n" ++
           "        vector6[__i0].field1.field_c = 4294901760;\n" ++

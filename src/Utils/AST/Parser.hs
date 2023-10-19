@@ -4,8 +4,6 @@ module Utils.AST.Parser where
 
 import           AST.Parser
 
-import Control.Arrow
-
 -- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
 groundTyEq  UInt8  UInt8 = True
@@ -16,6 +14,7 @@ groundTyEq  Int8  Int8 = True
 groundTyEq  Int16  Int16 = True
 groundTyEq  Int32  Int32 = True
 groundTyEq  Int64  Int64 = True
+groundTyEq  USize  USize = True
 groundTyEq  Bool  Bool = True
 groundTyEq  Unit Unit = True
 groundTyEq  (Option _) (Option Unit) = True
@@ -25,7 +24,7 @@ groundTyEq  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = groundTyEq
 groundTyEq  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
 -- TODO: These are considered complex types and should be handled differently
-groundTyEq  (Vector typespecl sizeel) (Vector typespecr sizer) = groundTyEq typespecl typespecr && constExprEq sizeel sizer
+groundTyEq  (Vector typespecl (K sizel)) (Vector typespecr (K sizer)) = groundTyEq typespecl typespecr && sizel == sizer
 groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
 groundTyEq  (Location tyspecl) (Location tyspecr) = groundTyEq tyspecl tyspecr

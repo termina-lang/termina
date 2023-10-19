@@ -9,20 +9,20 @@ import Text.Parsec
 
 test0 :: String
 test0 = "function vector_test0() {\n" ++
-        "    var foo : u32 = 0 : u32;\n" ++
-        "    var vector0 : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
-        "    var vector1 : [[i64; 5 : u32]; 10 : u16] = [[0 : i64; 5 : u32]; 10 : u16];\n" ++
-        "    vector0[3 : u32] = 10 : u32;\n" ++
+        "    var foo : usize = 0 : usize;\n" ++
+        "    var vector0 : [u32; 10] = [0 : u32; 10];\n" ++
+        "    var vector1 : [[i64; 5]; 10] = [[0 : i64; 5]; 10];\n" ++
+        "    vector0[3 : usize] = 10 : u32;\n" ++
         "    vector0[foo] = 1024 : u32;\n" ++
-        "    vector1[3 : u16][4 : u32] = 1024 : i64;\n" ++
+        "    vector1[3 : usize][4 : usize] = 1024 : i64;\n" ++
         "    return;\n" ++
         "}"
 
 test1 :: String
-test1 = "function vector_test1(p_vector0 : & [u32; 10 : u32]) {\n" ++
+test1 = "function vector_test1(p_vector0 : & [u32; 10]) {\n" ++
         "    var foo : u32 = 0 : u32;\n" ++
-        "    (*p_vector0)[3 : u32] = 10 : u32;\n" ++
-        "    (*p_vector0)[foo] = 1024 : u32;\n" ++
+        "    (*p_vector0)[3 : usize] = 10 : u32;\n" ++
+        "    (*p_vector0)[foo as usize] = 1024 : u32;\n" ++
         "    return;\n" ++
         "}"
 
@@ -52,12 +52,12 @@ spec = do
       renderSource test0 `shouldBe`
         pack ("void vector_test0() {\n" ++
               "\n" ++
-              "    uint32_t foo = 0;\n" ++
+              "    size_t foo = 0;\n" ++
               "\n" ++
               "    uint32_t vector0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            vector0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -65,8 +65,8 @@ spec = do
               "    int64_t vector1[10][5];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint16_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "            for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
               "                vector1[__i0][__i1] = 0;\n" ++
               "            }\n" ++
               "        }\n" ++
@@ -92,7 +92,7 @@ spec = do
               "\n" ++
               "    p_vector0[3] = 10;\n" ++
               "\n" ++
-              "    p_vector0[foo] = 1024;\n" ++
+              "    p_vector0[(size_t)foo] = 1024;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

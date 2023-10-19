@@ -13,8 +13,8 @@ optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, dynVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
-dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
 
 param0, param1 :: Object SemanticAnns
 param0 = Variable "param0" dynUInt32SemAnn
@@ -23,14 +23,14 @@ param1 = Variable "param1" dynVectorAnn
 uint32Const0 :: Expression SemanticAnns
 uint32Const0 = Constant (I UInt32 0) uint32SemAnn
 
-uint8Const0x8 :: Expression SemanticAnns
-uint8Const0x8 = Constant (I UInt8 8) uint8SemAnn
+usizeConst0x8 :: Expression SemanticAnns
+usizeConst0x8 = Constant (I USize 8) usizeSemAnn
 
 optionVar :: Expression SemanticAnns
 optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
 
 vector0IndexConstant :: Expression SemanticAnns
-vector0IndexConstant = AccessObject (VectorIndexExpression (Undyn param1 vectorAnn) uint8Const0x8 (objSemAnn Mutable UInt32))
+vector0IndexConstant = AccessObject (VectorIndexExpression (Undyn param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
 foo1 :: Object SemanticAnns
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)

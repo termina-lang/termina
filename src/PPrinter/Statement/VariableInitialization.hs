@@ -16,10 +16,10 @@ ppInitializeVectorFromExpression level target source ts =
   let iterator = namefy ("i" ++ show level)
    in case ts of
         -- \| If the initializer is a vector, we must iterate
-        (Vector ts' (KC (I indexTS size))) ->
+        (Vector ts' (K size)) ->
           let initExpr =
                 ppCForLoopInitExpression
-                  (ppTypeSpecifier indexTS)
+                  (ppTypeSpecifier USize)
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
               condExpr =
@@ -47,10 +47,10 @@ ppInitializeVector subs level target expr =
    in case expr of
         (FieldAssignmentsExpression {}) -> ppInitializeStruct subs level target expr
         (OptionVariantExpression {}) -> ppInitializeOption subs level target expr
-        (VectorInitExpression expr' (KC (I indexTS size)) _) ->
+        (VectorInitExpression expr' (K size) _) ->
           let initExpr =
                 ppCForLoopInitExpression
-                  (ppTypeSpecifier indexTS)
+                  (ppTypeSpecifier USize)
                   (pretty iterator)
                   (pretty (show (0 :: Integer)))
            in let condExpr =

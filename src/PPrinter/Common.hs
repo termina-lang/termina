@@ -124,6 +124,9 @@ charC = pretty "char"
 boolC :: DocStyle
 boolC = pretty "_Bool"
 
+sizeTC :: DocStyle
+sizeTC = pretty "size_t"
+
 -- C pretty extern
 externC :: DocStyle
 externC = pretty "extern"
@@ -180,6 +183,7 @@ ppTypeSpecifier Int8                         = int8C
 ppTypeSpecifier Int16                        = int16C
 ppTypeSpecifier Int32                        = int32C
 ppTypeSpecifier Int64                        = int64C
+ppTypeSpecifier USize                        = sizeTC
 ppTypeSpecifier Bool                         = boolC
 ppTypeSpecifier Char                         = charC
 ppTypeSpecifier (DefinedType typeIdentifier) = pretty typeIdentifier
@@ -198,7 +202,7 @@ ppTypeSpecifier (Port ts)                    = ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
-ppDimension (Vector ts (KC size)) = brackets (ppConst size) <> ppDimension ts
+ppDimension (Vector ts (K size)) = brackets (pretty size) <> ppDimension ts
 ppDimension _                     = emptyDoc
 
 ppReturnVectorValueStructure :: DocStyle -> DocStyle

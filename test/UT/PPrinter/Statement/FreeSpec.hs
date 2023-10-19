@@ -10,7 +10,7 @@ import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 
 dynVectorAnn :: SemanticAnns
-dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
+dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
 
 dynVar0, dynVector0 :: Object SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt32SemAnn

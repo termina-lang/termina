@@ -43,10 +43,10 @@ ppDynamicSubtypeCast (Vector ts _) =
 ppDynamicSubtypeCast ts = ppTypeSpecifier ts <+> pretty "*"
 
 ppDynamicSubtypeCast' :: TypeSpecifier -> DocStyle
-ppDynamicSubtypeCast' (Vector ts (KC vs)) =
+ppDynamicSubtypeCast' (Vector ts (K vs)) =
     case ts of
-        (Vector _ _) -> brackets (ppConst vs) <> ppDynamicSubtypeCast' ts
-        _ -> brackets (ppConst vs)
+        (Vector _ _) -> brackets (pretty vs) <> ppDynamicSubtypeCast' ts
+        _ -> brackets (pretty vs)
 ppDynamicSubtypeCast' ts = error $ "unsupported type" ++ show ts
 
 -- | Pretty prints the address of the object corresponding to the dynamic subtype

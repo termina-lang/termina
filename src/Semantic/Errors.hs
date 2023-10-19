@@ -22,6 +22,7 @@ data Errors a
   | ECasteable TypeSpecifier TypeSpecifier
   -- | Expected Numeric Types
   | ENumTs [TypeSpecifier]
+  | EUSizeTs TypeSpecifier
   -- | Reference of a global type?
   | EReferenceGlobal Identifier
   -- | Not Variable found
@@ -192,7 +193,7 @@ data Errors a
   | ELowerBoundConst ConstExpression -- | Lower bound is not a numeric constant expression
   | EUpperBoundConst ConstExpression -- | Upper bound is not a numeric constant expression
   | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type
-  | EBoundsAndVectorTypeMismatch TypeSpecifier TypeSpecifier -- | Bounds are not of the same type as the vector
+  | EBoundsTypeNotUSize TypeSpecifier TypeSpecifier -- | Bounds are not of of type usize
   | EBoundsLowerGTUpper Integer Integer -- | Lower bound is greater than upper bound
   | EUpperBoundGTSize Integer Integer -- | Upper bound is greater than the size of the vector
   deriving Show

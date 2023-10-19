@@ -30,7 +30,7 @@ classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "id0" 
     ] [] undefined,
     ClassProcedure "procedure1" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Reference Mutable (Vector UInt8 (KC (I UInt32 32))))
+      Parameter "param1" (Reference Mutable (Vector UInt8 (K 32)))
     ] [] undefined
   ] []) undefined
 
@@ -43,7 +43,7 @@ classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnns
 classWithOneProcedureAndTwoFields = TypeDefinition
   (Class ResourceClass "id0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
-    ClassField (FieldDefinition "field1" (Vector UInt64 (KC (I UInt32 24)))) undefined,
+    ClassField (FieldDefinition "field1" (Vector UInt64 (K 24))) undefined,
     ClassProcedure "procedure0" [] [] undefined
   ] []) undefined
 
@@ -51,7 +51,7 @@ noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnns
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "id0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
-    ClassField (FieldDefinition "field1" (Vector UInt64 (KC (I UInt32 24)))) undefined,
+    ClassField (FieldDefinition "field1" (Vector UInt64 (K 24))) undefined,
     ClassProcedure "procedure0" [] [] undefined
   ] [Modifier "no_handler" Nothing]) undefined
 
@@ -60,10 +60,10 @@ packedClass = TypeDefinition
   (Class ResourceClass "id0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" UInt16) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32)))) undefined,
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
     ClassProcedure "procedure0" [
       Parameter "param0" Char,
-      Parameter "param1" (Reference Mutable (Vector UInt8 (KC (I UInt32 16))))
+      Parameter "param1" (Reference Mutable (Vector UInt8 (K 16)))
     ] [] undefined
   ] [Modifier "packed" Nothing]) undefined
 
@@ -72,7 +72,7 @@ alignedClass = TypeDefinition
   (Class ResourceClass "id0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" UInt16) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32)))) undefined,
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
     ClassProcedure "procedure0" [] [] undefined
   ] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
 
@@ -81,7 +81,7 @@ packedAndAlignedClass = TypeDefinition
   (Class ResourceClass "id0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" (DefinedType "TCDescriptor")) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (KC (I UInt32 32)))) undefined,
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
     ClassProcedure "procedure0" [] [] undefined
   ] [
       Modifier "packed" Nothing,

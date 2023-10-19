@@ -32,8 +32,8 @@ test2 = "function assignment_test2(dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" 
         "}"
 
 test3 :: String
-test3 = "function assignment_test3(dyn_var0 : dyn [u32; 10 : u32], dyn_var1 : dyn [u32; 10 : u32]) {\n" ++
-        "    var foo : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
+test3 = "function assignment_test3(dyn_var0 : dyn [u32; 10], dyn_var1 : dyn [u32; 10]) {\n" ++
+        "    var foo : [u32; 10] = [0 : u32; 10];\n" ++
         "    dyn_var0 = foo;\n" ++
         "    foo = dyn_var1;\n" ++
         "    dyn_var1 = dyn_var0;\n" ++
@@ -124,25 +124,25 @@ spec = do
               "    uint32_t foo[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            foo[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "        }\n" ++
               "    }\n" ++

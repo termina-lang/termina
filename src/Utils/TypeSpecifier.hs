@@ -14,6 +14,7 @@ primitiveTypes Int8            = True
 primitiveTypes Int16           = True
 primitiveTypes Int32           = True
 primitiveTypes Int64           = True
+primitiveTypes USize           = True
 primitiveTypes Bool            = True
 primitiveTypes Char            = True
 primitiveTypes (DefinedType _) = True
@@ -56,6 +57,7 @@ numTy Int8   = True
 numTy Int16  = True
 numTy Int32  = True
 numTy Int64  = True
+numTy USize  = True
 numTy _      = False
 
 numCons :: Const -> Bool
@@ -75,6 +77,10 @@ memberIntCons i Int8   = ( -128 <= i ) && ( i <= 127 )
 memberIntCons i Int16  = ( -32768 <= i ) && ( i <= 32767 )
 memberIntCons i Int32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
 memberIntCons i Int64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
+-- | TODO: This value depends on the target architecture and shall be selected
+-- accordingly. Since we are currently targeting 32-bit systems, we assume that
+-- usize is a 32-bit unsigned integer.
+memberIntCons i USize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons _ _      = False
 
 identifierType :: TypeDef' expr lho a -> Identifier
