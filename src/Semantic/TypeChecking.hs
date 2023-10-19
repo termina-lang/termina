@@ -18,6 +18,10 @@ import           Utils.AST.Parser
 import           Utils.AST.Core
 import           Utils.TypeSpecifier
 
+-- Top Sort
+import Extras.TopSort (topSortFromDepList)
+import qualified Data.Map.Strict as M
+
 -- Termina Semantic AST
 import qualified AST.Seman as SAST
 
@@ -754,9 +758,6 @@ typeDefCheck ann (Class kind ident members mds)
   = 
   -- TODO: Check class well-formedness depending on its kind
   -- when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
-  -- TODO loop free
-  -- Split definitions in fields, methods, procedures and viewers.
-  -- plus check that all types are well define (see |classTypeChecking|)
   foldM
     (\(fs, prcs, mths, vws) cl ->
         case cl of
@@ -777,51 +778,36 @@ typeDefCheck ann (Class kind ident members mds)
             >> return (fs, prcs, mths, view : vws)
         )
     ([],[],[],[]) members
-  >>= \(fls  -- Fields do not need type checking :shrug:
-        , prcs -- Procedures.
-        , mths  -- Methods
-        , vws  -- Viewers
+  >>= \(fls   -- Fields do not need type checking :shrug:
+       , prcs -- Procedures.
+       , mths -- Methods
+       , vws  -- Viewers
        -- introduce a semi-well formed type.
-       )->
+       ) ->
   do
   -- Now we can go function by function checking everything is well typed.
-  -- Get depndencies
-  {-
-    let dependencies = 
-          Data.List.map (
-            \case{
-              -- This shouldn't happen here but I doesn't add anything
-              l@(ClassField (FieldDefinition identCF _) _) -> (l, identCF, []);
-              l@(ClassProcedure identCM _ps bs _ann) ->
-                  (l, identCM
-                  , concatMap (
-                    \case { ("self", [ ids ]) -> [ ids ];
-                            (_, []) -> [];
-                            a -> error ("In case the impossible happens >>> " ++ show a);
-                          } . depToList) (getDepBlock bs));
-              l@(ClassMethod identCM _mty bs _ann) ->
-                  (l, identCM
-                  , concatMap (
-                    \case { ("self", [ ids ]) -> [ ids ];
-                            (_, []) -> [];
-                            a -> error ("In case the impossible happens >>> " ++ show a);
-                          } . depToList) (getDepBlockRet bs));
-              l@(ClassViewer identCV _ps _mty bs _ann) ->
-                  (l, identCV
-                  , concatMap (
-                    \case { ("self", [ ids ]) -> [ ids ];
-                            (_, []) -> [];
-                            a -> error ("In case the impossible happens >>> " ++ show a);
-                          } . depToList) (getDepBlockRet bs));
-            }) (prcs ++ mths ++ vws)
-    
-  -- Build dependency graph and functions from internal Node representations to ClassMembers
-    let (dependencyGraph, vertexF , _KeyF) = Graph.graphFromEdges dependencies
-    let vertexToIdent = (\(n,_,_) -> n) . vertexF
-  -- Generate a solution with possible loops.
-    let topSortOrder = Data.List.map vertexToIdent $ Graph.topSort dependencyGraph
-    --}
-    let topSortOrder = (prcs ++ mths ++ vws)
+  ----------------------------------------
+  -- Loop between methods, procedures and viewers.
+  -- Assumption: dependencies are computes through `method g () {... self->f()
+  -- ...}`, then `g > f`.
+    let elements = prcs ++ mths ++ vws
+    -- Dependencies emplying the assumption.
+    let dependencies =
+          foldr (\a res -> maybe res (:res) (selfDepClass objIsSelf a)) [] elements
+    -- Map from ClassNames to their definition (usefull after sorting by name and dep)
+    let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
+    -- Sort and see if there is a loop
+    topSortOrder <- case topSortFromDepList dependencies of
+            -- Tell the user a loop is in the room
+            Left loop -> throwError (annotateError ann (EClassLoop loop))
+            -- Get the proper order of inclusion and get their definitions from names.
+            Right order ->
+              mapM
+              (maybe
+                (throwError (annotateError internalErrorSeman EMissingIdentifier))
+                return
+                . (`M.lookup` nameClassMap)) order
+  ----------------------------------------
   -- Type check in order, if a method is missing is because there is a loop.
     fnChecked <-
       foldM (\prevMembers newMember ->
@@ -876,30 +862,6 @@ enumDefinitionTy ann ev
   where
     ev_tys = assocData ev
 
-----------------------------------------
--- Class Definition Helpers
-
--- TODO: Check class well-formedness depending on its kind
--- emptyClass :: [ ClassMember' expr lha a ] -> Bool
--- emptyClass = Data.List.foldl' (\ b x -> case x of { ClassField {} -> b; ClassMethod {} -> False}) True
-
-classDependencies
-  :: PAST.ClassMember a
-  -> (Identifier, [ClassDep])
-classDependencies (ClassField (FieldDefinition fs_id _ty) _ann)
-  -- Definition does not depends on anything.
-  = (fs_id , [])
-classDependencies (ClassMethod fm_id _ body _ann)
-  -- We need to get all invocations to other methods in self.
-  = (fm_id, getDepBlockRet body)
-classDependencies (ClassProcedure fp_id _ blk _ann)
-  -- Procedures do not depend on anything.
-  = (fp_id, getDepBlock blk)
-classDependencies (ClassViewer fp_id _ _ body _ann)
-  -- Procedures do not depend on anything.
-  = (fp_id, getDepBlockRet body)
-
-----------------------------------------
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return () else throwError $ annotateError ann (err (repeated is))

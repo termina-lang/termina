@@ -142,6 +142,8 @@ data Errors a
   | EEnumDefNotUniqueField [Identifier]
   -- | Class Definition
   | EClassEmptyMethods Identifier
+  | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
+  | EMissingIdentifier -- Should not happen
   | ENotClassField Identifier
   | EClassTyping
   -- Dereference Object

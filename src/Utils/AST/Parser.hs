@@ -4,6 +4,8 @@ module Utils.AST.Parser where
 
 import           AST.Parser
 
+import Control.Arrow
+
 -- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
 groundTyEq  UInt8  UInt8 = True
@@ -38,107 +40,7 @@ constExprEq (KC (B vall)) (KC (B valr)) = vall == valr
 constExprEq (KC (C charl)) (KC (C charr)) = charl == charr
 constExprEq _ _ = False
 
-
-----------------------------------------
--- The following function defines a traversal..
--- I am not going to abstract the traverse parttern right now, but we should do
--- it next time we need it.
-
--- What dependencies we are interested right now
-data ClassDep
-  -- Variables
-  = SVar Identifier
-  -- Method accesses
-  | FunctionAccess ClassDep Identifier
-  -- Field accesses
-  | FieldAccess ClassDep Identifier
-  -- We mark as undec objects defined through expressions.
-  -- | Undec
-  -- see README/Q22
-
-depToList :: ClassDep -> (Identifier, [Identifier])
-depToList (SVar i)           = (i, [])
-depToList (FunctionAccess a i) = (\(r,as) -> (r, i : as)) $ depToList a
-depToList (FieldAccess a i)  = (\(r,as) -> (r, i : as)) $ depToList a
--- depToList Undec              = Nothing
-
-getRoot :: ClassDep -> Identifier
-getRoot = fst . depToList
-
--- |getDepObj| is where we compute the use of names and dependencies
--- The rest is just how we traverse the AST.
--- Here we collect two things:
--- the name of the object the argument is defining
--- and the extra dependencies we may need.
-getDepObj :: Object a -> (ClassDep, [ ClassDep ])
-getDepObj = getDepObj'
-  where
-    getDepObj' (Variable ident _ann) = (SVar ident, [])
-    -----------
-    -- TODO Q22
-    -- getDepObj' (IdentifierExpression e _ann) = (Undec, getDepExp e)
-    -----------
-    getDepObj' (VectorIndexExpression obj eix _ann)
-      = let (dnm, deps) = getDepObj' obj in (dnm, deps ++ getDepExp eix)
-    getDepObj' (MemberAccess obj ident _ann)
-      = let (dnm,deps) = getDepObj' obj
-      in (FieldAccess dnm ident , deps)
-    getDepObj' (DereferenceMemberAccess obj ident _ann)
-      = let (dnm,deps) = getDepObj' obj
-      in (FieldAccess dnm ident , deps)
-    getDepObj' (Dereference obj _ann ) = getDepObj' obj
-    -- getDepObj' (MemberMethodAccess obj ident es _ann)
-    --   = let (dnm, deps) = getDepObj' obj
-    --   in (MethodAccess dnm ident, deps ++ concatMap getDepExp es)
-
-getDepBlockRet :: BlockRet a -> [ClassDep]
-getDepBlockRet (BlockRet bs (ReturnStmt (Just expr) _)) = getDepBlock bs ++ getDepExp expr
-getDepBlockRet (BlockRet bs (ReturnStmt Nothing _)) = getDepBlock bs
-
-getDepBlock :: Block a -> [ClassDep]
-getDepBlock = concatMap getDepStmt
-
-getDepStmt :: Statement a -> [ClassDep]
-getDepStmt (Declaration _ _ _ e _)
-  = getDepExp e
-getDepStmt (AssignmentStmt _ e _)
-  = getDepExp e
-getDepStmt (IfElseStmt ec tB eB fB _)
-  = getDepExp ec
-  ++ getDepBlock tB
-  ++ concatMap
-      (\eC -> getDepExp (elseIfCond eC) ++ getDepBlock (elseIfBody eC) )
-      eB
-  ++ getDepBlock fB
-getDepStmt (ForLoopStmt _ _ initE lastE breakE body _)
-  = concatMap getDepExp [initE, lastE]
-  ++ maybe [] getDepExp breakE
-  ++ getDepBlock body
-getDepStmt (MatchStmt e mBody _)
-  = getDepExp e
-  ++ concatMap (getDepBlock . matchBody) mBody
-getDepStmt (SingleExpStmt e _)
-  = getDepExp e
-getDepStmt (Free obj _) =
-  let (dnm, deps) = getDepObj obj in (dnm : deps)
-
-
-getDepExp :: Expression a -> [ClassDep]
-getDepExp (AccessObject obj) =
-  let (dnm, deps) = getDepObj obj in (dnm : deps)
-getDepExp (Constant {}) = []
-getDepExp (BinOp _op le re _ann) = getDepExp le ++ getDepExp re
-getDepExp (ReferenceExpression _ obj _ann) =
-  let (dnm, deps) = getDepObj obj in (dnm : deps)
-getDepExp (Casting e _ty _ann ) = getDepExp e
-getDepExp (FunctionExpression _id args _ann) = concatMap getDepExp args
-getDepExp (VectorInitExpression iE _const _ann) = getDepExp iE
-getDepExp (FieldAssignmentsExpression _id fs _ann)
-  = concat [getDepExp expr | FieldValueAssignment _ expr <- fs]
-getDepExp (EnumVariantExpression _i1 _i2 es _ann) = concatMap getDepExp es
-getDepExp (OptionVariantExpression os _ann)
-  =  case os of
-       None   -> []
-       Some e -> getDepExp e
-getDepExp (MemberFunctionAccess obj accop es _ann) =
-  let (dnm, deps) = getDepObj obj in FunctionAccess dnm accop : deps ++ concatMap getDepExp es
+-- Helper to detect invocations to 'self'
+objIsSelf :: Object a -> Bool
+objIsSelf (Variable ident _ann ) = ident == "self"
+objIsSelf _ = False

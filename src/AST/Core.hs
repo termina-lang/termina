@@ -211,8 +211,8 @@ data ClassMember' expr obj a
     ClassField 
       FieldDefinition -- ^ the field
       a -- ^ transpiler annotation
-    -- | Methods. Methods are internal functions that can privately access the state of the
-    -- object and call other methods of the same class.
+    -- | Methods. Methods are internal functions that can privately access the
+    -- state of the object and call other methods of the same class.
     | ClassMethod 
       Identifier  -- ^ name of the method
       (Maybe TypeSpecifier) -- ^ type of the return value (optional)
