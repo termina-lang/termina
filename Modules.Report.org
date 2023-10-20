@@ -28,10 +28,12 @@ import { D1.D2.Mod }
 If ~./D1/D2/Mod.fin~ exists, read file ~./D1/D2/Mod.fin~
 
 * TODO Semantic Analyze each module
-** TODO Homogeneous inclusion
+** DONE Homogeneous inclusion
 I am inventing the name. Everything seems to be as if the whole project were in
 a single file.
 ** TODO Add meta-data to improve errors
+
+* TODO PPrint each module mimicking Project structure.
 
 * TODO Project File. Á la all-modern-compilers.
 There is a project file YAML,JSon or whatever, where there is a file noted as

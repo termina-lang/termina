@@ -1,5 +1,9 @@
 import { Hola.Fin.Mundo , Vamos.Que.Sha.Lo.Tenemos , ModB }
 
 function test0(){
-         return;
+  f();
+  h();
+  shaLoTenemos();
+  holaFinMundo();
+  return;
 }

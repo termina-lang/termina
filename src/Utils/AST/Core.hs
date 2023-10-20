@@ -1,11 +1,11 @@
-{-# Language LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
 -- | Util functions related to AST.Core
 
 module Utils.AST.Core where
 
 import           AST.Core
-import qualified Data.List as L
-import Data.Maybe (maybeToList)
+import qualified Data.List  as L
+import           Data.Maybe (maybeToList)
 
 -- TODO TEST
 -- findWith (if eq i j then just . f' else Nothing) = fmap f . L.find (eq i)
@@ -85,7 +85,9 @@ selfInvStmt isSelf = selfInvStmt'
       isSelfExpression e
       ++  concatMap (selfInvBlock isSelf . matchBody) mcases
     selfInvStmt' (SingleExpStmt e _ann) = isSelfExpression e
-    selfInvStmt' (Free obj _ann) = []
+    -- we cannot free methods and stuff, can we?
+    -- TODO
+    selfInvStmt' (Free _obj _ann) = []
 
 selfInvBlock :: (obj a -> Bool) -> Block' (Expression' obj) obj a -> [Identifier]
 selfInvBlock isSelf = concatMap (selfInvStmt isSelf)
@@ -117,9 +119,24 @@ selfDepClass isSelf = selfDepClass'
      Just (vId , selfInvBlockRet isSelf bRet)
 
 className :: ClassMember' expr obj a -> Identifier
-className (ClassField e _) = fieldIdentifier e
-className (ClassMethod mIdent _ _ _) = mIdent
+className (ClassField e _)              = fieldIdentifier e
+className (ClassMethod mIdent _ _ _)    = mIdent
 className (ClassProcedure pIdent _ _ _) = pIdent
-className (ClassViewer vIdent _ _ _ _) = vIdent
-
+className (ClassViewer vIdent _ _ _ _)  = vIdent
 ----------------------------------------
+
+glbName :: Global' expr a -> Identifier
+glbName (Task tId _ _ _ _)     = tId
+glbName (Resource tId _ _ _ _) = tId
+glbName (Handler tId _ _ _ _)  = tId
+glbName (Const tId _ _ _ _)    = tId
+
+tyDefName :: TypeDef'' member -> Identifier
+tyDefName (Struct sId _ _ )= sId
+tyDefName (Enum sId _ _ )=   sId
+tyDefName (Class _ sId _ _ )=sId
+
+globalsName :: AnnASTElement' expr obj a -> Identifier
+globalsName (Function fId _ _ _ _ _) = fId
+globalsName (GlobalDeclaration glb)  = glbName glb
+globalsName (TypeDefinition tyDef _) = tyDefName tyDef

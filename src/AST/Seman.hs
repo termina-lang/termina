@@ -8,6 +8,8 @@ module AST.Seman
 
 import           Annotations
 import           AST.Core
+
+import Modules.Modules (ModuleName)
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
 -- |Object| should not be invoked directly.
@@ -63,5 +65,5 @@ type Statement = Statement' Expression Object
 type AnnotatedProgram a = [AnnASTElement' Expression Object a]
 type Block a = Block' Expression Object a
 
-type Module = Module' ()
-type TerminaProgram a = TerminaProgram' Expression Object () a a
+type Module = Module' ModuleName
+type TerminaProgram a = TerminaProgram' Expression Object ModuleName a a

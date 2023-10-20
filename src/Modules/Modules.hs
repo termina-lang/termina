@@ -42,6 +42,9 @@ terminaExt = FileExt "fin"
 -- moduleStringToPath pDir
 --   = modulePath (\strs -> let nm = fragments strs in MData nm (moduleSrcFromName pDir nm))
 
+buildModuleName :: [String] -> ModuleName
+buildModuleName = fragments
+
 terminaProgramImports :: PAST.TerminaProgram Annotation -> [ ModuleName ]
 terminaProgramImports = map ( fragments . moduleIdentifier) . modules
 

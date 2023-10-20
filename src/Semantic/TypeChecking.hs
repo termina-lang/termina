@@ -42,7 +42,7 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import           Data.List            (find, map, nub, sortOn, (\\))
+import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -163,7 +163,7 @@ objectType _ (MemberAccess obj ident ann) = do
       \case{
         -- Either a struct
         Struct _identTy fields _mods ->
-            let mfield = find ((ident ==) . fieldIdentifier) fields in
+            let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError ann (EMemberAccessNotMember ident))
               (return . SAST.MemberAccess typed_obj ident . buildExpAnnObj ann obj_ak . fieldTypeSpecifier) mfield
@@ -213,7 +213,7 @@ objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
           \case{
             -- Either a struct
             Struct _identTy fields _mods ->
-                let mfield = find ((ident ==) . fieldIdentifier) fields in
+                let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
                   maybe
                   (throwError $ annotateError ann (EMemberAccessNotMember ident))
                   (return . SAST.DereferenceMemberAccess typed_obj ident . buildExpAnnObj ann ak . fieldTypeSpecifier) mfield
@@ -415,7 +415,7 @@ expressionType (EnumVariantExpression id_ty variant args pann) =
     (\_ -> throwError $ annotateError pann (ETyNotEnumFound id_ty))
   >>= \case{
    Enum _ ty_vs _mods ->
-     case find ((variant ==) . variantIdentifier) ty_vs of
+     case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
        Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant)
        Just (EnumVariant _ ps) ->
          let (psLen , asLen ) = (length ps, length args) in
@@ -496,8 +496,8 @@ checkFieldValues loc fds fas = checkSortedFields sorted_fds sorted_fas []
       FieldAddressAssignment fid _ -> fid;
       FieldPortConnection fid _ -> fid;
     }
-    sorted_fds = sortOn fieldIdentifier fds
-    sorted_fas = sortOn getFid fas
+    sorted_fds = Data.List.sortOn fieldIdentifier fds
+    sorted_fas = Data.List.sortOn getFid fas
     -- Same length monadic Zipwith
     checkSortedFields [] [] xs = return $ reverse xs
     checkSortedFields [] es _ = tError (EFieldExtra (fmap getFid es))
@@ -598,8 +598,8 @@ statementTySimple (MatchStmt matchE cases ann) =
         \case {
           Enum _ident flsDef _mods ->
           -- Sort both lists by identifiers
-          let ord_flsDef = sortOn variantIdentifier flsDef in
-          let ord_cases = sortOn matchIdentifier cases in
+          let ord_flsDef = Data.List.sortOn variantIdentifier flsDef in
+          let ord_cases = Data.List.sortOn matchIdentifier cases in
           case zipSameLength
                 (const (annotateError ann EMatchExtraCases))
                 (const (annotateError ann EMatchExtraCases))
@@ -610,7 +610,7 @@ statementTySimple (MatchStmt matchE cases ann) =
           _ -> throwError $ annotateError ann $ EMatchNotEnum t
         }
     Option t ->
-      let ord_cases = sortOn matchIdentifier cases in
+      let ord_cases = Data.List.sortOn matchIdentifier cases in
       optionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
       >>
       MatchStmt typed_matchE <$> zipWithM matchCaseType ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
@@ -851,17 +851,19 @@ checkUniqueNames ann err is =
 -- TODO Improve this two functions.
 -- nub is O(n^2)
 allUnique :: Eq a => [a] -> Bool
-allUnique xs = nub xs == xs
+allUnique xs = Data.List.nub xs == xs
 
 repeated :: Eq a => [a] -> [a]
-repeated xs = nub $ xs Data.List.\\ nub xs
+repeated xs = Data.List.nub $ xs Data.List.\\ Data.List.nub xs
 -----------------------------------------
 
 -- Adding Global elements to the environment.
-programAdd :: SAST.AnnASTElement SemanticAnns -> SemanticMonad ()
+programAdd :: SAST.AnnASTElement SemanticAnns -> SemanticMonad (Identifier, GEntry SemanticAnns)
 programAdd (Function ident args mretType _bd _mods anns) =
-  insertGlobal ident (GFun args (fromMaybe Unit mretType))
+  let gbl = GFun args (fromMaybe Unit mretType) in
+  insertGlobal ident gbl
   (annotateError (location anns) (EUsedFunName ident))
+  >> return (ident , gbl)
 programAdd (GlobalDeclaration glb) =
   let (global_name, sem) =
         case glb of
@@ -876,6 +878,7 @@ programAdd (GlobalDeclaration glb) =
           in
   insertGlobal global_name (GGlob sem)
   (annotateError (location (getAnnotation glb)) (EUsedGlobalName global_name))
+  >> return (global_name , GGlob sem)
 programAdd (TypeDefinition ty anns) =
   let type_name = identifierType ty in
     case ty_ann anns of
@@ -883,11 +886,13 @@ programAdd (TypeDefinition ty anns) =
         insertGlobal
           type_name semTy
           (annotateError (location anns) $ EUsedTypeName type_name)
+        >> return (type_name , semTy)
       _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
 
 --- Exectuing Type Checking
 typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation
-  -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns) , ExpressionState)
+  -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
+     , ExpressionState)
 typeCheckRunE = runTypeChecking initialExpressionSt  . mapM checkAndAdd
     where
       checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
@@ -895,3 +900,32 @@ typeCheckRunE = runTypeChecking initialExpressionSt  . mapM checkAndAdd
 typeCheckRun :: PAST.AnnotatedProgram Parser.Annotation
   -> Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
 typeCheckRun = fst . typeCheckRunE
+
+-- Module TypeChecking function
+typeAndGetGlobals
+  -- GlobalEnv from imports
+  :: GlobalEnv
+  -- Current Termina Module
+  -> PAST.AnnotatedProgram Parser.Annotation
+  -> Either
+        SemanticErrors
+        (SAST.AnnotatedProgram SemanticAnns
+        , [(Identifier , GEntry SemanticAnns)])
+typeAndGetGlobals preLoad p =
+  case buildInit of
+    Left err -> Left (annotateError internalErrorSeman err)
+    Right intGlbs -> fst (runTypeChecking (makeInitial intGlbs) (foldM checkAddCompile ([],[]) p))
+ where
+   checkAddCompile (ts, gs) t = do
+     tTyped <- programSeman t
+     glb <- programAdd tTyped
+     return (tTyped:ts, glb:gs)
+   buildInit =
+     Data.List.foldl'
+      (\env (k,v) -> either
+        Left
+        (\env -> if isJust (M.lookup k env)
+          then Left (EVarDefined k) else Right (M.insert k v env)
+        ) env )
+      (Right preLoad)
+      initGlb
