@@ -16,10 +16,10 @@ constUInt32 :: Expression SemanticAnns
 constUInt32 = Constant (I UInt32 1024) uint32SemAnn
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
 
 refVectorAnn :: SemanticAnns
-refVectorAnn = refVectorSemAnn UInt32 (I UInt32 10)
+refVectorAnn = refVectorSemAnn UInt32 (K 10)
 
 structASemAnn, tmDescriptorSemAnn :: SemanticAnns
 structASemAnn = definedTypeSemAnn Mutable "StructA"
@@ -35,14 +35,14 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 structAFieldsInit1 :: Expression SemanticAnns
 structAFieldsInit1 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))),
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (KC (I UInt32 10)) vectorAnn),
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
          FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
 
 structAFieldsInit2 :: Expression SemanticAnns
@@ -119,7 +119,7 @@ function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
     struct0Assignment0] returnStructField0) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnns
-function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (KC (I UInt32 10)))] (Just UInt32) 
+function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (K 10))] (Just UInt32) 
   (BlockRet [
     struct0Declaration2, 
     struct1Declaration, 
@@ -127,7 +127,7 @@ function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" 
     ] returnStructField0) [] unitSemAnn
 
 function4 :: AnnASTElement SemanticAnns
-function4 = Function "function4" [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Vector UInt32 (KC (I UInt32 10))))] (Just UInt32) 
+function4 = Function "function4" [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Vector UInt32 (K 10)))] (Just UInt32) 
   (BlockRet [
     struct0Declaration3, 
     struct1Declaration, 
@@ -172,7 +172,7 @@ spec = do
               "    {\n" ++
               "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = 0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = 4294901760;\n" ++
@@ -194,7 +194,7 @@ spec = do
               "    {\n" ++
               "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = 0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = 4294901760;\n" ++
@@ -216,7 +216,7 @@ spec = do
               "    {\n" ++
               "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = 0;\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = 4294901760;\n" ++
@@ -238,7 +238,7 @@ spec = do
               "    {\n" ++
               "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = param1.array[__i0];\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = 4294901760;\n" ++
@@ -260,7 +260,7 @@ spec = do
               "    {\n" ++
               "        struct0.field0 = 0;\n" ++
               "        struct0.field1.field_a = param0;\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            struct0.field1.field_b[__i0] = param1[__i0];\n" ++
               "        }\n" ++
               "        struct0.field1.field_c = 4294901760;\n" ++

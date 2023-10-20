@@ -13,13 +13,13 @@ optionDynUInt32TS :: TypeSpecifier
 optionDynUInt32TS = Option (DynamicSubtype UInt32)
 
 vectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (KC (I UInt32 10))
+vectorTS = Vector UInt32 (K 10)
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
 
 vector0 :: Expression SemanticAnns
 vector0 = AccessObject (Variable "vector0" vectorAnn)
@@ -83,7 +83,7 @@ spec = do
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -104,7 +104,7 @@ spec = do
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++
@@ -133,7 +133,7 @@ spec = do
           "    uint32_t vector1[10];\n" ++
           "\n" ++
           "    {\n" ++
-          "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "            vector1[__i0] = vector0[__i0];\n" ++
           "        }\n" ++
           "    }\n" ++

@@ -1,4 +1,6 @@
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use lambda-case" #-}
 -- | Module dedicated to Parsing
 
 module Parser.Parsing where
@@ -9,7 +11,7 @@ import           Text.Parsec.Pos
 -- Importing parser combinators
 import           Text.Parsec
 import           Text.Parsec.String
-import Text.Parsec.Char
+
 -- Importing tokenizer
 import qualified Text.Parsec.Expr     as Ex
 import qualified Text.Parsec.Language as Lang
@@ -45,7 +47,7 @@ lexer = Tok.makeTokenParser langDef
       -- Basic Types
       ["u8","u16","u32","u64"
       ,"i8","i16","i32","i64"
-      ,"bool","char"]
+      ,"usize", "bool","char"]
       ++ -- Polymorphic Types
       ["MsgQueue", "Pool", "Option"]
       ++ -- Struct and Union Types
@@ -208,6 +210,7 @@ typeSpecifierParser =
   <|> (reserved "i16" >> return Int16)
   <|> (reserved "i32" >> return Int32)
   <|> (reserved "i64" >> return Int64)
+  <|> (reserved "usize" >> return USize)
   <|> (reserved "bool" >> return Bool)
   <|> (reserved "char" >> return Char)
 
@@ -287,7 +290,7 @@ vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- KC <$> constExprParser'
+  size <- K <$> natural
   _ <- reservedOp "]"
   return $ Vector typeSpecifier size
 
@@ -476,7 +479,7 @@ objectParser = objectParser' objectTermParser
       _ <- reservedOp "->"
       p <- getPosition
       member <- identifierParser
-      return $ \parent ->   DereferenceMemberAccess parent member (Position p))
+      return $ \parent ->   DereferenceMemberAccess parent member (Position p))
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."
@@ -506,13 +509,13 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> (AccessObject (VectorSliceExpression obj low up (Position p)))
+              AccessObject obj -> AccessObject (VectorSliceExpression obj low up (Position p))
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
             index <- brackets expressionParser
             p <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> (AccessObject (VectorIndexExpression obj index (Position p)))
+              AccessObject obj -> AccessObject (VectorIndexExpression obj index (Position p))
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
@@ -521,7 +524,7 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       p <- getPosition
       member <- identifierParser
       return (\parent -> case parent of
-        AccessObject obj -> (AccessObject (DereferenceMemberAccess obj member (Position p)))
+        AccessObject obj -> AccessObject (DereferenceMemberAccess obj member (Position p))
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
@@ -538,7 +541,7 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       p <- getPosition
       _ <- reservedOp "*"
       return (\parent -> case parent of
-        AccessObject obj -> (AccessObject (Dereference obj (Position p)))
+        AccessObject obj -> AccessObject (Dereference obj (Position p))
         _ -> error "Unexpected member access to a non object"))
 
 vectorInitParser :: Parser (Expression Annotation)
@@ -547,7 +550,7 @@ vectorInitParser = do
   p <- getPosition
   value <- expressionParser
   _ <- semi
-  size <- KC <$> constExprParser'
+  size <- K <$> natural
   _ <- reservedOp "]"
   return $ VectorInitExpression value size (Position p)
 
@@ -808,7 +811,7 @@ classMethodParser = do
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
   return $ ClassMethod name typeSpec blockRet (Position p)
-      
+
 classProcedureParser :: Parser (ClassMember Annotation)
 classProcedureParser = do
   p <- getPosition
@@ -851,7 +854,7 @@ classDefinitionParser = do
   return $ Class classKind identifier fields modifiers
   where
     classKindParser :: Parser ClassKind
-    classKindParser = 
+    classKindParser =
       (reserved "task" >> return TaskClass)
       <|> (reserved "resource" >> return ResourceClass)
       <|> (reserved "handler" >> return HandlerClass)

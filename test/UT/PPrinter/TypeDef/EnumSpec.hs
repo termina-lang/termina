@@ -32,7 +32,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant0" [UInt32],
     EnumVariant "variant1" [],
     EnumVariant "variant2" [UInt64, DefinedType "id1", Char],
-    EnumVariant "variant3" [Int8, Vector (Vector Char (KC (I UInt32 20))) (KC (I UInt32 35))]
+    EnumVariant "variant3" [Int8, Vector (Vector Char (K 20)) (K 35)]
   ] []) undefined
 
 renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text

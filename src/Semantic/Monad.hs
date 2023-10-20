@@ -18,6 +18,7 @@ import           Data.Maybe
 import           Annotations
 import           AST.Parser
 import           AST.Seman                   as SAST
+import           AST.Core                    as CAST
 import           Utils.AST.Parser                  (groundTyEq)
 
 import qualified Parser.Parsing                    as Parser (Annotation (..))
@@ -444,12 +445,12 @@ checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
   void (getGlobalTy loc identTy)
   -- we assume that only well-formed types are added to globals.
-checkTypeDefinition loc (Vector ty c)         =
+checkTypeDefinition loc (Vector ty (CAST.K s)) =
   -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
   -- Numeric contast
-  unless (numConstExpression c) (throwError (annotateError loc (EVectorConst c))) >>
+  checkIntConstant loc USize s >>
   --
   checkTypeDefinition loc ty
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
@@ -486,6 +487,7 @@ checkTypeDefinition _ Int8                    = return ()
 checkTypeDefinition _ Int16                   = return ()
 checkTypeDefinition _ Int32                   = return ()
 checkTypeDefinition _ Int64                   = return ()
+checkTypeDefinition _ USize                   = return ()
 checkTypeDefinition _ Char                    = return ()
 checkTypeDefinition _ Bool                    = return ()
 checkTypeDefinition _ Unit                    = return ()
@@ -500,3 +502,20 @@ runTypeChecking
   -> SemanticMonad a
   -> (Either SemanticErrors a , ExpressionState)
 runTypeChecking initSt = flip ST.runState initSt . runExceptT
+
+-- | Function checking that constant expressions are correct.
+-- Here we have that syntact constant expressions are quite right, but we want
+-- to check that integers are correct.
+checkConstant :: Locations -> Const -> SemanticMonad Const
+checkConstant loc t@(I type_c c) =
+  -- |type_c| is correct
+  checkTypeDefinition loc type_c >>
+  checkIntConstant loc type_c c >>
+  return t
+checkConstant _ t = pure t
+
+checkIntConstant :: Locations -> TypeSpecifier -> Integer -> SemanticMonad ()
+checkIntConstant loc tyI i =
+  if memberIntCons i tyI
+  then return ()
+  else throwError $ annotateError loc (EConstantOutRange (I tyI i))

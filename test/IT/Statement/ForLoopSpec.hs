@@ -8,18 +8,18 @@ import Semantic.TypeChecking
 import Text.Parsec
 
 test0 :: String
-test0 = "function for_loop_test0(array0 : [u16; 10 : u32]) -> u16 {\n" ++
+test0 = "function for_loop_test0(array0 : [u16; 10]) -> u16 {\n" ++
         "    var total : u16 = 0 : u16;\n" ++
-        "    for i : u32 in 0 : u32 .. 10 : u32 {\n" ++
+        "    for i : usize in 0 : usize .. 10 : usize {\n" ++
         "        total = total + array0[i];\n" ++  
         "    }\n" ++
         "    return total;\n" ++
         "}"
 
 test1 :: String
-test1 = "function for_loop_test1(array0 : & [u16; 10 : u32]) -> bool {\n" ++
+test1 = "function for_loop_test1(array0 : & [u16; 10]) -> bool {\n" ++
         "    var found : bool = false;\n" ++
-        "    for i : u32 in 0 : u32 .. 10 : u32 while found == false {\n" ++
+        "    for i : usize in 0 : usize .. 10 : usize while found == false {\n" ++
         "        if (*array0)[i] == 1024 : u16 {\n" ++
         "            found = true;\n" ++
         "        }\n" ++   
@@ -60,10 +60,10 @@ spec = do
               "    uint16_t total = 0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = 0;\n" ++
-              "        uint32_t __end = 10;\n" ++
+              "        size_t __start = 0;\n" ++
+              "        size_t __end = 10;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
+              "        for (size_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
               "            total = total + array0.array[i];\n" ++
               "\n" ++
@@ -83,10 +83,10 @@ spec = do
               "    _Bool found = 0;\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = 0;\n" ++
-              "        uint32_t __end = 10;\n" ++
+              "        size_t __start = 0;\n" ++
+              "        size_t __end = 10;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end && (found == 0); i = i + 1) {\n" ++
+              "        for (size_t i = __start; i < __end && (found == 0); i = i + 1) {\n" ++
               "            \n" ++
               "            if (array0[i] == 1024) {\n" ++
               "\n" ++

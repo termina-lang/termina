@@ -10,14 +10,14 @@ import PPrinter.Statement
 import UT.PPrinter.Expression.Common
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
 
 vector0 :: Object SemanticAnns
 vector0 = Variable "vector0" vectorAnn
 
 total, i :: Expression SemanticAnns
 total = AccessObject (Variable "total" (objSemAnn Mutable UInt32))
-i = AccessObject (Variable "i" (objSemAnn Mutable UInt32))
+i = AccessObject (Variable "i" (objSemAnn Mutable USize))
 
 vector0IndexI:: Expression SemanticAnns
 vector0IndexI = AccessObject (VectorIndexExpression vector0 i (objSemAnn Mutable UInt32))
@@ -26,13 +26,13 @@ forLoopBody :: [Statement SemanticAnns]
 forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
 
 breakCond :: Expression SemanticAnns
-breakCond = BinOp RelationalNotEqual i (Constant (I UInt32 5) uint32SemAnn) boolSemAnn
+breakCond = BinOp RelationalNotEqual i (Constant (I USize 5) uint32SemAnn) boolSemAnn
 
 forLoop0 :: Statement SemanticAnns
-forLoop0 = ForLoopStmt "i" UInt32 (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) Nothing forLoopBody undefined
+forLoop0 = ForLoopStmt "i" USize (Constant (I USize 0) uint32SemAnn) (Constant (I USize 10) uint32SemAnn) Nothing forLoopBody undefined
 
 forLoop1 :: Statement SemanticAnns
-forLoop1 = ForLoopStmt "i" UInt32 (Constant (I UInt32 0) uint32SemAnn) (Constant (I UInt32 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
+forLoop1 = ForLoopStmt "i" USize (Constant (I USize 0) uint32SemAnn) (Constant (I USize 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement = render . ppStatement empty
@@ -44,10 +44,10 @@ spec = do
       renderStatement forLoop0 `shouldBe`
         pack (
           "{\n" ++
-          "    uint32_t __start = 0;\n" ++
-          "    uint32_t __end = 10;\n" ++
+          "    size_t __start = 0;\n" ++
+          "    size_t __end = 10;\n" ++
           "\n" ++
-          "    for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
+          "    for (size_t i = __start; i < __end; i = i + 1) {\n" ++
           "        \n" ++
           "        total = total + vector0[i];\n" ++
           "\n" ++
@@ -57,10 +57,10 @@ spec = do
       renderStatement forLoop1 `shouldBe`
         pack (
           "{\n" ++
-          "    uint32_t __start = 0;\n" ++
-          "    uint32_t __end = 10;\n" ++
+          "    size_t __start = 0;\n" ++
+          "    size_t __end = 10;\n" ++
           "\n" ++
-          "    for (uint32_t i = __start; i < __end && (i != 5); i = i + 1) {\n" ++
+          "    for (size_t i = __start; i < __end && (i != 5); i = i + 1) {\n" ++
           "        \n" ++
           "        total = total + vector0[i];\n" ++
           "\n" ++

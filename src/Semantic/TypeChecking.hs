@@ -14,6 +14,7 @@ module Semantic.TypeChecking where
 -- Termina Ast and Utils
 import           Annotations
 import           AST.Parser                  as PAST
+import           AST.Core                    as CAST
 import           Utils.AST.Parser
 import           Utils.AST.Core
 import           Utils.TypeSpecifier
@@ -46,8 +47,6 @@ import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Control.Monad
-
-import qualified Data.Graph           as Graph
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -143,9 +142,9 @@ objectType getVarTy (VectorIndexExpression obj idx ann) = do
   case obj_ty of
     Vector ty_elems _vexp ->
       typeExpression idx >>= \(idx_typed , idx_ty) ->
-        if numTy idx_ty
+        if groundTyEq idx_ty USize
         then return $ SAST.VectorIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
-        else throwError $ annotateError ann (ENumTs [idx_ty])
+        else throwError $ annotateError ann (EUSizeTs idx_ty)
     ty -> throwError $ annotateError ann (EVector ty)
 objectType _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
@@ -194,14 +193,14 @@ objectType getVarTy (VectorSliceExpression obj lower upper anns) = do
   unless (numConstExpression lower) (throwError (annotateError anns (ELowerBoundConst lower)))
   unless (numConstExpression upper) (throwError (annotateError anns (EUpperBoundConst upper)))
   case obj_ty of
-    Vector ty_elems (KC (I sizeTy size)) ->
+    Vector ty_elems (CAST.K size) ->
       case (lower, upper) of
         (KC (I lwTy lowerInt), KC (I upTy upperInt)) -> do
           unless (groundTyEq lwTy upTy) (throwError $ annotateError anns (EBoundsTypeMismatch lwTy upTy))
-          unless (groundTyEq sizeTy lwTy) (throwError $ annotateError anns (EBoundsAndVectorTypeMismatch lwTy upTy))
+          unless (groundTyEq USize lwTy) (throwError $ annotateError anns ( EBoundsTypeNotUSize lwTy upTy))
           when (lowerInt > upperInt) (throwError $ annotateError anns (EBoundsLowerGTUpper lowerInt upperInt))
           when (upperInt > size) (throwError $ annotateError anns (EUpperBoundGTSize upperInt size))
-          return $ SAST.VectorSliceExpression typed_obj lower upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (KC (I lwTy (upperInt - lowerInt))))
+          return $ SAST.VectorSliceExpression typed_obj lower upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (CAST.K (upperInt - lowerInt)))
         _ -> error "This should not happen, we already checked that the bounds are constant integers."
     ty -> throwError $ annotateError anns (EVector ty)
 objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
@@ -430,13 +429,12 @@ expressionType (EnumVariantExpression id_ty variant args pann) =
    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap (fmap forgetSemAnn) x))
   }
 -- IDEA Q4
-expressionType (VectorInitExpression iexp kexp@(KC constE) pann) = do
+expressionType (VectorInitExpression iexp isize@(CAST.K initSize) pann) = do
 -- | Vector Initialization
   (typed_init , type_init) <- typeExpression iexp
   -- Check that the type is correct
-  _ <- checkConstant pann constE
-  return (SAST.VectorInitExpression typed_init kexp (buildExpAnn pann (Vector type_init kexp)))
-expressionType (VectorInitExpression _ lexp pann) = throwError $ annotateError pann (EVectorConst lexp)
+  _ <- checkIntConstant pann USize initSize
+  return (SAST.VectorInitExpression typed_init isize (buildExpAnn pann (Vector type_init isize)))
 -- DONE [Q5]
 -- TODO [Q17]
 expressionType (OptionVariantExpression vexp anns) =
@@ -712,22 +710,6 @@ semanticTypeDef (Class kind i cls m) = Class kind i (Data.List.map kClassMember 
 typeExpression :: Expression Locations -> SemanticMonad (SAST.Expression SemanticAnns , TypeSpecifier)
 typeExpression e = expressionType e >>= \typed_e -> (typed_e, ) <$> getExpType typed_e
 
--- | Function checking that constant expressions are correct.
--- Here we have that syntact constant expressions are quite right, but we want
--- to check that integers are correct.
-checkConstant :: Locations -> Const -> SemanticMonad Const
-checkConstant loc t@(I type_c c) =
-  -- |type_c| is correct
-  checkTypeDefinition loc type_c >>
-  checkIntConstant loc type_c c >>
-  return t
-checkConstant _ t = pure t
-
-checkIntConstant :: Locations -> TypeSpecifier -> Integer -> SemanticMonad ()
-checkIntConstant loc tyI i =
-  if memberIntCons i tyI
-  then return ()
-  else throwError $ annotateError loc (EConstantOutRange (I tyI i))
 
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than

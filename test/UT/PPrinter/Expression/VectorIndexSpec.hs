@@ -10,12 +10,12 @@ import PPrinter.Expression
 import UT.PPrinter.Expression.Common
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (I UInt32 10)
-dynVectorAnn = dynVectorSemAnn UInt32 (I UInt32 10)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (I UInt32 5) (I UInt32 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
 
 refVectorAnn :: SemanticAnns
-refVectorAnn = refSemAnn (Vector UInt32 (KC (I UInt32 10)))
+refVectorAnn = refSemAnn (Vector UInt32 (K 10))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
@@ -25,33 +25,33 @@ vector1 = Variable "vector1" twoDymVectorAnn
 pVector0 :: Object SemanticAnns
 pVector0 = Variable "p_vector0" refVectorAnn
 
-uint32Index3, uint32Index4, uint8Const0x8 :: Expression SemanticAnns
-uint32Index3 = Constant (I UInt32 3) uint32SemAnn
-uint32Index4 = Constant (I UInt32 4) uint32SemAnn
-uint8Const0x8 = Constant (I UInt8 8) uint8SemAnn
+usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnns
+usizeIndex3 = Constant (I USize 3) usizeSemAnn
+usizeIndex4 = Constant (I USize 4) usizeSemAnn
+usizeConst0x8 = Constant (I USize 8) usizeSemAnn
 
 dynVector0 :: Object SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
-vector0IndexConstant = AccessObject (VectorIndexExpression vector0 uint8Const0x8 (objSemAnn Mutable UInt32))
+vector0IndexConstant = AccessObject (VectorIndexExpression vector0 usizeConst0x8 (objSemAnn Mutable UInt32))
 vector0IndexVar0 = AccessObject (VectorIndexExpression vector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 dynVector0IndexConstant, dynVector0IndexVar0 :: Expression SemanticAnns
-dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) uint8Const0x8 (objSemAnn Mutable UInt32))
+dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
 vector1IndexFirstDym :: Object SemanticAnns
-vector1IndexFirstDym = VectorIndexExpression vector1 uint32Index3 (vectorSemAnn Mutable Int64 (I UInt32 5))
+vector1IndexFirstDym = VectorIndexExpression vector1 usizeIndex3 (vectorSemAnn Mutable Int64 (K 5))
 
 vector1IndexExpression :: Expression SemanticAnns
-vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym uint32Index4 (objSemAnn Mutable Int64))
+vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym usizeIndex4 (objSemAnn Mutable Int64))
 
 derefpVector0 :: Object SemanticAnns
 derefpVector0 = Dereference pVector0 vectorAnn
 
 derefpVector0IndexConstant, derefpVector0IndexVar0 :: Expression SemanticAnns
-derefpVector0IndexConstant = AccessObject (VectorIndexExpression derefpVector0 uint32Index3 (objSemAnn Mutable UInt32))
+derefpVector0IndexConstant = AccessObject (VectorIndexExpression derefpVector0 usizeIndex3 (objSemAnn Mutable UInt32))
 derefpVector0IndexVar0 = AccessObject (VectorIndexExpression derefpVector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 renderExpression :: Expression SemanticAnns -> Text

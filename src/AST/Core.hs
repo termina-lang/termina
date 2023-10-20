@@ -98,9 +98,9 @@ type Address = Integer
 data TypeSpecifier
   -- Primitive types
   = UInt8 | UInt16 | UInt32 | UInt64
-  | Int8 | Int16 | Int32 | Int64
+  | Int8 | Int16 | Int32 | Int64 | USize
   | Bool | Char | DefinedType Identifier
-  | Vector TypeSpecifier ConstExpression
+  | Vector TypeSpecifier Size
   | Option TypeSpecifier
   -- Non-primitive types
   | MsgQueue TypeSpecifier Size
@@ -297,7 +297,7 @@ data Expression'
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | VectorInitExpression (Expression' obj a) ConstExpression a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
+  | VectorInitExpression (Expression' obj a) Size a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
   | FieldAssignmentsExpression
     Identifier -- ^ Structure type identifier
     [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier

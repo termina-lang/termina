@@ -9,40 +9,40 @@ import Text.Parsec
 
 test0 :: String
 test0 = "function slice_test0() {\n" ++
-        "    var vector0 : [u32; 10 : u32] = [0 : u32; 10 : u32];\n" ++
-        "    vector0[3 : u32..10 : u32][1 : u32] = 10 : u32;\n" ++
+        "    var vector0 : [u32; 10] = [0 : u32; 10];\n" ++
+        "    vector0[3 : usize .. 10 : usize][1 : usize] = 10 : u32;\n" ++
         "    return;\n" ++
         "}"
 
 test1 :: String
-test1 = "function slice_test1(vector0 : & [[[u32; 3 : u32]; 5 : u32]; 10 : u32]) {\n" ++
-        "    (*vector0)[3 : u32 .. 8 : u32] = [[[10 : u32; 3 : u32]; 5 : u32]; 5 : u32];\n" ++
+test1 = "function slice_test1(vector0 : & [[[u32; 3]; 5]; 10]) {\n" ++
+        "    (*vector0)[3 : usize .. 8 : usize] = [[[10 : u32; 3]; 5]; 5];\n" ++
         "    return;\n" ++
         "}"
 
 test2 :: String
-test2 = "function add_one(input : & [u32; 5 : u32]) {\n" ++ 
-        "    for i : u32 in 0 : u32 .. 5 : u32 {\n" ++
+test2 = "function add_one(input : & [u32; 5]) {\n" ++ 
+        "    for i : usize in 0 : usize .. 5 : usize {\n" ++
         "        (*input)[i] = (*input)[i] + 1 : u32;\n" ++
         "    }\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "function slice_test2(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
-        "    add_one(&(*vector0)[2 : u32 .. 3 : u32][0 : u32]);\n" ++
+        "function slice_test2(vector0 : & [[u32; 5]; 10]) {\n" ++
+        "    add_one(&(*vector0)[2 : usize .. 3 : usize][0 : usize]);\n" ++
         "    return;\n" ++
         "}"
 
 test3 :: String
-test3 = "function add_two(input : [u32; 5 : u32]) {\n" ++ 
-        "    for i : u32 in 0 : u32 .. 5 : u32 {\n" ++
+test3 = "function add_two(input : [u32; 5]) {\n" ++ 
+        "    for i : usize in 0 : usize .. 5 : usize {\n" ++
         "        input[i] = input[i] + 2 : u32;\n" ++
         "    }\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "function slice_test3(vector0 : & [[u32; 5 : u32]; 10 : u32]) {\n" ++
-        "    add_two((*vector0)[2 : u32 .. 3 : u32][0 : u32]);\n" ++
+        "function slice_test3(vector0 : & [[u32; 5]; 10]) {\n" ++
+        "    add_two((*vector0)[2 : usize .. 3 : usize][0 : usize]);\n" ++
         "    return;\n" ++
         "}"
 
@@ -75,7 +75,7 @@ spec = do
               "    uint32_t vector0[10];\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "            vector0[__i0] = 0;\n" ++
               "        }\n" ++
               "    }\n" ++
@@ -93,9 +93,9 @@ spec = do
         pack ("void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
               "\n" ++
               "    {\n" ++
-              "        for (uint32_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
-              "            for (uint32_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-              "                for (uint32_t __i2 = 0; __i2 < 3; __i2 = __i2 + 1) {\n" ++
+              "        for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
+              "            for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+              "                for (size_t __i2 = 0; __i2 < 3; __i2 = __i2 + 1) {\n" ++
               "                    (&vector0[3])[__i0][__i1][__i2] = 10;\n" ++
               "                }\n" ++
               "            }\n" ++
@@ -115,10 +115,10 @@ spec = do
         pack ("void add_one(uint32_t input[5]) {\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = 0;\n" ++
-              "        uint32_t __end = 5;\n" ++
+              "        size_t __start = 0;\n" ++
+              "        size_t __end = 5;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
+              "        for (size_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
               "            input[i] = input[i] + 1;\n" ++
               "\n" ++
@@ -150,10 +150,10 @@ spec = do
         pack ("void add_two(__param_add_two_input_t input) {\n" ++
               "\n" ++
               "    {\n" ++
-              "        uint32_t __start = 0;\n" ++
-              "        uint32_t __end = 5;\n" ++
+              "        size_t __start = 0;\n" ++
+              "        size_t __end = 5;\n" ++
               "\n" ++
-              "        for (uint32_t i = __start; i < __end; i = i + 1) {\n" ++
+              "        for (size_t i = __start; i < __end; i = i + 1) {\n" ++
               "            \n" ++
               "            input.array[i] = input.array[i] + 2;\n" ++
               "\n" ++
