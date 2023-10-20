@@ -887,11 +887,11 @@ moduleIdentifierParser = sepBy1 firstCapital dot
 singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
 
-moduleInclusionParser :: Parser [ Module Annotation]
+moduleInclusionParser :: Parser [ Module ]
 moduleInclusionParser = do
   reserved "import"
   modules <- braces (sepBy1 (wspcs *> singleModule <* wspcs) comma)
-  return $ map (\(mod, ident, ann) -> ModInclusion ident mod ann) modules
+  return $ map (\(mod, ident, ann) -> ModInclusion ident mod) modules
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof

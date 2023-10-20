@@ -164,12 +164,18 @@ data ExpressionState
  -- standard library. For the time being, initial type definitions such as
  -- "TaskRet" and "Result" are defined here.
 initialGlobalEnv :: GlobalEnv
-initialGlobalEnv = fromList
+initialGlobalEnv = fromList initGlb
+
+initGlb :: [(Identifier, GEntry SemanticAnns)]
+initGlb =
   [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] [])),
    ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" []] [])),
    ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
    ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
    ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
+
+makeInitial :: GlobalEnv -> ExpressionState
+makeInitial e = ExprST e empty empty
 
 initialExpressionSt :: ExpressionState
 initialExpressionSt = ExprST initialGlobalEnv empty empty

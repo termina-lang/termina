@@ -61,17 +61,14 @@ instance Annotated (AnnASTElement' expr glb) where
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
-data Module' pf a = ModInclusion
+data Module' pf = ModInclusion
   { moduleIdentifier ::  pf  -- Filepath!
   , moduleMods :: [ Modifier ]
-  , moduleAnns :: a}
+  }
   deriving Show
 
-modulePath :: (a -> b) -> Module' a c -> Module' b c
-modulePath f m = m{moduleIdentifier = f (moduleIdentifier m)}
-
-instance Annotated (Module' pf) where
-  getAnnotation = moduleAnns
+instance Functor Module' where
+  fmap f m = m{moduleIdentifier = f (moduleIdentifier m)}
 
 -- | This type represents constant expressions.
 -- Since we are not implementing it right now, we only have constants.
@@ -376,7 +373,7 @@ data Const = B Bool | I TypeSpecifier Integer | C Char
 type Block' expr obj a = [Statement' expr obj a]
 
 data TerminaProgram' expr glb pf a b = Termina
-  { modules :: [ Module' pf a]
+  { modules :: [ Module' pf]
   , frags :: [ AnnASTElement' expr glb b ] }
   deriving Show
 
