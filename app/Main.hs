@@ -96,19 +96,40 @@ main = runCommand $ \opts args ->
               -- let mainName = takeBaseName fspath
               -- Termina Map from paths to Parser ASTs.
               mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
-              --
-              analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst mapProject))
-                -- case sortOrLoop (M.map fst mapProject) of
-                -- -- Left loop -> fail ("Cycle between modules: " ++ show loop)
-                -- Right orderedModules -> return orderedModules
-              -- Prepare for Typing
-              let toModuleAST = M.map mAstFromPair mapProject
-              either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
+              if M.null mapProject
+                -- Single file project.
+                -- so we can still use it :sweat_smile: until the other part is done.
+              then
+                let
+                  tAST = frags terminaMain
+                in case typeCheckRun tAST of
+                    Left err -> fail ("Type Check Error:: \n" ++ show err)
+                    Right typedAST
+                        -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
+                        >> when (optPrintASTTyped opts) (print typedAST)
+                        >> maybe
+                                (print (ppHeaderFile typedAST))
+                                (\fn ->
+                                  let -- System.Path
+                                      header = fn ++ ".h"
+                                      source = fn ++ ".c"
+                                  in TIO.writeFile header (ppHeaderFile typedAST)
+                                  >> TIO.writeFile source (ppSourceFile typedAST)
+                                ) (optOutput opts)
+                        >> print "Perfect ✓"
+              else do
+                --
+                analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst mapProject))
+                  -- case sortOrLoop (M.map fst mapProject) of
+                  -- -- Left loop -> fail ("Cycle between modules: " ++ show loop)
+                  -- Right orderedModules -> return orderedModules
+                -- Prepare for Typing
+                let toModuleAST = M.map mAstFromPair mapProject
+                either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
             ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
             _ -> ioError $ userError "Arguments error"
-
 
               -- src_code <- readFile filepath
               -- case runParser terminaProgram () filepath src_code of
