@@ -15,6 +15,7 @@ import qualified Data.Text as T
 import Control.Monad
 
 import Modules.Modules
+import Modules.Typing
 import AST.Core
 import qualified AST.Parser as PAST
 
@@ -96,9 +97,13 @@ main = runCommand $ \opts args ->
               -- Termina Map from paths to Parser ASTs.
               mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               --
-              case sortOrLoop (M.map fst mapProject) of
-                Left loop -> fail ("Cycle between modules: " ++ show loop)
-                Right orderedModules -> print orderedModules
+              analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst mapProject))
+                -- case sortOrLoop (M.map fst mapProject) of
+                -- -- Left loop -> fail ("Cycle between modules: " ++ show loop)
+                -- Right orderedModules -> return orderedModules
+              -- Prepare for Typing
+              let toModuleAST = M.map mAstFromPair mapProject
+              either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
             ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"

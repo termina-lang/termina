@@ -34,6 +34,9 @@ data ModuleAST a = MData
   , moduleData :: a
   }
 
+mAstFromPair :: ([ModuleName] , PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
+mAstFromPair = uncurry MData
+
 data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns
    , defsModule  :: [ (SAST.Identifier , GEntry SemanticAnns) ]
@@ -45,6 +48,14 @@ type SemanProject =  M.Map ModuleName (ModuleAST TypedModule)
 type Environment = M.Map SAST.Identifier (GEntry SemanticAnns)
 
 type TProjectM = Except Errors
+
+runTypeProject
+  :: ParserProject
+  -- a list indicating the order in which they need to be loaded.
+  -> [ModuleName]
+  -- Return a seman project (covered with effects :sweat_smile:)
+  -> Either Errors SemanProject
+runTypeProject p = runExcept . typeProject p
 
 typeProject
   -- We have a project just parsed
