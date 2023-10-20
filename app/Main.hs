@@ -92,9 +92,11 @@ main = runCommand $ \opts args ->
               absPath <- makeAbsolute fspath
               let rootDir = routeToMain absPath
               -- Main is special
+              print ("Reading Main" ++ show absPath)
               terminaMain <- loadFile absPath
               -- let mainName = takeBaseName fspath
               -- Termina Map from paths to Parser ASTs.
+              print "Loading project and parsing modules"
               mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               if M.null mapProject
                 -- Single file project.
@@ -125,7 +127,16 @@ main = runCommand $ \opts args ->
                   -- Right orderedModules -> return orderedModules
                 -- Prepare for Typing
                 let toModuleAST = M.map mAstFromPair mapProject
-                either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
+                -- Let's make it interactive
+                -- Old: either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
+                _typedProject <- foldM_ (\env m -> do
+                     putStr ("Type Checking Module: " ++ show m)
+                     case typeModule toModuleAST m env of
+                      Left err -> fail ("[FAIL]" ++ show err)
+                      Right typedM ->
+                        print " >> [DONE]" >> return (M.insert m typedM env)
+                     ) M.empty analyzeOrd
+                print "Finished Module typing"
             ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"

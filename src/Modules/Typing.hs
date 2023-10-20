@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Control.Monad
 
 import Data.Maybe (isJust)
+import Data.List
 
 -- Core inof
 import AST.Core (TerminaProgram'(..), Module'(..))
@@ -28,6 +29,7 @@ import Semantic.TypeChecking (typeAndGetGlobals)
 
 -- Module system imports
 import qualified Data.Map.Strict as M
+import Control.Monad.Except (runExcept)
 
 data ModuleAST a = MData
   { moduleDeps :: [ModuleName]
@@ -56,6 +58,27 @@ runTypeProject
   -- Return a seman project (covered with effects :sweat_smile:)
   -> Either Errors SemanProject
 runTypeProject p = runExcept . typeProject p
+
+typeModule
+  :: ParserProject
+  -> ModuleName
+  -> SemanProject
+  -> Either Errors (ModuleAST TypedModule)
+typeModule parserMap m typedDeps = case M.lookup m parserMap of
+        Nothing -> Left (EModuleNotParsed m)
+        Just (MData deps parsedM) ->
+            addDeps deps >>= \env ->
+            case typeAndGetGlobals env (frags parsedM) of
+               Left err -> Left (ELiftTypeCheckError err)
+               Right t ->
+                 let typedModule
+                        = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst t)) (snd t)
+                 in Right (MData deps typedModule)
+  where
+   -- Load globals defined by dependecies and create the environment
+   -- used to type the current module.
+   addDeps = runExcept . foldM (flip envB) M.empty
+   envB = buildEnvironment typedDeps
 
 typeProject
   -- We have a project just parsed
