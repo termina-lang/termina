@@ -33,25 +33,77 @@ ppDeclareAndInitialize initializer identifier ts expr =
             braces' $ (indentTab . align) $ initializer identifier expr
         ]
 
+data MatchSource = Annonymous | Named DocStyle
+
 -- | Prints the statements of a match case.
 -- Within the match case, we have to substitute the symbols of the
 -- parameters of the match case. Each symbol must be substituted by the
 -- corresponding field of the enumeration variant's struct.
-ppMatchCase :: Substitutions -> DocStyle -> MatchCase SemanticAnns -> DocStyle
-ppMatchCase subs symbol (MatchCase identifier params body _) =
-    vsep [
+ppMatchCase :: Substitutions -> MatchSource -> TypeSpecifier -> MatchCase SemanticAnns -> DocStyle
+ppMatchCase subs _ (Option {}) (MatchCase "None" _ body _) =
+    vsep [ ppStatement subs s <> line | s <- body ]
+ppMatchCase subs Annonymous (Option {}) (MatchCase "Some" [sym] body _) =
+    let variable = pretty (namefy "match.__Some")
+        -- | New map of substitutions. This map contains the substitutions
+        -- of the parameters of the match case. It maps each parameter
+        -- identifier to the corresponding field of the enumeration variant's
+        -- struct.
+        newSubs = subs `union` fromList [(sym, variable)]
+    in
+    vsep $ [ ppStatement newSubs s <> line | s <- body ]
+ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
+    let variable = pretty "__" <> obj <> pretty "__Some"
+        -- | New map of substitutions. This map contains the substitutions
+        -- of the parameters of the match case. It maps each parameter
+        -- identifier to the corresponding field of the enumeration variant's
+        -- struct.
+        newSubs = subs `union` fromList [(sym, variable)]
+    in
+    vsep $
+    [
+        optionDyn <+> variable <+> pretty "=" <+> obj <> pretty "." <> pretty "__Some" <> semi,
+        emptyDoc
+    ] ++
+    [
         ppStatement newSubs s <> line | s <- body
     ]
-    where
+ppMatchCase subs _ (DefinedType _) (MatchCase _ [] body _) =
+    vsep $ [ ppStatement subs s <> line | s <- body ]
+ppMatchCase subs Annonymous (DefinedType _) (MatchCase variant params body _) =
+    let variable = pretty (namefy ("match." ++ (namefy variant)))
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
         -- struct.
         newKeyVals = zipWith
-            (\sym index -> (sym, symbol <> pretty "." <> pretty (namefy identifier) <> pretty "." <> pretty (namefy (show (index :: Integer))))) params [0..]
+            (\sym index -> (sym, variable <> pretty "." <> pretty (namefy (show (index :: Integer))))) params [0..]
         -- | Union of the previous map with the new one. This allows the nesting
         -- of match statements.
         newSubs = subs `union` fromList newKeyVals
+    in
+    vsep $ [ ppStatement newSubs s <> line | s <- body ]
+ppMatchCase subs (Named obj) (DefinedType identifier) (MatchCase variant params body _) =
+    let variable = pretty "__" <> obj <> pretty (namefy variant)
+        -- | New map of substitutions. This map contains the substitutions
+        -- of the parameters of the match case. It maps each parameter
+        -- identifier to the corresponding field of the enumeration variant's
+        -- struct.
+        newKeyVals = zipWith
+            (\sym index -> (sym, variable <> pretty "." <> pretty (namefy (show (index :: Integer))))) params [0..]
+        -- | Union of the previous map with the new one. This allows the nesting
+        -- of match statements.
+        newSubs = subs `union` fromList newKeyVals
+    in
+    vsep $
+    [
+        enumIdentifier (identifier ++ "_" ++ variant ++ "_" ++ "params") <+>
+            variable <+> pretty "=" <+> obj <> pretty "." <> pretty (namefy variant) <> semi,
+        emptyDoc
+    ] ++
+    [
+        ppStatement newSubs s <> line | s <- body
+    ]
+ppMatchCase _ _ _ mc = error $ "invalid match case: " ++ show mc
 
 -- | Prints a return statement
 ppReturnStmt :: 
@@ -168,41 +220,52 @@ ppStatement subs (ForLoopStmt iterator iteratorTS initValue endValue breakCond b
             (pretty iterator)
             (pretty (show (1 :: Integer)))
 ppStatement subs (MatchStmt expr matchCases _) =
-    let ppMatchCaseOthers symbol cls =
+    let matchSource = case expr of
+            (AccessObject {}) -> Named (ppExpression subs expr)
+            _ -> Annonymous
+        symbol = case matchSource of
+            Annonymous -> pretty (namefy "match")
+            Named obj -> obj
+        ts = getType expr
+        casePrefix = 
+            case ts of
+                -- | If the expression is an enumeration, the case identifier must 
+                -- be prefixed with the enumeration identifier.
+                (DefinedType enumId) -> namefy enumId ++ "_"
+                _ -> ""
+        ppMatchCaseOthers cls =
             case cls of
-                [c] -> space <> ppCElseBlock (ppMatchCase subs symbol c)
+                [c] -> space <> ppCElseBlock (ppMatchCase subs matchSource ts c)
                 c : cs ->
-                    case c of (MatchCase identifier _ _ _) ->
+                    case c of (MatchCase caseId _ _ _) ->
                                 space <> ppCElseIfBlock
-                                    (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty identifier)
-                                    (ppMatchCase subs symbol c) <> ppMatchCaseOthers symbol cs
+                                    (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty (casePrefix ++ caseId))
+                                    (ppMatchCase subs matchSource ts c) <> ppMatchCaseOthers cs
                 [] -> emptyDoc
-        ppMatchCases symbol cls =
+        ppMatchCases cls =
             case cls of
                 -- | Single case, we do not need to evaluate it, just print the case
-                [c] -> ppMatchCase subs symbol c
+                [c] -> ppMatchCase subs matchSource ts c
                 c : cs ->
-                    case c of (MatchCase identifier _ _ _) ->
+                    case c of (MatchCase caseId _ _ _) ->
                                 ppCIfBlock
-                                    (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty identifier)
-                                    (ppMatchCase subs symbol c) <> ppMatchCaseOthers symbol cs
+                                    (symbol <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty (casePrefix ++ caseId))
+                                    (ppMatchCase subs matchSource ts c) <> ppMatchCaseOthers cs
                 [] -> error "empty case list!"
     in
         case expr of
             -- | If the expression is an object, we can use it directly
             (AccessObject {}) ->
-                let symbol = ppExpression subs expr in
-                    ppMatchCases symbol matchCases
+                ppMatchCases matchCases
             -- | If the expression is a complex expression, we have to evaluate it first
             -- and then use the result of the evaluation when evaluating the different
             -- if-elseif clauses of the match statement.
             _ ->
-                let symbol = "__match" in
-                    braces' $ (indentTab . align) $ vsep [
-                        ppStatement subs (Declaration symbol Immutable (getType expr) expr undefined),
-                        emptyDoc,
-                        ppMatchCases (pretty symbol) matchCases
-                    ]
+                braces' $ (indentTab . align) $ vsep [
+                    ppStatement subs (Declaration "__match" Immutable (getType expr) expr undefined),
+                    emptyDoc,
+                    ppMatchCases matchCases
+                ]
 ppStatement subs (SingleExpStmt expr _) =
     ppExpression subs expr <> semi
 

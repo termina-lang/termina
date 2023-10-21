@@ -96,7 +96,9 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)option0.__Some.__0.data);\n" ++
+              "        __termina_option_dyn_t __option0__Some = option0.__Some;\n" ++
+              "\n" ++
+              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -117,7 +119,9 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)option0.__Some.__0.data);\n" ++
+              "        __termina_option_dyn_t __option0__Some = option0.__Some;\n" ++
+              "\n" ++
+              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -127,24 +131,28 @@ spec = do
     it "Prints declaration of function match_test2" $ do
       renderHeader test2 `shouldBe`
         pack ("typedef enum {\n" ++
-              "    In,\n" ++
-              "    Out,\n" ++
-              "    Stop,\n" ++
-              "    Reset\n" ++
-              "} __enum_Message;\n" ++
+              "    __Message_In,\n" ++
+              "    __Message_Out,\n" ++
+              "    __Message_Stop,\n" ++
+              "    __Message_Reset\n" ++
+              "} __enum_Message_t;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    uint32_t __0;\n" ++
+              "    uint32_t __1;\n" ++
+              "} __enum_Message_In_params_t;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    uint32_t __0;\n" ++
+              "} __enum_Message_Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
-              "    __enum_Message __variant;\n" ++
-              "    \n" ++
+              "    __enum_Message_t __variant;\n" ++
+              "\n" ++
               "    union {\n" ++
-              "        struct {\n" ++
-              "            uint32_t __0;\n" ++
-              "            uint32_t __1;\n" ++
-              "        } __In;\n" ++
-              "        struct {\n" ++
-              "            uint32_t __0;\n" ++
-              "        } __Out;\n" ++
+              "        __enum_Message_In_params_t __In;\n" ++
+              "        __enum_Message_Out_params_t __Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++
@@ -155,7 +163,8 @@ spec = do
         pack ("uint32_t match_test1() {\n" ++
               "\n" ++
               "    uint32_t ret = 0;\n" ++
-              "\n    Message msg;\n" ++
+              "\n" ++
+              "    Message msg;\n" ++
               "\n" ++
               "    {\n" ++
               "        msg.__variant = In;\n" ++
@@ -163,21 +172,25 @@ spec = do
               "        msg.__In.__1 = 10;\n" ++
               "    }\n" ++
               "\n" ++
-              "    if (msg.__variant == Stop) {\n" ++
+              "    if (msg.__variant == __Message_Stop) {\n" ++
               "\n" ++
               "        ret = 0;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == Reset) {\n" ++
+              "    } else if (msg.__variant == __Message_Reset) {\n" ++
               "\n" ++
               "        ret = 1;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == Out) {\n" ++
+              "    } else if (msg.__variant == __Message_Out) {\n" ++
               "\n" ++
-              "        ret = msg.__Out.__0;\n" ++
+              "        __enum_Message_Out_params_t __msg__Out = msg.__Out;\n" ++
+              "\n" ++
+              "        ret = __msg__Out.__0;\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        ret = msg.__In.__0 + msg.__In.__1;\n" ++
+              "        __enum_Message_In_params_t __msg__In = msg.__In;\n" ++
+              "\n" ++
+              "        ret = __msg__In.__0 + __msg__In.__1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

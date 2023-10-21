@@ -155,8 +155,10 @@ ppResourceClassIDField = pretty "__resource_id"
 ppTaskClassIDField = pretty "__task_id"
 ppHandlerClassIDField = pretty "__handler_id"
 
+-- | Pretty prints the name of the enum that defines the variants
+-- of the enumeration
 enumIdentifier :: Identifier -> DocStyle
-enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier))
+enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier ++ "_t"))
 
 -- |  Pretty prints the name of the field that will store the variant
 --  inside the struct corresponding to the enum.

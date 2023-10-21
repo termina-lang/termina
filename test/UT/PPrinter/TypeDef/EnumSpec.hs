@@ -45,42 +45,44 @@ spec = do
       renderTypedefDeclaration enumWithOneRegularField `shouldBe`
         pack (
             "typedef enum {\n" ++
-            "    variant0\n" ++
-            "} __enum_id0;\n" ++
+            "    __id0_variant0\n" ++
+            "} __enum_id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "\n" ++
-            "    __enum_id0 __variant;\n" ++
+            "    __enum_id0_t __variant;\n" ++
             "\n" ++
             "} id0;\n")
     it "Prints an enum with two regular variants" $ do
       renderTypedefDeclaration enumWithTwoRegularFields `shouldBe`
         pack (
             "typedef enum {\n" ++
-            "    variant0,\n" ++
-            "    variant1\n" ++
-            "} __enum_id0;\n" ++
+            "    __id0_variant0,\n" ++
+            "    __id0_variant1\n" ++
+            "} __enum_id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "\n" ++
-            "    __enum_id0 __variant;\n" ++
+            "    __enum_id0_t __variant;\n" ++
             "\n" ++
             "} id0;\n")
     it "Prints an enum with one parameterized variant" $ do
       renderTypedefDeclaration enumWithOneParameterizedField `shouldBe`
         pack (
             "typedef enum {\n" ++
-            "    variant0\n" ++
-            "} __enum_id0;\n" ++
+            "    __id0_variant0\n" ++
+            "} __enum_id0_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    uint32_t __0;\n" ++
+            "} __enum_id0_variant0_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "\n" ++
-            "    __enum_id0 __variant;\n" ++
-            "    \n" ++
+            "    __enum_id0_t __variant;\n" ++
+            "\n" ++
             "    union {\n" ++
-            "        struct {\n" ++
-            "            uint32_t __0;\n" ++
-            "        } __variant0;\n" ++
+            "        __enum_id0_variant0_params_t __variant0;\n" ++
             "    };\n" ++
             "\n" ++
             "} id0;\n")
@@ -88,29 +90,35 @@ spec = do
       renderTypedefDeclaration enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "typedef enum {\n" ++
-            "    variant0,\n" ++
-            "    variant1,\n" ++
-            "    variant2,\n" ++
-            "    variant3\n" ++
-            "} __enum_id0;\n" ++
+            "    __id0_variant0,\n" ++
+            "    __id0_variant1,\n" ++
+            "    __id0_variant2,\n" ++
+            "    __id0_variant3\n" ++
+            "} __enum_id0_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    uint32_t __0;\n" ++
+            "} __enum_id0_variant0_params_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    uint64_t __0;\n" ++
+            "    id1 __1;\n" ++
+            "    char __2;\n" ++
+            "} __enum_id0_variant2_params_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    int8_t __0;\n" ++
+            "    char __1[35][20];\n" ++
+            "} __enum_id0_variant3_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
             "\n" ++
-            "    __enum_id0 __variant;\n" ++
-            "    \n" ++
+            "    __enum_id0_t __variant;\n" ++
+            "\n" ++
             "    union {\n" ++
-            "        struct {\n" ++
-            "            uint32_t __0;\n" ++
-            "        } __variant0;\n" ++
-            "        struct {\n" ++
-            "            uint64_t __0;\n" ++
-            "            id1 __1;\n" ++
-            "            char __2;\n" ++
-            "        } __variant2;\n" ++
-            "        struct {\n" ++
-            "            int8_t __0;\n" ++
-            "            char __1[35][20];\n" ++
-            "        } __variant3;\n" ++
+            "        __enum_id0_variant0_params_t __variant0;\n" ++
+            "        __enum_id0_variant2_params_t __variant2;\n" ++
+            "        __enum_id0_variant3_params_t __variant3;\n" ++
             "    };\n" ++
             "\n" ++
             "} id0;\n");

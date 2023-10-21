@@ -83,7 +83,9 @@ spec = do
         pack (
           "if (option_var.__variant == Some) {\n" ++
           "\n" ++
-          "    foo1 = *((uint32_t *)option_var.__Some.__0.data);\n" ++
+          "    __termina_option_dyn_t __option_var__Some = option_var.__Some;\n" ++
+          "\n" ++
+          "    foo1 = *((uint32_t *)__option_var__Some.data);\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++
@@ -99,7 +101,9 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    foo1 = ((uint32_t *)option_var.__Some.__0.data)[8];\n" ++
+          "    __termina_option_dyn_t __option_var__Some = option_var.__Some;\n" ++
+          "\n" ++
+          "    foo1 = ((uint32_t *)__option_var__Some.data)[8];\n" ++
           "\n" ++
           "}")
     it "Prints a match option statement with a complex expression" $ do
@@ -110,7 +114,7 @@ spec = do
           "\n" ++
           "    if (__match.__variant == Some) {\n" ++
           "\n" ++
-          "        foo1 = *((uint32_t *)__match.__Some.__0.data);\n" ++
+          "        foo1 = *((uint32_t *)__match.__Some.data);\n" ++
           "\n" ++
           "    } else {\n" ++
           "\n" ++

@@ -31,24 +31,28 @@ spec = do
     it "Prints declaration of Message type and external pool" $ do
       renderHeader test0 `shouldBe`
         pack ("typedef enum {\n" ++
-              "    In,\n" ++
-              "    Out,\n" ++
-              "    Stop,\n" ++
-              "    Reset\n" ++
-              "} __enum_Message;\n" ++
+              "    __Message_In,\n" ++
+              "    __Message_Out,\n" ++
+              "    __Message_Stop,\n" ++
+              "    __Message_Reset\n" ++
+              "} __enum_Message_t;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    uint32_t __0;\n" ++
+              "    uint32_t __1;\n" ++
+              "} __enum_Message_In_params_t;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    uint32_t __0;\n" ++
+              "} __enum_Message_Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
-              "    __enum_Message __variant;\n" ++
-              "    \n" ++
+              "    __enum_Message_t __variant;\n" ++
+              "\n" ++
               "    union {\n" ++
-              "        struct {\n" ++
-              "            uint32_t __0;\n" ++
-              "            uint32_t __1;\n" ++
-              "        } __In;\n" ++
-              "        struct {\n" ++
-              "            uint32_t __0;\n" ++
-              "        } __Out;\n" ++
+              "        __enum_Message_In_params_t __In;\n" ++
+              "        __enum_Message_Out_params_t __Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++

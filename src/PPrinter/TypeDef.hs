@@ -128,11 +128,11 @@ ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
 ppClassFunctionDeclaration classId member = error $ "member of class " ++ classId ++ " not a function: " ++ show member
 
 
--- | Pretty prints an enum variant
+-- | Pretty prints the name of an enum variant
 -- This function is only used when generating the variant enumeration
 -- It takes as arguments the variant and its index.
-ppEnumVariant :: EnumVariant -> DocStyle
-ppEnumVariant (EnumVariant identifier _) = pretty identifier
+ppEnumVariant :: Identifier -> EnumVariant -> DocStyle
+ppEnumVariant identifier (EnumVariant variant _) = pretty (namefy (identifier ++ "_" ++ variant))
 
 ppTypeAttributes :: [Modifier] -> DocStyle
 ppTypeAttributes [] = emptyDoc
@@ -142,25 +142,29 @@ ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
   ppTypeSpecifier ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
 
-ppEnumVariantParameterStruct :: EnumVariant -> DocStyle
-ppEnumVariantParameterStruct (EnumVariant identifier params) =
-  structC <+> braces' (
+ppEnumVariantParameterStructName :: Identifier -> EnumVariant -> DocStyle
+ppEnumVariantParameterStructName identifier (EnumVariant variant _) = enumIdentifier (identifier ++ "_" ++ variant ++ "_" ++ "params")
+
+ppEnumVariantParameterStruct :: Identifier -> EnumVariant -> DocStyle
+ppEnumVariantParameterStruct identifier enumVariant@(EnumVariant _variant params) =
+  typedefC <+> structC <+> braces' (
     indentTab . align $ vsep $
       zipWith
         ppEnumVariantParameter params [0..]
-      ) <+> pretty (namefy identifier) <> semi
+      ) <+> ppEnumVariantParameterStructName identifier enumVariant <> semi
 
-ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
-ppClassDefinition (Class _ identifier members _) =
-  let (_fields, methods, procedures, viewers) =
-          foldr (\member (fs,ms,prs,vws) ->
+classifyClassMembers :: [ClassMember SemanticAnns] -> ([ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns])
+classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
               case member of
                 ClassField {} -> (member : fs, ms, prs, vws)
                 ClassMethod {} -> (fs, member : ms, prs, vws)
                 ClassProcedure {} -> (fs, ms, member : prs, vws)
                 ClassViewer {} -> (fs, ms, prs, member : vws)
-          ) ([],[], [], []) members
-  in
+          ) ([],[], [], [])
+
+ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
+ppClassDefinition (Class _ identifier members _) =
+  let (_fields, methods, procedures, viewers) = classifyClassMembers members in
     vsep $ map (\m -> ppClassFunctionDefinition identifier m) (methods ++ procedures ++ viewers)
 ppClassDefinition _ = error "AST element is not a class"
 
@@ -181,39 +185,37 @@ ppTypeDefDeclaration typeDef =
     (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
       in
-      vsep [
+      vsep $ [
+        -- | Print the declaration of the enum that defines the variants
         typedefC <+> enumC <+> braces' (
-          indentTab . align $ vsep $ punctuate comma $
-            map ppEnumVariant variants
-            ) <+> enumIdentifier identifier <> semi,
-        emptyDoc, -- empty line
-        typedefC <+> structC <+> braces' (
+            indentTab . align $ vsep $ punctuate comma $
+              map (ppEnumVariant identifier) variants
+          ) <+> enumIdentifier identifier <> semi, emptyDoc] ++
+        -- | Print the declaration of the enum variant parameter structs
+        (concatMap (\enumVariant ->
+            [ppEnumVariantParameterStruct identifier enumVariant,
+            emptyDoc]) variantsWithParams) ++
+        -- | Print the main enumeration struct
+        [typedefC <+> structC <+> braces' (line <> (indentTab . align $ 
           vsep [
-            emptyDoc, -- empty line
-            indentTab . align $ enumIdentifier identifier <+> enumVariantsField <> semi,
+            enumIdentifier identifier <+> enumVariantsField <> semi,
             if null variantsWithParams then emptyDoc else
-              indentTab . align $
               vsep [
                 emptyDoc, -- empty line
-                unionC <+> braces' (
-                  vsep $ map (indentTab . align
-                    . ppEnumVariantParameterStruct) variantsWithParams
+                unionC <+> braces' (indentTab . align $
+                  vsep $ map (\enumVariant@(EnumVariant variant _) ->
+                    ppEnumVariantParameterStructName identifier enumVariant 
+                      <+> pretty (namefy variant) <> semi) variantsWithParams
                 ) <> semi,
                 emptyDoc -- empty line
               ]
           ]
-        ) <+> pretty identifier <> semi,
+        )) <+> pretty identifier <> semi,
         emptyDoc ]
     (Class clsKind identifier members modifiers) ->
-      let structModifiers = filterStructModifiers modifiers in
-      let (fields, methods, procedures, viewers) =
-              foldr (\member (fs,ms,prs,vws) ->
-                  case member of
-                    ClassField {} -> (member : fs, ms, prs, vws)
-                    ClassMethod {} -> (fs, member : ms, prs, vws)
-                    ClassProcedure {} -> (fs, ms, member : prs, vws)
-                    ClassViewer {} -> (fs, ms, prs, member : vws)
-              ) ([],[], [], []) members
+      let 
+        structModifiers = filterStructModifiers modifiers
+        (fields, methods, procedures, viewers) = classifyClassMembers members
       in
         vsep $ [
               typedefC <+> structC <+> braces' (
@@ -221,10 +223,11 @@ ppTypeDefDeclaration typeDef =
                 vsep (
                   -- | Map the regular fields
                   map ppClassField fields ++
-                  -- | If the no_handler modifier is set, then we may use
-                  -- a mutex sempahore to handle mutual exclusion
+                  -- | Map the ID field. The type of this field
+                  -- | depends on the class kind.
                   [ppClassIDFieldDeclaration clsKind]))
                     <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
               emptyDoc
-          ]
-          ++ map (\m -> ppClassFunctionDeclaration identifier m) (methods ++ procedures ++ viewers)
+          ] ++
+          -- | Print the declaration of the class methods, procedures and viewers
+          map (\m -> ppClassFunctionDeclaration identifier m) (methods ++ procedures ++ viewers)
