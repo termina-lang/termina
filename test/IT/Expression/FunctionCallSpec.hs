@@ -36,7 +36,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -44,18 +44,28 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing function call expressions" $ do
     it "Prints declaration of functions of test0" $ do
       renderHeader test0 `shouldBe`
-        pack ("uint16_t func_test0_0(uint16_t a);\n\n" ++
-              "uint16_t func_test0_1(uint16_t a);\n")
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "uint16_t func_test0_0(uint16_t a);\n\n" ++
+              "uint16_t func_test0_1(uint16_t a);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of functions of test0" $ do
       renderSource test0 `shouldBe`
-        pack ("uint16_t func_test0_0(uint16_t a) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "uint16_t func_test0_0(uint16_t a) {\n" ++
               "\n" ++
               "    return a + 1;\n" ++
               "\n" ++
@@ -70,16 +80,26 @@ spec = do
               "}\n")    
     it "Prints declaration of functions test0 and test1" $ do
       renderHeader test1 `shouldBe`
-        pack ("typedef struct {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    uint32_t array[10];\n" ++
               "} __ret_func_test1_0_t;\n" ++
               "\n" ++
               "__ret_func_test1_0_t func_test1_0();\n" ++
               "\n" ++
-              "uint32_t func_test1_1();\n")
+              "uint32_t func_test1_1();\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of functions test0 and test1" $ do
       renderSource test1 `shouldBe`
-        pack ("__ret_func_test1_0_t func_test1_0() {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "__ret_func_test1_0_t func_test1_0() {\n" ++
               "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++

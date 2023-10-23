@@ -33,7 +33,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -41,21 +41,31 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints declaration of function for_loop_test0" $ do
       renderHeader test0 `shouldBe`
-        pack ("typedef struct {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    uint16_t array[10];\n" ++
               "} __param_for_loop_test0_array0_t;\n" ++
               "\n" ++
-              "uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0);\n")
+              "uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function for_loop_test0_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "uint16_t for_loop_test0(__param_for_loop_test0_array0_t array0) {\n" ++
               "\n" ++
               "    uint16_t total = 0;\n" ++
               "\n" ++
@@ -75,10 +85,20 @@ spec = do
               "}\n")
     it "Prints declaration of function for_loop_test0_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "_Bool for_loop_test1(uint16_t array0[10]);\n"
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "_Bool for_loop_test1(uint16_t array0[10]);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test1" $ do
       renderSource test1 `shouldBe`
-        pack ("_Bool for_loop_test1(uint16_t array0[10]) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "_Bool for_loop_test1(uint16_t array0[10]) {\n" ++
               "\n" ++
               "    _Bool found = 0;\n" ++
               "\n" ++

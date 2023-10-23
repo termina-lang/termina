@@ -389,7 +389,7 @@ expressionType (DerefMemberFunctionAccess obj ident args ann) = do
   case obj_ty of
     Reference _ refTy -> do
       -- NOTE: We have reused the code from MemberFunctionAccess, but we must take into
-      -- account that, for the time being, when we are accessing a member function throw
+      -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
       (ps, typed_args, fty) <- memberFunctionAccessType ann refTy ident args

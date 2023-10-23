@@ -35,7 +35,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -43,22 +43,32 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of class TMChannel without no_handler" $ do
       renderHeader test0 `shouldBe`
-        pack ("typedef struct {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "    __termina_resource_id_t __resource_id;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void __TMChannel_get_tm_sent_packets(TMChannel * self, uint32_t * packets);\n")
+              "void __TMChannel_get_tm_sent_packets(TMChannel * self, uint32_t * packets);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
-        pack ("void __TMChannel_get_tm_sent_packets(TMChannel * self, uint32_t * packets) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void __TMChannel_get_tm_sent_packets(TMChannel * self, uint32_t * packets) {\n" ++
               "\n" ++
               "    __termina_resource_lock(self->__resource_id);\n" ++
               "\n" ++
@@ -71,15 +81,25 @@ spec = do
               "}\n")
     it "Prints declaration of class UARTDriver" $ do
       renderHeader test1 `shouldBe`
-        pack ("typedef struct {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    volatile uint32_t * status;\n" ++
               "    __termina_resource_id_t __resource_id;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void __UARTDriver_get_status(UARTDriver * self, uint32_t * ret);\n")
+              "void __UARTDriver_get_status(UARTDriver * self, uint32_t * ret);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of class UARTDriver" $ do
       renderSource test1 `shouldBe`
-        pack ("void __UARTDriver_get_status(UARTDriver * self, uint32_t * ret) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void __UARTDriver_get_status(UARTDriver * self, uint32_t * ret) {\n" ++
               "\n" ++
               "    __termina_resource_lock(self->__resource_id);\n" ++
               "\n" ++

@@ -47,15 +47,15 @@ ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
     ppCFunctionPrototype (classFunctionName classId identifier)
       (
         -- | Print the self parameter
-        [ppSelfParameter classId] ++ 
+        ppSelfParameter classId :
         -- | Print the rest of the function parameters
         (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
-      ) 
+      )
       -- | Class procedures do not return anything
-      Nothing 
+      Nothing
     <+>
     -- | Function body
-    braces' (line <> 
+    braces' (line <>
       (indentTab . align $
         vsep (
           -- | Print the resource lock call
@@ -75,10 +75,10 @@ ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _)
     ppCFunctionPrototype (classFunctionName classId identifier)
       (
         -- | Print the self parameter
-        [ppSelfParameter classId] ++ 
+        ppSelfParameter classId :
         -- | Print the rest of the function parameters
         (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
-      ) 
+      )
       -- | Class viewer return type
       (Just (ppReturnType (pretty identifier) rts))
     <+> ppBlockRet (ppParameterSubstitutions parameters) (classFunctionName classId identifier) body <> line
@@ -94,34 +94,34 @@ ppClassFunctionDefinition _ _ = error "invalid class member"
 
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
-  vsep $ 
+  vsep $
   ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
   [
     ppCFunctionPrototype (classFunctionName classId identifier)
-      ([ppSelfParameter classId] ++ (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)) Nothing <> semi,
+      (ppSelfParameter classId : (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)) Nothing <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId (ClassMethod identifier mrts _ _) =
-  vsep $ 
+  vsep $
   (case mrts of
-    Just ts@(Vector {}) -> 
+    Just ts@(Vector {}) ->
       [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) ts <> line]
     _ -> []) ++
   [
-    ppCFunctionPrototype (classFunctionName classId identifier) 
-      [ppSelfParameter classId] 
+    ppCFunctionPrototype (classFunctionName classId identifier)
+      [ppSelfParameter classId]
       (ppReturnType (classFunctionName classId identifier) <$> mrts) <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
-  vsep $ 
+  vsep $
   ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
   (case rts of
     Vector {} -> [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) rts <> line]
     _ -> []) ++
   [
     ppCFunctionPrototype (pretty identifier)
-      ([ppSelfParameter classId] ++ ((ppParameterDeclaration (pretty identifier)) <$> parameters))
+      (ppSelfParameter classId : (ppParameterDeclaration (pretty identifier) <$> parameters))
       (Just (ppReturnType (pretty identifier) rts)) <> semi,
     emptyDoc
   ]
@@ -165,7 +165,7 @@ classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
 ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
 ppClassDefinition (Class _ identifier members _) =
   let (_fields, methods, procedures, viewers) = classifyClassMembers members in
-    vsep $ map (\m -> ppClassFunctionDefinition identifier m) (methods ++ procedures ++ viewers)
+    vsep $ map (ppClassFunctionDefinition identifier) (methods ++ procedures ++ viewers)
 ppClassDefinition _ = error "AST element is not a class"
 
 -- | TypeDef pretty printer.
@@ -192,11 +192,11 @@ ppTypeDefDeclaration typeDef =
               map (ppEnumVariant identifier) variants
           ) <+> enumIdentifier identifier <> semi, emptyDoc] ++
         -- | Print the declaration of the enum variant parameter structs
-        (concatMap (\enumVariant ->
+        concatMap (\enumVariant ->
             [ppEnumVariantParameterStruct identifier enumVariant,
-            emptyDoc]) variantsWithParams) ++
+            emptyDoc]) variantsWithParams ++
         -- | Print the main enumeration struct
-        [typedefC <+> structC <+> braces' (line <> (indentTab . align $ 
+        [typedefC <+> structC <+> braces' (line <> (indentTab . align $
           vsep [
             enumIdentifier identifier <+> enumVariantsField <> semi,
             if null variantsWithParams then emptyDoc else
@@ -204,7 +204,7 @@ ppTypeDefDeclaration typeDef =
                 emptyDoc, -- empty line
                 unionC <+> braces' (indentTab . align $
                   vsep $ map (\enumVariant@(EnumVariant variant _) ->
-                    ppEnumVariantParameterStructName identifier enumVariant 
+                    ppEnumVariantParameterStructName identifier enumVariant
                       <+> pretty (namefy variant) <> semi) variantsWithParams
                 ) <> semi,
                 emptyDoc -- empty line
@@ -213,7 +213,7 @@ ppTypeDefDeclaration typeDef =
         )) <+> pretty identifier <> semi,
         emptyDoc ]
     (Class clsKind identifier members modifiers) ->
-      let 
+      let
         structModifiers = filterStructModifiers modifiers
         (fields, methods, procedures, viewers) = classifyClassMembers members
       in
@@ -230,4 +230,4 @@ ppTypeDefDeclaration typeDef =
               emptyDoc
           ] ++
           -- | Print the declaration of the class methods, procedures and viewers
-          map (\m -> ppClassFunctionDeclaration identifier m) (methods ++ procedures ++ viewers)
+          map (ppClassFunctionDeclaration identifier) (methods ++ procedures ++ viewers)
