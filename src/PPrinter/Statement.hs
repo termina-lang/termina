@@ -70,7 +70,7 @@ ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
 ppMatchCase subs _ (DefinedType _) (MatchCase _ [] body _) =
     vsep $ [ ppStatement subs s <> line | s <- body ]
 ppMatchCase subs Annonymous (DefinedType _) (MatchCase variant params body _) =
-    let variable = pretty (namefy ("match." ++ (namefy variant)))
+    let variable = pretty (namefy ("match." ++ namefy variant))
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's

@@ -291,6 +291,8 @@ data Expression'
   | FunctionExpression Identifier [ Expression' obj a ] a
   | MemberFunctionAccess (obj a) Identifier [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
+  | DerefMemberFunctionAccess (obj a) Identifier [Expression' obj a] a
+  -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
@@ -312,14 +314,15 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (AccessObject obj)                       = getAnnotation obj
   getAnnotation (Constant _ a)                           = a
   getAnnotation (BinOp _ _ _ a)                          = a
-  getAnnotation (ReferenceExpression _ _ a)                = a
+  getAnnotation (ReferenceExpression _ _ a)              = a
   getAnnotation (Casting _ _ a)                          = a
   getAnnotation (FunctionExpression _ _ a)               = a
-  getAnnotation (FieldAssignmentsExpression _ _ a) = a
+  getAnnotation (FieldAssignmentsExpression _ _ a)       = a
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (VectorInitExpression _ _ a)             = a
   getAnnotation (OptionVariantExpression _ a)            = a
-  getAnnotation (MemberFunctionAccess _ _ _ a)             = a
+  getAnnotation (MemberFunctionAccess _ _ _ a)           = a
+  getAnnotation (DerefMemberFunctionAccess _ _ _ a)      = a
 
 
 data Statement' expr obj a =

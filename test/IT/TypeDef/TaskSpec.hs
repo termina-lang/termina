@@ -19,6 +19,14 @@ test0 = "enum Message {\n" ++
         "  interval : u32;\n" ++
         "  message_pool : port Pool<Message; 10>;\n" ++
         "\n" ++
+        "  viewer check_interval(&self, limit : u32) -> bool {\n" ++ 
+        "    var ret : bool = true;\n" ++     
+        "    if (self->interval > limit) {\n" ++
+        "      ret = false;\n" ++
+        "    }\n" ++
+        "    return ret;\n" ++
+        "  }\n" ++
+        "\n" ++
         "  method run(&priv self) -> TaskRet {\n" ++
         "\n" ++        
         "    var ret : TaskRet = TaskRet::Continue;\n" ++
@@ -33,6 +41,12 @@ test0 = "enum Message {\n" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
+        "    }\n" ++
+        "\n" ++
+        "    var check : bool = (*self).check_interval(10 : u32);\n" ++
+        "\n" ++
+        "    if (check == false) {\n" ++
+        "      ret = TaskRet::Abort;\n" ++
         "    }\n" ++
         "\n" ++
         "    return ret;\n" ++
@@ -94,7 +108,9 @@ spec = do
               "    __termina_task_id_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
-              "TaskRet __CHousekeeping_run(CHousekeeping * self);\n")
+              "TaskRet __CHousekeeping_run(CHousekeeping * self);\n" ++
+              "\n" ++
+              "_Bool check_interval(CHousekeeping * self, uint32_t limit);\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("TaskRet __CHousekeeping_run(CHousekeeping * self) {\n" ++
@@ -125,7 +141,32 @@ spec = do
               "        __termina_pool_free(__alloc_msg__Some);\n" ++
               "\n" ++  
               "    }\n" ++
+              "\n" ++
+              "    _Bool check = __CHousekeeping_check_interval(self, 10);\n" ++
+              "\n" ++
+              "    if (check == 0) {\n" ++
+              "\n" ++
+              "        {\n" ++
+              "            ret.__variant = Abort;\n" ++
+              "        }\n" ++
+              "\n" ++
+              "    }\n" ++
               "\n" ++   
               "    return ret;\n" ++
               "\n" ++   
+              "}\n" ++
+              "\n" ++
+              "\n" ++
+              "_Bool __CHousekeeping_check_interval(CHousekeeping * self, uint32_t limit) {\n" ++
+              "\n" ++
+              "    _Bool ret = 1;\n" ++
+              "\n" ++
+              "    if (self->interval > limit) {\n" ++
+              "\n" ++
+              "        ret = 0;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    return ret;\n" ++
+              "\n" ++
               "}\n\n")
