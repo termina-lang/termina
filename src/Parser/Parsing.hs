@@ -523,8 +523,10 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       _ <- reservedOp "->"
       p <- getPosition
       member <- identifierParser
+      params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
-        AccessObject obj -> AccessObject (DereferenceMemberAccess obj member (Position p))
+        AccessObject obj ->
+          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionAccess obj member) (Position p)) params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do

@@ -128,6 +128,33 @@ paramType ann [] (_a : _) = throwError $ annotateError ann EFunParams
 unboxObjectSAnns :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
 unboxObjectSAnns = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getObjectSAnns . getAnnotation
 
+memberFieldAccessType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
+memberFieldAccessType ann obj_ty ident =
+  case obj_ty of
+    DefinedType dident -> getGlobalTy internalErrorSeman dident >>=
+      \case{
+        -- Either a struct
+        Struct _identTy fields _mods ->
+            let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
+              maybe
+              (throwError $ annotateError ann (EMemberAccessNotMember ident))
+              (return . fieldTypeSpecifier) mfield
+        ;
+        -- Or a class
+        Class _ _identTy cls _mods ->
+          -- TODO Class access?
+          -- Find |ident| field in the class.
+          case findClassField ident cls of
+            Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
+            -- type |t| and the type inside |a| should be the same, no?
+            Just (t , _a) -> return t
+        ;
+        -- Other types do not have members.
+        ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    ty -> throwError $ annotateError ann (EMemberAccess ty)
+
+
 objectType ::
   -- | Scope of variables. It returns its access kind (mutable, immutable or private) and its type
   (Parser.Annotation -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier))
@@ -157,30 +184,8 @@ objectType _ (MemberAccess obj ident ann) = do
   -- function can be accessed.
   typed_obj <- objectType getLocalObjTy obj
   (obj_ak , obj_ty) <- unboxObjectSAnns typed_obj
-  -- Only complex types are the ones defined by the user
-  case obj_ty of
-    DefinedType dident -> getGlobalTy ann dident >>=
-      \case{
-        -- Either a struct
-        Struct _identTy fields _mods ->
-            let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
-              maybe
-              (throwError $ annotateError ann (EMemberAccessNotMember ident))
-              (return . SAST.MemberAccess typed_obj ident . buildExpAnnObj ann obj_ak . fieldTypeSpecifier) mfield
-        ;
-        -- Or a class
-        Class _ _identTy cls _mods ->
-          -- TODO Class access?
-          -- Find |ident| field in the class.
-          case findClassField ident cls of
-            Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
-            -- type |t| and the type inside |a| should be the same, no?
-            Just (t , _a) -> return (SAST.MemberAccess typed_obj ident (buildExpAnnObj ann obj_ak t))
-        ;
-        -- Other types do not have members.
-        ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
-      }
-    ty -> throwError $ annotateError ann (EMemberAccess ty)
+  fts <- memberFieldAccessType ann obj_ty ident
+  return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fts
 objectType getVarTy (Dereference obj ann) = do
   typed_obj <- objectType getVarTy obj
   (_, obj_ty) <- unboxObjectSAnns typed_obj
@@ -197,7 +202,7 @@ objectType getVarTy (VectorSliceExpression obj lower upper anns) = do
       case (lower, upper) of
         (KC (I lwTy lowerInt), KC (I upTy upperInt)) -> do
           unless (groundTyEq lwTy upTy) (throwError $ annotateError anns (EBoundsTypeMismatch lwTy upTy))
-          unless (groundTyEq USize lwTy) (throwError $ annotateError anns ( EBoundsTypeNotUSize lwTy upTy))
+          unless (groundTyEq USize lwTy) (throwError $ annotateError anns ( EBoundsTypeNotUSize lwTy upTy))
           when (lowerInt > upperInt) (throwError $ annotateError anns (EBoundsLowerGTUpper lowerInt upperInt))
           when (upperInt > size) (throwError $ annotateError anns (EUpperBoundGTSize upperInt size))
           return $ SAST.VectorSliceExpression typed_obj lower upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (CAST.K (upperInt - lowerInt)))
@@ -208,30 +213,100 @@ objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
   (_, obj_ty) <- unboxObjectSAnns typed_obj
   case obj_ty of
     Reference ak refTy ->
-      case refTy of
-        DefinedType dident -> getGlobalTy ann dident >>=
-          \case{
-            -- Either a struct
-            Struct _identTy fields _mods ->
-                let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
-                  maybe
-                  (throwError $ annotateError ann (EMemberAccessNotMember ident))
-                  (return . SAST.DereferenceMemberAccess typed_obj ident . buildExpAnnObj ann ak . fieldTypeSpecifier) mfield
-            ;
-            -- Or a class
-            Class _ _identTy cls _mods ->
-              -- TODO Class access?
-              -- Find |ident| field in the class.
-              case findClassField ident cls of
-                Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
-                -- type |t| and the type inside |a| should be the same, no?
-                Just (t , _a) -> return (SAST.DereferenceMemberAccess typed_obj ident (buildExpAnnObj ann ak t))
-            ;
-            -- Other types do not have members.
-            ty -> throwError $ annotateError ann (EMemberAccessUDef (fmap (fmap forgetSemAnn) ty))
-          }
-        ty -> throwError $ annotateError ann (EMemberAccess ty)
+      memberFieldAccessType ann refTy ident >>=
+        \fts -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fts
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
+
+memberFunctionAccessType ::
+  Parser.Annotation
+  -> TypeSpecifier
+  -> Identifier
+  -> [Expression Parser.Annotation]
+  -> SemanticMonad ([Parameter], [SAST.Expression SemanticAnns], TypeSpecifier)
+memberFunctionAccessType ann obj_ty ident args =
+  case obj_ty of
+      -- | Calling a self method or viewer. We must not allow calling a procedure.
+    DefinedType dident -> getGlobalTy ann dident >>=
+      \case{
+         Class _ _identTy cls _mods ->
+          case findClassProcedure ident cls of
+            Just (_, _) -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
+            Nothing ->
+              case findClassViewerOrMethod ident cls of
+                Just (ps, _, anns) ->
+                  let (psLen , asLen ) = (length ps, length args) in
+                  if psLen == asLen
+                  then do
+                      typed_args <- zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                      fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
+                      return (ps, typed_args, fty)
+                  else if psLen < asLen
+                  then throwError $ annotateError ann EMemberMethodExtraParams
+                  else throwError $ annotateError ann EMemberMethodMissingParams
+                Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
+          ;
+        -- Other User defined types do not define methods
+        ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    Port (DefinedType dident) -> getGlobalTy ann dident >>=
+      \case{
+         Class _ _identTy cls _mods ->
+         case findClassProcedure ident cls of
+           Nothing -> throwError $ annotateError ann (EMemberAccessNotProcedure ident)
+           Just (ps, anns) ->
+             let (psLen , asLen ) = (length ps, length args) in
+             if psLen == asLen
+             then do
+                typed_args <- zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
+                fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
+                return (ps, typed_args, fty)
+            else if psLen < asLen
+             then throwError $ annotateError ann EMemberMethodExtraParams
+             else throwError $ annotateError ann EMemberMethodMissingParams
+         ;
+         -- Other User defined types do not define methods
+         ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
+      }
+    Port (Pool ty_pool _sz) ->
+      case ident of
+        "alloc" ->
+          case args of
+            [refM] ->
+              typeExpression refM >>= \(typed_ref , type_ref) ->
+                            case type_ref of
+                              (Reference _ (Option (DynamicSubtype tyref))) ->
+                                if groundTyEq ty_pool tyref
+                                then 
+                                  return ([Parameter "ref_opt" type_ref], [typed_ref], Unit)
+                                else throwError $ annotateError ann (EPoolsWrongArgType tyref)
+                              _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
+            _ -> throwError $ annotateError ann EPoolsWrongNumArgs
+        _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
+    Port (MsgQueue ty _size) ->
+      case ident of
+        "send" ->
+          case args of
+            [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
+              case isDyn arg_type of
+                Just t ->
+                  if groundTyEq t ty
+                  then return ([Parameter "send_obj" arg_type], [arg_typed], Unit)
+                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
+                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotDyn arg_type
+            _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
+        "receive" ->
+          case args of
+            [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
+              case arg_type of
+                -- & Option<'dyn T>
+                Reference _ (Option (DynamicSubtype t)) ->
+                  if groundTyEq t ty
+                  then return ([Parameter "ref_opt" arg_type], [arg_typed], Unit)
+                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
+                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy arg_type
+            _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
+        _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
+    ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
 
 ----------------------------------------
 -- These two functions are useful, one lookups in read+write environments,
@@ -306,86 +381,20 @@ expressionType (FunctionExpression fun_name args pann) =
 expressionType (MemberFunctionAccess obj ident args ann) = do
   obj_typed <- rhsObjectType obj
   (_, obj_ty) <- unboxObjectSAnns obj_typed
+  (ps, typed_args, fty) <- memberFunctionAccessType ann obj_ty ident args
+  return $ SAST.MemberFunctionAccess obj_typed ident typed_args (buildExpAnnApp ann ps fty)
+expressionType (DerefMemberFunctionAccess obj ident args ann) = do
+  obj_typed <- rhsObjectType obj
+  (_, obj_ty) <- unboxObjectSAnns obj_typed
   case obj_ty of
-    -- | Calling a self method or viewer. We must not allow calling a procedure.
-    DefinedType dident -> getGlobalTy ann dident >>=
-      \case{
-         Class _ _identTy cls _mods ->
-         case findClassProcedure ident cls of
-          Just (_, _) -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
-          Nothing ->
-            case findClassViewerOrMethod ident cls of
-              Just (ps, _, anns) ->
-                let (psLen , asLen ) = (length ps, length args) in
-                if psLen == asLen
-                then SAST.MemberFunctionAccess obj_typed ident
-                    <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
-                    <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnnApp ann ps) (getTypeSAnns anns)
-                else if psLen < asLen
-                then throwError $ annotateError ann EMemberMethodExtraParams
-                else throwError $ annotateError ann EMemberMethodMissingParams
-              Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
-        ;
-        -- Other User defined types do not define methods
-        ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
-      }
-    Port (DefinedType dident) -> getGlobalTy ann dident >>=
-      \case{
-         Class _ _identTy cls _mods ->
-         case findClassProcedure ident cls of
-           Nothing -> throwError $ annotateError ann (EMemberAccessNotProcedure ident)
-           Just (ps, anns) ->
-             let (psLen , asLen ) = (length ps, length args) in
-             if psLen == asLen
-             then SAST.MemberFunctionAccess obj_typed ident
-                 <$> zipWithM (\p e -> mustBeTy (paramTypeSpecifier p) =<< expressionType e) ps args
-                 <*> maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) (return . buildExpAnnApp ann ps) (getTypeSAnns anns)
-             else if psLen < asLen
-             then throwError $ annotateError ann EMemberMethodExtraParams
-             else throwError $ annotateError ann EMemberMethodMissingParams
-         ;
-         -- Other User defined types do not define methods
-         ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap (fmap forgetSemAnn) ty))
-      }    
-    Port (Pool ty_pool _sz) ->
-      case ident of
-        "alloc" ->
-          case args of
-            [refM] ->
-              typeExpression refM >>= \(typed_ref , type_ref) ->
-                            case type_ref of
-                              (Reference _ (Option (DynamicSubtype tyref))) ->
-                                if groundTyEq ty_pool tyref
-                                then return $ SAST.MemberFunctionAccess obj_typed ident [typed_ref] (buildExpAnnApp ann [Parameter "item" type_ref] Unit)
-                                else throwError $ annotateError ann (EPoolsWrongArgType tyref)
-                              _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
-            _ -> throwError $ annotateError ann EPoolsWrongNumArgs
-        _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
-    Port (MsgQueue ty _size) ->
-      case ident of
-        "send" ->
-          case args of
-            [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
-              case isDyn arg_type of
-                Just t ->
-                  if groundTyEq t ty
-                  then return $ MemberFunctionAccess obj_typed ident [arg_typed] (buildExpAnn ann Unit)
-                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
-                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotDyn arg_type
-            _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
-        "receive" ->
-          case args of
-            [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
-              case arg_type of
-                -- & Option<'dyn T>
-                Reference _ (Option (DynamicSubtype t)) ->
-                  if groundTyEq t ty
-                  then return $ MemberFunctionAccess obj_typed ident [arg_typed] (buildExpAnn ann Unit)
-                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
-                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy arg_type
-            _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
-        _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
-    ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
+    Reference _ refTy -> do
+      -- NOTE: We have reused the code from MemberFunctionAccess, but we must take into
+      -- account that, for the time being, when we are accessing a member function throw
+      -- a reference, the object (self) can only be of a user-defined class type. There
+      -- cannot be references to ports. 
+      (ps, typed_args, fty) <- memberFunctionAccessType ann refTy ident args
+      return $ SAST.DerefMemberFunctionAccess obj_typed ident typed_args (buildExpAnnApp ann ps fty)
+    ty -> throwError $ annotateError ann $ ETypeNotReference ty
 ----------------------------------------
 expressionType (FieldAssignmentsExpression id_ty fs pann) =
   -- | Field Type
@@ -471,14 +480,14 @@ checkFieldValue loc (FieldDefinition fid fty) (FieldValueAssignment faid faexp) 
 checkFieldValue loc (FieldDefinition fid fty) (FieldAddressAssignment faid addr) =
   if fid == faid
   then
-    case fty of 
+    case fty of
       Location _ -> return $ SAST.FieldAddressAssignment faid addr
       _ -> throwError $ annotateError loc (EFieldNotFixedLocation fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc (FieldDefinition fid fty) (FieldPortConnection pid sid) =
   if fid == pid
   then
-    case fty of 
+    case fty of
       Port _ -> return $ SAST.FieldPortConnection pid sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
@@ -533,7 +542,7 @@ statementTySimple (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- Check type is alright
   checkTypeDefinition anns lhs_type >>
   -- Expression and type must match
-  expressionType expr >>= mustBeTy lhs_type >>= 
+  expressionType expr >>= mustBeTy lhs_type >>=
     \ety ->
   -- Insert object in the corresponding environment
   -- If the object is mutable, then we insert it in the local mutable environment
@@ -737,7 +746,7 @@ typeDefCheck ann (Enum ident evs mds)
 typeDefCheck ann (Class kind ident members mds)
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
   -- check that it defines at least one method.
-  = 
+  =
   -- TODO: Check class well-formedness depending on its kind
   -- when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
   foldM
@@ -755,7 +764,7 @@ typeDefCheck ann (Class kind ident members mds)
             -> maybe (return ()) (checkTypeDefinition annCM) mty
             >> return (fs, prcs, mth : mths, vws)
           view@(ClassViewer _fv_id fv_tys mty _body annCV)
-            -> checkTypeDefinition annCV mty 
+            -> checkTypeDefinition annCV mty
               >> mapM_ (checkTypeDefinition annCV . paramTypeSpecifier) fv_tys
             >> return (fs, prcs, mths, view : vws)
         )
@@ -802,26 +811,28 @@ typeDefCheck ann (Class kind ident members mds)
                   mds in
         localScope $ do
           insertGlobalTy ann clsType
-          insertLocalMutObj ann "self" (Reference Private (DefinedType ident))
           -- Now analyze new member.
           case newMember of
             -- Filtered Cases
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
+              insertLocalMutObj ann "self" (Reference Private (DefinedType ident))
               typed_blk <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
               let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              typed_bret <- retblockType mbody 
+              insertLocalMutObj ann "self" (Reference Private (DefinedType ident))
+              typed_bret <- retblockType mbody
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mps ty mbody mann -> do
+              insertLocalMutObj ann "self" (Reference Immutable (DefinedType ident))
               typed_bret <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType mbody)
               blockRetTy ty typed_bret
               let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
-              return (newVw : prevMembers) 
+              return (newVw : prevMembers)
         ) [] topSortOrder
     return (Class kind ident (fls ++ fnChecked) mds)
 

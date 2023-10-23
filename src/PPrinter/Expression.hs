@@ -78,52 +78,45 @@ ppDynamicSubtypeObject subs obj = ppCDereferenceExpression $ parens (ppDynamicSu
 ppRefDynamicSubtypeObject :: Printer Expression
 ppRefDynamicSubtypeObject subs expr = ppCDereferenceExpression $ parens (ppRefDynamicSubtypeObjectAddress subs expr)
 
-ppMemberAccessExpression :: Substitutions -> Expression SemanticAnns -> Expression SemanticAnns -> DocStyle
--- | If the right hand side is a function, then it is a method call
-ppMemberAccessExpression subs lhs (FunctionExpression methodId params _) =
-    case getType lhs of
+ppMemberFunctionAccess :: Substitutions -> Object SemanticAnns -> Identifier -> [Expression SemanticAnns] -> DocStyle
+ppMemberFunctionAccess subs obj ident params =
+    case getObjectType obj of
         (Reference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
                     ppCFunctionCall
-                        (classFunctionName classId methodId)
-                        (ppExpression subs lhs : (ppExpression subs <$> params))
-                -- | If the left hand side is a pool:
-                (Pool _ _) ->
-                    ppCFunctionCall
-                        (poolMethodName methodId)
-                        (ppExpression subs lhs : (ppExpression subs <$> params))
-                -- | If the left hand side is a message queue:
-                (MsgQueue _ _) ->
-                    ppCFunctionCall
-                        (msgQueueMethodName methodId)
-                        (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
+                        (classFunctionName classId ident)
+                        (ppObject subs obj : (ppExpression subs <$> params))
                 -- | Anything else should not happen
-                _ -> error "unsupported expression"
-        -- | If the left hand size is a class:
+                _ -> error $ "unsupported member function access to object: " ++ show obj
         (DefinedType classId) ->
+            case obj of 
+                (Dereference _ _) ->
+                    -- If we are here, it means that we are dereferencing the self object
+                    ppCFunctionCall
+                        (classFunctionName classId ident)
+                        (pretty "self" : (ppExpression subs <$> params))
+                _ -> ppCFunctionCall
+                        (classFunctionName classId ident)
+                        (ppObject subs obj : (ppExpression subs <$> params))
+        -- | If the left hand size is a class:
+        Port (DefinedType classId) ->
             ppCFunctionCall
-                (classFunctionName classId methodId)
-                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
+                (classFunctionName classId ident)
+                (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
-        (Pool _ _) ->
+        Port (Pool _ _) ->
             ppCFunctionCall
-                (poolMethodName methodId)
-                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
+                (poolMethodName ident)
+                (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
-        (MsgQueue _ _) ->
+        Port (MsgQueue _ _) ->
             ppCFunctionCall
-                (msgQueueMethodName methodId)
-                (ppCReferenceExpression (ppExpression subs lhs) : (ppExpression subs <$> params))
+                (msgQueueMethodName ident)
+                (ppObject subs obj : (ppExpression subs <$> params))
         -- | Anything else should not happen
-        _ -> error "unsupported expression"
--- | If the right hand side is not a function, then it is a field
-ppMemberAccessExpression subs lhs rhs = 
-    if getExpPrecedence lhs > 1 then
-        parens (ppExpression subs lhs) <> pretty "." <> ppExpression subs rhs
-    else
-        ppExpression subs lhs <> pretty "." <> ppExpression subs rhs
+        _ -> error $ "unsupported member function access to object: " ++ show obj
 
 ppObject :: Printer Object
 ppObject subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
@@ -255,27 +248,9 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
         case getType expr of
             Vector {} -> ppCFunctionCall (pretty identifier) ins <> pretty ".array"
             _ -> ppCFunctionCall (pretty identifier) ins
-ppExpression subs expr@(MemberFunctionAccess obj methodId params _) =
-    case getObjectType obj of
-        (Reference _ ts) ->
-            case ts of
-                -- | If the left hand size is a class:
-                (DefinedType classId) ->
-                    ppCFunctionCall
-                        (classFunctionName classId methodId)
-                        (ppObject subs obj : (ppExpression subs <$> params))
-                -- | Anything else should not happen
-                _ -> error $ "unsupported expression: " ++ show expr
-        -- | If the left hand side is a pool port:
-        Port (Pool _ _) ->
-            ppCFunctionCall
-                (poolMethodName methodId)
-                (ppObject subs obj : (ppExpression subs <$> params))
-        -- | If the left hand side is a message queue port:
-        Port (MsgQueue _ _) ->
-            ppCFunctionCall
-                (msgQueueMethodName methodId)
-                (ppObject subs obj : (ppExpression subs <$> params))
-        -- | Anything else should not happen
-        _ -> error $ "unsupported expression: " ++ show expr
+ppExpression subs (MemberFunctionAccess obj methodId params _) =
+    ppMemberFunctionAccess subs obj methodId params
+ppExpression subs (DerefMemberFunctionAccess obj methodId params _) =
+    ppMemberFunctionAccess subs obj methodId params
 ppExpression _ expr = error $  "unsupported expression" ++ show expr
+
