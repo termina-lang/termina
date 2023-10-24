@@ -67,6 +67,7 @@ binOpType locs op lty rty =
     binOpType' Division tyl tyr           = cmpNumTy tyl tyl tyr
     binOpType' Addition tyl tyr           = cmpNumTy tyl tyl tyr
     binOpType' Subtraction tyl tyr        = cmpNumTy tyl tyl tyr
+    binOpType' Modulo tyl tyr             = cmpNumTy tyl tyl tyr
     -- shifts both numeric but may not be the same
     -- Q2
     binOpType' BitwiseLeftShift tyl tyr   = justNumTy tyl tyl tyr
@@ -389,7 +390,7 @@ expressionType (DerefMemberFunctionAccess obj ident args ann) = do
   case obj_ty of
     Reference _ refTy -> do
       -- NOTE: We have reused the code from MemberFunctionAccess, but we must take into
-      -- account that, for the time being, when we are accessing a member function throw
+      -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
       (ps, typed_args, fty) <- memberFunctionAccessType ann refTy ident args

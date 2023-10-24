@@ -10,13 +10,11 @@ import Modules.Modules hiding (MData)
 import Modules.Errors
 
 import Control.Monad.Except
-import Control.Monad
 
 import Data.Maybe (isJust)
-import Data.List
 
 -- Core inof
-import AST.Core (TerminaProgram'(..), Module'(..))
+import AST.Core (TerminaProgram'(..))
 -- Parsing data types stuff
 import qualified AST.Parser as PAST
 import Parser.Parsing (Annotation)
@@ -29,7 +27,7 @@ import Semantic.TypeChecking (typeAndGetGlobals)
 
 -- Module system imports
 import qualified Data.Map.Strict as M
-import Control.Monad.Except (runExcept)
+
 
 data ModuleAST a = MData
   { moduleDeps :: [ModuleName]

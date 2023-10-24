@@ -46,7 +46,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -54,17 +54,27 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints declaration of function assignment_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void assignment_test0();\n"
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void assignment_test0();\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("void assignment_test0() {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void assignment_test0() {\n" ++
               "\n" ++
               "    uint32_t foo0 = 0;\n" ++
               "\n" ++
@@ -77,10 +87,20 @@ spec = do
               "}\n")    
     it "Prints declaration of function assignment_test1" $ do
      renderHeader test1 `shouldBe`
-       pack "void assignment_test1(__termina_dyn_t dyn_var0);\n"
+       pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void assignment_test1(__termina_dyn_t dyn_var0);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test1" $ do
      renderSource test1 `shouldBe`
-        pack ("void assignment_test1(__termina_dyn_t dyn_var0) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void assignment_test1(__termina_dyn_t dyn_var0) {\n" ++
               "\n" ++
               "    __termina_option_dyn_t option;\n" ++
               "\n" ++
@@ -98,10 +118,20 @@ spec = do
               "}\n")  
     it "Prints declaration of function assignment_test2" $ do
      renderHeader test2 `shouldBe`
-       pack "void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n"
+       pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test2" $ do
      renderSource test2 `shouldBe`
-        pack ("void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void assignment_test2(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
@@ -116,10 +146,20 @@ spec = do
               "}\n")  
     it "Prints declaration of function assignment_test3" $ do
      renderHeader test3 `shouldBe`
-       pack "void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n"
+       pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test2" $ do
      renderSource test3 `shouldBe`
-        pack ("void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void assignment_test3(__termina_dyn_t dyn_var0, __termina_dyn_t dyn_var1) {\n" ++
               "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++

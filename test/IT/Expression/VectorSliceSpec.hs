@@ -52,7 +52,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -60,17 +60,27 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing vector slicing expressions" $ do
     it "Prints declaration of function slice_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void slice_test0();\n"
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void slice_test0();\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function slice_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("void slice_test0() {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void slice_test0() {\n" ++
               "\n" ++
               "    uint32_t vector0[10];\n" ++
               "\n" ++
@@ -87,10 +97,20 @@ spec = do
               "}\n")    
     it "Prints declaration of function slice_test1" $ do
       renderHeader test1 `shouldBe`
-        pack "void slice_test1(uint32_t vector0[10][5][3]);\n"
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void slice_test1(uint32_t vector0[10][5][3]);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function slice_test0" $ do
       renderSource test1 `shouldBe`
-        pack ("void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
               "\n" ++
               "    {\n" ++
               "        for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
@@ -107,12 +127,22 @@ spec = do
               "}\n") 
     it "Prints declaration of function slice_test2" $ do
       renderHeader test2 `shouldBe`
-        pack ("void add_one(uint32_t input[5]);\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
               "\n" ++
-              "void slice_test2(uint32_t vector0[10][5]);\n")
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void add_one(uint32_t input[5]);\n" ++
+              "\n" ++
+              "void slice_test2(uint32_t vector0[10][5]);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function slice_test2" $ do
       renderSource test2 `shouldBe`
-        pack ("void add_one(uint32_t input[5]) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void add_one(uint32_t input[5]) {\n" ++
               "\n" ++
               "    {\n" ++
               "        size_t __start = 0;\n" ++
@@ -138,16 +168,26 @@ spec = do
               "}\n")
     it "Prints declaration of function slice_test3" $ do
       renderHeader test3 `shouldBe`
-        pack ("typedef struct {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    uint32_t array[5];\n" ++
               "} __param_add_two_input_t;\n" ++
               "\n" ++
               "void add_two(__param_add_two_input_t input);\n" ++
               "\n" ++
-              "void slice_test3(uint32_t vector0[10][5]);\n")
+              "void slice_test3(uint32_t vector0[10][5]);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function slice_test3" $ do
       renderSource test3 `shouldBe`
-        pack ("void add_two(__param_add_two_input_t input) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void add_two(__param_add_two_input_t input) {\n" ++
               "\n" ++
               "    {\n" ++
               "        size_t __start = 0;\n" ++

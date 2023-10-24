@@ -56,11 +56,17 @@ constantMultVar0 = BinOp Multiplication constUInt16 var0 uint16SemAnn
 var0MultVar1 :: Expression SemanticAnns
 var0MultVar1 = BinOp Multiplication var0 undynVar1 uint16SemAnn
 
-var1Divconstant :: Expression SemanticAnns
-var1Divconstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
+var1DivConstant :: Expression SemanticAnns
+var1DivConstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
 
 var0DivVar1 :: Expression SemanticAnns
 var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
+
+var1ModConstant :: Expression SemanticAnns
+var1ModConstant = BinOp Modulo undynVar1 constUInt16 uint16SemAnn
+
+var0ModVar1 :: Expression SemanticAnns
+var0ModVar1 = BinOp Modulo var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression = render . ppExpression empty
@@ -102,9 +108,15 @@ spec = do
       renderExpression var0MultVar1 `shouldBe`
         pack "var0 * *((uint16_t *)var1.data)"
     it "Prints the expression: var1 / 1024 : u16" $ do
-      renderExpression var1Divconstant `shouldBe`
+      renderExpression var1DivConstant `shouldBe`
         pack "*((uint16_t *)var1.data) / 1024"
     it "Prints the expression: var0 / var1 : u16" $ do
       renderExpression var0DivVar1 `shouldBe`
         pack "var0 / *((uint16_t *)var1.data)"
+    it "Prints the expression: var1 % 1024 : u16" $ do
+      renderExpression var1ModConstant `shouldBe`
+        pack "*((uint16_t *)var1.data) % 1024"
+    it "Prints the expression: var0 % var1 : u16" $ do
+      renderExpression var0ModVar1 `shouldBe`
+        pack "var0 % *((uint16_t *)var1.data)"
 

@@ -29,7 +29,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -37,17 +37,27 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing bitwise shifting expressions" $ do
     it "Prints declaration of function bitwise_test0" $ do
       renderHeader test0 `shouldBe`
-        pack "void bitwise_test0(uint16_t foo);\n"
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void bitwise_test0(uint16_t foo);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("void bitwise_test0(uint16_t foo) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void bitwise_test0(uint16_t foo) {\n" ++
               "\n" ++
               "    uint8_t bar = 0;\n" ++ 
               "\n" ++

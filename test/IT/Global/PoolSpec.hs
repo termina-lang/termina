@@ -23,14 +23,19 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing pool methods" $ do
     it "Prints declaration of Message type and external pool" $ do
       renderHeader test0 `shouldBe`
-        pack ("typedef enum {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef enum {\n" ++
               "    __Message_In,\n" ++
               "    __Message_Out,\n" ++
               "    __Message_Stop,\n" ++
@@ -57,4 +62,6 @@ spec = do
               "\n" ++
               "} Message;\n" ++
               "\n" ++
-              "extern __termina_pool_t message_pool;\n")
+              "extern __termina_pool_t message_pool;\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")

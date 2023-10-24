@@ -60,7 +60,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile tast
+      Right tast -> ppHeaderFile [pack "test"] [] tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -68,14 +68,19 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile tast
+      Right tast -> ppSourceFile [pack "test"] tast
 
 spec :: Spec
 spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of class TMChannel without no_handler" $ do
       renderHeader test0 `shouldBe`
-        pack ("typedef enum {\n" ++
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef enum {\n" ++
               "    __Message_In,\n" ++
               "    __Message_Out,\n" ++
               "    __Message_Stop,\n" ++
@@ -110,10 +115,15 @@ spec = do
               "\n" ++   
               "TaskRet __CHousekeeping_run(CHousekeeping * self);\n" ++
               "\n" ++
-              "_Bool check_interval(CHousekeeping * self, uint32_t limit);\n")
+              "_Bool check_interval(CHousekeeping * self, uint32_t limit);\n" ++
+              "\n" ++
+              "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
-        pack ("TaskRet __CHousekeeping_run(CHousekeeping * self) {\n" ++
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "TaskRet __CHousekeeping_run(CHousekeeping * self) {\n" ++
               "\n" ++
               "    TaskRet ret;\n" ++
               "\n" ++
