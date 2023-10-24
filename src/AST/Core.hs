@@ -123,6 +123,7 @@ data Op
   | Division
   | Addition
   | Subtraction
+  | Modulo
   | BitwiseLeftShift
   | BitwiseRightShift
   | RelationalLT

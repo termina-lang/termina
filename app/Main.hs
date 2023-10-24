@@ -110,13 +110,13 @@ main = runCommand $ \opts args ->
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
                         >> maybe
-                                (print (ppHeaderFile typedAST))
+                                (print (ppHeaderFile [T.pack "output"] [] typedAST))
                                 (\fn ->
                                   let -- System.Path
                                       header = fn ++ ".h"
                                       source = fn ++ ".c"
-                                  in TIO.writeFile header (ppHeaderFile typedAST)
-                                  >> TIO.writeFile source (ppSourceFile typedAST)
+                                  in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
+                                  >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
                                 ) (optOutput opts)
                         >> print "Perfect ✓"
               else do

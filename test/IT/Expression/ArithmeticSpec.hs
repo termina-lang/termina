@@ -18,6 +18,8 @@ test0 = "function test0() {\n" ++
         "    1024 : u16 * foo;\n" ++
         "    foo = foo / 1024 : u16;\n" ++
         "    1024 : u16 / foo;\n" ++
+        "    foo = foo % 1024 : u16;\n" ++
+        "    1024 : u16 % foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -31,6 +33,8 @@ test1 = "function test1(foo : dyn u16) {\n" ++
         "    1024 : u16 * foo;\n" ++
         "    foo = foo / 1024 : u16;\n" ++
         "    1024 : u16 / foo;\n" ++
+        "    foo = foo % 1024 : u16;\n" ++
+        "    1024 : u16 % foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -88,6 +92,10 @@ spec = do
               "\n" ++
               "    1024 / foo;\n" ++
               "\n" ++
+              "    foo = foo % 1024;\n" ++
+              "\n" ++
+              "    1024 % foo;\n" ++
+              "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")    
@@ -123,6 +131,10 @@ spec = do
              "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) / 1024;\n" ++
              "\n" ++
              "    1024 / *((uint16_t *)foo.data);\n" ++
+             "\n" ++
+             "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) % 1024;\n" ++
+             "\n" ++
+             "    1024 % *((uint16_t *)foo.data);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

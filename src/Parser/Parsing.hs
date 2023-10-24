@@ -317,7 +317,8 @@ expressionParser' :: Parser (Expression Annotation)
 expressionParser' = buildPrattParser -- New parser
     [[castingPostfix]
     ,[binaryInfix "*" Multiplication Ex.AssocLeft,
-      binaryInfix "/" Division Ex.AssocLeft]
+      binaryInfix "/" Division Ex.AssocLeft,
+      binaryInfix "%" Modulo Ex.AssocLeft]
     ,[binaryInfix "+" Addition Ex.AssocLeft,
       binaryInfix "-" Subtraction Ex.AssocLeft]
     ,[binaryInfix "<<" BitwiseLeftShift Ex.AssocLeft,

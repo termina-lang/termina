@@ -67,6 +67,7 @@ binOpType locs op lty rty =
     binOpType' Division tyl tyr           = cmpNumTy tyl tyl tyr
     binOpType' Addition tyl tyr           = cmpNumTy tyl tyl tyr
     binOpType' Subtraction tyl tyr        = cmpNumTy tyl tyl tyr
+    binOpType' Modulo tyl tyr             = cmpNumTy tyl tyl tyr
     -- shifts both numeric but may not be the same
     -- Q2
     binOpType' BitwiseLeftShift tyl tyr   = justNumTy tyl tyl tyr

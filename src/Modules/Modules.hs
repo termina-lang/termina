@@ -6,10 +6,8 @@ import AST.Core
 import qualified AST.Parser as PAST
 import Parser.Parsing (Annotation)
 import System.Path
-import Data.List
 import Extras.TopSort
 
-import Control.Arrow
 
 -- Containers
 import qualified Data.Map.Strict as M
