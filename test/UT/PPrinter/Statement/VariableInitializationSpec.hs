@@ -105,51 +105,41 @@ spec = do
         pack (
           "__termina_option_dyn_t option0;\n" ++
           "\n" ++
-          "{\n" ++
-          "    option0.__variant = Some;\n" ++
-          "    option0.__Some.__0 = dyn_var0;\n" ++
-          "}")
+          "option0.__variant = Some;\n" ++
+          "option0.Some.__0 = dyn_var0;")
     it "Prints the statement var option1 : Option <'dyn u32> = None;" $ do
       renderStatement option1 `shouldBe`
         pack (
           "__termina_option_dyn_t option1;\n" ++
           "\n" ++
-          "{\n" ++
-          "    option1.__variant = None;\n" ++
-          "}")
+          "option1.__variant = None;")
   describe "Pretty printing enum variable declarations" $ do
     it "Prints the statement var enum0 : Message = Message::Reset;" $ do
       renderStatement enum0 `shouldBe`
         pack (
           "Message enum0;\n" ++
           "\n" ++
-          "{\n" ++
-          "    enum0.__variant = Reset;\n" ++
-          "}")
+          "enum0.__variant = Reset;")
     it "Prints the statement var enum1 : Message = Message::In(0 : u32, 0 : u32);" $ do
       renderStatement enum1 `shouldBe`
         pack (
           "Message enum1;\n" ++
           "\n" ++
-          "{\n" ++
-          "    enum1.__variant = In;\n" ++
-          "    enum1.__In.__0 = 0;\n" ++
-          "    enum1.__In.__1 = 0;\n" ++
-          "}")
+          "enum1.__variant = In;\n" ++
+          "enum1.In.__0 = 0;\n" ++
+          "enum1.In.__1 = 0;")
   describe "Pretty printing struct variable declarations" $ do
     it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor;" $ do
       renderStatement struct0 `shouldBe`
         pack (
         "TMDescriptor struct0;\n" ++
         "\n" ++
-        "{\n" ++
-        "    struct0.field0 = 0;\n" ++
-        "    struct0.field1.field_a = 0;\n" ++
-        "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-        "        struct0.field1.field_b[__i0] = 0;\n" ++
-        "    }\n" ++
-        "    struct0.field1.field_c = 4294901760;\n" ++
-        "}")
+        "struct0.field0 = 0;\n" ++
+        "struct0.field1.field_a = 0;\n" ++
+        "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+        "    struct0.field1.field_b[__i0] = 0;\n" ++
+        "}\n" ++
+        "struct0.field1.field_c = 4294901760;")
     it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
       renderStatement struct1 `shouldBe`
         pack "TMDescriptor struct1 = struct0;"
@@ -159,21 +149,17 @@ spec = do
         pack (
           "uint32_t vector1[10];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector1[__i0] = vector0[__i0];\n" ++
-          "    }\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    vector1[__i0] = vector0[__i0];\n" ++
           "}")
     it "Prints the statement var vector2 : [[u32; 5 : u32]; 10 : u32] = vector0;" $ do
       renderStatement vector2 `shouldBe`
         pack (
           "int64_t vector2[10][5];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "            vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
-          "        }\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "        vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "    }\n" ++
           "}")
     it "Prints the statement var vector3 : [u32; 10 : u32] = [0 : u32; 10 : u32];" $ do
@@ -181,21 +167,17 @@ spec = do
         pack (
           "uint32_t vector3[10];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector3[__i0] = 0;\n" ++
-          "    }\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    vector3[__i0] = 0;\n" ++
           "}")
     it "Prints the statement var vector4 : [[u32; 5 : u32]; 10 : u32] = [[0 : u32; 5 : u32]; 10 : u32];" $ do
       renderStatement vector4 `shouldBe`
         pack (
           "int64_t vector4[10][5];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "            vector4[__i0][__i1] = 0;\n" ++
-          "        }\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "        vector4[__i0][__i1] = 0;\n" ++
           "    }\n" ++
           "}")
     it "Prints the statement var vector4 : [[u32; 5 : u32]; 10 : u32] = [vector_row; 10 : u32];" $ do
@@ -203,11 +185,9 @@ spec = do
         pack (
           "int64_t vector5[10][5];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "            vector5[__i0][__i1] = vector_row[__i1];\n" ++
-          "        }\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "        vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "    }\n" ++
           "}")
     it ("Prints the statement var vector6 : [TMDescriptor; 20 : u32] = " ++
@@ -216,13 +196,11 @@ spec = do
         pack (
           "TMDescriptor vector6[20];\n" ++
           "\n" ++
-          "{\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector6[__i0].field0 = 0;\n" ++
-          "        vector6[__i0].field1.field_a = 0;\n" ++
-          "        for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
-          "            vector6[__i0].field1.field_b[__i1] = 0;\n" ++
-          "        }\n" ++
-          "        vector6[__i0].field1.field_c = 4294901760;\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    vector6[__i0].field0 = 0;\n" ++
+          "    vector6[__i0].field1.field_a = 0;\n" ++
+          "    for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
+          "        vector6[__i0].field1.field_b[__i1] = 0;\n" ++
           "    }\n" ++
+          "    vector6[__i0].field1.field_c = 4294901760;\n" ++
           "}")

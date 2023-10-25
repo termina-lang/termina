@@ -56,8 +56,8 @@ spec = do
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t __In;\n" ++
-              "        __enum_Message_Out_params_t __Out;\n" ++
+              "        __enum_Message_In_params_t In;\n" ++
+              "        __enum_Message_Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++

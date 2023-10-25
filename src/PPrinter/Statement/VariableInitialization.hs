@@ -130,7 +130,7 @@ ppInitializeEnum subs level target expr =
     (EnumVariantExpression _ variant params _) ->
         vsep $
             (target <> pretty "." <> enumVariantsField <+> pretty "=" <+> pretty variant <> semi) : zipWith
-            (\e index -> ppFieldInitializer subs level target (pretty (namefy variant) <> pretty "." <> pretty (namefy (show (index :: Integer)))) e) params [0..]
+            (\e index -> ppFieldInitializer subs level target (pretty variant <> pretty "." <> pretty (namefy (show (index :: Integer)))) e) params [0..]
     _ -> error "Incorrect expression"
 
 ppInitializeOption ::

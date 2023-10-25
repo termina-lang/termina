@@ -82,18 +82,14 @@ spec = do
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
-          "    {\n" ++
-          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "            vector1[__i0] = vector0[__i0];\n" ++
-          "        }\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
-          "    {\n" ++
-          "        option0.__variant = Some;\n" ++
-          "        option0.__Some.__0 = dyn_var0;\n" ++
-          "    }\n" ++
+          "    option0.__variant = Some;\n" ++
+          "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
           "}")
     it "Prints an if-else statement" $ do
@@ -103,26 +99,20 @@ spec = do
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
-          "    {\n" ++
-          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "            vector1[__i0] = vector0[__i0];\n" ++
-          "        }\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
-          "    {\n" ++
-          "        option0.__variant = Some;\n" ++
-          "        option0.__Some.__0 = dyn_var0;\n" ++
-          "    }\n" ++
+          "    option0.__variant = Some;\n" ++
+          "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
           "} else {\n" ++
           "\n" ++
           "    __termina_option_dyn_t option1;\n" ++
           "\n" ++
-          "    {\n" ++
-          "        option1.__variant = None;\n" ++
-          "    }\n" ++
+          "    option1.__variant = None;\n" ++
           "\n" ++
           "}")
     it "Prints an if-else-if-else statement" $ do
@@ -132,18 +122,14 @@ spec = do
           "\n" ++
           "    uint32_t vector1[10];\n" ++
           "\n" ++
-          "    {\n" ++
-          "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "            vector1[__i0] = vector0[__i0];\n" ++
-          "        }\n" ++
+          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __termina_option_dyn_t option0;\n" ++
           "\n" ++
-          "    {\n" ++
-          "        option0.__variant = Some;\n" ++
-          "        option0.__Some.__0 = dyn_var0;\n" ++
-          "    }\n" ++
+          "    option0.__variant = Some;\n" ++
+          "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
           "} else if (foo0 == 0) {\n" ++
           "\n" ++
@@ -153,8 +139,6 @@ spec = do
           "\n" ++
           "    __termina_option_dyn_t option1;\n" ++
           "\n" ++
-          "    {\n" ++
-          "        option1.__variant = None;\n" ++
-          "    }\n" ++
+          "    option1.__variant = None;\n" ++
           "\n" ++
           "}")

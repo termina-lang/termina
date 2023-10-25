@@ -104,14 +104,10 @@ spec = do
               "\n" ++
               "    __termina_option_dyn_t option;\n" ++
               "\n" ++
-              "    {\n" ++
-              "        option.__variant = None;\n" ++
-              "    }\n" ++
+              "    option.__variant = None;\n" ++
               "\n" ++
-              "    {\n" ++
-              "        option.__variant = Some;\n" ++
-              "        option.__Some.__0 = dyn_var0;\n" ++
-              "    }\n" ++
+              "    option.__variant = Some;\n" ++
+              "    option.Some.__0 = dyn_var0;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -163,28 +159,20 @@ spec = do
               "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            foo[__i0] = 0;\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        foo[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
               "    }\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    return;\n" ++

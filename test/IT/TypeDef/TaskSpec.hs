@@ -46,7 +46,7 @@ test0 = "enum Message {\n" ++
         "    var check : bool = (*self).check_interval(10 : u32);\n" ++
         "\n" ++
         "    if (check == false) {\n" ++
-        "      ret = TaskRet::Abort;\n" ++
+        "      ret = TaskRet::Abort(1 : u32);\n" ++
         "    }\n" ++
         "\n" ++
         "    return ret;\n" ++
@@ -101,8 +101,8 @@ spec = do
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t __In;\n" ++
-              "        __enum_Message_Out_params_t __Out;\n" ++
+              "        __enum_Message_In_params_t In;\n" ++
+              "        __enum_Message_Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++
@@ -110,7 +110,7 @@ spec = do
               "typedef struct {\n" ++
               "    __termina_pool_t * message_pool;\n" ++
               "    uint32_t interval;\n" ++
-              "    __termina_task_id_t __task_id;\n" ++
+              "    __termina_task_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
               "TaskRet __CHousekeeping_run(CHousekeeping * self);\n" ++
@@ -127,17 +127,13 @@ spec = do
               "\n" ++
               "    TaskRet ret;\n" ++
               "\n" ++
-              "    {\n" ++
-              "        ret.__variant = Continue;\n" ++
-              "    }\n" ++
+              "    ret.__variant = Continue;\n" ++
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
               "    __termina_option_dyn_t alloc_msg;\n" ++
               "\n" ++
-              "    {\n" ++
-              "        alloc_msg.__variant = None;\n" ++
-              "    }\n" ++ 
+              "    alloc_msg.__variant = None;\n" ++
               "\n" ++   
               "    __termina_pool_alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++   
@@ -146,9 +142,9 @@ spec = do
               "        \n"  ++           
               "    } else {\n" ++
               "\n" ++   
-              "        __termina_option_dyn_t __alloc_msg__Some = alloc_msg.__Some;\n" ++
+              "        __termina_option_dyn_t __alloc_msg_Some = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        __termina_pool_free(__alloc_msg__Some);\n" ++
+              "        __termina_pool_free(__alloc_msg_Some);\n" ++
               "\n" ++  
               "    }\n" ++
               "\n" ++
@@ -156,9 +152,8 @@ spec = do
               "\n" ++
               "    if (check == 0) {\n" ++
               "\n" ++
-              "        {\n" ++
-              "            ret.__variant = Abort;\n" ++
-              "        }\n" ++
+              "        ret.__variant = Abort;\n" ++
+              "        ret.Abort.__0 = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++   
