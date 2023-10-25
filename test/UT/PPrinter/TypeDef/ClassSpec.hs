@@ -106,7 +106,7 @@ spec = do
       renderTypedefDeclaration classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
-          "    __termina_resource_id_t __resource_id;\n" ++
+          "    __termina_resource_t __resource_id;\n" ++
           "} id0;\n" ++
           "\n" ++
           "void __id0_procedure0(id0 * self, uint8_t param0, uint16_t param1,\n" ++
@@ -116,7 +116,7 @@ spec = do
       renderTypedefDeclaration classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
-          "    __termina_resource_id_t __resource_id;\n" ++
+          "    __termina_resource_t __resource_id;\n" ++
           "} id0;\n" ++
           "\n" ++
           "void __id0_procedure0(id0 * self, uint8_t param0,\n" ++
@@ -127,7 +127,7 @@ spec = do
       renderTypedefDeclaration noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "typedef struct {\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")
@@ -137,7 +137,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")
@@ -147,7 +147,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")
@@ -158,7 +158,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self, char param0, uint8_t param1[16]);\n")
@@ -169,7 +169,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")
@@ -180,7 +180,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")
@@ -190,7 +190,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
-            "    __termina_resource_id_t __resource_id;\n" ++
+            "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
             "void __id0_procedure0(id0 * self);\n")

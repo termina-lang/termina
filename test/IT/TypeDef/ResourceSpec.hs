@@ -57,7 +57,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t tm_sent_packets;\n" ++
-              "    __termina_resource_id_t __resource_id;\n" ++
+              "    __termina_resource_t __resource_id;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
               "void __TMChannel_get_tm_sent_packets(TMChannel * self, uint32_t * packets);\n" ++
@@ -88,7 +88,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    volatile uint32_t * status;\n" ++
-              "    __termina_resource_id_t __resource_id;\n" ++
+              "    __termina_resource_t __resource_id;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
               "void __UARTDriver_get_status(UARTDriver * self, uint32_t * ret);\n" ++
