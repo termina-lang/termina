@@ -199,16 +199,25 @@ ppTypeDefDeclaration typeDef =
         [typedefC <+> structC <+> braces' (line <> (indentTab . align $
           vsep [
             enumIdentifier identifier <+> enumVariantsField <> semi,
-            if null variantsWithParams then emptyDoc else
-              vsep [
-                emptyDoc, -- empty line
-                unionC <+> braces' (indentTab . align $
-                  vsep $ map (\enumVariant@(EnumVariant variant _) ->
+            case variantsWithParams of
+              [] -> emptyDoc
+              [enumVariant@(EnumVariant variant _)] -> 
+                  vsep [
+                    emptyDoc, -- empty line
                     ppEnumVariantParameterStructName identifier enumVariant
-                      <+> pretty (namefy variant) <> semi) variantsWithParams
-                ) <> semi,
-                emptyDoc -- empty line
-              ]
+                      <+> pretty variant <> semi,
+                    emptyDoc -- empty line
+                  ]
+              _ -> 
+                  vsep [
+                    emptyDoc, -- empty line
+                    unionC <+> braces' (indentTab . align $
+                      vsep $ map (\enumVariant@(EnumVariant variant _) ->
+                        ppEnumVariantParameterStructName identifier enumVariant
+                          <+> pretty variant <> semi) variantsWithParams
+                    ) <> semi,
+                    emptyDoc -- empty line
+                  ]
           ]
         )) <+> pretty identifier <> semi,
         emptyDoc ]

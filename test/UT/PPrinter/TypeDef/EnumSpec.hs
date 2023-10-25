@@ -81,9 +81,7 @@ spec = do
             "\n" ++
             "    __enum_id0_t __variant;\n" ++
             "\n" ++
-            "    union {\n" ++
-            "        __enum_id0_variant0_params_t __variant0;\n" ++
-            "    };\n" ++
+            "    __enum_id0_variant0_params_t variant0;\n" ++
             "\n" ++
             "} id0;\n")
     it "Prints an enum with multiple parameterized variants" $ do
@@ -116,9 +114,9 @@ spec = do
             "    __enum_id0_t __variant;\n" ++
             "\n" ++
             "    union {\n" ++
-            "        __enum_id0_variant0_params_t __variant0;\n" ++
-            "        __enum_id0_variant2_params_t __variant2;\n" ++
-            "        __enum_id0_variant3_params_t __variant3;\n" ++
+            "        __enum_id0_variant0_params_t variant0;\n" ++
+            "        __enum_id0_variant2_params_t variant2;\n" ++
+            "        __enum_id0_variant3_params_t variant3;\n" ++
             "    };\n" ++
             "\n" ++
             "} id0;\n");
