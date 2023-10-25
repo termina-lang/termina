@@ -103,10 +103,8 @@ spec = do
               "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            foo[__i0] = 1024;\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        foo[__i0] = 1024;\n" ++
               "    }\n" ++
               "\n" ++
               "    return *((__ret_func_test1_0_t *)foo);\n" ++
@@ -117,19 +115,15 @@ spec = do
               "\n" ++
               "    uint32_t bar0[10];\n" ++
               "\n" ++
-              "    {\n" ++
-              "        for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "            bar0[__i0] = 0;\n" ++
-              "        }\n" ++
+              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+              "        bar0[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
               "    *((__ret_func_test1_0_t *)bar0) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
               "\n" ++
               "    uint32_t bar1[10];\n" ++
               "\n" ++
-              "    {\n" ++
-              "        *((__ret_func_test1_0_t *)bar1) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
-              "    }\n" ++
+              "    *((__ret_func_test1_0_t *)bar1) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
               "\n" ++
               "    return bar0[1] + bar1[2];\n" ++
               "\n" ++

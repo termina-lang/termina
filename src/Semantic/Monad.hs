@@ -169,8 +169,8 @@ initialGlobalEnv = fromList initGlb
 
 initGlb :: [(Identifier, GEntry SemanticAnns)]
 initGlb =
-  [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] [])),
-   ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" []] [])),
+  [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
+   ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" [UInt32]] [])),
    ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
    ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
    ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]

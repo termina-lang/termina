@@ -30,7 +30,7 @@ ppDeclareAndInitialize initializer identifier ts expr =
             -- | Empty line
             emptyDoc,
             -- | Initialization of the object between braces
-            braces' $ (indentTab . align) $ initializer identifier expr
+            initializer identifier expr
         ]
 
 data MatchSource = Annonymous | Named DocStyle
@@ -43,7 +43,7 @@ ppMatchCase :: Substitutions -> MatchSource -> TypeSpecifier -> MatchCase Semant
 ppMatchCase subs _ (Option {}) (MatchCase "None" _ body _) =
     vsep [ ppStatement subs s <> line | s <- body ]
 ppMatchCase subs Annonymous (Option {}) (MatchCase "Some" [sym] body _) =
-    let variable = pretty (namefy "match.__Some")
+    let variable = pretty (namefy "match") <> pretty "." <> optionSomeField
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
@@ -52,7 +52,7 @@ ppMatchCase subs Annonymous (Option {}) (MatchCase "Some" [sym] body _) =
     in
     vsep $ [ ppStatement newSubs s <> line | s <- body ]
 ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
-    let variable = pretty "__" <> obj <> pretty "__Some"
+    let variable = pretty "__" <> obj <> pretty "_Some"
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
@@ -61,7 +61,7 @@ ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
     in
     vsep $
     [
-        optionDyn <+> variable <+> pretty "=" <+> obj <> pretty "." <> pretty "__Some" <> semi,
+        optionDyn <+> variable <+> pretty "=" <+> obj <> pretty "." <> optionSomeField <> semi,
         emptyDoc
     ] ++
     [
@@ -70,7 +70,7 @@ ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
 ppMatchCase subs _ (DefinedType _) (MatchCase _ [] body _) =
     vsep $ [ ppStatement subs s <> line | s <- body ]
 ppMatchCase subs Annonymous (DefinedType _) (MatchCase variant params body _) =
-    let variable = pretty (namefy ("match." ++ namefy variant))
+    let variable = pretty (namefy ("match." ++ variant))
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
@@ -83,7 +83,7 @@ ppMatchCase subs Annonymous (DefinedType _) (MatchCase variant params body _) =
     in
     vsep $ [ ppStatement newSubs s <> line | s <- body ]
 ppMatchCase subs (Named obj) (DefinedType identifier) (MatchCase variant params body _) =
-    let variable = pretty "__" <> obj <> pretty (namefy variant)
+    let variable = pretty "__" <> obj <> pretty "_" <> pretty variant
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
@@ -97,7 +97,7 @@ ppMatchCase subs (Named obj) (DefinedType identifier) (MatchCase variant params 
     vsep $
     [
         enumIdentifier (identifier ++ "_" ++ variant ++ "_" ++ "params") <+>
-            variable <+> pretty "=" <+> obj <> pretty "." <> pretty (namefy variant) <> semi,
+            variable <+> pretty "=" <+> obj <> pretty "." <> pretty variant <> semi,
         emptyDoc
     ] ++
     [
@@ -172,7 +172,7 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                     ppCDereferenceExpression (parens
                             (parens (ppReturnVectorValueStructure (pretty identifier) <+> pretty "*") <> ppExpression subs expr))
                     <> semi
-                _ -> braces' $ (indentTab . align) $ ppInitializeVector subs 0 (
+                _ -> ppInitializeVector subs 0 (
                     -- | If we are here, it means that we will be assigning the array to another array 
                     -- using a for loop. Since we are going to use a vector index expression on the assignments
                     -- we need to first check that the precedence of the target object is greater than 1.
@@ -189,11 +189,11 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                 ppCDereferenceExpression (ppObject subs obj)
         _ -> case expr of
             (FieldAssignmentsExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeStruct subs 0 (ppObject subs obj) expr
+                ppInitializeStruct subs 0 (ppObject subs obj) expr
             (OptionVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeOption subs 0 (ppObject subs obj) expr
+                ppInitializeOption subs 0 (ppObject subs obj) expr
             (EnumVariantExpression {}) ->
-                braces' $ (indentTab . align) $ ppInitializeEnum subs 0 (ppObject subs obj) expr
+                ppInitializeEnum subs 0 (ppObject subs obj) expr
             _ -> ppObject subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =

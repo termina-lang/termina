@@ -106,9 +106,9 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0__Some = option0.__Some;\n" ++
+              "        __termina_option_dyn_t __option0_Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
+              "        ret = *((uint32_t *)__option0_Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -139,9 +139,9 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0__Some = option0.__Some;\n" ++
+              "        __termina_option_dyn_t __option0_Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
+              "        ret = *((uint32_t *)__option0_Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -176,8 +176,8 @@ spec = do
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t __In;\n" ++
-              "        __enum_Message_Out_params_t __Out;\n" ++
+              "        __enum_Message_In_params_t In;\n" ++
+              "        __enum_Message_Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++
@@ -196,11 +196,9 @@ spec = do
               "\n" ++
               "    Message msg;\n" ++
               "\n" ++
-              "    {\n" ++
-              "        msg.__variant = In;\n" ++
-              "        msg.__In.__0 = 10;\n" ++
-              "        msg.__In.__1 = 10;\n" ++
-              "    }\n" ++
+              "    msg.__variant = In;\n" ++
+              "    msg.In.__0 = 10;\n" ++
+              "    msg.In.__1 = 10;\n" ++
               "\n" ++
               "    if (msg.__variant == __Message_Stop) {\n" ++
               "\n" ++
@@ -212,15 +210,15 @@ spec = do
               "\n" ++
               "    } else if (msg.__variant == __Message_Out) {\n" ++
               "\n" ++
-              "        __enum_Message_Out_params_t __msg__Out = msg.__Out;\n" ++
+              "        __enum_Message_Out_params_t __msg_Out = msg.Out;\n" ++
               "\n" ++
-              "        ret = __msg__Out.__0;\n" ++
+              "        ret = __msg_Out.__0;\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __enum_Message_In_params_t __msg__In = msg.__In;\n" ++
+              "        __enum_Message_In_params_t __msg_In = msg.In;\n" ++
               "\n" ++
-              "        ret = __msg__In.__0 + __msg__In.__1;\n" ++
+              "        ret = __msg_In.__0 + __msg_In.__1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

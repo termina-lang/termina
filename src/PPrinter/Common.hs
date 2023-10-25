@@ -35,6 +35,7 @@ getType _ = error "invalid expression annotation"
 getBinOpPrecedence :: Op -> Int
 getBinOpPrecedence Multiplication = 3
 getBinOpPrecedence Division = 3
+getBinOpPrecedence Modulo = 3
 getBinOpPrecedence Addition = 4
 getBinOpPrecedence Subtraction = 4
 getBinOpPrecedence BitwiseAnd = 8
@@ -72,6 +73,7 @@ getExpPrecedence (ReferenceExpression {}) = 2
 getExpPrecedence (Casting {}) = 2
 getExpPrecedence (FunctionExpression {}) = 0
 getExpPrecedence (MemberFunctionAccess {}) = 1
+getExpPrecedence (DerefMemberFunctionAccess {}) = 1
 getExpPrecedence (FieldAssignmentsExpression {}) = 0
 getExpPrecedence (EnumVariantExpression {}) = 0
 getExpPrecedence (VectorInitExpression {}) = 0
@@ -170,7 +172,7 @@ optionSomeVariant = pretty "Some"
 optionNoneVariant = pretty "None"
 
 optionSomeField :: DocStyle
-optionSomeField = pretty (namefy "Some") <> pretty ".__0"
+optionSomeField = optionSomeVariant <> pretty ".__0"
 
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
