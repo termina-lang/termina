@@ -275,10 +275,10 @@ memberFunctionAccessType ann obj_ty ident args =
             [refM] ->
               typeExpression refM >>= \(typed_ref , type_ref) ->
                             case type_ref of
-                              (Reference _ (Option (DynamicSubtype tyref))) ->
+                              (Reference Mutable (Option (DynamicSubtype tyref))) ->
                                 if groundTyEq ty_pool tyref
                                 then 
-                                  return ([Parameter "ref_opt" type_ref], [typed_ref], Unit)
+                                  return ([Parameter "opt" type_ref], [typed_ref], Unit)
                                 else throwError $ annotateError ann (EPoolsWrongArgType tyref)
                               _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW type_ref)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
@@ -287,22 +287,31 @@ memberFunctionAccessType ann obj_ty ident args =
       case ident of
         "send" ->
           case args of
-            [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
-              case isDyn arg_type of
-                Just t ->
-                  if groundTyEq t ty
-                  then return ([Parameter "send_obj" arg_type], [arg_typed], Unit)
-                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
-                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotDyn arg_type
+            [element, res] -> do
+              -- | Type the first argument element : Option<dyn ty>
+              (element_typed, element_type) <- typeExpression element
+              -- | Type the second argument result : &mut Result
+              (res_typed, res_type) <- typeExpression res
+              -- Check first type. ety stores the type of the dynamic element.
+              ety <- maybe (throwError $ annotateError ann $ EMsgQueueSendArgNotDyn element_type) return (isDyn element_type)
+              unless (groundTyEq ety ty) (throwError $ annotateError ann $ EMsgQueueWrongType ety ty)
+              -- Check second type. rty stores a reference to a result type
+              case res_type of
+                Reference Mutable (DefinedType "Result") -> 
+                  return (
+                    [Parameter "element" element_type, Parameter "result" res_type]
+                    , [element_typed, res_typed], Unit
+                  )
+                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotRefMutResult res_type
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
         "receive" ->
           case args of
             [arg] -> typeExpression arg >>= \(arg_typed, arg_type) ->
               case arg_type of
                 -- & Option<'dyn T>
-                Reference _ (Option (DynamicSubtype t)) ->
+                Reference Mutable (Option (DynamicSubtype t)) ->
                   if groundTyEq t ty
-                  then return ([Parameter "ref_opt" arg_type], [arg_typed], Unit)
+                  then return ([Parameter "opt" arg_type], [arg_typed], Unit)
                   else throwError $ annotateError ann $ EMsgQueueWrongType t ty
                 _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy arg_type
             _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs

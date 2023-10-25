@@ -46,7 +46,7 @@ test0 = "enum Message {\n" ++
         "    var check : bool = (*self).check_interval(10 : u32);\n" ++
         "\n" ++
         "    if (check == false) {\n" ++
-        "      ret = TaskRet::Abort(1 : u32);\n" ++
+        "      ret = TaskRet::Abort;\n" ++
         "    }\n" ++
         "\n" ++
         "    return ret;\n" ++
@@ -153,7 +153,6 @@ spec = do
               "    if (check == 0) {\n" ++
               "\n" ++
               "        ret.__variant = Abort;\n" ++
-              "        ret.Abort.__0 = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++   

@@ -167,13 +167,30 @@ data ExpressionState
 initialGlobalEnv :: GlobalEnv
 initialGlobalEnv = fromList initGlb
 
+taskRet, result, timeVal, clockGetUpptime, delayIn :: (Identifier, GEntry SemanticAnns)
+-- | enum TaskRet { Continue, Finish, Abort };
+taskRet = 
+  ("TaskRet", 
+    GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] []))
+-- | enum Result { Ok, Error };
+result = 
+  ("Result", 
+    GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] []))
+-- | struct TimeVal { tv_sec : u32, tv_usec : u32 };
+timeVal = 
+  ("TimeVal", 
+    GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] []))
+-- | API function clock_get_uptime() -> TimeVal;
+clockGetUpptime = 
+  ("clock_get_uptime", 
+    GFun [] (DefinedType "TimeVal"))
+-- | API function delay_in(time_val : TimeVal);
+delayIn = 
+  ("delay_in", 
+    GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)
+
 initGlb :: [(Identifier, GEntry SemanticAnns)]
-initGlb =
-  [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
-   ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" [UInt32]] [])),
-   ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
-   ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
-   ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
+initGlb = [taskRet, result, timeVal, clockGetUpptime, delayIn]
 
 makeInitial :: GlobalEnv -> ExpressionState
 makeInitial e = ExprST e empty empty

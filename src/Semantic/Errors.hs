@@ -187,6 +187,7 @@ data Errors a
   | ENoMsgQueueSendWrongArgs
   | ENoMsgQueueRcvWrongArgs
   | EMsgQueueSendArgNotDyn TypeSpecifier
+  | EMsgQueueSendArgNotRefMutResult TypeSpecifier
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
   -- | Vector slicing
