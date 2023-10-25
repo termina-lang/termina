@@ -141,7 +141,8 @@ type SemanticErrors = AnnotatedErrors Locations
 ----------------------------------------
 -- | Global env
 -- It has global definitions
-type GlobalEnv = Map Identifier (GEntry SemanticAnns)
+type GlobalEnv = Map Identifier (SAnns (GEntry SemanticAnns))
+
 -- | Local env
 -- variables to their type
 type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
@@ -167,30 +168,18 @@ data ExpressionState
 initialGlobalEnv :: GlobalEnv
 initialGlobalEnv = fromList initGlb
 
-taskRet, result, timeVal, clockGetUpptime, delayIn :: (Identifier, GEntry SemanticAnns)
--- | enum TaskRet { Continue, Finish, Abort };
-taskRet = 
-  ("TaskRet", 
-    GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] []))
--- | enum Result { Ok, Error };
-result = 
-  ("Result", 
-    GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] []))
--- | struct TimeVal { tv_sec : u32, tv_usec : u32 };
-timeVal = 
-  ("TimeVal", 
-    GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] []))
--- | API function clock_get_uptime() -> TimeVal;
-clockGetUpptime = 
-  ("clock_get_uptime", 
-    GFun [] (DefinedType "TimeVal"))
--- | API function delay_in(time_val : TimeVal);
-delayIn = 
-  ("delay_in", 
-    GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)
-
-initGlb :: [(Identifier, GEntry SemanticAnns)]
-initGlb = [taskRet, result, timeVal, clockGetUpptime, delayIn]
+initGlb :: [(Identifier, SAnns (GEntry SemanticAnns))]
+initGlb =
+  [("TaskRet",internalErrorSeman `SemAnn` GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] []) ),
+   ("Result", internalErrorSeman `SemAnn`GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" []] [])),
+   ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
+   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [] (DefinedType "TimeVal")),
+   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
+  -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
+  --  ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" [UInt32]] [])),
+  --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
+  --  ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
+  --  ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
 
 makeInitial :: GlobalEnv -> ExpressionState
 makeInitial e = ExprST e empty empty
@@ -243,7 +232,7 @@ getGlobalTy loc tid  = gets global >>=
   (\case {
       GType tydef -> return tydef;
         _         -> throwError $ annotateError loc (EGlobalNoType tid)
-      }) . M.lookup tid
+      } . ty_ann) . M.lookup tid
 
 -- | From a global name get enum variations
 getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
@@ -289,19 +278,23 @@ insertROImmObj loc ident ty =
 
 insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
-  insertGlobal type_name (GType tydef) (annotateError loc $ EUsedTypeName type_name)
+  insertGlobal type_name (loc `SemAnn` GType tydef) (EUsedTypeName type_name)
  where
    type_name = identifierType tydef
 
 insertGlobalFun :: Locations -> Identifier -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
 insertGlobalFun loc ident ps rettype =
-  insertGlobal ident (GFun ps rettype) (annotateError loc $ EUsedFunName ident)
+  insertGlobal ident (loc `SemAnn` GFun ps rettype) (EUsedFunName ident)
 
-insertGlobal :: Identifier -> GEntry SemanticAnns -> SemanticErrors -> SemanticMonad ()
+insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Locations -> Errors Locations) -> SemanticMonad ()
 insertGlobal ident entry err =
-  isDefined ident >>= \b ->
-  if b then throwError err
-  else modify (\s -> s{global = M.insert ident entry (global s)})
+  glbWhereIsDefined ident >>=
+  \case
+    { Just l -> throwError (annotateError (location entry) (err l)) ;
+      Nothing -> modify (\s -> s{global = M.insert ident entry (global s)}) ;
+    }
+  -- if b then throwError (annotateError (location entry) err)
+  -- else
 
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (uncurry (insertROImmObj loc))
@@ -330,7 +323,7 @@ getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)
 getGlobalGEnTy loc ident =
   gets global
   -- | Get local variables map and check if |ident| is a member of that map
-  >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
+  >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) (return . ty_ann) . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
 getLHSVarTy, getRHSVarTy:: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
@@ -403,6 +396,10 @@ getRHSVarTy loc ident =
 
 isDefinedIn :: Identifier -> M.Map Identifier a -> Bool
 isDefinedIn = M.member
+
+glbWhereIsDefined :: Identifier -> SemanticMonad (Maybe Locations)
+-- M.Map Identifier (SAnns a) -> Maybe Locations
+glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
 
 isDefined :: Identifier -> SemanticMonad Bool
 isDefined ident =

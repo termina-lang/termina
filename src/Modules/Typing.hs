@@ -21,7 +21,7 @@ import Parser.Parsing (Annotation)
 
 -- Semantic datat types stuff
 import qualified AST.Seman as SAST
-import Semantic.Monad (SemanticAnns)
+import Semantic.Monad (SAnns(..), SemanticAnns)
 import Semantic.Types (GEntry)
 import Semantic.TypeChecking (typeAndGetGlobals)
 
@@ -39,13 +39,13 @@ mAstFromPair = uncurry MData
 
 data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns
-   , defsModule  :: [ (SAST.Identifier , GEntry SemanticAnns) ]
+   , defsModule  :: [ (SAST.Identifier , SAnns (GEntry SemanticAnns)) ]
    }
 
 type ParserProject = M.Map ModuleName (ModuleAST (PAST.TerminaProgram Annotation))
 type SemanProject =  M.Map ModuleName (ModuleAST TypedModule)
 
-type Environment = M.Map SAST.Identifier (GEntry SemanticAnns)
+type Environment = M.Map SAST.Identifier (SAnns (GEntry SemanticAnns))
 
 type TProjectM = Except Errors
 
