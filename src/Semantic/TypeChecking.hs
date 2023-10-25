@@ -47,6 +47,7 @@ import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Control.Monad
+import Annotations (Annotated(getAnnotation))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -866,39 +867,46 @@ allUnique :: Eq a => [a] -> Bool
 allUnique xs = Data.List.nub xs == xs
 
 repeated :: Eq a => [a] -> [a]
+
 repeated xs = Data.List.nub $ xs Data.List.\\ Data.List.nub xs
 -----------------------------------------
 
 -- Adding Global elements to the environment.
-programAdd :: SAST.AnnASTElement SemanticAnns -> SemanticMonad (Identifier, GEntry SemanticAnns)
+programAdd :: SAST.AnnASTElement SemanticAnns
+  -> SemanticMonad (Identifier, SAnns (GEntry SemanticAnns))
 programAdd (Function ident args mretType _bd _mods anns) =
-  let gbl = GFun args (fromMaybe Unit mretType) in
-  insertGlobal ident gbl
-  (annotateError (location anns) (EUsedFunName ident))
-  >> return (ident , gbl)
+  let
+    gbl = GFun args (fromMaybe Unit mretType)
+    el = location anns `SemAnn` gbl
+  in
+  insertGlobal ident el
+  (EUsedFunName ident)
+  >> return (ident , el)
 programAdd (GlobalDeclaration glb) =
-  let (global_name, sem) =
+  let (global_name, sem, ann_glb) =
         case glb of
-          Task ident type_spec _me _mod _ann ->
-            (ident, STask type_spec)
-          Resource ident type_spec _me _mod _ann ->
-            (ident, SResource type_spec)
-          Handler ident type_spec _me _mod _ann ->
-            (ident, SHandler type_spec)
-          Const ident type_spec _e _mod _ann ->
-            (ident, SConst type_spec)
+          Task ident type_spec _me _mod ann ->
+            (ident, STask type_spec, ann)
+          Resource ident type_spec _me _mod ann ->
+            (ident, SResource type_spec, ann)
+          Handler ident type_spec _me _mod ann ->
+            (ident, SHandler type_spec, ann)
+          Const ident type_spec _e _mod ann ->
+            (ident, SConst type_spec, ann)
+      el = (location ann_glb `SemAnn` GGlob sem)
           in
-  insertGlobal global_name (GGlob sem)
-  (annotateError (location (getAnnotation glb)) (EUsedGlobalName global_name))
-  >> return (global_name , GGlob sem)
+  insertGlobal global_name el
+  (EUsedGlobalName global_name)
+  >> return (global_name , el)
 programAdd (TypeDefinition ty anns) =
   let type_name = identifierType ty in
     case ty_ann anns of
       GTy semTy@(GType _) ->
+        let el = location anns `SemAnn` semTy in
         insertGlobal
-          type_name semTy
-          (annotateError (location anns) $ EUsedTypeName type_name)
-        >> return (type_name , semTy)
+          type_name el
+          (EUsedTypeName type_name)
+        >> return (type_name , el)
       _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
 
 --- Exectuing Type Checking
@@ -922,7 +930,8 @@ typeAndGetGlobals
   -> Either
         SemanticErrors
         (SAST.AnnotatedProgram SemanticAnns
-        , [(Identifier , GEntry SemanticAnns)])
+        , [(Identifier
+           , SAnns (GEntry SemanticAnns))])
 typeAndGetGlobals preLoad p =
   case buildInit of
     Left err -> Left (annotateError internalErrorSeman err)

@@ -108,9 +108,9 @@ data Errors a
   | EUnboxingStmtExpr -- Unboxing statement as an expression.
   | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
-  | EUsedTypeName Identifier
+  | EUsedTypeName Identifier a
   -- | Unique names for Global
-  | EUsedGlobalName Identifier
+  | EUsedGlobalName Identifier a
   -- | Unique names Handler
   | EUsedHandlerName Identifier
   -- | Unique names Taks
@@ -124,7 +124,7 @@ data Errors a
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
   -- | Function Declaration error,
-  | EUsedFunName Identifier
+  | EUsedFunName Identifier a
   -- | Error getting type of expressions of objects.
   | EUnboxingObjectExpr
   -- | Expected Simple Type
