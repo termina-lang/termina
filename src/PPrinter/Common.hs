@@ -144,12 +144,12 @@ attribute = pretty "__attribute__"
 -- | Termina's pretty builtin types
 pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID :: DocStyle
 pool = pretty $ namefy "termina_pool_t"
-msgQueue = pretty $ namefy "termina_msg_queue_id_t"
+msgQueue = pretty $ namefy "termina_msg_queue_t"
 optionDyn = pretty $ namefy "termina_option_dyn_t"
 dynamicStruct = pretty $ namefy "termina_dyn_t"
-taskID = pretty $ namefy "termina_task_id_t"
-resourceID = pretty $ namefy "termina_resource_id_t"
-handlerID = pretty $ namefy "termina_handler_id_t"
+taskID = pretty $ namefy "termina_task_t"
+resourceID = pretty $ namefy "termina_resource_t"
+handlerID = pretty $ namefy "termina_handler_t"
 
 -- | Pretty prints the ID field of the resource, task and handler classes
 ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle

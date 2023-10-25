@@ -110,7 +110,7 @@ spec = do
               "typedef struct {\n" ++
               "    __termina_pool_t * message_pool;\n" ++
               "    uint32_t interval;\n" ++
-              "    __termina_task_id_t __task_id;\n" ++
+              "    __termina_task_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
               "TaskRet __CHousekeeping_run(CHousekeeping * self);\n" ++
