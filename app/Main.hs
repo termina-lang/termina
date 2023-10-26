@@ -27,8 +27,6 @@ import System.Path.IO
 -- Containers
 import qualified Data.Map.Strict as M
 
--- data Mode = Transpiler | Interpreter
-
 data MainOptions = MainOptions
   {optREPL :: Bool
   , optPrintAST :: Bool
@@ -88,8 +86,8 @@ whenChatty :: MainOptions -> IO () -> IO ()
 whenChatty = when . optChatty
 
 -- Replicate users tree. There are two ways to definea module...
-printModule :: Bool -> Path Absolute -> ModuleName -> ModuleAST TypedModule -> IO ()
-printModule chatty pdir mName modTyped = do
+printModule :: Bool -> Bool -> Path Absolute -> ModuleName -> ModuleAST TypedModule -> IO ()
+printModule isSrcFile chatty pdir mName modTyped = do
   when chatty $ print $ "PP Module:" ++ show mName
   -- Let's check if files already exists.
   hExists <- doesFileExist hFile
@@ -108,7 +106,7 @@ printModule chatty pdir mName modTyped = do
   when chatty $ print $ "Writing to" ++ show cFile
   writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
   where
-    fileRoute = pdir </> mName
+    fileRoute = if isSrcFile then pdir </> mName </> fragment "src" else pdir </> mName
     (cFile,hFile) = (fileRoute <.> FileExt "c", fileRoute <.> FileExt "h")
     deps = moduleDeps modTyped
     tyModule = frags $ typedModule $ moduleData modTyped
@@ -172,7 +170,10 @@ main = runCommand $ \opts args ->
                 -- Printing Project
                 whenChatty opts $ print "Printing Project"
                 let printDir = maybe (rootDir </> fragment "src") fromAbsoluteFilePath (optOutputDir opts)
-                mapM_ (uncurry (printModule (optChatty opts) printDir)) (M.toList typedProject)
+                mapM_ (\(mName, mTyped) ->
+                      doesDirectoryExist (rootDir </> mName) >>=
+                      \b -> printModule b (optChatty opts) printDir mName mTyped)
+                      (M.toList typedProject)
                 whenChatty opts $ print "Finished PProject"
                 ----------------------------------------
             ----------------------------------------
