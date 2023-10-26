@@ -24,8 +24,12 @@ ppModuleName = pretty . toUnrootedFilePath
 moduleNameToText :: ModuleName -> [Text]
 moduleNameToText = map (pack . toUnrootedFilePath) . splitFragments
 
-includes :: [ModuleName] -> DocStyle
-includes = vsep . map (\m -> pinclude <+> dquotes(ppModuleName m <> pretty ".h"))
+includeMod :: (ModuleName, ModuleMode) -> DocStyle
+includeMod (nm,DirMod) = ppModuleName nm <> pretty "/src"
+includeMod (nm,SrcFile) = ppModuleName nm
+
+includes :: [(ModuleName, ModuleMode)] -> DocStyle
+includes = vsep . map (\m -> pinclude <+> dquotes(includeMod m <> pretty ".h"))
  where
    pinclude = pretty "#include"
 

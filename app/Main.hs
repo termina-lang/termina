@@ -6,6 +6,7 @@ import Options
 import PPrinter
 -- import Control.Applicative
 import Semantic.TypeChecking
+import Semantic.Monad (SemanticAnns)
 
 import Text.Parsec (runParser)
 
@@ -19,6 +20,7 @@ import Modules.Typing
 import qualified Modules.Printing  as MPP
 import AST.Core
 import qualified AST.Parser as PAST
+import qualified AST.Seman as SAST
 
 -- FilePath and IO
 import System.Path
@@ -48,7 +50,12 @@ instance Options MainOptions where
         <*> simpleOption "chatty" False
             "Chatty compilation"
 
-getFileSrc :: Path Absolute -> IO (Path Absolute)
+fst3 :: (a ,b ,c ) -> a
+fst3 (a,_,_) = a
+snd3 :: (a , b , c) -> b
+snd3 (_,b,_) = b
+
+getFileSrc :: Path Absolute -> IO ( ModuleMode, Path Absolute)
 getFileSrc path =
   doesDirectoryExist path >>= \isDir ->
   if isDir then
@@ -58,26 +65,26 @@ getFileSrc path =
         unless
           isSrcFile
           (fail ("Module name ("++ show path ++") is a directory but src found:" ++ show srcFile))
-        return srcFile
+        return (DirMod, srcFile)
   else
     let filePath = path <.> terminaExt in
     do
       isFile <- doesFileExist filePath
       unless isFile (fail ("File not found:" ++ show filePath ++"."))
-      return filePath
+      return (SrcFile, filePath)
 
 -- We need to Module names and File Paths
 -- Load File takes an absolute path (could be something else but whatev)
-loadFile :: Path Absolute -> IO (PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
+loadFile :: Path Absolute -> IO (ModuleMode , PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
 loadFile absPath = do
   -- Get file name
-  absPathFile <- getFileSrc absPath
+  (mMode, absPathFile) <- getFileSrc absPath
   -- read it
   src_code <- readStrictText absPathFile
   -- parse it
   case runParser terminaProgram () (toFilePath absPathFile) (T.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-    Right term -> return term
+    Right term -> return (mMode , term)
 
 routeToMain :: Path Absolute -> Path Absolute
 routeToMain = takeDirectory
@@ -86,8 +93,12 @@ whenChatty :: MainOptions -> IO () -> IO ()
 whenChatty = when . optChatty
 
 -- Replicate users tree. There are two ways to definea module...
-printModule :: Bool -> Bool -> Path Absolute -> ModuleName -> ModuleAST TypedModule -> IO ()
-printModule isSrcFile chatty pdir mName modTyped = do
+printModule :: ModuleMode -> Bool -> Path Absolute
+  -> ModuleName
+  -> [(ModuleName, ModuleMode)]
+  -> SAST.AnnotatedProgram SemanticAnns
+  -> IO ()
+printModule mMode chatty pdir mName deps tyModule = do
   when chatty $ print $ "PP Module:" ++ show mName
   -- Let's check if files already exists.
   hExists <- doesFileExist hFile
@@ -106,10 +117,11 @@ printModule isSrcFile chatty pdir mName modTyped = do
   when chatty $ print $ "Writing to" ++ show cFile
   writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
   where
-    fileRoute = if isSrcFile then pdir </> mName </> fragment "src" else pdir </> mName
+    fileRoute =
+      case mMode of
+        DirMod -> pdir </> mName </> fragment "src"
+        SrcFile -> pdir </> mName
     (cFile,hFile) = (fileRoute <.> FileExt "c", fileRoute <.> FileExt "h")
-    deps = moduleDeps modTyped
-    tyModule = frags $ typedModule $ moduleData modTyped
 
 main :: IO ()
 main = runCommand $ \opts args ->
@@ -124,12 +136,14 @@ main = runCommand $ \opts args ->
               let rootDir = routeToMain absPath
               -- Main is special
               whenChatty opts (print ("Reading Main:" ++ show absPath))
-              terminaMain <- loadFile absPath
+              (mMode , terminaMain) <- loadFile absPath
+              when (isMDir mMode) (fail "Main cannot be in a folder")
               -- Termina Map from paths to Parser ASTs.
               whenChatty opts $ print "Loading project and parsing modules"
-              mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
+              let baseMainName = takeBaseName absPath
+              mapProject <- M.insert baseMainName (terminaProgramImports terminaMain, mMode, terminaMain) <$> loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               whenChatty opts $ print "Finished Parsing"
-              if M.null mapProject
+              if M.size mapProject == 1
                 -- Single file project.
                 -- so we can still use it :sweat_smile: until the other part is done.
               then
@@ -152,9 +166,8 @@ main = runCommand $ \opts args ->
                         >> print "Perfect ✓"
               else do
                 --
-                analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst mapProject))
-                let baseMainName = takeBaseName absPath
-                let toModuleAST = M.map mAstFromPair (M.insert baseMainName (terminaProgramImports terminaMain , terminaMain) mapProject)
+                analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))
+                let toModuleAST = M.map mAstFromPair mapProject
                 -- Let's make it interactive (for the use)
                 -- typedProject :: Map ModuleName (ModuleAST TypedModule)
                 typedProject <- foldM (\env m -> do
@@ -170,9 +183,13 @@ main = runCommand $ \opts args ->
                 -- Printing Project
                 whenChatty opts $ print "Printing Project"
                 let printDir = maybe (rootDir </> fragment "src") fromAbsoluteFilePath (optOutputDir opts)
-                mapM_ (\(mName, mTyped) ->
-                      doesDirectoryExist (rootDir </> mName) >>=
-                      \b -> printModule b (optChatty opts) printDir mName mTyped)
+                mapM_ (\(mName,mTyped) ->
+                      --  Get deps modes
+                      maybe (fail "Internal error: missing modulename in mapProject")
+                          (return . snd3) (M.lookup mName mapProject)
+                      >>= \moduleMode ->
+                      mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
+                      printModule moduleMode (optChatty opts) printDir mName depModes (frags $ typedModule $ moduleData mTyped))
                       (M.toList typedProject)
                 whenChatty opts $ print "Finished PProject"
                 ----------------------------------------

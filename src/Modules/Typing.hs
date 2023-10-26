@@ -34,8 +34,8 @@ data ModuleAST a = MData
   , moduleData :: a
   }
 
-mAstFromPair :: ([ModuleName] , PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
-mAstFromPair = uncurry MData
+mAstFromPair :: ([ModuleName] , a , PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
+mAstFromPair (deps, _ , tast) = MData deps tast
 
 data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns

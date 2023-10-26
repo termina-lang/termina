@@ -24,6 +24,15 @@ data ModuleData = MData
   , moduleSrc :: ModuleSrc
   }
 
+
+-- Ways of modules
+data ModuleMode = DirMod | SrcFile
+
+isMDir :: ModuleMode -> Bool
+isMDir DirMod = True
+isMDir _ = False
+--
+
 isTerminaFile :: Path a -> Bool
 isTerminaFile = (Just terminaExt ==)  . takeExtension
 
@@ -49,19 +58,19 @@ terminaProgramImports = map ( fragments . moduleIdentifier) . modules
 loadProject
   :: Monad m
   -- ModuleName
-  => (ModuleName -> m (PAST.TerminaProgram Annotation))
+  => (ModuleName -> m (ModuleMode,PAST.TerminaProgram Annotation))
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName],PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName], ModuleMode, PAST.TerminaProgram Annotation))
 loadProject = loadProject' M.empty
 
 loadProject' :: Monad m
   -- Map loading every file imported
-  => M.Map ModuleName ([ModuleName], PAST.TerminaProgram Annotation)
+  => M.Map ModuleName ([ModuleName], ModuleMode,PAST.TerminaProgram Annotation)
   -- Loading function
-  -> (ModuleName -> m (PAST.TerminaProgram Annotation))
+  -> (ModuleName -> m (ModuleMode,PAST.TerminaProgram Annotation))
   -- Modules to load
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName],PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName],ModuleMode, PAST.TerminaProgram Annotation))
 loadProject' fsLoaded _loadFile [] = return fsLoaded
 loadProject' fsLoaded loadFile (fs:fss) =
   if M.member fs fsLoaded
@@ -70,10 +79,10 @@ loadProject' fsLoaded loadFile (fs:fss) =
   then loadProject' fsLoaded loadFile fss
   -- Import and load it.
   else do
-    terminaProg <- loadFile fs
+    (tMode, terminaProg) <- loadFile fs
     let deps = terminaProgramImports terminaProg
     loadProject'
-      (M.insert fs (deps,terminaProg) fsLoaded)
+      (M.insert fs (deps,tMode, terminaProg) fsLoaded)
       loadFile
       (fss ++ deps)
 
