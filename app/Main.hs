@@ -16,6 +16,7 @@ import Control.Monad
 
 import Modules.Modules
 import Modules.Typing
+import qualified Modules.Printing  as MPP
 import AST.Core
 import qualified AST.Parser as PAST
 
@@ -32,7 +33,8 @@ data MainOptions = MainOptions
   {optREPL :: Bool
   , optPrintAST :: Bool
   , optPrintASTTyped :: Bool
-  , optOutput :: Maybe String
+  , optOutputDir :: Maybe String
+  , optChatty :: Bool
   }
 
 instance Options MainOptions where
@@ -43,8 +45,10 @@ instance Options MainOptions where
             "Prints AST after parsed"
         <*> simpleOption "printTyped" False
             "Prints AST after parsed + type"
-        <*> simpleOption "output" Nothing
+        <*> simpleOption "outputdir" Nothing
             "Output file"
+        <*> simpleOption "chatty" False
+            "Chatty compilation"
 
 getFileSrc :: Path Absolute -> IO (Path Absolute)
 getFileSrc path =
@@ -80,6 +84,35 @@ loadFile absPath = do
 routeToMain :: Path Absolute -> Path Absolute
 routeToMain = takeDirectory
 
+whenChatty :: MainOptions -> IO () -> IO ()
+whenChatty = when . optChatty
+
+-- Replicate users tree. There are two ways to definea module...
+printModule :: Bool -> Path Absolute -> ModuleName -> ModuleAST TypedModule -> IO ()
+printModule chatty pdir mName modTyped = do
+  when chatty $ print $ "PP Module:" ++ show mName
+  -- Let's check if files already exists.
+  hExists <- doesFileExist hFile
+  cExists <- doesFileExist cFile
+  -- If they exist create a copy .bkp
+  when hExists (renameFile hFile (hFile <.> FileExt "bkp"))
+  when cExists (renameFile cFile (cFile <.> FileExt "bkp"))
+  -- Folder checking and creation
+  when chatty $ print "Creating Project folders."
+  -- Creating resulting project Folder Structure
+  createDirectoryIfMissing True (takeDirectory fileRoute)
+  -- Now, both files are no more.
+  when chatty $ print $ "Writing to" ++ show hFile
+  let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName
+  writeStrictText hFile (MPP.ppHeaderFile docMName (MPP.includes deps) tyModule)
+  when chatty $ print $ "Writing to" ++ show cFile
+  writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
+  where
+    fileRoute = pdir </> mName
+    (cFile,hFile) = (fileRoute <.> FileExt "c", fileRoute <.> FileExt "h")
+    deps = moduleDeps modTyped
+    tyModule = frags $ typedModule $ moduleData modTyped
+
 main :: IO ()
 main = runCommand $ \opts args ->
     if optREPL opts then
@@ -92,12 +125,12 @@ main = runCommand $ \opts args ->
               absPath <- makeAbsolute fspath
               let rootDir = routeToMain absPath
               -- Main is special
-              print ("Reading Main" ++ show absPath)
+              whenChatty opts (print ("Reading Main:" ++ show absPath))
               terminaMain <- loadFile absPath
-              -- let mainName = takeBaseName fspath
               -- Termina Map from paths to Parser ASTs.
-              print "Loading project and parsing modules"
+              whenChatty opts $ print "Loading project and parsing modules"
               mapProject <- loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
+              whenChatty opts $ print "Finished Parsing"
               if M.null mapProject
                 -- Single file project.
                 -- so we can still use it :sweat_smile: until the other part is done.
@@ -109,7 +142,7 @@ main = runCommand $ \opts args ->
                     Right typedAST
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
-                        >> maybe
+                        >> maybe -- check this, it sees weird.
                                 (print (ppHeaderFile [T.pack "output"] [] typedAST))
                                 (\fn ->
                                   let -- System.Path
@@ -117,26 +150,31 @@ main = runCommand $ \opts args ->
                                       source = fn ++ ".c"
                                   in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
                                   >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
-                                ) (optOutput opts)
+                                ) (optOutputDir opts)
                         >> print "Perfect ✓"
               else do
                 --
                 analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst mapProject))
-                  -- case sortOrLoop (M.map fst mapProject) of
-                  -- -- Left loop -> fail ("Cycle between modules: " ++ show loop)
-                  -- Right orderedModules -> return orderedModules
-                -- Prepare for Typing
-                let toModuleAST = M.map mAstFromPair mapProject
-                -- Let's make it interactive
-                -- Old: either (fail . show)(const (print "ok")) (runTypeProject toModuleAST analyzeOrd)
-                _typedProject <- foldM_ (\env m -> do
-                     putStr ("Type Checking Module: " ++ show m)
+                let baseMainName = takeBaseName absPath
+                let toModuleAST = M.map mAstFromPair (M.insert baseMainName (terminaProgramImports terminaMain , terminaMain) mapProject)
+                -- Let's make it interactive (for the use)
+                -- typedProject :: Map ModuleName (ModuleAST TypedModule)
+                typedProject <- foldM (\env m -> do
+                     whenChatty opts $ putStr ("Type Checking Module: " ++ show m)
                      case typeModule toModuleAST m env of
                       Left err -> fail ("[FAIL]" ++ show err)
                       Right typedM ->
-                        print " >> [DONE]" >> return (M.insert m typedM env)
-                     ) M.empty analyzeOrd
-                print "Finished Module typing"
+                        whenChatty opts (print " >> [DONE]")
+                        >> return (M.insert m typedM env)
+                     ) M.empty (analyzeOrd ++ [baseMainName])
+                whenChatty opts $ print "Finished Module typing"
+                ----------------------------------------
+                -- Printing Project
+                whenChatty opts $ print "Printing Project"
+                let printDir = maybe (rootDir </> fragment "src") fromAbsoluteFilePath (optOutputDir opts)
+                mapM_ (uncurry (printModule (optChatty opts) printDir)) (M.toList typedProject)
+                whenChatty opts $ print "Finished PProject"
+                ----------------------------------------
             ----------------------------------------
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
