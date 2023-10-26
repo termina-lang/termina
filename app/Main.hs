@@ -93,12 +93,17 @@ whenChatty :: MainOptions -> IO () -> IO ()
 whenChatty = when . optChatty
 
 -- Replicate users tree. There are two ways to definea module...
-printModule :: ModuleMode -> Bool -> Path Absolute
+printModule :: ModuleMode -> Bool
+  -- Src Dir
+  -> Path Absolute
+  -- Headers Dir
+  -> Path Absolute
+  --
   -> ModuleName
   -> [(ModuleName, ModuleMode)]
   -> SAST.AnnotatedProgram SemanticAnns
   -> IO ()
-printModule mMode chatty pdir mName deps tyModule = do
+printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
   when chatty $ print $ "PP Module:" ++ show mName
   -- Let's check if files already exists.
   hExists <- doesFileExist hFile
@@ -109,7 +114,8 @@ printModule mMode chatty pdir mName deps tyModule = do
   -- Folder checking and creation
   when chatty $ print "Creating Project folders."
   -- Creating resulting project Folder Structure
-  createDirectoryIfMissing True (takeDirectory fileRoute)
+  createDirectoryIfMissing True (takeDirectory (fileRoute srcdir))
+  createDirectoryIfMissing True (takeDirectory (fileRoute hdrsdir))
   -- Now, both files are no more.
   when chatty $ print $ "Writing to" ++ show hFile
   let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName
@@ -117,11 +123,11 @@ printModule mMode chatty pdir mName deps tyModule = do
   when chatty $ print $ "Writing to" ++ show cFile
   writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
   where
-    fileRoute =
+    fileRoute dd =
       case mMode of
-        DirMod -> pdir </> mName </> fragment "src"
-        SrcFile -> pdir </> mName
-    (cFile,hFile) = (fileRoute <.> FileExt "c", fileRoute <.> FileExt "h")
+        DirMod -> dd </> mName </> fragment "src"
+        SrcFile -> dd </> mName
+    (cFile,hFile) = (fileRoute srcdir <.> FileExt "c", fileRoute hdrsdir <.> FileExt "h")
 
 main :: IO ()
 main = runCommand $ \opts args ->
@@ -182,14 +188,20 @@ main = runCommand $ \opts args ->
                 ----------------------------------------
                 -- Printing Project
                 whenChatty opts $ print "Printing Project"
-                let printDir = maybe (rootDir </> fragment "src") fromAbsoluteFilePath (optOutputDir opts)
+                (srcDir, hdrsDir) <-
+                     (\i -> (i </> fragment "src",i </> fragment "include")) <$>
+                    (case optOutputDir opts of
+                      Nothing -> return rootDir
+                      Just fp -> makeAbsolute (fromFilePath fp))
+                -- let srcDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "src"
+                -- let hdrsDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "include"
                 mapM_ (\(mName,mTyped) ->
                       --  Get deps modes
                       maybe (fail "Internal error: missing modulename in mapProject")
                           (return . snd3) (M.lookup mName mapProject)
                       >>= \moduleMode ->
                       mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
-                      printModule moduleMode (optChatty opts) printDir mName depModes (frags $ typedModule $ moduleData mTyped))
+                      printModule moduleMode (optChatty opts) srcDir hdrsDir mName depModes (frags $ typedModule $ moduleData mTyped))
                       (M.toList typedProject)
                 whenChatty opts $ print "Finished PProject"
                 ----------------------------------------
