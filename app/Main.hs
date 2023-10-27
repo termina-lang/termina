@@ -163,7 +163,7 @@ main = runCommand $ \opts args ->
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
                         >> maybe -- check this, it sees weird.
-                                (print (ppHeaderFile [T.pack "output"] [] typedAST))
+                                (TIO.putStrLn (ppHeaderFile [ (T.pack "output") ] [] typedAST))
                                 (\fn ->
                                   let -- System.Path
                                       header = fn ++ ".h"
@@ -197,7 +197,12 @@ main = runCommand $ \opts args ->
                      (\i -> (i </> fragment "src",i </> fragment "include")) <$>
                     (case optOutputDir opts of
                       Nothing -> return rootDir
-                      Just fp -> makeAbsolute (fromFilePath fp))
+                      Just fp -> do
+                      -- Check optOutputDir exists.
+                        p <- makeAbsolute (fromFilePath fp)
+                        exists <- doesDirectoryExist p
+                        unless exists (fail "Output Folder does not exist.")
+                        return p)
                 -- let srcDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "src"
                 -- let hdrsDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "include"
                 mapM_ (\(mName,mTyped) ->
