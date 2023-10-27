@@ -7,6 +7,7 @@ import PPrinter
 -- import Control.Applicative
 import Semantic.TypeChecking
 import Semantic.Monad (SemanticAnns)
+import Semantic.Errors (ppError) --Printing errors
 
 import Text.Parsec (runParser)
 
@@ -30,7 +31,7 @@ import System.Path.IO
 import qualified Data.Map.Strict as M
 
 data MainOptions = MainOptions
-  {optREPL :: Bool
+  { optREPL :: Bool
   , optPrintAST :: Bool
   , optPrintASTTyped :: Bool
   , optOutputDir :: Maybe String
@@ -156,7 +157,8 @@ main = runCommand $ \opts args ->
                 let
                   tAST = frags terminaMain
                 in case typeCheckRun tAST of
-                    Left err -> fail ("Type Check Error:: \n" ++ show err)
+                    Left err ->
+                      TIO.putStr (render (ppError err)) >> fail "Type Check Error Fin."
                     Right typedAST
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
@@ -177,9 +179,12 @@ main = runCommand $ \opts args ->
                 -- Let's make it interactive (for the use)
                 -- typedProject :: Map ModuleName (ModuleAST TypedModule)
                 typedProject <- foldM (\env m -> do
-                     whenChatty opts $ putStr ("Type Checking Module: " ++ show m)
+                     whenChatty opts $ print ("Type Checking Module: " ++ show m)
                      case typeModule toModuleAST m env of
-                      Left err -> fail ("[FAIL]" ++ show err)
+                      Left err ->
+                        print "--------" >>
+                        TIO.putStrLn (render (MPP.ppModError err)) >>
+                        fail ("[FAIL]")
                       Right typedM ->
                         whenChatty opts (print " >> [DONE]")
                         >> return (M.insert m typedM env)

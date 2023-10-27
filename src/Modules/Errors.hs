@@ -3,9 +3,7 @@
 module Modules.Errors where
 
 import AST.Core
--- import Semantic.Errors (Errors)
-import Semantic.Monad (SemanticErrors)
-
+import Semantic.Errors (SemanticErrors)
 
 import Modules.Modules
 

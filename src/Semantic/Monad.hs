@@ -130,14 +130,6 @@ undynTypeAnn :: SemanticAnns -> SemanticAnns
 undynTypeAnn (SemAnn p (ETy en)) = SemAnn p (ETy (undynExpType en))
 undynTypeAnn _                                    = error "impossible 888"
 
--- -- | Global Definitions
--- type GlobalsSemantic = SAnns (GEntry ())
-
--- globType :: Locations -> SemGlobal -> GlobalsSemantic
--- globType loc = SemAnn loc . GGlob
-
-type SemanticErrors = AnnotatedErrors Locations
-
 ----------------------------------------
 -- | Global env
 -- It has global definitions

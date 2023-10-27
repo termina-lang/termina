@@ -4,6 +4,7 @@ import           Data.Maybe
 import           Prettyprinter
 import           Prettyprinter.Render.Terminal
 import           AST.Seman
+
 import           Semantic.Monad
 
 type DocStyle = Doc AnsiStyle
