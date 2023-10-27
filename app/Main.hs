@@ -150,6 +150,20 @@ main = runCommand $ \opts args ->
               let baseMainName = takeBaseName absPath
               mapProject <- M.insert baseMainName (terminaProgramImports terminaMain, mMode, terminaMain) <$> loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               whenChatty opts $ print "Finished Parsing"
+              -- Prepare stuff to print.
+              -- A little bit nonsense to do it here.
+              -- But we need it.
+              (srcDir, hdrsDir) <-
+                     (\i -> (i </> fragment "src",i </> fragment "include")) <$>
+                    (case optOutputDir opts of
+                      Nothing -> return rootDir
+                      Just fp -> do
+                      -- Check optOutputDir exists.
+                        p <- makeAbsolute (fromFilePath fp)
+                        exists <- doesDirectoryExist p
+                        unless exists (fail "Output Folder does not exist.")
+                        return p)
+              --
               if M.size mapProject == 1
                 -- Single file project.
                 -- so we can still use it :sweat_smile: until the other part is done.
@@ -162,16 +176,18 @@ main = runCommand $ \opts args ->
                     Right typedAST
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
-                        >> maybe -- check this, it sees weird.
-                                (TIO.putStrLn (ppHeaderFile [ (T.pack "output") ] [] typedAST))
-                                (\fn ->
-                                  let -- System.Path
-                                      header = fn ++ ".h"
-                                      source = fn ++ ".c"
-                                  in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
-                                  >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
-                                ) (optOutputDir opts)
+                        >> printModule DirMod (optChatty opts) srcDir hdrsDir baseMainName [] typedAST
                         >> print "Perfect ✓"
+                       ---
+                        -- maybe -- check this, it sees weird.
+                        --           (TIO.putStrLn (ppHeaderFile [ (T.pack "output") ] [] typedAST))
+                        --           (\fn ->
+                        --             let -- System.Path
+                        --                 header = fn ++ ".h"
+                        --                 source = fn ++ ".c"
+                        --             in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
+                        --             >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
+                        --           ) (optOutputDir opts)
               else do
                 --
                 analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))
@@ -193,18 +209,6 @@ main = runCommand $ \opts args ->
                 ----------------------------------------
                 -- Printing Project
                 whenChatty opts $ print "Printing Project"
-                (srcDir, hdrsDir) <-
-                     (\i -> (i </> fragment "src",i </> fragment "include")) <$>
-                    (case optOutputDir opts of
-                      Nothing -> return rootDir
-                      Just fp -> do
-                      -- Check optOutputDir exists.
-                        p <- makeAbsolute (fromFilePath fp)
-                        exists <- doesDirectoryExist p
-                        unless exists (fail "Output Folder does not exist.")
-                        return p)
-                -- let srcDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "src"
-                -- let hdrsDir = maybe rootDir fromFilePath (optOutputDir opts) </> fragment "include"
                 mapM_ (\(mName,mTyped) ->
                       --  Get deps modes
                       maybe (fail "Internal error: missing modulename in mapProject")
