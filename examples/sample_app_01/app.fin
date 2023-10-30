@@ -1,0 +1,11 @@
+import { tasks.housekeeping, drivers.uart }
+
+resource uart0 : UARTDriver = { 
+    initialized = false,
+    status_register @ 0x80000100
+} : UARTDriver;
+
+task housekeeping_task : CHouseKeepingTask = { 
+    uart <- uart0,
+    count = 0 : u32
+} : CHouseKeepingTask;

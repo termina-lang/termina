@@ -5,13 +5,11 @@ module Modules.Printing where
 import Modules.Modules
 import Modules.Errors
 
-import Data.List (intercalate)
 import System.Path
 
 import Data.Text hiding (group, intercalate,map)
 import Prettyprinter
-import Prettyprinter.Render.Terminal
-import AST.Seman (AnnotatedProgram(..))
+import AST.Seman (AnnotatedProgram)
 import Semantic.Monad (SemanticAnns)
 import Data.Maybe (mapMaybe)
 
@@ -28,12 +26,9 @@ ppModuleName = pretty . toUnrootedFilePath
 moduleNameToText :: ModuleName -> [Text]
 moduleNameToText = map (pack . toUnrootedFilePath) . splitFragments
 
-includeMod :: (ModuleName, ModuleMode) -> Doc a
-includeMod (nm,DirMod) = ppModuleName nm <> pretty "/src"
-includeMod (nm,SrcFile) = ppModuleName nm
-
 includes :: [(ModuleName, ModuleMode)] -> Doc a
-includes = vsep . map (\m -> pinclude <+> dquotes(includeMod m <> pretty ".h"))
+includes [] = emptyDoc
+includes deps = vsep $ emptyDoc : map (\(nm, _) -> pinclude <+> dquotes(ppModuleName nm <> pretty ".h")) deps ++ [emptyDoc]
  where
    pinclude = pretty "#include"
 
@@ -49,14 +44,12 @@ ppHeaderFile modName imports program = render $
   [ vsep
     [ pretty "#ifndef " <> modName
     , pretty "#define " <> modName
-    , line
+    , emptyDoc
     ]
   , pretty "#include <termina.h>"
-  , line
   , imports
   , vsep (mapMaybe ppHeaderASTElement program
-               ++ [ pretty "#endif // " <> modName
-                  , line])
+               ++ [ pretty "#endif // " <> modName])
   ]
 
 ppSourceFile
@@ -67,9 +60,9 @@ ppSourceFile
   -- Resulting PP program
   -> Text
 ppSourceFile modName program = render $ vsep $
-        [line,
+        [emptyDoc,
         pretty "#include " <+> dquotes(modName <> pretty ".h"),
-        line
+        emptyDoc
         ] ++ mapMaybe ppSourceASTElement program
 
 -- Error Printing

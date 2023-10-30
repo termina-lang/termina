@@ -227,8 +227,8 @@ parameterParser = do
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
 fieldAssignmentsExpressionParser = do
-    assignments <- braces (sepBy (try flValues <|> try flAddresses <|> flConnection) comma)
     p <- getPosition
+    assignments <- braces (sepBy (wspcs *> (try flValues <|> try flAddresses <|> flConnection) <* wspcs) comma)
     _ <- reservedOp ":"
     identifier <- identifierParser
     return $ FieldAssignmentsExpression identifier assignments (Position p)
@@ -881,14 +881,13 @@ topLevel :: Parser (AnnotatedProgram Annotation)
 topLevel = many1 $
   try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
-  -- <|> moduleInclusionParser
 
 moduleIdentifierParser :: Parser [ String ]
 moduleIdentifierParser = sepBy1 firstCapital dot
   where
     firstCapital = (:)
-      <$> (upper <?> "Module paths begin with capital letters.")
-      <*> (many letter <?> "Module names only accept letters.")
+      <$> (lower <?> "Module paths begin with a lowercase letter.")
+      <*> (many (lower <|> char '_') <?> "Module names only accept lowercase letters or underscores.")
 
 singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
@@ -903,7 +902,7 @@ contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
 
 terminaProgram :: Parser (TerminaProgram Annotation)
-terminaProgram = Termina <$> option [] moduleInclusionParser <*> contents topLevel
+terminaProgram = wspcs *> (Termina <$> option [] moduleInclusionParser <*> contents topLevel)
 
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram Annotation)

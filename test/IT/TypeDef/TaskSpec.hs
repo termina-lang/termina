@@ -113,9 +113,9 @@ spec = do
               "    __termina_task_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
-              "TaskRet __CHousekeeping_run(CHousekeeping * self);\n" ++
+              "TaskRet __CHousekeeping_run(CHousekeeping * const self);\n" ++
               "\n" ++
-              "_Bool check_interval(CHousekeeping * self, uint32_t limit);\n" ++
+              "_Bool check_interval(const CHousekeeping * const self, uint32_t limit);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -123,7 +123,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "TaskRet __CHousekeeping_run(CHousekeeping * self) {\n" ++
+              "TaskRet __CHousekeeping_run(CHousekeeping * const self) {\n" ++
               "\n" ++
               "    TaskRet ret;\n" ++
               "\n" ++
@@ -161,7 +161,8 @@ spec = do
               "}\n" ++
               "\n" ++
               "\n" ++
-              "_Bool __CHousekeeping_check_interval(CHousekeeping * self, uint32_t limit) {\n" ++
+              "_Bool __CHousekeeping_check_interval(const CHousekeeping * const self,\n" ++
+              "                                     uint32_t limit) {\n" ++
               "\n" ++
               "    _Bool ret = 1;\n" ++
               "\n" ++

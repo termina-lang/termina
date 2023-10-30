@@ -39,7 +39,7 @@ ppClassProcedureOnExit :: DocStyle
 ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [pretty "self->__resource_id"] <> semi
 
 ppSelfParameter :: Identifier -> DocStyle
-ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "self"
+ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> pretty "self"
 
 ppClassFunctionDefinition :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
@@ -75,7 +75,7 @@ ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _)
     ppCFunctionPrototype (classFunctionName classId identifier)
       (
         -- | Print the self parameter
-        ppSelfParameter classId :
+        pretty "const" <+> ppSelfParameter classId :
         -- | Print the rest of the function parameters
         (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
       )
@@ -121,7 +121,7 @@ ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
     _ -> []) ++
   [
     ppCFunctionPrototype (pretty identifier)
-      (ppSelfParameter classId : (ppParameterDeclaration (pretty identifier) <$> parameters))
+      (pretty "const" <+> ppSelfParameter classId : (ppParameterDeclaration (pretty identifier) <$> parameters))
       (Just (ppReturnType (pretty identifier) rts)) <> semi,
     emptyDoc
   ]

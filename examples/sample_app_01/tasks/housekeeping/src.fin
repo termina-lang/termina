@@ -1,0 +1,23 @@
+import { drivers.uart }
+
+task class CHouseKeepingTask {
+
+    uart : port UARTDriver;
+
+    count : u32;
+
+    viewer is_count_zero(&self) -> bool {
+        return self->count == 0 : u32;
+    }
+
+    method run(&priv self) -> TaskRet {
+
+        var ret : TaskRet = TaskRet::Continue;
+
+        self->uart.init();
+
+        return ret;
+
+    }
+
+};
