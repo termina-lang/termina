@@ -318,7 +318,10 @@ getGlobalGEnTy loc ident =
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) (return . ty_ann) . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
-getLHSVarTy, getRHSVarTy:: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
+getLHSVarTy, getRHSVarTy, getGlobalVarTy :: 
+  Locations 
+  -> Identifier 
+  -> SemanticMonad (AccessKind, TypeSpecifier)
 getLHSVarTy loc ident =
   -- | Try first local environment
   catchError
@@ -379,6 +382,22 @@ getRHSVarTy loc ident =
           ;
         _  -> throwError errorLocal;
       })
+getGlobalVarTy loc ident =
+  catchError (getGlobalGEnTy loc ident)
+             (\errorGlobal ->
+                case semError errorGlobal of {
+                  ENotNamedGlobal errvar ->
+                    if errvar == ident then
+                      throwError $ annotateError loc (ENotNamedObject ident);
+                    else
+                      throwError errorGlobal;
+                   _  -> throwError errorGlobal;
+                }
+              ) >>= (\case {
+                        GGlob (SResource ts)  -> return (Immutable, ts);
+                        _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                      });
+
 
 -- | Lookups |idenfitier| in local scope first (I assuming this is the most
 -- frequent case) and then the global scope.

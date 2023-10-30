@@ -1,0 +1,15 @@
+
+resource class UARTDriver {
+
+    initialized : bool;
+    status_register : loc u32;
+
+    procedure init(&priv self) {
+
+        self->initialized = true;
+
+        return;
+
+    }
+
+};
