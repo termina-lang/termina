@@ -250,8 +250,8 @@ data Parameter = Parameter {
 
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a)
-  | FieldAddressAssignment Identifier Address
-  | FieldPortConnection Identifier Identifier
+  | FieldAddressAssignment Identifier Address a
+  | FieldPortConnection Identifier Identifier a
   deriving (Show, Functor)
 
 data FieldDefinition = FieldDefinition {
