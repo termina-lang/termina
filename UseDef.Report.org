@@ -1,0 +1,35 @@
+#+title: Use Def Report
+
+* Main Idea
+
+We want to analyze the data-flow of dynamic variables.  In particular, we want
+all dynamic variables to flow back to either pools or to other functions. In
+other words, no class members (methods, viewers and procedures) can keep their
+dynamic variables.
+
+---
+
+There is only one way to get Dynamic variables now.
+Pablo decided ([2023-11-02 Thu]) Options cannot be passed around arguments.
+
+--
+
+We implement then a simple [[https://en.wikipedia.org/wiki/Data-flow_analysis][Data-flow analysis]].
+
+* Option definitions
+Defs: alloc.
+Uses: destroy with matchs.
+
+There exists only one use.
+
+* Dynamic definitions
+Defs: given by environment after destroying an OptDyn when there is something.
+Uses: free, send.
+
+There exsists only one use.
+
+* Everything else
+Defs: when declared, arguments, etc
+Uses: whenever named.
+
+There exist *at least* one use.
