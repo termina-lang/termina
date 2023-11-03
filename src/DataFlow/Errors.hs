@@ -12,6 +12,9 @@ data Errors
   | NotUsed Identifier
   | UsingTwice Identifier
   | DifferentOnlyOnce
+  | DifferentOnlyOnceMatch
+  | ForMoreOO
+  | InternalOptionMissMatch
 
 data AnnotatedErrors
   = AnErrors {location :: Annotation , err :: Errors}

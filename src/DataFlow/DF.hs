@@ -99,16 +99,27 @@ useExpression (OptionVariantExpression opt _ann)
         Some e -> useExpression e
 
 
--- useDefBlockRet :: BlockRet SemanticAnns -> UDM AnnotatedErrors ()
--- useDefBlockRet = _
+useDefBlockRet :: BlockRet SemanticAnns -> UDM AnnotatedErrors ()
+useDefBlockRet bret =
+  maybe (return ()) useExpression (returnExpression (blockRet bret))
+  >> useDefBlock (blockBody bret)
 
 -- Not so sure about this.
 useDefBlock :: Block SemanticAnns -> UDM AnnotatedErrors ()
 useDefBlock = mapM_ useDefStmt . reverse
 
 useDefStmt :: Statement SemanticAnns -> UDM AnnotatedErrors ()
--- useDefStmt (Declaration ident accK tyS initE _ann)
---   = _
+useDefStmt (Declaration ident _accK tyS initE ann)
+  -- variable def is defined
+  =
+  (SM.location ann) `annotateError`
+  case tyS of
+    Option _ -> defVariableOO ident
+    -- DynamicSubtype _ ->  This is not possible
+    -- Dynamic are only declared on match statements
+    _ -> defVariable ident
+  -- Use everithing in the |initE|
+  >> useExpression initE
 -- All branches should have the same used Only ones.
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
@@ -128,9 +139,101 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   let normalUses = S.unions (map usedSet sets)
   -- We get all defined but not defined variables
   let notUsed = S.unions (map defV sets)
+  --
   continueWith (head usedOO) normalUses notUsed
+useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
+  =
+    -- Iterator body can alloc and free/give memory.
+    -- Interator bode runs with empty UsedOnly and should return it that way.
+    -- It can only use variables /only/ only if they are declared inside the
+    -- iterator body
+    runEncapsulated
+      ( emptyOO
+        >> useDefBlock block
+        >> get
+        >>= \ st ->
+          unless (S.null (usedOnlyOnce st))
+            ((SM.location ann) `annotateError` throwError ForMoreOO)
+          >>
+          return (usedSet st)
+      )
+    -- We add all normal use variables
+    >>= unionUsed
+    -- Definition of iteration varialbe.
+    >> (SM.location ann) `annotateError` defVariable itIdent
+    -- Use expression over begin, end, and break condition.
+    >> maybe (return ()) useExpression mBrk
+    >> useExpression eB
+    >> useExpression eE
+useDefStmt (MatchStmt e mcase ann)
+  =
+  -- Depending on expression |e| type
+  -- we handle OptionDyn special case properly.
+  maybe ((SM.location ann) `annotateError`throwError ImpossibleError)
+  (\case
+    Option (DynamicSubtype _) ->
+      case mcase of
+        [x,y] ->
+          let (mo,mn) = destroyOptionDyn (x,y)
+          in runEncapsEOO [mo,mn]
+        _ -> (SM.location ann) `annotateError` throwError InternalOptionMissMatch;
+    -- Otherwise, it is a simple use variable.
+    _ -> runEncapsEOO (map ( (>> get) . useMCase) mcase);
+      ) (getTypeSAnns ann)
+  >>= \sets ->
+  -- Get all OO sets
+  let usedOO = map usedOnlyOnce sets
+  in
+  -- Should all be the same
+  unless (sameSets usedOO)
+        ((SM.location ann) `annotateError` throwError DifferentOnlyOnceMatch)
+  -- Then continue addin uses
+  >> unionS
+        (head usedOO)
+        (S.unions (map usedSet sets))
+        (S.unions (map defV sets))
+  -- Similar to the case ifElse and For
+  >> useExpression e
+useDefStmt (SingleExpStmt e _ann)
+  = useExpression e
+useDefStmt (Free obj _ann)
+  = useObject obj
+
+destroyOptionDyn
+  :: (MatchCase SemanticAnns, MatchCase SemanticAnns)
+  -> (UDM AnnotatedErrors UDSt , UDM AnnotatedErrors UDSt)
+destroyOptionDyn (ml, mr)
+  =
+  let (mOpt, mNone) = if matchIdentifier ml == "Option" then (ml,mr) else (mr,ml)
+  in
+    ( useDefBlock(matchBody mOpt)
+      >>
+     (SM.location (matchAnnotation mOpt)) `annotateError` defVariableOO (head (matchBVars mOpt))
+     >> get
+    , useDefBlock (matchBody mNone) >> get)
+
+
+-- General case, not when it is Option Dyn
+useMCase :: MatchCase SemanticAnns -> UDM AnnotatedErrors ()
+useMCase (MatchCase _mIdent bvars blk ann)
+  =
+  useDefBlock blk
+  >> (SM.location ann) `annotateError` mapM_ defVariable bvars
 
 -- Same sets
 sameSets :: [VarSet] -> Bool
 sameSets [] = False -- shouldn't happen but :shrug:
 sameSets (x:xs) = all ( S.null . S.difference x) xs
+
+-- Globals
+useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
+useDefFrag (Function _ident ps _ty blk _mods anns)
+ = useDefBlockRet blk >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
+useDefFrag (GlobalDeclaration {}) = return ()
+useDefFrag (TypeDefinition {}) = return ()
+
+runUDFrag :: AnnASTElement SemanticAnns -> Maybe AnnotatedErrors
+runUDFrag =
+  either Just (const Nothing)
+  . fst
+  . runComputation . useDefFrag

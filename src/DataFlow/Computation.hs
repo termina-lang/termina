@@ -24,13 +24,37 @@ data UDSt
          , usedOnlyOnce :: VarSet
          }
 
+emptyUDSt :: UDSt
+emptyUDSt = UDSt S.empty S.empty S.empty S.empty
+
+union :: UDSt -> UDSt -> UDSt
+union (UDSt n1 d1 us1 uoo1) (UDSt n2 d2 us2 uoo2)
+ = UDSt (S.union n1 n2) (S.union d1 d2) (S.union us1 us2) (S.union uoo1 uoo2)
+
 type UDM e = ExceptT e (ST.State UDSt)
 
-continueWith :: VarSet -> VarSet -> VarSet -> UDM e ()
+emptyOO :: UDM e ()
+emptyOO = get >>= \st -> put (st{usedOnlyOnce = S.empty})
+
+unionToState :: UDSt -> UDM e ()
+unionToState st = get >>= put . union st
+
+runComputation :: UDM e a -> (Either e a , UDSt )
+runComputation = flip ST.runState emptyUDSt  . runExceptT
+
+
+continueWith,unionS :: VarSet -> VarSet -> VarSet -> UDM e ()
 continueWith oo uses defs = lift $ ST.put $ UDSt S.empty defs uses oo
+unionS oo uses defs =
+  get >>= \st -> put st{ usedOnlyOnce = S.union oo (usedOnlyOnce st)
+                       , usedSet = S.union uses (usedSet st)
+                       , defV = S.union defs (defV st)}
 
 get :: UDM e UDSt
 get = lift ST.get
+
+put :: UDSt -> UDM e ()
+put = lift . ST.put
 
 gets :: (UDSt -> b) ->  UDM e b
 gets = lift . ST.gets
@@ -45,17 +69,33 @@ runEncapsulated :: UDM e a -> UDM e a
 runEncapsulated m =
   get >>= \st -> m >>= \res -> lift (ST.put st) >> return res
 
+-- This should be a little bit more efficient
+
+runEncapsEOO :: [UDM e a] -> UDM e [a]
+runEncapsEOO ms =
+  get >>= \st ->
+  mapM (withState (const emptyUDSt)) ms >>=
+  (put st >>) . return
+
 runEncaps :: [UDM e a] -> UDM e [a]
 runEncaps ms =
   get >>= \st ->
   mapM (withState (const st)) ms >>= \res ->
-  lift (ST.put st) >> return res
+  put st >> return res
 
 modify :: (UDSt -> UDSt) -> UDM e ()
 modify = lift . ST.modify
 
 unsafeAdd :: Identifier -> VarSet -> VarSet
 unsafeAdd = S.insert
+
+unionUsed :: VarSet -> UDM e ()
+unionUsed vset =
+  modify (\st -> st{usedSet = S.union vset (usedSet st)})
+
+removeUsedOO,removeUsed :: Identifier -> UDSt -> UDSt
+removeUsedOO s st = st{usedOnlyOnce = S.delete s (usedOnlyOnce st)}
+removeUsed s st = st{usedSet = S.delete s (usedSet st)}
 
 safeAdd :: Identifier -> VarSet -> UDM Errors VarSet
 safeAdd ident vset =
@@ -81,16 +121,25 @@ notUsedVar :: Identifier -> UDM Errors ()
 notUsedVar = throwError . NotUsed
 
 -- If we define a variable that was not used, then error.
-defVariable :: Identifier -> UDM Errors ()
+defVariable,defVariableOO :: Identifier -> UDM Errors ()
 defVariable ident =
   gets usedSet >>=
   \i ->
     if S.member ident i
     then
         -- Variable is used, strong assumtions on use!
-        return () -- we can remove it... but maybe it is more expensive.
+        -- return () -- we can remove it... but maybe it is more expensive.
+        modify (removeUsed ident)
     else
         -- Variable |ident| is not used in the rest of the code :(
+        notUsedVar ident
+defVariableOO ident =
+  gets usedOnlyOnce >>=
+  \i ->
+    if S.member ident i
+    then
+        modify (removeUsedOO ident)
+    else
         notUsedVar ident
 -----
 
