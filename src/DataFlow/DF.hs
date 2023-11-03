@@ -20,7 +20,7 @@ import Control.Monad
 import Control.Monad.Except
 
 import qualified Data.Set as S
-import Data.List (all)
+import Data.List (all,foldl')
 
 import AST.Core (Identifier)
 -- AST to work with.
@@ -204,7 +204,7 @@ destroyOptionDyn
   -> (UDM AnnotatedErrors UDSt , UDM AnnotatedErrors UDSt)
 destroyOptionDyn (ml, mr)
   =
-  let (mOpt, mNone) = if matchIdentifier ml == "Option" then (ml,mr) else (mr,ml)
+  let (mOpt, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
   in
     ( useDefBlock(matchBody mOpt)
       >>
@@ -237,3 +237,9 @@ runUDFrag =
   either Just (const Nothing)
   . fst
   . runComputation . useDefFrag
+
+runUDAnnotatedProgram :: AnnotatedProgram  SemanticAnns -> Maybe AnnotatedErrors
+runUDAnnotatedProgram = foldl' (\b a -> maybe (runUDFrag a) Just b) Nothing
+
+runUDTerminaProgram :: TerminaProgram SemanticAnns -> Maybe AnnotatedErrors
+runUDTerminaProgram = runUDAnnotatedProgram . frags

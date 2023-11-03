@@ -23,6 +23,8 @@ import AST.Core
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
+import DataFlow.DF
+
 -- FilePath and IO
 import System.Path
 import System.Path.IO
@@ -187,18 +189,13 @@ main = runCommand $ \opts args ->
                     Right typedAST
                         -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
                         >> when (optPrintASTTyped opts) (print typedAST)
+                        >> maybe
+                            (when (optChatty opts) (print "UseDef Passed"))
+                            (fail . ("UseDef error : " ++) . show)
+                            (runUDAnnotatedProgram typedAST)
                         >> printModule DirMod (optChatty opts) srcDir hdrsDir baseMainName [] typedAST
                         >> print "Perfect ✓"
                        ---
-                        -- maybe -- check this, it sees weird.
-                        --           (TIO.putStrLn (ppHeaderFile [ (T.pack "output") ] [] typedAST))
-                        --           (\fn ->
-                        --             let -- System.Path
-                        --                 header = fn ++ ".h"
-                        --                 source = fn ++ ".c"
-                        --             in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
-                        --             >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
-                        --           ) (optOutputDir opts)
               else do
                 --
                 analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))

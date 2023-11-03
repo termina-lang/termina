@@ -15,9 +15,11 @@ data Errors
   | DifferentOnlyOnceMatch
   | ForMoreOO
   | InternalOptionMissMatch
+  deriving Show
 
 data AnnotatedErrors
   = AnErrors {location :: Annotation , err :: Errors}
+  deriving Show
 
 annError :: Annotation -> Errors -> AnnotatedErrors
 annError = AnErrors
