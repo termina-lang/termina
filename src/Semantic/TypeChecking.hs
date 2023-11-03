@@ -493,18 +493,18 @@ checkFieldValue loc objType (FieldDefinition fid fty) (FieldValueAssignment faid
   then
     SAST.FieldValueAssignment faid <$> (expressionType objType faexp >>= mustBeTy fty)
   else throwError $ annotateError loc (EFieldMissing [fid])
-checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr) =
+checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
-      Location _ -> return $ SAST.FieldAddressAssignment faid addr
+      Location _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
       _ -> throwError $ annotateError loc (EFieldNotFixedLocation fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
-checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection pid sid) =
+checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection pid sid pann) =
   if fid == pid
   then
     case fty of
-      Port _ -> return $ SAST.FieldPortConnection pid sid
+      Port _ -> return $ SAST.FieldPortConnection pid sid (buildExpAnn pann fty)
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 
@@ -519,8 +519,8 @@ checkFieldValues loc objType fds fas = checkSortedFields sorted_fds sorted_fas [
     tError = throwError . annotateError loc
     getFid = \case {
       FieldValueAssignment fid _ -> fid;
-      FieldAddressAssignment fid _ -> fid;
-      FieldPortConnection fid _ -> fid;
+      FieldAddressAssignment fid _ _ -> fid;
+      FieldPortConnection fid _ _ -> fid;
     }
     sorted_fds = Data.List.sortOn fieldIdentifier fds
     sorted_fas = Data.List.sortOn getFid fas

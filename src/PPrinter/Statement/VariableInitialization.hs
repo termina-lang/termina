@@ -113,7 +113,11 @@ ppInitializeStruct subs level target expr =
     -- \| This function can only be called with a field values assignments expressions
     (FieldAssignmentsExpression _ vas _) ->
         vsep $
-            map (\(FieldValueAssignment field expr') -> ppFieldInitializer subs level target (pretty field) expr') vas
+            map (\a -> case a of
+              FieldValueAssignment field expr' -> ppFieldInitializer subs level target (pretty field) expr'
+              FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> target <> pretty "." <> (pretty field) <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi
+              FieldPortConnection field res _ -> target <> pretty "." <> (pretty field) <+> pretty "=" <+> ppCReferenceExpression (pretty res)
+              _ -> error $ "Incorrect annotated assignment expression: " ++ show a) vas
     _ -> error $ "Incorrect initialization expression: " ++ show expr
 
 ppInitializeEnum ::

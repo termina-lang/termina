@@ -240,11 +240,13 @@ fieldAssignmentsExpressionParser = do
       flAddresses = do
             identifier <- identifierParser
             _ <- reservedOp "@"
-            FieldAddressAssignment identifier <$> hexa
+            p' <- getPosition
+            flip (FieldAddressAssignment identifier) (Position p') <$> hexa
       flConnection = do
             identifier <- identifierParser
             _ <- reservedOp "<-"
-            FieldPortConnection identifier <$> identifierParser
+            p' <- getPosition
+            flip (FieldPortConnection identifier) (Position p') <$> identifierParser
 
 -- | Parser for an element modifier
 -- A modifier is of the form:

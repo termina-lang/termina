@@ -1,13 +1,10 @@
-module PPrinter.TypeDef where
+module PPrinter.TypeDef.Declaration where
 
 import Prettyprinter
 
 import AST.Seman
 import PPrinter.Common
-import PPrinter.Statement
-import Semantic.Monad (SemanticAnns)
-import Data.Map (empty)
-
+import Semantic.Monad
 
 ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
@@ -32,65 +29,8 @@ filterStructModifiers = filter (\case
       Modifier "align" _ -> True
       _ -> False)
 
-ppClassProcedureOnEntry :: DocStyle
-ppClassProcedureOnEntry = ppCFunctionCall resourceLock [pretty "self->__resource_id"] <> semi
-
-ppClassProcedureOnExit :: DocStyle
-ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [pretty "self->__resource_id"] <> semi
-
 ppSelfParameter :: Identifier -> DocStyle
 ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> pretty "self"
-
-ppClassFunctionDefinition :: Identifier -> ClassMember SemanticAnns -> DocStyle
-ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
-    -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
-      (
-        -- | Print the self parameter
-        ppSelfParameter classId :
-        -- | Print the rest of the function parameters
-        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
-      )
-      -- | Class procedures do not return anything
-      Nothing
-    <+>
-    -- | Function body
-    braces' (line <>
-      (indentTab . align $
-        vsep (
-          -- | Print the resource lock call
-          [ppClassProcedureOnEntry, emptyDoc] ++
-          -- | Print the function body
-          [ppStatement subs s <> line | s <- blk] ++
-          -- | Print the resource unlock call
-          [ppClassProcedureOnExit, emptyDoc]
-        )
-        -- | Print the empty return statement
-        <> line <> returnC <> semi <> line)
-    ) <> line
-  where
-    subs = ppParameterSubstitutions parameters
-ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _) =
-    -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
-      (
-        -- | Print the self parameter
-        pretty "const" <+> ppSelfParameter classId :
-        -- | Print the rest of the function parameters
-        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
-      )
-      -- | Class viewer return type
-      (Just (ppReturnType (pretty identifier) rts))
-    <+> ppBlockRet (ppParameterSubstitutions parameters) (classFunctionName classId identifier) body <> line
-ppClassFunctionDefinition classId (ClassMethod identifier mrts body _) =
-    -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
-      -- | Print the self parameter
-      [ppSelfParameter classId]
-      -- | Class viewer return type
-      (ppReturnType (pretty identifier) <$> mrts)
-    <+> ppBlockRet empty (classFunctionName classId identifier) body <> line
-ppClassFunctionDefinition _ _ = error "invalid class member"
 
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
@@ -161,12 +101,6 @@ classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
                 ClassProcedure {} -> (fs, ms, member : prs, vws)
                 ClassViewer {} -> (fs, ms, prs, member : vws)
           ) ([],[], [], [])
-
-ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
-ppClassDefinition (Class _ identifier members _) =
-  let (_fields, methods, procedures, viewers) = classifyClassMembers members in
-    vsep $ map (ppClassFunctionDefinition identifier) (methods ++ procedures ++ viewers)
-ppClassDefinition _ = error "AST element is not a class"
 
 -- | TypeDef pretty printer.
 ppTypeDefDeclaration :: TypeDef SemanticAnns -> DocStyle
