@@ -6,7 +6,7 @@ import Options
 import PPrinter
 -- import Control.Applicative
 import Semantic.TypeChecking
-import Semantic.Monad (SemanticAnns)
+import Semantic.Monad
 import Semantic.Errors (ppError) --Printing errors
 
 import Text.Parsec (runParser)
@@ -29,6 +29,7 @@ import System.Path.IO
 
 -- Containers
 import qualified Data.Map.Strict as M
+import PPrinter.Application.Initialization (ppInitFile)
 
 data MainOptions = MainOptions
   { optREPL :: Bool
@@ -130,6 +131,16 @@ printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
         SrcFile -> dd </> mName
     (cFile,hFile) = (fileRoute srcdir <.> FileExt "c", fileRoute hdrsdir <.> FileExt "h")
 
+printInitFile :: Bool -> Path Absolute -> [(ModuleName, [SAST.Global SemanticAnns])] -> IO ()
+printInitFile chatty targetDir globals = do
+  when chatty $ print "Creating init file"
+  createDirectoryIfMissing True targetDir
+  iExists <- doesFileExist initFile
+  when (iExists) (renameFile initFile (initFile <.> FileExt "bkp"))
+  writeStrictText initFile (render $ ppInitFile globals)
+  where
+    initFile = targetDir </> fragment "init" <.> FileExt "c"
+
 main :: IO ()
 main = runCommand $ \opts args ->
     if optREPL opts then
@@ -153,8 +164,8 @@ main = runCommand $ \opts args ->
               -- Prepare stuff to print.
               -- A little bit nonsense to do it here.
               -- But we need it.
-              (srcDir, hdrsDir) <-
-                     (\i -> (i </> fragment "src",i </> fragment "include")) <$>
+              (outputDir, srcDir, hdrsDir) <-
+                     (\i -> (i, i </> fragment "src",i </> fragment "include")) <$>
                     (case optOutputDir opts of
                       Nothing -> return rootDir
                       Just fp -> do
@@ -217,6 +228,8 @@ main = runCommand $ \opts args ->
                       mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
                       printModule moduleMode (optChatty opts) srcDir hdrsDir mName depModes (frags $ typedModule $ moduleData mTyped))
                       (M.toList typedProject)
+                let globals = map (\(mName, mTyped) -> (mName, [g | (GlobalDeclaration g) <- frags $ typedModule $ moduleData mTyped])) $ M.toList typedProject
+                printInitFile (optChatty opts) outputDir globals
                 whenChatty opts $ print "Finished PProject"
                 ----------------------------------------
             ----------------------------------------
