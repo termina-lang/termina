@@ -6,10 +6,14 @@ import AST.Core (Identifier)
 
 import Parser.Parsing (Annotation)
 
+import Semantic.Monad (SemanticAnns)
+
 data Errors
   = SetMaxBound
   | ImpossibleError
+  | ImpossibleErrorMatchGetType
   | NotUsed Identifier
+  | NotUsedOO Identifier
   | UsingTwice Identifier
   | DifferentOnlyOnce
   | DifferentOnlyOnceMatch

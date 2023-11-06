@@ -12,6 +12,8 @@ import Control.Monad.Except as E
 import Control.Monad
 import Control.Monad.Trans
 
+import Debug.Termina
+
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
@@ -117,12 +119,12 @@ addUseOnlyOnce ident = get >>= \udst
 
 -- This function eventually produces an error.
 -- We collect all unused variables and produce an Error.
-notUsedVar :: Identifier -> UDM Errors ()
-notUsedVar = throwError . NotUsed
+-- notUsedVar :: Identifier -> UDM Errors ()
+-- notUsedVar = throwError . NotUsed
 
 -- If we define a variable that was not used, then error.
 defVariable,defVariableOO :: Identifier -> UDM Errors ()
-defVariable ident =
+defVariable ident = showMsgVal ("DefVar " ++ ident) $
   gets usedSet >>=
   \i ->
     if S.member ident i
@@ -132,15 +134,15 @@ defVariable ident =
         modify (removeUsed ident)
     else
         -- Variable |ident| is not used in the rest of the code :(
-        notUsedVar ident
-defVariableOO ident =
+        throwError (NotUsed ident)
+defVariableOO ident = showMsgVal ("DefVarOO " ++ ident) $
   gets usedOnlyOnce >>=
   \i ->
     if S.member ident i
     then
         modify (removeUsedOO ident)
     else
-        notUsedVar ident
+        throwError (NotUsedOO ident)
 -----
 
 annotateError :: Annotation -> UDM Errors a -> UDM AnnotatedErrors a

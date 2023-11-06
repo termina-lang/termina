@@ -16,6 +16,8 @@ statement and build our sets backwards.
 import           DataFlow.Computation
 import           DataFlow.Errors
 
+import Annotations
+
 import           Control.Monad
 import           Control.Monad.Except
 
@@ -28,8 +30,10 @@ import           AST.Core             (Identifier)
 import           AST.Seman            as SAST
 -- We need to know the type of objects.
 import qualified Semantic.Monad       as SM (location)
-import           Semantic.Monad       (SemanticAnns (..), getTypeSAnns)
+import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns)
 
+
+import Debug.Termina
 
 -- Constant expression could be global variables, should we check they are used
 -- too?
@@ -38,19 +42,24 @@ useConstE = const (return ())
 
 useObject :: Object SemanticAnns -> UDM AnnotatedErrors ()
 useObject (Variable ident ann)
-  = let loc = SM.location ann in
+  =
+  let loc = SM.location ann in
   maybe
         (loc `annotateError` throwError ImpossibleError)
         (\case {
             -- We can use dynamic only once!
                 DynamicSubtype _ ->
+                showMsgVal ("Dyn using variable: " ++ show ident) $
                 loc `annotateError` addUseOnlyOnce ident
                 ;
             -- We can use Options only once!
                 Option _ ->
+                showMsgVal ("Opt using variable: " ++ show ident) $
                 loc  `annotateError` addUseOnlyOnce ident
                 ;
+            -- Mutable Options??
                 _ ->
+                showMsgVal ("Rest using variable: " ++ show ident) $
                 loc `annotateError` safeAddUse ident
         }) (getTypeSAnns ann)
 useObject (VectorIndexExpression obj e _ann)
@@ -91,9 +100,10 @@ useExpression (MemberFunctionAccess obj ident args ann)
   >> (annotateError (SM.location ann)
      $ case args of
         -- I don't think we can have expression computing variables here.
-        [(ReferenceExpression Mutable (Variable avar _anni) _ann)] ->
+        [ReferenceExpression Mutable (Variable avar _anni) _ann] ->
           defVariableOO avar
         _ -> throwError ImpossibleErrorBadAllocArg)
+  >> mapM_ useExpression args
   -- other functions
   | otherwise
   = useObject obj >> mapM_ useExpression args
@@ -178,20 +188,24 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
     >> useExpression eB
     >> useExpression eE
 useDefStmt (MatchStmt e mcase ann)
-  =
+  = showMsgVal "Match Pattern" $
+  -- Similar to the case ifElse and For
+  showMsgVal ("UseExpr " ++ show e) (useExpression e)
+  >>
   -- Depending on expression |e| type
   -- we handle OptionDyn special case properly.
-  maybe ((SM.location ann) `annotateError`throwError ImpossibleError)
-  (\case
-    Option (DynamicSubtype _) ->
-      case mcase of
-        [x,y] ->
-          let (mo,mn) = destroyOptionDyn (x,y)
-          in runEncapsEOO [mo,mn]
-        _ -> (SM.location ann) `annotateError` throwError InternalOptionMissMatch;
-    -- Otherwise, it is a simple use variable.
-    _ -> runEncapsEOO (map ( (>> get) . useMCase) mcase);
-      ) (getTypeSAnns ann)
+  maybe ((SM.location ann) `annotateError`throwError ImpossibleErrorMatchGetType)
+    (\case
+        Option (DynamicSubtype _) ->
+          case mcase of
+            [x,y] ->
+              let (mo,mn) = destroyOptionDyn (x,y)
+              in runEncapsEOO [mo,mn]
+            _ -> (SM.location ann) `annotateError` throwError InternalOptionMissMatch;
+        -- Otherwise, it is a simple use variable.
+        _ -> runEncapsEOO (map ( (>> get) . useMCase) mcase);
+    )
+    (getResultingType $ ty_ann $ getAnnotation e)
   >>= \sets ->
   -- Get all OO sets
   let usedOO = map usedOnlyOnce sets
@@ -204,8 +218,6 @@ useDefStmt (MatchStmt e mcase ann)
         (head usedOO)
         (S.unions (map usedSet sets))
         (S.unions (map defV sets))
-  -- Similar to the case ifElse and For
-  >> useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 useDefStmt (Free obj _ann)
