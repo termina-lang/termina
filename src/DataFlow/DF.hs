@@ -13,21 +13,22 @@ statement and build our sets backwards.
 -}
 
 -- Monad and manipulations
-import DataFlow.Computation
-import DataFlow.Errors
+import           DataFlow.Computation
+import           DataFlow.Errors
 
-import Control.Monad
-import Control.Monad.Except
+import           Control.Monad
+import           Control.Monad.Except
 
-import qualified Data.Set as S
-import Data.List (all,foldl')
+import           Data.List            (all, find, foldl')
+import           Data.Maybe
+import qualified Data.Set             as S
 
-import AST.Core (Identifier)
+import           AST.Core             (Identifier)
 -- AST to work with.
-import AST.Seman as SAST
+import           AST.Seman            as SAST
 -- We need to know the type of objects.
-import Semantic.Monad (SemanticAnns(..), getTypeSAnns)
-import qualified Semantic.Monad as SM (location)
+import qualified Semantic.Monad       as SM (location)
+import           Semantic.Monad       (SemanticAnns (..), getTypeSAnns)
 
 
 -- Constant expression could be global variables, should we check they are used
@@ -37,8 +38,7 @@ useConstE = const (return ())
 
 useObject :: Object SemanticAnns -> UDM AnnotatedErrors ()
 useObject (Variable ident ann)
-  =
-  let loc = SM.location ann in
+  = let loc = SM.location ann in
   maybe
         (loc `annotateError` throwError ImpossibleError)
         (\case {
@@ -59,8 +59,9 @@ useObject (MemberAccess obj _i _ann)
   = useObject obj
 useObject (Dereference obj _ann)
   = useObject obj
-useObject (DereferenceMemberAccess obj _i _ann)
-  = useObject obj
+useObject (DereferenceMemberAccess obj i ann)
+  = (SM.location ann) `annotateError` safeAddUse i
+  >> useObject obj
 useObject (VectorSliceExpression obj eB eT _ann)
   = useObject obj >> useConstE eB >> useConstE eT
 -- TODO Use Object undyn?
@@ -83,7 +84,18 @@ useExpression (ReferenceExpression _aK obj _a)
   = useObject obj
 useExpression (Casting e _ty _a)
   = useExpression e
-useExpression (MemberFunctionAccess obj _ident args _ann)
+useExpression (MemberFunctionAccess obj ident args ann)
+  -- when requesting stuff from a pool with alloc.
+  | ident == "alloc"
+  =  useObject obj
+  >> (annotateError (SM.location ann)
+     $ case args of
+        -- I don't think we can have expression computing variables here.
+        [(ReferenceExpression Mutable (Variable avar _anni) _ann)] ->
+          defVariableOO avar
+        _ -> throwError ImpossibleErrorBadAllocArg)
+  -- other functions
+  | otherwise
   = useObject obj >> mapM_ useExpression args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
   = useObject obj >> mapM_ useExpression args
@@ -95,7 +107,7 @@ useExpression (EnumVariantExpression _ident _ident2 es _ann)
   = mapM_ useExpression es
 useExpression (OptionVariantExpression opt _ann)
   = case opt of
-        None -> return ()
+        None   -> return ()
         Some e -> useExpression e
 
 
@@ -117,7 +129,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
     Option _ -> defVariableOO ident
     -- DynamicSubtype _ ->  This is not possible
     -- Dynamic are only declared on match statements
-    _ -> defVariable ident
+    _        -> defVariable ident
   -- Use everithing in the |initE|
   >> useExpression initE
 -- All branches should have the same used Only ones.
@@ -222,24 +234,61 @@ useMCase (MatchCase _mIdent bvars blk ann)
 
 -- Same sets
 sameSets :: [VarSet] -> Bool
-sameSets [] = False -- shouldn't happen but :shrug:
+sameSets []     = False -- shouldn't happen but :shrug:
 sameSets (x:xs) = all ( S.null . S.difference x) xs
+
+useDefCMemb :: ClassMember SemanticAnns -> UDM AnnotatedErrors ()
+useDefCMemb (ClassField fdef ann)
+  = (SM.location ann) `annotateError` defVariable (fieldIdentifier fdef)
+useDefCMemb (ClassMethod _ident _tyret bret _ann)
+  = useDefBlockRet bret
+useDefCMemb (ClassProcedure _ident ps blk ann)
+  = useDefBlock blk
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
+useDefCMemb (ClassViewer _ident ps _tyret bret ann)
+  = useDefBlockRet bret
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
+
+useDefTypeDef :: TypeDef SemanticAnns -> UDM AnnotatedErrors ()
+useDefTypeDef (Class _k _id members _mods)
+  -- First we go through uses
+  = mapM_ useDefCMemb muses
+  -- Then all definitions (ClassFields)
+  >> mapM_ useDefCMemb mdefs
+  where
+    (muses,mdefs) = foldr (\m (u,d)->
+                             case m of {
+                               ClassField {} -> (u, m:d);
+                               _             -> (m:u, d)
+                                       }) ([],[]) members
+useDefTypeDef (Struct {}) = return ()
+useDefTypeDef (Enum {}) = return ()
 
 -- Globals
 useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
- = useDefBlockRet blk >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
-useDefFrag (GlobalDeclaration {}) = return ()
-useDefFrag (TypeDefinition {}) = return ()
+ = useDefBlockRet blk
+ >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
+useDefFrag (GlobalDeclaration {})
+  = return ()
+useDefFrag (TypeDefinition tyDef _ann)
+  = (useDefTypeDef tyDef)
 
 runUDFrag :: AnnASTElement SemanticAnns -> Maybe AnnotatedErrors
 runUDFrag =
   either Just (const Nothing)
   . fst
-  . runComputation . useDefFrag
+  . runComputation
+  . useDefFrag
 
 runUDAnnotatedProgram :: AnnotatedProgram  SemanticAnns -> Maybe AnnotatedErrors
-runUDAnnotatedProgram = foldl' (\b a -> maybe (runUDFrag a) Just b) Nothing
+runUDAnnotatedProgram
+  = safeHead
+  . filter isJust
+  . map runUDFrag
+  where
+    safeHead []     = Nothing
+    safeHead (x:xs) = x
 
 runUDTerminaProgram :: TerminaProgram SemanticAnns -> Maybe AnnotatedErrors
 runUDTerminaProgram = runUDAnnotatedProgram . frags

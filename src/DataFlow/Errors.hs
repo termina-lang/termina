@@ -15,6 +15,7 @@ data Errors
   | DifferentOnlyOnceMatch
   | ForMoreOO
   | InternalOptionMissMatch
+  | ImpossibleErrorBadAllocArg
   deriving Show
 
 data AnnotatedErrors
