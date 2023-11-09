@@ -57,12 +57,15 @@ instance Ord RTEMSGlobal where
     compare (RTEMSHandler {}) _ = LT
     compare (RTEMSResource {}) _ = LT
 
-
+-- | Returns the value of the "priority" modifier, if present in the list of modifiers.
+-- If not, it returns 255, which is the default value for the priority (the lowest).
 getPriority :: [Modifier] -> Integer
 getPriority [] = 255
 getPriority ((Modifier "priority" (Just (KC (I _ priority)))) : _) = priority
 getPriority (_ : modifiers) = getPriority modifiers
 
+-- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
+-- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
 getStackSize :: [Modifier] -> Integer
 getStackSize [] = 4096
 getStackSize ((Modifier "stack_size" (Just (KC (I _ stackSize)))) : _) = stackSize
@@ -94,20 +97,30 @@ addDependencies :: S.Set RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Se
 addDependencies newGlbs Nothing = Just newGlbs
 addDependencies newGlbs (Just prevGlbs) = Just (S.union newGlbs prevGlbs)
 
-
-ppRTEMSTaskCode :: RTEMSGlobal -> DocStyle
-ppRTEMSTaskCode (RTEMSTask identifier (Class _ classId _ _) _ _ _) = staticC <+>
-    ppCFunctionPrototype (namefy (pretty "rtems_task") <::> pretty identifier) [pretty "rtems_task_argument ignored"] (Just (pretty "rtems_task")) <+>
+-- | Prints the code of the RTEMS tasks that will execute a Termina task.
+-- The RTEMS task will implement the main loop of the task. This loop
+-- will call the run() method of the Termina task, and will handle the
+-- return value. If the value is Abort, the task will call
+-- rtems_shutdown_executive() to termine the application. If the value
+-- is Finish, the task will call rtems_task_delete() to terminate itself.
+-- Otherwise, the task will call the run() method again.
+ppRTEMSTaskCode :: TypeDef SemanticAnns -> DocStyle
+ppRTEMSTaskCode (Class _ classId _ _) = staticC <+>
+    ppCFunctionPrototype (namefy (pretty "rtems_task") <::> pretty classId) [pretty "rtems_task_argument arg"] (Just (pretty "rtems_task")) <+>
         braces' (line <>
             (indentTab . align $
                 vsep [
-                    pretty classId <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
+                    -- ClassIdentifier self = &task_identifier;
+                    pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> parens (pretty classId <+> pretty "*") <> pretty "arg" <> semi,
                     emptyDoc,
+                    -- TaskRet ret = TaskRet__Continue;
                     pretty "TaskRet ret" <+> pretty "=" <+> pretty "TaskRet" <::> pretty "Continue" <> semi,
                     emptyDoc,
+                    -- for (;;)
                     ppCInfiniteLoop (
                         vsep [
                             emptyDoc,
+                            -- ret = ClassId__run(self);
                             pretty "ret" <+> pretty "=" <+>  ppCFunctionCall (taskRunMethodName classId) [pretty "self"] <> semi,  emptyDoc,
                             ppCIfBlock (pretty "ret" <+> pretty "==" <+> pretty "TaskRet" <::> pretty "Abort") (vsep [pretty "break" <> semi, emptyDoc]) <+>
                             ppCElseIfBlock (pretty "ret" <+> pretty "==" <+> pretty "TaskRet" <::> pretty "Finish") (vsep [pretty "rtems_task_delete(RTEMS_SELF)" <> semi, emptyDoc]) <+>
@@ -124,31 +137,33 @@ ppRTEMSTaskCode obj = error $ "Invalid global object (not a task): " ++ show obj
 
 ppInitResource :: RTEMSGlobal -> DocStyle
 ppInitResource (RTEMSResource identifier cls@(Class _ classId _ _) _) = vsep $
-    (pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi) : 
+    (pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi) :
     if hasInitMethod cls then
         [
+            emptyDoc,
             pretty "result" <+> pretty "=" <+> ppCFunctionCall (classFunctionName (pretty classId) (pretty "init")) [ppCReferenceExpression (pretty identifier)] <> semi,
             emptyDoc,
-            ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-            emptyDoc
+            ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
         ]
     else []
 ppInitResource obj = error $ "Invalid global object (not a resource): " ++ show obj
 
 ppInitTask :: RTEMSGlobal -> DocStyle
 ppInitTask (RTEMSTask identifier cls@(Class _ classId _ _) priority stackSize _) = vsep $
+    [
+        emptyDoc,
+        pretty identifier <> pretty ".__task_id.priority" <+> pretty "=" <+> pretty (show priority) <> semi,
+        pretty identifier <> pretty ".__task_id.stack_size" <+> pretty "=" <+> pretty (show stackSize) <> semi,
+        pretty identifier <> pretty ".__task_id.entry" <+> pretty "=" <+> (namefy (pretty "rtems_task") <::> pretty classId) <> semi,
+        pretty identifier <> pretty ".__task_id.argument" <+> pretty "=" <+> parens (pretty "rtems_task_argument") <> ppCReferenceExpression (pretty identifier) <> semi
+    ] ++
     (if hasInitMethod cls then
         [
             pretty "result" <+> pretty "=" <+> ppCFunctionCall (classFunctionName (pretty classId) (pretty "init")) [ppCReferenceExpression (pretty identifier)] <> semi,
             emptyDoc,
-            ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-            emptyDoc
+            ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
         ]
-    else []) ++
-    [
-        pretty identifier <> pretty ".__task_id.priority" <+> pretty "=" <+> pretty (show priority) <> semi,
-        pretty identifier <> pretty ".__task_id.stack_size" <+> pretty "=" <+> pretty (show stackSize) <> semi
-    ]
+    else [])
 ppInitTask obj = error $ "Invalid global object (not a task): " ++ show obj
 
 ppCreateTask :: RTEMSGlobal -> DocStyle
@@ -158,7 +173,6 @@ ppCreateTask (RTEMSTask identifier _ _ _ _) = vsep
         emptyDoc,
         ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
         emptyDoc
-        
     ]
 ppCreateTask obj = error $ "Invalid global object (not a task): " ++ show obj
 
@@ -173,13 +187,16 @@ ppInstallHandler (RTEMSHandler identifier _ vector _) = vsep
 ppInstallHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
 
 ppInitHandler :: RTEMSGlobal -> DocStyle
-ppInitHandler (RTEMSHandler identifier _ vector _) = vsep
-    [
-        pretty "result" <+> pretty "=" <+> ppCFunctionCall (namefy $ pretty "rtems_runtime" <::> pretty "install_handler") [ppCReferenceExpression (pretty identifier <> pretty ".__handler_id"), pretty (show vector)] <> semi,
-        emptyDoc,
-        ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-        emptyDoc
-    ]
+ppInitHandler (RTEMSHandler identifier cls@(Class _ classId _ _) _ _) = vsep $
+    if hasInitMethod cls then
+        [
+            emptyDoc,
+            pretty "result" <+> pretty "=" <+> ppCFunctionCall (classFunctionName (pretty classId) (pretty "init")) [ppCReferenceExpression (pretty identifier)] <> semi,
+            emptyDoc,
+            ppCIfBlock (pretty "result" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+            emptyDoc
+        ]
+    else []
 ppInitHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
 
 ppRTEMSHandlerCode :: RTEMSGlobal -> DocStyle
@@ -223,13 +240,13 @@ ppMainFile prjprogs =
         pretty "#include <termina.h>"
     ] ++
     [includes incs] ++
-    [ppRTEMSTaskCode task | task@(RTEMSTask {}) <- rtemsGlbs] ++
+    map ppRTEMSTaskCode (M.elems taskClss) ++
     [ppRTEMSHandlerCode handler | handler@(RTEMSHandler {}) <- rtemsGlbs] ++
     [
-        -- | Function __rtems_glb__enable_protection. This function is called from the Init task.
+        -- | Function __rtems_app__enable_protection. This function is called from the Init task.
         -- It enables the protection of the shared resources when needed. In case the resource uses a mutex,
         -- it also initializes the mutex. The function is called AFTER the initialization of the tasks and handlers.
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_glb" <::> pretty "enable_protection") [] Nothing <+>
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "enable_protection") [] Nothing <+>
         braces' (line <>
             (indentTab . align $
                 vsep (
@@ -238,16 +255,16 @@ ppMainFile prjprogs =
             ) <> line
         ),
         emptyDoc,
-        -- | Function __rtems_glb__init_resources. This function is called from the Init task.
+        -- | Function __rtems_app__init_resources. This function is called from the Init task.
         -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
         -- the protection of the global resources, since it is not needed when running in the Init task. It also
         -- executes the init() method of the resources if defined.
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_glb" <::> pretty "init_resources") [] Nothing <+>
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] Nothing <+>
         braces' (line <>
             (indentTab . align $
-                vsep $ 
+                vsep $
                 (
-                    if any hasInitMethod [cls | (RTEMSResource _ cls _) <- rtemsGlbs] then 
+                    if any hasInitMethod [cls | (RTEMSResource _ cls _) <- rtemsGlbs] then
                     [
                         pretty "Result" <+> pretty "result" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
                         emptyDoc
@@ -256,44 +273,45 @@ ppMainFile prjprogs =
             ) <> line
         ),
         emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_glb" <::> pretty "init_tasks") [] Nothing <+>
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] Nothing <+>
         braces' (line <>
             (indentTab . align $
-                vsep $
-                [
-                    pretty "Result" <+> pretty "result" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                    emptyDoc
-                ] ++ [ppInitTask task | task@(RTEMSTask {}) <- rtemsGlbs]
+                vsep $ (pretty "Result" <+> pretty "result" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi) :
+                    [ppInitTask task | task@(RTEMSTask {}) <- rtemsGlbs]
             ) <> line
         ),
         emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_glb" <::> pretty "init_handlers") [] Nothing <+>
-        braces' (line <>
-            (indentTab . align $
-                vsep $ 
-                (
-                    if any hasInitMethod [cls | (RTEMSHandler _ cls _ _) <- rtemsGlbs] then 
-                    [
-                        pretty "Result" <+> pretty "result" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                        emptyDoc
-                    ] else [emptyDoc]
-                ) ++ [ppInitHandler handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
-            ) <> line
-        ),
-        emptyDoc,
+        if any hasInitMethod [cls | (RTEMSHandler _ cls _ _) <- rtemsGlbs] then
+            staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep $ (pretty "Result" <+> pretty "result" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi) : 
+                            [ppInitHandler handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
+                    ) <> line
+                ) <> line else emptyDoc,
+        -- | RTEMS Init task
         ppCFunctionPrototype (pretty "Init") [pretty "rtems_task_argument ignored"] (Just (pretty "rtems_task")) <+>
         braces' (line <>
             (indentTab . align $
                 vsep $
                 [
-                    ppCFunctionCall (namefy $ pretty "rtems_glb" <::> pretty "init_resources") [] <> semi,
+                    ppCFunctionCall (namefy $ pretty "termina_app" <::> pretty "init_globals") [] <> semi,
                     emptyDoc,
-                    ppCFunctionCall (namefy $ pretty "rtems_glb" <::> pretty "init_handlers") [] <> semi,
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] <> semi,
+                    emptyDoc
+                ] ++ 
+                (if any hasInitMethod [cls | (RTEMSHandler _ cls _ _) <- rtemsGlbs] then
+                    [
+                        ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] <> semi,
+                        emptyDoc
+                    ] else [])
+                ++ [
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] <> semi,
                     emptyDoc,
-                    ppCFunctionCall (namefy $ pretty "rtems_glb" <::> pretty "init_tasks") [] <> semi,
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "enable_protection") [] <> semi,
                     emptyDoc
                 ] ++ [ppInstallHandler handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
-                ++ [ppCreateTask task | task@(RTEMSTask {}) <- rtemsGlbs]
+                ++ [ppCreateTask task | task@(RTEMSTask {}) <- rtemsGlbs]
                 ++ [ppCFunctionCall (pretty "rtems_task_delete") [pretty "RTEMS_SELF"] <> semi]
             ) <> line
         )
@@ -317,6 +335,11 @@ ppMainFile prjprogs =
         incs = map (\(nm, mm, _) -> (nm, mm)) glbs
         -- List of RTEMS global declarations (tasks, handlers and resources)
         rtemsGlbs = concatMap (\(_, _, objs) -> map (flip buildRTEMSGlobal classMap) objs) glbs
+        -- List of used task classes
+        taskClss = foldr (\glb acc -> case glb of
+                RTEMSTask _ cls@(Class _ classId _ _) _ _ _ -> if M.member classId acc then acc else M.insert classId cls acc
+                _ -> acc
+            ) M.empty rtemsGlbs
         -- Map between the resources and the task and handlers that access them
         dependenciesMap = foldr
                 (\glb accMap ->
