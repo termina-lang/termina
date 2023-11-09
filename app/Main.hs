@@ -19,7 +19,7 @@ import Control.Monad
 import Modules.Modules
 import Modules.Typing
 import qualified Modules.Printing  as MPP
-import AST.Core
+
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
@@ -30,6 +30,7 @@ import System.Path.IO
 -- Containers
 import qualified Data.Map.Strict as M
 import PPrinter.Application.Initialization (ppInitFile)
+import PPrinter.Application.OS.RTEMSNOEL (ppMainFile)
 
 data MainOptions = MainOptions
   { optREPL :: Bool
@@ -116,8 +117,8 @@ printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
   -- Folder checking and creation
   when chatty $ print "Creating Project folders."
   -- Creating resulting project Folder Structure
-  createDirectoryIfMissing True (takeDirectory (fileRoute srcdir))
-  createDirectoryIfMissing True (takeDirectory (fileRoute hdrsdir))
+  createDirectoryIfMissing True (takeDirectory (srcFileRoute srcdir))
+  createDirectoryIfMissing True (takeDirectory (hdrFileRoute hdrsdir))
   -- Now, both files are no more.
   when chatty $ print $ "Writing to" ++ show hFile
   let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName
@@ -125,21 +126,35 @@ printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
   when chatty $ print $ "Writing to" ++ show cFile
   writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
   where
-    fileRoute dd =
+    srcFileRoute dd =
       case mMode of
         DirMod -> dd </> mName </> fragment "src"
         SrcFile -> dd </> mName
-    (cFile,hFile) = (fileRoute srcdir <.> FileExt "c", fileRoute hdrsdir <.> FileExt "h")
+    hdrFileRoute dd =
+      case mMode of
+        DirMod -> dd </> mName </> fragment "header"
+        SrcFile -> dd </> mName
+    (cFile,hFile) = (srcFileRoute srcdir <.> FileExt "c", hdrFileRoute hdrsdir <.> FileExt "h")
 
-printInitFile :: Bool -> Path Absolute -> [(ModuleName, [SAST.Global SemanticAnns])] -> IO ()
-printInitFile chatty targetDir globals = do
+printInitFile :: Bool -> Path Absolute -> [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> IO ()
+printInitFile chatty targetDir prjprogs = do
   when chatty $ print "Creating init file"
   createDirectoryIfMissing True targetDir
   iExists <- doesFileExist initFile
-  when (iExists) (renameFile initFile (initFile <.> FileExt "bkp"))
-  writeStrictText initFile (render $ ppInitFile globals)
+  when iExists (renameFile initFile (initFile <.> FileExt "bkp"))
+  writeStrictText initFile (render $ ppInitFile prjprogs)
   where
     initFile = targetDir </> fragment "init" <.> FileExt "c"
+
+printMainFile :: Bool -> Path Absolute -> [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> IO ()
+printMainFile chatty targetDir prjprogs = do
+  when chatty $ print "Creating main file"
+  createDirectoryIfMissing True targetDir
+  iExists <- doesFileExist mainFile
+  when iExists (renameFile mainFile (mainFile <.> FileExt "bkp"))
+  writeStrictText mainFile (render $ ppMainFile prjprogs)
+  where
+    mainFile = targetDir </> fragment "main" <.> FileExt "c"
 
 main :: IO ()
 main = runCommand $ \opts args ->
@@ -175,62 +190,38 @@ main = runCommand $ \opts args ->
                         unless exists (fail "Output Folder does not exist.")
                         return p)
               --
-              if M.size mapProject == 1
-                -- Single file project.
-                -- so we can still use it :sweat_smile: until the other part is done.
-              then
-                let
-                  tAST = frags terminaMain
-                in case typeCheckRun tAST of
+              analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))
+              let toModuleAST = M.map mAstFromPair mapProject
+              -- Let's make it interactive (for the use)
+              -- typedProject :: Map ModuleName (ModuleAST TypedModule)
+              typedProject <- foldM (\env m -> do
+                   whenChatty opts $ print ("Type Checking Module: " ++ show m)
+                   case typeModule toModuleAST m env of
                     Left err ->
-                      TIO.putStr (render (ppError err)) >> fail "Type Check Error Fin."
-                    Right typedAST
-                        -> when (optPrintAST opts) (print tAST) >> print (optPrintAST opts)
-                        >> when (optPrintASTTyped opts) (print typedAST)
-                        >> printModule DirMod (optChatty opts) srcDir hdrsDir baseMainName [] typedAST
-                        >> print "Perfect ✓"
-                       ---
-                        -- maybe -- check this, it sees weird.
-                        --           (TIO.putStrLn (ppHeaderFile [ (T.pack "output") ] [] typedAST))
-                        --           (\fn ->
-                        --             let -- System.Path
-                        --                 header = fn ++ ".h"
-                        --                 source = fn ++ ".c"
-                        --             in TIO.writeFile header (ppHeaderFile [T.pack fn] [] typedAST)
-                        --             >> TIO.writeFile source (ppSourceFile [T.pack fn] typedAST)
-                        --           ) (optOutputDir opts)
-              else do
-                --
-                analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))
-                let toModuleAST = M.map mAstFromPair mapProject
-                -- Let's make it interactive (for the use)
-                -- typedProject :: Map ModuleName (ModuleAST TypedModule)
-                typedProject <- foldM (\env m -> do
-                     whenChatty opts $ print ("Type Checking Module: " ++ show m)
-                     case typeModule toModuleAST m env of
-                      Left err ->
-                        print "--------" >>
-                        TIO.putStrLn (render (MPP.ppModError err)) >>
-                        fail ("[FAIL]")
-                      Right typedM ->
-                        whenChatty opts (print " >> [DONE]")
-                        >> return (M.insert m typedM env)
-                     ) M.empty (analyzeOrd ++ [baseMainName])
-                whenChatty opts $ print "Finished Module typing"
-                ----------------------------------------
-                -- Printing Project
-                whenChatty opts $ print "Printing Project"
-                mapM_ (\(mName,mTyped) ->
-                      --  Get deps modes
-                      maybe (fail "Internal error: missing modulename in mapProject")
-                          (return . snd3) (M.lookup mName mapProject)
-                      >>= \moduleMode ->
-                      mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
-                      printModule moduleMode (optChatty opts) srcDir hdrsDir mName depModes (frags $ typedModule $ moduleData mTyped))
-                      (M.toList typedProject)
-                let globals = map (\(mName, mTyped) -> (mName, [g | (GlobalDeclaration g) <- frags $ typedModule $ moduleData mTyped])) $ M.toList typedProject
-                printInitFile (optChatty opts) outputDir globals
-                whenChatty opts $ print "Finished PProject"
+                      print "--------" >>
+                      TIO.putStrLn (render (MPP.ppModError err)) >>
+                      fail "[FAIL]"
+                    Right typedM ->
+                      whenChatty opts (print " >> [DONE]")
+                      >> return (M.insert m typedM env)
+                   ) M.empty (analyzeOrd ++ [baseMainName])
+              whenChatty opts $ print "Finished Module typing"
+              ----------------------------------------
+              -- Printing Project
+              whenChatty opts $ print "Printing Project"
+              mapM_ (\(mName,mTyped) ->
+                    --  Get deps modes
+                    maybe (fail "Internal error: missing modulename in mapProject")
+                        (return . snd3) (M.lookup mName mapProject)
+                    >>= \moduleMode ->
+                    mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
+                      printModule moduleMode (optChatty opts) srcDir hdrsDir mName depModes (SAST.frags $ typedModule $ moduleData mTyped))
+                    (M.toList typedProject)
+              allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mMode,_) -> return (mName, mMode, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
+              let prjprogs = map (\(mName, mMode, mTyped) -> (mName, mMode, SAST.frags $ typedModule $ moduleData mTyped)) allModules
+              printInitFile (optChatty opts) outputDir prjprogs
+              printMainFile (optChatty opts) outputDir prjprogs
+              whenChatty opts $ print "Finished PProject"
                 ----------------------------------------
             ----------------------------------------
             -- Wrong arguments Errors

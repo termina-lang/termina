@@ -13,22 +13,22 @@ ppInitializeVectorFromExpression ::
   TypeSpecifier ->
   DocStyle
 ppInitializeVectorFromExpression level target source ts =
-  let iterator = namefy ("i" ++ show level)
+  let iterator = namefy $ pretty ("i" ++ show level)
    in case ts of
         -- \| If the initializer is a vector, we must iterate
         (Vector ts' (K size)) ->
           let initExpr =
                 ppCForLoopInitExpression
                   (ppTypeSpecifier USize)
-                  (pretty iterator)
+                  iterator
                   (pretty (show (0 :: Integer)))
               condExpr =
-                  pretty iterator <+> pretty "<" <+> pretty size
+                  iterator <+> pretty "<" <+> pretty size
               incrExpr =
                   ppCForLoopIncrExpression
-                  (pretty iterator)
+                  iterator
                   (pretty (show (1 :: Integer)))
-              in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets (pretty iterator)) (source <> brackets (pretty iterator)) ts')
+              in ppCForLoop initExpr condExpr incrExpr (ppInitializeVectorFromExpression (level + 1) (target <> brackets iterator) (source <> brackets iterator) ts')
         _ -> target <+> pretty "=" <+> source <> semi
 
 ppInitializeVector ::
@@ -43,7 +43,7 @@ ppInitializeVector ::
   Expression SemanticAnns ->
   DocStyle
 ppInitializeVector subs level target expr =
-  let iterator = namefy ("i" ++ show level)
+  let iterator = namefy $ pretty ("i" ++ show level)
    in case expr of
         (FieldAssignmentsExpression {}) -> ppInitializeStruct subs level target expr
         (OptionVariantExpression {}) -> ppInitializeOption subs level target expr
@@ -51,19 +51,19 @@ ppInitializeVector subs level target expr =
           let initExpr =
                 ppCForLoopInitExpression
                   (ppTypeSpecifier USize)
-                  (pretty iterator)
+                  iterator
                   (pretty (show (0 :: Integer)))
            in let condExpr =
-                    pretty iterator <+> pretty "<" <+> pretty size
+                    iterator <+> pretty "<" <+> pretty size
                in let incrExpr =
                         ppCForLoopIncrExpression
-                          (pretty iterator)
+                          iterator
                           (pretty (show (1 :: Integer)))
                    in ppCForLoop
                         initExpr
                         condExpr
                         incrExpr
-                        ( ppInitializeVector subs (level + 1) (target <> brackets (pretty iterator)) expr'
+                        ( ppInitializeVector subs (level + 1) (target <> brackets iterator) expr'
                         )
         (EnumVariantExpression {}) -> ppInitializeEnum subs level target expr
         (FunctionExpression identifier _ _) ->
@@ -131,10 +131,10 @@ ppInitializeEnum ::
 ppInitializeEnum subs level target expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
-    (EnumVariantExpression _ variant params _) ->
+    (EnumVariantExpression ts variant params _) ->
         vsep $
-            (target <> pretty "." <> enumVariantsField <+> pretty "=" <+> pretty variant <> semi) : zipWith
-            (\e index -> ppFieldInitializer subs level target (pretty variant <> pretty "." <> pretty (namefy (show (index :: Integer)))) e) params [0..]
+            (target <> pretty "." <> enumVariantsField <+> pretty "=" <+> (pretty ts <::> pretty variant) <> semi) : zipWith
+            (\e index -> ppFieldInitializer subs level target (pretty variant <> pretty "." <> namefy (pretty (show (index :: Integer)))) e) params [0..]
     _ -> error "Incorrect expression"
 
 ppInitializeOption ::

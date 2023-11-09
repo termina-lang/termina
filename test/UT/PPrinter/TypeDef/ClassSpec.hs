@@ -109,9 +109,9 @@ spec = do
           "    __termina_resource_t __resource_id;\n" ++
           "} id0;\n" ++
           "\n" ++
-          "void __id0_procedure0(id0 * const self, uint8_t param0, uint16_t param1,\n" ++
-          "                      uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                      int16_t param5, int32_t param6, int64_t param7);\n")
+          "void id0__procedure0(id0 * const self, uint8_t param0, uint16_t param1,\n" ++
+          "                     uint32_t param2, uint64_t param3, int8_t param4,\n" ++
+          "                     int16_t param5, int32_t param6, int64_t param7);\n")
     it "Prints a class with two procedures and zero fields" $ do
       renderTypedefDeclaration classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
@@ -119,10 +119,10 @@ spec = do
           "    __termina_resource_t __resource_id;\n" ++
           "} id0;\n" ++
           "\n" ++
-          "void __id0_procedure0(id0 * const self, uint8_t param0,\n" ++
-          "                      __termina_option_dyn_t param1);\n" ++
+          "void id0__procedure0(id0 * const self, uint8_t param0,\n" ++
+          "                     __termina_option_dyn_t param1);\n" ++
           "\n" ++
-          "void __id0_procedure1(id0 * const self, uint8_t param0, uint8_t param1[32]);\n")
+          "void id0__procedure1(id0 * const self, uint8_t param0, uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypedefDeclaration noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
@@ -130,7 +130,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")
     it "Prints a class marked as no_handler with two fields" $ do
       renderTypedefDeclaration noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
@@ -140,7 +140,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")
     it "Prints a class with one procedure and two fields" $ do
       renderTypedefDeclaration classWithOneProcedureAndTwoFields `shouldBe`
         pack (
@@ -150,7 +150,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")
     it "Prints a packed class" $ do
       renderTypedefDeclaration packedClass `shouldBe`
         pack (
@@ -161,7 +161,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((packed)) id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self, char param0, uint8_t param1[16]);\n")
+            "void id0__procedure0(id0 * const self, char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
       renderTypedefDeclaration alignedClass `shouldBe`
         pack (
@@ -172,7 +172,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((align(16))) id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")
     it "Prints a packed & aligned class" $ do
       renderTypedefDeclaration packedAndAlignedClass `shouldBe`
         pack (
@@ -183,7 +183,7 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} __attribute__((packed, align(16))) id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")
     it "Prints a class with a fixed location field" $ do
       renderTypedefDeclaration classWithFixedLocationField `shouldBe`
         pack (
@@ -193,4 +193,4 @@ spec = do
             "    __termina_resource_t __resource_id;\n" ++
             "} id0;\n" ++
             "\n" ++
-            "void __id0_procedure0(id0 * const self);\n")
+            "void id0__procedure0(id0 * const self);\n")

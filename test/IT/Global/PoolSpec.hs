@@ -2,10 +2,11 @@ module IT.Global.PoolSpec (spec) where
 
 import Test.Hspec
 import Parser.Parsing
-import PPrinter
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
+import Prettyprinter
+import Modules.Printing
 
 test0 :: String
 test0 = "enum Message {\n" ++
@@ -23,7 +24,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile [pack "test"] [] tast
+      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
 
 spec :: Spec
 spec = do
@@ -36,28 +37,28 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef enum {\n" ++
-              "    __Message_In,\n" ++
-              "    __Message_Out,\n" ++
-              "    __Message_Stop,\n" ++
-              "    __Message_Reset\n" ++
+              "    Message__In,\n" ++
+              "    Message__Out,\n" ++
+              "    Message__Stop,\n" ++
+              "    Message__Reset\n" ++
               "} __enum_Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
               "    uint32_t __1;\n" ++
-              "} __enum_Message_In_params_t;\n" ++
+              "} __enum_Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __enum_Message_Out_params_t;\n" ++
+              "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t In;\n" ++
-              "        __enum_Message_Out_params_t Out;\n" ++
+              "        __enum_Message__In_params_t In;\n" ++
+              "        __enum_Message__Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++

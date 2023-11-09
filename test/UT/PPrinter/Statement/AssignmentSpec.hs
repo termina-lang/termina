@@ -128,11 +128,11 @@ spec = do
   describe "Pretty printing enum variable declarations" $ do
     it "Prints the statement enum0 = Message::Reset; where enum0 : Message" $ do
       renderStatement enum0Assign `shouldBe`
-        pack "enum0.__variant = Reset;"
+        pack "enum0.__variant = Message__Reset;"
     it "Prints the statement enum1 = Message::In(0 : u32, 0 : u32); where enum1 : Message" $ do
       renderStatement enum1Assign `shouldBe`
         pack (
-          "enum1.__variant = In;\n" ++
+          "enum1.__variant = Message__In;\n" ++
           "enum1.In.__0 = 0;\n" ++
           "enum1.In.__1 = 0;")
   describe "Pretty printing struct variable declarations" $ do

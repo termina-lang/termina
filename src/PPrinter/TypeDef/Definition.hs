@@ -19,12 +19,12 @@ ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [pretty "self->__resourc
 ppClassFunctionDefinition :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
     -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
+    ppCFunctionPrototype clsFuncName
       (
         -- | Print the self parameter
         ppSelfParameter classId :
         -- | Print the rest of the function parameters
-        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
+        (ppParameterDeclaration clsFuncName <$> parameters)
       )
       -- | Class procedures do not return anything
       Nothing
@@ -44,27 +44,32 @@ ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
         <> line <> returnC <> semi <> line)
     ) <> line
   where
+    clsFuncName = (classFunctionName (pretty classId) (pretty identifier))
     subs = ppParameterSubstitutions parameters
 ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _) =
     -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
+    ppCFunctionPrototype clsFuncName
       (
         -- | Print the self parameter
         pretty "const" <+> ppSelfParameter classId :
         -- | Print the rest of the function parameters
-        (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)
+        (ppParameterDeclaration clsFuncName <$> parameters)
       )
       -- | Class viewer return type
       (Just (ppReturnType (pretty identifier) rts))
-    <+> ppBlockRet (ppParameterSubstitutions parameters) (classFunctionName classId identifier) body <> line
+    <+> ppBlockRet (ppParameterSubstitutions parameters) clsFuncName body <> line
+  where
+    clsFuncName = (classFunctionName (pretty classId) (pretty identifier))
 ppClassFunctionDefinition classId (ClassMethod identifier mrts body _) =
     -- | Function prototype
-    ppCFunctionPrototype (classFunctionName classId identifier)
+    ppCFunctionPrototype clsFuncName
       -- | Print the self parameter
       [ppSelfParameter classId]
       -- | Class viewer return type
       (ppReturnType (pretty identifier) <$> mrts)
-    <+> ppBlockRet empty (classFunctionName classId identifier) body <> line
+    <+> ppBlockRet empty clsFuncName body <> line
+  where
+    clsFuncName = (classFunctionName (pretty classId) (pretty identifier))
 ppClassFunctionDefinition _ _ = error "invalid class member"
 
 ppClassDefinition :: TypeDef SemanticAnns -> DocStyle

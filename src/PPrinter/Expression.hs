@@ -87,24 +87,25 @@ ppMemberFunctionAccess subs obj ident params =
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
                     ppCFunctionCall
-                        (classFunctionName classId ident)
+                        (classFunctionName (pretty classId) (pretty ident))
                         (ppObject subs obj : (ppExpression subs <$> params))
                 -- | Anything else should not happen
                 _ -> error $ "unsupported member function access to object: " ++ show obj
         (DefinedType classId) ->
+            let clsFuncName = (classFunctionName (pretty classId) (pretty ident)) in
             case obj of 
                 (Dereference _ _) ->
                     -- If we are here, it means that we are dereferencing the self object
                     ppCFunctionCall
-                        (classFunctionName classId ident)
+                        clsFuncName
                         (pretty "self" : (ppExpression subs <$> params))
                 _ -> ppCFunctionCall
-                        (classFunctionName classId ident)
+                        clsFuncName
                         (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand size is a class:
         Port (DefinedType classId) ->
             ppCFunctionCall
-                (classFunctionName classId ident)
+                (classFunctionName (pretty classId) (pretty ident))
                 (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
         Port (Pool _ _) ->

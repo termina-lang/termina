@@ -91,8 +91,11 @@ indentTab = indent 4
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.
-namefy :: Identifier -> Identifier
-namefy = ("__" ++)
+namefy :: DocStyle -> DocStyle
+namefy = (pretty "__" <>)
+
+(<::>) :: DocStyle -> DocStyle -> DocStyle
+(<::>) id0 id1 = id0 <> pretty "__" <> id1
 
 --------------------------------------------------------------------------------
 -- C pretty keywords
@@ -134,6 +137,10 @@ sizeTC = pretty "size_t"
 externC :: DocStyle
 externC = pretty "extern"
 
+-- C pretty static
+staticC :: DocStyle
+staticC = pretty "static"
+
 -- C pretty volatile
 volatileC :: DocStyle
 volatileC = pretty "volatile"
@@ -144,13 +151,13 @@ attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
 pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID :: DocStyle
-pool = pretty $ namefy "termina_pool_t"
-msgQueue = pretty $ namefy "termina_msg_queue_t"
-optionDyn = pretty $ namefy "termina_option_dyn_t"
-dynamicStruct = pretty $ namefy "termina_dyn_t"
-taskID = pretty $ namefy "termina_task_t"
-resourceID = pretty $ namefy "termina_resource_t"
-handlerID = pretty $ namefy "termina_handler_t"
+pool = namefy $ pretty "termina_pool_t"
+msgQueue = namefy $ pretty "termina_msg_queue_t"
+optionDyn = namefy $ pretty "termina_option_dyn_t"
+dynamicStruct = namefy $ pretty "termina_dyn_t"
+taskID = namefy $ pretty "termina_task_t"
+resourceID = namefy $ pretty "termina_resource_t"
+handlerID = namefy $ pretty "termina_handler_t"
 
 -- | Pretty prints the ID field of the resource, task and handler classes
 ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle
@@ -160,13 +167,13 @@ ppHandlerClassIDField = pretty "__handler_id"
 
 -- | Pretty prints the name of the enum that defines the variants
 -- of the enumeration
-enumIdentifier :: Identifier -> DocStyle
-enumIdentifier identifier = pretty (namefy ("enum_" ++ identifier ++ "_t"))
+enumIdentifier :: DocStyle -> DocStyle
+enumIdentifier identifier = namefy (pretty "enum_" <> identifier <> pretty "_t")
 
 -- |  Pretty prints the name of the field that will store the variant
 --  inside the struct corresponding to the enum.
 enumVariantsField :: DocStyle
-enumVariantsField = pretty (namefy "variant")
+enumVariantsField = namefy $ pretty "variant"
 
 optionSomeVariant, optionNoneVariant :: DocStyle
 optionSomeVariant = pretty "Some"
@@ -212,7 +219,7 @@ ppDimension _                     = emptyDoc
 
 ppReturnVectorValueStructure :: DocStyle -> DocStyle
 ppReturnVectorValueStructure identifier =
-  pretty "__ret_" <> identifier <> pretty "_t"
+  namefy $ pretty "ret_" <> identifier <> pretty "_t"
 
 ppReturnVectorValueStructureDecl :: DocStyle -> TypeSpecifier -> DocStyle
 ppReturnVectorValueStructureDecl identifier ts =
@@ -222,7 +229,7 @@ ppReturnVectorValueStructureDecl identifier ts =
 
 ppParameterVectorValueStructure :: DocStyle -> DocStyle -> DocStyle
 ppParameterVectorValueStructure prefix identifier =
-  pretty "__param_" <> prefix <> pretty "_" <> identifier <> pretty "_t"
+  namefy $ pretty "param_" <> prefix <> pretty "_" <> identifier <> pretty "_t"
 
 -- | Pretty print the declaration of a structure that will be used to pass a vector as parameter
 ppParameterVectorValueStructureDecl :: 
@@ -283,20 +290,26 @@ ppModifier (Modifier identifier Nothing) = pretty identifier
 -- TODO: Support modifiers with non-integer values
 ppModifier m = error $ "unsupported modifier: " ++ show m
 
-classFunctionName :: Identifier -> Identifier -> DocStyle
-classFunctionName ident = pretty . namefy . ((ident ++ "_") ++)
+classFunctionName :: DocStyle -> DocStyle -> DocStyle
+classFunctionName = (<::>)
+
+taskRunMethodName :: Identifier -> DocStyle
+taskRunMethodName identifier = classFunctionName (pretty identifier) (pretty "run")
+
+handlerHandleMethodName :: Identifier -> DocStyle
+handlerHandleMethodName identifier = classFunctionName (pretty identifier) (pretty "handle")
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName = classFunctionName "termina_pool"
+poolMethodName = classFunctionName (namefy $ pretty "termina_pool") . pretty
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName = classFunctionName "termina_msg_queue"
+msgQueueMethodName = classFunctionName (namefy $ pretty "termina_msg_queue") . pretty
 
 resourceLock :: DocStyle
-resourceLock = classFunctionName "termina_resource" "lock"
+resourceLock = classFunctionName (namefy $ pretty "termina_resource") (pretty "lock")
 
 resourceUnlock :: DocStyle
-resourceUnlock = classFunctionName "termina_resource" "unlock"
+resourceUnlock = classFunctionName (namefy $ pretty "termina_resource") (pretty "unlock")
 
 -- | Prints the name of the function that frees an objet to the pool
 poolFree :: DocStyle
@@ -322,6 +335,13 @@ ppCForLoop initializer cond incr body =
   pretty "for"
     <+> parens
       (initializer <> semi <+> cond <> semi <+> incr)
+    <+> braces'
+      ((indentTab . align) body)
+
+ppCInfiniteLoop :: DocStyle -> DocStyle
+ppCInfiniteLoop body =
+  pretty "for"
+    <+> parens (semi <> semi)
     <+> braces'
       ((indentTab . align) body)
 

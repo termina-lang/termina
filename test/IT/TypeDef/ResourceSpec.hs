@@ -2,10 +2,11 @@ module IT.TypeDef.ResourceSpec (spec) where
 
 import Test.Hspec
 import Parser.Parsing
-import PPrinter
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
+import Prettyprinter
+import Modules.Printing
 
 test0 :: String
 test0 = "resource class TMChannel {\n" ++
@@ -35,7 +36,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile [pack "test"] [] tast
+      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -43,7 +44,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile [pack "test"] tast
+      Right tast -> ppSourceFile (pretty "test") tast
 
 spec :: Spec
 spec = do
@@ -60,8 +61,7 @@ spec = do
               "    __termina_resource_t __resource_id;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void __TMChannel_get_tm_sent_packets(TMChannel * const self,\n" ++
-              "                                     uint32_t * packets);\n" ++
+              "void TMChannel__get_tm_sent_packets(TMChannel * const self, uint32_t * packets);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -69,14 +69,14 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void __TMChannel_get_tm_sent_packets(TMChannel * const self,\n" ++
-              "                                     uint32_t * packets) {\n" ++
+              "void TMChannel__get_tm_sent_packets(TMChannel * const self,\n" ++
+              "                                    uint32_t * packets) {\n" ++
               "\n" ++
-              "    __termina_resource_lock(self->__resource_id);\n" ++
+              "    __termina_resource__lock(self->__resource_id);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina_resource_unlock(self->__resource_id);\n" ++
+              "    __termina_resource__unlock(self->__resource_id);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -93,7 +93,7 @@ spec = do
               "    __termina_resource_t __resource_id;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void __UARTDriver_get_status(UARTDriver * const self, uint32_t * ret);\n" ++
+              "void UARTDriver__get_status(UARTDriver * const self, uint32_t * ret);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class UARTDriver" $ do
@@ -101,13 +101,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void __UARTDriver_get_status(UARTDriver * const self, uint32_t * ret) {\n" ++
+              "void UARTDriver__get_status(UARTDriver * const self, uint32_t * ret) {\n" ++
               "\n" ++
-              "    __termina_resource_lock(self->__resource_id);\n" ++
+              "    __termina_resource__lock(self->__resource_id);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina_resource_unlock(self->__resource_id);\n" ++
+              "    __termina_resource__unlock(self->__resource_id);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

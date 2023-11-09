@@ -1,11 +1,12 @@
 module IT.Statement.MatchSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
+import Prettyprinter
+import Modules.Printing
 
 test0 :: String
 test0 = "function match_test0(option0 : Option<dyn u32>) -> u32 {\n" ++
@@ -68,7 +69,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile [pack "test"] [] tast
+      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -76,7 +77,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile [pack "test"] tast
+      Right tast -> ppSourceFile (pretty "test") tast
 
 spec :: Spec
 spec = do
@@ -106,9 +107,9 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0_Some = option0.Some.__0;\n" ++
+              "        __termina_option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0_Some.data);\n" ++
+              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -139,9 +140,9 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0_Some = option0.Some.__0;\n" ++
+              "        __termina_option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0_Some.data);\n" ++
+              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -156,28 +157,28 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef enum {\n" ++
-              "    __Message_In,\n" ++
-              "    __Message_Out,\n" ++
-              "    __Message_Stop,\n" ++
-              "    __Message_Reset\n" ++
+              "    Message__In,\n" ++
+              "    Message__Out,\n" ++
+              "    Message__Stop,\n" ++
+              "    Message__Reset\n" ++
               "} __enum_Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
               "    uint32_t __1;\n" ++
-              "} __enum_Message_In_params_t;\n" ++
+              "} __enum_Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __enum_Message_Out_params_t;\n" ++
+              "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t In;\n" ++
-              "        __enum_Message_Out_params_t Out;\n" ++
+              "        __enum_Message__In_params_t In;\n" ++
+              "        __enum_Message__Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++
@@ -196,29 +197,29 @@ spec = do
               "\n" ++
               "    Message msg;\n" ++
               "\n" ++
-              "    msg.__variant = In;\n" ++
+              "    msg.__variant = Message__In;\n" ++
               "    msg.In.__0 = 10;\n" ++
               "    msg.In.__1 = 10;\n" ++
               "\n" ++
-              "    if (msg.__variant == __Message_Stop) {\n" ++
+              "    if (msg.__variant == Message__Stop) {\n" ++
               "\n" ++
               "        ret = 0;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == __Message_Reset) {\n" ++
+              "    } else if (msg.__variant == Message__Reset) {\n" ++
               "\n" ++
               "        ret = 1;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == __Message_Out) {\n" ++
+              "    } else if (msg.__variant == Message__Out) {\n" ++
               "\n" ++
-              "        __enum_Message_Out_params_t __msg_Out = msg.Out;\n" ++
+              "        __enum_Message__Out_params_t __msg__Out = msg.Out;\n" ++
               "\n" ++
-              "        ret = __msg_Out.__0;\n" ++
+              "        ret = __msg__Out.__0;\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __enum_Message_In_params_t __msg_In = msg.In;\n" ++
+              "        __enum_Message__In_params_t __msg__In = msg.In;\n" ++
               "\n" ++
-              "        ret = __msg_In.__0 + __msg_In.__1;\n" ++
+              "        ret = __msg__In.__0 + __msg__In.__1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
