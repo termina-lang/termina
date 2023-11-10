@@ -34,35 +34,38 @@ ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> p
 
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
+  let clsFuncName = classFunctionName (pretty classId) (pretty identifier) in
   vsep $
-  ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
+  ([ppParameterVectorValueStructureDecl clsFuncName (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
   [
-    ppCFunctionPrototype (classFunctionName classId identifier)
-      (ppSelfParameter classId : (ppParameterDeclaration (classFunctionName classId identifier) <$> parameters)) Nothing <> semi,
+    ppCFunctionPrototype clsFuncName
+      (ppSelfParameter classId : (ppParameterDeclaration clsFuncName <$> parameters)) Nothing <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId (ClassMethod identifier mrts _ _) =
+  let clsFuncName = classFunctionName (pretty classId) (pretty identifier) in
   vsep $
   (case mrts of
     Just ts@(Vector {}) ->
-      [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) ts <> line]
+      [ppReturnVectorValueStructureDecl clsFuncName ts <> line]
     _ -> []) ++
   [
-    ppCFunctionPrototype (classFunctionName classId identifier)
+    ppCFunctionPrototype clsFuncName
       [ppSelfParameter classId]
-      (ppReturnType (classFunctionName classId identifier) <$> mrts) <> semi,
+      (ppReturnType clsFuncName <$> mrts) <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
+  let clsFuncName = classFunctionName (pretty classId) (pretty identifier) in
   vsep $
-  ([ppParameterVectorValueStructureDecl (classFunctionName classId identifier) (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
+  ([ppParameterVectorValueStructureDecl clsFuncName (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
   (case rts of
-    Vector {} -> [ppReturnVectorValueStructureDecl (classFunctionName classId identifier) rts <> line]
+    Vector {} -> [ppReturnVectorValueStructureDecl clsFuncName rts <> line]
     _ -> []) ++
   [
-    ppCFunctionPrototype (pretty identifier)
-      (pretty "const" <+> ppSelfParameter classId : (ppParameterDeclaration (pretty identifier) <$> parameters))
-      (Just (ppReturnType (pretty identifier) rts)) <> semi,
+    ppCFunctionPrototype clsFuncName
+      (pretty "const" <+> ppSelfParameter classId : (ppParameterDeclaration clsFuncName <$> parameters))
+      (Just (ppReturnType clsFuncName rts)) <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId member = error $ "member of class " ++ classId ++ " not a function: " ++ show member
@@ -72,7 +75,7 @@ ppClassFunctionDeclaration classId member = error $ "member of class " ++ classI
 -- This function is only used when generating the variant enumeration
 -- It takes as arguments the variant and its index.
 ppEnumVariant :: Identifier -> EnumVariant -> DocStyle
-ppEnumVariant identifier (EnumVariant variant _) = pretty (namefy (identifier ++ "_" ++ variant))
+ppEnumVariant identifier (EnumVariant variant _) = pretty identifier <::> pretty variant
 
 ppTypeAttributes :: [Modifier] -> DocStyle
 ppTypeAttributes [] = emptyDoc
@@ -80,10 +83,10 @@ ppTypeAttributes mods = attribute <> parens (parens (encloseSep emptyDoc emptyDo
 
 ppEnumVariantParameter :: TypeSpecifier -> Integer -> DocStyle
 ppEnumVariantParameter ts index =
-  ppTypeSpecifier ts <+> pretty (namefy (show index)) <> ppDimension ts <> semi
+  ppTypeSpecifier ts <+> namefy (pretty (show index)) <> ppDimension ts <> semi
 
 ppEnumVariantParameterStructName :: Identifier -> EnumVariant -> DocStyle
-ppEnumVariantParameterStructName identifier (EnumVariant variant _) = enumIdentifier (identifier ++ "_" ++ variant ++ "_" ++ "params")
+ppEnumVariantParameterStructName identifier (EnumVariant variant _) = enumIdentifier (pretty identifier <::> pretty variant <> pretty "_params")
 
 ppEnumVariantParameterStruct :: Identifier -> EnumVariant -> DocStyle
 ppEnumVariantParameterStruct identifier enumVariant@(EnumVariant _variant params) =
@@ -124,7 +127,7 @@ ppTypeDefDeclaration typeDef =
         typedefC <+> enumC <+> braces' (
             indentTab . align $ vsep $ punctuate comma $
               map (ppEnumVariant identifier) variants
-          ) <+> enumIdentifier identifier <> semi, emptyDoc] ++
+          ) <+> enumIdentifier (pretty identifier) <> semi, emptyDoc] ++
         -- | Print the declaration of the enum variant parameter structs
         concatMap (\enumVariant ->
             [ppEnumVariantParameterStruct identifier enumVariant,
@@ -132,7 +135,7 @@ ppTypeDefDeclaration typeDef =
         -- | Print the main enumeration struct
         [typedefC <+> structC <+> braces' (line <> (indentTab . align $
           vsep [
-            enumIdentifier identifier <+> enumVariantsField <> semi,
+            enumIdentifier (pretty identifier) <+> enumVariantsField <> semi,
             case variantsWithParams of
               [] -> emptyDoc
               [enumVariant@(EnumVariant variant _)] -> 

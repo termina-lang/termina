@@ -17,7 +17,7 @@ import PPrinter.TypeDef.Declaration
 import PPrinter.TypeDef.Definition
 import Semantic.Monad (SemanticAnns)
 import PPrinter.Function
-import Data.Maybe
+
 import PPrinter.Global
 
 render :: DocStyle -> Text
@@ -51,35 +51,6 @@ ppHeaderFileDefine filePath =
     let qualifiedPath = intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) in
     pretty "__" <> pretty qualifiedPath <> pretty "_H__"
 
-ppHeaderFile :: [Text] -> [[Text]] -> AnnotatedProgram SemanticAnns -> Text
--- Print only the elements that are not nothing
-ppHeaderFile filePath imports program = render (
-    vsep $
-        [
-            pretty "#ifndef " <> ppHeaderFileDefine filePath,
-            pretty "#define " <> ppHeaderFileDefine filePath,
-            emptyDoc,
-            pretty "#include <termina.h>"
-        ] ++ 
-        map (\i -> pretty "#include \"" <> pretty (intercalate (pack "/") i) <> pretty ".h\"") imports ++
-        emptyDoc :
-        mapMaybe ppHeaderASTElement program ++
-        [   
-            pretty "#endif // " <> ppHeaderFileDefine filePath,
-            emptyDoc
-        ]
-    )
-
-ppSourceFile :: [Text] -> AnnotatedProgram SemanticAnns -> Text
-ppSourceFile filePath program = render (
-        vsep $
-        [
-            emptyDoc,
-            pretty "#include \"" <> pretty (intercalate (pack "/") filePath) <> pretty ".h\"",
-            emptyDoc
-        ] ++
-        mapMaybe ppSourceASTElement program
-    )
 
 -- ppProgramDebug :: AnnotatedProgram Annotation -> Text
 -- ppAnnonProgram = render . vsep . map (ppAnnAST (pretty . show))

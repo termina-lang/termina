@@ -2,10 +2,11 @@ module IT.TypeDef.TaskSpec (spec) where
 
 import Test.Hspec
 import Parser.Parsing
-import PPrinter
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
+import Prettyprinter
+import Modules.Printing
 
 test0 :: String
 test0 = "enum Message {\n" ++
@@ -60,7 +61,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile [pack "test"] [] tast
+      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -68,7 +69,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile [pack "test"] tast
+      Right tast -> ppSourceFile (pretty "test") tast
 
 spec :: Spec
 spec = do
@@ -81,28 +82,28 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef enum {\n" ++
-              "    __Message_In,\n" ++
-              "    __Message_Out,\n" ++
-              "    __Message_Stop,\n" ++
-              "    __Message_Reset\n" ++
+              "    Message__In,\n" ++
+              "    Message__Out,\n" ++
+              "    Message__Stop,\n" ++
+              "    Message__Reset\n" ++
               "} __enum_Message_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
               "    uint32_t __1;\n" ++
-              "} __enum_Message_In_params_t;\n" ++
+              "} __enum_Message__In_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __enum_Message_Out_params_t;\n" ++
+              "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
               "    __enum_Message_t __variant;\n" ++
               "\n" ++
               "    union {\n" ++
-              "        __enum_Message_In_params_t In;\n" ++
-              "        __enum_Message_Out_params_t Out;\n" ++
+              "        __enum_Message__In_params_t In;\n" ++
+              "        __enum_Message__Out_params_t Out;\n" ++
               "    };\n" ++
               "\n" ++
               "} Message;\n" ++
@@ -113,9 +114,10 @@ spec = do
               "    __termina_task_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
-              "TaskRet __CHousekeeping_run(CHousekeeping * const self);\n" ++
+              "TaskRet CHousekeeping__run(CHousekeeping * const self);\n" ++
               "\n" ++
-              "_Bool check_interval(const CHousekeeping * const self, uint32_t limit);\n" ++
+              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "                                    uint32_t limit);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -123,11 +125,11 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "TaskRet __CHousekeeping_run(CHousekeeping * const self) {\n" ++
+              "TaskRet CHousekeeping__run(CHousekeeping * const self) {\n" ++
               "\n" ++
               "    TaskRet ret;\n" ++
               "\n" ++
-              "    ret.__variant = Continue;\n" ++
+              "    ret.__variant = TaskRet__Continue;\n" ++
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
@@ -135,24 +137,24 @@ spec = do
               "\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++   
-              "    __termina_pool_alloc(self->message_pool, &alloc_msg);\n"  ++
+              "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++   
               "    if (alloc_msg.__variant == None) {\n"  ++
               "\n"  ++   
               "        \n"  ++           
               "    } else {\n" ++
               "\n" ++   
-              "        __termina_option_dyn_t __alloc_msg_Some = alloc_msg.Some.__0;\n" ++
+              "        __termina_option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        __termina_pool_free(__alloc_msg_Some);\n" ++
+              "        __termina_pool__free(__alloc_msg__Some);\n" ++
               "\n" ++  
               "    }\n" ++
               "\n" ++
-              "    _Bool check = __CHousekeeping_check_interval(self, 10);\n" ++
+              "    _Bool check = CHousekeeping__check_interval(self, 10);\n" ++
               "\n" ++
               "    if (check == 0) {\n" ++
               "\n" ++
-              "        ret.__variant = Abort;\n" ++
+              "        ret.__variant = TaskRet__Abort;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++   
@@ -161,8 +163,8 @@ spec = do
               "}\n" ++
               "\n" ++
               "\n" ++
-              "_Bool __CHousekeeping_check_interval(const CHousekeeping * const self,\n" ++
-              "                                     uint32_t limit) {\n" ++
+              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "                                    uint32_t limit) {\n" ++
               "\n" ++
               "    _Bool ret = 1;\n" ++
               "\n" ++

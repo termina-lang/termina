@@ -119,13 +119,13 @@ spec = do
         pack (
           "Message enum0;\n" ++
           "\n" ++
-          "enum0.__variant = Reset;")
+          "enum0.__variant = Message__Reset;")
     it "Prints the statement var enum1 : Message = Message::In(0 : u32, 0 : u32);" $ do
       renderStatement enum1 `shouldBe`
         pack (
           "Message enum1;\n" ++
           "\n" ++
-          "enum1.__variant = In;\n" ++
+          "enum1.__variant = Message__In;\n" ++
           "enum1.In.__0 = 0;\n" ++
           "enum1.In.__1 = 0;")
   describe "Pretty printing struct variable declarations" $ do

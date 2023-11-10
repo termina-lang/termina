@@ -1,11 +1,12 @@
 module IT.Expression.VectorIndexSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
+import Prettyprinter
+import Modules.Printing
 
 test0 :: String
 test0 = "function vector_test0() {\n" ++
@@ -32,7 +33,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile [pack "test"] [] tast
+      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -40,7 +41,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile [pack "test"] tast
+      Right tast -> ppSourceFile (pretty "test") tast
 
 spec :: Spec
 spec = do
