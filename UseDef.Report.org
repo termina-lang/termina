@@ -36,5 +36,17 @@ There exist *at least* one use.
 * TODO Ask Pablo
 ** What objects can be freed?
 ** Can we reuse variables after alloc?
+** [Q1] Every assigned value should be used?
+for example
+#+begin_src
+var r ...
+...
+r := r + 1
+[B2] ...
+#+end_src
+~r~ should be used in ~B2~?
+I think yes. but :shrug:
+Right now is no.
+
 ** Type of send, it is not a dyn ref
 I though send was similar to free, but their type is different?

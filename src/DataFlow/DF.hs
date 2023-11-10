@@ -167,7 +167,8 @@ useDefStmt (Declaration ident _accK tyS initE ann)
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e _ann)
   = useExpression e
-  >> defObject obj
+  -- TODO [Q1] Not so sure about defining when assign.
+  -- >> defObject obj
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
