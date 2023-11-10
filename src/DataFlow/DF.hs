@@ -67,7 +67,7 @@ useObject (MemberAccess obj _i _ann)
 useObject (Dereference obj _ann)
   = useObject obj
 useObject (DereferenceMemberAccess obj i ann)
-  = (SM.location ann) `annotateError` (safeAddUse i)
+  = (SM.location ann) `annotateError` safeAddUse i
   >> useObject obj
 useObject (VectorSliceExpression obj eB eT _ann)
   = useObject obj >> useConstE eB >> useConstE eT
@@ -167,8 +167,8 @@ useDefStmt (Declaration ident _accK tyS initE ann)
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e _ann)
   = useExpression e
-  -- TODO [Q1] Not so sure about defining when assign.
-  -- >> defObject obj
+  >> useObject obj
+  -- DONE [Q1] Still not super sure, but acceptable.
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
