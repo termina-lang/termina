@@ -23,7 +23,8 @@ import           Control.Monad.Except
 
 import           Data.List            (all, find, foldl')
 import           Data.Maybe
-import qualified Data.Set             as S
+-- import qualified Data.Set             as S
+import qualified Data.Map.Strict      as M
 
 import           AST.Core             (Identifier)
 -- AST to work with.
@@ -40,26 +41,23 @@ import Debug.Termina
 useConstE :: ConstExpression -> UDM AnnotatedErrors ()
 useConstE = const (return ())
 
-useObject :: Object SemanticAnns -> UDM AnnotatedErrors ()
+useObject, defObject :: Object SemanticAnns -> UDM AnnotatedErrors ()
 useObject (Variable ident ann)
   =
   let loc = SM.location ann in
   maybe
         (loc `annotateError` throwError ImpossibleError)
         (\case {
-            -- We can use dynamic only once!
+                -- Nothing, we can use it freely, in the normal sense of using it.
                 DynamicSubtype _ ->
-                showMsgVal ("Dyn using variable: " ++ show ident) $
-                loc `annotateError` addUseOnlyOnce ident
+                return ()
                 ;
             -- We can use Options only once!
                 Option _ ->
-                showMsgVal ("Opt using variable: " ++ show ident) $
                 loc  `annotateError` addUseOnlyOnce ident
                 ;
             -- Mutable Options??
                 _ ->
-                showMsgVal ("Rest using variable: " ++ show ident) $
                 loc `annotateError` safeAddUse ident
         }) (getTypeSAnns ann)
 useObject (VectorIndexExpression obj e _ann)
@@ -69,12 +67,29 @@ useObject (MemberAccess obj _i _ann)
 useObject (Dereference obj _ann)
   = useObject obj
 useObject (DereferenceMemberAccess obj i ann)
-  = (SM.location ann) `annotateError` safeAddUse i
+  = (SM.location ann) `annotateError` (safeAddUse i)
   >> useObject obj
 useObject (VectorSliceExpression obj eB eT _ann)
   = useObject obj >> useConstE eB >> useConstE eT
 -- TODO Use Object undyn?
 useObject (Undyn obj _ann)
+  = useObject obj
+
+defObject (Variable ident ann)
+  = (SM.location ann) `annotateError` defVariable ident
+defObject (VectorIndexExpression obj e _ann)
+  = useExpression e
+  >> useObject obj
+defObject (MemberAccess obj _i _ann)
+  = useObject obj
+defObject (Dereference obj _ann)
+  = useObject obj
+defObject (DereferenceMemberAccess obj i ann)
+  = (SM.location ann) `annotateError` safeAddUse i
+  >> useObject obj
+defObject (VectorSliceExpression obj eB eT _ann)
+  = useObject obj >> useConstE eB >> useConstE eT
+defObject (Undyn obj _ann)
   = useObject obj
 
 useFieldAssignment :: FieldAssignment SemanticAnns -> UDM AnnotatedErrors ()
@@ -96,17 +111,23 @@ useExpression (Casting e _ty _a)
 useExpression (MemberFunctionAccess obj ident args ann)
   -- when requesting stuff from a pool with alloc.
   | ident == "alloc"
-  =  useObject obj
+  = useObject obj
   >> (annotateError (SM.location ann)
      $ case args of
         -- I don't think we can have expression computing variables here.
         [ReferenceExpression Mutable (Variable avar _anni) _ann] ->
-          defVariableOO avar
+          (allocOO avar)
         _ -> throwError ImpossibleErrorBadAllocArg)
-  >> mapM_ useExpression args
+  -- >> mapM_ useExpression args
   -- other functions
+  | ident == "send"
+    = useObject obj
+    >> error "TODO"
+    -- (annotateError (SM.location ann))
+    --    $ case args of
+    --         _ -> error "TODO"
   | otherwise
-  = useObject obj >> mapM_ useExpression args
+    = useObject obj >> mapM_ useExpression args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
   = useObject obj >> mapM_ useExpression args
 useExpression (VectorInitExpression e _size _ann)
@@ -138,11 +159,15 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   case tyS of
     Option _ -> defVariableOO ident
     -- DynamicSubtype _ ->  This is not possible
+    DynamicSubtype _ -> throwError (DefiningDyn ident)
     -- Dynamic are only declared on match statements
     _        -> defVariable ident
   -- Use everithing in the |initE|
   >> useExpression initE
 -- All branches should have the same used Only ones.
+useDefStmt (AssignmentStmt obj e _ann)
+  = useExpression e
+  >> defObject obj
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
@@ -154,29 +179,34 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
                  map ((\l -> mapM_ useDefStmt l >> get) . reverse . elseIfBody) elseIfs
                 )
   -- Rule here is, all branches should have the same onlyonce behaviour.
-  let usedOO = map usedOnlyOnce sets
-  unless (sameSets usedOO)
+  let (usedOO, usedDyns)
+        = foldr (\s (oo,dd) -> (usedOption s : oo, usedDyn s : dd)) ([],[]) sets -- (map usedOption sets)
+  unless (sameMaps usedOO)
     ((SM.location ann) `annotateError` throwError DifferentOnlyOnce)
+  unless (sameSets usedDyns)
+    ((SM.location ann) `annotateError` throwError DifferentDynsSets)
   -- We get all uses
-  let normalUses = S.unions (map usedSet sets)
-  -- We get all defined but not defined variables
-  let notUsed = S.unions (map defV sets)
-  --
-  continueWith (head usedOO) normalUses notUsed
+  let normalUses = M.unions (map usedSet sets)
+  --TODO remove continueWith
+  continueWith (head usedOO) normalUses (head usedDyns)
 useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
     -- Interator bode runs with empty UsedOnly and should return it that way.
     -- It can only use variables /only/ only if they are declared inside the
-    -- iterator body
+    -- iterator body, and freed and everything.
     runEncapsulated
       ( emptyOO
         >> useDefBlock block
         >> get
-        >>= \ st ->
-          unless (S.null (usedOnlyOnce st))
-            ((SM.location ann) `annotateError` throwError ForMoreOO)
+        >>= \st ->
+          -- No Option should be in the state
+          unless (M.null (usedOption st)) ((SM.location ann) `annotateError` throwError ForMoreOOpt)
           >>
+          -- No Dyn should be in the state
+          unless (M.null (usedDyn st)) ((SM.location ann) `annotateError` throwError ForMoreODyn)
+          >>
+          -- If everything goes okay, return used variables
           return (usedSet st)
       )
     -- We add all normal use variables
@@ -188,9 +218,8 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
     >> useExpression eB
     >> useExpression eE
 useDefStmt (MatchStmt e mcase ann)
-  = showMsgVal "Match Pattern" $
-  -- Similar to the case ifElse and For
-  showMsgVal ("UseExpr " ++ show e) (useExpression e)
+  = -- Similar to the case ifElse and For
+  (useExpression e)
   >>
   -- Depending on expression |e| type
   -- we handle OptionDyn special case properly.
@@ -208,20 +237,33 @@ useDefStmt (MatchStmt e mcase ann)
     (getResultingType $ ty_ann $ getAnnotation e)
   >>= \sets ->
   -- Get all OO sets
-  let usedOO = map usedOnlyOnce sets
+  let
+    (usedOOpt, usedDyns, usedN)
+     = foldr (\s (opts,dyns,norms) ->
+               ( usedOption s : opts
+               , usedDyn s : dyns
+               , usedSet s : norms)) ([],[],[]) sets
   in
   -- Should all be the same
-  unless (sameSets usedOO)
+  unless (sameMaps usedOOpt)
         ((SM.location ann) `annotateError` throwError DifferentOnlyOnceMatch)
+  >>
+  unless (sameSets usedDyns)
+        ((SM.location ann) `annotateError` throwError DifferentDynsSetsMatch)
   -- Then continue addin uses
   >> unionS
-        (head usedOO)
-        (S.unions (map usedSet sets))
-        (S.unions (map defV sets))
+        (head usedOOpt)
+        (M.unions usedN)
+        (head usedDyns)
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 useDefStmt (Free obj _ann)
-  = useObject obj
+  = case obj of
+      Variable var ann
+        -> (SM.location ann) `annotateError` useDynVar var
+      -- Idk If we can free whatever object, can we?
+      _
+        -> useObject obj
 
 destroyOptionDyn
   :: (MatchCase SemanticAnns, MatchCase SemanticAnns)
@@ -232,10 +274,9 @@ destroyOptionDyn (ml, mr)
   in
     ( useDefBlock(matchBody mOpt)
       >>
-     (SM.location (matchAnnotation mOpt)) `annotateError` defVariableOO (head (matchBVars mOpt))
+     (SM.location (matchAnnotation mOpt)) `annotateError` defDynVar (head (matchBVars mOpt))
      >> get
     , useDefBlock (matchBody mNone) >> get)
-
 
 -- General case, not when it is Option Dyn
 useMCase :: MatchCase SemanticAnns -> UDM AnnotatedErrors ()
@@ -244,10 +285,13 @@ useMCase (MatchCase _mIdent bvars blk ann)
   useDefBlock blk
   >> (SM.location ann) `annotateError` mapM_ defVariable bvars
 
--- Same sets
+sameMaps :: [OOVarSt] -> Bool
+sameMaps [] = False
+sameMaps (x:xs) = all (M.null . M.difference x) xs
+
 sameSets :: [VarSet] -> Bool
-sameSets []     = False -- shouldn't happen but :shrug:
-sameSets (x:xs) = all ( S.null . S.difference x) xs
+sameSets [] = False
+sameSets (x:xs) = all (M.null . M.difference x) xs
 
 useDefCMemb :: ClassMember SemanticAnns -> UDM AnnotatedErrors ()
 useDefCMemb (ClassField fdef ann)

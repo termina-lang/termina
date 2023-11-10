@@ -10,16 +10,29 @@ import Semantic.Monad (SemanticAnns)
 
 data Errors
   = SetMaxBound
+  | MapMaxBound
   | ImpossibleError
   | ImpossibleErrorMatchGetType
   | NotUsed Identifier
   | NotUsedOO Identifier
   | UsingTwice Identifier
   | DifferentOnlyOnce
+  | DifferentDynsSets
   | DifferentOnlyOnceMatch
-  | ForMoreOO
+  | DifferentDynsSetsMatch
+  | ForMoreOOpt
+  | ForMoreODyn
   | InternalOptionMissMatch
   | ImpossibleErrorBadAllocArg
+  -- Special Variable errors
+  | AllocNotUsed Identifier
+  | AllocTwice Identifier
+  | AllocRedef Identifier -- This is impossible
+  | DefinedNotAlloc Identifier
+  | DefinedTwice Identifier
+  -- Dyn
+  | DefiningDyn Identifier
+  -- vv| NotUsedDyn Identifier
   deriving Show
 
 data AnnotatedErrors

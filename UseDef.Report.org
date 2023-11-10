@@ -33,3 +33,8 @@ Defs: when declared, arguments, etc
 Uses: whenever named.
 
 There exist *at least* one use.
+* TODO Ask Pablo
+** What objects can be freed?
+** Can we reuse variables after alloc?
+** Type of send, it is not a dyn ref
+I though send was similar to free, but their type is different?
