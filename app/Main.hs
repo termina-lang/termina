@@ -121,10 +121,10 @@ printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
   createDirectoryIfMissing True (takeDirectory (hdrFileRoute hdrsdir))
   -- Now, both files are no more.
   when chatty $ print $ "Writing to" ++ show hFile
-  let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName
+  let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName mMode
   writeStrictText hFile (MPP.ppHeaderFile docMName (MPP.includes deps) tyModule)
   when chatty $ print $ "Writing to" ++ show cFile
-  writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName) tyModule)
+  writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName mMode) tyModule)
   where
     srcFileRoute dd =
       case mMode of

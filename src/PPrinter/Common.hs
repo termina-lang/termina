@@ -58,7 +58,7 @@ getObjPrecedence (Variable _ _) = 0
 getObjPrecedence (VectorIndexExpression {}) = 1
 getObjPrecedence (MemberAccess {}) = 1
 getObjPrecedence (DereferenceMemberAccess {}) = 1
-getObjPrecedence obj@(Dereference _ _) = 
+getObjPrecedence obj@(Dereference _ _) =
   case getObjectType obj of
     (Vector _ _) -> 1
     _            -> 2
@@ -107,6 +107,9 @@ enumC = pretty "enum"
 structC = pretty "struct"
 unionC = pretty "union"
 voidC = pretty "void"
+
+sizeofC :: DocStyle -> DocStyle
+sizeofC ts = pretty "sizeof" <> parens ts
 
 -- C pretty unsigned integer types
 uint8C, uint16C, uint32C, uint64C :: DocStyle
@@ -182,6 +185,9 @@ optionNoneVariant = pretty "None"
 optionSomeField :: DocStyle
 optionSomeField = optionSomeVariant <> pretty ".__0"
 
+poolMemoryArea :: DocStyle -> DocStyle
+poolMemoryArea identifier = namefy $ pretty "pool_" <> identifier <> pretty "_memory"
+
 -- | Pretty prints the corresponding C type of a primitive type
 -- This function is used to pretty print the type of a variable
 ppTypeSpecifier :: TypeSpecifier -> DocStyle
@@ -209,6 +215,7 @@ ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
 ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
 -- | Pool type
 ppTypeSpecifier (Pool _ _)                   = pool
+ppTypeSpecifier (MsgQueue _ _)               = msgQueue
 ppTypeSpecifier (Location ts)                = volatileC <+> ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier (Port ts)                    = ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
@@ -232,11 +239,11 @@ ppParameterVectorValueStructure prefix identifier =
   namefy $ pretty "param_" <> prefix <> pretty "_" <> identifier <> pretty "_t"
 
 -- | Pretty print the declaration of a structure that will be used to pass a vector as parameter
-ppParameterVectorValueStructureDecl :: 
+ppParameterVectorValueStructureDecl ::
   -- | prefix used as part of the function's name
-  DocStyle 
+  DocStyle
   -- | parameter identifier
-  -> DocStyle 
+  -> DocStyle
   -- | type specifier of the parameter
   -> TypeSpecifier -> DocStyle
 ppParameterVectorValueStructureDecl prefix identifier ts =
@@ -300,16 +307,16 @@ handlerHandleMethodName :: Identifier -> DocStyle
 handlerHandleMethodName identifier = classFunctionName (pretty identifier) (pretty "handle")
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName = classFunctionName (namefy $ pretty "termina_pool") . pretty
+poolMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "pool_" <> pretty mName)
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName = classFunctionName (namefy $ pretty "termina_msg_queue") . pretty
+msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "msg_queue_" <> pretty mName)
 
 resourceLock :: DocStyle
-resourceLock = classFunctionName (namefy $ pretty "termina_resource") (pretty "lock")
+resourceLock = classFunctionName (namefy $ pretty "termina") (pretty "resource_lock")
 
 resourceUnlock :: DocStyle
-resourceUnlock = classFunctionName (namefy $ pretty "termina_resource") (pretty "unlock")
+resourceUnlock = classFunctionName (namefy $ pretty "termina") (pretty "resource_unlock")
 
 -- | Prints the name of the function that frees an objet to the pool
 poolFree :: DocStyle

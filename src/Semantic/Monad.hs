@@ -163,12 +163,12 @@ initialGlobalEnv = fromList initGlb
 initGlb :: [(Identifier, SAnns (GEntry SemanticAnns))]
 initGlb =
   [("TaskRet",internalErrorSeman `SemAnn` GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] []) ),
-   ("Result", internalErrorSeman `SemAnn`GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" []] [])),
+   ("Result", internalErrorSeman `SemAnn`GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
    ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
    ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [] (DefinedType "TimeVal")),
    ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
   -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
-  --  ("Result", GType (Enum "Result" [EnumVariant "OK" [], EnumVariant "Error" [UInt32]] [])),
+  --  ("Result", GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" [UInt32]] [])),
   --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
   --  ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
   --  ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]

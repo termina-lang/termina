@@ -956,7 +956,9 @@ typeAndGetGlobals preLoad p =
    checkAddCompile (ts, gs) t = do
      tTyped <- programSeman t
      glb <- programAdd tTyped
-     return (tTyped:ts, glb:gs)
+     -- IMPORTANT: When the module is typed, the typed elements must be included at
+     -- the end of the list.
+     return (ts ++ [tTyped], gs ++ [glb])
    buildInit =
      Data.List.foldl'
       (\env (k,v) -> either

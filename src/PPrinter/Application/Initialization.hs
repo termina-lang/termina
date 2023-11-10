@@ -11,15 +11,15 @@ import Modules.Printing
 import qualified AST.Seman as SAST
 
 
-ppInitializeObj :: Global SemanticAnns -> DocStyle
+ppInitializeObj :: Global SemanticAnns -> Maybe DocStyle
 -- Print only the elements that are not nothing
 ppInitializeObj (Resource identifier _ (Just expr) _ _) =
-    ppInitializeStruct M.empty 0 (pretty identifier) expr
+    Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
 ppInitializeObj (Task identifier _ (Just expr) _ _) =
-    ppInitializeStruct M.empty 0 (pretty identifier) expr
+    Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
 ppInitializeObj (Handler identifier _ (Just expr) _ _) =
-    ppInitializeStruct M.empty 0 (pretty identifier) expr
-ppInitializeObj _ = emptyDoc
+    Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
+ppInitializeObj _ = Nothing
 
 ppInitFile :: [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> DocStyle
 ppInitFile prjprogs =
@@ -33,7 +33,7 @@ ppInitFile prjprogs =
         braces' (line <>
             (indentTab . align $
                 vsep (
-                    concatMap (map ppInitializeObj) [objs | (_, _, objs) <- globals]
+                    initializeObjs [objs | (_, _, objs) <- globals]
                 )
             ) <> line
         ) <> line
@@ -42,3 +42,7 @@ ppInitFile prjprogs =
         globals = map (\(mn, mm, elems) -> (mn, mm, [g | (SAST.GlobalDeclaration g) <- elems])) prjprogs
         modsWithGlobals = filter (\(_, _, objs) -> not (null objs)) globals
         incs = map (\(nm, mm, _) -> (nm, mm)) modsWithGlobals
+        initializeObjs = concatMap (
+            (\case
+                Nothing -> []
+                Just p -> [p]) . ppInitializeObj) . concat

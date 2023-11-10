@@ -18,24 +18,27 @@ import PPrinter.Common (DocStyle)
 
 import Semantic.Errors (ppError)
 
-ppModuleName :: ModuleName -> Doc a
-ppModuleName = pretty . toUnrootedFilePath
+ppModuleName :: ModuleName -> ModuleMode -> Doc a
+ppModuleName mn DirMod = pretty $ toUnrootedFilePath (mn </> fragment "header")
+ppModuleName mn SrcFile = pretty $ toUnrootedFilePath mn
 -- ppModuleName = pretty . intercalate "." . toUnrootedFilePath
 
 -- Function to use |ppHeaderFileDefine|
-moduleNameToText :: ModuleName -> [Text]
-moduleNameToText = map (pack . toUnrootedFilePath) . splitFragments
+moduleNameToText :: ModuleName -> ModuleMode -> [Text]
+moduleNameToText mn DirMod = map (pack . toUnrootedFilePath) (splitFragments (mn </> fragment "header"))
+moduleNameToText mn SrcFile = map (pack . toUnrootedFilePath) (splitFragments mn)
 
-includes :: [(ModuleName, ModuleMode)] -> Doc a
+includes :: [(ModuleName, ModuleMode)] -> DocStyle
 includes [] = emptyDoc
 includes deps = vsep $ emptyDoc : map (
-  \(nm, mm) -> 
-    case mm of
-      DirMod -> pinclude <+> dquotes(ppModuleName (nm </> fragment "header" <.> FileExt "h"))
-      SrcFile -> pinclude <+> dquotes(ppModuleName (nm <.> FileExt "h"))
-  ) deps ++ [emptyDoc]
+  \(nm, mm) -> includeC <+> dquotes(headerPath nm mm)) deps ++ [emptyDoc]
  where
-   pinclude = pretty "#include"
+    includeC :: DocStyle
+    includeC = pretty "#include"
+
+    headerPath :: ModuleName -> ModuleMode -> DocStyle
+    headerPath mName DirMod = pretty $ toUnrootedFilePath (mName </> fragment "header" <.> FileExt "h")
+    headerPath mName SrcFile =  pretty $ toUnrootedFilePath (mName <.> FileExt "h")
 
 ppHeaderFile
   -- Module Name

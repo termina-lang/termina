@@ -137,7 +137,7 @@ spec = do
               "\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++   
-              "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
+              "    __termina__pool_alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++   
               "    if (alloc_msg.__variant == None) {\n"  ++
               "\n"  ++   
@@ -146,7 +146,7 @@ spec = do
               "\n" ++   
               "        __termina_option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        __termina_pool__free(__alloc_msg__Some);\n" ++
+              "        __termina__pool_free(__alloc_msg__Some);\n" ++
               "\n" ++  
               "    }\n" ++
               "\n" ++

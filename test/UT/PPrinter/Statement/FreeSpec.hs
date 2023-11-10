@@ -28,7 +28,7 @@ spec = do
   describe "Pretty printing free statements" $ do
     it "Prints the statement free(dyn_var0);" $ do
       renderStatement freeVar0 `shouldBe`
-        pack "__termina_pool__free(dyn_var0);"
+        pack "__termina__pool_free(dyn_var0);"
     it "Prints the statement free(dyn_vector0);" $ do
       renderStatement freeVector0 `shouldBe`
-        pack "__termina_pool__free(dyn_vector0);"
+        pack "__termina__pool_free(dyn_vector0);"

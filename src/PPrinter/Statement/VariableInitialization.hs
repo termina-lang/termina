@@ -115,8 +115,8 @@ ppInitializeStruct subs level target expr =
         vsep $
             map (\a -> case a of
               FieldValueAssignment field expr' -> ppFieldInitializer subs level target (pretty field) expr'
-              FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> target <> pretty "." <> (pretty field) <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi
-              FieldPortConnection field res _ -> target <> pretty "." <> (pretty field) <+> pretty "=" <+> ppCReferenceExpression (pretty res)
+              FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> target <> pretty "." <> pretty field <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi
+              FieldPortConnection field res _ -> target <> pretty "." <> pretty field <+> pretty "=" <+> ppCReferenceExpression (pretty res) <> semi
               _ -> error $ "Incorrect annotated assignment expression: " ++ show a) vas
     _ -> error $ "Incorrect initialization expression: " ++ show expr
 

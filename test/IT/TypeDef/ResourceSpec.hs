@@ -72,11 +72,11 @@ spec = do
               "void TMChannel__get_tm_sent_packets(TMChannel * const self,\n" ++
               "                                    uint32_t * packets) {\n" ++
               "\n" ++
-              "    __termina_resource__lock(self->__resource_id);\n" ++
+              "    __termina__resource_lock(&self->__resource_id);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(self->__resource_id);\n" ++
+              "    __termina__resource_unlock(&self->__resource_id);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -103,11 +103,11 @@ spec = do
               "\n" ++ 
               "void UARTDriver__get_status(UARTDriver * const self, uint32_t * ret) {\n" ++
               "\n" ++
-              "    __termina_resource__lock(self->__resource_id);\n" ++
+              "    __termina__resource_lock(&self->__resource_id);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina_resource__unlock(self->__resource_id);\n" ++
+              "    __termina__resource_unlock(&self->__resource_id);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
