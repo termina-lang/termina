@@ -23,6 +23,8 @@ import qualified Modules.Printing  as MPP
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
+import DataFlow.DF
+
 -- FilePath and IO
 import System.Path
 import System.Path.IO
@@ -203,6 +205,13 @@ main = runCommand $ \opts args ->
                       fail "[FAIL]"
                     Right typedM ->
                       whenChatty opts (print " >> [DONE]")
+                      ----------------------------------------
+                      -- Use/Def Ann
+                      >> maybe
+                          (when (optChatty opts) (print ("UseDef " ++ show m ++  " Passed")))
+                          (fail . (("UseDef ["++ show m ++"]  Error : ") ++) . show)
+                          (runUDTerminaProgram (typedModule $ moduleData typedM))
+                      ----------------------------------------
                       >> return (M.insert m typedM env)
                    ) M.empty (analyzeOrd ++ [baseMainName])
               whenChatty opts $ print "Finished Module typing"
@@ -227,22 +236,3 @@ main = runCommand $ \opts args ->
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
             _ -> ioError $ userError "Arguments error"
-
-              -- src_code <- readFile filepath
-              -- case runParser terminaProgram () filepath src_code of
-              --   Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-              --   Right (Termina mdls frags) ->
-              --     let mdlsPF = map moduleStringToPath mdls in
-              --       mapM_ loadFile  (map moduleIdentifier mdlsPF)
-                  -- case typeCheckRun ast of
-                  --   Left err -> ioError $ userError $ "Type Check Error ::\n" ++ show err
-                  --   Right tast ->
-                  --     when (optPrintAST opts) (print ast) >>
-                  --     when (optPrintASTTyped opts) (print tast) >>
-                  --     case optOutput opts of
-                  --       Nothing -> print (ppHeaderFile tast)
-                  --       Just fn ->
-                  --         let header = fn ++ ".h" in
-                  --         let source = fn ++ ".c" in
-                  --           TIO.writeFile header (ppHeaderFile tast)
-                  --           >> TIO.writeFile source (ppSourceFile tast)

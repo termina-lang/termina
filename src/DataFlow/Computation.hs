@@ -1,0 +1,239 @@
+-- | DSL to compute Use/Defs of Termina expressions
+
+module DataFlow.Computation where
+
+import AST.Core (Identifier)
+import Parser.Parsing (Annotation)
+
+import DataFlow.Errors
+
+import qualified Control.Monad.State as ST
+import Control.Monad.Except as E
+import Control.Monad
+import Control.Monad.Trans
+
+import Debug.Termina
+
+
+-- Something weird is going with set
+-- import qualified Data.Set as S
+import qualified Data.Map.Strict as M
+
+-- Implementing sets with maps :shrug:
+type VarSet = M.Map Identifier ()
+
+-- Variables could be defined, allocated or used.
+-- Normal variables go from |Defined| to used |Used|
+-- while special variables go from |Defined| -> |Allocated| -> |Used|.
+data MVars
+  = Defined
+  | Allocated
+  | Used
+
+-- We already know that each used variable is defined from previous pass.
+-- We just check that every defined variable is used plus the special ones goes
+-- throw the special process.
+
+type OOVarSt = M.Map Identifier MVars
+
+-- Internal state.
+data UDSt
+  = UDSt
+  -- A set of used variables
+    { usedSet :: VarSet
+  -- A map indicating the state of special variables.
+    , usedOption :: OOVarSt
+    , usedDyn :: VarSet
+    }
+
+emptyUDSt :: UDSt
+emptyUDSt
+  = UDSt M.empty M.empty M.empty
+
+type UDM e = ExceptT e (ST.State UDSt)
+
+----------------------------------------
+-- Manipulating the state inside monad |UDM|
+get :: UDM e UDSt
+get = lift ST.get
+
+put :: UDSt -> UDM e ()
+put = lift . ST.put
+
+putOOMap :: OOVarSt -> UDM e ()
+putOOMap = modify . (\s st -> st{usedOption = s})
+
+putUSet,putDynSet :: VarSet -> UDM e ()
+putUSet = modify . (\s st -> st{usedSet = s})
+putDynSet = modify . (\s st -> st{usedDyn = s})
+
+gets :: (UDSt -> b) ->  UDM e b
+gets = lift . ST.gets
+
+modify :: (UDSt -> UDSt) -> UDM e ()
+modify = lift . ST.modify
+
+withState :: (UDSt -> UDSt) -> UDM e a -> UDM e a
+withState f = (modify f >>)
+
+-- Encapsulation mechanisms.
+-- Useful to run computations in isolated environments.
+
+runEncapsulated :: UDM e a -> UDM e a
+runEncapsulated m =
+  get >>= \st -> m >>= \res -> lift (ST.put st) >> return res
+
+runEncapsEOO :: [UDM e a] -> UDM e [a]
+runEncapsEOO ms =
+  get >>= \st ->
+  mapM (withState (const emptyUDSt)) ms >>=
+  (put st >>) . return
+
+-- Run computations encapusulates with same first state.
+runEncaps :: [UDM e a] -> UDM e [a]
+runEncaps ms = do
+  st <- get
+  res <- mapM (withState (const st)) ms
+  put st
+  return res
+----------------------------------------
+
+emptyOO :: UDM e ()
+emptyOO = get >>= \st -> put (st{usedOption = M.empty})
+
+continueWith,unionS :: OOVarSt -> VarSet -> VarSet -> UDM e ()
+continueWith oo uses dyns
+  = put $ UDSt uses oo dyns
+unionS oo uses dyns
+  = get
+  >>= \st
+  -> put
+    -- M.union is left biased. Meaning that it takes priority over the other map
+    -- when key collision. It is what we want tho.
+     st{ usedOption = M.union oo (usedOption st)
+       , usedSet = M.union uses (usedSet st)
+       , usedDyn = M.union dyns (usedDyn st)
+       }
+
+getOnlyOnce :: UDM e OOVarSt
+getOnlyOnce = gets usedOption
+
+unsafeAdd :: Identifier -> VarSet -> VarSet
+unsafeAdd = flip M.insert ()
+
+unionUsed :: VarSet -> UDM e ()
+unionUsed vset =
+  modify (\st -> st{usedSet = M.union vset (usedSet st)})
+
+removeUsedOO,removeUsed :: Identifier -> UDSt -> UDSt
+removeUsedOO s st = st{usedOption = M.delete s (usedOption st)}
+removeUsed s st = st{usedSet = M.delete s (usedSet st)}
+
+-- safeAdd :: Identifier -> VarSet -> UDM Errors VarSet
+-- safeAdd ident vset =
+--   unless (M.size vset < maxBound) (throwError SetMaxBound)
+--   >> return (unsafeAdd ident vset)
+
+----------------------------------------
+-- This function checks we have not reached the limit of the data structure.
+safeAddUse :: Identifier -> UDM Errors ()
+-- Add Variable to use set
+safeAddUse ident
+  = do
+    usedSet <- gets usedSet
+    unless (M.size usedSet < maxBound) (throwError SetMaxBound)
+    putUSet $ unsafeAdd ident usedSet
+
+safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Errors ()
+safeAddUseOnlyOnce ident mv
+  = do
+    ooMap <- gets usedOption
+    unless (M.size ooMap < maxBound) (throwError MapMaxBound)
+    putOOMap $ M.insert ident mv ooMap
+
+-- DynVar manipulation
+defDynVar, useDynVar :: Identifier -> UDM Errors ()
+defDynVar ident
+  = gets usedDyn
+  >>= \dynSet ->
+    if M.member ident dynSet
+    then do
+      putDynSet $ M.delete ident dynSet
+    else
+      throwError (NotUsedOO ident)
+useDynVar ident
+  = gets usedDyn
+  >>= \dynSet ->
+  if M.member ident dynSet
+  then
+    throwError (UsingTwice ident)
+  else
+    unless (M.size dynSet < maxBound) (throwError SetMaxBound)
+    >> putDynSet (unsafeAdd ident dynSet)
+----------------------------------------
+
+addUseOnlyOnce :: Identifier -> UDM Errors ()
+addUseOnlyOnce ident
+  = do
+    ooMap <- gets usedOption
+    when (M.member ident ooMap) (throwError (UsingTwice ident))
+    safeAddUseOnlyOnce ident Used
+
+allocOO :: Identifier -> UDM Errors ()
+allocOO ident
+  =
+  maybe
+    (throwError (AllocNotUsed ident))
+    (\case{
+        -- We use it in the future
+        Used -> safeAddUseOnlyOnce ident Allocated;
+        -- Re-allocation
+        Allocated -> throwError (AllocTwice ident);
+        -- Define in the future? This case shouldn't happen
+        Defined -> throwError (AllocRedef ident);
+        })
+  =<<
+  M.lookup ident
+  <$> gets usedOption
+
+defVariableOO :: Identifier -> UDM Errors ()
+defVariableOO ident =
+  maybe
+    (throwError (NotUsed ident))
+    (\case{
+        -- Allocated after defined.
+        Allocated ->  safeAddUseOnlyOnce ident Defined;
+        -- Skipped allocation
+        Used -> throwError (DefinedNotAlloc ident);
+        -- Defined;Defined not allowed,
+        Defined -> throwError (DefinedTwice ident);
+        })
+  =<<
+  M.lookup ident
+  <$> gets usedOption
+
+-- If we define a variable that was not used, then error.
+defVariable :: Identifier -> UDM Errors ()
+defVariable ident =
+  gets usedSet >>=
+  \i ->
+    if M.member ident i
+    then
+        -- Variable is used, strong assumtions on use!
+        -- return () -- we can remove it... but maybe it is more expensive.
+        modify (removeUsed ident)
+    else
+        -- Variable |ident| is not used in the rest of the code :(
+        throwError (NotUsed ident)
+----
+
+----------------------------------------
+-- Annotation and error helper.
+annotateError :: Annotation -> UDM Errors a -> UDM AnnotatedErrors a
+annotateError an = withExceptT (annError an)
+
+----------------------------------------
+-- Run computation and get its result.
+runComputation :: UDM e a -> (Either e a , UDSt )
+runComputation = flip ST.runState emptyUDSt  . runExceptT
+----------------------------------------
