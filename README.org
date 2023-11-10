@@ -316,3 +316,11 @@ I don't think it should be possible, but I am not sure.
 ** TODO Parser Addresses! (aside from numbers, 0x..., other stuff)
 ** TODO modifiers type check
 ** DONE type specifiers check
+** TODO Mucho IMportant: Data.Map and stuff have undetectable errors!!
+#+begin_quote
+The size of a Map must not exceed maxBound::Int. Violation of this condition is not detected and if the size limit is exceeded, its behaviour is undefined.
+
+The Map type is shared between the lazy and strict modules, meaning that the same Map value can be passed to functions in both modules. This means that the Functor, Traversable and Data instances are the same as for the Data.Map.Lazy module, so if they are used the resulting maps may contain suspended values (thunks).
+#+end_quote
+
+Same goes for Data.Set.
