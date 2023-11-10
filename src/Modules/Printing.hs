@@ -13,7 +13,7 @@ import AST.Seman (AnnotatedProgram)
 import Semantic.Monad (SemanticAnns)
 import Data.Maybe (mapMaybe)
 
-import PPrinter hiding (ppHeaderFile)
+import PPrinter
 import PPrinter.Common (DocStyle)
 
 import Semantic.Errors (ppError)
@@ -28,7 +28,12 @@ moduleNameToText = map (pack . toUnrootedFilePath) . splitFragments
 
 includes :: [(ModuleName, ModuleMode)] -> Doc a
 includes [] = emptyDoc
-includes deps = vsep $ emptyDoc : map (\(nm, _) -> pinclude <+> dquotes(ppModuleName nm <> pretty ".h")) deps ++ [emptyDoc]
+includes deps = vsep $ emptyDoc : map (
+  \(nm, mm) -> 
+    case mm of
+      DirMod -> pinclude <+> dquotes(ppModuleName (nm </> fragment "header" <.> FileExt "h"))
+      SrcFile -> pinclude <+> dquotes(ppModuleName (nm <.> FileExt "h"))
+  ) deps ++ [emptyDoc]
  where
    pinclude = pretty "#include"
 
@@ -42,14 +47,14 @@ ppHeaderFile
 ppHeaderFile modName imports program = render $
   vsep
   [ vsep
-    [ pretty "#ifndef " <> modName
-    , pretty "#define " <> modName
+    [ pretty "#ifndef" <+> modName
+    , pretty "#define" <+> modName
     , emptyDoc
     ]
   , pretty "#include <termina.h>"
   , imports
   , vsep (mapMaybe ppHeaderASTElement program
-               ++ [ pretty "#endif // " <> modName])
+               ++ [ pretty "#endif //" <+> modName, emptyDoc])
   ]
 
 ppSourceFile
@@ -61,7 +66,7 @@ ppSourceFile
   -> Text
 ppSourceFile modName program = render $ vsep $
         [emptyDoc,
-        pretty "#include " <+> dquotes(modName <> pretty ".h"),
+        pretty "#include" <+> dquotes(modName <> pretty ".h"),
         emptyDoc
         ] ++ mapMaybe ppSourceASTElement program
 
