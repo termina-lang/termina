@@ -140,7 +140,8 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-
+useExpression (FunctionExpression _ident args _ann)
+  = mapM_ useExpression args
 
 useDefBlockRet :: BlockRet SemanticAnns -> UDM AnnotatedErrors ()
 useDefBlockRet bret =
