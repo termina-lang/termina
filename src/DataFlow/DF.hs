@@ -127,8 +127,14 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
         case ident of
           "send" -> do
             case args of
-              [AccessObject (Variable var _), ReferenceExpression Mutable res_obj _] -> annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
+              [AccessObject (Variable var _), ReferenceExpression Mutable res_obj _] -> 
+                  annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadSendArg)
+          "receive" -> do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> 
+                  annotateError (SM.location ann) (allocOO avar)
+              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
           _ -> mapM_ useExpression args -- receive, receive_timed, try_receive
       _ -> mapM_ useExpression args
   -- when requesting stuff from a pool with alloc.
