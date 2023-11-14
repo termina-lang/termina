@@ -130,12 +130,20 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
               [AccessObject (Variable var _), ReferenceExpression Mutable res_obj _] -> 
                   annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadSendArg)
-          "receive" -> do
+          "receive" -> annotateError (SM.location ann) (do
             case args of
-              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> 
-                  annotateError (SM.location ann) (allocOO avar)
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
+              _ -> throwError ImpossibleErrorBadReceiveArg)
+          "receive_timed" -> do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann, ReferenceExpression Immutable timeout_obj _] -> 
+                  annotateError (SM.location ann) (allocOO avar) >> useObject timeout_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
-          _ -> mapM_ useExpression args -- receive, receive_timed, try_receive
+          "try_receive" -> annotateError (SM.location ann) (do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
+              _ -> throwError ImpossibleErrorBadReceiveArg)
+          _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
       _ -> mapM_ useExpression args
   -- when requesting stuff from a pool with alloc.
 --  | ident == "alloc"
