@@ -31,7 +31,7 @@ import           AST.Core             (Identifier)
 import           AST.Seman            as SAST
 -- We need to know the type of objects.
 import qualified Semantic.Monad       as SM (location)
-import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns)
+import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
 
 
 import Debug.Termina
@@ -97,6 +97,9 @@ useFieldAssignment (FieldValueAssignment _ident e) = useExpression e
 -- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignemnt _ = return ()
 
+getObjectType :: Object SemanticAnns -> UDM Errors (AccessKind, TypeSpecifier)
+getObjectType = maybe (throwError ImpossibleError) return . getObjectSAnns . getAnnotation
+
 useExpression :: Expression SemanticAnns -> UDM AnnotatedErrors ()
 useExpression (AccessObject obj)
   = useObject obj
@@ -108,26 +111,59 @@ useExpression (ReferenceExpression _aK obj _a)
   = useObject obj
 useExpression (Casting e _ty _a)
   = useExpression e
-useExpression (MemberFunctionAccess obj ident args ann)
+useExpression (MemberFunctionAccess obj ident args ann) = do
+    useObject obj
+    obj_type <- annotateError (SM.location ann) (getObjectType obj)
+    case obj_type  of
+      (_, Port (Pool {})) ->
+        annotateError (SM.location ann) (case ident of
+          "alloc" -> do
+            case args of
+              -- I don't think we can have expression computing variables here.
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
+              _ -> throwError ImpossibleErrorBadAllocArg
+          _ -> throwError ImpossibleError) -- Pools only have alloc
+      (_, Port (MsgQueue {})) ->
+        case ident of
+          "send" -> do
+            case args of
+              [AccessObject (Variable var _), ReferenceExpression Mutable res_obj _] -> 
+                  annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
+              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadSendArg)
+          "receive" -> annotateError (SM.location ann) (do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
+              _ -> throwError ImpossibleErrorBadReceiveArg)
+          "receive_timed" -> do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann, ReferenceExpression Immutable timeout_obj _] -> 
+                  annotateError (SM.location ann) (allocOO avar) >> useObject timeout_obj
+              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
+          "try_receive" -> annotateError (SM.location ann) (do
+            case args of
+              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
+              _ -> throwError ImpossibleErrorBadReceiveArg)
+          _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
+      _ -> mapM_ useExpression args
   -- when requesting stuff from a pool with alloc.
-  | ident == "alloc"
-  = useObject obj
-  >> (annotateError (SM.location ann)
-     $ case args of
-        -- I don't think we can have expression computing variables here.
-        [ReferenceExpression Mutable (Variable avar _anni) _ann] ->
-          (allocOO avar)
-        _ -> throwError ImpossibleErrorBadAllocArg)
+--  | ident == "alloc"
+--  = useObject obj
+--  >> (annotateError (SM.location ann)
+--     $ case args of
+--        -- I don't think we can have expression computing variables here.
+--        [ReferenceExpression Mutable (Variable avar _anni) _ann] ->
+--          (allocOO avar)
+--        _ -> throwError ImpossibleErrorBadAllocArg)
   -- >> mapM_ useExpression args
   -- other functions
-  | ident == "send"
-    = useObject obj
-    >> error "TODO"
+--  | ident == "send"
+--    = useObject obj
+--    >> error "TODO"
     -- (annotateError (SM.location ann))
     --    $ case args of
     --         _ -> error "TODO"
-  | otherwise
-    = useObject obj >> mapM_ useExpression args
+--  | otherwise
+--    = useObject obj >> mapM_ useExpression args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
   = useObject obj >> mapM_ useExpression args
 useExpression (VectorInitExpression e _size _ann)
@@ -274,7 +310,7 @@ destroyOptionDyn (ml, mr)
   =
   let (mOpt, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
   in
-    ( useDefBlock(matchBody mOpt)
+    ( useDefBlock (matchBody mOpt)
       >>
      (SM.location (matchAnnotation mOpt)) `annotateError` defDynVar (head (matchBVars mOpt))
      >> get

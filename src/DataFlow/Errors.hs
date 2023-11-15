@@ -24,6 +24,7 @@ data Errors
   | ForMoreODyn
   | InternalOptionMissMatch
   | ImpossibleErrorBadAllocArg
+  | ImpossibleErrorBadSendArg
   -- Special Variable errors
   | AllocNotUsed Identifier
   | AllocTwice Identifier

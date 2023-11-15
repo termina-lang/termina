@@ -285,39 +285,74 @@ memberFunctionAccessType ann obj_ty ident args =
         _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
     Port (MsgQueue ty _size) ->
       case ident of
+        -- | send(dyn T, result : &mut Result)
         "send" ->
           case args of
-            [element, res] -> do
+            [element, result] -> do
               -- | Type the first argument element : Option<dyn ty>
               element_typed <- expressionType rhsObjectType element
               element_type <- getExpType element_typed
               -- | Type the second argument result : &mut Result
-              res_typed <- expressionType rhsObjectType res
-              res_type <- getExpType res_typed
+              result_typed <- expressionType rhsObjectType result
+              result_type <- getExpType result_typed
               -- Check first type. ety stores the type of the dynamic element.
               ety <- maybe (throwError $ annotateError ann $ EMsgQueueSendArgNotDyn element_type) return (isDyn element_type)
               unless (groundTyEq ety ty) (throwError $ annotateError ann $ EMsgQueueWrongType ety ty)
               -- Check second type. rty stores a reference to a result type
-              case res_type of
+              case result_type of
                 Reference Mutable (DefinedType "Result") -> 
                   return (
-                    [Parameter "element" element_type, Parameter "result" res_type]
-                    , [element_typed, res_typed], Unit
+                    [Parameter "result" element_type, Parameter "result" result_type]
+                    , [element_typed, result_typed], Unit
                   )
-                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotRefMutResult res_type
+                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotRefMutResult result_type
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
+        -- | receive(msg : &mut Option<dyn T>)
         "receive" ->
           case args of
-            [arg] -> do 
-              arg_typed <- expressionType rhsObjectType arg
-              arg_type <- getExpType arg_typed
-              case arg_type of
+            [opt] -> do 
+              opt_typed <- expressionType rhsObjectType opt
+              opt_type <- getExpType opt_typed
+              case opt_type of
                 -- & Option<'dyn T>
                 Reference Mutable (Option (DynamicSubtype t)) ->
-                  if groundTyEq t ty
-                  then return ([Parameter "opt" arg_type], [arg_typed], Unit)
-                  else throwError $ annotateError ann $ EMsgQueueWrongType t ty
-                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy arg_type
+                  unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
+                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
+              return ([Parameter "opt" opt_type], [opt_typed], Unit)
+            _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
+        -- | receive(msg : &mut Option<dyn T>)
+        "receive_timed" ->
+          case args of
+            [opt, timeout] -> do 
+              opt_typed <- expressionType rhsObjectType opt
+              opt_type <- getExpType opt_typed
+              timeout_typed <- expressionType rhsObjectType timeout
+              timeout_type <- getExpType timeout_typed
+              case opt_type of
+                -- & Option<'dyn T>
+                Reference Mutable (Option (DynamicSubtype t)) ->
+                  unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
+                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
+              case timeout_type of
+                Reference Immutable (DefinedType "Result") -> 
+                  return (
+                    [Parameter "opt" opt_type, Parameter "timeout" timeout_type]
+                    , [opt_typed, opt_typed], Unit
+                  )
+                _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotRefImmTimeout timeout_type
+            _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
+                -- | receive(msg : &mut Option<dyn T>)
+        "try_receive" ->
+          case args of
+            [opt] -> do 
+              opt_typed <- expressionType rhsObjectType opt
+              opt_type <- getExpType opt_typed
+              case opt_type of
+                -- & Option<'dyn T>
+                Reference Mutable (Option (DynamicSubtype t)) ->
+                  unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
+                _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
+              return ([Parameter "opt" opt_type], [opt_typed], Unit)
             _ -> throwError $ annotateError ann ENoMsgQueueRcvWrongArgs
         _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
     ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
