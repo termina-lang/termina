@@ -9,11 +9,10 @@ import Prettyprinter
 import Modules.Printing
 
 test0 :: String
-test0 = "enum Message {\n" ++
-        "    In (u32, u32),\n" ++
-        "    Out (u32),\n" ++
-        "    Stop,\n" ++
-        "    Reset\n" ++
+test0 = "struct Message {\n" ++
+        "    sender_id : u32;\n" ++
+        "    destination_id : u32;\n" ++
+        "    urgent : bool;\n" ++
         "};\n" ++
         "\n" ++
         "task class CHousekeeping {\n" ++
@@ -38,6 +37,7 @@ test0 = "enum Message {\n" ++
         "    self->message_pool.alloc(&mut alloc_msg);\n" ++
         "    match alloc_msg {\n" ++
         "        case Some(msg) => {\n" ++
+        "            msg.urgent = false;\n" ++
         "            free(msg);\n" ++
         "        }\n" ++
         "        case None => {\n" ++
@@ -81,31 +81,10 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "typedef enum {\n" ++
-              "    Message__In,\n" ++
-              "    Message__Out,\n" ++
-              "    Message__Stop,\n" ++
-              "    Message__Reset\n" ++
-              "} __enum_Message_t;\n" ++
-              "\n" ++
               "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
-              "    uint32_t __1;\n" ++
-              "} __enum_Message__In_params_t;\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    uint32_t __0;\n" ++
-              "} __enum_Message__Out_params_t;\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "\n" ++
-              "    __enum_Message_t __variant;\n" ++
-              "\n" ++
-              "    union {\n" ++
-              "        __enum_Message__In_params_t In;\n" ++
-              "        __enum_Message__Out_params_t Out;\n" ++
-              "    };\n" ++
-              "\n" ++
+              "    uint32_t sender_id;\n" ++
+              "    uint32_t destination_id;\n" ++
+              "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++   
               "typedef struct {\n" ++
@@ -145,6 +124,8 @@ spec = do
               "    } else {\n" ++
               "\n" ++   
               "        __termina_option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
+              "\n" ++
+              "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
               "\n" ++
               "        __termina__pool_free(__alloc_msg__Some);\n" ++
               "\n" ++  

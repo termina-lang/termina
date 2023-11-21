@@ -184,8 +184,9 @@ objectType _ (MemberAccess obj ident ann) = do
   -- field of an object, only the local objects are available, not the global ones. 
   -- This way, only the fields of objects that are in the local environment of the
   -- function can be accessed.
-  typed_obj <- objectType getLocalObjTy obj
-  (obj_ak , obj_ty) <- unboxObjectSAnns typed_obj
+  typed_obj' <- objectType getLocalObjTy obj
+  (obj_ak , obj_ty') <- unboxObjectSAnns typed_obj'
+  let (typed_obj, obj_ty) = maybe (typed_obj', obj_ty') (unDyn typed_obj',) (isDyn obj_ty')
   fts <- memberFieldAccessType ann obj_ty ident
   return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fts
 objectType getVarTy (Dereference obj ann) = do
