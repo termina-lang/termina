@@ -4,11 +4,50 @@ resource class UARTDriver {
     initialized : bool;
     status_register : loc u32;
 
-    procedure init(&priv self) {
+    method init(&priv self) -> Result {
+
+        var result : Result = Result::Ok;
 
         self->initialized = true;
+        self->status_register = 0 : u32;
+
+        return result;
+
+    }
+
+    procedure init_drv(&priv self) {
 
         return;
+
+    }
+
+    procedure use(&priv self) {
+
+        return;
+
+    }
+
+};
+
+handler class UARTIrqHandler {
+
+    driver : port UARTDriver;
+
+    method init(&priv self) -> Result {
+
+        var result : Result = Result::Ok;
+
+        return result;
+
+    }
+
+    method handle(&priv self) -> Result {
+
+        var result : Result = Result::Ok;
+
+        self->driver.use();
+
+        return result;
 
     }
 
