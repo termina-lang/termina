@@ -39,16 +39,6 @@ isTerminaFile = (Just terminaExt ==)  . takeExtension
 terminaExt :: FileExt
 terminaExt = FileExt "fin"
 
--- Let [projDir] be the route to the "project" and [nm]  a module name.
--- [moduleSrcFromName projDir nm] = "projDir/nm/src.fin"
--- moduleSrcFromName :: ProjectDir -> ModuleName -> [ ModuleSrc ]
--- moduleSrcFromName dirProject mName = dirProject </> mName <.> terminaExt
-
--- moduleStringToPath
---   :: ProjectDir -> Module' [String] a -> Module' ModuleData a
--- moduleStringToPath pDir
---   = modulePath (\strs -> let nm = fragments strs in MData nm (moduleSrcFromName pDir nm))
-
 buildModuleName :: [String] -> ModuleName
 buildModuleName = fragments
 

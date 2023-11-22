@@ -20,6 +20,15 @@ So we have:
 
 In ~./src.fin~, we can import ~module A;~, ~module B;~, ~module C.S;~.
 
+*** Although we support modules, we have only one namespace.
+
+We have modules, but since we are transpiling to C, we have only one namespace.
+
+There are several solutions:
++ Providing unique names, but we do not want to break names defined by the user.
++ Reject Termina programs with at least two shared globals at different modules, even when they do not see each other.
++ Do nothing.
+
 * Example
 
 #+begin_src bash

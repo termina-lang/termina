@@ -34,9 +34,10 @@ Uses: whenever named.
 
 There exist *at least* one use.
 * TODO Ask Pablo
-** What objects can be freed?
-** Can we reuse variables after alloc?
-** [Q1] Every assigned value should be used?
+** DONE What objects can be freed?
+** DONE Can we reuse variables after alloc?
+NO! No reuse
+** TODO [Q1] Every assigned value should be used?
 for example
 #+begin_src
 var r ...
@@ -47,6 +48,10 @@ r := r + 1
 ~r~ should be used in ~B2~?
 I think yes. but :shrug:
 Right now is no.
+--
+*** TODO Change to we should use r.
+State variables not necessarily.
 
-** Type of send, it is not a dyn ref
+** TODO Type of send, it is not a dyn ref
 I though send was similar to free, but their type is different?
+*** TODO Check PullRequest
