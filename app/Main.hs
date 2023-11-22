@@ -192,12 +192,18 @@ main = runCommand $ \opts args ->
                         unless exists (fail "Output Folder does not exist.")
                         return p)
               --
-              analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop (M.map fst3 mapProject))
+              let modDeps = M.map fst3 mapProject
+              whenChatty opts $ print ("Deps:" ++ show modDeps)
+
+              analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop modDeps)
+              whenChatty opts $ print ("Project Order: " ++ show analyzeOrd)
+              --
               let toModuleAST = M.map mAstFromPair mapProject
               -- Let's make it interactive (for the use)
               -- typedProject :: Map ModuleName (ModuleAST TypedModule)
               typedProject <- foldM (\env m -> do
                    whenChatty opts $ print ("Type Checking Module: " ++ show m)
+                   -- Here is something wrong!!
                    case typeModule toModuleAST m env of
                     Left err ->
                       print "--------" >>

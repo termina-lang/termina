@@ -20,7 +20,7 @@ import           Utils.AST.Core
 import           Utils.TypeSpecifier
 
 -- Top Sort
-import Extras.TopSort (topSortFromDepList)
+import Extras.TopSort (TopE(..) , topSortFromDepList)
 import qualified Data.Map.Strict as M
 
 -- Termina Semantic AST
@@ -844,7 +844,8 @@ typeDefCheck ann (Class kind ident members mds)
     -- Sort and see if there is a loop
     topSortOrder <- case topSortFromDepList dependencies of
             -- Tell the user a loop is in the room
-            Left loop -> throwError (annotateError ann (EClassLoop loop))
+            Left (ELoop loop) -> throwError (annotateError ann (EClassLoop loop))
+            Left _ -> error "Internal TopSort Error"
             -- Get the proper order of inclusion and get their definitions from names.
             Right order ->
               mapM

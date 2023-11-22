@@ -33,6 +33,7 @@ data ModuleAST a = MData
   { moduleDeps :: [ModuleName]
   , moduleData :: a
   }
+  deriving Show
 
 mAstFromPair :: ([ModuleName] , a , PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
 mAstFromPair (deps, _ , tast) = MData deps tast
@@ -41,6 +42,7 @@ data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns
    , defsModule  :: [ (SAST.Identifier , SAnns (GEntry SemanticAnns)) ]
    }
+  deriving Show
 
 type ParserProject = M.Map ModuleName (ModuleAST (PAST.TerminaProgram Annotation))
 type SemanProject =  M.Map ModuleName (ModuleAST TypedModule)
@@ -62,7 +64,8 @@ typeModule
   -> ModuleName
   -> SemanProject
   -> Either Errors (ModuleAST TypedModule)
-typeModule parserMap m typedDeps = case M.lookup m parserMap of
+typeModule parserMap m typedDeps =
+  case M.lookup m parserMap of
         Nothing -> Left (EModuleNotParsed m)
         Just (MData deps parsedM) ->
             addDeps deps >>= \env ->
@@ -85,7 +88,8 @@ typeProject
   -> [ModuleName]
   -- Return a seman project (covered with effects :sweat_smile:)
   -> TProjectM SemanProject
-typeProject parserMap = flip typeProject' M.empty
+typeProject parserMap mds =
+  typeProject' mds M.empty
   where
     typeProject' [] typedP = return typedP
     typeProject' (m:ms) tP =
@@ -108,6 +112,7 @@ buildEnvironment
   :: SemanProject -> ModuleName -> Environment -> TProjectM Environment
 buildEnvironment tP dName env =
   case M.lookup dName tP of
+     --
      Nothing -> throwError (EDependencyNotTyped dName)
      --
      Just typedM ->

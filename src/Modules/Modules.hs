@@ -97,4 +97,11 @@ processProjectDeps
 sortOrLoop
   :: M.Map ModuleName [ModuleName]
   -> Either [ModuleName] [ModuleName]
-sortOrLoop = topSortFromDepList . processProjectDeps
+sortOrLoop = topErrorInternal . processProjectDeps
+  where
+    topErrorInternal = (either
+                        (\case { ELoop xs -> Left xs; ENotFound a -> error
+                          ("Internal TopSort Error Node not found" ++ show a)})
+                         Right
+                       )
+                          . topSortFromDepList

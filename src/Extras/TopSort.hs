@@ -20,30 +20,36 @@ data TopSt a
   { getTemp :: S.Set a
   -- Permanent marked set
   , getPerm :: S.Set a
+  , res :: [a]
   }
 
 emptyTopS :: TopSt a
-emptyTopS = St S.empty S.empty
+emptyTopS = St S.empty S.empty []
 
-addTemp, addPerm :: Ord a => a -> TopSt a -> TopSt a
-addTemp a (St temp perm) = St (S.insert a temp) perm
-addPerm a (St temp perm) = St temp (S.insert a perm)
+-- Add to temp and perm sets
+addTemp, addPerm, addL :: Ord a => a -> TopSt a -> TopSt a
+addTemp a sets = sets{getTemp = S.insert a (getTemp sets)}
+addPerm a sets = sets{getPerm = S.insert a (getPerm sets)}
+addL a st = st{res=a : (res st)}
 
 -- Remove or nothing.
 rmTemp :: Ord a => a -> TopSt a -> TopSt a
-rmTemp a (St temp perm) = St (S.delete a temp) perm
+rmTemp a st = st{getTemp = S.delete a (getTemp st)}
 
 data TopE a
-  = ELoop [a]
-  | ENotFound a
+  = ELoop [a] -- ^ Loop Error fund.
+  | ENotFound a -- ^ Internal error.
+  deriving Show
 
+-- Monad to compute.
+-- Error TopE and State TopSt
 type TopSort a = ExceptT (TopE a) (State (TopSt a))
-
-lmodify :: (s -> s) -> ExceptT e (State s) ()
-lmodify = lift . modify
 
 -- Adj map
 type Graph a = M.Map a [a]
+
+lmodify :: (s -> s) -> ExceptT e (State s) ()
+lmodify = lift . modify
 
 -------------------------------------------------
 -- Note [0]
@@ -57,18 +63,14 @@ topSort
   -- | Takes a dependency graph
   => Graph a
   -- Returns either a loop between elements [0] or an ordered list of them.
-  -> Either [a] [a]
-topSort graph = case evalState (runExceptT computation) emptyTopS of
-  -- Left (EEnd _a) -> error "[Top Sort] Impossible Behaviour: Only one endpoint of a loop found."
-  Left (ENotFound a) -> error ("[Top Sort] Impossible Behaviour: Node (" ++ show a ++ ") not found in " ++ show nodes)
-  Left (ELoop loop ) -> Left loop
-  Right res -> Right res
+  -> Either (TopE a) [a]
+topSort graph = evalState (runExceptT (computation >> gets (reverse . res))) emptyTopS
   where
     nodes = M.keys graph
     computation = topSortInternal graph nodes
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: (Ord a, Show a) => [(a, [a])] -> Either [a] [a]
+topSortFromDepList :: (Ord a, Show a) => [(a, [a])] -> Either (TopE a) [a]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
@@ -78,30 +80,31 @@ topSortInternal
   -- Nodes
   -> [a]
   -- Result
-  -> TopSort a [a]
-topSortInternal _graph [] = return []
-topSortInternal graph (a:as) =
-  gets getPerm >>= \permSet ->
-  if S.member a permSet
-  then topSortInternal graph as
-  else
-    (++) <$>
-    (reverse <$> visit graph a)
-    <*>
-    topSortInternal graph as
+  -> TopSort a ()
+topSortInternal graph =
+  mapM_
+   (\a ->
+    get >>= \sets ->
+    if S.member a (getPerm sets) || S.member a (getTemp sets)
+    then -- skip if marked
+      return ()
+    else -- if a is unmarked
+        visit graph a
+   )
 
-visit :: Ord a => Graph a -> a -> TopSort a [a]
+visit :: Ord a => Graph a -> a -> TopSort a ()
 visit graph src
   = gets getPerm >>= \permSet ->
-  if S.member src permSet then return []
+  if S.member src permSet
+  then return ()
   else
     do
       tempSet <- gets getTemp
       when (S.member src tempSet) (throwError (ELoop (S.toList tempSet)))
       -- temp mark |src|
       lmodify (addTemp src)
+      --
       accms <- case M.lookup src graph of
                     Nothing -> throwError (ENotFound src)
                     Just adj_src -> mapM (visit graph) adj_src
-      lmodify (addPerm src . rmTemp src)
-      return (src : concat accms)
+      lmodify (addL src . addPerm src . rmTemp src)
