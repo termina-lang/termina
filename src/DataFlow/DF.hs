@@ -249,8 +249,9 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
       )
     -- We add all normal use variables
     >>= unionUsed
+    -- We do not define variable itIdent, we do not need it.
     -- Definition of iteration varialbe.
-    >> (SM.location ann) `annotateError` defVariable itIdent
+    -- >> (SM.location ann) `annotateError` defVariable itIdent
     -- Use expression over begin, end, and break condition.
     >> maybe (return ()) useExpression mBrk
     >> useExpression eB
