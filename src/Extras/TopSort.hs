@@ -7,7 +7,8 @@
 
 module Extras.TopSort where
 
-import qualified Data.Set as S  -- We'll keep a set of visited nodes.
+-- import qualified Data.Set as S  -- We'll keep a set of visited nodes.
+import qualified Extras.Set as S
 import qualified Data.Map.Strict as M  -- We interpret map as graphs.
 
 import Control.Monad.State.Strict
@@ -28,8 +29,13 @@ emptyTopS = St S.empty S.empty []
 
 -- Add to temp and perm sets
 addTemp, addPerm, addL :: Ord a => a -> TopSt a -> TopSt a
-addTemp a sets = sets{getTemp = S.insert a (getTemp sets)}
-addPerm a sets = sets{getPerm = S.insert a (getPerm sets)}
+addTemp a sets =
+  maybe (error "TopSort Max Bound -addTemp-")
+  (\s -> sets{getTemp = s}) (S.insert a (getTemp sets))
+  -- sets{getTemp = S.insert a (getTemp sets)}
+addPerm a sets =
+  maybe (error "TopSort Max Bound -addPerm-")
+  (\s -> sets{getPerm = s}) (S.insert a (getPerm sets))
 addL a st = st{res=a : (res st)}
 
 -- Remove or nothing.
