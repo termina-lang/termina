@@ -1,0 +1,8 @@
+function double_def () -> u16 {
+  var r : u16 = 0 : u16;
+
+  r  = 1 : u16;
+
+  return (0 : u16);
+  // return r;
+}

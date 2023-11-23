@@ -1,0 +1,50 @@
+// Issue #40
+
+#[packed]
+struct UARTRegs {
+
+    data : u32;
+    status : u32;
+    control :  u32;
+    scaler : u32;
+
+};
+
+resource class UARTDriver{
+
+    uart_regs: loc UARTRegs;
+
+    viewer riscv_uart_tf_is_full(&self) -> bool {
+
+        let riscv_uart_tf : u32 = 0x00000200 : u32;
+
+        return ((self->uart_regs.status & riscv_uart_tf) != 0 : u32);
+
+    }
+
+    procedure riscv_putchar(&priv self, c : u8, result : &mut Result) {
+
+        var write_timeout : u32 = 0 : u32;
+        let timeout : u32 = 0xAAAAA : u32;
+
+        *result = Result::Error;
+
+        for i : u32 in 0 : u32 .. timeout while self->riscv_uart_tf_is_full() {
+
+            write_timeout = write_timeout + 1 : u32;
+
+        }
+
+        if (write_timeout < timeout){
+
+            self->uart_regs.data = c as u32;
+
+            *result = Result::Ok;
+
+        }
+
+        return;
+
+    }
+
+};
