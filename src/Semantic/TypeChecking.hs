@@ -133,6 +133,7 @@ unboxObjectSAnns = maybe (throwError $ annotateError internalErrorSeman EUnboxin
 memberFieldAccessType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
 memberFieldAccessType ann obj_ty ident =
   case obj_ty of
+    Location obj_ty' -> memberFieldAccessType ann obj_ty' ident
     DefinedType dident -> getGlobalTy internalErrorSeman dident >>=
       \case{
         -- Either a struct
@@ -274,7 +275,7 @@ memberFunctionAccessType ann obj_ty ident args =
       case ident of
         "alloc" ->
           case args of
-            [refM] -> do 
+            [refM] -> do
               typed_ref <- expressionType rhsObjectType refM
               type_ref <- getExpType typed_ref
               case type_ref of
@@ -301,7 +302,7 @@ memberFunctionAccessType ann obj_ty ident args =
               unless (groundTyEq ety ty) (throwError $ annotateError ann $ EMsgQueueWrongType ety ty)
               -- Check second type. rty stores a reference to a result type
               case result_type of
-                Reference Mutable (DefinedType "Result") -> 
+                Reference Mutable (DefinedType "Result") ->
                   return (
                     [Parameter "result" element_type, Parameter "result" result_type]
                     , [element_typed, result_typed], Unit
@@ -311,7 +312,7 @@ memberFunctionAccessType ann obj_ty ident args =
         -- | receive(msg : &mut Option<dyn T>)
         "receive" ->
           case args of
-            [opt] -> do 
+            [opt] -> do
               opt_typed <- expressionType rhsObjectType opt
               opt_type <- getExpType opt_typed
               case opt_type of
@@ -324,7 +325,7 @@ memberFunctionAccessType ann obj_ty ident args =
         -- | receive(msg : &mut Option<dyn T>)
         "receive_timed" ->
           case args of
-            [opt, timeout] -> do 
+            [opt, timeout] -> do
               opt_typed <- expressionType rhsObjectType opt
               opt_type <- getExpType opt_typed
               timeout_typed <- expressionType rhsObjectType timeout
@@ -335,7 +336,7 @@ memberFunctionAccessType ann obj_ty ident args =
                   unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
                 _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
               case timeout_type of
-                Reference Immutable (DefinedType "Result") -> 
+                Reference Immutable (DefinedType "Result") ->
                   return (
                     [Parameter "opt" opt_type, Parameter "timeout" timeout_type]
                     , [opt_typed, opt_typed], Unit
@@ -345,7 +346,7 @@ memberFunctionAccessType ann obj_ty ident args =
                 -- | receive(msg : &mut Option<dyn T>)
         "try_receive" ->
           case args of
-            [opt] -> do 
+            [opt] -> do
               opt_typed <- expressionType rhsObjectType opt
               opt_type <- getExpType opt_typed
               case opt_type of
@@ -647,7 +648,7 @@ statementTySimple (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt an
   ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr
     <$> (case mWhile of
               Nothing -> return Nothing
-              Just whileC -> do 
+              Just whileC -> do
                   typed_whileC <- expressionType rhsObjectType whileC
                   type_whileC <- getExpType typed_whileC
                   unless (groundTyEq Bool type_whileC) (throwError $ annotateError anns (EForWhileTy type_whileC))
@@ -872,19 +873,16 @@ typeDefCheck ann (Class kind ident members mds)
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
-              insertLocalMutObj ann "self" (Reference Private (DefinedType ident))
-              typed_blk <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
+              typed_blk <- addLocalMutObjs mann (("self", Reference Private (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
               let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              insertLocalMutObj ann "self" (Reference Private (DefinedType ident))
-              typed_bret <- retblockType mbody
+              typed_bret <- addLocalMutObjs mann [("self", Reference Private (DefinedType ident))] (retblockType mbody)
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mps ty mbody mann -> do
-              insertLocalMutObj ann "self" (Reference Immutable (DefinedType ident))
-              typed_bret <- addLocalMutObjs mann (fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType mbody)
+              typed_bret <- addLocalMutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType mbody)
               blockRetTy ty typed_bret
               let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
               return (newVw : prevMembers)

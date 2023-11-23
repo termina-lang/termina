@@ -267,7 +267,7 @@ insertROImmObj loc ident ty =
   then -- | if there is throw error
   throwError $ annotateError loc $ EVarDefined ident
   else -- | If there is no variable named |ident|
-  modify (\s -> s{local = M.insert ident (Immutable, ty) (ro s)})
+  modify (\s -> s{ro = M.insert ident (Immutable, ty) (ro s)})
 
 insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =

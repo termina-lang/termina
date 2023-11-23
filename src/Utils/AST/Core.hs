@@ -57,6 +57,8 @@ findClassViewerOrMethod i
 selfInv :: Expression' obj a -> (obj a -> Bool) -> Maybe Identifier
 selfInv (MemberFunctionAccess obj mident _args _ann) isSelf =
   if isSelf obj then Just mident else Nothing
+selfInv (DerefMemberFunctionAccess obj mident _args _ann) isSelf =
+  if isSelf obj then Just mident else Nothing
 selfInv _ _isSelf = Nothing
 
 selfInvStmt :: (obj a -> Bool) -> Statement' (Expression' obj) obj a -> [Identifier]
