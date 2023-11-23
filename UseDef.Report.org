@@ -33,11 +33,11 @@ Defs: when declared, arguments, etc
 Uses: whenever named.
 
 There exists *at least* one use.
-* TODO Ask Pablo
+* DONE Ask Pablo
 ** DONE What objects can be freed?
 ** DONE Can we reuse variables after alloc?
 NO! No reuse
-** TODO [Q1] Every assigned value should be used?
+** DONE [Q1] Every assigned value should be used?
 for example
 #+begin_src
 var r ...
@@ -49,9 +49,9 @@ r := r + 1
 I think yes. but :shrug:
 Right now is no.
 --
-*** TODO Change to we should use r.
+*** DONE Change to we should use r.
 State variables not necessarily.
 
-** TODO Type of send, it is not a dyn ref
+** DONE Type of send, it is not a dyn ref
 I though send was similar to free, but their type is different?
-*** TODO Check PullRequest
+*** DONE Check PullRequest

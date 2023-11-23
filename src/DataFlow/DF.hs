@@ -203,9 +203,10 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   >> useExpression initE
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e _ann)
-  = useExpression e
+  -- DONE [UseDef.Report.Q1]
+  = defObject obj
+  >> useExpression e
   >> useObject obj
-  -- DONE [Q1] Still not super sure, but acceptable.
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
