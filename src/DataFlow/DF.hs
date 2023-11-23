@@ -145,25 +145,6 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
               _ -> throwError ImpossibleErrorBadReceiveArg)
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
       _ -> mapM_ useExpression args
-  -- when requesting stuff from a pool with alloc.
---  | ident == "alloc"
---  = useObject obj
---  >> (annotateError (SM.location ann)
---     $ case args of
---        -- I don't think we can have expression computing variables here.
---        [ReferenceExpression Mutable (Variable avar _anni) _ann] ->
---          (allocOO avar)
---        _ -> throwError ImpossibleErrorBadAllocArg)
-  -- >> mapM_ useExpression args
-  -- other functions
---  | ident == "send"
---    = useObject obj
---    >> error "TODO"
-    -- (annotateError (SM.location ann))
-    --    $ case args of
-    --         _ -> error "TODO"
---  | otherwise
---    = useObject obj >> mapM_ useExpression args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
   = useObject obj >> mapM_ useExpression args
 useExpression (VectorInitExpression e _size _ann)
@@ -209,6 +190,9 @@ useDefStmt (AssignmentStmt obj e _ann)
   >> useObject obj
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
+  -- Issue #40, forgot to use condition expression.
+  useExpression eCond
+  mapM (useExpression . elseIfCond) elseIfs
   -- All sets generated for all different branches.
   sets <- runEncaps
                 ([ useDefBlock bTrue >> get
