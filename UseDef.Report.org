@@ -32,7 +32,7 @@ There exsists only one use.
 Defs: when declared, arguments, etc
 Uses: whenever named.
 
-There exist *at least* one use.
+There exists *at least* one use.
 * TODO Ask Pablo
 ** DONE What objects can be freed?
 ** DONE Can we reuse variables after alloc?

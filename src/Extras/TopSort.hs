@@ -28,14 +28,16 @@ emptyTopS :: TopSt a
 emptyTopS = St S.empty S.empty []
 
 -- Add to temp and perm sets
-addTemp, addPerm, addL :: Ord a => a -> TopSt a -> TopSt a
+addTemp, addPerm :: Ord a => a -> TopSt a -> Maybe (TopSt a)
 addTemp a sets =
-  maybe (error "TopSort Max Bound -addTemp-")
-  (\s -> sets{getTemp = s}) (S.insert a (getTemp sets))
+  (\s -> sets{getTemp = s}) <$> (S.insert a (getTemp sets))
+  -- maybe (error "TopSort Max Bound -addTemp-")
   -- sets{getTemp = S.insert a (getTemp sets)}
 addPerm a sets =
-  maybe (error "TopSort Max Bound -addPerm-")
-  (\s -> sets{getPerm = s}) (S.insert a (getPerm sets))
+  -- maybe (error "TopSort Max Bound -addPerm-")
+  (\s -> sets{getPerm = s}) <$> (S.insert a (getPerm sets))
+
+addL :: Ord a => a -> TopSt a -> TopSt a
 addL a st = st{res=a : (res st)}
 
 -- Remove or nothing.
@@ -45,6 +47,7 @@ rmTemp a st = st{getTemp = S.delete a (getTemp st)}
 data TopE a
   = ELoop [a] -- ^ Loop Error fund.
   | ENotFound a -- ^ Internal error.
+  | MaxBound
   deriving Show
 
 -- Monad to compute.
@@ -56,6 +59,12 @@ type Graph a = M.Map a [a]
 
 lmodify :: (s -> s) -> ExceptT e (State s) ()
 lmodify = lift . modify
+
+lmodifyE :: (TopSt a -> Maybe (TopSt a)) -> TopSort a ()
+lmodifyE m = getE >>= maybe (throwError MaxBound) putE . m
+  where
+    getE = lift get
+    putE = lift . put
 
 -------------------------------------------------
 -- Note [0]
@@ -108,9 +117,11 @@ visit graph src
       tempSet <- gets getTemp
       when (S.member src tempSet) (throwError (ELoop (S.toList tempSet)))
       -- temp mark |src|
-      lmodify (addTemp src)
+      lmodifyE (addTemp src)
       --
       accms <- case M.lookup src graph of
                     Nothing -> throwError (ENotFound src)
                     Just adj_src -> mapM (visit graph) adj_src
-      lmodify (addL src . addPerm src . rmTemp src)
+      lmodify (rmTemp src)
+      lmodifyE (addPerm src)
+      lmodify (addL src)
