@@ -27,6 +27,7 @@ primitiveTypes  _              = False
 -- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
 simpleType :: TypeSpecifier -> Bool
 simpleType Unit                = False
+simpleType (Option (DynamicSubtype {})) = False
 simpleType (DynamicSubtype {}) = False
 simpleType (MsgQueue {})       = False
 simpleType (Pool {})           = False
@@ -36,12 +37,13 @@ simpleType (Port {})           = False
 simpleType _                   = True
 
 classFieldType :: TypeSpecifier -> Bool
-classFieldType Unit                = False
-classFieldType (DynamicSubtype {}) = False
-classFieldType (MsgQueue {})       = False
-classFieldType (Pool {})           = False
-classFieldType (Reference {})      = False
-classFieldType _                   = True
+classFieldType Unit                         = False
+classFieldType (DynamicSubtype {})          = False
+classFieldType (Option (DynamicSubtype {})) = False
+classFieldType (MsgQueue {})                = False
+classFieldType (Pool {})                    = False
+classFieldType (Reference {})               = False
+classFieldType _                            = True
 
 boolTy :: TypeSpecifier -> Bool
 boolTy Bool = True
@@ -90,9 +92,29 @@ identifierType (Class _ ident _ _)  = ident
 
 referenceType :: TypeSpecifier -> Bool
 referenceType Unit           = False
+referenceType (MsgQueue {})  = False
+referenceType (Pool {})      = False
 referenceType (Reference {}) = False
+referenceType (Location {})  = False
+referenceType (Port {})      = False
 referenceType _              = True
 
 isDyn :: TypeSpecifier -> Maybe TypeSpecifier
 isDyn (DynamicSubtype t) = Just t
 isDyn _ = Nothing
+
+isNonDynOption :: TypeSpecifier -> Bool
+isNonDynOption (Option (DynamicSubtype _)) = False
+isNonDynOption (Option _) = True
+isNonDynOption _ = False
+
+rootType :: TypeSpecifier -> TypeSpecifier
+rootType (Option ts) = rootType ts
+rootType (Vector ts _) = rootType ts
+rootType (MsgQueue ts _) = rootType ts
+rootType (Pool ts _) = rootType ts
+rootType (Reference _ ts) = rootType ts
+rootType (DynamicSubtype ts) = rootType ts
+rootType (Location ts) = rootType ts
+rootType (Port ts) = rootType ts
+rootType t = t

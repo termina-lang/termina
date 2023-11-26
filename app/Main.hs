@@ -9,10 +9,13 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors (ppError) --Printing errors
 
+import Semantic.Option (mapOptions, OptionMap)
+
 import Text.Parsec (runParser)
 
 import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
+import qualified Data.Set as S
 
 import Control.Monad
 
@@ -32,6 +35,7 @@ import System.Path.IO
 -- Containers
 import qualified Data.Map.Strict as M
 import PPrinter.Application.Initialization (ppInitFile)
+import PPrinter.Application.Option (ppSimpleOptionTypesFile)
 import PPrinter.Application.OS.RTEMSNOEL (ppMainFile)
 
 data MainOptions = MainOptions
@@ -98,7 +102,9 @@ whenChatty :: MainOptions -> IO () -> IO ()
 whenChatty = when . optChatty
 
 -- Replicate users tree. There are two ways to definea module...
-printModule :: ModuleMode -> Bool
+printModule :: Bool ->
+  OptionMap ->
+  ModuleMode -> Bool
   -- Src Dir
   -> Path Absolute
   -- Headers Dir
@@ -108,7 +114,7 @@ printModule :: ModuleMode -> Bool
   -> [(ModuleName, ModuleMode)]
   -> SAST.AnnotatedProgram SemanticAnns
   -> IO ()
-printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
+printModule includeOptionH opts mMode chatty srcdir hdrsdir mName deps tyModule = do
   when chatty $ print $ "PP Module:" ++ show mName
   -- Let's check if files already exists.
   hExists <- doesFileExist hFile
@@ -124,7 +130,7 @@ printModule mMode chatty srcdir hdrsdir mName deps tyModule = do
   -- Now, both files are no more.
   when chatty $ print $ "Writing to" ++ show hFile
   let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName mMode
-  writeStrictText hFile (MPP.ppHeaderFile docMName (MPP.includes deps) tyModule)
+  writeStrictText hFile (MPP.ppHeaderFile includeOptionH opts docMName (MPP.includes deps) tyModule)
   when chatty $ print $ "Writing to" ++ show cFile
   writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName mMode) tyModule)
   where
@@ -157,6 +163,16 @@ printMainFile chatty targetDir prjprogs = do
   writeStrictText mainFile (render $ ppMainFile prjprogs)
   where
     mainFile = targetDir </> fragment "main" <.> FileExt "c"
+
+printOptionsHeaderFile :: Bool -> Path Absolute -> OptionMap -> IO ()
+printOptionsHeaderFile chatty targetDir opts = do
+  when chatty $ print "Creating header file with required option structures"
+  createDirectoryIfMissing True targetDir
+  iExists <- doesFileExist optionsHeaderFile
+  when iExists (renameFile optionsHeaderFile (optionsHeaderFile <.> FileExt "bkp"))
+  writeStrictText optionsHeaderFile (render $ ppSimpleOptionTypesFile opts)
+  where
+    optionsHeaderFile = targetDir </> fragment "include" </> fragment "option" <.> FileExt "h"
 
 main :: IO ()
 main = runCommand $ \opts args ->
@@ -224,18 +240,25 @@ main = runCommand $ \opts args ->
               ----------------------------------------
               -- Printing Project
               whenChatty opts $ print "Printing Project"
+              allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mMode,_) -> return (mName, mMode, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
+              allOptions <- foldM (\opts (_, mTyped) -> 
+                foldM mapOptions opts (SAST.frags $ typedModule $ moduleData mTyped)) M.empty $ M.toList typedProject
+              (basicTypeOptions, definedTypeOptions) <- return $ M.partitionWithKey 
+                (\k _ -> case k of
+                  SAST.DefinedType {} -> False
+                  _ -> True) allOptions
               mapM_ (\(mName,mTyped) ->
                     --  Get deps modes
                     maybe (fail "Internal error: missing modulename in mapProject")
                         (return . snd3) (M.lookup mName mapProject)
                     >>= \moduleMode ->
                     mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
-                      printModule moduleMode (optChatty opts) srcDir hdrsDir mName depModes (SAST.frags $ typedModule $ moduleData mTyped))
+                      printModule (not (M.null basicTypeOptions)) definedTypeOptions moduleMode (optChatty opts) srcDir hdrsDir mName depModes (SAST.frags $ typedModule $ moduleData mTyped))
                     (M.toList typedProject)
-              allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mMode,_) -> return (mName, mMode, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
               let prjprogs = map (\(mName, mMode, mTyped) -> (mName, mMode, SAST.frags $ typedModule $ moduleData mTyped)) allModules
               printInitFile (optChatty opts) outputDir prjprogs
               printMainFile (optChatty opts) outputDir prjprogs
+              unless (M.null basicTypeOptions) (printOptionsHeaderFile (optChatty opts) outputDir basicTypeOptions)
               whenChatty opts $ print "Finished PProject"
                 ----------------------------------------
             ----------------------------------------

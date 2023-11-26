@@ -108,15 +108,31 @@ ppMemberFunctionAccess subs obj ident params =
                 (classFunctionName (pretty classId) (pretty ident))
                 (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
-        Port (Pool _ _) ->
+        Port (Pool {}) ->
             ppCFunctionCall
                 (poolMethodName ident)
                 (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
-        Port (MsgQueue _ _) ->
-            ppCFunctionCall
-                (msgQueueMethodName ident)
-                (ppObject subs obj : (ppExpression subs <$> params))
+        Port (MsgQueue {}) ->
+            case ident of
+                -- | If it is a send, the first parameter is the object to be sent. The
+                -- function is expecting to receive a reference to that object.
+                "send" -> 
+                    case params of
+                        [element, result] ->
+                            ppCFunctionCall
+                                (msgQueueMethodName ident)
+                                [
+                                    ppObject subs obj, 
+                                    (case getType element of
+                                        (Vector _ _) -> parens (voidC <+> pretty "*") <> (ppExpression subs element)
+                                        _ -> parens (voidC <+> pretty "*") <> ppCReferenceExpression (ppExpression subs element)),
+                                    ppExpression subs result
+                                ]
+                        _ -> error $ "invalid params for message queue send: " ++ show params
+                _ -> ppCFunctionCall
+                    (msgQueueMethodName ident)
+                    (ppObject subs obj : (ppExpression subs <$> params))
         -- | Anything else should not happen
         _ -> error $ "unsupported member function access to object: " ++ show obj
 

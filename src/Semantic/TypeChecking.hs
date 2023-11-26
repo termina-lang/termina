@@ -291,15 +291,17 @@ memberFunctionAccessType ann obj_ty ident args =
         "send" ->
           case args of
             [element, result] -> do
-              -- | Type the first argument element : Option<dyn ty>
+              -- | Type the first argument element
               element_typed <- expressionType rhsObjectType element
               element_type <- getExpType element_typed
+              case element_typed of
+                (SAST.AccessObject (SAST.Variable {})) -> 
+                  unless (groundTyEq element_type ty) (throwError $ annotateError ann $ EMsgQueueWrongType element_type ty)
+                _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
               -- | Type the second argument result : &mut Result
               result_typed <- expressionType rhsObjectType result
               result_type <- getExpType result_typed
               -- Check first type. ety stores the type of the dynamic element.
-              ety <- maybe (throwError $ annotateError ann $ EMsgQueueSendArgNotDyn element_type) return (isDyn element_type)
-              unless (groundTyEq ety ty) (throwError $ annotateError ann $ EMsgQueueWrongType ety ty)
               -- Check second type. rty stores a reference to a result type
               case result_type of
                 Reference Mutable (DefinedType "Result") ->
@@ -317,7 +319,7 @@ memberFunctionAccessType ann obj_ty ident args =
               opt_type <- getExpType opt_typed
               case opt_type of
                 -- & Option<'dyn T>
-                Reference Mutable (Option (DynamicSubtype t)) ->
+                Reference Mutable (Option t) ->
                   unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
                 _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
               return ([Parameter "opt" opt_type], [opt_typed], Unit)
@@ -332,7 +334,7 @@ memberFunctionAccessType ann obj_ty ident args =
               timeout_type <- getExpType timeout_typed
               case opt_type of
                 -- & Option<'dyn T>
-                Reference Mutable (Option (DynamicSubtype t)) ->
+                Reference Mutable (Option t) ->
                   unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
                 _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
               case timeout_type of
@@ -351,7 +353,7 @@ memberFunctionAccessType ann obj_ty ident args =
               opt_type <- getExpType opt_typed
               case opt_type of
                 -- & Option<'dyn T>
-                Reference Mutable (Option (DynamicSubtype t)) ->
+                Reference Mutable (Option t) ->
                   unless (groundTyEq t ty) (throwError $ annotateError ann $ EMsgQueueWrongType t ty)
                 _ -> throwError $ annotateError ann $ EMsgQueueRcvWrongArgTy opt_type
               return ([Parameter "opt" opt_type], [opt_typed], Unit)
@@ -503,9 +505,7 @@ expressionType objType (OptionVariantExpression vexp anns) =
     Some e -> do
       typed_e <- expressionType objType e
       type_e <- getExpType typed_e
-      case type_e of
-          DynamicSubtype _ -> return $ SAST.OptionVariantExpression (Some typed_e) (buildExpAnn anns (Option type_e))
-          _ -> throwError $ annotateError anns (EOptionVariantNotDynamic type_e)
+      return $ SAST.OptionVariantExpression (Some typed_e) (buildExpAnn anns (Option type_e))
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]

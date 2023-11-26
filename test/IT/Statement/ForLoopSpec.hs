@@ -7,6 +7,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 import Prettyprinter
 import Modules.Printing
+import qualified Data.Map as M
 
 test0 :: String
 test0 = "function for_loop_test0(array0 : [u16; 10]) -> u16 {\n" ++
@@ -34,7 +35,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of

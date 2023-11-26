@@ -53,7 +53,7 @@ useObject (Variable ident ann)
                 return ()
                 ;
             -- We can use Options only once!
-                Option _ ->
+                Option (DynamicSubtype _) ->
                 loc  `annotateError` addUseOnlyOnce ident
                 ;
             -- Mutable Options??
@@ -127,22 +127,36 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
         case ident of
           "send" -> do
             case args of
-              [AccessObject (Variable var _), ReferenceExpression Mutable res_obj _] -> 
-                  annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
+              [AccessObject input_obj@(Variable var _), ReferenceExpression Mutable res_obj _] -> do
+                  input_obj_type <- annotateError (SM.location ann) (getObjectType input_obj)
+                  case input_obj_type of
+                    (_, DynamicSubtype _) -> annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
+                    _ -> useObject input_obj >> useObject res_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadSendArg)
-          "receive" -> annotateError (SM.location ann) (do
+          "receive" -> do
             case args of
-              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
-              _ -> throwError ImpossibleErrorBadReceiveArg)
+              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann] -> do
+                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
+                case output_obj_type of
+                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar)
+                  _ -> useObject output_obj
+              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
           "receive_timed" -> do
             case args of
-              [ReferenceExpression Mutable (Variable avar _anni) _ann, ReferenceExpression Immutable timeout_obj _] -> 
-                  annotateError (SM.location ann) (allocOO avar) >> useObject timeout_obj
+              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann, ReferenceExpression Immutable timeout_obj _] -> do
+                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
+                case output_obj_type of
+                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar) >> useObject timeout_obj
+                  _ -> useObject output_obj >> useObject timeout_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
-          "try_receive" -> annotateError (SM.location ann) (do
+          "try_receive" -> do
             case args of
-              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
-              _ -> throwError ImpossibleErrorBadReceiveArg)
+              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann] -> do
+                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
+                case output_obj_type of
+                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar)
+                  _ -> useObject output_obj
+              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
       _ -> mapM_ useExpression args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
@@ -175,7 +189,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   =
   (SM.location ann) `annotateError`
   case tyS of
-    Option _ -> defVariableOO ident
+    Option (DynamicSubtype _) -> defVariableOO ident
     -- DynamicSubtype _ ->  This is not possible
     DynamicSubtype _ -> throwError (DefiningDyn ident)
     -- Dynamic are only declared on match statements

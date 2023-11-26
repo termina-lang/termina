@@ -103,14 +103,14 @@ spec = do
     it "Prints the statement var option0 : Option <'dyn u32> = Some(dyn_var0);" $ do
       renderStatement option0 `shouldBe`
         pack (
-          "__termina_option_dyn_t option0;\n" ++
+          "__option_dyn_t option0;\n" ++
           "\n" ++
           "option0.__variant = Some;\n" ++
           "option0.Some.__0 = dyn_var0;")
     it "Prints the statement var option1 : Option <'dyn u32> = None;" $ do
       renderStatement option1 `shouldBe`
         pack (
-          "__termina_option_dyn_t option1;\n" ++
+          "__option_dyn_t option1;\n" ++
           "\n" ++
           "option1.__variant = None;")
   describe "Pretty printing enum variable declarations" $ do

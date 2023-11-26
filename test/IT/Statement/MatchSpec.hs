@@ -7,6 +7,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 import Prettyprinter
 import Modules.Printing
+import qualified Data.Map as M
 
 test0 :: String
 test0 = "function match_test0(option0 : Option<dyn u32>) -> u32 {\n" ++
@@ -69,7 +70,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -89,7 +90,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint32_t match_test0(__termina_option_dyn_t option0);\n" ++
+              "uint32_t match_test0(__option_dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function match_test0" $ do
@@ -97,7 +98,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint32_t match_test0(__termina_option_dyn_t option0) {\n" ++
+              "uint32_t match_test0(__option_dyn_t option0) {\n" ++
               "\n" ++
               "    uint32_t ret = 0;\n" ++
               "\n" ++
@@ -107,7 +108,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0__Some = option0.Some.__0;\n" ++
+              "        __option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
               "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
@@ -123,7 +124,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint32_t match_test1(__termina_option_dyn_t option0);\n" ++
+              "uint32_t match_test1(__option_dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function match_test1" $ do
@@ -131,7 +132,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint32_t match_test1(__termina_option_dyn_t option0) {\n" ++
+              "uint32_t match_test1(__option_dyn_t option0) {\n" ++
               "\n" ++
               "    uint32_t ret = 0;\n" ++
               "\n" ++
@@ -140,7 +141,7 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __termina_option_dyn_t __option0__Some = option0.Some.__0;\n" ++
+              "        __option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
               "        ret = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
