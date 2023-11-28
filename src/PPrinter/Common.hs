@@ -156,11 +156,81 @@ attribute = pretty "__attribute__"
 pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID :: DocStyle
 pool = namefy $ pretty "termina_pool_t"
 msgQueue = namefy $ pretty "termina_msg_queue_t"
-optionDyn = namefy $ pretty "termina_option_dyn_t"
+optionDyn = namefy $ pretty "option_dyn_t"
 dynamicStruct = namefy $ pretty "termina_dyn_t"
 taskID = namefy $ pretty "termina_task_t"
 resourceID = namefy $ pretty "termina_resource_t"
 handlerID = namefy $ pretty "termina_handler_t"
+
+ppDimensionOptionTS :: TypeSpecifier -> DocStyle
+ppDimensionOptionTS (Vector ts (K size)) = pretty "__" <> (pretty size) <> ppDimensionOptionTS ts
+ppDimensionOptionTS _ = emptyDoc
+
+ppOptionSomeParameterStructName :: TypeSpecifier -> DocStyle
+ppOptionSomeParameterStructName Bool = namefy $ pretty "option_" <> pretty "bool_params_t"
+ppOptionSomeParameterStructName Char = namefy $ pretty "option_" <> pretty "char_params_t"
+ppOptionSomeParameterStructName UInt8 = namefy $ pretty "option_" <> pretty "uint8_params_t"
+ppOptionSomeParameterStructName UInt16 = namefy $ pretty "option_" <> pretty "uint16_params_t"
+ppOptionSomeParameterStructName UInt32 = namefy $ pretty "option_" <> pretty "uint32_params_t"
+ppOptionSomeParameterStructName UInt64 = namefy $ pretty "option_" <> pretty "uint64_params_t"
+ppOptionSomeParameterStructName Int8 = namefy $ pretty "option_" <> pretty "int8_params_t"
+ppOptionSomeParameterStructName Int16 = namefy $ pretty "option_" <> pretty "int16_params_t"
+ppOptionSomeParameterStructName Int32 = namefy $ pretty "option_" <> pretty "int32_params_t"
+ppOptionSomeParameterStructName Int64 = namefy $ pretty "option_" <> pretty "int64_params_t"
+ppOptionSomeParameterStructName ts@(Option _) = error $ "invalid recursive option type: " ++ show ts
+ppOptionSomeParameterStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_params_t"
+  where
+    ppTypeSpecifier' UInt8 = pretty "uint8"
+    ppTypeSpecifier' UInt16 = pretty "uint16"
+    ppTypeSpecifier' UInt32 = pretty "uint32"
+    ppTypeSpecifier' UInt64 = pretty "uint64"
+    ppTypeSpecifier' Int8 = pretty "int8"
+    ppTypeSpecifier' Int16 = pretty "int16"
+    ppTypeSpecifier' Int32 = pretty "int32"
+    ppTypeSpecifier' Int64 = pretty "int64"
+    ppTypeSpecifier' ts = ppTypeSpecifier ts
+
+ppOptionSomeParameterStruct :: TypeSpecifier -> DocStyle
+ppOptionSomeParameterStruct ts =
+  typedefC <+> structC <+> braces' 
+    (indentTab . align $ 
+      (ppTypeSpecifier ts <+> namefy (pretty (show (0 :: Integer))) <> ppDimension ts <> semi))
+    <+> ppOptionSomeParameterStructName ts <> semi
+
+ppOptionStruct :: TypeSpecifier -> DocStyle
+ppOptionStruct ts = 
+    typedefC <+> structC <+> braces' (line <> 
+      (indentTab . align $ vsep [
+          ppOptionSomeParameterStructName ts <+> optionSomeVariant <> semi,
+          emptyDoc,
+          enumIdentifier (pretty "option") <+> enumVariantsField <> semi,
+          emptyDoc
+      ])) <+> ppOptionStructName ts <> semi
+
+-- | Pretty prints the name of the option type
+ppOptionStructName :: TypeSpecifier -> DocStyle
+ppOptionStructName Bool = namefy $ pretty "option_" <> pretty "bool_t"
+ppOptionStructName Char = namefy $ pretty "option_" <> pretty "char_t"
+ppOptionStructName UInt8 = namefy $ pretty "option_" <> ppTypeSpecifier UInt8
+ppOptionStructName UInt16 = namefy $ pretty "option_" <> ppTypeSpecifier UInt16
+ppOptionStructName UInt32 = namefy $ pretty "option_" <> ppTypeSpecifier UInt32
+ppOptionStructName UInt64 = namefy $ pretty "option_" <> ppTypeSpecifier UInt64
+ppOptionStructName Int8 = namefy $ pretty "option_" <> ppTypeSpecifier Int8
+ppOptionStructName Int16 = namefy $ pretty "option_" <> ppTypeSpecifier Int16
+ppOptionStructName Int32 = namefy $ pretty "option_" <> ppTypeSpecifier Int32
+ppOptionStructName Int64 = namefy $ pretty "option_" <> ppTypeSpecifier Int64
+ppOptionStructName ts@(Option _) = error $ "invalid recursive option type: " ++ show ts
+ppOptionStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_t"
+  where
+    ppTypeSpecifier' UInt8 = pretty "uint8"
+    ppTypeSpecifier' UInt16 = pretty "uint16"
+    ppTypeSpecifier' UInt32 = pretty "uint32"
+    ppTypeSpecifier' UInt64 = pretty "uint64"
+    ppTypeSpecifier' Int8 = pretty "int8"
+    ppTypeSpecifier' Int16 = pretty "int16"
+    ppTypeSpecifier' Int32 = pretty "int32"
+    ppTypeSpecifier' Int64 = pretty "int64"
+    ppTypeSpecifier' ts = ppTypeSpecifier ts
 
 -- | Pretty prints the ID field of the resource, task and handler classes
 ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle
@@ -210,6 +280,7 @@ ppTypeSpecifier (DefinedType typeIdentifier) = pretty typeIdentifier
 ppTypeSpecifier (Vector ts _)                = ppTypeSpecifier ts
 -- | Option type
 ppTypeSpecifier (Option (DynamicSubtype _))  = optionDyn
+ppTypeSpecifier (Option ts)                  = ppOptionStructName ts
 -- Non-primitive types:
 -- | Dynamic subtype
 ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
@@ -222,7 +293,11 @@ ppTypeSpecifier t                            = error $ "unsupported type: " ++ s
 
 ppDimension :: TypeSpecifier -> DocStyle
 ppDimension (Vector ts (K size)) = brackets (pretty size) <> ppDimension ts
-ppDimension _                     = emptyDoc
+ppDimension _                    = emptyDoc
+
+ppSizeOf :: TypeSpecifier -> DocStyle
+ppSizeOf (Vector ts (K size)) = ppSizeOf ts <+> pretty "*" <+> pretty size
+ppSizeOf ts = sizeofC (ppTypeSpecifier ts)
 
 ppReturnVectorValueStructure :: DocStyle -> DocStyle
 ppReturnVectorValueStructure identifier =

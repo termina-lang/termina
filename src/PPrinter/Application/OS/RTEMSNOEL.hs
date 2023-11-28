@@ -39,6 +39,7 @@ data RTEMSGlobal =
       Integer -- ^ pool size
     | RTEMSMsgQueue
       Identifier -- ^ message queue identifier
+      TypeSpecifier -- ^ type of the elements of the message queue
       Integer -- ^ message queue size
     deriving Show
 
@@ -61,7 +62,7 @@ instance Ord RTEMSGlobal where
     compare (RTEMSHandler id1 _ _ _) (RTEMSHandler id2 _ _ _) = compare id1 id2
     compare (RTEMSResource id1 _ _) (RTEMSResource id2 _ _) = compare id1 id2
     compare (RTEMSPool id1 _ _) (RTEMSPool id2 _ _) = compare id1 id2
-    compare (RTEMSMsgQueue id1 _) (RTEMSMsgQueue id2 _) = compare id1 id2
+    compare (RTEMSMsgQueue id1 _ _) (RTEMSMsgQueue id2 _ _) = compare id1 id2
     compare (RTEMSTask {}) _ = LT
     compare (RTEMSHandler {}) _ = LT
     compare (RTEMSResource {}) _ = LT
@@ -99,7 +100,7 @@ buildRTEMSGlobal (Task identifier (DefinedType ty) expr modifiers _) classMap = 
 buildRTEMSGlobal (Handler identifier (DefinedType ty) expr modifiers _) classMap = RTEMSHandler identifier (fromJust (M.lookup ty classMap)) (getVector modifiers) expr
 buildRTEMSGlobal (Resource identifier (DefinedType ty) expr _ _) classMap = RTEMSResource identifier (fromJust (M.lookup ty classMap)) expr
 buildRTEMSGlobal (Resource identifier (Pool ty (K size)) _ _ _) _ = RTEMSPool identifier ty size
-buildRTEMSGlobal (Resource identifier (MsgQueue _ (K size)) _ _ _) _ = RTEMSMsgQueue identifier size
+buildRTEMSGlobal (Resource identifier (MsgQueue ts (K size)) _ _ _) _ = RTEMSMsgQueue identifier ts size
 buildRTEMSGlobal obj _ = error $ "Invalid global object: " ++ show obj
 
 addDependency :: RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Set RTEMSGlobal)
@@ -163,7 +164,7 @@ ppInitPool (RTEMSPool identifier ts _) = vsep
                 [ppCReferenceExpression (pretty identifier),
                  parens (pretty "void *") <> poolMemoryArea (pretty identifier),
                  sizeofC (poolMemoryArea (pretty identifier)),
-                 sizeofC (ppTypeSpecifier ts)] <> semi,
+                 ppSizeOf ts] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
             (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
@@ -171,12 +172,13 @@ ppInitPool (RTEMSPool identifier ts _) = vsep
 ppInitPool obj = error $ "Invalid global object (not a pool): " ++ show obj
 
 ppInitMsgQueue :: RTEMSGlobal -> DocStyle
-ppInitMsgQueue (RTEMSMsgQueue identifier size) = vsep
+ppInitMsgQueue (RTEMSMsgQueue identifier ts size) = vsep
     [
         emptyDoc,
         pretty "result" <+> pretty "=" <+>
             ppCFunctionCall (namefy $ pretty "termina" <::> pretty "msg_queue_init")
                 [ppCReferenceExpression (pretty identifier),
+                 ppSizeOf ts,
                  pretty (show size)] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
@@ -418,9 +420,10 @@ ppMainFile prjprogs =
     ] ++
     (if not (null msgQueues) then
         [
-            pretty "#define CONFIGURE_MESSAGE_BUFFER_MEMORY ( \\",
-            pretty "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE(" <> pretty (show msgQueuesTotalMsgs) <> pretty ", "
-                <> sizeofC dynamicStruct <> pretty ") \\",
+            pretty "#define CONFIGURE_MESSAGE_BUFFER_MEMORY ( \\"
+        ] ++
+        punctuate (line <> pretty "    + \\") (map ppMessagesForQueue msgQueues) ++
+        [
             pretty ")"
         ]
     else
@@ -459,7 +462,17 @@ ppMainFile prjprogs =
         tasks = [task | task@(RTEMSTask {}) <- rtemsGlbs]
         handlers = [handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
         msgQueues = [queue | queue@(RTEMSMsgQueue {}) <- rtemsGlbs]
-        msgQueuesTotalMsgs = sum [size | RTEMSMsgQueue _ size <- msgQueues]
+
+        ppMessagesForQueue :: RTEMSGlobal -> DocStyle
+        ppMessagesForQueue (RTEMSMsgQueue _ ts size) =
+            vsep [
+                pretty "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( \\",
+                pretty "        " <> pretty size <> pretty ", \\",
+                pretty "        " <> ppSizeOf ts <> pretty " \\",
+                pretty "    ) \\"
+            ]
+        ppMessagesForQueue g = error $ "Invalid global object (not a message queue): " ++ show g
+
         -- List of used task classes
         taskClss = foldr (\glb acc -> case glb of
                 RTEMSTask _ cls@(Class _ classId _ _) _ _ _ -> if M.member classId acc then acc else M.insert classId cls acc

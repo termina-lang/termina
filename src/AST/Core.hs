@@ -110,13 +110,13 @@ data TypeSpecifier
   | Port TypeSpecifier
   -- See Q9
   | Unit
-  deriving (Show)
+  deriving (Show, Ord, Eq)
 
 data AccessKind = Immutable | Mutable | Private
-  deriving (Show)
+  deriving (Show, Ord, Eq)
 
 newtype Size = K Integer
- deriving (Show)
+ deriving (Show, Ord, Eq)
 
 data Op
   = Multiplication

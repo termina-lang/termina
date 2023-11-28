@@ -83,7 +83,7 @@ spec = do
         pack (
           "if (option_var.__variant == Some) {\n" ++
           "\n" ++
-          "    __termina_option_dyn_t __option_var__Some = option_var.Some.__0;\n" ++
+          "    __option_dyn_t __option_var__Some = option_var.Some.__0;\n" ++
           "\n" ++
           "    foo1 = *((uint32_t *)__option_var__Some.data);\n" ++
           "\n" ++
@@ -101,7 +101,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "\n" ++
-          "    __termina_option_dyn_t __option_var__Some = option_var.Some.__0;\n" ++
+          "    __option_dyn_t __option_var__Some = option_var.Some.__0;\n" ++
           "\n" ++
           "    foo1 = ((uint32_t *)__option_var__Some.data)[8];\n" ++
           "\n" ++
@@ -110,7 +110,7 @@ spec = do
       renderStatement matchOption2 `shouldBe`
         pack (
           "{\n" ++
-          "    __termina_option_dyn_t __match = get_integer();\n" ++
+          "    __option_dyn_t __match = get_integer();\n" ++
           "\n" ++
           "    if (__match.__variant == Some) {\n" ++
           "\n" ++

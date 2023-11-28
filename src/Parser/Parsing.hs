@@ -50,8 +50,8 @@ lexer = Tok.makeTokenParser langDef
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
       ["MsgQueue", "Pool", "Option"]
-      ++ -- Struct and Union Types
-      ["struct","union"]
+      ++ -- Struct and enum types
+      ["struct", "enum"]
       ++ -- Dynamic Subtyping
       ["dyn"]
       ++ -- Fixed Location Subtyping
@@ -72,6 +72,10 @@ lexer = Tok.makeTokenParser langDef
       ["import"]
       ++ -- Class methods
       ["procedure", "viewer", "method"]
+      ++ -- Casting keyword
+      ["as"]
+      ++ -- option name
+      ["option"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
@@ -898,7 +902,7 @@ moduleInclusionParser :: Parser [ Module ]
 moduleInclusionParser = do
   reserved "import"
   modules <- braces (sepBy1 (wspcs *> singleModule <* wspcs) comma)
-  return $ map (\(mod, ident, ann) -> ModInclusion ident mod) modules
+  return $ map (\(mod, ident, _ann) -> ModInclusion ident mod) modules
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof

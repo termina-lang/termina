@@ -11,6 +11,7 @@ import Prettyprinter
 import Prettyprinter.Render.Terminal
 
 import Data.Text (Text, pack, intercalate, replace, toUpper)
+import Semantic.Option (OptionMap)
 
 import PPrinter.Common
 import PPrinter.TypeDef.Declaration
@@ -26,13 +27,13 @@ render = renderStrict . layoutSmart defaultLayoutOptions
 ppEmptyDoc :: a -> Doc ann
 ppEmptyDoc = const emptyDoc
 
-ppHeaderASTElement :: AnnASTElement SemanticAnns -> Maybe DocStyle
-ppHeaderASTElement (TypeDefinition t _) = Just (ppTypeDefDeclaration t)
-ppHeaderASTElement (GlobalDeclaration obj@(Resource {})) = Just (ppGlobalDeclaration obj)
-ppHeaderASTElement (GlobalDeclaration obj@(Task {})) = Just (ppGlobalDeclaration obj)
-ppHeaderASTElement (GlobalDeclaration obj@(Handler {})) = Just (ppGlobalDeclaration obj)
-ppHeaderASTElement func@(Function {}) = Just (ppFunctionDeclaration func)
-ppHeaderASTElement _ = Nothing
+ppHeaderASTElement :: OptionMap -> AnnASTElement SemanticAnns -> Maybe DocStyle
+ppHeaderASTElement opts (TypeDefinition t _) = Just (ppTypeDefDeclaration opts t)
+ppHeaderASTElement _ (GlobalDeclaration obj@(Resource {})) = Just (ppGlobalDeclaration obj)
+ppHeaderASTElement _ (GlobalDeclaration obj@(Task {})) = Just (ppGlobalDeclaration obj)
+ppHeaderASTElement _ (GlobalDeclaration obj@(Handler {})) = Just (ppGlobalDeclaration obj)
+ppHeaderASTElement _ func@(Function {}) = Just (ppFunctionDeclaration func)
+ppHeaderASTElement _ _ = Nothing
 
 ppSourceASTElement :: AnnASTElement SemanticAnns -> Maybe DocStyle
 ppSourceASTElement (TypeDefinition (Struct {}) _) = Nothing

@@ -133,6 +133,8 @@ data Errors a
   | EInvalidClassFieldType TypeSpecifier
   -- | Forbidden Reference Type
   | EReferenceTy TypeSpecifier
+  -- | Nested Option
+  | EOptionNested 
   -- | Complex expression on LHS
   | ELHSComplex
   -- | Struct Definition
@@ -186,7 +188,7 @@ data Errors a
   | EMsgQueueWrongProcedure Identifier
   | ENoMsgQueueSendWrongArgs
   | ENoMsgQueueRcvWrongArgs
-  | EMsgQueueSendArgNotDyn TypeSpecifier
+  | EMsgQueueSendArgNotObject
   | EMsgQueueSendArgNotRefMutResult TypeSpecifier
   | EMsgQueueSendArgNotRefImmTimeout TypeSpecifier
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier

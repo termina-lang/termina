@@ -5,7 +5,9 @@ import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
+import Semantic.Option (OptionMap)
 import Data.Maybe
+import qualified Data.Map as M
 
 enumWithOneRegularField :: AnnASTElement SemanticAnns
 enumWithOneRegularField = TypeDefinition
@@ -35,14 +37,14 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant3" [Int8, Vector (Vector Char (K 20)) (K 35)]
   ] []) undefined
 
-renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration = render . fromJust .ppHeaderASTElement
+renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
 
 spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderTypedefDeclaration enumWithOneRegularField `shouldBe`
+      renderTypedefDeclaration M.empty enumWithOneRegularField `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -54,7 +56,7 @@ spec = do
             "\n" ++
             "} id0;\n")
     it "Prints an enum with two regular variants" $ do
-      renderTypedefDeclaration enumWithTwoRegularFields `shouldBe`
+      renderTypedefDeclaration M.empty enumWithTwoRegularFields `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    id0__variant0,\n" ++
@@ -67,7 +69,7 @@ spec = do
             "\n" ++
             "} id0;\n")
     it "Prints an enum with one parameterized variant" $ do
-      renderTypedefDeclaration enumWithOneParameterizedField `shouldBe`
+      renderTypedefDeclaration M.empty enumWithOneParameterizedField `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -85,7 +87,7 @@ spec = do
             "\n" ++
             "} id0;\n")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderTypedefDeclaration enumWithMultipleParameterizedFields `shouldBe`
+      renderTypedefDeclaration M.empty enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "typedef enum {\n" ++
             "    id0__variant0,\n" ++

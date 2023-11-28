@@ -7,6 +7,7 @@ import Semantic.TypeChecking
 import Text.Parsec
 import Prettyprinter
 import Modules.Printing
+import qualified Data.Map as M
 
 test0 :: String
 test0 = "function assignment_test0() {\n" ++
@@ -18,8 +19,8 @@ test0 = "function assignment_test0() {\n" ++
 
 test1 :: String
 test1 = "function assignment_test1(dyn_var0 : dyn u32) {\n" ++
-        "    var option : Option<dyn u32> = None;\n" ++
-        "    option = Some(dyn_var0);\n" ++
+        "    var opt : Option<dyn u32> = None;\n" ++
+        "    opt = Some(dyn_var0);\n" ++
         "    return;\n" ++
         "}"
 
@@ -47,7 +48,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -103,12 +104,12 @@ spec = do
               "\n" ++ 
               "void assignment_test1(__termina_dyn_t dyn_var0) {\n" ++
               "\n" ++
-              "    __termina_option_dyn_t option;\n" ++
+              "    __option_dyn_t opt;\n" ++
               "\n" ++
-              "    option.__variant = None;\n" ++
+              "    opt.__variant = None;\n" ++
               "\n" ++
-              "    option.__variant = Some;\n" ++
-              "    option.Some.__0 = dyn_var0;\n" ++
+              "    opt.__variant = Some;\n" ++
+              "    opt.Some.__0 = dyn_var0;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

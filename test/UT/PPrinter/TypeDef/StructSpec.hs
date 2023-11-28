@@ -5,7 +5,10 @@ import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
+import Semantic.Option (OptionMap)
 import Data.Maybe
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 {- | Struct type with a single field.
 In Termina's context sytax:
@@ -85,27 +88,39 @@ packedAndAlignedStruct = TypeDefinition
       Modifier "align" (Just (KC (I UInt32 16)))
     ]) undefined
 
-renderTypedefDeclaration :: AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration = render . fromJust . ppHeaderASTElement
+renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
+renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
 
 spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypedefDeclaration structWithOneField `shouldBe`
+       renderTypedefDeclaration (M.fromList [(DefinedType "id0", S.fromList [DefinedType "id0"])]) structWithOneField `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
-            "} id0;\n")
+            "} id0;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __option_id0_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "\n" ++         
+            "    __option_id0_params_t Some;\n" ++
+            "\n" ++     
+            "    __enum_option_t __variant;\n" ++
+            "\n" ++     
+            "} __option_id0_t;\n")
     it "Prints a struct with two fields" $ do
-      renderTypedefDeclaration structWithTwoFields `shouldBe`
+      renderTypedefDeclaration M.empty structWithTwoFields `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "} id0;\n")
     it "Prints a packed struct" $ do
-      renderTypedefDeclaration packedStruct `shouldBe`
+      renderTypedefDeclaration M.empty packedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -113,7 +128,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed)) id0;\n")
     it "Prints an aligned struct" $ do
-      renderTypedefDeclaration alignedStruct `shouldBe`
+      renderTypedefDeclaration M.empty alignedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -121,7 +136,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((align(16))) id0;\n")
     it "Prints a packet & aligned struct" $ do
-      renderTypedefDeclaration packedAndAlignedStruct `shouldBe`
+      renderTypedefDeclaration M.empty packedAndAlignedStruct `shouldBe`
         pack (
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++

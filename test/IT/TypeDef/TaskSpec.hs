@@ -5,13 +5,16 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
+import qualified AST.Seman as SAST
 import Prettyprinter
 import Modules.Printing
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 test0 :: String
 test0 = "struct Message {\n" ++
         "    sender_id : u32;\n" ++
-        "    destination_id : u32;\n" ++
+        "    destination_id : Option<u32>;\n" ++
         "    urgent : bool;\n" ++
         "};\n" ++
         "\n" ++
@@ -61,7 +64,7 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> ppHeaderFile True (M.fromList [(SAST.UInt32, S.fromList [(SAST.Option SAST.UInt32)])]) (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -81,9 +84,11 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
+              "#include \"option.h\"\n" ++
+              "\n" ++
               "typedef struct {\n" ++
               "    uint32_t sender_id;\n" ++
-              "    uint32_t destination_id;\n" ++
+              "    __option_uint32_t destination_id;\n" ++
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++   
@@ -112,7 +117,7 @@ spec = do
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
-              "    __termina_option_dyn_t alloc_msg;\n" ++
+              "    __option_dyn_t alloc_msg;\n" ++
               "\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++   
@@ -123,7 +128,7 @@ spec = do
               "        \n"  ++           
               "    } else {\n" ++
               "\n" ++   
-              "        __termina_option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
+              "        __option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
               "\n" ++
               "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
               "\n" ++

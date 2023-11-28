@@ -11,7 +11,9 @@ import Data.Text hiding (group, intercalate,map)
 import Prettyprinter
 import AST.Seman (AnnotatedProgram)
 import Semantic.Monad (SemanticAnns)
+import Semantic.Option (OptionMap)
 import Data.Maybe (mapMaybe)
+import qualified Data.Map as M
 
 import PPrinter
 import PPrinter.Common (DocStyle)
@@ -41,22 +43,28 @@ includes deps = vsep $ emptyDoc : map (
     headerPath mName SrcFile =  pretty $ toUnrootedFilePath (mName <.> FileExt "h")
 
 ppHeaderFile
+  :: Bool
+  -> OptionMap
   -- Module Name
-  :: DocStyle
+  -> DocStyle
   -- Import list
   -> DocStyle
   -- Typed Program
   -> AnnotatedProgram SemanticAnns -> Text
-ppHeaderFile modName imports program = render $
-  vsep
-  [ vsep
-    [ pretty "#ifndef" <+> modName
+ppHeaderFile includeOptionH opts modName imports program = render $
+  vsep $
+  [
+    pretty "#ifndef" <+> modName
     , pretty "#define" <+> modName
     , emptyDoc
-    ]
-  , pretty "#include <termina.h>"
-  , imports
-  , vsep (mapMaybe ppHeaderASTElement program
+    , pretty "#include <termina.h>"
+  ] ++
+  (if not includeOptionH then [] else 
+    [
+      emptyDoc, pretty "#include \"option.h\""
+    ]) ++
+  [ imports
+  , vsep (mapMaybe (ppHeaderASTElement opts) program
                ++ [ pretty "#endif //" <+> modName, emptyDoc])
   ]
 

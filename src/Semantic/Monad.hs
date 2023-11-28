@@ -489,11 +489,14 @@ checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
 -- Dynamic Subtyping
 checkTypeDefinition loc (Option tyd@(DynamicSubtype _ty)) = checkTypeDefinition loc tyd
-checkTypeDefinition loc (Option ty) = throwError $ annotateError loc $ EOptionDyn ty
+-- Regular option subtyping
+checkTypeDefinition loc (Option (Option _))     = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (Option ty) = simpleTyorFail loc ty >> checkTypeDefinition loc ty
 checkTypeDefinition loc (Reference _ ty)        =
   -- Unless we are referencing a reference we are good
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
   checkTypeDefinition loc ty
+checkTypeDefinition loc (DynamicSubtype (Option _)) = throwError $ annotateError loc EOptionNested
 checkTypeDefinition loc (DynamicSubtype ty)   =
   simpleTyorFail loc ty >>
   checkTypeDefinition loc ty
@@ -502,8 +505,10 @@ checkTypeDefinition loc (Location ty)         =
   checkTypeDefinition loc ty
 checkTypeDefinition loc (Port ty)             =
   case ty of
-    (MsgQueue ty' _)      -> checkTypeDefinition loc ty'
-    (Pool ty' _)          -> checkTypeDefinition loc ty'
+    (MsgQueue (Option _) _)      -> throwError $ annotateError loc EOptionNested
+    (MsgQueue ty' _)      -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+    (Pool (Option _) _)          -> throwError $ annotateError loc EOptionNested
+    (Pool ty' _)          -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
     (DefinedType identTy) ->
       getGlobalTy loc identTy >>=
         \case

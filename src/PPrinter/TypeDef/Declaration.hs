@@ -5,6 +5,9 @@ import Prettyprinter
 import AST.Seman
 import PPrinter.Common
 import Semantic.Monad
+import Semantic.Option (OptionMap)
+import qualified Data.Set as S
+import qualified Data.Map as M
 
 ppStructField :: FieldDefinition -> DocStyle
 ppStructField (FieldDefinition identifier ts) = ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi
@@ -105,19 +108,30 @@ classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
                 ClassViewer {} -> (fs, ms, prs, member : vws)
           ) ([],[], [], [])
 
+ppOptionDefinition :: TypeSpecifier -> DocStyle
+ppOptionDefinition ts@(DefinedType {}) = 
+  vsep [
+    ppOptionSomeParameterStruct ts,
+    emptyDoc,
+    ppOptionStruct ts,
+    emptyDoc
+  ]
+ppOptionDefinition ts = error $ "invalid option type: " ++ show ts
+
 -- | TypeDef pretty printer.
-ppTypeDefDeclaration :: TypeDef SemanticAnns -> DocStyle
-ppTypeDefDeclaration typeDef =
+ppTypeDefDeclaration :: OptionMap -> TypeDef SemanticAnns -> DocStyle
+ppTypeDefDeclaration opts typeDef =
   case typeDef of
     -- | Struct declaration pretty pr_¨^ç+
     (Struct identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
-      vsep [
+      vsep $ [
         typedefC <+> structC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
-            ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
-        emptyDoc]
+            ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi
+        ] ++ 
+        (maybe ([emptyDoc]) (\s -> emptyDoc : (map ppOptionDefinition (S.toList s))) $ M.lookup (DefinedType identifier) opts)
     -- | Enum declaration pretty printer  
     (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
@@ -156,8 +170,8 @@ ppTypeDefDeclaration typeDef =
                     emptyDoc -- empty line
                   ]
           ]
-        )) <+> pretty identifier <> semi,
-        emptyDoc ]
+        )) <+> pretty identifier <> semi] ++ 
+        (maybe ([emptyDoc]) (\s -> emptyDoc : (map ppOptionDefinition (S.toList s))) $ M.lookup (DefinedType identifier) opts)
     (Class clsKind identifier members modifiers) ->
       let
         structModifiers = filterStructModifiers modifiers
