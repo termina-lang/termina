@@ -21,7 +21,7 @@ data Errors
   | DifferentOnlyOnceMatch
   | DifferentDynsSetsMatch
   | ForMoreOOpt
-  | ForMoreODyn
+  | ForMoreODyn [Identifier]
   | InternalOptionMissMatch
   | ImpossibleErrorBadAllocArg
   | ImpossibleErrorBadSendArg

@@ -2,7 +2,7 @@
 
 module DataFlow.Computation where
 
-import AST.Core (Identifier)
+import AST.Core (Identifier,Parameter(..),TypeSpecifier(..))
 import Parser.Parsing (Annotation)
 
 import DataFlow.Errors
@@ -14,17 +14,24 @@ import Control.Monad.Trans
 
 import Debug.Termina
 
-
--- Something weird is going with set
--- import qualified Data.Set as S
+-- Warning: Both implmentations have a limit on the number of elements they can
+-- contain. They do not fail if the limit is rechead.
+-- Sets
+import qualified Data.Set as S
+-- Maps
 import qualified Data.Map.Strict as M
 
--- Implementing sets with maps :shrug:
-type VarSet = M.Map Identifier ()
+type VarSet = S.Set Identifier
+
+getVars :: VarSet -> [Identifier]
+getVars = S.toList
 
 -- Variables could be defined, allocated or used.
 -- Normal variables go from |Defined| to used |Used|
--- while special variables go from |Defined| -> |Allocated| -> |Used|.
+
+-- Special variables go from |Defined| -> |Allocated| -> |Used|.
+-- Unless the method is a /procedure/, in which case, it can take dyns as
+-- arguments.
 data MVars
   = Defined
   | Allocated
@@ -48,7 +55,10 @@ data UDSt
 
 emptyUDSt :: UDSt
 emptyUDSt
-  = UDSt M.empty M.empty M.empty
+  = UDSt S.empty M.empty S.empty
+
+emptyButUsed :: UDSt -> UDSt
+emptyButUsed st = st{usedOption = M.empty, usedDyn = S.empty}
 
 type UDM e = ExceptT e (ST.State UDSt)
 
@@ -111,23 +121,23 @@ unionS oo uses dyns
     -- M.union is left biased. Meaning that it takes priority over the other map
     -- when key collision. It is what we want tho.
      st{ usedOption = M.union oo (usedOption st)
-       , usedSet = M.union uses (usedSet st)
-       , usedDyn = M.union dyns (usedDyn st)
+       , usedSet = S.union uses (usedSet st)
+       , usedDyn = S.union dyns (usedDyn st)
        }
 
 getOnlyOnce :: UDM e OOVarSt
 getOnlyOnce = gets usedOption
 
 unsafeAdd :: Identifier -> VarSet -> VarSet
-unsafeAdd = flip M.insert ()
+unsafeAdd = S.insert
 
 unionUsed :: VarSet -> UDM e ()
 unionUsed vset =
-  modify (\st -> st{usedSet = M.union vset (usedSet st)})
+  modify (\st -> st{usedSet = S.union vset (usedSet st)})
 
 removeUsedOO,removeUsed :: Identifier -> UDSt -> UDSt
 removeUsedOO s st = st{usedOption = M.delete s (usedOption st)}
-removeUsed s st = st{usedSet = M.delete s (usedSet st)}
+removeUsed s st = st{usedSet = S.delete s (usedSet st)}
 
 -- safeAdd :: Identifier -> VarSet -> UDM Errors VarSet
 -- safeAdd ident vset =
@@ -141,7 +151,7 @@ safeAddUse :: Identifier -> UDM Errors ()
 safeAddUse ident
   = do
     usedSet <- gets usedSet
-    unless (M.size usedSet < maxBound) (throwError SetMaxBound)
+    unless (S.size usedSet < maxBound) (throwError SetMaxBound)
     putUSet $ unsafeAdd ident usedSet
 
 safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Errors ()
@@ -156,19 +166,19 @@ defDynVar, useDynVar :: Identifier -> UDM Errors ()
 defDynVar ident
   = gets usedDyn
   >>= \dynSet ->
-    if M.member ident dynSet
+    if S.member ident dynSet
     then do
-      putDynSet $ M.delete ident dynSet
+      putDynSet $ S.delete ident dynSet
     else
       throwError (NotUsedOO ident)
 useDynVar ident
   = gets usedDyn
   >>= \dynSet ->
-  if M.member ident dynSet
+  if S.member ident dynSet
   then
     throwError (UsingTwice ident)
   else
-    unless (M.size dynSet < maxBound) (throwError SetMaxBound)
+    unless (S.size dynSet < maxBound) (throwError SetMaxBound)
     >> putDynSet (unsafeAdd ident dynSet)
 ----------------------------------------
 
@@ -217,7 +227,7 @@ defVariable :: Identifier -> UDM Errors ()
 defVariable ident =
   gets usedSet >>=
   \i ->
-    if M.member ident i
+    if S.member ident i
     then
         -- Variable is used, strong assumtions on use!
         -- return () -- we can remove it... but maybe it is more expensive.
@@ -225,7 +235,17 @@ defVariable ident =
     else
         -- Variable |ident| is not used in the rest of the code :(
         throwError (NotUsed ident)
-----
+
+-- Procedures can receive /dyn/ variables as arguments.
+-- Dyn variables have a special Use, through free or stuff.
+-- So we need to analyze each argument to decide if it is normal variable or
+-- dyn.
+defArgumentsProc :: Parameter -> UDM Errors ()
+defArgumentsProc ps
+  = (case paramTypeSpecifier ps of
+        DynamicSubtype _ -> defDynVar
+        _ -> defVariable)
+    (paramIdentifier ps)
 
 ----------------------------------------
 -- Annotation and error helper.

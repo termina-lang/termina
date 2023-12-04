@@ -23,7 +23,7 @@ import           Control.Monad.Except
 
 import           Data.List            (all, find, foldl')
 import           Data.Maybe
--- import qualified Data.Set             as S
+import qualified Data.Set             as S
 import qualified Data.Map.Strict      as M
 
 import           AST.Core             (Identifier)
@@ -223,7 +223,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   unless (sameSets usedDyns)
     ((SM.location ann) `annotateError` throwError DifferentDynsSets)
   -- We get all uses
-  let normalUses = M.unions (map usedSet sets)
+  let normalUses = S.unions (map usedSet sets)
   --TODO remove continueWith
   continueWith (head usedOO) normalUses (head usedDyns)
 useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
@@ -232,8 +232,8 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
     -- Interator bode runs with empty UsedOnly and should return it that way.
     -- It can only use variables /only/ only if they are declared inside the
     -- iterator body, and freed and everything.
-    runEncapsulated
-      ( emptyOO
+    runEncapsulated -- What happens inside the body of a for, may not happen at all.
+      ( modify emptyButUsed -- put emptyUDSt -- emptyOO
         >> useDefBlock block
         >> get
         >>= \st ->
@@ -241,13 +241,14 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
           unless (M.null (usedOption st)) ((SM.location ann) `annotateError` throwError ForMoreOOpt)
           >>
           -- No Dyn should be in the state
-          unless (M.null (usedDyn st)) ((SM.location ann) `annotateError` throwError ForMoreODyn)
-          >>
+          let usedDynSet = usedDyn st in
+          unless (S.null usedDynSet) ((SM.location ann) `annotateError` throwError (ForMoreODyn (getVars usedDynSet)))
+          -- >>
           -- If everything goes okay, return used variables
-          return (usedSet st)
+          -- return (usedSet st)
       )
-    -- We add all normal use variables
-    >>= unionUsed
+    -- We add all normal use variables, no, we do not have the guarantee it will execute.
+    -- >>= unionUsed
     -- We do not define variable itIdent, we do not need it.
     -- Definition of iteration varialbe.
     -- >> (SM.location ann) `annotateError` defVariable itIdent
@@ -291,7 +292,7 @@ useDefStmt (MatchStmt e mcase ann)
   -- Then continue addin uses
   >> unionS
         (head usedOOpt)
-        (M.unions usedN)
+        (S.unions usedN)
         (head usedDyns)
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
@@ -329,7 +330,7 @@ sameMaps (x:xs) = all (M.null . M.difference x) xs
 
 sameSets :: [VarSet] -> Bool
 sameSets [] = False
-sameSets (x:xs) = all (M.null . M.difference x) xs
+sameSets (x:xs) = all (S.null . S.difference x) xs
 
 useDefCMemb :: ClassMember SemanticAnns -> UDM AnnotatedErrors ()
 useDefCMemb (ClassField fdef ann)
@@ -338,7 +339,8 @@ useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
   = useDefBlock blk
-  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
+  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) ps
+  -- >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
