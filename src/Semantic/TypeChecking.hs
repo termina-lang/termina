@@ -422,7 +422,9 @@ expressionType objType (ReferenceExpression refKind rhs_e pann) = do
   -- TODO [Q15]
   typed_obj <- objType rhs_e
   (_, obj_type) <- unboxObjectSAnns typed_obj
-  return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
+  case obj_type of
+    DynamicSubtype ty -> return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
+    _ -> return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
 -- Function call?
 expressionType _ (FunctionExpression fun_name args pann) =
   -- | Function Expression.  A tradicional function call

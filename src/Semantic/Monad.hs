@@ -506,7 +506,8 @@ checkTypeDefinition loc (Location ty)         =
 checkTypeDefinition loc (Port ty)             =
   case ty of
     (MsgQueue (Option _) _)      -> throwError $ annotateError loc EOptionNested
-    (MsgQueue ty' _)      -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+    (MsgQueue ty'@(DynamicSubtype _) _)  -> checkTypeDefinition loc ty'
+    (MsgQueue ty' _) -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
     (Pool (Option _) _)          -> throwError $ annotateError loc EOptionNested
     (Pool ty' _)          -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
     (DefinedType identTy) ->
