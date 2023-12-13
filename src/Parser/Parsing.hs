@@ -778,7 +778,7 @@ constDeclParser = do
 
 globalDeclParser :: Parser (AnnASTElement  Annotation)
 globalDeclParser = do
-  g <- taskDeclParser <|> resourceDeclParser <|> handlerDeclParser <|> constDeclParser
+  g <- try taskDeclParser <|> try resourceDeclParser <|> try handlerDeclParser <|> constDeclParser
   return $ GlobalDeclaration g
 
 typeDefintionParser :: Parser (AnnASTElement  Annotation)
