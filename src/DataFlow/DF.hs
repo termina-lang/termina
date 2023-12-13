@@ -229,7 +229,6 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
 useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
-    -- Interator bode runs with empty UsedOnly and should return it that way.
     -- It can only use variables /only/ only if they are declared inside the
     -- iterator body, and freed and everything.
     runEncapsulated -- What happens inside the body of a for, may not happen at all.
@@ -243,15 +242,12 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
           -- No Dyn should be in the state
           let usedDynSet = usedDyn st in
           unless (S.null usedDynSet) ((SM.location ann) `annotateError` throwError (ForMoreODyn (getVars usedDynSet)))
-          -- >>
+          >>
           -- If everything goes okay, return used variables
-          -- return (usedSet st)
+          return (usedSet st)
       )
-    -- We add all normal use variables, no, we do not have the guarantee it will execute.
-    -- >>= unionUsed
-    -- We do not define variable itIdent, we do not need it.
-    -- Definition of iteration varialbe.
-    -- >> (SM.location ann) `annotateError` defVariable itIdent
+    -- We add all normal use variables (even if we do not guarantee they body is going to be executed.)
+    >>= unionUsed -- Note that we add uses, but we do not remove definitions, that is dangerous.
     -- Use expression over begin, end, and break condition.
     >> maybe (return ()) useExpression mBrk
     >> useExpression eB

@@ -1,0 +1,23 @@
+resource class UARTDriver {
+
+    initialized : bool;
+
+    method init(&priv self) -> bool {
+
+        var result : bool = true;
+
+        self->initialized = true;
+
+        return result;
+
+    }
+
+    procedure init_drv(&priv self) {
+
+        self->initialized = true;
+
+        return;
+
+    }
+
+};
