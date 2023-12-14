@@ -204,9 +204,6 @@ useDefStmt (AssignmentStmt obj e _ann)
   >> useObject obj
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
-  -- Issue #40, forgot to use condition expression.
-  useExpression eCond
-  mapM (useExpression . elseIfCond) elseIfs
   -- All sets generated for all different branches.
   sets <- runEncaps
                 ([ useDefBlock bTrue >> get
@@ -224,38 +221,48 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
     ((SM.location ann) `annotateError` throwError DifferentDynsSets)
   -- We get all uses
   let normalUses = S.unions (map usedSet sets)
-  --TODO remove continueWith
+  --
   continueWith (head usedOO) normalUses (head usedDyns)
+  -- Issue #40, forgot to use condition expression.
+  useExpression eCond
+  mapM_ (useExpression . elseIfCond) elseIfs
 useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
     -- It can only use variables /only/ only if they are declared inside the
     -- iterator body, and freed and everything.
-    runEncapsulated -- What happens inside the body of a for, may not happen at all.
-      ( modify emptyButUsed -- put emptyUDSt -- emptyOO
+    ----------------------------------------
+    -- Break condition.
+    -- Used at the end of the body of loop. Simulating next loop use.
+    -- I think with this use should be enough.
+    maybe (return ()) useExpression mBrk
+    >>
+    ----------------------------------------
+    -- What happens inside the body of a for, may not happen at all.
+    runEncapsulated
+      ( modify emptyButUsed
         >> useDefBlock block
-        >> get
-        >>= \st ->
-          -- No Option should be in the state
-          unless (M.null (usedOption st)) ((SM.location ann) `annotateError` throwError ForMoreOOpt)
-          >>
-          -- No Dyn should be in the state
-          let usedDynSet = usedDyn st in
-          unless (S.null usedDynSet) ((SM.location ann) `annotateError` throwError (ForMoreODyn (getVars usedDynSet)))
-          >>
-          -- If everything goes okay, return used variables
-          return (usedSet st)
+        >> get >>= \st -> -- No Option should be in the state
+        unless (M.null (usedOption st)) ((SM.location ann) `annotateError` throwError ForMoreOOpt)
+        >> -- No Dyn should be in the state
+        let usedDynSet = usedDyn st in
+        unless (S.null usedDynSet) ((SM.location ann) `annotateError` throwError (ForMoreODyn (getVars usedDynSet)))
+        >> -- If everything goes okay, return used variables
+        return (usedSet st)
       )
+    ----------------------------------------
     -- We add all normal use variables (even if we do not guarantee they body is going to be executed.)
     >>= unionUsed -- Note that we add uses, but we do not remove definitions, that is dangerous.
-    -- Use expression over begin, end, and break condition.
+    ----------------------------------------
+    -- Break condition.
+    -- Used at the beggining of for loop.
     >> maybe (return ()) useExpression mBrk
+    ----------------------------------------
+    -- Use expression over begin and end.
     >> useExpression eB
     >> useExpression eE
 useDefStmt (MatchStmt e mcase ann)
-  = -- Similar to the case ifElse and For
-  (useExpression e)
-  >>
+  =
   -- Depending on expression |e| type
   -- we handle OptionDyn special case properly.
   maybe ((SM.location ann) `annotateError`throwError ImpossibleErrorMatchGetType)
@@ -290,6 +297,8 @@ useDefStmt (MatchStmt e mcase ann)
         (head usedOOpt)
         (S.unions usedN)
         (head usedDyns)
+  >> -- Use of expression matching
+  useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 useDefStmt (Free obj _ann)
@@ -316,8 +325,7 @@ destroyOptionDyn (ml, mr)
 -- General case, not when it is Option Dyn
 useMCase :: MatchCase SemanticAnns -> UDM AnnotatedErrors ()
 useMCase (MatchCase _mIdent bvars blk ann)
-  =
-  useDefBlock blk
+  = useDefBlock blk
   >> (SM.location ann) `annotateError` mapM_ defVariable bvars
 
 sameMaps :: [OOVarSt] -> Bool

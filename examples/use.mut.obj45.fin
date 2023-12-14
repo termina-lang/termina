@@ -1,0 +1,56 @@
+function get_prev_natural(natural : &mut u8, result : &mut Result){
+
+        var previous : u8 = *natural;
+        *natural = previous - 1 : u8;
+
+        if previous > 2 : u8 {
+            *result = Result::Ok;
+        }
+        else {
+            *result = Result::Error;
+        }
+
+
+        return;
+
+    }
+
+function countdown_naturals_filling(data : &mut [u8;6]){
+
+    var flag : bool = true;
+    var result : Result = Result::Ok;
+
+    let start : u8 = 20 : u8;
+    var value : u8 = start;
+
+
+    for i : u8 in 0 : u8 .. 6 : u8  while flag {
+
+        get_prev_natural(&mut value, &mut result);
+
+        (*data)[i as usize] = value;
+
+        match result {
+            case Ok => {
+                flag = true;
+            }
+            case Error => {
+                flag = false;
+            }
+        }
+    }
+
+  return;
+}
+
+function putchar(c : &mut u8)->u8{
+
+        var uart_reg : u8 = 0 : u8;
+        var new_value : u8 = 0 : u8;
+
+        uart_reg = *c;
+        new_value = *c + 8 : u8;
+
+        return new_value;
+
+    }
