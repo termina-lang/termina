@@ -1,0 +1,45 @@
+function change_flag (flag : &mut bool) {
+
+    *flag = false;
+
+    return;
+}
+
+function  fill_vector_with_ones (data: &mut [u8;6]){
+
+
+    var flag : bool = true;
+
+    for i : u8 in 0 : u8 .. 6 : u8 while flag {
+
+        (*data)[i as usize] = 1 : u8;
+        if (*data)[i as usize] != 1 : u8 {
+            change_flag(&mut flag);
+        }
+
+    }
+
+    return;
+}
+function cal_crc_16 (data : [u8; 256] ,nbytes : u16) -> u16  {
+
+    var crc_value : u16 = 0xFFFF : u16;
+
+    for i : u16 in 0 : u16 .. nbytes {
+
+        crc_value = crc_value ^ (data[i as usize] as u16 << 8 : u16);
+
+        for j : u16 in 0 : u16 .. 8 : u16 {
+
+            if ((crc_value & 0x8000 : u16) != 0 : u16) {
+                crc_value = (crc_value << 1 : u16) ^ 0x1021 : u16;
+            } else {
+                crc_value = crc_value << 1 : u16;
+            }
+        }
+    }
+
+
+
+	return crc_value;
+}

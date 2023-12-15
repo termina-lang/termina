@@ -1,0 +1,11 @@
+struct TMDescriptorT {
+    tm_bytes : [u8 ; 256];
+    tm_num_bytes : u16;
+};
+
+resource class TMChannel{
+   procedure test (&priv self, testD : dyn TMDescriptorT){
+             free(testD);
+             return;
+   }
+};
