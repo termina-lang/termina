@@ -37,11 +37,19 @@ findClassProcedure i
 findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], Maybe TypeSpecifier, a)
 findClassViewerOrMethod i
   = fmap
-  (\case {  ClassViewer _ ps ty _ a -> (ps, Just ty, a)
-         ; _ -> error "Impossible after find"})
+  (\case {
+    ClassViewer _ ps ty _ a -> (ps, Just ty, a);
+    ClassMethod _ ty _ a -> ([], ty, a);
+    _ -> error "Impossible after find"
+  })
   .
-  L.find (\case{ClassViewer ident _ _ _ _ -> (ident == i)
-               ; _ -> False})
+  L.find (
+    \case{
+      ClassViewer ident _ _ _ _ -> (ident == i);
+      ClassMethod ident _ _ _ -> (ident == i);
+      _ -> False
+    }
+  )
 
 
 ----------------------------------------
