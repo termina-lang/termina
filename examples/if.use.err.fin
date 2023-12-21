@@ -1,0 +1,27 @@
+function testIf(foo : u16) -> u32 {
+  var out : u32 = 0 : u32;
+
+  if (foo > (16 : u16)) {
+    out = 1 : u32;
+  } else  {
+    out = 2 : u32;
+  }
+
+  return out;
+}
+
+function gFree (t : dyn u16) {
+         free(t);
+         return;
+}
+
+function testIfS (foo : dyn u16) {
+    // var btest : u16 = 0 : u16;
+    gFree(foo);
+    // if (btest > 1 : u16){
+    //     free(foo);
+    // } else {
+    //     gFree(foo);
+    // }
+    return;
+}
