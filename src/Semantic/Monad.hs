@@ -530,6 +530,43 @@ checkTypeDefinition _ Char                    = return ()
 checkTypeDefinition _ Bool                    = return ()
 checkTypeDefinition _ Unit                    = return ()
 
+-- | Type does not have Dynamic Subtyping.
+-- Note to self: I still do not have the complete type system in my head.
+-- It is something that keeps changing... When we have the complete type system,
+-- we should write this module from scratch.
+-- Note this is not a function checking that the type itself is well-formed.
+-- we are just lifting a similar check on types.
+typeHasDyn :: Locations -> TypeSpecifier -> SemanticMonad Bool
+typeHasDyn loc ty
+  = either
+      -- There is a user defined type.
+      (userDefHasDyn loc)
+      -- No user defined, either it has it or not.
+      return
+  $ hasDynOrDep ty
+
+userDefHasDyn :: Locations -> Identifier -> SemanticMonad Bool
+userDefHasDyn loc ident =
+  getGlobalTy loc ident >>= stypedefHasDyn
+  where
+    --
+    stypedefHasDyn :: SemanTypeDef SemanticAnns -> SemanticMonad Bool
+    stypedefHasDyn (Struct _ident fsdef _mods) =
+      or <$> mapM (typeHasDyn loc . fieldTypeSpecifier) fsdef
+    stypedefHasDyn (Enum _ident enumVs _mods) =
+      or . concat <$> mapM ( mapM (typeHasDyn loc) . assocData) enumVs
+    stypedefHasDyn (Class _cKind _ident sMembers _mods) =
+      or <$> mapM clsMemberHasDyn sMembers
+    --
+    clsMemberHasDyn :: SemanClassMember SemanticAnns  -> SemanticMonad Bool
+    -- The only one struct carrying Dynamic Value are class fields.
+    clsMemberHasDyn (ClassField fldDef _anns) = typeHasDyn loc (fieldTypeSpecifier fldDef)
+    clsMemberHasDyn (ClassMethod _ident _retTy _blk _anns) = return False
+    clsMemberHasDyn (ClassProcedure _ident _params _blk _anns) = return False -- It is not a value, it takes one
+    clsMemberHasDyn (ClassViewer _ident _params _retTy _blk _ann) = return False
+
+
+
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return

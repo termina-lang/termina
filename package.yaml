@@ -53,6 +53,7 @@ ghc-options:
 
 default-extensions:
 - LambdaCase
+- TupleSections
 
 library:
   source-dirs: src
