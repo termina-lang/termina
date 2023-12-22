@@ -205,10 +205,11 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   =
   (SM.location ann) `annotateError`
   case tyS of
-    Option (DynamicSubtype _) -> defVariableOO ident
-    -- DynamicSubtype _ ->  This is not possible
-    DynamicSubtype _ -> throwError (DefiningDyn ident)
     -- Dynamic are only declared on match statements
+    Option (DynamicSubtype _) -> defVariableOO ident
+    -- Dynamic are not possible, they come from somewhere else.
+    DynamicSubtype _ -> throwError (DefiningDyn ident)
+    --Everything else
     _        -> defVariable ident
   -- Use everithing in the |initE|
   >> useExpression initE
@@ -232,7 +233,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   let (usedOO, usedDyns)
         = foldr (\s (oo,dd) -> (usedOption s : oo, usedDyn s : dd)) ([],[]) sets -- (map usedOption sets)
   unless (sameMaps usedOO)
-    ((SM.location ann) `annotateError` throwError DifferentOnlyOnce)
+    ((SM.location ann) `annotateError` throwError (DifferentOnlyOnce usedOO))
   unless (sameSets usedDyns)
     ((SM.location ann) `annotateError` throwError (DifferentDynsSets usedDyns))
   -- We get all uses

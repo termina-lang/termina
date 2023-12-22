@@ -1,0 +1,44 @@
+resource class TMChannel{
+  procedure send_tm(&priv self, tm_descriptor: dyn u32){
+    free(tm_descriptor);
+    return;
+  }
+};
+
+task class CHouseKeepingTask {
+
+    interval : u32;
+    interval_control : u32;
+
+    tm_pool : port Pool<u32; 20>;
+    tm_channel : port TMChannel;
+
+    method do_housekeeping(&priv self) {
+
+        if(self->interval_control == self->interval) {
+
+            var tm_descriptor : Option<dyn u32> = None;
+            self->tm_pool.alloc(&mut tm_descriptor);
+
+            match tm_descriptor {
+
+                case Some(descriptor) => {
+
+                    self->tm_channel.send_tm(descriptor);
+
+                }
+                case None => {
+                    //error
+                }
+            }
+
+              self->interval_control = 0 : u32;
+
+        }
+        else{
+            //do nothing
+        }
+
+        return;
+    }
+};
