@@ -41,6 +41,20 @@ import Debug.Termina
 useConstE :: ConstExpression -> UDM AnnotatedErrors ()
 useConstE = const (return ())
 
+-- There are two types of arguments :
+-- + Moving out variables of type Dyn and Option?
+-- + Copying expressions, everything.
+-- It is context dependent (AFAIK).
+useArguments :: Expression SemanticAnns -> UDM AnnotatedErrors ()
+-- If we are giving a variable of type Dyn, we moving it out.
+useArguments e@(AccessObject (Variable ident ann))
+  = case getTypeSAnns ann of
+     Just (DynamicSubtype _) ->
+       (SM.location ann) `annotateError` (useDynVar ident)
+     _ -> useExpression e
+-- Dyn variables inside expressions are read as values.
+useArguments e = useExpression e
+
 useObject, defObject :: Object SemanticAnns -> UDM AnnotatedErrors ()
 useObject (Variable ident ann)
   =
@@ -49,8 +63,7 @@ useObject (Variable ident ann)
         (loc `annotateError` throwError ImpossibleError)
         (\case {
                 -- Nothing, we can use it freely, in the normal sense of using it.
-                DynamicSubtype _ ->
-                return ()
+                DynamicSubtype _ -> return ()
                 ;
             -- We can use Options only once!
                 Option (DynamicSubtype _) ->
@@ -158,9 +171,11 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
                   _ -> useObject output_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
-      _ -> mapM_ useExpression args
+      -- TODO Can Dyn be passed around as arguments?
+      _ -> mapM_ useArguments args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
-  = useObject obj >> mapM_ useExpression args
+      -- TODO Can Dyn be passed around as arguments?
+  = useObject obj >> mapM_ useArguments args
 useExpression (VectorInitExpression e _size _ann)
   = useExpression e
 useExpression (FieldAssignmentsExpression _ident fs _ann)
@@ -171,8 +186,9 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-useExpression (FunctionExpression _ident args _ann)
-  = mapM_ useExpression args
+useExpression (FunctionExpression ident args _ann)
+      -- TODO Can Dyn be passed around as arguments?
+  = mapM_ useArguments args
 
 useDefBlockRet :: BlockRet SemanticAnns -> UDM AnnotatedErrors ()
 useDefBlockRet bret =
@@ -189,10 +205,11 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   =
   (SM.location ann) `annotateError`
   case tyS of
-    Option (DynamicSubtype _) -> defVariableOO ident
-    -- DynamicSubtype _ ->  This is not possible
-    DynamicSubtype _ -> throwError (DefiningDyn ident)
     -- Dynamic are only declared on match statements
+    Option (DynamicSubtype _) -> defVariableOO ident
+    -- Dynamic are not possible, they come from somewhere else.
+    DynamicSubtype _ -> throwError (DefiningDyn ident)
+    --Everything else
     _        -> defVariable ident
   -- Use everithing in the |initE|
   >> useExpression initE
@@ -216,9 +233,9 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   let (usedOO, usedDyns)
         = foldr (\s (oo,dd) -> (usedOption s : oo, usedDyn s : dd)) ([],[]) sets -- (map usedOption sets)
   unless (sameMaps usedOO)
-    ((SM.location ann) `annotateError` throwError DifferentOnlyOnce)
+    ((SM.location ann) `annotateError` throwError (DifferentOnlyOnce usedOO))
   unless (sameSets usedDyns)
-    ((SM.location ann) `annotateError` throwError DifferentDynsSets)
+    ((SM.location ann) `annotateError` throwError (DifferentDynsSets usedDyns))
   -- We get all uses
   let normalUses = S.unions (map usedSet sets)
   --
@@ -368,7 +385,8 @@ useDefTypeDef (Enum {}) = return ()
 useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
+ >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) ps
+ -- >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()
 useDefFrag (TypeDefinition tyDef _ann)

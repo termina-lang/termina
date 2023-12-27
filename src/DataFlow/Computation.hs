@@ -6,6 +6,7 @@ import AST.Core (Identifier,Parameter(..),TypeSpecifier(..))
 import Parser.Parsing (Annotation)
 
 import DataFlow.Errors
+import DataFlow.Types
 
 import qualified Control.Monad.State as ST
 import Control.Monad.Except as E
@@ -29,13 +30,6 @@ getVars = S.toList
 -- Variables could be defined, allocated or used.
 -- Normal variables go from |Defined| to used |Used|
 
--- Special variables go from |Defined| -> |Allocated| -> |Used|.
--- Unless the method is a /procedure/, in which case, it can take dyns as
--- arguments.
-data MVars
-  = Defined
-  | Allocated
-  | Used
 
 -- We already know that each used variable is defined from previous pass.
 -- We just check that every defined variable is used plus the special ones goes
@@ -160,7 +154,13 @@ safeAddUseOnlyOnce ident mv
   = do
     ooMap <- gets usedOption
     unless (M.size ooMap < maxBound) (throwError MapMaxBound)
-    putOOMap $ M.insert ident mv ooMap
+    putOOMap $
+      case mv of
+        -- We can delete it, because previous stage guarantees no variable
+        -- shadowing.
+        Defined -> M.delete ident ooMap
+        -- Everything else just inserts.
+        _ -> M.insert ident mv ooMap
 
 -- DynVar manipulation
 defDynVar, useDynVar :: Identifier -> UDM Errors ()

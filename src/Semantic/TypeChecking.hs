@@ -1,15 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase       #-}
-{-# LANGUAGE TupleSections    #-}
-
 -- | Semantic Analysis Module i.e. Type checking
--- In particular this module, describes a mapping from |AST Parser.Annotation|
--- to ~|AST SemanticAnnotations|~ | SemanAST {ParserInfo , TypeInfo}|
+-- This module defines a mapping from |AST Parser.Annotation|
+-- to |AST SemanticAnnotations|, | SemanAST {ParserInfo , TypeInfo}|
 
 module Semantic.TypeChecking where
-
--- Debugging
--- import           Debugging
 
 -- Termina Ast and Utils
 import           Annotations
@@ -228,8 +221,8 @@ memberFunctionAccessType ::
   -> [Expression Parser.Annotation]
   -> SemanticMonad ([Parameter], [SAST.Expression SemanticAnns], TypeSpecifier)
 memberFunctionAccessType ann obj_ty ident args =
+  -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
-      -- | Calling a self method or viewer. We must not allow calling a procedure.
     DefinedType dident -> getGlobalTy ann dident >>=
       \case{
          Class _ _identTy cls _mods ->
@@ -287,18 +280,18 @@ memberFunctionAccessType ann obj_ty ident args =
         _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
     Port (MsgQueue ty _size) ->
       case ident of
-        -- | send(dyn T, result : &mut Result)
+        -- send(dyn T, result : &mut Result)
         "send" ->
           case args of
             [element, result] -> do
-              -- | Type the first argument element
+              -- Type the first argument element
               element_typed <- expressionType rhsObjectType element
               element_type <- getExpType element_typed
               case element_typed of
                 (SAST.AccessObject (SAST.Variable {})) -> 
                   unless (groundTyEq element_type ty) (throwError $ annotateError ann $ EMsgQueueWrongType element_type ty)
                 _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
-              -- | Type the second argument result : &mut Result
+              -- Type the second argument result : &mut Result
               result_typed <- expressionType rhsObjectType result
               result_type <- getExpType result_typed
               -- Check first type. ety stores the type of the dynamic element.
@@ -311,7 +304,7 @@ memberFunctionAccessType ann obj_ty ident args =
                   )
                 _ -> throwError $ annotateError ann $ EMsgQueueSendArgNotRefMutResult result_type
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
-        -- | receive(msg : &mut Option<dyn T>)
+        -- receive(msg : &mut Option<dyn T>)
         "receive" ->
           case args of
             [opt] -> do
@@ -425,9 +418,9 @@ expressionType objType (ReferenceExpression refKind rhs_e pann) = do
   case obj_type of
     DynamicSubtype ty -> return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
     _ -> return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
--- Function call?
+----------------------------------------
+-- | Function Expression.  A tradicional function call
 expressionType _ (FunctionExpression fun_name args pann) =
-  -- | Function Expression.  A tradicional function call
   getFunctionTy pann fun_name >>= \(params, retty) ->
   flip (SAST.FunctionExpression fun_name) (buildExpAnnApp pann params retty)
   <$> paramType pann params args
@@ -686,11 +679,14 @@ statementTySimple (MatchStmt matchE cases ann) = do
       MatchStmt typed_matchE <$> zipWithM matchCaseType ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
     where
+      optionCases :: [MatchCase Parser.Annotation] -> SemanticMonad Bool
       optionCases [a,b] = return $ (optionNone a && optionSome b) || (optionSome a && optionNone b)
       optionCases _ = throwError $ annotateError ann EMatchOptionBadArgs
+      optionNone :: MatchCase Parser.Annotation -> Bool
       optionNone c =
         matchIdentifier c == "None"
           && Prelude.null (matchBVars c)
+      optionSome ::MatchCase Parser.Annotation -> Bool
       optionSome c =
         matchIdentifier c == "Some"
            && length (matchBVars c) == 1
@@ -745,18 +741,35 @@ globalCheck (Const ident ty expr mods anns) =
   <*> pure mods
   <*> pure (buildGlobalAnn anns (SConst ty))
 
+parameterTypeChecking :: Locations -> Parameter -> SemanticMonad ()
+parameterTypeChecking anns p =
+         let typeSpec = paramTypeSpecifier p in
+           typeHasDyn anns typeSpec
+           >>=
+           (`when` (throwError (annotateError anns (EArgHasDyn p))))
+
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
 programSeman (Function ident ps mty bret mods anns) =
-  maybe (return ()) (checkTypeDefinition anns) mty >>
+  ----------------------------------------
+  -- Check Type Definitions of types.
+  -- Ret type is okay.
+  maybe
+    (return ())
+    (checkTypeDefinition anns)
+    mty >>
+  -- Check params are not Dyn (or contains dyn)
+  forM_ ps (parameterTypeChecking anns)
+  >>
+  ----------------------------------------
   (Function ident ps mty
   <$> (addLocalMutObjs anns
           (fmap (\ p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
           (retblockType bret) >>= \ typed_bret ->
     maybe
-      -- | Procedure
+      -- Procedure
       (blockRetTy Unit)
-      -- | Function
+      -- Function
       blockRetTy
       mty typed_bret >> return typed_bret
       )
@@ -809,20 +822,25 @@ typeDefCheck ann (Class kind ident members mds)
   foldM
     (\(fs, prcs, mths, vws) cl ->
         case cl of
+          -- ClassFields
           ClassField fld@(FieldDefinition _fs_id fs_ty) annCF
             -> checkTypeDefinition annCF fs_ty
               >> classFieldTyorFail annCF fs_ty
               >> let checkFs = SAST.ClassField fld (buildExpAnn annCF fs_ty)
                 in return (checkFs : fs, prcs, mths, vws)
+          -- Procedures
           prc@(ClassProcedure _fp_id fp_tys _body annCP)
-            -> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) fp_tys >>
-              return (fs, prc : prcs, mths, vws)
+            -> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) fp_tys
+            >> return (fs, prc : prcs, mths, vws)
+          -- Methods
           mth@(ClassMethod _fm_id mty _body annCM)
             -> maybe (return ()) (checkTypeDefinition annCM) mty
             >> return (fs, prcs, mth : mths, vws)
+          -- Viewers
           view@(ClassViewer _fv_id fv_tys mty _body annCV)
             -> checkTypeDefinition annCV mty
-              >> mapM_ (checkTypeDefinition annCV . paramTypeSpecifier) fv_tys
+            -- Parameters cannot have dyns inside.
+            >> mapM_ (parameterTypeChecking annCV) fv_tys
             >> return (fs, prcs, mths, view : vws)
         )
     ([],[],[],[]) members

@@ -8,6 +8,11 @@ import Parser.Parsing (Annotation)
 
 import Semantic.Monad (SemanticAnns)
 
+import DataFlow.Types
+
+import qualified Data.Set as S
+import qualified Data.Map.Strict as M
+
 data Errors
   = SetMaxBound
   | MapMaxBound
@@ -16,8 +21,8 @@ data Errors
   | NotUsed Identifier
   | NotUsedOO Identifier
   | UsingTwice Identifier
-  | DifferentOnlyOnce
-  | DifferentDynsSets
+  | DifferentOnlyOnce [M.Map Identifier MVars]
+  | DifferentDynsSets [S.Set Identifier]
   | DifferentOnlyOnceMatch
   | DifferentDynsSetsMatch
   | ForMoreOOpt

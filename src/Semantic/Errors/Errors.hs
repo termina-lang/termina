@@ -123,6 +123,8 @@ data Errors a
   | EPortNotResource TypeSpecifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
+  -- | Dynamic (type has a Dynamic inside) as Argument of a function
+  | EArgHasDyn Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier a
   -- | Error getting type of expressions of objects.

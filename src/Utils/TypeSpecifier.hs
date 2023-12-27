@@ -99,6 +99,8 @@ referenceType (Location {})  = False
 referenceType (Port {})      = False
 referenceType _              = True
 
+----------------------------------------
+-- Dynamic Helpers
 isDyn :: TypeSpecifier -> Maybe TypeSpecifier
 isDyn (DynamicSubtype t) = Just t
 isDyn _ = Nothing
@@ -107,6 +109,31 @@ isNonDynOption :: TypeSpecifier -> Bool
 isNonDynOption (Option (DynamicSubtype _)) = False
 isNonDynOption (Option _) = True
 isNonDynOption _ = False
+
+hasDynOrDep :: TypeSpecifier -> Either Identifier Bool
+hasDynOrDep (DefinedType ident) = Left ident
+hasDynOrDep UInt8 = Right False
+hasDynOrDep UInt16 = Right False
+hasDynOrDep UInt32 = Right False
+hasDynOrDep UInt64 = Right False
+hasDynOrDep Int8 = Right False
+hasDynOrDep Int16 = Right False
+hasDynOrDep Int32 = Right False
+hasDynOrDep Int64 = Right False
+hasDynOrDep USize = Right False
+hasDynOrDep Bool = Right False
+hasDynOrDep Char = Right False
+--
+hasDynOrDep (Vector ty _s) = hasDynOrDep ty
+hasDynOrDep (Option ty) = hasDynOrDep ty
+hasDynOrDep (MsgQueue ty _s) = hasDynOrDep ty
+hasDynOrDep (Pool ty _s) = hasDynOrDep ty
+hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
+hasDynOrDep (DynamicSubtype _) = Right True
+hasDynOrDep (Location ty) = hasDynOrDep ty
+hasDynOrDep (Port ty) = hasDynOrDep ty
+hasDynOrDep Unit = Right False
+----------------------------------------
 
 rootType :: TypeSpecifier -> TypeSpecifier
 rootType (Option ts) = rootType ts
