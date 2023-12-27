@@ -109,14 +109,13 @@ classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
           ) ([],[], [], [])
 
 ppOptionDefinition :: TypeSpecifier -> DocStyle
-ppOptionDefinition ts@(DefinedType {}) = 
+ppOptionDefinition ts = 
   vsep [
     ppOptionSomeParameterStruct ts,
     emptyDoc,
     ppOptionStruct ts,
     emptyDoc
   ]
-ppOptionDefinition ts = error $ "invalid option type: " ++ show ts
 
 -- | TypeDef pretty printer.
 ppTypeDefDeclaration :: OptionMap -> TypeDef SemanticAnns -> DocStyle
