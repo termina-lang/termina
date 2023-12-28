@@ -17,7 +17,6 @@ insertOptionType :: Monad m
   -> TypeSpecifier
   -- | The resulting map
   -> m OptionMap
-insertOptionType prevMap (Vector ts _) = insertOptionType prevMap ts
 insertOptionType prevMap ts =
   if isNonDynOption ts then
     maybe

@@ -10,31 +10,35 @@ import Modules.Printing
 import qualified Data.Map as M
 
 test0 :: String
-test0 = "function match_test0(option0 : Option<dyn u32>) -> u32 {\n" ++
-        "    var ret : u32 = 0 : u32;\n" ++
-        "    match option0 {\n" ++
-        "        case Some(value) => {\n" ++
-        "            ret = value;\n" ++
+test0 = "resource class id0 {\n" ++
+        "    procedure match_test0(&priv self, option0 : Option<dyn u32>) {\n" ++
+        "        var foo : u32 = 0 : u32;\n" ++
+        "        match option0 {\n" ++
+        "            case Some(value) => {\n" ++
+        "                foo = value;\n" ++
+        "            }\n" ++
+        "            case None => {\n" ++
+        "                foo = 0 : u32;\n" ++
+        "            }\n" ++
         "        }\n" ++
-        "        case None => {\n" ++
-        "            ret = 0 : u32;\n" ++
-        "        }\n" ++
+        "        return;\n" ++
         "    }\n" ++
-        "    return ret;\n" ++
-        "}"
+        "};"
 
 test1 :: String
-test1 = "function match_test1(option0 : Option<dyn u32>) -> u32 {\n" ++
-        "    var ret : u32 = 0 : u32;\n" ++
-        "    match option0 {\n" ++
-        "        case None => {\n" ++
+test1 = "resource class id0 {\n" ++
+        "    procedure match_test1(&priv self, option0 : Option<dyn u32>) {\n" ++
+        "        var foo : u32 = 0 : u32;\n" ++
+        "        match option0 {\n" ++
+        "            case None => {\n" ++
+        "            }\n" ++
+        "            case Some(value) => {\n" ++
+        "                foo = value;\n" ++
+        "            }\n" ++
         "        }\n" ++
-        "        case Some(value) => {\n" ++
-        "            ret = value;\n" ++
-        "        }\n" ++
+        "        return;\n" ++
         "    }\n" ++
-        "    return ret;\n" ++
-        "}"
+        "};"
 
 test2 :: String
 test2 = "enum Message {\n" ++
@@ -90,51 +94,65 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint32_t match_test0(__option_dyn_t option0);\n" ++
+              "typedef struct {\n" ++
+              "    __termina_resource_t __resource_id;\n" ++
+              "} id0;\n" ++
+              "\n" ++
+              "void id0__match_test0(id0 * const self, __option_dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
-    it "Prints definition of function match_test0" $ do
+    it "Prints definition of procedure match_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint32_t match_test0(__option_dyn_t option0) {\n" ++
+              "void id0__match_test0(id0 * const self, __option_dyn_t option0) {\n" ++
               "\n" ++
-              "    uint32_t ret = 0;\n" ++
+              "    __termina__resource_lock(&self->__resource_id);\n" ++
+              "\n" ++
+              "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
               "\n" ++
-              "        ret = 0;\n" ++
+              "        foo = 0;\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
               "        __option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
+              "        foo = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    return ret;\n" ++
+              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "\n" ++
+              "    return;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of function match_test1" $ do
+    it "Prints declaration of procedure match_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint32_t match_test1(__option_dyn_t option0);\n" ++
+              "typedef struct {\n" ++
+              "    __termina_resource_t __resource_id;\n" ++
+              "} id0;\n" ++
+              "\n" ++
+              "void id0__match_test1(id0 * const self, __option_dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
-    it "Prints definition of function match_test1" $ do
+    it "Prints definition of procedure match_test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint32_t match_test1(__option_dyn_t option0) {\n" ++
+              "void id0__match_test1(id0 * const self, __option_dyn_t option0) {\n" ++
               "\n" ++
-              "    uint32_t ret = 0;\n" ++
+              "    __termina__resource_lock(&self->__resource_id);\n" ++
+              "\n" ++
+              "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
               "\n" ++
@@ -143,11 +161,13 @@ spec = do
               "\n" ++
               "        __option_dyn_t __option0__Some = option0.Some.__0;\n" ++
               "\n" ++
-              "        ret = *((uint32_t *)__option0__Some.data);\n" ++
+              "        foo = *((uint32_t *)__option0__Some.data);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    return ret;\n" ++
+              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "\n" ++
+              "    return;\n" ++
               "\n" ++
               "}\n")
     it "Prints declaration of function match_test2" $ do

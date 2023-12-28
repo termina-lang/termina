@@ -288,7 +288,7 @@ poolParser = do
   typeSpecifier <- typeSpecifierParser
   _ <- semi
   size <- K <$> natural
-  _ <- reservedOp ">"
+  _ <- reserved ">"
   return $ Pool typeSpecifier size
 
 vectorParser :: Parser TypeSpecifier
@@ -297,7 +297,7 @@ vectorParser = do
   typeSpecifier <- typeSpecifierParser
   _ <- semi
   size <- K <$> natural
-  _ <- reservedOp "]"
+  _ <- reserved "]"
   return $ Vector typeSpecifier size
 
 referenceParser :: Parser TypeSpecifier
@@ -316,7 +316,12 @@ portSubtypeParser :: Parser TypeSpecifier
 portSubtypeParser = reservedOp "port" >> Port <$> typeSpecifierParser
 
 optionParser :: Parser TypeSpecifier
-optionParser = reserved "Option" >> Option <$> angles typeSpecifierParser
+optionParser = do
+  _ <- reserved "Option"
+  _ <- reservedOp "<"
+  ts <- typeSpecifierParser
+  _ <- reservedOp ">"
+  return $ Option ts
 
 -- Expression Parser
 expressionParser' :: Parser (Expression Annotation)

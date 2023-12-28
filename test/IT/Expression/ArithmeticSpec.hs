@@ -26,19 +26,21 @@ test0 = "function test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "function test1(foo : dyn u16) {\n" ++
-        "    foo = foo + 1024 : u16;\n" ++
-        "    1024 : u16 + foo;\n" ++
-        "    foo = foo - 1024 : u16;\n" ++
-        "    1024 : u16 - foo;\n" ++
-        "    foo = foo * 1024 : u16;\n" ++
-        "    1024 : u16 * foo;\n" ++
-        "    foo = foo / 1024 : u16;\n" ++
-        "    1024 : u16 / foo;\n" ++
-        "    foo = foo % 1024 : u16;\n" ++
-        "    1024 : u16 % foo;\n" ++
-        "    return;\n" ++
-        "}"
+test1 = "resource class id0 {\n" ++
+        "    procedure test1(&priv self, foo : dyn u16) {\n" ++
+        "        foo = foo + 1024 : u16;\n" ++
+        "        1024 : u16 + foo;\n" ++
+        "        foo = foo - 1024 : u16;\n" ++
+        "        1024 : u16 - foo;\n" ++
+        "        foo = foo * 1024 : u16;\n" ++
+        "        1024 : u16 * foo;\n" ++
+        "        foo = foo / 1024 : u16;\n" ++
+        "        1024 : u16 / foo;\n" ++
+        "        foo = foo % 1024 : u16;\n" ++
+        "        1024 : u16 % foo;\n" ++
+        "        return;\n" ++
+        "    }\n" ++
+        "};"
 
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
@@ -108,7 +110,11 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void test1(__termina_dyn_t foo);\n" ++
+              "typedef struct {\n" ++
+              "    __termina_resource_t __resource_id;\n" ++
+              "} id0;\n" ++
+              "\n" ++
+              "void id0__test1(id0 * const self, __termina_dyn_t foo);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function test1" $ do
@@ -116,7 +122,9 @@ spec = do
        pack ("\n" ++
              "#include \"test.h\"\n" ++
              "\n" ++ 
-             "void test1(__termina_dyn_t foo) {\n" ++
+             "void id0__test1(id0 * const self, __termina_dyn_t foo) {\n" ++
+             "\n" ++
+             "    __termina__resource_lock(&self->__resource_id);\n" ++
              "\n" ++
              "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + 1024;\n" ++
              "\n" ++
@@ -137,6 +145,8 @@ spec = do
              "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) % 1024;\n" ++
              "\n" ++
              "    1024 % *((uint16_t *)foo.data);\n" ++
+             "\n" ++
+              "    __termina__resource_unlock(&self->__resource_id);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

@@ -24,7 +24,5 @@ ppSimpleOptionTypesFile opts =
         emptyDoc,
         pretty "#include <termina.h>"
     ] ++
-    concat ((map (\s -> emptyDoc : (map ppSimpleOptionDefinition (S.toList s))) $ M.elems opts)) ++
-    [
-        pretty "#endif // __OPTION_H__"
-    ]
+    concatMap (\s -> emptyDoc : map ppSimpleOptionDefinition (S.toList s)) (M.elems opts) ++
+    [ pretty "#endif // __OPTION_H__", emptyDoc ]

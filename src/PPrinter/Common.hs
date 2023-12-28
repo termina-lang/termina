@@ -188,7 +188,9 @@ ppOptionSomeParameterStructName ts = namefy $ pretty "option_" <> ppTypeSpecifie
     ppTypeSpecifier' Int16 = pretty "int16"
     ppTypeSpecifier' Int32 = pretty "int32"
     ppTypeSpecifier' Int64 = pretty "int64"
-    ppTypeSpecifier' ts = ppTypeSpecifier ts
+    ppTypeSpecifier' (Vector ts' _) = ppTypeSpecifier' ts'
+    ppTypeSpecifier' (DefinedType typeIdentifier) = pretty typeIdentifier
+    ppTypeSpecifier' ts' = error $ "invalid option type specifier :" ++ show ts'
 
 ppOptionSomeParameterStruct :: TypeSpecifier -> DocStyle
 ppOptionSomeParameterStruct ts =
@@ -230,7 +232,9 @@ ppOptionStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDi
     ppTypeSpecifier' Int16 = pretty "int16"
     ppTypeSpecifier' Int32 = pretty "int32"
     ppTypeSpecifier' Int64 = pretty "int64"
-    ppTypeSpecifier' ts = ppTypeSpecifier ts
+    ppTypeSpecifier' (Vector ts' _) = ppTypeSpecifier' ts'
+    ppTypeSpecifier' (DefinedType typeIdentifier) = pretty typeIdentifier
+    ppTypeSpecifier' ts' = error $ "invalid option type specifier :" ++ show ts'
 
 -- | Pretty prints the ID field of the resource, task and handler classes
 ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle
