@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 {- | Struct type with a single field.
-In Termina's context sytax:
+In Termina's concrete sytax:
 struct id0 {
     field0 : u8;
 };
@@ -20,7 +20,7 @@ structWithOneField :: AnnASTElement SemanticAnns
 structWithOneField = TypeDefinition (Struct "id0" [FieldDefinition "field0" UInt8] []) undefined
 
 {- | Struct type with two fields.
-In Termina's context sytax:
+In Termina's concrete sytax:
 struct id0 {
     field0 : u8;
     field1 : u16;
@@ -34,7 +34,7 @@ structWithTwoFields = TypeDefinition
   ] []) undefined
 
 {- | Packed Struct type.
-In Termina's context sytax:
+In Termina's concrete sytax:
 #[packed]
 struct id0 {
     field0 : u8;
@@ -51,7 +51,7 @@ packedStruct = TypeDefinition
   ] [Modifier "packed" Nothing]) undefined
 
 {- | Aligned Struct type.
-In Termina's context sytax:
+In Termina's concrete sytax:
 #[aligned(16)]
 struct id0 {
     field0 : u8;
@@ -68,7 +68,7 @@ alignedStruct = TypeDefinition
   ] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
 
 {- | Aligned Struct type.
-In Termina's context sytax:
+In Termina's concrete sytax:
 #[packed]
 #[aligned(16)]
 struct id0 {

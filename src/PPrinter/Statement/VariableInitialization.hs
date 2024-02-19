@@ -6,6 +6,7 @@ import Prettyprinter
 import AST.Seman
 import Semantic.Monad
 
+
 ppInitializeVectorFromExpression ::
   Integer ->
   DocStyle ->
@@ -113,12 +114,25 @@ ppInitializeStruct subs level target expr =
     -- \| This function can only be called with a field values assignments expressions
     (FieldAssignmentsExpression _ vas _) ->
         vsep $
-            map (\a -> case a of
-              FieldValueAssignment field expr' -> ppFieldInitializer subs level target (pretty field) expr'
-              FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> target <> pretty "." <> pretty field <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi
-              FieldPortConnection field res _ -> target <> pretty "." <> pretty field <+> pretty "=" <+> ppCReferenceExpression (pretty res) <> semi
-              _ -> error $ "Incorrect annotated assignment expression: " ++ show a) vas
+            foldr (
+              \assignment acc ->
+                case assignment of
+                  FieldValueAssignment field expr' _ -> ppFieldInitializer subs level target (pretty field) expr' : acc
+                  FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> 
+                    target <> pretty "." <> pretty field <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi : acc
+                  -- | Regular access port connection  
+                  FieldPortConnection AccessPortConnection field _ (SemAnn _ (PTy rts procedures)) -> 
+                    vsep (ppProcedureAssignment field rts <$> procedures) : acc
+                  -- | Pool port connections
+                  FieldPortConnection AccessPortConnection field res _ -> 
+                    target <> pretty "." <> pretty field <+> pretty "=" <+> ppCReferenceExpression (pretty res) <> semi : acc
+                  _ -> acc
+            ) [] vas
     _ -> error $ "Incorrect initialization expression: " ++ show expr
+  where
+    ppProcedureAssignment :: Identifier -> TypeSpecifier -> SemanProcedure -> DocStyle
+    ppProcedureAssignment field res (SemanProcedure procid) =
+      target <> pretty "." <> pretty field <> pretty "." <> pretty procid <+> pretty "=" <+> classFunctionName (ppTypeSpecifier res) (pretty procid) <> semi
 
 ppInitializeEnum ::
   Substitutions ->

@@ -9,6 +9,10 @@ import           Semantic.Monad
 
 type DocStyle = Doc AnsiStyle
 
+-- | This function returns the type of an object. The type is extracted from the
+-- object's semantic annotation. The function assumes that the object is well-typed
+-- and that the semantic annotation is correct. If the object is not well-typed, the
+-- function will throw an error.
 getObjectType :: Object SemanticAnns -> TypeSpecifier
 getObjectType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = ts
 getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))   = ts
@@ -153,7 +157,7 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID :: DocStyle
+pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID, allocator :: DocStyle
 pool = namefy $ pretty "termina_pool_t"
 msgQueue = namefy $ pretty "termina_msg_queue_t"
 optionDyn = namefy $ pretty "option_dyn_t"
@@ -161,6 +165,7 @@ dynamicStruct = namefy $ pretty "termina_dyn_t"
 taskID = namefy $ pretty "termina_task_t"
 resourceID = namefy $ pretty "termina_resource_t"
 handlerID = namefy $ pretty "termina_handler_t"
+allocator = namefy $ pretty "termina_allocator_t"
 
 ppDimensionOptionTS :: TypeSpecifier -> DocStyle
 ppDimensionOptionTS (Vector ts (K size)) = pretty "__" <> (pretty size) <> ppDimensionOptionTS ts
@@ -242,6 +247,9 @@ ppResourceClassIDField = pretty "__resource_id"
 ppTaskClassIDField = pretty "__task_id"
 ppHandlerClassIDField = pretty "__handler_id"
 
+ppInterfaceThatField :: DocStyle
+ppInterfaceThatField = pretty "__that"
+
 -- | Pretty prints the name of the enum that defines the variants
 -- of the enumeration
 enumIdentifier :: DocStyle -> DocStyle
@@ -292,7 +300,8 @@ ppTypeSpecifier (DynamicSubtype _)           = dynamicStruct
 ppTypeSpecifier (Pool _ _)                   = pool
 ppTypeSpecifier (MsgQueue _ _)               = msgQueue
 ppTypeSpecifier (Location ts)                = volatileC <+> ppTypeSpecifier ts <+> pretty "*"
-ppTypeSpecifier (Port ts)                    = ppTypeSpecifier ts <+> pretty "*"
+ppTypeSpecifier (AccessPort ts)              = ppTypeSpecifier ts
+ppTypeSpecifier (Allocator _)                = allocator
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
@@ -386,7 +395,7 @@ handlerHandleMethodName :: Identifier -> DocStyle
 handlerHandleMethodName identifier = classFunctionName (pretty identifier) (pretty "handle")
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "pool_" <> pretty mName)
+poolMethodName = namefy . pretty
 
 msgQueueMethodName :: Identifier -> DocStyle
 msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "msg_queue_" <> pretty mName)
@@ -397,9 +406,9 @@ resourceLock = classFunctionName (namefy $ pretty "termina") (pretty "resource_l
 resourceUnlock :: DocStyle
 resourceUnlock = classFunctionName (namefy $ pretty "termina") (pretty "resource_unlock")
 
--- | Prints the name of the function that frees an objet to the pool
-poolFree :: DocStyle
-poolFree = poolMethodName "free"
+ppCFunctionPointer :: DocStyle -> DocStyle -> [DocStyle] -> DocStyle
+ppCFunctionPointer ts identifier parameters = 
+  ts <+> parens (pretty "*" <> identifier) <> parens (align (fillSep (punctuate comma parameters)))
 
 -- | Pretty prints a C reference expression
 ppCReferenceExpression :: DocStyle -> DocStyle

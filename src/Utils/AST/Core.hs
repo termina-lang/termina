@@ -34,6 +34,13 @@ findClassProcedure i
   L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
                ; _ -> False})
 
+findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([Parameter], a)
+findInterfaceProcedure i
+  = fmap
+  (\case {InterfaceProcedure _ ps a -> (ps, a)})
+  .
+  L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
+
 findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], Maybe TypeSpecifier, a)
 findClassViewerOrMethod i
   = fmap
@@ -95,9 +102,6 @@ selfInvStmt isSelf = selfInvStmt'
       isSelfExpression e
       ++  concatMap (selfInvBlock isSelf . matchBody) mcases
     selfInvStmt' (SingleExpStmt e _ann) = isSelfExpression e
-    -- we cannot free methods and stuff, can we?
-    -- TODO
-    selfInvStmt' (Free _obj _ann) = []
 
 selfInvBlock :: (obj a -> Bool) -> Block' (Expression' obj) obj a -> [Identifier]
 selfInvBlock isSelf = concatMap (selfInvStmt isSelf)
@@ -127,24 +131,31 @@ selfDepClass isSelf = selfDepClass'
    -- Viewers can
    selfDepClass' (ClassViewer vId _param _type bRet _ann) =
      Just (vId , selfInvBlockRet isSelf bRet)
+   -- Actions can
+   selfDepClass' (ClassAction aId _param _type bRet _ann) =
+      Just (aId , selfInvBlockRet isSelf bRet)
 
 className :: ClassMember' expr obj a -> Identifier
 className (ClassField e _)              = fieldIdentifier e
 className (ClassMethod mIdent _ _ _)    = mIdent
 className (ClassProcedure pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
+className (ClassAction aIdent _ _ _ _)  = aIdent
 ----------------------------------------
 
 glbName :: Global' expr a -> Identifier
 glbName (Task tId _ _ _ _)     = tId
 glbName (Resource tId _ _ _ _) = tId
+glbName (Channel tId _ _ _ _)  = tId
+glbName (Emitter tId _ _ _ _) = tId
 glbName (Handler tId _ _ _ _)  = tId
 glbName (Const tId _ _ _ _)    = tId
 
-tyDefName :: TypeDef'' member -> Identifier
+tyDefName :: TypeDef' expr obj a -> Identifier
 tyDefName (Struct sId _ _ )= sId
 tyDefName (Enum sId _ _ )=   sId
-tyDefName (Class _ sId _ _ )=sId
+tyDefName (Class _ sId _ _ _ )=sId
+tyDefName (Interface sId _ _ )=sId
 
 globalsName :: AnnASTElement' expr obj a -> Identifier
 globalsName (Function fId _ _ _ _ _) = fId

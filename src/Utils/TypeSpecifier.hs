@@ -33,7 +33,8 @@ simpleType (MsgQueue {})       = False
 simpleType (Pool {})           = False
 simpleType (Reference {})      = False
 simpleType (Location {})       = False
-simpleType (Port {})           = False
+simpleType (SinkPort {})       = False
+simpleType (AccessPort {})     = False
 simpleType _                   = True
 
 classFieldType :: TypeSpecifier -> Bool
@@ -88,16 +89,18 @@ memberIntCons _ _      = False
 identifierType :: TypeDef' expr lho a -> Identifier
 identifierType (Struct ident _ _) = ident
 identifierType (Enum ident _ _)   = ident
-identifierType (Class _ ident _ _)  = ident
+identifierType (Class _ ident _ _ _)  = ident
+identifierType (Interface ident _ _) = ident
 
 referenceType :: TypeSpecifier -> Bool
-referenceType Unit           = False
-referenceType (MsgQueue {})  = False
-referenceType (Pool {})      = False
-referenceType (Reference {}) = False
-referenceType (Location {})  = False
-referenceType (Port {})      = False
-referenceType _              = True
+referenceType Unit            = False
+referenceType (MsgQueue {})   = False
+referenceType (Pool {})       = False
+referenceType (Reference {})  = False
+referenceType (Location {})   = False
+referenceType (SinkPort {})   = False
+referenceType (AccessPort {}) = False
+referenceType _               = True
 
 ----------------------------------------
 -- Dynamic Helpers
@@ -126,12 +129,11 @@ hasDynOrDep Char = Right False
 --
 hasDynOrDep (Vector ty _s) = hasDynOrDep ty
 hasDynOrDep (Option ty) = hasDynOrDep ty
-hasDynOrDep (MsgQueue ty _s) = hasDynOrDep ty
-hasDynOrDep (Pool ty _s) = hasDynOrDep ty
+-- hasDynOrDep (MsgQueue ty _s) = hasDynOrDep ty
+-- hasDynOrDep (Pool ty _s) = hasDynOrDep ty
 hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
 hasDynOrDep (DynamicSubtype _) = Right True
-hasDynOrDep (Location ty) = hasDynOrDep ty
-hasDynOrDep (Port ty) = hasDynOrDep ty
+-- hasDynOrDep (Location ty) = hasDynOrDep ty
 hasDynOrDep Unit = Right False
 ----------------------------------------
 
@@ -143,5 +145,4 @@ rootType (Pool ts _) = rootType ts
 rootType (Reference _ ts) = rootType ts
 rootType (DynamicSubtype ts) = rootType ts
 rootType (Location ts) = rootType ts
-rootType (Port ts) = rootType ts
 rootType t = t

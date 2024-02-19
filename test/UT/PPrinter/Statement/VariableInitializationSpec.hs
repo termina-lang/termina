@@ -60,21 +60,21 @@ uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
 structAFieldsInit0 :: Expression SemanticAnns
-structAFieldsInit0 = 
+structAFieldsInit0 =
     FieldAssignmentsExpression "StructA"
-        [FieldValueAssignment "field_a" uint32Const0,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
+        [FieldValueAssignment "field_a" uint32Const0 undefined,
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
-tmDescriptorFieldsInit0 = 
+tmDescriptorFieldsInit0 =
     FieldAssignmentsExpression "TMDescriptor"
-        [FieldValueAssignment "field0" uint32Const0,
-         FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
+        [FieldValueAssignment "field0" uint32Const0 undefined,
+         FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorSemAnn
 
 struct0, struct1 :: Statement SemanticAnns
 struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 undefined
-struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject ( (Variable "struct0" tmDescriptorSemAnn))) undefined
+struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorSemAnn)) undefined
 
 enum0, enum1 :: Statement SemanticAnns
 enum0 = Declaration "enum0" Mutable messageTS (EnumVariantExpression "Message" "Reset" [] messageSemAnn) undefined

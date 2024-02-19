@@ -57,11 +57,15 @@ data ESeman
   | AppType [Parameter] TypeSpecifier
   deriving Show
 
+newtype SemanProcedure = SemanProcedure Identifier
+  deriving (Show)
+
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
   = ETy ESeman -- ^ Expressions with their types
   | STy -- ^ Statements with no types
+  | PTy TypeSpecifier [SemanProcedure] -- ^ Access port connection
   | GTy (GEntry SemanticAnns) -- ^ Global elements
   deriving Show
 
@@ -110,6 +114,9 @@ buildGlobalTy loc = SemAnn loc . GTy . GType
 
 buildStmtAnn :: Locations -> SAnns SemanticElems
 buildStmtAnn = flip SemAnn STy
+
+buildPortConnectionAnn :: Locations -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
+buildPortConnectionAnn loc ts procs = SemAnn loc (PTy ts procs)
 
 -- | Expression Semantic Annotations
 type SemanticAnns = SAnns SemanticElems
@@ -162,12 +169,12 @@ initialGlobalEnv = fromList initGlb
 
 initGlb :: [(Identifier, SAnns (GEntry SemanticAnns))]
 initGlb =
-  [("TaskRet",internalErrorSeman `SemAnn` GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" []] []) ),
-   ("Result", internalErrorSeman `SemAnn`GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
+  [("Interrupt", internalErrorSeman `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
+   ("irq_3", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
+   ("Result", internalErrorSeman `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
    ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
    ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
-   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit),
-   ("delay_at",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
+   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
   -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
   --  ("Result", GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" [UInt32]] [])),
   --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
@@ -231,7 +238,7 @@ getGlobalTy loc tid  = gets global >>=
 getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
 getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
   Enum _ fs _mods -> return fs
-  ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap (fmap forgetSemAnn) ty)
+  ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
 getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier)
 getFunctionTy loc iden =
@@ -497,25 +504,30 @@ checkTypeDefinition loc (Reference _ ty)        =
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
   checkTypeDefinition loc ty
 checkTypeDefinition loc (DynamicSubtype (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (DynamicSubtype ty)   =
+checkTypeDefinition loc (DynamicSubtype ty) =
   simpleTyorFail loc ty >>
   checkTypeDefinition loc ty
-checkTypeDefinition loc (Location ty)         =
+checkTypeDefinition loc (Location ty) =
   simpleTyorFail loc ty >>
   checkTypeDefinition loc ty
-checkTypeDefinition loc (Port ty)             =
+checkTypeDefinition loc (AccessPort ty) =
   case ty of
-    (MsgQueue (Option _) _)      -> throwError $ annotateError loc EOptionNested
-    (MsgQueue ty'@(DynamicSubtype _) _)  -> checkTypeDefinition loc ty'
-    (MsgQueue ty' _) -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-    (Pool (Option _) _)          -> throwError $ annotateError loc EOptionNested
-    (Pool ty' _)          -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+    (Allocator (Option _))  -> throwError $ annotateError loc EOptionNested
+    (Allocator ty') -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
     (DefinedType identTy) ->
       getGlobalTy loc identTy >>=
         \case
-          (Class ResourceClass _ _ _) -> return ()
-          _ -> throwError $ annotateError loc $ EPortNotResource ty
-    _                -> throwError $ annotateError loc $ EPortNotResource ty
+          (Interface {}) -> return ()
+          _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
+    _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
+checkTypeDefinition loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+checkTypeDefinition loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+checkTypeDefinition loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+checkTypeDefinition loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 -- This is explicit just in case
 checkTypeDefinition _ UInt8                   = return ()
 checkTypeDefinition _ UInt16                  = return ()
@@ -536,34 +548,34 @@ checkTypeDefinition _ Unit                    = return ()
 -- we should write this module from scratch.
 -- Note this is not a function checking that the type itself is well-formed.
 -- we are just lifting a similar check on types.
-typeHasDyn :: Locations -> TypeSpecifier -> SemanticMonad Bool
-typeHasDyn loc ty
-  = either
+-- typeHasDyn :: Locations -> TypeSpecifier -> SemanticMonad Bool
+-- typeHasDyn loc ty
+--  = either
       -- There is a user defined type.
-      (userDefHasDyn loc)
+--      (userDefHasDyn loc)
       -- No user defined, either it has it or not.
-      return
-  $ hasDynOrDep ty
+--      return
+--  $ hasDynOrDep ty
 
-userDefHasDyn :: Locations -> Identifier -> SemanticMonad Bool
-userDefHasDyn loc ident =
-  getGlobalTy loc ident >>= stypedefHasDyn
-  where
+-- userDefHasDyn :: Locations -> Identifier -> SemanticMonad Bool
+-- userDefHasDyn loc ident =
+--  getGlobalTy loc ident >>= stypedefHasDyn
+--  where
     --
-    stypedefHasDyn :: SemanTypeDef SemanticAnns -> SemanticMonad Bool
-    stypedefHasDyn (Struct _ident fsdef _mods) =
-      or <$> mapM (typeHasDyn loc . fieldTypeSpecifier) fsdef
-    stypedefHasDyn (Enum _ident enumVs _mods) =
-      or . concat <$> mapM ( mapM (typeHasDyn loc) . assocData) enumVs
-    stypedefHasDyn (Class _cKind _ident sMembers _mods) =
-      or <$> mapM clsMemberHasDyn sMembers
+--    stypedefHasDyn :: SemanTypeDef SemanticAnns -> SemanticMonad Bool
+--    stypedefHasDyn (Struct _ident fsdef _mods) =
+--      or <$> mapM (typeHasDyn loc . fieldTypeSpecifier) fsdef
+--    stypedefHasDyn (Enum _ident enumVs _mods) =
+--      or . concat <$> mapM ( mapM (typeHasDyn loc) . assocData) enumVs
+--    stypedefHasDyn (Class _cKind _ident sMembers _mods) =
+--      or <$> mapM clsMemberHasDyn sMembers
     --
-    clsMemberHasDyn :: SemanClassMember SemanticAnns  -> SemanticMonad Bool
-    -- The only one struct carrying Dynamic Value are class fields.
-    clsMemberHasDyn (ClassField fldDef _anns) = typeHasDyn loc (fieldTypeSpecifier fldDef)
-    clsMemberHasDyn (ClassMethod _ident _retTy _blk _anns) = return False
-    clsMemberHasDyn (ClassProcedure _ident _params _blk _anns) = return False -- It is not a value, it takes one
-    clsMemberHasDyn (ClassViewer _ident _params _retTy _blk _ann) = return False
+--    clsMemberHasDyn :: SemanClassMember SemanticAnns  -> SemanticMonad Bool
+--    -- The only one struct carrying Dynamic Value are class fields.
+--    clsMemberHasDyn (ClassField fldDef _anns) = typeHasDyn loc (fieldTypeSpecifier fldDef)
+--    clsMemberHasDyn (ClassMethod _ident _retTy _blk _anns) = return False
+--    clsMemberHasDyn (ClassProcedure _ident _params _blk _anns) = return False -- It is not a value, it takes one
+--    clsMemberHasDyn (ClassViewer _ident _params _retTy _blk _ann) = return False
 
 
 

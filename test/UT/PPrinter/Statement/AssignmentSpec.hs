@@ -59,15 +59,15 @@ uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
 structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
-        [FieldValueAssignment "field_a" uint32Const0,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn),
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000] structASemAnn
+        [FieldValueAssignment "field_a" uint32Const0 undefined,
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
 tmDescriptorFieldsInit0 = 
     FieldAssignmentsExpression "TMDescriptor"
-        [FieldValueAssignment "field0" uint32Const0,
-         FieldValueAssignment "field1" structAFieldsInit0] tmDescriptorSemAnn
+        [FieldValueAssignment "field0" uint32Const0 undefined,
+         FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorSemAnn
 
 
 struct0, struct1 :: Object SemanticAnns

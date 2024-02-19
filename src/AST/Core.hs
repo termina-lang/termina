@@ -99,21 +99,29 @@ data TypeSpecifier
   | Bool | Char | DefinedType Identifier
   | Vector TypeSpecifier Size
   | Option TypeSpecifier
+  -- Built-in polymorphic types
+  | MsgQueue TypeSpecifier Size -- Message queues
+  | Pool TypeSpecifier Size -- Memory pools
+  | Allocator TypeSpecifier -- Interface of memory pools
   -- Non-primitive types
-  | MsgQueue TypeSpecifier Size
-  | Pool TypeSpecifier Size
   | Reference AccessKind TypeSpecifier
   | DynamicSubtype TypeSpecifier
   -- | Fixed-location types
   | Location TypeSpecifier
   -- | Port types
-  | Port TypeSpecifier
+  | AccessPort TypeSpecifier
+  | SinkPort TypeSpecifier Identifier
+  | InPort TypeSpecifier Identifier
+  | OutPort TypeSpecifier
   -- See Q9
   | Unit
   deriving (Show, Ord, Eq)
 
 data AccessKind = Immutable | Mutable | Private
   deriving (Show, Ord, Eq)
+
+data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
+  deriving (Show, Ord, Eq) 
 
 newtype Size = K Integer
  deriving (Show, Ord, Eq)
@@ -156,9 +164,22 @@ data Global' expr a
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
-
     -- | Shared resource global variable constructor
     | Resource
+      Identifier -- ^ name of the variable
+      TypeSpecifier -- ^ type of the variable
+      (Maybe (expr a)) -- ^ initialization expression (optional)
+      [ Modifier ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
+    | Channel
+      Identifier -- ^ name of the variable
+      TypeSpecifier -- ^ type of the variable
+      (Maybe (expr a)) -- ^ initialization expression (optional)
+      [ Modifier ] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
+
+    | Emitter
       Identifier -- ^ name of the variable
       TypeSpecifier -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
@@ -186,21 +207,33 @@ data Global' expr a
 instance Annotated (Global' expr) where
   getAnnotation (Task _ _ _ _ a) = a
   getAnnotation (Resource _ _ _ _ a)   = a
+  getAnnotation (Channel _ _ _ _ a)    = a
+  getAnnotation (Emitter _ _ _ _ a)    = a
   getAnnotation (Handler _ _ _ _ a)   = a
   getAnnotation (Const _ _ _ _ a)    = a
 
 -- Extremelly internal type definition
-data TypeDef'' member
+data TypeDef' expr obj a
   = Struct Identifier [FieldDefinition]  [ Modifier ]
   | Enum Identifier [EnumVariant] [ Modifier ]
-  | Class ClassKind Identifier [member] [ Modifier ]
+  | Class ClassKind Identifier [ClassMember' expr obj a] [Identifier] [ Modifier ]
+  | Interface Identifier [InterfaceMember a] [ Modifier ]
   deriving (Show, Functor)
 
-data ClassKind = TaskClass | ResourceClass | HandlerClass
+data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass 
   deriving (Show)
 
--- Type Defs are the above when composed with Class members.
-type TypeDef' expr obj a = TypeDef'' (ClassMember' expr obj a)
+-------------------------------------------------
+-- Interface Member
+data InterfaceMember a
+  = 
+    -- | Procedure
+    InterfaceProcedure
+      Identifier -- ^ name of the procedure
+      [Parameter] -- ^ list of parameters (possibly empty)
+      a
+  deriving (Show, Functor)
+
 -------------------------------------------------
 -- Class Member
 data ClassMember' expr obj a
@@ -225,9 +258,15 @@ data ClassMember' expr obj a
       (Block' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
-      Identifier -- ^ name of the procedure
+      Identifier -- ^ name of the viewer
       [Parameter] -- ^ list of parameters (possibly empty)
       TypeSpecifier -- ^ return type of the viewer
+      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      a -- ^ transpiler annotation
+    | ClassAction 
+      Identifier  -- ^ name of the method
+      Parameter -- ^ input parameter
+      TypeSpecifier -- ^ type of the return value
       (BlockRet' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)
@@ -249,9 +288,9 @@ data Parameter = Parameter {
 } deriving (Show)
 
 data FieldAssignment' expr a =
-  FieldValueAssignment Identifier (expr a)
+  FieldValueAssignment Identifier (expr a) a
   | FieldAddressAssignment Identifier Address a
-  | FieldPortConnection Identifier Identifier a
+  | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
 data FieldDefinition = FieldDefinition {
@@ -360,7 +399,6 @@ data Statement' expr obj a =
   | SingleExpStmt
     (expr a) -- ^ expression
     a
-  | Free (obj a) a
   deriving (Show, Functor)
 
 -- | Constant values:

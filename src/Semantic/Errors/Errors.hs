@@ -119,8 +119,10 @@ data Errors a
   -- | ENoPrimitiveType TypeSpecifier
   -- | Only option Dyn
   | EOptionDyn TypeSpecifier
-  -- | Port specifier not a shared resource
-  | EPortNotResource TypeSpecifier
+  -- | Access port does not have an Interface type
+  | EAccessPortNotInterface TypeSpecifier
+  | EAccessPortNotResource Identifier 
+  | EAccessPortNotPool Identifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
   -- | Dynamic (type has a Dynamic inside) as Argument of a function
@@ -142,9 +144,12 @@ data Errors a
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
-  -- | Enums Definition
+  -- | Enums Definition 
   | EEnumDefEmpty Identifier
   | EEnumDefNotUniqueField [Identifier]
+  -- | Interface Definition
+  | EInterfaceEmpty Identifier
+  | EInterfaceNotUniqueProcedure [Identifier]
   -- | Class Definition
   | EClassEmptyMethods Identifier
   | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
@@ -184,8 +189,6 @@ data Errors a
   | ETyNotEnum Identifier (SemanTypeDef a)
   -- | Unexpected Global element unboxing.
   | EInternalNoGTY
-  -- | Free not dyn type
-  | EFreeNotDyn TypeSpecifier
   -- | MsgQueue operations errors
   | EMsgQueueWrongProcedure Identifier
   | ENoMsgQueueSendWrongArgs

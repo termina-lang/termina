@@ -65,6 +65,17 @@ mapStatementOption prevMap (MatchStmt _ cases _) =
   foldM (\m (MatchCase _ _ stmts _) -> foldM mapStatementOption m stmts) prevMap cases
 mapStatementOption prevMap _ = return prevMap
 
+mapInterfaceProcedureOption :: Monad m
+  -- | The initial map with the all the option types
+  => OptionMap
+  -- | The new element
+  -> InterfaceMember a
+  -- | The resulting map
+  -> m OptionMap
+mapInterfaceProcedureOption prevMap (InterfaceProcedure _ params _) =
+  -- | Get the option types from the parameters
+  foldM mapParameterOption prevMap params
+
 mapClassMemberOption :: Monad m
   -- | The initial map with the all the option types
   => OptionMap
@@ -90,6 +101,13 @@ mapClassMemberOption prevMap (ClassViewer _ params ret blkRet _) =
   flip insertOptionType ret >>=
   -- | Get the option types from the block return type
   flip (foldM mapStatementOption) (blockBody blkRet)
+mapClassMemberOption prevMap (ClassAction _ param ret blkRet _) =
+  -- | Get the option types from the parameter
+  mapParameterOption prevMap param >>=
+  -- | Get the option types from the return type
+  flip insertOptionType ret >>=
+  -- | Get the option types from the block return type
+  flip (foldM mapStatementOption) (blockBody blkRet)
 
 mapTypeDefOption :: Monad m
   -- | The initial map with the all the option types
@@ -104,9 +122,12 @@ mapTypeDefOption prevMap (Struct _ fields _) =
 mapTypeDefOption prevMap (Enum _ variants _) =
   -- | Get the option types from the fields
   foldM (\m (EnumVariant _ tss) -> foldM insertOptionType m tss) prevMap variants
-mapTypeDefOption prevMap (Class _ _ members _) =
+mapTypeDefOption prevMap (Class _ _ members _ _) =
   -- | Get the option types from the class members
   foldM mapClassMemberOption prevMap members
+mapTypeDefOption prevMap (Interface _ members _) =
+  -- | Get the option types from the class members
+  foldM mapInterfaceProcedureOption prevMap members
 
 mapOptions :: Monad m
   -- | The initial map with the all the option types

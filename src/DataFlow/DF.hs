@@ -21,12 +21,10 @@ import Annotations
 import           Control.Monad
 import           Control.Monad.Except
 
-import           Data.List            (all, find, foldl')
 import           Data.Maybe
 import qualified Data.Set             as S
 import qualified Data.Map.Strict      as M
 
-import           AST.Core             (Identifier)
 -- AST to work with.
 import           AST.Seman            as SAST
 -- We need to know the type of objects.
@@ -34,7 +32,7 @@ import qualified Semantic.Monad       as SM (location)
 import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
 
 
-import Debug.Termina
+--import Debug.Termina
 
 -- Constant expression could be global variables, should we check they are used
 -- too?
@@ -42,7 +40,7 @@ useConstE :: ConstExpression -> UDM AnnotatedErrors ()
 useConstE = const (return ())
 
 -- There are two types of arguments :
--- + Moving out variables of type Dyn and Option?
+-- + Moving out variables of type dyn and Option<dyn T>
 -- + Copying expressions, everything.
 -- It is context dependent (AFAIK).
 useArguments :: Expression SemanticAnns -> UDM AnnotatedErrors ()
@@ -80,7 +78,7 @@ useObject (MemberAccess obj _i _ann)
 useObject (Dereference obj _ann)
   = useObject obj
 useObject (DereferenceMemberAccess obj i ann)
-  = (SM.location ann) `annotateError` safeAddUse i
+  = SM.location ann `annotateError` safeAddUse i
   >> useObject obj
 useObject (VectorSliceExpression obj eB eT _ann)
   = useObject obj >> useConstE eB >> useConstE eT
@@ -106,7 +104,7 @@ defObject (Undyn obj _ann)
   = useObject obj
 
 useFieldAssignment :: FieldAssignment SemanticAnns -> UDM AnnotatedErrors ()
-useFieldAssignment (FieldValueAssignment _ident e) = useExpression e
+useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 -- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignemnt _ = return ()
 
@@ -128,49 +126,29 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)
     case obj_type  of
-      (_, Port (Pool {})) ->
+      (_, AccessPort (Allocator {})) ->
         annotateError (SM.location ann) (case ident of
           "alloc" -> do
             case args of
               -- I don't think we can have expression computing variables here.
               [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
               _ -> throwError ImpossibleErrorBadAllocArg
+          "free" -> do
+            case args of
+              [AccessObject (Variable var _anni)] -> useDynVar var
+              _ -> throwError ImpossibleErrorBadFreeArg
           _ -> throwError ImpossibleError) -- Pools only have alloc
-      (_, Port (MsgQueue {})) ->
+      (_, OutPort {}) ->
         case ident of
           "send" -> do
             case args of
-              [AccessObject input_obj@(Variable var _), ReferenceExpression Mutable res_obj _] -> do
+              [AccessObject input_obj@(Variable var _)] -> do
                   input_obj_type <- annotateError (SM.location ann) (getObjectType input_obj)
                   case input_obj_type of
-                    (_, DynamicSubtype _) -> annotateError (SM.location ann) (useDynVar var) >> useObject res_obj
-                    _ -> useObject input_obj >> useObject res_obj
+                    (_, DynamicSubtype _) -> annotateError (SM.location ann) (useDynVar var)
+                    _ -> useObject input_obj
               _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadSendArg)
-          "receive" -> do
-            case args of
-              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann] -> do
-                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
-                case output_obj_type of
-                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar)
-                  _ -> useObject output_obj
-              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
-          "receive_timed" -> do
-            case args of
-              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann, ReferenceExpression Immutable timeout_obj _] -> do
-                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
-                case output_obj_type of
-                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar) >> useObject timeout_obj
-                  _ -> useObject output_obj >> useObject timeout_obj
-              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
-          "try_receive" -> do
-            case args of
-              [ReferenceExpression Mutable output_obj@(Variable avar _anni) _ann] -> do
-                output_obj_type <- annotateError (SM.location ann) (getObjectType output_obj)
-                case output_obj_type of
-                  (_, Option (DynamicSubtype _)) -> annotateError (SM.location ann) (allocOO avar)
-                  _ -> useObject output_obj
-              _ -> annotateError (SM.location ann) (throwError ImpossibleErrorBadReceiveArg)
-          _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- Pools only have alloc
+          _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
 useExpression (DerefMemberFunctionAccess obj _ident args _ann)
@@ -318,13 +296,6 @@ useDefStmt (MatchStmt e mcase ann)
   useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
-useDefStmt (Free obj _ann)
-  = case obj of
-      Variable var ann
-        -> (SM.location ann) `annotateError` useDynVar var
-      -- Idk If we can free whatever object, can we?
-      _
-        -> useObject obj
 
 destroyOptionDyn
   :: (MatchCase SemanticAnns, MatchCase SemanticAnns)
@@ -365,9 +336,12 @@ useDefCMemb (ClassProcedure _ident ps blk ann)
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
+useDefCMemb (ClassAction _ident p _tyret bret ann)
+  = useDefBlockRet bret
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) [p]
 
 useDefTypeDef :: TypeDef SemanticAnns -> UDM AnnotatedErrors ()
-useDefTypeDef (Class _k _id members _mods)
+useDefTypeDef (Class _k _id members _provides _mods)
   -- First we go through uses
   = mapM_ useDefCMemb muses
   -- Then all definitions (ClassFields)
@@ -375,10 +349,13 @@ useDefTypeDef (Class _k _id members _mods)
   where
     (muses,mdefs) = foldr (\m (u,d)->
                              case m of {
+                               ClassField (FieldDefinition _ (SinkPort {})) _ -> (u, d);
+                               ClassField (FieldDefinition _ (InPort {})) _ -> (u, d);
                                ClassField {} -> (u, m:d);
                                _             -> (m:u, d)
                                        }) ([],[]) members
 useDefTypeDef (Struct {}) = return ()
+useDefTypeDef (Interface {}) = return ()
 useDefTypeDef (Enum {}) = return ()
 
 -- Globals

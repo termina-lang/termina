@@ -92,8 +92,8 @@ ppMemberFunctionAccess subs obj ident params =
                 -- | Anything else should not happen
                 _ -> error $ "unsupported member function access to object: " ++ show obj
         (DefinedType classId) ->
-            let clsFuncName = (classFunctionName (pretty classId) (pretty ident)) in
-            case obj of 
+            let clsFuncName = classFunctionName (pretty classId) (pretty ident) in
+            case obj of
                 (Dereference _ _) ->
                     -- If we are here, it means that we are dereferencing the self object
                     ppCFunctionCall
@@ -103,31 +103,32 @@ ppMemberFunctionAccess subs obj ident params =
                         clsFuncName
                         (ppObject subs obj : (ppExpression subs <$> params))
         -- | If the left hand size is a class:
-        Port (DefinedType classId) ->
+        AccessPort (DefinedType {}) ->
+            let objname = ppObject subs obj in
             ppCFunctionCall
-                (classFunctionName (pretty classId) (pretty ident))
-                (ppObject subs obj : (ppExpression subs <$> params))
+                (objname <> pretty "." <> pretty ident)
+                (objname <> pretty "." <> ppInterfaceThatField : (ppExpression subs <$> params))
         -- | If the left hand side is a pool:
-        Port (Pool {}) ->
+        AccessPort (Allocator {}) ->
+            let objname = ppObject subs obj in
             ppCFunctionCall
-                (poolMethodName ident)
-                (ppObject subs obj : (ppExpression subs <$> params))
+                (objname <> pretty "." <> poolMethodName ident)
+                (objname <> pretty "." <> ppInterfaceThatField : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
-        Port (MsgQueue {}) ->
+        OutPort {} ->
             case ident of
                 -- | If it is a send, the first parameter is the object to be sent. The
                 -- function is expecting to receive a reference to that object.
-                "send" -> 
+                "send" ->
                     case params of
-                        [element, result] ->
+                        [element] ->
                             ppCFunctionCall
                                 (msgQueueMethodName ident)
                                 [
-                                    ppObject subs obj, 
-                                    (case getType element of
-                                        (Vector _ _) -> parens (voidC <+> pretty "*") <> (ppExpression subs element)
-                                        _ -> parens (voidC <+> pretty "*") <> ppCReferenceExpression (ppExpression subs element)),
-                                    ppExpression subs result
+                                    ppObject subs obj,
+                                    case getType element of
+                                        (Vector _ _) -> parens (voidC <+> pretty "*") <> ppExpression subs element
+                                        _ -> parens (voidC <+> pretty "*") <> ppCReferenceExpression (ppExpression subs element)
                                 ]
                         _ -> error $ "invalid params for message queue send: " ++ show params
                 _ -> ppCFunctionCall
@@ -139,22 +140,22 @@ ppMemberFunctionAccess subs obj ident params =
 ppObject :: Printer Object
 ppObject subs (Variable identifier _) = findWithDefault (pretty identifier) identifier subs
 -- ppObject subs (IdentifierExpression expr _)  = printer subs expr
-ppObject subs (VectorIndexExpression obj index _) = 
-    if getObjPrecedence obj > 1 then 
+ppObject subs (VectorIndexExpression obj index _) =
+    if getObjPrecedence obj > 1 then
         parens (ppObject subs obj) <> brackets (ppExpression subs index)
     else
         ppObject subs obj <> brackets (ppExpression subs index)
-ppObject subs (VectorSliceExpression vector lower _ _) = 
+ppObject subs (VectorSliceExpression vector lower _ _) =
     case lower of
         KC (I _ lowInteger) ->
             ppCReferenceExpression (ppObject subs vector <> brackets (pretty lowInteger))
         _ -> error $ "Invalid constant expression: " ++ show lower
-ppObject subs (MemberAccess obj identifier _) = 
+ppObject subs (MemberAccess obj identifier _) =
     if getObjPrecedence obj > 1 then
         parens (ppObject subs obj) <> pretty "." <> pretty identifier
     else
         ppObject subs obj <> pretty "." <> pretty identifier
-ppObject subs (DereferenceMemberAccess obj identifier _) = 
+ppObject subs (DereferenceMemberAccess obj identifier _) =
     if getObjPrecedence obj > 1 then
         parens (ppObject subs obj) <> pretty "->" <> pretty identifier
     else
@@ -163,7 +164,7 @@ ppObject subs (Dereference obj _) =
         case getObjectType obj of
         -- | A dereference to a vector is printed as the name of the vector
         (Reference _ (Vector _ _)) -> ppObject subs obj
-        _ -> 
+        _ ->
             if getObjPrecedence obj > 2 then
                 ppCDereferenceExpression $ parens (ppObject subs obj)
             else
@@ -218,9 +219,9 @@ ppExpression' subs expr = ppExpression subs expr
 
 -- | Expression pretty printer
 ppExpression :: Printer Expression
-ppExpression subs (AccessObject obj) = 
+ppExpression subs (AccessObject obj) =
     case getObjectType obj of
-        (Location _) -> 
+        (Location _) ->
             if getObjPrecedence obj > 2 then
                 ppCDereferenceExpression $ parens (ppObject subs obj)
             else
@@ -243,7 +244,7 @@ ppExpression _ (Constant constant _) =
 ppExpression subs (BinOp op expr1 expr2 _) =
     ppExpression' subs expr1 <+> ppBinaryOperator op <+> ppExpression' subs expr2
 ppExpression subs (Casting expr' ts' _) =
-    parens (ppTypeSpecifier ts') <> 
+    parens (ppTypeSpecifier ts') <>
         if getExpPrecedence expr' > 2 then
             parens (ppExpression subs expr')
         else

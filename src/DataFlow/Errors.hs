@@ -29,6 +29,7 @@ data Errors
   | ForMoreODyn [Identifier]
   | InternalOptionMissMatch
   | ImpossibleErrorBadAllocArg
+  | ImpossibleErrorBadFreeArg
   | ImpossibleErrorBadSendArg
   | ImpossibleErrorBadReceiveArg
   -- Special Variable errors

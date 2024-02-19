@@ -35,6 +35,11 @@ filterStructModifiers = filter (\case
 ppSelfParameter :: Identifier -> DocStyle
 ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> pretty "self"
 
+ppInterfaceProcedureField :: InterfaceMember SemanticAnns -> DocStyle
+ppInterfaceProcedureField (InterfaceProcedure identifier parameters _) =
+  ppCFunctionPointer (voidC) (pretty identifier)
+    (voidC <+> pretty "*" <+> pretty "__self" : (ppParameterDeclaration (pretty identifier) <$> parameters)) <> semi
+
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
   let clsFuncName = classFunctionName (pretty classId) (pretty identifier) in
@@ -71,6 +76,22 @@ ppClassFunctionDeclaration classId (ClassViewer identifier parameters rts _ _) =
       (Just (ppReturnType clsFuncName rts)) <> semi,
     emptyDoc
   ]
+ppClassFunctionDeclaration classId (ClassAction identifier parameter rts _ _) =
+  let clsFuncName = classFunctionName (pretty classId) (pretty identifier) in
+  vsep $
+  (case rts of
+    Vector {} ->
+      [ppReturnVectorValueStructureDecl clsFuncName rts <> line]
+    _ -> []) ++
+  (case parameter of
+    Parameter pid ts@(Vector {}) ->
+      [ppParameterVectorValueStructureDecl clsFuncName (pretty pid) ts <> line]
+    _ -> []) ++
+  [
+    ppCFunctionPrototype clsFuncName
+      [ppSelfParameter classId, ppParameterDeclaration clsFuncName parameter] (Just (ppReturnType clsFuncName rts)) <> semi,
+    emptyDoc
+  ]
 ppClassFunctionDeclaration classId member = error $ "member of class " ++ classId ++ " not a function: " ++ show member
 
 
@@ -99,17 +120,21 @@ ppEnumVariantParameterStruct identifier enumVariant@(EnumVariant _variant params
         ppEnumVariantParameter params [0..]
       ) <+> ppEnumVariantParameterStructName identifier enumVariant <> semi
 
-classifyClassMembers :: [ClassMember SemanticAnns] -> ([ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns])
-classifyClassMembers = foldr (\member (fs,ms,prs,vws) ->
+classifyClassMembers :: [ClassMember SemanticAnns] -> ([ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns])
+classifyClassMembers = foldr (\member (fs,ms,prs,vws,acts) ->
               case member of
-                ClassField {} -> (member : fs, ms, prs, vws)
-                ClassMethod {} -> (fs, member : ms, prs, vws)
-                ClassProcedure {} -> (fs, ms, member : prs, vws)
-                ClassViewer {} -> (fs, ms, prs, member : vws)
-          ) ([],[], [], [])
+                -- We are filtering out the fields that are not relevant for the class structure 
+                ClassField (FieldDefinition _ (SinkPort {})) _ -> (fs, ms, prs, vws, acts)
+                ClassField (FieldDefinition _ (InPort {})) _ -> (fs, ms, prs, vws, acts)
+                ClassField {} -> (member : fs, ms, prs, vws, acts)
+                ClassMethod {} -> (fs, member : ms, prs, vws, acts)
+                ClassProcedure {} -> (fs, ms, member : prs, vws, acts)
+                ClassViewer {} -> (fs, ms, prs, member : vws, acts)
+                ClassAction {} -> (fs, ms, prs, vws, member : acts)
+          ) ([],[], [], [], [])
 
 ppOptionDefinition :: TypeSpecifier -> DocStyle
-ppOptionDefinition (Option ts) = 
+ppOptionDefinition (Option ts) =
   vsep [
     ppOptionSomeParameterStruct ts,
     emptyDoc,
@@ -125,13 +150,11 @@ ppTypeDefDeclaration opts typeDef =
     -- | Struct declaration pretty pr_¨^ç+
     (Struct identifier fls modifiers) ->
       let structModifiers = filterStructModifiers modifiers in
-      vsep $ [
-        typedefC <+> structC <+> braces' (
+      vsep $ (typedefC <+> structC <+> braces' (
           indentTab . align $ vsep $
             map ppStructField fls
-            ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi
-        ] ++ 
-        (maybe ([emptyDoc]) (\s -> emptyDoc : (map ppOptionDefinition (S.toList s))) $ M.lookup (DefinedType identifier) opts)
+            ) <+> ppTypeAttributes structModifiers <> pretty identifier <> semi) : 
+          maybe [emptyDoc] (\s -> emptyDoc : map ppOptionDefinition (S.toList s)) (M.lookup (DefinedType identifier) opts)
     -- | Enum declaration pretty printer  
     (Enum identifier variants _) ->
       let variantsWithParams = filter (not . null . assocData) variants
@@ -146,20 +169,20 @@ ppTypeDefDeclaration opts typeDef =
         concatMap (\enumVariant ->
             [ppEnumVariantParameterStruct identifier enumVariant,
             emptyDoc]) variantsWithParams ++
-        -- | Print the main enumeration struct
+        -- | Print the main enumeration structs
         [typedefC <+> structC <+> braces' (line <> (indentTab . align $
           vsep [
             enumIdentifier (pretty identifier) <+> enumVariantsField <> semi,
             case variantsWithParams of
               [] -> emptyDoc
-              [enumVariant@(EnumVariant variant _)] -> 
+              [enumVariant@(EnumVariant variant _)] ->
                   vsep [
                     emptyDoc, -- empty line
                     ppEnumVariantParameterStructName identifier enumVariant
                       <+> pretty variant <> semi,
                     emptyDoc -- empty line
                   ]
-              _ -> 
+              _ ->
                   vsep [
                     emptyDoc, -- empty line
                     unionC <+> braces' (indentTab . align $
@@ -170,12 +193,24 @@ ppTypeDefDeclaration opts typeDef =
                     emptyDoc -- empty line
                   ]
           ]
-        )) <+> pretty identifier <> semi] ++ 
-        (maybe ([emptyDoc]) (\s -> emptyDoc : (map ppOptionDefinition (S.toList s))) $ M.lookup (DefinedType identifier) opts)
-    (Class clsKind identifier members modifiers) ->
+        )) <+> pretty identifier <> semi] ++
+        maybe [emptyDoc] (\s -> emptyDoc : map ppOptionDefinition (S.toList s)) (M.lookup (DefinedType identifier) opts)
+    (Interface identifier members _) ->
+      vsep [
+              typedefC <+> structC <+> braces' (
+                indentTab . align $
+                vsep $
+                  -- | Print the that field
+                  voidC <+> pretty "*" <+> ppInterfaceThatField <> semi :
+                  -- | Print the procedure fields
+                  map ppInterfaceProcedureField members)
+                    <+> pretty identifier <> semi,
+              emptyDoc
+      ]
+    (Class clsKind identifier members _provides modifiers) ->
       let
         structModifiers = filterStructModifiers modifiers
-        (fields, methods, procedures, viewers) = classifyClassMembers members
+        (fields, methods, procedures, viewers, actions) = classifyClassMembers members
       in
         vsep $ [
               typedefC <+> structC <+> braces' (
@@ -190,4 +225,4 @@ ppTypeDefDeclaration opts typeDef =
               emptyDoc
           ] ++
           -- | Print the declaration of the class methods, procedures and viewers
-          map (ppClassFunctionDeclaration identifier) (methods ++ procedures ++ viewers)
+          map (ppClassFunctionDeclaration identifier) (methods ++ procedures ++ viewers ++ actions)

@@ -111,11 +111,11 @@ dynDefinedTypeSemAnn name = dynTySemAnn (DefinedType name)
 refDefinedTypeSemAnn :: Identifier -> SemanticAnns
 refDefinedTypeSemAnn name = refSemAnn (DefinedType name)
 
-poolSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-poolSemAnn ts size = objSemAnn Mutable (Port (Pool ts (K size)))
+poolSemAnn :: TypeSpecifier -> SemanticAnns
+poolSemAnn ts = objSemAnn Mutable (AccessPort (Allocator ts))
 
-msgQueueSemAnn :: TypeSpecifier -> Integer -> SemanticAnns
-msgQueueSemAnn ts size = objSemAnn Mutable (Port (MsgQueue ts (K size)))
+msgQueueSemAnn :: TypeSpecifier -> SemanticAnns
+msgQueueSemAnn ts = objSemAnn Mutable (OutPort ts)
 
 funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
 funSemAnn params ts = SemAnn undefined (ETy (AppType params ts))

@@ -49,29 +49,31 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
-      ["MsgQueue", "Pool", "Option"]
+      ["MsgQueue", "Pool", "Option", "Allocator"]
       ++ -- Struct and enum types
       ["struct", "enum"]
       ++ -- Dynamic Subtyping
       ["dyn"]
       ++ -- Fixed Location Subtyping
       ["loc"]
-      ++ -- Port Subtyping
-      ["port"]
+      ++ -- Ports Subtyping
+      ["access", "sink", "in", "out"]
       ++ -- Private reference typing
       ["&priv"]
       ++ -- Global declarations
       ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
       ["var", "match", "for", "if", "else", "return", "while"]
-      ++ -- Free
-      ["free"]
+      ++ -- Trigger
+      ["triggers"]
+      ++ -- Provide
+      ["provides"]
       ++ -- Constants
       ["true", "false"]
       ++ -- Modules
       ["import"]
       ++ -- Class methods
-      ["procedure", "viewer", "method"]
+      ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
       ["as"]
       ++ -- option name
@@ -112,7 +114,7 @@ lexer = Tok.makeTokenParser langDef
                       ,":" -- Type annotation
                       ,"::" -- Enum variant
                       ,"=" -- Assignment
-                      ,"->" -- Function return type
+                      ,"->" -- Function return type/Outbound connection
                       ,"=>" -- Match case
                       ,"[" -- Vector init
                       ,"]" -- Vector init
@@ -123,7 +125,8 @@ lexer = Tok.makeTokenParser langDef
                       ,".." -- Vector slice and for loop range
                       ,"&mut" -- Mutable reference creation
                       ,"@" -- Field address assignment
-                      ,"<-" -- Field connection assignment
+                      ,"<->" -- Access port connection
+                      ,"<-" -- Inbound/Sink connection
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
@@ -203,7 +206,9 @@ typeSpecifierParser =
   <|> referenceParser
   <|> dynamicSubtypeParser
   <|> locationSubtypeParser
-  <|> portSubtypeParser
+  <|> allocatorParser
+  <|> sinkPortParser
+  <|> accessPortParser
   <|> optionParser
   <|> (DefinedType <$> identifierParser)
   <|> (reserved "u8" >> return UInt8)
@@ -232,7 +237,9 @@ parameterParser = do
 fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
 fieldAssignmentsExpressionParser = do
     p <- getPosition
-    assignments <- braces (sepBy (wspcs *> (try flValues <|> try flAddresses <|> flConnection) <* wspcs) comma)
+    assignments <- braces (sepBy 
+      (wspcs *> (try flValues <|> try flAddresses <|> try flAccessPortConnection <|> flInboundPortConnection <|> flOutboundPortConnection) <* wspcs) 
+      comma)
     _ <- reservedOp ":"
     identifier <- identifierParser
     return $ FieldAssignmentsExpression identifier assignments (Position p)
@@ -240,17 +247,28 @@ fieldAssignmentsExpressionParser = do
       flValues = do
             identifier <- identifierParser
             _ <- reservedOp "="
-            FieldValueAssignment identifier <$> expressionParser
+            p' <- getPosition
+            flip (FieldValueAssignment identifier) (Position p')  <$> expressionParser
       flAddresses = do
             identifier <- identifierParser
             _ <- reservedOp "@"
             p' <- getPosition
             flip (FieldAddressAssignment identifier) (Position p') <$> hexa
-      flConnection = do
+      flAccessPortConnection = do
+            identifier <- identifierParser
+            _ <- reservedOp "<->"
+            p' <- getPosition
+            flip (FieldPortConnection AccessPortConnection identifier) (Position p') <$> identifierParser
+      flInboundPortConnection = do
             identifier <- identifierParser
             _ <- reservedOp "<-"
             p' <- getPosition
-            flip (FieldPortConnection identifier) (Position p') <$> identifierParser
+            flip (FieldPortConnection InboundPortConnection identifier) (Position p') <$> identifierParser
+      flOutboundPortConnection = do
+            identifier <- identifierParser
+            _ <- reservedOp "->"
+            p' <- getPosition
+            flip (FieldPortConnection OutboundPortConnection identifier) (Position p') <$> identifierParser
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -291,6 +309,14 @@ poolParser = do
   _ <- reserved ">"
   return $ Pool typeSpecifier size
 
+allocatorParser :: Parser TypeSpecifier
+allocatorParser = do
+  reserved "Allocator"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reserved ">"
+  return $ Allocator typeSpecifier
+
 vectorParser :: Parser TypeSpecifier
 vectorParser = do
   _ <- reservedOp "["
@@ -312,8 +338,15 @@ dynamicSubtypeParser = reservedOp "dyn" >> DynamicSubtype <$> typeSpecifierParse
 locationSubtypeParser :: Parser TypeSpecifier
 locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser
 
-portSubtypeParser :: Parser TypeSpecifier
-portSubtypeParser = reservedOp "port" >> Port <$> typeSpecifierParser
+sinkPortParser :: Parser TypeSpecifier
+sinkPortParser = do
+  _ <- reserved "sink"
+  ts <- typeSpecifierParser
+  _ <- reserved "triggers"
+  SinkPort ts <$> identifierParser
+
+accessPortParser :: Parser TypeSpecifier
+accessPortParser = reservedOp "access" >> AccessPort <$> typeSpecifierParser
 
 optionParser :: Parser TypeSpecifier
 optionParser = do
@@ -644,12 +677,6 @@ singleExprStmtParser = do
   _ <- semi
   return $ SingleExpStmt expression (Position p)
 
-freeStmtParser :: Parser (Statement Annotation)
-freeStmtParser = reserved "free" >>
- Free <$> parens objectParser <*> (Position <$> getPosition)
- >>= \t -> semi >> return t
-
-
 blockItemParser :: Parser (Statement Annotation)
 blockItemParser
   =   try ifElseIfStmtParser
@@ -658,7 +685,6 @@ blockItemParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
-  <|> try freeStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
@@ -790,7 +816,7 @@ typeDefintionParser :: Parser (AnnASTElement  Annotation)
 typeDefintionParser = flip TypeDefinition
   -- First we get the position, at the beginning of the definition
   <$> (Position <$> getPosition)
-  <*> (structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser)
+  <*> (structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser <|> interfaceDefinitionParser)
 
 fieldDefinitionParser :: Parser FieldDefinition
 fieldDefinitionParser = do
@@ -826,6 +852,16 @@ classMethodParser = do
   blockRet <- braces blockParser
   return $ ClassMethod name typeSpec blockRet (Position p)
 
+classActionParser :: Parser (ClassMember Annotation)
+classActionParser = do
+  p <- getPosition
+  reserved "action"
+  name <- identifierParser
+  param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
+  typeSpec <- reservedOp "->" >>  typeSpecifierParser
+  blockRet <- braces blockParser
+  return $ ClassAction name param typeSpec blockRet (Position p)
+
 classProcedureParser :: Parser (ClassMember Annotation)
 classProcedureParser = do
   p <- getPosition
@@ -837,6 +873,19 @@ classProcedureParser = do
   emptyReturn
   reservedOp "}"
   return $ ClassProcedure name params block (Position p)
+  where
+    procedureParamsParser :: Parser [Parameter]
+    procedureParamsParser =
+      reserved "&priv" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
+
+interfaceProcedureParser :: Parser (InterfaceMember Annotation)
+interfaceProcedureParser = do
+  p <- getPosition
+  reserved "procedure"
+  name <- identifierParser
+  params <- parens procedureParamsParser
+  reservedOp ";"
+  return $ InterfaceProcedure name params (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -856,6 +905,15 @@ classViewerParser = do
     viewerParamsParser =
       reserved "&self" >> option [] (comma >> sepBy parameterParser comma)
 
+interfaceDefinitionParser :: Parser (TypeDef Annotation)
+interfaceDefinitionParser = do
+  modifiers <- many modifierParser
+  reserved "interface"
+  identifier <- identifierParser
+  procedures <- braces (many1 interfaceProcedureParser)
+  _ <- semi
+  return $ Interface identifier procedures modifiers
+
 classDefinitionParser :: Parser (TypeDef Annotation)
 classDefinitionParser = do
   modifiers <- many modifierParser
@@ -863,9 +921,15 @@ classDefinitionParser = do
   -- p <- getPosition
   reserved "class"
   identifier <- identifierParser
-  fields <- braces (many1 $ classMethodParser <|> classViewerParser <|> classProcedureParser <|> classFieldDefinitionParser)
+  provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
+  fields <- 
+    braces (many1 $ classMethodParser 
+      <|> classViewerParser 
+      <|> classProcedureParser 
+      <|> classActionParser 
+      <|> classFieldDefinitionParser)
   _ <- semi
-  return $ Class classKind identifier fields modifiers
+  return $ Class classKind identifier fields provides modifiers
   where
     classKindParser :: Parser ClassKind
     classKindParser =

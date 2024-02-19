@@ -20,19 +20,20 @@ test0 = "struct Message {\n" ++
         "\n" ++
         "task class CHousekeeping {\n" ++
         "  interval : u32;\n" ++
-        "  message_pool : port Pool<Message; 10>;\n" ++
+        "  message_pool : access Allocator<Message>;\n" ++
+        "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
-        "  viewer check_interval(&self, limit : u32) -> bool {\n" ++ 
-        "    var ret : bool = true;\n" ++     
+        "  viewer check_interval(&self, limit : u32) -> bool {\n" ++
+        "    var ret : bool = true;\n" ++
         "    if (self->interval > limit) {\n" ++
         "      ret = false;\n" ++
         "    }\n" ++
         "    return ret;\n" ++
         "  }\n" ++
         "\n" ++
-        "  method run(&priv self) -> TaskRet {\n" ++
-        "\n" ++        
-        "    var ret : TaskRet = TaskRet::Continue;\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
+        "\n" ++
+        "    var ret : Result = Result::Ok;\n" ++
         "\n" ++
         "    self->interval = self->interval + 1 : u32;\n" ++
         "\n" ++
@@ -41,7 +42,7 @@ test0 = "struct Message {\n" ++
         "    match alloc_msg {\n" ++
         "        case Some(msg) => {\n" ++
         "            msg.urgent = false;\n" ++
-        "            free(msg);\n" ++
+        "            self->message_pool.free(msg);\n" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
@@ -50,7 +51,7 @@ test0 = "struct Message {\n" ++
         "    var check : bool = (*self).check_interval(10 : u32);\n" ++
         "\n" ++
         "    if (check == false) {\n" ++
-        "      ret = TaskRet::Abort;\n" ++
+        "      ret = Result::Error;\n" ++
         "    }\n" ++
         "\n" ++
         "    return ret;\n" ++
@@ -61,15 +62,15 @@ test0 = "struct Message {\n" ++
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
+  Right ast ->
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile True (M.fromList [(SAST.UInt32, S.fromList [(SAST.Option SAST.UInt32)])]) (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> ppHeaderFile True (M.fromList [(SAST.UInt32, S.fromList [SAST.Option SAST.UInt32])]) (pretty "__TEST_H__") emptyDoc tast
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
+  Right ast ->
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
       Right tast -> ppSourceFile (pretty "test") tast
@@ -91,63 +92,23 @@ spec = do
               "    __option_uint32_t destination_id;\n" ++
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
-              "\n" ++   
+              "\n" ++
               "typedef struct {\n" ++
-              "    __termina_pool_t * message_pool;\n" ++
+              "    __termina_allocator_t message_pool;\n" ++
               "    uint32_t interval;\n" ++
               "    __termina_task_t __task_id;\n" ++
               "} CHousekeeping;\n" ++
-              "\n" ++   
-              "TaskRet CHousekeeping__run(CHousekeeping * const self);\n" ++
               "\n" ++
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
+              "\n" ++
+              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "TaskRet CHousekeeping__run(CHousekeeping * const self) {\n" ++
-              "\n" ++
-              "    TaskRet ret;\n" ++
-              "\n" ++
-              "    ret.__variant = TaskRet__Continue;\n" ++
-              "\n" ++
-              "    self->interval = self->interval + 1;\n" ++
-              "\n" ++
-              "    __option_dyn_t alloc_msg;\n" ++
-              "\n" ++
-              "    alloc_msg.__variant = None;\n" ++
-              "\n" ++   
-              "    __termina__pool_alloc(self->message_pool, &alloc_msg);\n"  ++
-              "\n"  ++   
-              "    if (alloc_msg.__variant == None) {\n"  ++
-              "\n"  ++   
-              "        \n"  ++           
-              "    } else {\n" ++
-              "\n" ++   
-              "        __option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
-              "\n" ++
-              "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
-              "\n" ++
-              "        __termina__pool_free(__alloc_msg__Some);\n" ++
-              "\n" ++  
-              "    }\n" ++
-              "\n" ++
-              "    _Bool check = CHousekeeping__check_interval(self, 10);\n" ++
-              "\n" ++
-              "    if (check == 0) {\n" ++
-              "\n" ++
-              "        ret.__variant = TaskRet__Abort;\n" ++
-              "\n" ++
-              "    }\n" ++
-              "\n" ++   
-              "    return ret;\n" ++
-              "\n" ++   
-              "}\n" ++
-              "\n" ++
               "\n" ++
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit) {\n" ++
@@ -162,4 +123,45 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}\n\n")
+              "}\n" ++
+              "\n" ++
+              "\n" ++
+              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
+              "\n" ++
+              "    Result ret;\n" ++
+              "\n" ++
+              "    ret.__variant = Result__Ok;\n" ++
+              "\n" ++
+              "    self->interval = self->interval + 1;\n" ++
+              "\n" ++
+              "    __option_dyn_t alloc_msg;\n" ++
+              "\n" ++
+              "    alloc_msg.__variant = None;\n" ++
+              "\n" ++
+              "    self->message_pool.__alloc(self->message_pool.__that, &alloc_msg);\n"  ++
+              "\n"  ++
+              "    if (alloc_msg.__variant == None) {\n"  ++
+              "\n"  ++
+              "        \n"  ++
+              "    } else {\n" ++
+              "\n" ++
+              "        __option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
+              "\n" ++
+              "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
+              "\n" ++
+              "        self->message_pool.__free(self->message_pool.__that, __alloc_msg__Some);\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    _Bool check = CHousekeeping__check_interval(self, 10);\n" ++
+              "\n" ++
+              "    if (check == 0) {\n" ++
+              "\n" ++
+              "        ret.__variant = Result__Error;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    return ret;\n" ++
+              "\n" ++
+              "}\n" ++
+              "\n")

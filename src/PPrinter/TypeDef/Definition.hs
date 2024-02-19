@@ -70,10 +70,24 @@ ppClassFunctionDefinition classId (ClassMethod identifier mrts body _) =
     <+> ppBlockRet empty clsFuncName body <> line
   where
     clsFuncName = classFunctionName (pretty classId) (pretty identifier)
+ppClassFunctionDefinition classId (ClassAction identifier parameter rts body _) =
+    -- | Function prototype
+    ppCFunctionPrototype clsFuncName
+      (
+        -- | Print the self parameter
+        ppSelfParameter classId :
+        -- | Print the rest of the function parameters
+        [ppParameterDeclaration clsFuncName parameter]
+      )
+      -- | Class viewer return type
+      (Just (ppReturnType (pretty identifier) rts))
+    <+> ppBlockRet (ppParameterSubstitutions [parameter]) clsFuncName body <> line
+  where
+    clsFuncName = classFunctionName (pretty classId) (pretty identifier)
 ppClassFunctionDefinition _ _ = error "invalid class member"
 
 ppClassDefinition :: TypeDef SemanticAnns -> DocStyle
-ppClassDefinition (Class _ identifier members _) =
-  let (_fields, methods, procedures, viewers) = classifyClassMembers members in
-    vsep $ map (ppClassFunctionDefinition identifier) (methods ++ procedures ++ viewers)
+ppClassDefinition (Class _ identifier members _provides _) =
+  let (_fields, methods, procedures, viewers, actions) = classifyClassMembers members in
+    vsep $ map (ppClassFunctionDefinition identifier) (methods ++ procedures ++ viewers ++ actions)
 ppClassDefinition _ = error "AST element is not a class"

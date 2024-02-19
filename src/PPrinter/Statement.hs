@@ -138,11 +138,6 @@ ppStatement ::
     Substitutions 
     -- | Statement to be printed
     -> Statement SemanticAnns -> DocStyle
--- | Prints a free statement. These statements are used to free a
--- dynamically allocated object. They are of the form "free(obj)".
--- The printer prints the corresponding free() function call.
-ppStatement subs (Free obj _) =
-    ppCFunctionCall poolFree [ppObject subs obj] <> semi
 ppStatement subs (Declaration identifier _ ts expr _) =
   case ts of
     Vector _ _ ->

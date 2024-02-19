@@ -20,6 +20,8 @@ data SemGlobal
   = STask TypeSpecifier
   | SResource TypeSpecifier
   | SHandler TypeSpecifier
+  | SEmitter TypeSpecifier
+  | SChannel TypeSpecifier
   | SConst TypeSpecifier
   deriving Show
 
@@ -29,6 +31,8 @@ getTySemGlobal :: SemGlobal -> TypeSpecifier
 getTySemGlobal (STask ty) = ty
 getTySemGlobal (SResource ty)   = ty
 getTySemGlobal (SHandler ty)   = ty
+getTySemGlobal (SEmitter ty)   = ty
+getTySemGlobal (SChannel ty)   = ty
 getTySemGlobal (SConst ty)    = ty
 
 ----------------------------------------
@@ -48,9 +52,7 @@ data GEntry a
 -- Aux constant type type-constructor
 data K a = K
   deriving (Functor, Show)
-type SemanTypeDef a = TypeDef'' (SemanClassMember a)
-
-type SemanClassMember = ClassMember' K SAST.Object
+type SemanTypeDef a = TypeDef' K SAST.Object a
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
@@ -61,6 +63,8 @@ kClassMember (ClassProcedure idx ps _blk ann) =
   ClassProcedure idx ps [] ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
   ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+kClassMember (ClassAction idx ps ty _blk ann) =
+  ClassAction idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 
 -- type GEntry = GEntry' SemAnn
 
