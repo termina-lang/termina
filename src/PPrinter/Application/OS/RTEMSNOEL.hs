@@ -89,7 +89,7 @@ getVector ((Modifier "vector" (Just (KC (I _ vector)))) : _) = vector
 getVector (_ : modifiers) = getVector modifiers
 
 hasInitMethod :: TypeDef SemanticAnns -> Bool
-hasInitMethod (Class _ _ members _) = any (
+hasInitMethod (Class _ _ members _ _) = any (
     \member -> case member of
         ClassMethod "init" _ _ _-> True
         _ -> False) members
@@ -119,7 +119,7 @@ addDependencies newGlbs (Just prevGlbs) = Just (S.union newGlbs prevGlbs)
 -- is Finish, the task will call rtems_task_delete() to terminate itself.
 -- Otherwise, the task will call the run() method again.
 ppRTEMSTaskCode :: TypeDef SemanticAnns -> DocStyle
-ppRTEMSTaskCode (Class _ classId _ _) = staticC <+>
+ppRTEMSTaskCode (Class _ classId _ _ _) = staticC <+>
     ppCFunctionPrototype (namefy (pretty "rtems_task") <::> pretty classId) [pretty "rtems_task_argument arg"] (Just (pretty "rtems_task")) <+>
         braces' (line <>
             (indentTab . align $
@@ -127,10 +127,10 @@ ppRTEMSTaskCode (Class _ classId _ _) = staticC <+>
                     -- ClassIdentifier self = &task_identifier;
                     pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> parens (pretty classId <+> pretty "*") <> pretty "arg" <> semi,
                     emptyDoc,
-                    -- TaskRet ret = TaskRet__Continue;
-                    pretty "TaskRet ret" <> semi,
+                    -- Result res = Result__Ok;
+                    pretty "Result res" <> semi,
                     emptyDoc,
-                    pretty "ret.__variant" <+> pretty "=" <+> pretty "TaskRet" <::> pretty "Continue" <> semi,
+                    pretty "ret.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
                     emptyDoc,
                     -- for (;;)
                     ppCInfiniteLoop (
@@ -187,7 +187,7 @@ ppInitMsgQueue (RTEMSMsgQueue identifier ts size) = vsep
 ppInitMsgQueue obj = error $ "Invalid global object (not a message queue): " ++ show obj
 
 ppInitResource :: RTEMSGlobal -> DocStyle
-ppInitResource (RTEMSResource identifier cls@(Class _ classId _ _) _) = vsep $
+ppInitResource (RTEMSResource identifier cls@(Class _ classId _ _ _) _) = vsep $
     (pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi) :
     if hasInitMethod cls then
         [
@@ -203,7 +203,7 @@ ppInitResource (RTEMSResource identifier cls@(Class _ classId _ _) _) = vsep $
 ppInitResource obj = error $ "Invalid global object (not a resource): " ++ show obj
 
 ppInitTask :: RTEMSGlobal -> DocStyle
-ppInitTask (RTEMSTask identifier cls@(Class _ classId _ _) priority stackSize _) = vsep $
+ppInitTask (RTEMSTask identifier cls@(Class _ classId _ _ _) priority stackSize _) = vsep $
     [
         emptyDoc,
         pretty identifier <> pretty ".__task_id.priority" <+> pretty "=" <+> pretty (show priority) <> semi,
@@ -249,7 +249,7 @@ ppInstallHandler (RTEMSHandler identifier _ _ _) = vsep
 ppInstallHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
 
 ppInitHandler :: RTEMSGlobal -> DocStyle
-ppInitHandler (RTEMSHandler identifier cls@(Class _ classId _ _) vector _) = vsep $
+ppInitHandler (RTEMSHandler identifier cls@(Class _ classId _ _ _) vector _) = vsep $
     [
         emptyDoc,
         pretty identifier <> pretty ".__handler_id.entry" <+> pretty "=" <+> (namefy (pretty "rtems_isr") <::> pretty identifier) <> semi,
@@ -270,7 +270,7 @@ ppInitHandler (RTEMSHandler identifier cls@(Class _ classId _ _) vector _) = vse
 ppInitHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
 
 ppRTEMSHandlerCode :: RTEMSGlobal -> DocStyle
-ppRTEMSHandlerCode (RTEMSHandler identifier (Class _ classId _ _) _ _) = staticC <+>
+ppRTEMSHandlerCode (RTEMSHandler identifier (Class _ classId _ _ _) _ _) = staticC <+>
     ppCFunctionPrototype (namefy (pretty "rtems_isr") <::> pretty identifier) [pretty "void * ignored"] Nothing <+>
         braces' (line <>
             (indentTab . align $
@@ -448,7 +448,7 @@ ppMainFile prjprogs =
                 (\(_, _, objs) accMap ->
                     foldr (\obj currMap ->
                         case obj of
-                            SAST.TypeDefinition cls@(Class _ classId _ _) _ -> M.insert classId cls currMap
+                            SAST.TypeDefinition cls@(Class _ classId _ _ _) _ -> M.insert classId cls currMap
                             _ -> currMap
                         ) accMap objs
                 ) M.empty prjprogs
@@ -475,7 +475,7 @@ ppMainFile prjprogs =
 
         -- List of used task classes
         taskClss = foldr (\glb acc -> case glb of
-                RTEMSTask _ cls@(Class _ classId _ _) _ _ _ -> if M.member classId acc then acc else M.insert classId cls acc
+                RTEMSTask _ cls@(Class _ classId _ _ _) _ _ _ -> if M.member classId acc then acc else M.insert classId cls acc
                 _ -> acc
             ) M.empty tasks
         -- Map between the resources and the task and handlers that access them
@@ -487,13 +487,13 @@ ppMainFile prjprogs =
                     RTEMSTask _ _ _ _ (Just (FieldAssignmentsExpression _ assignments _)) ->
                         foldr (\assignment currMap ->
                                 case assignment of
-                                    FieldPortConnection _ identifier _ -> M.alter (addDependency glb) identifier currMap
+                                    FieldPortConnection _ identifier _ _ -> M.alter (addDependency glb) identifier currMap
                                     _ -> currMap
                             ) accMap assignments
                     RTEMSHandler _ _ _ (Just (FieldAssignmentsExpression _ assignments _)) ->
                         foldr (\assignment currMap ->
                                 case assignment of
-                                    FieldPortConnection _ identifier _ -> M.alter (addDependency glb) identifier currMap
+                                    FieldPortConnection _ identifier _ _ -> M.alter (addDependency glb) identifier currMap
                                     _ -> currMap
                             ) accMap assignments
                     _ -> accMap
