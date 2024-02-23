@@ -49,32 +49,46 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
+       -- Polymorphic Types
       ["MsgQueue", "Pool", "Option", "Allocator"]
       ++ -- Struct and enum types
+       -- Struct and enum types
       ["struct", "enum"]
       ++ -- Dynamic Subtyping
+       -- Dynamic Subtyping
       ["dyn"]
       ++ -- Fixed Location Subtyping
+       -- Fixed Location Subtyping
       ["loc"]
       ++ -- Ports Subtyping
+       -- Ports Subtyping
       ["access", "sink", "in", "out"]
       ++ -- Private reference typing
+       -- Private reference typing
       ["&priv"]
       ++ -- Global declarations
+       -- Global declarations
       ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
+       -- Stmt
       ["var", "match", "for", "if", "else", "return", "while"]
       ++ -- Trigger
+       -- Trigger
       ["triggers"]
       ++ -- Provide
+       -- Provide
       ["provides"]
       ++ -- Constants
+       -- Constants
       ["true", "false"]
       ++ -- Modules
+       -- Modules
       ["import"]
       ++ -- Class methods
+       -- Class methods
       ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
+       -- Casting keyword
       ["as"]
       ++ -- option name
       ["option"]
@@ -208,6 +222,8 @@ typeSpecifierParser =
   <|> locationSubtypeParser
   <|> allocatorParser
   <|> sinkPortParser
+  <|> inPortParser
+  <|> outPortParser
   <|> accessPortParser
   <|> optionParser
   <|> (DefinedType <$> identifierParser)
@@ -223,9 +239,12 @@ typeSpecifierParser =
   <|> (reserved "bool" >> return Bool)
   <|> (reserved "char" >> return Char)
 
+parameterIdentifierParser :: Parser Identifier
+parameterIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
+
 parameterParser :: Parser Parameter
 parameterParser = do
-  identifier <- identifierParser
+  identifier <- parameterIdentifierParser
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
@@ -237,8 +256,8 @@ parameterParser = do
 fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
 fieldAssignmentsExpressionParser = do
     p <- getPosition
-    assignments <- braces (sepBy 
-      (wspcs *> (try flValues <|> try flAddresses <|> try flAccessPortConnection <|> flInboundPortConnection <|> flOutboundPortConnection) <* wspcs) 
+    assignments <- braces (sepBy
+      (wspcs *> (try flValues <|> try flAddresses <|> try flAccessPortConnection <|> try flInboundPortConnection <|> flOutboundPortConnection) <* wspcs)
       comma)
     _ <- reservedOp ":"
     identifier <- identifierParser
@@ -347,6 +366,16 @@ sinkPortParser = do
 
 accessPortParser :: Parser TypeSpecifier
 accessPortParser = reservedOp "access" >> AccessPort <$> typeSpecifierParser
+
+outPortParser :: Parser TypeSpecifier
+outPortParser = reservedOp "out" >> OutPort <$> typeSpecifierParser
+
+inPortParser :: Parser TypeSpecifier
+inPortParser = do
+  _ <- reserved "in"
+  ts <- typeSpecifierParser
+  _ <- reserved "triggers"
+  InPort ts <$> identifierParser
 
 optionParser :: Parser TypeSpecifier
 optionParser = do
@@ -766,6 +795,34 @@ taskDeclParser = do
   _ <- semi
   return $ Task identifier typeSpecifier initializer modifiers (Position p)
 
+emitterDeclParser :: Parser (Global Annotation)
+emitterDeclParser = do
+  modifiers <- many modifierParser
+  p <- getPosition
+  reserved "emitter"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  _ <- semi
+  return $ Emitter identifier typeSpecifier initializer modifiers (Position p)
+
+channelDeclParser :: Parser (Global Annotation)
+channelDeclParser = do
+  modifiers <- many modifierParser
+  p <- getPosition
+  reserved "channel"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  initializer <- optionMaybe (do
+    reservedOp "="
+    expressionParser)
+  _ <- semi
+  return $ Channel identifier typeSpecifier initializer modifiers (Position p)
+
 resourceDeclParser :: Parser (Global Annotation)
 resourceDeclParser = do
   modifiers <- many modifierParser
@@ -809,7 +866,12 @@ constDeclParser = do
 
 globalDeclParser :: Parser (AnnASTElement  Annotation)
 globalDeclParser = do
-  g <- try taskDeclParser <|> try resourceDeclParser <|> try handlerDeclParser <|> constDeclParser
+  g <- try taskDeclParser
+    <|> try resourceDeclParser
+    <|> try handlerDeclParser
+    <|> try emitterDeclParser
+    <|> try channelDeclParser
+    <|> constDeclParser
   return $ GlobalDeclaration g
 
 typeDefintionParser :: Parser (AnnASTElement  Annotation)
@@ -922,11 +984,11 @@ classDefinitionParser = do
   reserved "class"
   identifier <- identifierParser
   provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
-  fields <- 
-    braces (many1 $ classMethodParser 
-      <|> classViewerParser 
-      <|> classProcedureParser 
-      <|> classActionParser 
+  fields <-
+    braces (many1 $ classMethodParser
+      <|> classViewerParser
+      <|> classProcedureParser
+      <|> classActionParser
       <|> classFieldDefinitionParser)
   _ <- semi
   return $ Class classKind identifier fields provides modifiers

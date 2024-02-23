@@ -18,6 +18,7 @@ data Errors
   | MapMaxBound
   | ImpossibleError
   | ImpossibleErrorMatchGetType
+  | UsedIgnoredVariable Identifier
   | NotUsed Identifier
   | NotUsedOO Identifier
   | UsingTwice Identifier

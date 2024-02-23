@@ -338,7 +338,7 @@ useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) [p]
+  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) [p]
 
 useDefTypeDef :: TypeDef SemanticAnns -> UDM AnnotatedErrors ()
 useDefTypeDef (Class _k _id members _provides _mods)

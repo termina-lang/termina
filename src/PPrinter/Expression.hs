@@ -112,8 +112,8 @@ ppMemberFunctionAccess subs obj ident params =
         AccessPort (Allocator {}) ->
             let objname = ppObject subs obj in
             ppCFunctionCall
-                (objname <> pretty "." <> poolMethodName ident)
-                (objname <> pretty "." <> ppInterfaceThatField : (ppExpression subs <$> params))
+                (poolMethodName ident)
+                (objname : (ppExpression subs <$> params))
         -- | If the left hand side is a message queue:
         OutPort {} ->
             case ident of

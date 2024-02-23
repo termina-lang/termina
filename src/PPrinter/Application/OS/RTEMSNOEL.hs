@@ -1,8 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use lambda-case" #-}
 module PPrinter.Application.OS.RTEMSNOEL where
 
-import Semantic.Monad (SemanticAnns)
+import Semantic.Monad
 import AST.Seman
 import PPrinter.Common
 import Prettyprinter
@@ -13,31 +12,54 @@ import Modules.Modules
 import Modules.Printing
 import qualified AST.Seman as SAST
 import Data.Maybe (fromJust)
+import Data.List (find)
+
+data RTEMSPort = 
+    RTEMSEventPort
+        Identifier -- ^ port identifier
+        Identifier -- ^ event emitter identifier
+        TypeSpecifier -- ^ data type specifier
+        Identifier -- ^ action to be executed
+    | RTEMSAccessPort
+        Identifier -- ^ port identifier
+        Identifier -- ^ resource identifier
+    deriving Show
 
 data RTEMSGlobal =
     -- | RTEMS Task
     RTEMSTask
       Identifier -- ^ task identifier
-      (TypeDef SemanticAnns)  -- ^ task class
+      Identifier -- ^ task class identifier
+      (TypeDef SemanticAnns) -- ^ task class definition
       Integer -- ^ task priority
       Integer -- ^ task stack size
-      (Maybe (Expression SemanticAnns)) -- ^ task state initialization expression
+      [RTEMSPort] -- ^ task ports
     -- | RTEMS Handler
     | RTEMSHandler
       Identifier -- ^ handler identifier
-      (TypeDef SemanticAnns) -- ^ handler class
-      Integer -- ^ interrupt vector
-      (Maybe (Expression SemanticAnns)) -- ^ handler state initialization expression
+      Identifier -- ^ handler class identifier
+      (TypeDef SemanticAnns)  -- ^ handler class definition
+      RTEMSPort -- ^ event port
+      [RTEMSPort] -- ^ resource access ports
     -- | RTEMS Resource
     | RTEMSResource
       Identifier -- ^ resource identifier
-      (TypeDef SemanticAnns) -- ^ resource class
-      (Maybe (Expression SemanticAnns)) -- ^ resource state initialization expression
+      Identifier -- ^ resource class identifier
+      [RTEMSPort] -- ^ resource access ports
     | RTEMSPool
       Identifier -- ^ pool identifier
       TypeSpecifier -- ^ type of the elements of the pool
       Integer -- ^ pool size
-    | RTEMSMsgQueue
+    | RTEMSInterruptEmitter
+      Identifier -- ^ interrupt identifier
+    | RTEMSPeriodicTimerEmitter
+      Identifier -- ^ periodic timer identifier
+    | RTEMSInitialEventEmitter
+      Identifier -- ^ initial event identifier
+    deriving Show
+
+data RTEMSMsgQueue =
+    RTEMSMsgQueue
       Identifier -- ^ message queue identifier
       TypeSpecifier -- ^ type of the elements of the message queue
       Integer -- ^ message queue size
@@ -51,23 +73,27 @@ data RTEMSResourceLock =
 
 -- | Eq instance for RTEMSGlobal
 instance Eq RTEMSGlobal where
-    (RTEMSTask id1 _ _ _ _) == (RTEMSTask id2 _ _ _ _) = id1 == id2
-    (RTEMSHandler id1 _ _ _) == (RTEMSHandler id2 _ _ _) = id1 == id2
+    (RTEMSTask id1 _ _ _ _ _) == (RTEMSTask id2 _ _ _ _ _) = id1 == id2
+    (RTEMSHandler id1 _ _ _ _) == (RTEMSHandler id2 _ _ _ _) = id1 == id2
     (RTEMSResource id1 _ _) == (RTEMSResource id2 _ _) = id1 == id2
     _ == _ = False
 
 -- | Ord instance for RTEMSGlobal
 instance Ord RTEMSGlobal where
-    compare (RTEMSTask id1 _ _ _ _) (RTEMSTask id2 _ _ _ _) = compare id1 id2
-    compare (RTEMSHandler id1 _ _ _) (RTEMSHandler id2 _ _ _) = compare id1 id2
+    compare (RTEMSTask id1 _ _ _ _ _) (RTEMSTask id2 _ _ _ _ _) = compare id1 id2
+    compare (RTEMSHandler id1 _ _ _ _) (RTEMSHandler id2 _ _ _ _) = compare id1 id2
     compare (RTEMSResource id1 _ _) (RTEMSResource id2 _ _) = compare id1 id2
     compare (RTEMSPool id1 _ _) (RTEMSPool id2 _ _) = compare id1 id2
-    compare (RTEMSMsgQueue id1 _ _) (RTEMSMsgQueue id2 _ _) = compare id1 id2
+    compare (RTEMSInterruptEmitter id1) (RTEMSInterruptEmitter id2) = compare id1 id2
+    compare (RTEMSPeriodicTimerEmitter id1) (RTEMSPeriodicTimerEmitter id2) = compare id1 id2
+    compare (RTEMSInitialEventEmitter id1) (RTEMSInitialEventEmitter id2) = compare id1 id2
     compare (RTEMSTask {}) _ = LT
     compare (RTEMSHandler {}) _ = LT
     compare (RTEMSResource {}) _ = LT
     compare (RTEMSPool {}) _ = LT
-    compare (RTEMSMsgQueue {}) _ = LT
+    compare (RTEMSInterruptEmitter {}) _ = LT
+    compare (RTEMSPeriodicTimerEmitter {}) _ = LT
+    compare (RTEMSInitialEventEmitter {}) _ = LT
 
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
@@ -83,43 +109,92 @@ getStackSize [] = 4096
 getStackSize ((Modifier "stack_size" (Just (KC (I _ stackSize)))) : _) = stackSize
 getStackSize (_ : modifiers) = getStackSize modifiers
 
-getVector :: [Modifier] -> Integer
-getVector [] = 0
-getVector ((Modifier "vector" (Just (KC (I _ vector)))) : _) = vector
-getVector (_ : modifiers) = getVector modifiers
-
-hasInitMethod :: TypeDef SemanticAnns -> Bool
-hasInitMethod (Class _ _ members _ _) = any (
-    \member -> case member of
-        ClassMethod "init" _ _ _-> True
-        _ -> False) members
-hasInitMethod ty = error $ "Invalid type (not a class): " ++ show ty
+-- Finds the assignment that connects a given port
+findPortConnection :: Identifier -> [FieldAssignment a] -> Maybe (FieldAssignment a)
+findPortConnection _ [] = Nothing
+findPortConnection identifier (assignment : assignments) = 
+    case assignment of
+        FieldPortConnection _ port _ _ | port == identifier -> Just assignment
+        _ -> findPortConnection identifier assignments
 
 buildRTEMSGlobal :: Global SemanticAnns -> M.Map Identifier (TypeDef SemanticAnns) -> RTEMSGlobal
-buildRTEMSGlobal (Task identifier (DefinedType ty) expr modifiers _) classMap = RTEMSTask identifier (fromJust (M.lookup ty classMap)) (getPriority modifiers) (getStackSize modifiers) expr
-buildRTEMSGlobal (Handler identifier (DefinedType ty) expr modifiers _) classMap = RTEMSHandler identifier (fromJust (M.lookup ty classMap)) (getVector modifiers) expr
-buildRTEMSGlobal (Resource identifier (DefinedType ty) expr _ _) classMap = RTEMSResource identifier (fromJust (M.lookup ty classMap)) expr
+buildRTEMSGlobal (Task identifier (DefinedType ty) (Just (FieldAssignmentsExpression _ assignments _)) modifiers _) classMap = 
+    RTEMSTask identifier clsIdentifier clsTypeDefinition (getPriority modifiers) (getStackSize modifiers) ports
+    where
+        -- Task class
+        (clsTypeDefinition, clsIdentifier, clsMembers) = case fromJust (M.lookup ty classMap) of
+            cls@(Class TaskClass clsId members _ _) -> (cls, clsId, members)
+            cls -> error $ "invalid task class: " ++ show cls
+
+        ports = 
+            concatMap (\case 
+                ClassField (FieldDefinition portIdentifier (AccessPort {})) _ -> 
+                    case findPortConnection portIdentifier assignments of
+                        Just (FieldPortConnection AccessPortConnection _ resourceIdentifier _) -> 
+                            [RTEMSAccessPort portIdentifier resourceIdentifier]
+                        _ -> error $ "Invalid port connections: " ++ show portIdentifier;
+                ClassField (FieldDefinition portIdentifier (SinkPort dts action)) _ -> 
+                    case findPortConnection portIdentifier assignments of
+                        Just (FieldPortConnection InboundPortConnection _ resourceIdentifier _) -> 
+                            [RTEMSEventPort portIdentifier resourceIdentifier dts action]
+                        _ -> error $ "Invalid port connections: " ++ show portIdentifier;
+                _ -> []) clsMembers
+buildRTEMSGlobal (Handler identifier (DefinedType ty) (Just (FieldAssignmentsExpression _ assignments _)) _ _) classMap =
+    RTEMSHandler identifier clsIdentifier clsTypeDefinition eventPort ports 
+    where
+        -- Handler class
+        (clsTypeDefinition, clsIdentifier, clsMembers) = case fromJust (M.lookup ty classMap) of
+            cls@(Class HandlerClass clsId members _ _) -> (cls, clsId, members)
+            cls -> error $ "invalid task class: " ++ show cls
+
+        buildEventPort :: [ClassMember' a b c] -> RTEMSPort
+        buildEventPort [] = error $ "handler does not have an event port: " ++ show clsIdentifier
+        buildEventPort (ClassField (FieldDefinition portIdentifier (SinkPort dts action)) _ : _) = 
+            case findPortConnection portIdentifier assignments of
+                Just (FieldPortConnection InboundPortConnection _ emitterIdentifier _) -> 
+                    RTEMSEventPort portIdentifier emitterIdentifier dts action
+                _ -> error $ "Invalid port connection: " ++ show portIdentifier
+        buildEventPort (_ : members) = buildEventPort members
+
+        eventPort = buildEventPort clsMembers
+
+        ports = 
+            concatMap (\case 
+                ClassField (FieldDefinition portIdentifier (AccessPort {})) _ -> 
+                    case findPortConnection portIdentifier assignments of
+                        Just (FieldPortConnection AccessPortConnection _ resourceIdentifier _) -> 
+                            [RTEMSAccessPort portIdentifier resourceIdentifier]
+                        _ -> error $ "Invalid port connection: " ++ show portIdentifier;
+                _ -> []) clsMembers
+
+buildRTEMSGlobal (Resource identifier (DefinedType ty) (Just (FieldAssignmentsExpression _ assignments _)) _ _) classMap = 
+    RTEMSResource identifier clsIdentifier ports
+    where
+        -- Resource class
+        (clsIdentifier, clsMembers) = case fromJust (M.lookup ty classMap) of
+            (Class ResourceClass clsId members _ _) -> (clsId, members)
+            cls -> error $ "invalid task class: " ++ show cls
+
+        ports = 
+            concatMap (\case 
+                ClassField (FieldDefinition portIdentifier (AccessPort {})) _ -> 
+                    case findPortConnection portIdentifier assignments of
+                        Just (FieldPortConnection AccessPortConnection _ resourceIdentifier _) -> 
+                            [RTEMSAccessPort portIdentifier resourceIdentifier]
+                        _ -> error $ "Invalid port connection: " ++ show portIdentifier;
+                _ -> []) clsMembers
+
 buildRTEMSGlobal (Resource identifier (Pool ty (K size)) _ _ _) _ = RTEMSPool identifier ty size
-buildRTEMSGlobal (Resource identifier (MsgQueue ts (K size)) _ _ _) _ = RTEMSMsgQueue identifier ts size
 buildRTEMSGlobal obj _ = error $ "Invalid global object: " ++ show obj
 
 addDependency :: RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Set RTEMSGlobal)
 addDependency newGlb Nothing = Just (S.singleton newGlb)
 addDependency newGlb (Just prevGlbs) = Just (S.insert newGlb prevGlbs)
 
-addDependencies :: S.Set RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Set RTEMSGlobal)
-addDependencies newGlbs Nothing = Just newGlbs
-addDependencies newGlbs (Just prevGlbs) = Just (S.union newGlbs prevGlbs)
-
 -- | Prints the code of the RTEMS tasks that will execute a Termina task.
--- The RTEMS task will implement the main loop of the task. This loop
--- will call the run() method of the Termina task, and will handle the
--- return value. If the value is Abort, the task will call
--- rtems_shutdown_executive() to termine the application. If the value
--- is Finish, the task will call rtems_task_delete() to terminate itself.
--- Otherwise, the task will call the run() method again.
-ppRTEMSTaskCode :: TypeDef SemanticAnns -> DocStyle
-ppRTEMSTaskCode (Class _ classId _ _ _) = staticC <+>
+-- The RTEMS task will implement the main loop of the task.
+ppTaskClassCode :: TypeDef SemanticAnns -> DocStyle
+ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
     ppCFunctionPrototype (namefy (pretty "rtems_task") <::> pretty classId) [pretty "rtems_task_argument arg"] (Just (pretty "rtems_task")) <+>
         braces' (line <>
             (indentTab . align $
@@ -128,23 +203,26 @@ ppRTEMSTaskCode (Class _ classId _ _ _) = staticC <+>
                     pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> parens (pretty classId <+> pretty "*") <> pretty "arg" <> semi,
                     emptyDoc,
                     -- Result res = Result__Ok;
-                    pretty "Result res" <> semi,
-                    emptyDoc,
-                    pretty "ret.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                    pretty "rtems_status_code status = RTEMS_SUCESSFUL" <> semi,
+                    ppTypeSpecifier UInt32 <+> pretty "next_msg" <+> pretty "= 0" <> semi,
                     emptyDoc,
                     -- for (;;)
                     ppCInfiniteLoop (
                         vsep [
                             emptyDoc,
-                            -- ret = ClassId__run(self);
-                            pretty "ret" <+> pretty "=" <+>  ppCFunctionCall (taskRunMethodName classId) [pretty "self"] <> semi,
+                            -- Call receive on the task's message queue
+                            pretty "status" <+> pretty "=" <+> 
+                                ppCFunctionCall (pretty "rtems_message_queue_receive") 
+                                    [pretty "self.__msgq_id",
+                                     pretty "&next_msg", 
+                                     pretty "RTEMS_WAIT", 
+                                     pretty "RTEMS_NO_TIMEOUT"] <> semi,
+                            -- 
                             emptyDoc,
-                            ppCIfBlock (pretty "ret.__variant" <+> pretty "==" <+> pretty "TaskRet" <::> pretty "Abort")
-                                (vsep [pretty "break" <> semi, emptyDoc]) <+>
-                            ppCElseIfBlock (pretty "ret.__variant" <+> pretty "==" <+> pretty "TaskRet" <::> pretty "Finish")
-                                (vsep [pretty "rtems_task_delete(RTEMS_SELF)" <> semi, emptyDoc]) <+>
-                            ppCElseBlock
-                                emptyDoc,
+                            -- if (status != RTEMS_SUCCESSFUL)
+                            ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
+                                (vsep [pretty "break" <> semi, emptyDoc]),
+                            -- Check the message type and execute the corresponding action
                             emptyDoc
                         ]
                     ),
@@ -153,7 +231,7 @@ ppRTEMSTaskCode (Class _ classId _ _ _) = staticC <+>
                 ]
             ) <> line
         ) <> line
-ppRTEMSTaskCode obj = error $ "Invalid global object (not a task): " ++ show obj
+ppTaskClassCode obj = error $ "Invalid global object (not a task): " ++ show obj
 
 ppInitPool :: RTEMSGlobal -> DocStyle
 ppInitPool (RTEMSPool identifier ts _) = vsep
@@ -171,59 +249,41 @@ ppInitPool (RTEMSPool identifier ts _) = vsep
     ]
 ppInitPool obj = error $ "Invalid global object (not a pool): " ++ show obj
 
-ppInitMsgQueue :: RTEMSGlobal -> DocStyle
+-- | Prints the code to initialize a message queue. The function is called to generate the code for the
+-- message queues corresponding to the channels declared by the user plus the ones that belong to each
+-- of the tasks that is used to notify the inclusion of a given message on a specific queue.
+ppInitMsgQueue :: RTEMSMsgQueue -> DocStyle
 ppInitMsgQueue (RTEMSMsgQueue identifier ts size) = vsep
     [
         emptyDoc,
-        pretty "result" <+> pretty "=" <+>
-            ppCFunctionCall (namefy $ pretty "termina" <::> pretty "msg_queue_init")
+        pretty "status" <+> pretty "=" <+>
+            ppCFunctionCall (pretty "rtems_message_queue_create")
                 [ppCReferenceExpression (pretty identifier),
                  ppSizeOf ts,
                  pretty (show size)] <> semi,
         emptyDoc,
-        ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
+        ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
             (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
     ]
-ppInitMsgQueue obj = error $ "Invalid global object (not a message queue): " ++ show obj
 
 ppInitResource :: RTEMSGlobal -> DocStyle
-ppInitResource (RTEMSResource identifier cls@(Class _ classId _ _ _) _) = vsep $
-    (pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi) :
-    if hasInitMethod cls then
-        [
-            emptyDoc,
-            pretty "result" <+> pretty "=" <+>
-                ppCFunctionCall (classFunctionName (pretty classId) (pretty "init"))
-                    [ppCReferenceExpression (pretty identifier)] <> semi,
-            emptyDoc,
-            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
-        ]
-    else []
+ppInitResource (RTEMSResource identifier _ _) =
+    pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi
 ppInitResource obj = error $ "Invalid global object (not a resource): " ++ show obj
 
 ppInitTask :: RTEMSGlobal -> DocStyle
-ppInitTask (RTEMSTask identifier cls@(Class _ classId _ _ _) priority stackSize _) = vsep $
+ppInitTask (RTEMSTask identifier classId _ priority stackSize _) = vsep
     [
         emptyDoc,
         pretty identifier <> pretty ".__task_id.priority" <+> pretty "=" <+> pretty (show priority) <> semi,
         pretty identifier <> pretty ".__task_id.stack_size" <+> pretty "=" <+> pretty (show stackSize) <> semi,
         pretty identifier <> pretty ".__task_id.entry" <+> pretty "=" <+> (namefy (pretty "rtems_task") <::> pretty classId) <> semi,
         pretty identifier <> pretty ".__task_id.argument" <+> pretty "=" <+> parens (pretty "rtems_task_argument") <> ppCReferenceExpression (pretty identifier) <> semi
-    ] ++
-    (if hasInitMethod cls then
-        [
-            pretty "result" <+> pretty "=" <+> ppCFunctionCall (classFunctionName (pretty classId) (pretty "init"))
-                [ppCReferenceExpression (pretty identifier)] <> semi,
-            emptyDoc,
-            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
-        ]
-    else [])
+    ]
 ppInitTask obj = error $ "Invalid global object (not a task): " ++ show obj
 
-ppCreateTask :: RTEMSGlobal -> DocStyle
-ppCreateTask (RTEMSTask identifier _ _ _ _) = vsep
+ppRTEMSTaskCreate :: RTEMSGlobal -> DocStyle
+ppRTEMSTaskCreate (RTEMSTask identifier _ _ _ _ _) = vsep
     [
         pretty "result" <+> pretty "=" <+>
             ppCFunctionCall (namefy $ pretty "termina" <::> pretty "task_create")
@@ -233,63 +293,153 @@ ppCreateTask (RTEMSTask identifier _ _ _ _) = vsep
             (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
         emptyDoc
     ]
-ppCreateTask obj = error $ "Invalid global object (not a task): " ++ show obj
+ppRTEMSTaskCreate obj = error $ "Invalid global object (not a task): " ++ show obj
 
-ppInstallHandler :: RTEMSGlobal -> DocStyle
-ppInstallHandler (RTEMSHandler identifier _ _ _) = vsep
-    [
-        pretty "result" <+> pretty "=" <+>
-            ppCFunctionCall (namefy $ pretty "termina" <::> pretty "install_handler")
-                [ppCReferenceExpression (pretty identifier <> pretty ".__handler_id")] <> semi,
-        emptyDoc,
-        ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-            (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-        emptyDoc
-    ]
-ppInstallHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
+emitterToVectorMap :: M.Map Identifier Integer
+emitterToVectorMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
 
-ppInitHandler :: RTEMSGlobal -> DocStyle
-ppInitHandler (RTEMSHandler identifier cls@(Class _ classId _ _ _) vector _) = vsep $
-    [
-        emptyDoc,
-        pretty identifier <> pretty ".__handler_id.entry" <+> pretty "=" <+> (namefy (pretty "rtems_isr") <::> pretty identifier) <> semi,
-        pretty identifier <> pretty ".__handler_id.vector" <+> pretty "=" <+> pretty (show vector) <> semi
-    ] ++
-    if hasInitMethod cls then
-        [
-            emptyDoc,
-            pretty "result" <+> pretty "=" <+>
-                ppCFunctionCall (classFunctionName (pretty classId) (pretty "init"))
-                    [ppCReferenceExpression (pretty identifier)] <> semi,
-            emptyDoc,
-            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-            emptyDoc
-        ]
-    else []
-ppInitHandler obj = error $ "Invalid global object (not a handler): " ++ show obj
+ppMsgQueueName :: Identifier -> DocStyle
+ppMsgQueueName identifier = namefy (pretty "msgq" <::> pretty identifier)
 
-ppRTEMSHandlerCode :: RTEMSGlobal -> DocStyle
-ppRTEMSHandlerCode (RTEMSHandler identifier (Class _ classId _ _ _) _ _) = staticC <+>
-    ppCFunctionPrototype (namefy (pretty "rtems_isr") <::> pretty identifier) [pretty "void * ignored"] Nothing <+>
-        braces' (line <>
-            (indentTab . align $
-                vsep [
-                    pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
-                    emptyDoc,
-                    pretty "Result result" <> semi,
-                    emptyDoc,
-                    pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                    emptyDoc,
-                    pretty "result" <+> pretty "=" <+>
-                        ppCFunctionCall (handlerHandleMethodName classId) [pretty "self"] <> semi,
-                    emptyDoc,
-                    ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
-                ]
-            ) <> line
-        ) <> line
-ppRTEMSHandlerCode obj = error $ "Invalid global object (not a task): " ++ show obj
+ppRTEMSEmitter :: RTEMSGlobal -> M.Map Identifier RTEMSGlobal -> DocStyle
+ppRTEMSEmitter (RTEMSInterruptEmitter interrupt) connectionsMap = 
+    case M.lookup interrupt connectionsMap of
+        Nothing -> pretty "//" <+> pretty interrupt <+> pretty " is not connected" <> line
+        -- | The interrupt is connected to a handler. In this case, we must execute the action
+        Just (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _) ->
+            ppCFunctionPrototype (namefy (pretty "rtems_isr") <::> pretty interrupt) [pretty "void * ignored"] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
+                            emptyDoc,
+                            pretty "Result result" <> semi,
+                            emptyDoc,
+                            pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                            emptyDoc,
+                            pretty "result" <+> pretty "=" <+>
+                                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self", pretty (emitterToVectorMap M.! interrupt)] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                        ]
+                    ) <> line
+                ) <> line 
+        Just (RTEMSTask identifier _ _ _ _ ports) ->
+            let portIdentifier =
+                    case fromJust $ find (\case { RTEMSEventPort _ emitter _ _ -> interrupt == emitter; _ -> False }) ports of
+                        RTEMSEventPort portId _ _ _ -> portId
+                        _ -> error $ "Invalid port connection for interrupt: " ++ show interrupt
+            in
+            ppCFunctionPrototype (namefy (pretty "rtems_isr") <::> pretty interrupt) [pretty "void * ignored"] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty "rtems_status_code status" <> semi,
+                            emptyDoc,
+                            pretty "status" <+> pretty "=" <+>
+                                ppCFunctionCall (pretty "rtems_message_queue_send") [pretty identifier <> pretty "." <> pretty portIdentifier] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCESSFUL")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                        ]
+                    ) <> line
+                ) <> line
+        Just _ -> error $ "Invalid connection for interrupt: " ++ show interrupt
+ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer) connectionsMap =
+    case M.lookup timer connectionsMap of
+        Nothing -> pretty "//" <+> pretty timer <+> pretty " is not connected" <> line
+        -- | The interrupt is connected to a handler. In this case, we must execute the action
+        Just (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _) ->
+            ppCFunctionPrototype (namefy (pretty "rtems_periodic_timer") <::> pretty timer) [pretty "void * ingnored"] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
+                            emptyDoc,
+                            pretty "Result result" <> semi,
+                            emptyDoc,
+                            pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                            emptyDoc,
+                            pretty "result" <+> pretty "=" <+>
+                                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self", pretty timer <> pretty "." <> pretty "current"] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                            -- TODO: Arm the next timer
+                        ]
+                    ) <> line
+                ) <> line 
+        Just (RTEMSTask identifier _ _ _ _ ports) ->
+            let portIdentifier =
+                    case fromJust $ find (\case { RTEMSEventPort _ emitter _ _ -> timer == emitter; _ -> False }) ports of
+                        RTEMSEventPort portId _ _ _ -> portId
+                        _ -> error $ "Invalid port connection for interrupt: " ++ show timer
+            in
+            ppCFunctionPrototype (namefy (pretty "rtems_periodic_timer") <::> pretty timer) [pretty "void * ingnored"] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty "rtems_status_code status" <> semi,
+                            emptyDoc,
+                            pretty "status" <+> pretty "=" <+>
+                                ppCFunctionCall (pretty "rtems_message_queue_send") [pretty identifier <> pretty "." <> pretty portIdentifier] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCESSFUL")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                            -- TODO: Arm the next timer
+                        ]
+                    ) <> line
+                ) <> line
+        Just _ -> error $ "Invalid connection for timer: " ++ show timer
+ppRTEMSEmitter (RTEMSInitialEventEmitter event) connectionsMap =
+    case M.lookup event connectionsMap of
+        Nothing -> pretty "//" <+> pretty event <+> pretty " is not connected" <> line
+        Just (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _) ->
+            ppCFunctionPrototype (namefy (pretty "rtems_initial_event") <::> pretty event) [] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
+                            emptyDoc,
+                            pretty "Result result" <> semi,
+                            emptyDoc,
+                            pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                            emptyDoc,
+                            pretty "result" <+> pretty "=" <+>
+                                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self"] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                        ]
+                    ) <> line
+                ) <> line
+        Just (RTEMSTask identifier classId _ _ _ ports) ->
+            let action =
+                    case fromJust $ find (\case { RTEMSEventPort _ emitter _ _ -> event == emitter; _ -> False }) ports of
+                        RTEMSEventPort _ _ _ actionId -> actionId
+                        _ -> error $ "Invalid port connection for interrupt: " ++ show event
+            in
+            ppCFunctionPrototype (namefy (pretty "rtems_initial_event") <::> pretty event) [] Nothing <+>
+                braces' (line <>
+                    (indentTab . align $
+                        vsep [
+                            pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> ppCReferenceExpression (pretty identifier) <> semi,
+                            emptyDoc,
+                            pretty "Result result" <> semi,
+                            emptyDoc,
+                            pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                            emptyDoc,
+                            pretty "result" <+> pretty "=" <+>
+                                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self"] <> semi,
+                            emptyDoc,
+                            ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
+                                (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                        ]
+                    ) <> line
+                ) <> line
+        Just _ -> error $ "Invalid connection for event: " ++ show event
+ppRTEMSEmitter obj _ = error $ "Invalid global object (not an emitter): " ++ show obj
 
 ppInitResourceProt :: Identifier -> RTEMSResourceLock -> DocStyle
 ppInitResourceProt identifier RTEMSResourceLockNone = pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi
@@ -317,8 +467,15 @@ ppMainFile prjprogs =
     [
         externC <+> ppCFunctionPrototype (namefy $ pretty "termina_app" <::> pretty "init_globals") [] Nothing <> semi
     ] ++
-    map ppRTEMSTaskCode (M.elems taskClss) ++
-    map ppRTEMSHandlerCode handlers ++
+    -- | These arrays are used to store the names of the tasks, handlers and message queues
+    [
+        ppTypeSpecifier Int8 <+> pretty "ntask_name[5] = \"0000\"" <> semi,
+        ppTypeSpecifier Int8 <+> pretty "nsem_name[5] = \"0000\"" <> semi,
+        ppTypeSpecifier Int8 <+> pretty "nmsgq_name[5] = \"0000\"" <> semi,
+        ppTypeSpecifier Int8 <+> pretty "ntimers_name[5] = \"0000\"" <> semi
+    ] ++
+    map ppTaskClassCode (M.elems taskClss) ++
+    map (`ppRTEMSEmitter` emitterConnectionsMap) emitters ++
     [
         -- | Function __rtems_app__enable_protection. This function is called from the Init task.
         -- It enables the protection of the shared resources when needed. In case the resource uses a mutex,
@@ -332,84 +489,20 @@ ppMainFile prjprogs =
             ) <> line
         ),
         emptyDoc,
-        -- | Function __rtems_app__init_resources. This function is called from the Init task.
-        -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
-        -- the protection of the global resources, since it is not needed when running in the Init task. It also
-        -- executes the init() method of the resources if defined.
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] Nothing <+>
-        braces' (line <>
-            (indentTab . align $
-                vsep $
-                (
-                    if any hasInitMethod [cls | (RTEMSResource _ cls _) <- rtemsGlbs] then
-                    [
-                        pretty "Result" <+> pretty "result" <> semi,
-                        emptyDoc,
-                        pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                        emptyDoc
-                    ] else []
-                ) ++ [ppInitResource resource |resource@(RTEMSResource {}) <- rtemsGlbs]
-                ++ [ppInitPool pl |pl@(RTEMSPool {}) <- rtemsGlbs]
-                ++ [ppInitMsgQueue queue | queue@(RTEMSMsgQueue {}) <- rtemsGlbs]
-            ) <> line
-        ),
-        emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] Nothing <+>
-        braces' (line <>
-            (indentTab . align $
-                vsep $ 
-                (
-                    if any hasInitMethod [cls | (RTEMSTask _ cls _ _ _) <- rtemsGlbs] then
-                    [
-                        pretty "Result" <+> pretty "result" <> semi,
-                        emptyDoc,
-                        pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                        emptyDoc
-                    ] else []
-                ) ++ map ppInitTask tasks
-            ) <> line
-        ),
-        emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] Nothing <+>
-        braces' (line <>
-            (indentTab . align $
-                vsep $ 
-                [
-                    pretty "Result" <+> pretty "result" <> semi,
-                    emptyDoc,
-                    pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
-                    emptyDoc
-                ] ++ map ppInitHandler handlers
-            ) <> line
-        ),
-        emptyDoc,
         -- | RTEMS Init task
         ppCFunctionPrototype (pretty "Init") [pretty "rtems_task_argument ignored"] (Just (pretty "rtems_task")) <+>
         braces' (line <>
             (indentTab . align $
                 vsep $
                 [
-                    pretty "Result" <+> pretty "result" <> semi,
-                    emptyDoc,
-                    pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
+                    pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi,
                     emptyDoc,
                     ppCFunctionCall (namefy $ pretty "termina_app" <::> pretty "init_globals") [] <> semi,
                     emptyDoc,
-                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] <> semi,
-                    emptyDoc
-                ] ++
-                (if any hasInitMethod [cls | (RTEMSHandler _ cls _ _) <- rtemsGlbs] then
-                    [
-                        ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] <> semi,
-                        emptyDoc
-                    ] else [])
-                ++ [
-                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] <> semi,
-                    emptyDoc,
+                    -- TODO: execute initialization action in case there is one
                     ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "enable_protection") [] <> semi,
                     emptyDoc
-                ] ++ map ppInstallHandler handlers
-                ++ map ppCreateTask tasks
+                ]
                 ++ [ppCFunctionCall (pretty "rtems_task_delete") [pretty "RTEMS_SELF"] <> semi]
             ) <> line
         ),
@@ -457,13 +550,32 @@ ppMainFile prjprogs =
         glbs = filter (\(_, _, objs) -> not (null objs)) globals
         -- | List of modules that must be included
         incs = map (\(nm, mm, _) -> (nm, mm)) glbs
-        -- List of RTEMS global declarations (tasks, handlers and resources)
-        rtemsGlbs = concatMap (\(_, _, objs) -> map (flip buildRTEMSGlobal classMap) objs) glbs
-        tasks = [task | task@(RTEMSTask {}) <- rtemsGlbs]
-        handlers = [handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
-        msgQueues = [queue | queue@(RTEMSMsgQueue {}) <- rtemsGlbs]
+        -- List of RTEMS global declarations (tasks, handlers, resources and channels)
+        rtemsGlbs = concatMap (\(_, _, objs) -> 
+            map (`buildRTEMSGlobal` classMap)
+                (filter (\case { Task {} -> True; Resource {} -> True; Handler {} -> True; _ -> False}) objs)
+            ) glbs
 
-        ppMessagesForQueue :: RTEMSGlobal -> DocStyle
+        -- List of used task classes
+        taskClss = foldr (\glb acc -> case glb of
+                RTEMSTask _ _ cls@(Class _ classId _ _ _) _ _ _ -> M.insert classId cls acc
+                _ -> acc
+            ) M.empty rtemsGlbs
+
+        tasks = [task | task@(RTEMSTask {}) <- rtemsGlbs]
+        -- handlers = [handler | handler@(RTEMSHandler {}) <- rtemsGlbs]
+        emitters = 
+            [emitter | emitter <- rtemsGlbs, 
+                case emitter of { 
+                    RTEMSInterruptEmitter {} -> True; 
+                    RTEMSPeriodicTimerEmitter {} -> True; 
+                    RTEMSInitialEventEmitter {} -> True; 
+                    _ -> False 
+                }
+            ]
+        msgQueues = [] 
+
+        ppMessagesForQueue :: RTEMSMsgQueue -> DocStyle
         ppMessagesForQueue (RTEMSMsgQueue _ ts size) =
             vsep [
                 pretty "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( \\",
@@ -471,41 +583,53 @@ ppMainFile prjprogs =
                 pretty "        " <> ppSizeOf ts <> pretty " \\",
                 pretty "    ) \\"
             ]
-        ppMessagesForQueue g = error $ "Invalid global object (not a message queue): " ++ show g
 
-        -- List of used task classes
-        taskClss = foldr (\glb acc -> case glb of
-                RTEMSTask _ cls@(Class _ classId _ _ _) _ _ _ -> if M.member classId acc then acc else M.insert classId cls acc
-                _ -> acc
-            ) M.empty tasks
         -- Map between the resources and the task and handlers that access them
         dependenciesMap = foldr
                 (\glb accMap ->
                     case glb of
-                    -- | Resources do not have ports, so they cannot produce dependencies
+                    -- TODO: We are not considering the case of a resource being accessed by another resources
+                    -- We need to change the way we are building the dependencies map to consider this case
                     RTEMSResource {} -> accMap
-                    RTEMSTask _ _ _ _ (Just (FieldAssignmentsExpression _ assignments _)) ->
-                        foldr (\assignment currMap ->
-                                case assignment of
-                                    FieldPortConnection _ identifier _ _ -> M.alter (addDependency glb) identifier currMap
+                    RTEMSTask _ _ _ _ _ ports ->
+                        foldr (\port currMap ->
+                                case port of
+                                    RTEMSAccessPort _ identifier -> M.alter (addDependency glb) identifier currMap
                                     _ -> currMap
-                            ) accMap assignments
-                    RTEMSHandler _ _ _ (Just (FieldAssignmentsExpression _ assignments _)) ->
-                        foldr (\assignment currMap ->
-                                case assignment of
-                                    FieldPortConnection _ identifier _ _ -> M.alter (addDependency glb) identifier currMap
+                            ) accMap ports
+                    RTEMSHandler _ _ _ _ ports ->
+                        foldr (\port currMap ->
+                                case port of
+                                    RTEMSAccessPort _ identifier -> M.alter (addDependency glb) identifier currMap
                                     _ -> currMap
-                            ) accMap assignments
+                            ) accMap ports
                     _ -> accMap
                 ) M.empty rtemsGlbs
+
+        emitterConnectionsMap = foldr
+                (\glb accMap ->
+                    case glb of
+                        RTEMSTask _ _ _ _ _ ports  ->
+                            foldr (\port currMap ->
+                                case port of
+                                    RTEMSEventPort _ identifier _ _ -> M.insert identifier glb currMap
+                                    _ -> currMap
+                            ) accMap ports
+                        RTEMSHandler _ _ _ eventPort _ ->
+                            case eventPort of
+                                RTEMSEventPort _ identifier _ _ -> M.insert identifier glb accMap
+                                _ -> error $ "invalid event port for handler: " ++ show glb
+                        _ -> accMap
+                ) M.empty rtemsGlbs
+        
         -- | Map between the resources and the locking mechanism that must be used
-        resLockingMap = M.map (getResLocking . S.elems) dependenciesMap
+        resLockingMap = getResLocking . S.elems <$> dependenciesMap
         -- | Obtains the locking mechanism that must be used for a resource
         getResLocking :: [RTEMSGlobal] -> RTEMSResourceLock
         getResLocking [] = RTEMSResourceLockNone
         getResLocking [_] = RTEMSResourceLockNone
         getResLocking ((RTEMSHandler {}) : _) = RTEMSResourceLockIrq
-        getResLocking ((RTEMSTask _ _ priority _ _) : gs) = getResLocking' priority gs
+        getResLocking ((RTEMSTask _ _ _ priority _ _) : gs) = getResLocking' priority gs
             where
                 getResLocking' :: Integer -> [RTEMSGlobal] -> RTEMSResourceLock
                 -- | If we have reach the end of the list, it means that there are at least two different tasks that
@@ -513,7 +637,6 @@ ppMainFile prjprogs =
                 -- (hopefully near) future, we will support algorithm selection via the configuration file.
                 getResLocking' ceilPrio [] = RTEMSResourceLockMutex ceilPrio
                 getResLocking' _ ((RTEMSHandler {}) : _) = RTEMSResourceLockIrq
-                getResLocking' ceilPrio ((RTEMSTask _ _ prio _ _) : gs') = getResLocking' (min prio ceilPrio) gs'
+                getResLocking' ceilPrio ((RTEMSTask _ _ _ prio _ _) : gs') = getResLocking' (min prio ceilPrio) gs'
                 getResLocking' _ _ = error "Internal error when obtaining the resource dependencies."
         getResLocking _ = error "Internal error when obtaining the resource dependencies."
-

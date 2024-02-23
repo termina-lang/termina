@@ -122,6 +122,8 @@ data Errors a
   -- | Access port does not have an Interface type
   | EAccessPortNotInterface TypeSpecifier
   | EAccessPortNotResource Identifier 
+  | EInboundPortNotEmitter Identifier 
+  | EInboundPortNotChannel Identifier
   | EAccessPortNotPool Identifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier

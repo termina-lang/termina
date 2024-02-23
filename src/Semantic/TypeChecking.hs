@@ -299,7 +299,7 @@ memberFunctionAccessType ann obj_ty ident args =
               element_typed <- expressionType rhsObjectType element
               element_type <- getExpType element_typed
               case element_typed of
-                (SAST.AccessObject (SAST.Variable {})) -> 
+                (SAST.AccessObject (SAST.Variable {})) ->
                   unless (groundTyEq element_type ty) (throwError $ annotateError ann $ EMsgQueueWrongType element_type ty)
                 _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
               return ([Parameter "element" element_type] , [element_typed], Unit)
@@ -488,9 +488,17 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid add
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
+    getGlobalGEnTy loc sid >>=
+    \gentry ->
     case fty of
-      SinkPort _ _  -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildStmtAnn pann)
-      InPort _ _  -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildStmtAnn pann)
+      SinkPort _ _  ->
+        case gentry of
+          GGlob (SEmitter ets) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets)
+          _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
+      InPort _ _  -> 
+        case gentry of
+          GGlob (SChannel cts) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts)
+          _ -> throwError $ annotateError loc $ EInboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
@@ -504,14 +512,14 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
   if fid == pid
   then
     getGlobalGEnTy loc sid >>=
-    \gentry ->      
+    \gentry ->
     case fty of
-      AccessPort (Allocator {}) -> 
+      AccessPort (Allocator {}) ->
         case gentry of
           -- TODO: Check that the types match
           GGlob (SResource (Pool {})) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildStmtAnn pann)
           _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
-      AccessPort (DefinedType iface) -> 
+      AccessPort (DefinedType iface) ->
         getGlobalTy loc iface >>=
           \case {
             Interface _ members _ ->
@@ -519,7 +527,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
               case gentry of
                 GGlob (SResource rts@(DefinedType {})) ->
                   let procs = [SemanProcedure procid | (InterfaceProcedure procid _ _) <- members] in
-                  return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPortConnectionAnn pann rts procs)
+                  return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
               ;
             _ -> throwError $ annotateError loc (EAccessPortNotInterface (DefinedType iface))
@@ -720,7 +728,13 @@ globalCheck (Emitter ident ty mexpr mods anns) = do
               Just expr -> Just <$> (mustBeTy ty =<< expressionType globalObjectType expr)
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
-  return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns (SEmitter ty)))
+  glb <- case ty of
+        -- | We are going to manually map de Emitter to the proper type
+        (DefinedType "Interrupt") -> return $ SEmitter ty
+        (DefinedType "PeriodicTimer") -> return $  SEmitter ty
+        (DefinedType "SystemInit") -> return $ SEmitter ty
+        _ -> throwError $ annotateError internalErrorSeman EInternalNoGTY
+  return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns glb))
 globalCheck (Channel ident ty mexpr mods anns) = do
   checkTypeDefinition anns ty
   exprty <- case mexpr of
@@ -799,7 +813,7 @@ interfaceProcedureTy (InterfaceProcedure ident ps annIP) = do
 -- proficient for the time being.
 typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SAST.TypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
-typeDefCheck ann (Struct ident fs mds) = 
+typeDefCheck ann (Struct ident fs mds) =
   -- Check every type is well-defined:
   -- Check that the struct is not empty
   when (Prelude.null fs) (throwError $ annotateError ann (EStructDefEmptyStruct ident))
@@ -860,8 +874,7 @@ typeDefCheck ann (Class kind ident members provides mds)
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)
             -> checkTypeDefinition annCA mty
-            -- Parameters cannot have dyns inside.
-            >> parameterTypeChecking annCA fa_ty
+            >> (checkTypeDefinition annCA . paramTypeSpecifier) fa_ty
             >> return (fs, prcs, mths, vws , action : acts)
         )
     ([],[],[],[],[]) members
@@ -983,20 +996,19 @@ programAdd (Function ident args mretType _bd _mods anns) =
 programAdd (GlobalDeclaration glb) =
   let (global_name, sem, ann_glb) =
         case glb of
-          Task ident type_spec _me _mod ann ->
-            (ident, STask type_spec, ann)
-          Resource ident type_spec _me _mod ann ->
-            (ident, SResource type_spec, ann)
-          Handler ident type_spec _me _mod ann ->
-            (ident, SHandler type_spec, ann)
-          Emitter ident type_spec _me _mod ann ->
-            (ident, SEmitter type_spec, ann)
-          Channel ident type_spec _me _mod ann ->
-            (ident, SChannel type_spec, ann)
-          Const ident type_spec _e _mod ann ->
-            (ident, SConst type_spec, ann)
-      el = (location ann_glb `SemAnn` GGlob sem)
-          in
+          Task ident _type_spec _me _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+          Resource ident _type_spec _me _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+          Handler ident _type_spec _me _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+          Emitter ident _type_spec _me _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+          Channel ident _type_spec _me _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+          Const ident _type_spec _e _mod ann ->
+            (ident, fromJust (getGEntry (ty_ann ann)), ann)
+      el = (location ann_glb `SemAnn` sem) in
   insertGlobal global_name el
   (EUsedGlobalName global_name)
   >> return (global_name , el)

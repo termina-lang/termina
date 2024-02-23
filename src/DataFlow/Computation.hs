@@ -10,10 +10,6 @@ import DataFlow.Types
 
 import qualified Control.Monad.State as ST
 import Control.Monad.Except as E
-import Control.Monad
-import Control.Monad.Trans
-
-import Debug.Termina
 
 -- Warning: Both implmentations have a limit on the number of elements they can
 -- contain. They do not fail if the limit is rechead.
@@ -91,6 +87,8 @@ runEncapsEOO :: [UDM e a] -> UDM e [a]
 runEncapsEOO ms =
   get >>= \st ->
   mapM (withState emptyButUsed) ms >>=
+-- mapM (withState (const emptyUDSt)) ms >>=
+  
 -- mapM (withState (const emptyUDSt)) ms >>=
   (put st >>) . return
 
@@ -228,14 +226,18 @@ defVariable :: Identifier -> UDM Errors ()
 defVariable ident =
   gets usedSet >>=
   \i ->
-    if S.member ident i
-    then
-        -- Variable is used, strong assumtions on use!
-        -- return () -- we can remove it... but maybe it is more expensive.
-        modify (removeUsed ident)
-    else
-        -- Variable |ident| is not used in the rest of the code :(
-        throwError (NotUsed ident)
+    case head ident of
+      -- If the argument starts with an underscore, then the parameter must be ignored and not used.
+      '_' -> when (S.member ident i) $ throwError (UsedIgnoredVariable ident)
+      _ ->
+        if S.member ident i
+        then
+            -- Variable is used, strong assumtions on use!
+            -- return () -- we can remove it... but maybe it is more expensive.
+            modify (removeUsed ident)
+        else
+            -- Variable |ident| is not used in the rest of the code :(
+            throwError (NotUsed ident)
 
 -- Procedures can receive /dyn/ variables as arguments.
 -- Dyn variables have a special Use, through free or stuff.

@@ -302,6 +302,7 @@ ppTypeSpecifier (MsgQueue _ _)               = msgQueue
 ppTypeSpecifier (Location ts)                = volatileC <+> ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier (AccessPort ts)              = ppTypeSpecifier ts
 ppTypeSpecifier (Allocator _)                = allocator
+ppTypeSpecifier (OutPort {})                 = msgQueue
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
@@ -388,17 +389,11 @@ ppModifier m = error $ "unsupported modifier: " ++ show m
 classFunctionName :: DocStyle -> DocStyle -> DocStyle
 classFunctionName = (<::>)
 
-taskRunMethodName :: Identifier -> DocStyle
-taskRunMethodName identifier = classFunctionName (pretty identifier) (pretty "run")
-
-handlerHandleMethodName :: Identifier -> DocStyle
-handlerHandleMethodName identifier = classFunctionName (pretty identifier) (pretty "handle")
-
 poolMethodName :: Identifier -> DocStyle
-poolMethodName = namefy . pretty
+poolMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "pool" <::> pretty mName)
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "msg_queue_" <> pretty mName)
+msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "msg_queue" <::> pretty mName)
 
 resourceLock :: DocStyle
 resourceLock = classFunctionName (namefy $ pretty "termina") (pretty "resource_lock")

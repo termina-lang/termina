@@ -25,6 +25,7 @@ ppClassIDFieldDeclaration :: ClassKind -> DocStyle
 ppClassIDFieldDeclaration ResourceClass = resourceID <+> ppResourceClassIDField <> semi
 ppClassIDFieldDeclaration TaskClass = taskID <+> ppTaskClassIDField <> semi
 ppClassIDFieldDeclaration HandlerClass = handlerID <+> ppHandlerClassIDField <> semi
+ppClassIDFieldDeclaration cls = error $ "invalid class kind: " ++ show cls
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case
@@ -216,8 +217,11 @@ ppTypeDefDeclaration opts typeDef =
               typedefC <+> structC <+> braces' (
                 indentTab . align $
                 vsep (
-                  -- | Map the regular fields
-                  map ppClassField fields ++
+                  -- | Map the regular fields except for the sink and in ports
+                  map ppClassField (filter (\case {
+                    ClassField (FieldDefinition _ (SinkPort {})) _ -> False;
+                    ClassField (FieldDefinition _ (InPort {})) _ -> False;
+                    _ -> True}) fields) ++
                   -- | Map the ID field. The type of this field
                   -- | depends on the class kind.
                   [ppClassIDFieldDeclaration clsKind]))

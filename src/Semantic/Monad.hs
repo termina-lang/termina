@@ -29,6 +29,7 @@ import           Utils.TypeSpecifier
 -- Monads
 import           Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
+import GHC.Base (build)
 
 type Locations = Parser.Annotation
 
@@ -60,13 +61,35 @@ data ESeman
 newtype SemanProcedure = SemanProcedure Identifier
   deriving (Show)
 
+data ConnectionSeman =
+    -- | Access port connection
+  APConnTy 
+  -- | Type specifier of the connected resource
+    TypeSpecifier
+    -- | List of procedures that can be called on the connected resource
+    [SemanProcedure]
+  -- | Sink port connection
+  | SPConnTy
+    -- | Type specifier of the connected event emitter
+    TypeSpecifier
+  -- | In port connection
+  | InPConnTy
+    -- | Type specifier of the connected channel
+    TypeSpecifier
+  deriving Show
+
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
-  = ETy ESeman -- ^ Expressions with their types
-  | STy -- ^ Statements with no types
-  | PTy TypeSpecifier [SemanProcedure] -- ^ Access port connection
-  | GTy (GEntry SemanticAnns) -- ^ Global elements
+  = 
+  -- | Expressions with their types
+  ETy ESeman
+  -- | Statements with no types
+  | STy
+  -- | Port connections
+  | CTy ConnectionSeman
+  -- | Global elements
+  | GTy (GEntry SemanticAnns)
   deriving Show
 
 ----------------------------------------
@@ -115,8 +138,14 @@ buildGlobalTy loc = SemAnn loc . GTy . GType
 buildStmtAnn :: Locations -> SAnns SemanticElems
 buildStmtAnn = flip SemAnn STy
 
-buildPortConnectionAnn :: Locations -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
-buildPortConnectionAnn loc ts procs = SemAnn loc (PTy ts procs)
+buildAccessPortConnAnn :: Locations -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
+buildAccessPortConnAnn loc ts procs = SemAnn loc (CTy (APConnTy ts procs))
+
+buildSinkPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
+buildSinkPortConnAnn loc ts = SemAnn loc (CTy (SPConnTy ts))
+
+buildInPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
+buildInPortConnAnn loc ts = SemAnn loc (CTy (InPConnTy ts))
 
 -- | Expression Semantic Annotations
 type SemanticAnns = SAnns SemanticElems
@@ -169,10 +198,13 @@ initialGlobalEnv = fromList initGlb
 
 initGlb :: [(Identifier, SAnns (GEntry SemanticAnns))]
 initGlb =
-  [("Interrupt", internalErrorSeman `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
-   ("irq_3", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-   ("Result", internalErrorSeman `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
+  [("Result", internalErrorSeman `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
    ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
+   ("Interrupt", internalErrorSeman `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
+   ("irq_3", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
+   ("SystemInit", internalErrorSeman `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
+   ("system_init", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
+   ("PeriodicTimer", internalErrorSeman `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn internalErrorSeman (DefinedType "TimeVal"))] [] [])),
    ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
    ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
   -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
@@ -523,8 +555,10 @@ checkTypeDefinition loc (AccessPort ty) =
 checkTypeDefinition loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
 checkTypeDefinition loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 checkTypeDefinition loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (InPort (DynamicSubtype ty') _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 checkTypeDefinition loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 checkTypeDefinition loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeDefinition loc (OutPort (DynamicSubtype ty')) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 checkTypeDefinition loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
 checkTypeDefinition loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
 checkTypeDefinition loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'

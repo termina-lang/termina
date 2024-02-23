@@ -121,7 +121,7 @@ ppInitializeStruct subs level target expr =
                   FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> 
                     target <> pretty "." <> pretty field <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi : acc
                   -- | Regular access port connection  
-                  FieldPortConnection AccessPortConnection field _ (SemAnn _ (PTy rts procedures)) -> 
+                  FieldPortConnection AccessPortConnection field _ (SemAnn _ (CTy (APConnTy rts procedures))) -> 
                     vsep (ppProcedureAssignment field rts <$> procedures) : acc
                   -- | Pool port connections
                   FieldPortConnection AccessPortConnection field res _ -> 

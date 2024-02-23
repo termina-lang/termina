@@ -13,7 +13,6 @@ import AST.Seman (AnnotatedProgram)
 import Semantic.Monad (SemanticAnns)
 import Semantic.Option (OptionMap)
 import Data.Maybe (mapMaybe)
-import qualified Data.Map as M
 
 import PPrinter
 import PPrinter.Common (DocStyle)
