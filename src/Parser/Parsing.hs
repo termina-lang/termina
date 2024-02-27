@@ -49,47 +49,33 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
-       -- Polymorphic Types
-      ["MsgQueue", "Pool", "Option", "Allocator"]
+             ["MsgQueue", "Pool", "Option", "Allocator"]
       ++ -- Struct and enum types
-       -- Struct and enum types
-      ["struct", "enum"]
+             ["struct", "enum"]
       ++ -- Dynamic Subtyping
-       -- Dynamic Subtyping
-      ["dyn"]
+             ["dyn"]
       ++ -- Fixed Location Subtyping
-       -- Fixed Location Subtyping
-      ["loc"]
+             ["loc"]
       ++ -- Ports Subtyping
-       -- Ports Subtyping
-      ["access", "sink", "in", "out"]
+             ["access", "sink", "in", "out"]
       ++ -- Private reference typing
-       -- Private reference typing
-      ["&priv"]
+             ["&priv"]
       ++ -- Global declarations
-       -- Global declarations
-      ["task", "function", "handler", "resource", "const"]
+             ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
-       -- Stmt
-      ["var", "match", "for", "if", "else", "return", "while"]
+             ["var", "match", "for", "if", "else", "return", "while"]
       ++ -- Trigger
-       -- Trigger
-      ["triggers"]
+             ["triggers"]
       ++ -- Provide
-       -- Provide
-      ["provides"]
+             ["provides"]
       ++ -- Constants
-       -- Constants
-      ["true", "false"]
+             ["true", "false"]
       ++ -- Modules
-       -- Modules
-      ["import"]
+             ["import"]
       ++ -- Class methods
-       -- Class methods
-      ["procedure", "viewer", "method", "action"]
+             ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
-       -- Casting keyword
-      ["as"]
+             ["as"]
       ++ -- option name
       ["option"]
 
