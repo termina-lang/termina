@@ -390,16 +390,16 @@ classFunctionName :: DocStyle -> DocStyle -> DocStyle
 classFunctionName = (<::>)
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "pool" <::> pretty mName)
+poolMethodName mName = classFunctionName (namefy $ pretty "termina_pool") (pretty mName)
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina") (pretty "msg_queue" <::> pretty mName)
+msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina_msg_queue") (pretty mName)
 
 resourceLock :: DocStyle
-resourceLock = classFunctionName (namefy $ pretty "termina") (pretty "resource_lock")
+resourceLock = classFunctionName (namefy $ pretty "termina_resource") (pretty "lock")
 
 resourceUnlock :: DocStyle
-resourceUnlock = classFunctionName (namefy $ pretty "termina") (pretty "resource_unlock")
+resourceUnlock = classFunctionName (namefy $ pretty "termina_resource") (pretty "unlock")
 
 ppCFunctionPointer :: DocStyle -> DocStyle -> [DocStyle] -> DocStyle
 ppCFunctionPointer ts identifier parameters = 
@@ -458,3 +458,18 @@ ppCElseBlock ::
   DocStyle -> DocStyle
 ppCElseBlock body =
   pretty "else" <+> braces' (line <> (indentTab . align) body)
+
+ppCSwitchCase :: DocStyle -> DocStyle -> DocStyle
+ppCSwitchCase expr body = pretty "case" <+> expr <> colon <> (line <> (indentTab . align) body)
+
+ppCDefaultSwitchCase :: DocStyle -> DocStyle
+ppCDefaultSwitchCase body = pretty "default" <> colon <> (line <> (indentTab . align) body)
+
+ppCSwitchBlock ::
+  -- | Switch expression
+  DocStyle
+  -- | Cases
+  -> [DocStyle] ->
+  DocStyle
+ppCSwitchBlock expr cases =
+  pretty "switch" <+> parens expr <+> braces' (line <> (indentTab . align) (vsep cases))
