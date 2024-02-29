@@ -189,6 +189,10 @@ data Errors a
   | EEnumVariantExtraParams
   | EEnumVariantMissingParams
   | ETyNotEnum Identifier (SemanTypeDef a)
+  | EIsVariantNotEnum TypeSpecifier
+  | EIsVariantNotOption TypeSpecifier
+  | EIsVariantEnumMismatch Identifier Identifier
+  | EIsVariantNotFound Identifier
   -- | Unexpected Global element unboxing.
   | EInternalNoGTY
   -- | MsgQueue operations errors

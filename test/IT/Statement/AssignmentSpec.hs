@@ -102,10 +102,10 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource_id;\n" ++
+              "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test1(id0 * const self, __termina_dyn_t dyn_var0);\n" ++
+              "void id0__assignment_test1(id0 * const self, __termina__dyn_t dyn_var0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test1" $ do
@@ -113,18 +113,18 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test1(id0 * const self, __termina_dyn_t dyn_var0) {\n" ++
+              "void id0__assignment_test1(id0 * const self, __termina__dyn_t dyn_var0) {\n" ++
               "\n" ++
-              "    __termina__resource_lock(&self->__resource_id);\n" ++
+              "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    __option_dyn_t opt;\n" ++
+              "    __option__dyn_t opt;\n" ++
               "\n" ++
               "    opt.__variant = None;\n" ++
               "\n" ++
               "    opt.__variant = Some;\n" ++
               "    opt.Some.__0 = dyn_var0;\n" ++
               "\n" ++
-              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "    __termina__resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -137,11 +137,11 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource_id;\n" ++
+              "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test2(id0 * const self, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test2(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "                           __termina__dyn_t dyn_var1);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test2" $ do
@@ -149,10 +149,10 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test2(id0 * const self, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "void id0__assignment_test2(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "                           __termina__dyn_t dyn_var1) {\n" ++
               "\n" ++
-              "    __termina__resource_lock(&self->__resource_id);\n" ++
+              "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
@@ -162,7 +162,7 @@ spec = do
               "\n" ++
               "    *((uint32_t *)dyn_var1.data) = *((uint32_t *)dyn_var0.data);\n" ++
               "\n" ++
-              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "    __termina__resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -175,11 +175,11 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource_id;\n" ++
+              "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test3(id0 * const self, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test3(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "                           __termina__dyn_t dyn_var1);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test2" $ do
@@ -187,10 +187,10 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test3(id0 * const self, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "void id0__assignment_test3(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "                           __termina__dyn_t dyn_var1) {\n" ++
               "\n" ++
-              "    __termina__resource_lock(&self->__resource_id);\n" ++
+              "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo[10];\n" ++
               "\n" ++
@@ -210,7 +210,7 @@ spec = do
               "        ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "    __termina__resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -64,7 +64,6 @@ spec = do
               "\n" ++
               "} Message;\n" ++
               "\n" ++
-              "extern Message __pool_message_pool_memory[10];\n" ++
-              "extern __termina_pool_t message_pool;\n" ++
+              "extern __termina__pool_t message_pool;\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")

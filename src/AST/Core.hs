@@ -150,6 +150,9 @@ data Op
 data OptionVariant expr = None | Some expr
   deriving (Show, Functor)
 
+data OptionVariantLabel = NoneLabel | SomeLabel
+  deriving (Show)
+
 ----------------------------------------
 -- | Datatype representing Global Declarations.
 -- There are three types of global declarations:
@@ -348,6 +351,15 @@ data Expression'
     [ Expression' obj a ] -- ^ list of expressions
     a
   | OptionVariantExpression (OptionVariant (Expression' obj a)) a
+  | IsEnumVariantExpression
+    (obj a) -- ^ Enum object
+    Identifier -- ^ Enum identifier
+    Identifier -- ^ Variant identifier a
+    a
+  | IsOptionVariantExpression
+    (obj a) -- ^ Opion object
+    OptionVariantLabel -- ^ Variant label
+    a
   deriving (Show, Functor)
 
 instance (Annotated obj) => Annotated (Expression' obj) where
@@ -363,6 +375,8 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (OptionVariantExpression _ a)            = a
   getAnnotation (MemberFunctionAccess _ _ _ a)           = a
   getAnnotation (DerefMemberFunctionAccess _ _ _ a)      = a
+  getAnnotation (IsEnumVariantExpression _ _ _ a)        = a
+  getAnnotation (IsOptionVariantExpression _ _ a)        = a
 
 
 data Statement' expr obj a =

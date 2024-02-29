@@ -89,14 +89,15 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t sender_id;\n" ++
-              "    __option_uint32_t destination_id;\n" ++
+              "    __option__uint32_t destination_id;\n" ++
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_allocator_t message_pool;\n" ++
+              "    __termina__sink_port_t timer;\n" ++
+              "    __termina__pool_t * message_pool;\n" ++
               "    uint32_t interval;\n" ++
-              "    __termina_task_t __task_id;\n" ++
+              "    __termina__task_t __task;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
@@ -134,22 +135,22 @@ spec = do
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
-              "    __option_dyn_t alloc_msg;\n" ++
+              "    __option__dyn_t alloc_msg;\n" ++
               "\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
-              "    self->message_pool.__alloc(self->message_pool.__that, &alloc_msg);\n"  ++
+              "    __termina__pool__alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++
               "    if (alloc_msg.__variant == None) {\n"  ++
               "\n"  ++
               "        \n"  ++
               "    } else {\n" ++
               "\n" ++
-              "        __option_dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
+              "        __option__dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
               "\n" ++
               "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
               "\n" ++
-              "        self->message_pool.__free(self->message_pool.__that, __alloc_msg__Some);\n" ++
+              "        __termina__pool__free(self->message_pool, __alloc_msg__Some);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

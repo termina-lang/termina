@@ -21,11 +21,10 @@ ppClassField (ClassField (FieldDefinition identifier ts) _) = ppTypeSpecifier ts
 ppClassField _ = error "invalid class member"
 
 -- | Pretty prints the ID field of a class depending on its kind
-ppClassIDFieldDeclaration :: ClassKind -> DocStyle
-ppClassIDFieldDeclaration ResourceClass = resourceID <+> ppResourceClassIDField <> semi
-ppClassIDFieldDeclaration TaskClass = taskID <+> ppTaskClassIDField <> semi
-ppClassIDFieldDeclaration HandlerClass = handlerID <+> ppHandlerClassIDField <> semi
-ppClassIDFieldDeclaration cls = error $ "invalid class kind: " ++ show cls
+ppClassIDFieldDeclaration :: ClassKind -> [DocStyle]
+ppClassIDFieldDeclaration ResourceClass = [resourceID <+> ppResourceClassIDField <> semi]
+ppClassIDFieldDeclaration TaskClass = [taskID <+> ppTaskClassIDField <> semi]
+ppClassIDFieldDeclaration _ = []
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case
@@ -38,7 +37,7 @@ ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> p
 
 ppInterfaceProcedureField :: InterfaceMember SemanticAnns -> DocStyle
 ppInterfaceProcedureField (InterfaceProcedure identifier parameters _) =
-  ppCFunctionPointer (voidC) (pretty identifier)
+  ppCFunctionPointer voidC (pretty identifier)
     (voidC <+> pretty "*" <+> pretty "__self" : (ppParameterDeclaration (pretty identifier) <$> parameters)) <> semi
 
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
@@ -124,9 +123,6 @@ ppEnumVariantParameterStruct identifier enumVariant@(EnumVariant _variant params
 classifyClassMembers :: [ClassMember SemanticAnns] -> ([ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns], [ClassMember SemanticAnns])
 classifyClassMembers = foldr (\member (fs,ms,prs,vws,acts) ->
               case member of
-                -- We are filtering out the fields that are not relevant for the class structure 
-                ClassField (FieldDefinition _ (SinkPort {})) _ -> (fs, ms, prs, vws, acts)
-                ClassField (FieldDefinition _ (InPort {})) _ -> (fs, ms, prs, vws, acts)
                 ClassField {} -> (member : fs, ms, prs, vws, acts)
                 ClassMethod {} -> (fs, member : ms, prs, vws, acts)
                 ClassProcedure {} -> (fs, ms, member : prs, vws, acts)
@@ -212,19 +208,23 @@ ppTypeDefDeclaration opts typeDef =
       let
         structModifiers = filterStructModifiers modifiers
         (fields, methods, procedures, viewers, actions) = classifyClassMembers members
+        fields' = 
+          case clsKind of
+            TaskClass -> fields
+            _ -> filter (\case {
+              ClassField (FieldDefinition _ (SinkPort {})) _ -> False;
+              ClassField (FieldDefinition _ (InPort {})) _ -> False;
+              _ -> True}) fields
       in
         vsep $ [
               typedefC <+> structC <+> braces' (
                 indentTab . align $
                 vsep (
                   -- | Map the regular fields except for the sink and in ports
-                  map ppClassField (filter (\case {
-                    ClassField (FieldDefinition _ (SinkPort {})) _ -> False;
-                    ClassField (FieldDefinition _ (InPort {})) _ -> False;
-                    _ -> True}) fields) ++
+                  map ppClassField fields' ++
                   -- | Map the ID field. The type of this field
                   -- | depends on the class kind.
-                  [ppClassIDFieldDeclaration clsKind]))
+                  ppClassIDFieldDeclaration clsKind))
                     <+> ppTypeAttributes structModifiers <> pretty identifier <> semi,
               emptyDoc
           ] ++

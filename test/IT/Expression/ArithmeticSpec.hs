@@ -111,10 +111,10 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource_id;\n" ++
+              "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__test1(id0 * const self, __termina_dyn_t foo);\n" ++
+              "void id0__test1(id0 * const self, __termina__dyn_t foo);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function test1" $ do
@@ -122,9 +122,9 @@ spec = do
        pack ("\n" ++
              "#include \"test.h\"\n" ++
              "\n" ++ 
-             "void id0__test1(id0 * const self, __termina_dyn_t foo) {\n" ++
+             "void id0__test1(id0 * const self, __termina__dyn_t foo) {\n" ++
              "\n" ++
-             "    __termina__resource_lock(&self->__resource_id);\n" ++
+             "    __termina__resource__lock(&self->__resource);\n" ++
              "\n" ++
              "    *((uint16_t *)foo.data) = *((uint16_t *)foo.data) + 1024;\n" ++
              "\n" ++
@@ -146,7 +146,7 @@ spec = do
              "\n" ++
              "    1024 % *((uint16_t *)foo.data);\n" ++
              "\n" ++
-              "    __termina__resource_unlock(&self->__resource_id);\n" ++
+              "    __termina__resource__unlock(&self->__resource);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

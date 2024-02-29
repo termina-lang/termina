@@ -251,6 +251,7 @@ ppExpression subs (Casting expr' ts' _) =
             ppExpression subs expr'
 ppExpression subs expr@(FunctionExpression identifier params _) =
     let
+        func = findWithDefault (pretty identifier) identifier subs
         paramAnns = getParameters expr
         ins = zipWith
             (\p (Parameter pid ts) ->
@@ -265,11 +266,17 @@ ppExpression subs expr@(FunctionExpression identifier params _) =
                     (_, _) -> ppExpression subs p) params paramAnns
     in
         case getType expr of
-            Vector {} -> ppCFunctionCall (pretty identifier) ins <> pretty ".array"
-            _ -> ppCFunctionCall (pretty identifier) ins
+            Vector {} -> ppCFunctionCall func ins <> pretty ".array"
+            _ -> ppCFunctionCall func ins
 ppExpression subs (MemberFunctionAccess obj methodId params _) =
     ppMemberFunctionAccess subs obj methodId params
 ppExpression subs (DerefMemberFunctionAccess obj methodId params _) =
     ppMemberFunctionAccess subs obj methodId params
+ppExpression subs (IsEnumVariantExpression obj enum variant _) =
+    ppObject subs obj <> pretty "." <> enumVariantsField <+> pretty "==" <+> pretty enum <::> pretty variant
+ppExpression subs (IsOptionVariantExpression obj NoneLabel _) =
+    ppObject subs obj <> pretty "." <> enumVariantsField <+> pretty "==" <+> optionNoneVariant
+ppExpression subs (IsOptionVariantExpression obj SomeLabel _) =
+    ppObject subs obj <> pretty "." <> enumVariantsField <+> pretty "==" <+> optionSomeVariant
 ppExpression _ expr = error $  "unsupported expression" ++ show expr
 

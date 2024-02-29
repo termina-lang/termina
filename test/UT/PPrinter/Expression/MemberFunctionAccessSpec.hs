@@ -34,10 +34,10 @@ spec = do
   describe "Pretty printing method call expressions" $ do
     it "Prints the expression: tm_pool.alloc()" $ do
       renderExpression tmPoolAlloc `shouldBe`
-        pack "tm_pool.__alloc(tm_pool.__that)"
+        pack "__termina__pool__alloc(tm_pool)"
     it "Prints the expression: tm_channel.foo0(bar0)" $ do
       renderExpression tmChannelsend `shouldBe`
-        pack "__termina__msg_queue_send(tm_channel, (void *)&bar0)"
+        pack "__termina__msg_queue__send(tm_channel, (void *)&bar0)"
     it "Prints the expression: (*self).foo0(bar0, bar1)" $ do
       renderExpression selfFoo0 `shouldBe`
         pack "Resource__foo0(self, bar0, bar1)"

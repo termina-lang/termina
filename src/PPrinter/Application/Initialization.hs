@@ -19,6 +19,8 @@ ppInitializeObj (Task identifier _ (Just expr) _ _) =
     Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
 ppInitializeObj (Handler identifier _ (Just expr) _ _) =
     Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
+ppInitializeObj (Emitter identifier _ (Just expr) _ _) =
+    Just (ppInitializeStruct M.empty 0 (pretty identifier) expr)
 ppInitializeObj _ = Nothing
 
 ppInitFile :: [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> DocStyle

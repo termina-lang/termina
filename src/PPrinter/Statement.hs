@@ -276,6 +276,10 @@ ppBlockRet subs identifier (BlockRet body ret) =
       <> line <> ppReturnStmt identifier ret <> line)
   ) <> line
 
-ppParameterSubstitutions :: [Parameter] -> Substitutions
-ppParameterSubstitutions parameters =
-  fromList [(pid, pretty pid <> pretty ".array") | (Parameter pid (Vector {})) <- parameters]
+ppSubstitutions :: [Parameter] -> Substitutions
+ppSubstitutions parameters =
+  fromList $ [
+        ("clock_get_uptime", namefy $ pretty "termina" <::> pretty "clock_get_uptime"),
+        ("delay_at", namefy $ pretty "termina" <::> pretty "delay_at")
+    ] ++
+    [(pid, pretty pid <> pretty ".array") | (Parameter pid (Vector {})) <- parameters]

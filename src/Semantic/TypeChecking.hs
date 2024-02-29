@@ -454,6 +454,29 @@ expressionType objType (OptionVariantExpression vexp anns) =
       typed_e <- expressionType objType e
       type_e <- getExpType typed_e
       return $ SAST.OptionVariantExpression (Some typed_e) (buildExpAnn anns (Option type_e))
+expressionType objType (IsEnumVariantExpression obj id_ty variant_id pann) = do
+  obj_typed <- objType obj
+  (_, obj_ty) <- unboxObjectSAnns obj_typed
+  lhs_ty <- case obj_ty of 
+    DefinedType dident -> 
+      catchError (getGlobalTy pann dident) (\_ -> throwError $ annotateError pann (EIsVariantNotEnum obj_ty))
+    _ -> throwError $ annotateError pann (EIsVariantNotEnum obj_ty)
+  case lhs_ty of
+    Enum lhs_enum ty_vs _mods ->
+      if lhs_enum == id_ty
+      then
+        case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
+          Just (EnumVariant {}) -> return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann Bool)
+          Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant_id)
+      else throwError $ annotateError pann (EIsVariantEnumMismatch lhs_enum id_ty)
+    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
+expressionType objType (IsOptionVariantExpression obj variant_id pann) = do
+  obj_typed <- objType obj
+  (_, obj_ty) <- unboxObjectSAnns obj_typed
+  case obj_ty of 
+    (Option {}) -> 
+      return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann Bool)
+    _ -> throwError $ annotateError pann (EIsVariantNotOption obj_ty)
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]

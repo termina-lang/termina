@@ -94,7 +94,7 @@ spec = do
               "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_task_t __task_id;\n" ++
+              "    __termina__task_t __task;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
               "Result CHousekeeping__run(CHousekeeping * const self);\n" ++
@@ -109,15 +109,15 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __option_uint32_params_t;\n" ++
+              "} __option__uint32_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
-              "    __option_uint32_params_t Some;\n" ++
+              "    __option__uint32_params_t Some;\n" ++
               "\n" ++
               "    __enum_option_t __variant;\n" ++
               "\n" ++
-              "} __option_uint32_t;\n" ++
+              "} __option__uint32_t;\n" ++
               "\n" ++
               "#endif // __OPTION_H__\n")
     it "Prints option header file of test1" $ do
@@ -129,15 +129,15 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0[10];\n" ++
-              "} __option_uint32__10_params_t;\n" ++
+              "} __option__uint32__10_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "\n" ++
-              "    __option_uint32__10_params_t Some;\n" ++
+              "    __option__uint32__10_params_t Some;\n" ++
               "\n" ++
               "    __enum_option_t __variant;\n" ++
               "\n" ++
-              "} __option_uint32__10_t;\n" ++
+              "} __option__uint32__10_t;\n" ++
               "\n" ++
               "#endif // __OPTION_H__\n")
     it "Prints definition of function test1" $ do
@@ -153,7 +153,7 @@ spec = do
               "        foo[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    __option_uint32__10_t optionFoo;\n" ++
+              "    __option__uint32__10_t optionFoo;\n" ++
               "\n" ++
               "    optionFoo.__variant = None;\n" ++
               "\n" ++
@@ -167,7 +167,7 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++   
-              "        __option_dyn_t __optionFoo__Some = optionFoo.Some.__0;\n" ++
+              "        __option__dyn_t __optionFoo__Some = optionFoo.Some.__0;\n" ++
               "\n" ++
               "        __optionFoo__Some[0] = 1;\n" ++
               "\n" ++

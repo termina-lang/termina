@@ -122,6 +122,10 @@ useExpression (ReferenceExpression _aK obj _a)
   = useObject obj
 useExpression (Casting e _ty _a)
   = useExpression e
+useExpression (IsEnumVariantExpression obj _ _ _)
+  = useObject obj
+useExpression (IsOptionVariantExpression obj _ _)
+  = useObject obj
 useExpression (MemberFunctionAccess obj ident args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)

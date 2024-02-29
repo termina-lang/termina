@@ -11,10 +11,10 @@ import Data.Map (empty)
 
 
 ppClassProcedureOnEntry :: DocStyle
-ppClassProcedureOnEntry = ppCFunctionCall resourceLock [ppCReferenceExpression (pretty "self->__resource_id")] <> semi
+ppClassProcedureOnEntry = ppCFunctionCall resourceLock [ppCReferenceExpression (pretty "self->__resource")] <> semi
 
 ppClassProcedureOnExit :: DocStyle
-ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [ppCReferenceExpression (pretty "self->__resource_id")] <> semi
+ppClassProcedureOnExit = ppCFunctionCall resourceUnlock [ppCReferenceExpression (pretty "self->__resource")] <> semi
 
 ppClassFunctionDefinition :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
@@ -45,7 +45,7 @@ ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
     ) <> line
   where
     clsFuncName = classFunctionName (pretty classId) (pretty identifier)
-    subs = ppParameterSubstitutions parameters
+    subs = ppSubstitutions parameters
 ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _) =
     -- | Function prototype
     ppCFunctionPrototype clsFuncName
@@ -57,7 +57,7 @@ ppClassFunctionDefinition classId (ClassViewer identifier parameters rts body _)
       )
       -- | Class viewer return type
       (Just (ppReturnType (pretty identifier) rts))
-    <+> ppBlockRet (ppParameterSubstitutions parameters) clsFuncName body <> line
+    <+> ppBlockRet (ppSubstitutions parameters) clsFuncName body <> line
   where
     clsFuncName = classFunctionName (pretty classId) (pretty identifier)
 ppClassFunctionDefinition classId (ClassMethod identifier mrts body _) =
@@ -81,7 +81,7 @@ ppClassFunctionDefinition classId (ClassAction identifier parameter rts body _) 
       )
       -- | Class viewer return type
       (Just (ppReturnType (pretty identifier) rts))
-    <+> ppBlockRet (ppParameterSubstitutions [parameter]) clsFuncName body <> line
+    <+> ppBlockRet (ppSubstitutions [parameter]) clsFuncName body <> line
   where
     clsFuncName = classFunctionName (pretty classId) (pretty identifier)
 ppClassFunctionDefinition _ _ = error "invalid class member"

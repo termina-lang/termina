@@ -116,7 +116,7 @@ spec = do
       renderTypedefDeclaration M.empty classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
-          "    __termina_resource_t __resource_id;\n" ++
+          "    __termina__resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(Class0 * const self, uint8_t param0, uint16_t param1,\n" ++
@@ -126,11 +126,11 @@ spec = do
       renderTypedefDeclaration M.empty classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "typedef struct {\n" ++
-          "    __termina_resource_t __resource_id;\n" ++
+          "    __termina__resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(Class0 * const self, uint8_t param0,\n" ++
-          "                        __option_dyn_t param1);\n" ++
+          "                        __option__dyn_t param1);\n" ++
           "\n" ++
           "void Class0__procedure1(Class0 * const self, uint8_t param0,\n" ++
           "                        uint8_t param1[32]);\n")
@@ -138,7 +138,7 @@ spec = do
       renderTypedefDeclaration M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "typedef struct {\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -148,7 +148,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -158,7 +158,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -169,7 +169,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} __attribute__((packed)) Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self, char param0, uint8_t param1[16]);\n")
@@ -180,7 +180,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} __attribute__((align(16))) Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -191,7 +191,7 @@ spec = do
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} __attribute__((packed, align(16))) Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -201,7 +201,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")
@@ -211,7 +211,7 @@ spec = do
             "typedef struct {\n" ++
             "    uint32_t field0;\n" ++
             "    Interface1 field1;\n" ++
-            "    __termina_resource_t __resource_id;\n" ++
+            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(Class0 * const self);\n")

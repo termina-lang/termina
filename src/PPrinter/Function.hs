@@ -12,7 +12,7 @@ ppFunction (Function identifier parameters rTS blk _ _) =
   ppCFunctionPrototype (pretty identifier)
     (ppParameterDeclaration (pretty identifier) <$> parameters)
     (ppReturnType (pretty identifier) <$> rTS)
-    <+> ppBlockRet (ppParameterSubstitutions parameters) (pretty identifier) blk
+    <+> ppBlockRet (ppSubstitutions parameters) (pretty identifier) blk
 ppFunction _ = error "AST element is not a function"
 
 ppFunctionDeclaration :: AnnASTElement SemanticAnns -> DocStyle

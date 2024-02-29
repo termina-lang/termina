@@ -13,6 +13,7 @@ import Modules.Printing
 import qualified AST.Seman as SAST
 import Data.Maybe (fromJust)
 import Data.List (find)
+import Semantic.Types (GEntry (GGlob), SemGlobal (SEmitter))
 
 data RTEMSPort =
     RTEMSEventPort
@@ -66,8 +67,6 @@ data RTEMSEmitter =
       RTEMSGlobal -- ^ target of the interrupt (task or handler)
     | RTEMSPeriodicTimerEmitter
       Identifier -- ^ periodic timer identifier
-      (Expression SemanticAnns) -- ^ periodic timer period tv_sec
-      (Expression SemanticAnns) -- ^ periodic timer period tv_usec
       RTEMSGlobal -- ^ target of the timer (task or handler)
     | RTEMSSystemInitEmitter
       Identifier -- ^ initial event identifier
@@ -83,6 +82,11 @@ data RTEMSMsgQueue =
       TypeSpecifier -- ^ type of the elements of the message queue
       Integer -- ^ message queue size
       RTEMSGlobal -- ^ task that will receive the messages
+    | RTEMSSinkPortMsgQueue
+      Identifier -- ^ identifier of the receiving task
+      Identifier -- ^ identifier of the port that will receive the messages
+      TypeSpecifier -- ^ type of the elements of the message queue
+      Integer -- ^ message queue size
     deriving Show
 
 data RTEMSResourceLock =
@@ -123,30 +127,27 @@ getStackSize [] = 4096
 getStackSize ((Modifier "stack_size" (Just (KC (I _ stackSize)))) : _) = stackSize
 getStackSize (_ : modifiers) = getStackSize modifiers
 
-ppTaskMessageQueue :: Identifier -> Identifier
-ppTaskMessageQueue identifier = "__msgq__" ++ identifier
-
-ppVariantForAction ::
+ppVariantForPort ::
     -- | Name of the task class
     Identifier
-    -- | Name of the action
-    ->Identifier -> DocStyle
-ppVariantForAction taskCls action = namefy $ pretty taskCls <::> pretty action
+    -- | Name of the port
+    -> Identifier -> DocStyle
+ppVariantForPort taskCls port = namefy $ pretty taskCls <::> pretty port
 
-ppDefineVariantsForActions :: Identifier -> Identifier -> Integer -> DocStyle
-ppDefineVariantsForActions taskCls action value =
-    pretty "#define" <+> ppVariantForAction taskCls action <+> pretty value
+ppDefineVariantsForPorts :: Identifier -> Identifier -> Integer -> DocStyle
+ppDefineVariantsForPorts taskCls port value =
+    pretty "#define" <+> ppVariantForPort taskCls port <+> pretty value
 
-ppVariantsForTaskActions :: TypeDef SemanticAnns -> DocStyle
-ppVariantsForTaskActions (Class _ classId members _ _) = vsep $ emptyDoc :
-    zipWith (ppDefineVariantsForActions classId) actions [0..]
+ppVariantsForTaskPorts :: TypeDef SemanticAnns -> DocStyle
+ppVariantsForTaskPorts (Class _ classId members _ _) = vsep $ emptyDoc :
+    zipWith (ppDefineVariantsForPorts classId) ports [0..]
     where
-        actions = foldr (\field acc ->
+        ports = foldr (\field acc ->
                         case field of
-                            ClassField (FieldDefinition _ (SinkPort _ action)) _ -> action : acc
-                            ClassField (FieldDefinition _ (InPort _ action)) _ -> action : acc
+                            ClassField (FieldDefinition prt (SinkPort {})) _ -> prt : acc
+                            ClassField (FieldDefinition prt (InPort {})) _ -> prt : acc
                             _ -> acc ) [] members
-ppVariantsForTaskActions def = error $ "Definition not a class: " ++ show def
+ppVariantsForTaskPorts def = error $ "Definition not a class: " ++ show def
 
 -- Finds the assignment that connects a given port
 findPortConnection :: Identifier -> [FieldAssignment a] -> Maybe (FieldAssignment a)
@@ -244,36 +245,17 @@ buildRTEMSEmitter (Emitter identifier (DefinedType "Interrupt") _ _ _) connectio
     case M.lookup identifier connectionsMap of
         Just glb -> Just (RTEMSInterruptEmitter identifier glb)
         Nothing -> Nothing -- Not connected
-buildRTEMSEmitter (Emitter identifier (DefinedType "PeriodicTimer") (Just (FieldAssignmentsExpression "PeriodicTimer" fvas _)) _ _) connectionsMap =
+buildRTEMSEmitter (Emitter identifier (DefinedType "PeriodicTimer") _ _ _) connectionsMap =
     case M.lookup identifier connectionsMap of
-        Just glb -> Just (RTEMSPeriodicTimerEmitter identifier tvsec tvusec glb)
+        Just glb -> Just (RTEMSPeriodicTimerEmitter identifier glb)
         Nothing -> Nothing -- Not connected
-    where
-        period = case find (\case { FieldValueAssignment "period" _ _ -> True; _ -> False }) fvas of
-            Just (FieldValueAssignment _ tvs _) -> tvs
-            _ -> error $ "Invalid field assignments for periodic timer: " ++ show fvas
-            
-        tvsec =
-            case period of 
-                (FieldAssignmentsExpression "TimeVal" pfvas _) -> 
-                    case find (\case { FieldValueAssignment "tv_sec" _ _ -> True; _ -> False }) pfvas of
-                        Just (FieldValueAssignment _ tvs _) -> tvs
-                        _ -> error $ "Invalid field assignments for periodic timer: " ++ show pfvas
-                e -> error $ "Invalid assignment: " ++ show e
-        tvusec =
-            case period of 
-                (FieldAssignmentsExpression "TimeVal" pfvas _) -> 
-                    case find (\case { FieldValueAssignment "tv_usec" _ _ -> True; _ -> False }) pfvas of
-                        Just (FieldValueAssignment _ tvus _) -> tvus
-                        _ -> error $ "Invalid field assignments for periodic timer: " ++ show pfvas
-                e -> error $ "Invalid assignment: " ++ show e
 buildRTEMSEmitter (Emitter identifier (DefinedType "SystemInit") _ _ _) connectionsMap =
     case M.lookup identifier connectionsMap of
         Just glb -> Just (RTEMSSystemInitEmitter identifier glb)
         Nothing -> Nothing -- Not connected
 buildRTEMSEmitter emitter@(Emitter {}) _ = error $ "Unsupported emitter" ++ show emitter
 buildRTEMSEmitter _ _ = Nothing
-    
+
 addDependency :: RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Set RTEMSGlobal)
 addDependency newGlb Nothing = Just (S.singleton newGlb)
 addDependency newGlb (Just prevGlbs) = Just (S.insert newGlb prevGlbs)
@@ -290,7 +272,7 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
                     -- ClassIdentifier self = &task_identifier;
                     pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> parens (pretty classId <+> pretty "*") <> pretty "arg" <> semi,
                     -- Result res = Result__Ok;
-                    pretty "rtems_status_code status = RTEMS_SUCESSFUL" <> semi,
+                    pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCESSFUL" <> semi,
                     ppTypeSpecifier UInt32 <+> pretty "next_msg" <+> pretty "= 0" <> semi,
                     emptyDoc,
                     -- for (;;)
@@ -300,7 +282,7 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
                             -- Call receive on the task's message queue
                             pretty "status" <+> pretty "=" <+>
                                 ppCFunctionCall (pretty "rtems_message_queue_receive")
-                                    [pretty "self.__msgq_id",
+                                    [pretty "self->__task.msgq_id",
                                      pretty "&next_msg",
                                      pretty "RTEMS_WAIT",
                                      pretty "RTEMS_NO_TIMEOUT"] <> semi,
@@ -343,7 +325,7 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
 
         ppExecuteAction :: Identifier -> ClassMember SemanticAnns -> DocStyle
         ppExecuteAction taskCls (ClassField (FieldDefinition portIdentifier (SinkPort dts action)) _) =
-            ppCSwitchCase (ppVariantForAction taskCls action) $
+            ppCSwitchCase (ppVariantForPort taskCls portIdentifier) $
             vsep [
                 emptyDoc,
                 ppTypeSpecifier dts <+> pretty action <::> pretty "msg_data" <> semi,
@@ -351,13 +333,17 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
                 -- | Extract message from the queue
                 pretty "status" <+> pretty "=" <+>
                     ppCFunctionCall (pretty "rtems_message_queue_receive")
-                        [pretty "self." <> pretty portIdentifier,
+                        [pretty "self->" <> pretty portIdentifier,
                          ppCReferenceExpression (pretty action <::> pretty "msg_data"),
                          pretty "RTEMS_NO_WAIT",
                          pretty "RTEMS_NO_TIMEOUT"] <> semi,
                 emptyDoc,
+                ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
+                    (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                emptyDoc,
                 pretty "result" <+> pretty "=" <+>
-                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self"] <> semi,
+                ppCFunctionCall (classFunctionName (pretty classId) (pretty action))
+                    [pretty "self", pretty "msg_data"] <> semi,
                 emptyDoc,
                 ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
                     (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
@@ -366,7 +352,7 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
                 emptyDoc
             ]
         ppExecuteAction taskCls (ClassField (FieldDefinition portIdentifier (InPort dts action)) _) =
-            ppCSwitchCase (ppVariantForAction taskCls action) $
+            ppCSwitchCase (ppVariantForPort taskCls portIdentifier) $
             vsep [
                 emptyDoc,
                 ppTypeSpecifier dts <+> pretty action <::> pretty "msg_data" <> semi,
@@ -374,13 +360,17 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
                 -- | Extract message from the queue
                 pretty "status" <+> pretty "=" <+>
                     ppCFunctionCall (pretty "rtems_message_queue_receive")
-                        [pretty "self." <> pretty portIdentifier,
+                        [pretty "self->" <> pretty portIdentifier,
                          ppCReferenceExpression (pretty action <::> pretty "msg_data"),
                          pretty "RTEMS_NO_WAIT",
                          pretty "RTEMS_NO_TIMEOUT"] <> semi,
                 emptyDoc,
+                ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
+                    (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                emptyDoc,
                 pretty "result" <+> pretty "=" <+>
-                ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self"] <> semi,
+                ppCFunctionCall (classFunctionName (pretty classId) (pretty action))
+                    [pretty "self", pretty "msg_data"] <> semi,
                 emptyDoc,
                 ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
                     (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
@@ -391,11 +381,57 @@ ppTaskClassCode (Class TaskClass classId members _ _) = staticC <+>
         ppExecuteAction _ member = error $ "Invalid class member: " ++ show member
 ppTaskClassCode obj = error $ "Invalid global object (not a task): " ++ show obj
 
+ppInitInterruptEmitterToTask :: RTEMSEmitter -> DocStyle
+ppInitInterruptEmitterToTask (RTEMSInterruptEmitter identifier (RTEMSTask taskId classId _ _ _ ports)) =
+    vsep
+    [
+        emptyDoc,
+        pretty identifier <> pretty ".task_msgq_id" <+> pretty "=" <+> pretty taskId <> pretty ".__task.msgq_id",
+        pretty identifier <> pretty ".sink_msgq_id" <+> pretty "=" <+> pretty taskId <> pretty "." <> pretty port,
+        pretty identifier <> pretty ".task_port" <+> pretty "=" <+> ppVariantForPort classId port <> semi
+    ]
+    where
+        port = case find (\case {
+            RTEMSEventPort _ chid _ _ -> chid == identifier;
+            _ -> False }) ports of
+                Just (RTEMSEventPort prt _ _ _) -> prt
+                _ -> error $ "Invalid port connection for channel: " ++ show identifier
+ppInitInterruptEmitterToTask obj = error $ "Invalid global object (not an interrupt emitter connected to a task): " ++ show obj
+
+ppInitTimerToTask :: RTEMSEmitter -> DocStyle
+ppInitTimerToTask (RTEMSPeriodicTimerEmitter identifier (RTEMSTask taskId classId _ _ _ ports)) =
+    vsep
+    [
+        emptyDoc,
+        pretty identifier <> pretty ".__timer.task_msgq_id" <+> pretty "=" <+> pretty taskId <> pretty ".__task.msgq_id",
+        pretty identifier <> pretty ".__timer.sink_msgq_id" <+> pretty "=" <+> pretty taskId <> pretty "." <> pretty port,
+        pretty identifier <> pretty ".__timer.task_port" <+> pretty "=" <+> ppVariantForPort classId port <> semi
+    ]
+    where
+        port = case find (\case {
+            RTEMSEventPort _ chid _ _ -> chid == identifier;
+            _ -> False }) ports of
+                Just (RTEMSEventPort prt _ _ _) -> prt
+                _ -> error $ "Invalid port connection for channel: " ++ show identifier
+ppInitTimerToTask obj = error $ "Invalid global object (not a timer connected to a task): " ++ show obj
+
+ppInitTask :: RTEMSGlobal -> DocStyle
+ppInitTask (RTEMSTask identifier _ _ _ _ ports) =
+    vsep $ emptyDoc : [ppInputPort p | p <- ports, (\case {
+        RTEMSInputPort {} -> True;
+        _ -> False }) p]
+    where
+        ppInputPort :: RTEMSPort -> DocStyle
+        ppInputPort (RTEMSInputPort portId channelId _ _) =
+            pretty identifier <> pretty "." <> pretty portId <+> pretty "=" <+> pretty channelId <> pretty ".msgq_id" <> semi
+        ppInputPort obj = error $ "Invalid port object: " ++ show obj
+ppInitTask obj = error $ "Invalid global object (not a task): " ++ show obj
+
 ppInitPool :: RTEMSGlobal -> DocStyle
 ppInitPool (RTEMSPool identifier ts _) = vsep
     [
         emptyDoc,
-        pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi,
+        pretty identifier <> pretty ".__resource.lock = __RTEMSResourceLock__None" <> semi,
         emptyDoc,
         pretty "result" <+> pretty "=" <+>
             ppCFunctionCall (namefy $ pretty "termina" <::> pretty "pool_init")
@@ -409,78 +445,82 @@ ppInitPool (RTEMSPool identifier ts _) = vsep
     ]
 ppInitPool obj = error $ "Invalid global object (not a pool): " ++ show obj
 
-ppMsgQueueDeclaration :: RTEMSMsgQueue -> DocStyle
-ppMsgQueueDeclaration (RTEMSChannelMsgQueue identifier _ _ _) =
-    msgQueue <+> pretty identifier <> semi
-ppMsgQueueDeclaration (RTEMSTaskMsgQueue identifier _) =
-    pretty "rtems_id" <+> pretty identifier <> semi
+ppInterruptEmitterDeclaration :: RTEMSEmitter -> DocStyle
+ppInterruptEmitterDeclaration (RTEMSInterruptEmitter identifier (RTEMSTask {})) = namefy (pretty "rtems" <::> pretty "interrupt_emitter_t") <+> pretty identifier <> semi
+ppInterruptEmitterDeclaration obj = error $ "Invalid global object (not an interrupt emitter): " ++ show obj
+
+ppPoolMemoryArea :: RTEMSGlobal -> DocStyle
+ppPoolMemoryArea (RTEMSPool identifier ts size) =
+    staticC <+> ppTypeSpecifier ts <+> poolMemoryArea (pretty identifier) <> brackets (pretty (show size)) <> semi
+ppPoolMemoryArea obj = error $ "Invalid global object (not a pool): " ++ show obj
+
+pRTEMSCreateTimer :: RTEMSEmitter -> DocStyle
+pRTEMSCreateTimer (RTEMSPeriodicTimerEmitter identifier _) = 
+    vsep [
+        emptyDoc,
+        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_timer") [
+            ppCReferenceExpression (pretty identifier <> pretty ".__timer.timer_id")
+        ] <> semi
+    ]
+pRTEMSCreateTimer obj = error $ "Invalid global object (not a timer): " ++ show obj
 
 -- | Prints the code to initialize a message queue. The function is called to generate the code for the
 -- message queues corresponding to the channels declared by the user plus the ones that belong to each
 -- of the tasks that is used to notify the inclusion of a given message on a specific queue.
-ppInitMsgQueue :: RTEMSMsgQueue -> DocStyle
-ppInitMsgQueue (RTEMSChannelMsgQueue identifier ts size (RTEMSTask taskId classId _ _ _ ports)) = vsep
+ppRTEMSCreateMsgQueue :: RTEMSMsgQueue -> DocStyle
+ppRTEMSCreateMsgQueue (RTEMSChannelMsgQueue identifier ts size (RTEMSTask taskId classId _ _ _ ports)) = vsep
     [
         emptyDoc,
-        pretty identifier <> pretty ".__task_msgq" <+> pretty "=" <+> pretty (ppTaskMessageQueue taskId) <> semi,
-        pretty identifier <> pretty ".__task_port" <+> pretty "=" <+> ppVariantForAction classId portId <> semi,
-        pretty identifier <> pretty ".__msgq_size" <+> pretty "=" <+> ppSizeOf ts <> semi,
-        emptyDoc,
-        ppCFunctionCall (pretty "NEXT_RESOURCE_NAME") [
-            pretty "nmsg_queue_name[0]", pretty "nmsg_queue_name[1]",
-            pretty "nmsg_queue_name[2]", pretty "nmsg_queue_name[3]"] <> semi,
-        pretty "r_name" <+> pretty "=" <+>
-            ppCFunctionCall (pretty "rtems_build_name") [
-                pretty "nmsg_queue_name[0]", pretty "nmsg_queue_name[1]",
-                pretty "nmsg_queue_name[2]", pretty "nmsg_queue_name[3]"] <> semi,
+        pretty identifier <> pretty ".task_msgq_id" <+> pretty "=" <+> pretty taskId <> pretty ".__task.msgq_id" <> semi,
+        pretty identifier <> pretty ".task_port" <+> pretty "=" <+> ppVariantForPort classId port <> semi,
+        pretty identifier <> pretty ".message_size" <+> pretty "=" <+> ppSizeOf ts <> semi,
         emptyDoc,
         pretty "status" <+> pretty "=" <+>
-            ppCFunctionCall (pretty "rtems_message_queue_create")
+            ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_msg_queue")
                 [
-                    -- | name
-                    pretty "r_name",
                     -- | numer of mesaages
                     pretty (show size),
                     -- | size of the messages
                     ppSizeOf ts,
-                    -- | attributes
-                    pretty "RTEMS_FIFO",
                     -- | queue id
-                    ppCReferenceExpression (pretty identifier) <> pretty ".__msgq_id"] <> semi,
+                    ppCReferenceExpression (pretty identifier) <> pretty ".msgq_id"] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
             (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
     ]
-    where 
-        portId = case find (\case {
+    where
+        port = case find (\case {
             RTEMSInputPort _ chid _ _ -> chid == identifier;
             _ -> False }) ports of
-                Just (RTEMSInputPort pid _ _ _) -> pid
+                Just (RTEMSInputPort prt _ _ _) -> prt
                 _ -> error $ "Invalid port connection for channel: " ++ show identifier
-ppInitMsgQueue obj@(RTEMSChannelMsgQueue {}) = error $ "Invalid channel objet: " ++ show obj
-ppInitMsgQueue (RTEMSTaskMsgQueue identifier size) = vsep
+ppRTEMSCreateMsgQueue obj@(RTEMSChannelMsgQueue {}) = error $ "Invalid channel objet: " ++ show obj
+ppRTEMSCreateMsgQueue (RTEMSTaskMsgQueue identifier size) = vsep
     [
         emptyDoc,
-        ppCFunctionCall (pretty "NEXT_RESOURCE_NAME") [
-            pretty "nmsg_queue_name[0]", pretty "nmsg_queue_name[1]",
-            pretty "nmsg_queue_name[2]", pretty "nmsg_queue_name[3]"] <> semi,
-        pretty "r_name" <+> pretty "=" <+>
-            ppCFunctionCall (pretty "rtems_build_name") [
-                pretty "nmsg_queue_name[0]", pretty "nmsg_queue_name[1]",
-                pretty "nmsg_queue_name[2]", pretty "nmsg_queue_name[3]"] <> semi,
-        emptyDoc,
-        ppCFunctionCall (pretty "rtems_message_queue_create")
+        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_msg_queue")
             [
-                -- | name
-                pretty "r_name",
                 -- | numer of mesaages
                 pretty (show size),
                 -- | size of the messages
                 ppSizeOf UInt32,
-                -- | attributes
-                pretty "RTEMS_FIFO",
                 -- | queue id
-                ppCReferenceExpression (pretty identifier)] <> semi,
+                ppCReferenceExpression (pretty identifier <> pretty ".__task.msgq_id")] <> semi,
+        emptyDoc,
+        ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
+            (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+    ]
+ppRTEMSCreateMsgQueue (RTEMSSinkPortMsgQueue taskId portId ts size) = vsep
+    [
+        emptyDoc,
+        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_msg_queue")
+            [
+                -- | numer of mesaages
+                pretty (show size),
+                -- | size of the messages
+                ppSizeOf ts,
+                -- | queue id
+                ppCReferenceExpression (pretty taskId <> pretty "." <> pretty portId)] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
             (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
@@ -488,35 +528,28 @@ ppInitMsgQueue (RTEMSTaskMsgQueue identifier size) = vsep
 
 ppInitResource :: RTEMSGlobal -> DocStyle
 ppInitResource (RTEMSResource identifier _ _) =
-    pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi
+    pretty identifier <> pretty ".__resource.lock = __RTEMSResourceLock__None" <> semi
 ppInitResource obj = error $ "Invalid global object (not a resource): " ++ show obj
 
-ppInitTask :: RTEMSGlobal -> DocStyle
-ppInitTask (RTEMSTask identifier _ _ _ _ ports) = vsep $
-    emptyDoc : [pretty identifier <> pretty "." <> pretty portId
-               <+> pretty "=" <+> ppCReferenceExpression (pretty channel) <> semi |
-       (RTEMSOutputPort portId channel) <- ports]
-ppInitTask obj = error $ "Invalid global object (not a task): " ++ show obj
-
-ppInitHandler :: RTEMSGlobal -> DocStyle
-ppInitHandler (RTEMSHandler identifier _ _ _ ports) = vsep $
-    emptyDoc : [pretty identifier <> pretty "." <> pretty portId
-               <+> pretty "=" <+> ppCReferenceExpression (pretty channel) <> semi |
-       (RTEMSOutputPort portId channel) <- ports]
-ppInitHandler obj = error $ "Invalid global object (not a task): " ++ show obj
-
-ppRTEMSTaskCreate :: RTEMSGlobal -> DocStyle
-ppRTEMSTaskCreate (RTEMSTask identifier _ _ _ _ _) = vsep
+ppRTEMSCreateTask :: RTEMSGlobal -> DocStyle
+ppRTEMSCreateTask (RTEMSTask identifier classId _ priority stackSize _) = 
+    vsep
     [
-        pretty "result" <+> pretty "=" <+>
-            ppCFunctionCall (namefy $ pretty "termina" <::> pretty "task_create")
-                [ppCReferenceExpression (pretty identifier <> pretty ".__task_id")] <> semi,
         emptyDoc,
-        ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-            (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
-        emptyDoc
+        pretty "status" <+> pretty "=" <+>
+            ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "task_create")
+                [
+                    ppCReferenceExpression (pretty identifier <> pretty ".__task.task_id"),
+                    pretty (show priority),
+                    pretty (show stackSize),
+                    namefy (pretty "rtems_task") <::> pretty classId,
+                    ppCReferenceExpression (pretty identifier)
+                ] <> semi,
+        emptyDoc,
+        ppCIfBlock (pretty "RTEMS_SUCCESSFUL" <+> pretty "!=" <+> pretty "status")
+            (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
     ]
-ppRTEMSTaskCreate obj = error $ "Invalid global object (not a task): " ++ show obj
+ppRTEMSCreateTask obj = error $ "Invalid global object (not a task): " ++ show obj
 
 emitterToVectorMap :: M.Map Identifier Integer
 emitterToVectorMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
@@ -537,32 +570,37 @@ ppRTEMSEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId
                         ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self", pretty (emitterToVectorMap M.! interrupt)] <> semi,
                     emptyDoc,
                     ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
-                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    returnC <> semi
                 ]
             ) <> line
         ) <> line
-ppRTEMSEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask identifier _ _ _ _ ports)) =
-    let portIdentifier =
-            case fromJust $ find (\case { RTEMSEventPort _ emitter _ _ -> interrupt == emitter; _ -> False }) ports of
-                RTEMSEventPort portId _ _ _ -> portId
-                _ -> error $ "Invalid port connection for interrupt: " ++ show interrupt
-    in
+ppRTEMSEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) =
     ppCFunctionPrototype (namefy (pretty "rtems_isr") <::> pretty interrupt) [pretty "void * ignored"] Nothing <+>
         braces' (line <>
             (indentTab . align $
                 vsep [
-                    pretty "rtems_status_code status" <> semi,
+                    pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi,
                     emptyDoc,
                     pretty "status" <+> pretty "=" <+>
-                        ppCFunctionCall (pretty "rtems_message_queue_send") [pretty identifier <> pretty "." <> pretty portIdentifier] <> semi,
+                        ppCFunctionCall (pretty "rtems_message_queue_send") [
+                            pretty interrupt <> pretty ".sink_msgq_id",
+                            ppCReferenceExpression (pretty interrupt <> pretty ".task_port"),
+                            ppSizeOf UInt32] <> semi,
                     emptyDoc,
-                    ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCESSFUL")
-                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
+                    ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "==" <+> pretty "status")
+                        (pretty "status" <+> pretty "=" <+>
+                            ppCFunctionCall (pretty "rtems_message_queue_send") [pretty interrupt <> pretty "." <> pretty "task_msgq_id"] <> semi
+                        ),
+                    emptyDoc,
+                    ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
+                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    returnC <> semi
                 ]
             ) <> line
         ) <> line
 ppRTEMSEmitter (RTEMSInterruptEmitter _ glb) = error $ "Invalid connection for interrupt: " ++ show glb
-ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer tvsec tvusec (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) =
+ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) =
     ppCFunctionPrototype (namefy (pretty "rtems_periodic_timer") <::> pretty timer) [pretty "void * _ingnored"] Nothing <+>
         braces' (line <>
             (indentTab . align $
@@ -582,30 +620,55 @@ ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer tvsec tvusec (RTEMSHandler ident
                 ]
             ) <> line
         ) <> line
-ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer tvsec tvusec (RTEMSTask identifier _ _ _ _ ports)) =
-    let portIdentifier =
-            case fromJust $ find (\case { RTEMSEventPort _ emitter _ _ -> timer == emitter; _ -> False }) ports of
-                RTEMSEventPort portId _ _ _ -> portId
-                _ -> error $ "Invalid port connection for interrupt: " ++ show timer
-    in
+ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) =
     ppCFunctionPrototype (namefy (pretty "rtems_periodic_timer") <::> pretty timer) [pretty "void * _ingnored"] Nothing <+>
         braces' (line <>
             (indentTab . align $
                 vsep [
-                    pretty "rtems_status_code status" <> semi,
+                    pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi,
                     emptyDoc,
                     pretty "status" <+> pretty "=" <+>
-                        ppCFunctionCall (pretty "rtems_message_queue_send") [pretty identifier <> pretty "." <> pretty portIdentifier] <> semi,
+                        ppCFunctionCall (pretty "rtems_message_queue_send") [
+                            pretty timer <> pretty ".__timer.sink_msgq_id",
+                            ppCReferenceExpression (pretty timer <> pretty ".__timer.current"),
+                            ppSizeOf (DefinedType "TimeVal")
+                        ] <> semi,
                     emptyDoc,
-                    ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCESSFUL")
-                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
-                            -- TODO: Arm the next timer
+                    ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "==" <+> pretty "status")
+                        (pretty "status" <+> pretty "=" <+>
+                            ppCFunctionCall (pretty "rtems_message_queue_send") [
+                                pretty timer <> pretty "." <> pretty ".__timer.task_msg_id",
+                                ppCReferenceExpression (pretty timer <> pretty "." <> pretty ".__timer.task_port"),
+                                ppSizeOf UInt32
+                            ] <> semi
+                        ),
+                    -- | If we were able to send both messages, we need to arm the next timer
+                    ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "==" <+> pretty "status")
+                        (vsep
+                            [
+                                ppCFunctionCall (namefy $ pretty "termina" <::> pretty "add_timeval") [
+                                        ppCReferenceExpression (pretty timer <> pretty ".__timer.current"),
+                                        ppCReferenceExpression (pretty timer <> pretty ".period")
+                                    ] <> semi,
+                                emptyDoc,
+                                pretty "status" <+> pretty "=" <+>
+                                    ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "timer_delay_at") [
+                                        pretty timer <> pretty ".__timer.timer_id",
+                                        ppCReferenceExpression (pretty timer <> pretty ".__timer.current")
+                                    ] <> semi
+                            ]
+                        ),
+                    emptyDoc,
+                    ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
+                        (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    returnC <> semi
                 ]
             ) <> line
         ) <> line
-ppRTEMSEmitter (RTEMSPeriodicTimerEmitter _ _ _ glb) = error $ "Invalid connection for timer: " ++ show glb
+ppRTEMSEmitter (RTEMSPeriodicTimerEmitter _ glb) = error $ "Invalid connection for timer: " ++ show glb
 ppRTEMSEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) =
-    ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "inital_event") [] Nothing <+>
+    ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "inital_event") 
+        [ppTypeSpecifier (DefinedType "TimeVal") <+> pretty "*" <+> pretty "current"] Nothing <+>
         braces' (line <>
             (indentTab . align $
                 vsep [
@@ -616,7 +679,7 @@ ppRTEMSEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTE
                     pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi,
                     emptyDoc,
                     pretty "result" <+> pretty "=" <+>
-                        ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self"] <> semi,
+                        ppCFunctionCall (classFunctionName (pretty classId) (pretty action)) [pretty "self", ppCDereferenceExpression (pretty "current")] <> semi,
                     emptyDoc,
                     ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
                         (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
@@ -649,17 +712,41 @@ ppRTEMSEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _
         ) <> line
 ppRTEMSEmitter (RTEMSSystemInitEmitter _ glb) = error $ "Invalid connection for initial event: " ++ show glb
 
+ppRTEMSInstallEmitter :: RTEMSEmitter -> DocStyle
+ppRTEMSInstallEmitter (RTEMSInterruptEmitter interrupt _) = 
+    vsep [
+        emptyDoc,
+        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "install_isr") [
+            pretty (emitterToVectorMap M.! interrupt),
+        namefy $ pretty "rtems_isr" <::> pretty interrupt] <> semi
+    ]
+ppRTEMSInstallEmitter (RTEMSPeriodicTimerEmitter timer _) = vsep
+    [
+        emptyDoc,
+        pretty timer <> pretty ".__timer.current" <+> pretty "=" <+> ppCDereferenceExpression (pretty "current") <> semi,
+        ppCFunctionCall (namefy $ pretty "termina" <::> pretty "add_timeval") [
+            ppCReferenceExpression (pretty timer <> pretty ".__timer.current"),
+            ppCReferenceExpression (pretty timer <> pretty ".period")
+        ] <> semi,        
+        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "timer_delay_at") [
+            ppCReferenceExpression (pretty timer <> pretty ".__timer.timer_id"),
+            pretty timer <> pretty ".period.tv_sec",
+            pretty timer <> pretty ".period.tv_usec",
+            namefy $ pretty "rtems_periodic_timer" <::> pretty timer] <> semi
+    ]
+ppRTEMSInstallEmitter (RTEMSSystemInitEmitter {}) = error "Initial event does not have to be installed"
+
 ppInitResourceProt :: Identifier -> RTEMSResourceLock -> DocStyle
-ppInitResourceProt identifier RTEMSResourceLockNone = vsep $ emptyDoc : [pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__None" <> semi]
-ppInitResourceProt identifier RTEMSResourceLockIrq = vsep $ emptyDoc : [pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__Irq" <> semi]
+ppInitResourceProt identifier RTEMSResourceLockNone = vsep $ emptyDoc : [pretty identifier <> pretty ".__resource.lock = __RTEMSResourceLock__None" <> semi]
+ppInitResourceProt identifier RTEMSResourceLockIrq = vsep $ emptyDoc : [pretty identifier <> pretty ".__resource.lock = __RTEMSResourceLock__Irq" <> semi]
 ppInitResourceProt identifier (RTEMSResourceLockMutex ceilPrio) = vsep
     [
         emptyDoc,
-        pretty identifier <> pretty ".__resource_id.lock = __RTEMSResourceLock__Mutex" <> semi,
-        pretty identifier <> pretty ".__resource_id.mutex.policy = __RTEMSMutexPolicy__Ceiling" <> semi,
-        pretty identifier <> pretty ".__resource_id.mutex.prio_ceiling = " <> pretty (show ceilPrio) <> semi,
+        pretty identifier <> pretty ".__resource.lock = __RTEMSResourceLock__Mutex" <> semi,
+        pretty identifier <> pretty ".__resource.mutex.policy = __RTEMSMutexPolicy__Ceiling" <> semi,
+        pretty identifier <> pretty ".__resource.mutex.prio_ceiling = " <> pretty (show ceilPrio) <> semi,
         emptyDoc,
-        pretty "Result" <+> pretty "result.__variant" <+> pretty "=" <+> ppCFunctionCall (namefy $ pretty "termina" <::> pretty "resource_init") [ppCReferenceExpression (pretty identifier <> pretty ".__resource_id")] <> semi,
+        pretty "Result" <+> pretty "result.__variant" <+> pretty "=" <+> ppCFunctionCall (namefy $ pretty "termina" <::> pretty "resource_init") [ppCReferenceExpression (pretty identifier <> pretty ".__resource")] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok") (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])
     ]
@@ -676,23 +763,9 @@ ppMainFile prjprogs =
     [
         externC <+> ppCFunctionPrototype (namefy $ pretty "termina_app" <::> pretty "init_globals") [] Nothing <> semi
     ] ++
-    map ppVariantsForTaskActions (M.elems taskClss) ++
-    -- | These arrays are used to store the names of the tasks, handlers and message queues
-    
-    -- | These arrays are used to store the names of the tasks, handlers and message queues
-    [
-        emptyDoc,
-        ppTypeSpecifier Int8 <+> pretty "ntask_name[5] = \"0000\"" <> semi,
-        ppTypeSpecifier Int8 <+> pretty "nsem_name[5] = \"0000\"" <> semi,
-        ppTypeSpecifier Int8 <+> pretty "nmsgq_name[5] = \"0000\"" <> semi,
-        ppTypeSpecifier Int8 <+> pretty "ntimers_name[5] = \"0000\"" <> semi,
-        emptyDoc
-    ] ++
-    -- | Print the structures corresponding to the declared channels
-    
-    -- | Print the structures corresponding to the declared channels
-    map ppMsgQueueDeclaration msgQueues ++
-    [emptyDoc] ++
+    map ppVariantsForTaskPorts (M.elems taskClss) ++ [emptyDoc] ++
+    map ppPoolMemoryArea pools ++
+    map ppInterruptEmitterDeclaration interruptEmittersToTasks ++
     map ppTaskClassCode (M.elems taskClss) ++
     map ppRTEMSEmitter emitters ++
     [
@@ -704,14 +777,14 @@ ppMainFile prjprogs =
             indentTab . align $
                 vsep (
                     map (uncurry ppInitResourceProt) (M.toList resLockingMap)
-                ) <> line
+                            ) <> line
         ),
         emptyDoc,
         -- | Function __rtems_app__init_resources. This function is called from the Init task.
         -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
         -- the protection of the global resources, since it is not needed when running in the Init task. It also
         -- executes the init() method of the resources if defined.
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] Nothing <+>
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_globals") [] Nothing <+>
         braces' (
             (indentTab . align $
                 vsep $
@@ -723,29 +796,41 @@ ppMainFile prjprogs =
                         pretty "result.__variant" <+> pretty "=" <+> pretty "Result" <::> pretty "Ok" <> semi
                     ] else []) ++
                 (if not (null resources) then emptyDoc : map ppInitResource resources else [])
-                ++ (if not (null pools) then map ppInitPool pools else [])
+                ++ map ppInitPool pools
                 ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) then
                     [
                         emptyDoc,
-                        pretty "rtems_status_code status" <> semi
+                        pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi
                     ] else [])
                 -- | Initialize the message queues of the tasks. We need to do this before initializing the
                 -- channels so that the identifiers of the task message queues are already available.
-                ++ (if not (null tasksMessageQueues) then map ppInitMsgQueue tasksMessageQueues else [])
-                ++ (if not (null channelMessageQueues) then map ppInitMsgQueue channelMessageQueues else [])
+                ++ map ppRTEMSCreateMsgQueue tasksMessageQueues
+                ++ map ppRTEMSCreateMsgQueue channelMessageQueues
+                ++ map ppInitInterruptEmitterToTask interruptEmittersToTasks
+                ++ map ppInitTimerToTask timersToTasks
+                ++ map ppInitTask tasks
+                ++ map pRTEMSCreateTimer timers
             ) <> line
         ),
         emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] Nothing <+>
+        -- | Function __rtems_app__install_emitters. This function is called from the Init task.
+        -- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
+        -- of the tasks and handlers.
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "install_emitters") [
+            ppTypeSpecifier (DefinedType "TimeVal") <+> pretty "*" <+> pretty "current"
+        ] Nothing <+>
         braces' (
-            indentTab . align $
-                vsep $ map ppInitTask tasks
+            indentTab . align . vsep $ [
+                emptyDoc,
+                pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi
+            ] ++             
+                -- | Install only the ISRs and the periodic timers. The initial event does not have to be installed.
+            [ppRTEMSInstallEmitter e | e <- emitters, (\case { RTEMSSystemInitEmitter {} -> False; _ -> True }) e]
         ),
         emptyDoc,
-        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] Nothing <+>
+        staticC <+> ppCFunctionPrototype (namefy $ pretty "rtems_app" <::> pretty "create_tasks") [] Nothing <+>
         braces' (
-            indentTab . align $
-                vsep $ map ppInitHandler handlers        
+            (indentTab . align . vsep $ map ppRTEMSCreateTask tasks) <> line
         ),
         emptyDoc,
         -- | RTEMS Init task
@@ -755,18 +840,32 @@ ppMainFile prjprogs =
                 vsep $
                 [
                     emptyDoc,
+                    pretty "TimeVal current" <> semi,
+                    emptyDoc,
+                    ppCFunctionCall (namefy $ pretty "termina" <::> pretty "clock_get_uptime") [
+                        ppCReferenceExpression (pretty "current")] <> semi,
+                    emptyDoc,
                     ppCFunctionCall (namefy $ pretty "termina_app" <::> pretty "init_globals") [] <> semi,
-                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_resources") [] <> semi,
-                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_tasks") [] <> semi,
-                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_handlers") [] <> semi,
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "init_globals") [] <> semi,
                     emptyDoc
                 ] ++
                     -- Execute initialization action in case there is one
                     (case find (\case { RTEMSSystemInitEmitter {} -> True; _ -> False }) emitters of
-                        Just (RTEMSSystemInitEmitter {}) -> [ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "inital_event") [] <> semi, emptyDoc]
-                        _ -> [])
-                ++ [
+                        Just (RTEMSSystemInitEmitter {}) -> [ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "inital_event")
+                            [
+                                ppCReferenceExpression (pretty "current")
+                            ] <> semi, emptyDoc]
+                        _ -> []) ++
+                [
                     ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "enable_protection") [] <> semi,
+                    emptyDoc,
+                    -- | Install the emitters
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "install_emitters") [
+                        ppCReferenceExpression (pretty "current")
+                    ] <> semi,
+                    emptyDoc,
+                    -- | Create the tasks
+                    ppCFunctionCall (namefy $ pretty "rtems_app" <::> pretty "create_tasks") [] <> semi,
                     emptyDoc,
                     ppCFunctionCall (pretty "rtems_task_delete") [pretty "RTEMS_SELF"] <> semi
                 ]
@@ -775,7 +874,9 @@ ppMainFile prjprogs =
         emptyDoc,
         -- | RTEMS application configuration
         pretty "#define CONFIGURE_MAXIMUM_TASKS" <+> parens (pretty (show (length tasks + 1))),
-        pretty "#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES" <+> parens (pretty (show (length msgQueues)))
+        pretty "#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES" <+> parens (pretty (show (length msgQueues))),
+        pretty "#define CONFIGURE_MAXIMUM_TIMERS" <+> parens (pretty (show (length timers))),
+        emptyDoc
     ] ++
     (if not (null msgQueues) then
         [
@@ -829,7 +930,6 @@ ppMainFile prjprogs =
             ) M.empty rtemsGlbs
 
         tasks = [t | t@(RTEMSTask {}) <- rtemsGlbs]
-        handlers = [h | h@(RTEMSHandler {}) <- rtemsGlbs]
         pools = [p | p@(RTEMSPool {}) <- rtemsGlbs]
         resources = [r | r@(RTEMSResource {}) <- rtemsGlbs]
 
@@ -845,16 +945,22 @@ ppMainFile prjprogs =
                         _ -> accMap
                 ) M.empty rtemsGlbs
 
-        tasksMessageQueues =
-            map (\case {
-                    (RTEMSTask identifier _ _ _ _ _) ->  RTEMSTaskMsgQueue (ppTaskMessageQueue identifier) 1;
-                    _ -> error "Invalid global object (not a task)"}) tasks
+        tasksMessageQueues = foldr (\glb acc ->
+                case glb of
+                    RTEMSTask identifier _ _ _ _ ports -> RTEMSTaskMsgQueue identifier 1 : 
+                        foldr (\port acc' ->
+                            case port of
+                                RTEMSEventPort portId _ ts _ -> RTEMSSinkPortMsgQueue identifier portId ts 1 : acc'
+                                _ -> acc'
+                        ) acc ports
+                    _ -> acc
+            ) [] tasks
 
         channelMessageQueues = concatMap (\(_, _, objs) ->
             map (\case {
                     (Channel identifier (MsgQueue ts (K size)) _ _ _) ->
                         case M.lookup identifier targetChannelConnections of
-                            Just task@(RTEMSTask {}) -> 
+                            Just task@(RTEMSTask {}) ->
                                 RTEMSChannelMsgQueue identifier ts size task
                             _ -> error $ "channel not connected: " ++ show identifier
                         ;
@@ -873,6 +979,13 @@ ppMainFile prjprogs =
                 pretty "    ) \\"
             ]
         ppMessagesForQueue (RTEMSChannelMsgQueue _ ts size _) =
+            vsep [
+                pretty "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( \\",
+                pretty "        " <> pretty size <> pretty ", \\",
+                pretty "        " <> ppSizeOf ts <> pretty " \\",
+                pretty "    ) \\"
+            ]
+        ppMessagesForQueue (RTEMSSinkPortMsgQueue _ _ ts size) =
             vsep [
                 pretty "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( \\",
                 pretty "        " <> pretty size <> pretty ", \\",
@@ -920,7 +1033,7 @@ ppMainFile prjprogs =
 
         emitters = foldr (\e acc -> case e of
             Just emitter -> emitter : acc
-            Nothing -> acc) [] $ concatMap (\(_, _, objs) -> 
+            Nothing -> acc) [] $ concatMap (\(_, _, objs) ->
                 map (`buildRTEMSEmitter` emitterConnectionsMap) $ objs
                 -- Manually add the missing global objects:
                 ++ [
@@ -928,6 +1041,10 @@ ppMainFile prjprogs =
                         Emitter "system_init" (DefinedType "SystemInit") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "SystemInit"))))
                     ]
                 ) glbs
+        
+        timers = [t | t <- emitters, case t of { RTEMSPeriodicTimerEmitter {} -> True; _ -> False }]
+        interruptEmittersToTasks = [e | e <- emitters, case e of { RTEMSInterruptEmitter _ (RTEMSTask{}) -> True; _ -> False }]
+        timersToTasks = [e | e <- emitters, case e of { RTEMSPeriodicTimerEmitter _ (RTEMSTask{}) -> True; _ -> False }]
 
         -- | Map between the resources and the locking mechanism that must be used
         resLockingMap = getResLocking . S.elems <$> dependenciesMap

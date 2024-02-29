@@ -32,6 +32,8 @@ ppHeaderASTElement opts (TypeDefinition t _) = Just (ppTypeDefDeclaration opts t
 ppHeaderASTElement _ (GlobalDeclaration obj@(Resource {})) = Just (ppGlobalDeclaration obj)
 ppHeaderASTElement _ (GlobalDeclaration obj@(Task {})) = Just (ppGlobalDeclaration obj)
 ppHeaderASTElement _ (GlobalDeclaration obj@(Handler {})) = Just (ppGlobalDeclaration obj)
+ppHeaderASTElement _ (GlobalDeclaration obj@(Channel {})) = Just (ppGlobalDeclaration obj)
+ppHeaderASTElement _ (GlobalDeclaration obj@(Emitter _ (DefinedType "PeriodicTimer") _ _ _)) = Just (ppGlobalDeclaration obj)
 ppHeaderASTElement _ func@(Function {}) = Just (ppFunctionDeclaration func)
 ppHeaderASTElement _ _ = Nothing
 
@@ -42,6 +44,8 @@ ppSourceASTElement (TypeDefinition cls@(Class {}) _) = Just (ppClassDefinition c
 ppSourceASTElement (GlobalDeclaration obj@(Resource {})) = Just (ppGlobalDefinition obj)
 ppSourceASTElement (GlobalDeclaration obj@(Task {})) = Just (ppGlobalDefinition obj)
 ppSourceASTElement (GlobalDeclaration obj@(Handler {})) = Just (ppGlobalDefinition obj)
+ppSourceASTElement (GlobalDeclaration obj@(Channel {})) = Just (ppGlobalDefinition obj)
+ppSourceASTElement (GlobalDeclaration obj@(Emitter _ (DefinedType "PeriodicTimer") _ _ _)) = Just (ppGlobalDefinition obj)
 ppSourceASTElement func@(Function {}) = Just (ppFunction func)
 ppSourceASTElement _ = Nothing
 

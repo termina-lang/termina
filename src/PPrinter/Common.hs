@@ -157,33 +157,35 @@ attribute :: DocStyle
 attribute = pretty "__attribute__"
 
 -- | Termina's pretty builtin types
-pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, handlerID, allocator :: DocStyle
-pool = namefy $ pretty "termina_pool_t"
-msgQueue = namefy $ pretty "termina_msg_queue_t"
-optionDyn = namefy $ pretty "option_dyn_t"
-dynamicStruct = namefy $ pretty "termina_dyn_t"
-taskID = namefy $ pretty "termina_task_t"
-resourceID = namefy $ pretty "termina_resource_t"
-handlerID = namefy $ pretty "termina_handler_t"
-allocator = namefy $ pretty "termina_allocator_t"
+pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, periodicTimer, sinkPort, inPort, outPort :: DocStyle
+pool = namefy $ pretty "termina" <::> pretty "pool_t"
+msgQueue = namefy $ pretty "termina" <::> pretty "msg_queue_t"
+optionDyn = namefy $ pretty "option" <::> pretty "dyn_t"
+dynamicStruct = namefy $ pretty "termina" <::> pretty "dyn_t"
+taskID = namefy $ pretty "termina" <::> pretty "task_t"
+resourceID = namefy $ pretty "termina" <::> pretty "resource_t"
+periodicTimer = pretty "PeriodicTimer"
+sinkPort = namefy $ pretty "termina" <::> pretty "sink_port_t"
+inPort = namefy $ pretty "termina" <::> pretty "in_port_t"
+outPort = namefy $ pretty "termina" <::> pretty "out_port_t"
 
 ppDimensionOptionTS :: TypeSpecifier -> DocStyle
-ppDimensionOptionTS (Vector ts (K size)) = pretty "__" <> (pretty size) <> ppDimensionOptionTS ts
+ppDimensionOptionTS (Vector ts (K size)) = pretty "__" <> pretty size <> ppDimensionOptionTS ts
 ppDimensionOptionTS _ = emptyDoc
 
 ppOptionSomeParameterStructName :: TypeSpecifier -> DocStyle
-ppOptionSomeParameterStructName Bool = namefy $ pretty "option_" <> pretty "bool_params_t"
-ppOptionSomeParameterStructName Char = namefy $ pretty "option_" <> pretty "char_params_t"
-ppOptionSomeParameterStructName UInt8 = namefy $ pretty "option_" <> pretty "uint8_params_t"
-ppOptionSomeParameterStructName UInt16 = namefy $ pretty "option_" <> pretty "uint16_params_t"
-ppOptionSomeParameterStructName UInt32 = namefy $ pretty "option_" <> pretty "uint32_params_t"
-ppOptionSomeParameterStructName UInt64 = namefy $ pretty "option_" <> pretty "uint64_params_t"
-ppOptionSomeParameterStructName Int8 = namefy $ pretty "option_" <> pretty "int8_params_t"
-ppOptionSomeParameterStructName Int16 = namefy $ pretty "option_" <> pretty "int16_params_t"
-ppOptionSomeParameterStructName Int32 = namefy $ pretty "option_" <> pretty "int32_params_t"
-ppOptionSomeParameterStructName Int64 = namefy $ pretty "option_" <> pretty "int64_params_t"
+ppOptionSomeParameterStructName Bool = namefy $ pretty "option" <::> pretty "bool_params_t"
+ppOptionSomeParameterStructName Char = namefy $ pretty "option" <::> pretty "char_params_t"
+ppOptionSomeParameterStructName UInt8 = namefy $ pretty "option" <::> pretty "uint8_params_t"
+ppOptionSomeParameterStructName UInt16 = namefy $ pretty "option" <::> pretty "uint16_params_t"
+ppOptionSomeParameterStructName UInt32 = namefy $ pretty "option" <::> pretty "uint32_params_t"
+ppOptionSomeParameterStructName UInt64 = namefy $ pretty "option" <::> pretty "uint64_params_t"
+ppOptionSomeParameterStructName Int8 = namefy $ pretty "option" <::> pretty "int8_params_t"
+ppOptionSomeParameterStructName Int16 = namefy $ pretty "option" <::> pretty "int16_params_t"
+ppOptionSomeParameterStructName Int32 = namefy $ pretty "option" <::> pretty "int32_params_t"
+ppOptionSomeParameterStructName Int64 = namefy $ pretty "option" <::> pretty "int64_params_t"
 ppOptionSomeParameterStructName ts@(Option _) = error $ "invalid recursive option type: " ++ show ts
-ppOptionSomeParameterStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_params_t"
+ppOptionSomeParameterStructName ts = namefy $ pretty "option" <::> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_params_t"
   where
     ppTypeSpecifier' UInt8 = pretty "uint8"
     ppTypeSpecifier' UInt16 = pretty "uint16"
@@ -216,18 +218,18 @@ ppOptionStruct ts =
 
 -- | Pretty prints the name of the option type
 ppOptionStructName :: TypeSpecifier -> DocStyle
-ppOptionStructName Bool = namefy $ pretty "option_" <> pretty "bool_t"
-ppOptionStructName Char = namefy $ pretty "option_" <> pretty "char_t"
-ppOptionStructName UInt8 = namefy $ pretty "option_" <> ppTypeSpecifier UInt8
-ppOptionStructName UInt16 = namefy $ pretty "option_" <> ppTypeSpecifier UInt16
-ppOptionStructName UInt32 = namefy $ pretty "option_" <> ppTypeSpecifier UInt32
-ppOptionStructName UInt64 = namefy $ pretty "option_" <> ppTypeSpecifier UInt64
-ppOptionStructName Int8 = namefy $ pretty "option_" <> ppTypeSpecifier Int8
-ppOptionStructName Int16 = namefy $ pretty "option_" <> ppTypeSpecifier Int16
-ppOptionStructName Int32 = namefy $ pretty "option_" <> ppTypeSpecifier Int32
-ppOptionStructName Int64 = namefy $ pretty "option_" <> ppTypeSpecifier Int64
+ppOptionStructName Bool = namefy $ pretty "option" <::> pretty "bool_t"
+ppOptionStructName Char = namefy $ pretty "option" <::> pretty "char_t"
+ppOptionStructName UInt8 = namefy $ pretty "option" <::> ppTypeSpecifier UInt8
+ppOptionStructName UInt16 = namefy $ pretty "option" <::> ppTypeSpecifier UInt16
+ppOptionStructName UInt32 = namefy $ pretty "option" <::> ppTypeSpecifier UInt32
+ppOptionStructName UInt64 = namefy $ pretty "option" <::> ppTypeSpecifier UInt64
+ppOptionStructName Int8 = namefy $ pretty "option" <::> ppTypeSpecifier Int8
+ppOptionStructName Int16 = namefy $ pretty "option" <::> ppTypeSpecifier Int16
+ppOptionStructName Int32 = namefy $ pretty "option" <::> ppTypeSpecifier Int32
+ppOptionStructName Int64 = namefy $ pretty "option" <::> ppTypeSpecifier Int64
 ppOptionStructName ts@(Option _) = error $ "invalid recursive option type: " ++ show ts
-ppOptionStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_t"
+ppOptionStructName ts = namefy $ pretty "option" <::> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_t"
   where
     ppTypeSpecifier' UInt8 = pretty "uint8"
     ppTypeSpecifier' UInt16 = pretty "uint16"
@@ -242,10 +244,9 @@ ppOptionStructName ts = namefy $ pretty "option_" <> ppTypeSpecifier' ts <> ppDi
     ppTypeSpecifier' ts' = error $ "invalid option type specifier :" ++ show ts'
 
 -- | Pretty prints the ID field of the resource, task and handler classes
-ppResourceClassIDField, ppTaskClassIDField, ppHandlerClassIDField :: DocStyle
-ppResourceClassIDField = pretty "__resource_id"
-ppTaskClassIDField = pretty "__task_id"
-ppHandlerClassIDField = pretty "__handler_id"
+ppResourceClassIDField, ppTaskClassIDField :: DocStyle
+ppResourceClassIDField = pretty "__resource"
+ppTaskClassIDField = pretty "__task"
 
 ppInterfaceThatField :: DocStyle
 ppInterfaceThatField = pretty "__that"
@@ -301,8 +302,11 @@ ppTypeSpecifier (Pool _ _)                   = pool
 ppTypeSpecifier (MsgQueue _ _)               = msgQueue
 ppTypeSpecifier (Location ts)                = volatileC <+> ppTypeSpecifier ts <+> pretty "*"
 ppTypeSpecifier (AccessPort ts)              = ppTypeSpecifier ts
-ppTypeSpecifier (Allocator _)                = allocator
-ppTypeSpecifier (OutPort {})                 = msgQueue
+ppTypeSpecifier (Allocator _)                = pool <+> pretty "*"
+-- | Type of the ports
+ppTypeSpecifier (SinkPort {})                = sinkPort
+ppTypeSpecifier (OutPort {})                 = outPort
+ppTypeSpecifier (InPort {})                  = inPort
 ppTypeSpecifier t                            = error $ "unsupported type: " ++ show t
 
 ppDimension :: TypeSpecifier -> DocStyle
@@ -390,16 +394,16 @@ classFunctionName :: DocStyle -> DocStyle -> DocStyle
 classFunctionName = (<::>)
 
 poolMethodName :: Identifier -> DocStyle
-poolMethodName mName = classFunctionName (namefy $ pretty "termina_pool") (pretty mName)
+poolMethodName mName = classFunctionName (namefy $ pretty "termina" <::> pretty "pool") (pretty mName)
 
 msgQueueMethodName :: Identifier -> DocStyle
-msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina_msg_queue") (pretty mName)
+msgQueueMethodName mName = classFunctionName (namefy $ pretty "termina" <::> pretty "msg_queue") (pretty mName)
 
 resourceLock :: DocStyle
-resourceLock = classFunctionName (namefy $ pretty "termina_resource") (pretty "lock")
+resourceLock = classFunctionName (namefy $ pretty "termina" <::> pretty "resource") (pretty "lock")
 
 resourceUnlock :: DocStyle
-resourceUnlock = classFunctionName (namefy $ pretty "termina_resource") (pretty "unlock")
+resourceUnlock = classFunctionName (namefy $ pretty "termina" <::> pretty "resource") (pretty "unlock")
 
 ppCFunctionPointer :: DocStyle -> DocStyle -> [DocStyle] -> DocStyle
 ppCFunctionPointer ts identifier parameters = 

@@ -77,7 +77,9 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Casting keyword
              ["as"]
       ++ -- option name
-      ["option"]
+             ["option"]
+      ++ -- is variant operator
+             ["is"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
@@ -395,11 +397,12 @@ expressionParser' = buildPrattParser -- New parser
     ,[binaryInfix "||" LogicalOr Ex.AssocLeft]
     ]
     expressionTermParser
-  where binaryInfix s f = Ex.Infix (do
+  where 
+    binaryInfix s f = Ex.Infix (do
           _ <- reservedOp s
           p <- getPosition
           return $ \l r -> BinOp f l r (Position p))
-        castingPostfix = Ex.Postfix (do
+    castingPostfix = Ex.Postfix (do
           _ <- reserved "as"
           p <- getPosition
           typeSpecificer <- typeSpecifierParser
@@ -435,10 +438,37 @@ enumVariantExprParser = do
     option [] (parens (sepBy (try expressionParser) comma))
   return $ EnumVariantExpression enum variant parameterList (Position p)
 
+isEnumVariantExprParser :: Parser (Expression Annotation)
+isEnumVariantExprParser = do
+  p <- getPosition
+  object <- objectParser
+  _ <- reserved "is"
+  enum <- identifierParser
+  _ <- reservedOp "::"
+  variant <- identifierParser
+  return $ IsEnumVariantExpression object enum variant (Position p)
+
+isOptionVariantExprParser :: Parser (Expression Annotation)
+isOptionVariantExprParser =
+  (do
+    p <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "None"
+    return $ IsOptionVariantExpression object NoneLabel (Position p)) <|>
+  (do
+    p <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "Some"
+    return $ IsOptionVariantExpression object SomeLabel (Position p))
+
 expressionParser :: Parser (Expression Annotation)
 expressionParser = try optionVariantExprParser
   <|> try enumVariantExprParser
   <|> try mutableReferenceExprParser
+  <|> try isOptionVariantExprParser
+  <|> try isEnumVariantExprParser
   <|> referenceExprParser
   <|> vectorInitParser
   <|> fieldAssignmentsExpressionParser
