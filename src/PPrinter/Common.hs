@@ -82,6 +82,8 @@ getExpPrecedence (DerefMemberFunctionAccess {}) = 1
 getExpPrecedence (FieldAssignmentsExpression {}) = 0
 getExpPrecedence (EnumVariantExpression {}) = 0
 getExpPrecedence (VectorInitExpression {}) = 0
+getExpPrecedence (IsEnumVariantExpression {}) = 7
+getExpPrecedence (IsOptionVariantExpression {}) = 7
 
 getParameters :: Expression SemanticAnns -> [Parameter]
 getParameters (FunctionExpression _ _ (SemAnn _ (ETy (AppType params _)))) = params

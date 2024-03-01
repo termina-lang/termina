@@ -537,13 +537,13 @@ ppRTEMSCreateTask (RTEMSTask identifier classId _ priority stackSize _) =
     [
         emptyDoc,
         pretty "status" <+> pretty "=" <+>
-            ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "task_create")
+            ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_task")
                 [
-                    ppCReferenceExpression (pretty identifier <> pretty ".__task.task_id"),
                     pretty (show priority),
                     pretty (show stackSize),
                     namefy (pretty "rtems_task") <::> pretty classId,
-                    ppCReferenceExpression (pretty identifier)
+                    ppCReferenceExpression (pretty identifier),
+                    ppCReferenceExpression (pretty identifier <> pretty ".__task.task_id")
                 ] <> semi,
         emptyDoc,
         ppCIfBlock (pretty "RTEMS_SUCCESSFUL" <+> pretty "!=" <+> pretty "status")
@@ -571,6 +571,7 @@ ppRTEMSEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId
                     emptyDoc,
                     ppCIfBlock (pretty "result.__variant" <+> pretty "!=" <+> pretty "Result" <::> pretty "Ok")
                         (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    emptyDoc,
                     returnC <> semi
                 ]
             ) <> line
@@ -595,6 +596,7 @@ ppRTEMSEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) =
                     emptyDoc,
                     ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
                         (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    emptyDoc,
                     returnC <> semi
                 ]
             ) <> line
@@ -654,13 +656,15 @@ ppRTEMSEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) =
                                 pretty "status" <+> pretty "=" <+>
                                     ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "timer_delay_at") [
                                         pretty timer <> pretty ".__timer.timer_id",
-                                        ppCReferenceExpression (pretty timer <> pretty ".__timer.current")
+                                        ppCReferenceExpression (pretty timer <> pretty ".__timer.current"),
+                                        namefy $ pretty "rtems_periodic_timer" <::> pretty timer
                                     ] <> semi
                             ]
                         ),
                     emptyDoc,
                     ppCIfBlock (pretty "RTEMS_SUCESSFUL" <+> pretty "!=" <+> pretty "status")
                         (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc]),
+                    emptyDoc,
                     returnC <> semi
                 ]
             ) <> line
@@ -729,9 +733,8 @@ ppRTEMSInstallEmitter (RTEMSPeriodicTimerEmitter timer _) = vsep
             ppCReferenceExpression (pretty timer <> pretty ".period")
         ] <> semi,        
         ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "timer_delay_at") [
-            ppCReferenceExpression (pretty timer <> pretty ".__timer.timer_id"),
-            pretty timer <> pretty ".period.tv_sec",
-            pretty timer <> pretty ".period.tv_usec",
+            pretty timer <> pretty ".__timer.timer_id",
+            ppCReferenceExpression (pretty timer <> pretty ".__timer.current"),
             namefy $ pretty "rtems_periodic_timer" <::> pretty timer] <> semi
     ]
 ppRTEMSInstallEmitter (RTEMSSystemInitEmitter {}) = error "Initial event does not have to be installed"

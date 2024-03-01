@@ -76,6 +76,9 @@ data ConnectionSeman =
   | InPConnTy
     -- | Type specifier of the connected channel
     TypeSpecifier
+  | OutPConnTy
+    -- | Type specifier of the connected channel
+    TypeSpecifier
   deriving Show
 
 -- | Semantic elements
@@ -137,6 +140,9 @@ buildGlobalTy loc = SemAnn loc . GTy . GType
 
 buildStmtAnn :: Locations -> SAnns SemanticElems
 buildStmtAnn = flip SemAnn STy
+
+buildOutPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
+buildOutPortConnAnn loc ts = SemAnn loc (CTy (OutPConnTy ts))
 
 buildAccessPortConnAnn :: Locations -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
 buildAccessPortConnAnn loc ts procs = SemAnn loc (CTy (APConnTy ts procs))

@@ -124,6 +124,7 @@ data Errors a
   | EAccessPortNotResource Identifier 
   | EInboundPortNotEmitter Identifier 
   | EInboundPortNotChannel Identifier
+  | EOutboundPortNotChannel Identifier
   | EAccessPortNotPool Identifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier

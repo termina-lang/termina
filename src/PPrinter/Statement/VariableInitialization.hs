@@ -120,6 +120,9 @@ ppInitializeStruct subs level target expr =
                   FieldValueAssignment field expr' _ -> ppFieldInitializer subs level target (pretty field) expr' : acc
                   FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))) -> 
                     target <> pretty "." <> pretty field <+> pretty "=" <+> parens (ppTypeSpecifier ts) <> pretty addr <> semi : acc
+                  -- | Outbound port connection
+                  FieldPortConnection OutboundPortConnection field channel _ -> 
+                    target <> pretty "." <> pretty field <+> pretty "=" <+> ppCReferenceExpression (pretty channel) <> semi : acc
                   -- | Regular access port connection  
                   FieldPortConnection AccessPortConnection field resource (SemAnn _ (CTy (APConnTy rts procedures))) -> 
                     vsep (

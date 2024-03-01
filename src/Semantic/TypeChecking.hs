@@ -516,10 +516,12 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPort
     case fty of
       SinkPort _ _  ->
         case gentry of
+          -- TODO: Check that the type of the inbound port and the type of the emitter match
           GGlob (SEmitter ets) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets)
           _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
       InPort _ _  -> 
         case gentry of
+          -- TODO: Check that the type of the inbound port and the type of the emitter match
           GGlob (SChannel cts) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EInboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
@@ -527,8 +529,14 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPort
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
+    getGlobalGEnTy loc sid >>=
+    \gentry ->
     case fty of
-      OutPort _ -> return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildStmtAnn pann)
+      OutPort _ -> 
+        case gentry of
+          -- TODO: Check that the type of the outbound port and the type of the channel match
+          GGlob (SChannel cts) -> return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
+          _ -> throwError $ annotateError loc $ EOutboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
