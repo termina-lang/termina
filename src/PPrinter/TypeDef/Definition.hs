@@ -22,7 +22,7 @@ ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
     ppCFunctionPrototype clsFuncName
       (
         -- | Print the self parameter
-        ppSelfParameter classId :
+        ppThisParameter :
         -- | Print the rest of the function parameters
         (ppParameterDeclaration clsFuncName <$> parameters)
       )
@@ -34,7 +34,12 @@ ppClassFunctionDefinition classId (ClassProcedure identifier parameters blk _) =
       (indentTab . align $
         vsep (
           -- | Print the resource lock call
-          [ppClassProcedureOnEntry, emptyDoc] ++
+          [
+            pretty classId <+> pretty "*" <+> pretty "self" <+> pretty "=" <+> parens (pretty classId <+> pretty "*") <> pretty "__this" <> semi,
+            emptyDoc,
+            ppClassProcedureOnEntry, 
+            emptyDoc
+          ] ++
           -- | Print the function body
           [ppStatement subs s <> line | s <- blk] ++
           -- | Print the resource unlock call

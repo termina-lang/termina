@@ -56,8 +56,8 @@ ppDynamicSubtypeObjectAddress :: Printer Object
 ppDynamicSubtypeObjectAddress subs obj =
     case getObjectType obj of
         DynamicSubtype ts ->
-            parens (ppDynamicSubtypeCast ts) <> ppObject subs obj <> pretty ".data"
-        _ -> error "unsupported expression"
+            parens (ppDynamicSubtypeCast ts) <> parens (ppObject subs obj <> pretty ".data")
+        _ -> error $ "unsupported object: " ++ show obj
 
 ppRefDynamicSubtypeObjectAddress :: Printer Expression
 ppRefDynamicSubtypeObjectAddress subs expr =
@@ -152,9 +152,13 @@ ppObject subs (VectorSliceExpression vector lower _ _) =
         _ -> error $ "Invalid constant expression: " ++ show lower
 ppObject subs (MemberAccess obj identifier _) =
     if getObjPrecedence obj > 1 then
-        parens (ppObject subs obj) <> pretty "." <> pretty identifier
+        case getObjectType obj of
+            (Location {}) -> parens (ppObject subs obj) <> pretty "->" <> pretty identifier
+            _ -> parens (ppObject subs obj) <> pretty "." <> pretty identifier
     else
-        ppObject subs obj <> pretty "." <> pretty identifier
+        case getObjectType obj of
+            (Location {}) -> ppObject subs obj <> pretty "->" <> pretty identifier
+            _ -> ppObject subs obj <> pretty "." <> pretty identifier
 ppObject subs (DereferenceMemberAccess obj identifier _) =
     if getObjPrecedence obj > 1 then
         parens (ppObject subs obj) <> pretty "->" <> pretty identifier

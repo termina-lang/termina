@@ -34,7 +34,7 @@ spec = do
         pack (
           "typedef struct {\n" ++
           "    void * __that;\n" ++
-          "    void (*procedure0)(void * __self, uint8_t param0, uint16_t param1,\n" ++
+          "    void (*procedure0)(void * __this, uint8_t param0, uint16_t param1,\n" ++
           "                       uint32_t param2, uint64_t param3, int8_t param4,\n" ++
           "                       int16_t param5, int32_t param6, int64_t param7);\n" ++
           "} iface0;\n")

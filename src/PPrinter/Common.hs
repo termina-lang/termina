@@ -67,7 +67,10 @@ getObjPrecedence obj@(Dereference _ _) =
     (Vector _ _) -> 1
     _            -> 2
 getObjPrecedence (VectorSliceExpression {}) = 2
-getObjPrecedence (Undyn obj _) = getObjPrecedence obj
+getObjPrecedence (Undyn obj _) = 
+  case getObjectType obj of
+    DynamicSubtype (Vector _ _) -> 1
+    _            -> 2
 
 getExpPrecedence :: Expression SemanticAnns -> Int
 getExpPrecedence (AccessObject obj) = getObjPrecedence obj
@@ -187,6 +190,7 @@ ppOptionSomeParameterStructName Int16 = namefy $ pretty "option" <::> pretty "in
 ppOptionSomeParameterStructName Int32 = namefy $ pretty "option" <::> pretty "int32_params_t"
 ppOptionSomeParameterStructName Int64 = namefy $ pretty "option" <::> pretty "int64_params_t"
 ppOptionSomeParameterStructName ts@(Option _) = error $ "invalid recursive option type: " ++ show ts
+ppOptionSomeParameterStructName (DynamicSubtype _) = namefy $ pretty "option" <::> pretty "dyn_params_t"
 ppOptionSomeParameterStructName ts = namefy $ pretty "option" <::> ppTypeSpecifier' ts <> ppDimensionOptionTS ts <> pretty "_params_t"
   where
     ppTypeSpecifier' UInt8 = pretty "uint8"

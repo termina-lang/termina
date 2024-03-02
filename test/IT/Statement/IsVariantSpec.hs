@@ -67,7 +67,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(id0 * const self, __option__dyn_t option0);\n" ++
+              "void id0__match_test0(void * const __this, __option__dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of procedure match_test0" $ do
@@ -75,7 +75,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test0(id0 * const self, __option__dyn_t option0) {\n" ++
+              "void id0__match_test0(void * const __this, __option__dyn_t option0) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++

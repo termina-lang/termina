@@ -98,7 +98,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(id0 * const self, __option__dyn_t option0);\n" ++
+              "void id0__match_test0(void * const __this, __option__dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of procedure match_test0" $ do
@@ -106,7 +106,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test0(id0 * const self, __option__dyn_t option0) {\n" ++
+              "void id0__match_test0(void * const __this, __option__dyn_t option0) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
@@ -118,9 +120,9 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __option__dyn_t __option0__Some = option0.Some.__0;\n" ++
+              "        __option__dyn_params_t __option0__Some = option0.Some;\n" ++
               "\n" ++
-              "        foo = *((uint32_t *)__option0__Some.data);\n" ++
+              "        foo = *((uint32_t *)(__option0__Some.__0.data));\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -140,7 +142,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test1(id0 * const self, __option__dyn_t option0);\n" ++
+              "void id0__match_test1(void * const __this, __option__dyn_t option0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of procedure match_test1" $ do
@@ -148,7 +150,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test1(id0 * const self, __option__dyn_t option0) {\n" ++
+              "void id0__match_test1(void * const __this, __option__dyn_t option0) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
@@ -159,9 +163,9 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++
-              "        __option__dyn_t __option0__Some = option0.Some.__0;\n" ++
+              "        __option__dyn_params_t __option0__Some = option0.Some;\n" ++
               "\n" ++
-              "        foo = *((uint32_t *)__option0__Some.data);\n" ++
+              "        foo = *((uint32_t *)(__option0__Some.__0.data));\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -234,13 +238,13 @@ spec = do
               "\n" ++
               "        __enum_Message__Out_params_t __msg__Out = msg.Out;\n" ++
               "\n" ++
-              "        ret = __msg__Out.__0;\n" ++
+              "        ret = (__msg__Out.__0);\n" ++
               "\n" ++
               "    } else {\n" ++
               "\n" ++
               "        __enum_Message__In_params_t __msg__In = msg.In;\n" ++
               "\n" ++
-              "        ret = __msg__In.__0 + __msg__In.__1;\n" ++
+              "        ret = (__msg__In.__0) + (__msg__In.__1);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

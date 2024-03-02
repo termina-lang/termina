@@ -35,10 +35,13 @@ filterStructModifiers = filter (\case
 ppSelfParameter :: Identifier -> DocStyle
 ppSelfParameter classId = pretty classId <+> pretty "*" <+> pretty "const" <+> pretty "self"
 
+ppThisParameter :: DocStyle
+ppThisParameter = voidC <+> pretty "*" <+> pretty "const" <+> pretty "__this"
+
 ppInterfaceProcedureField :: InterfaceMember SemanticAnns -> DocStyle
 ppInterfaceProcedureField (InterfaceProcedure identifier parameters _) =
   ppCFunctionPointer voidC (pretty identifier)
-    (voidC <+> pretty "*" <+> pretty "__self" : (ppParameterDeclaration (pretty identifier) <$> parameters)) <> semi
+    (voidC <+> pretty "*" <+> pretty "__this" : (ppParameterDeclaration (pretty identifier) <$> parameters)) <> semi
 
 ppClassFunctionDeclaration :: Identifier -> ClassMember SemanticAnns -> DocStyle
 ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
@@ -47,7 +50,7 @@ ppClassFunctionDeclaration classId (ClassProcedure identifier parameters _ _) =
   ([ppParameterVectorValueStructureDecl clsFuncName (pretty pid) ts <> line | (Parameter pid ts@(Vector {})) <- parameters]) ++
   [
     ppCFunctionPrototype clsFuncName
-      (ppSelfParameter classId : (ppParameterDeclaration clsFuncName <$> parameters)) Nothing <> semi,
+      (ppThisParameter : (ppParameterDeclaration clsFuncName <$> parameters)) Nothing <> semi,
     emptyDoc
   ]
 ppClassFunctionDeclaration classId (ClassMethod identifier mrts _ _) =

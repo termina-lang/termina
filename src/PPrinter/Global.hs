@@ -16,7 +16,7 @@ ppGlobalDeclaration (Resource identifier (Pool {}) _ _ _) = vsep
 ppGlobalDeclaration (Channel identifier (MsgQueue {}) _ _ _) = externC <+> msgQueue <+> pretty identifier <> semi <> line
 ppGlobalDeclaration (Task identifier ts _ _ _) = externC <+> ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi <> line
 ppGlobalDeclaration (Handler identifier ts _ _ _) = externC <+> ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi <> line
-ppGlobalDeclaration (Emitter identifier (DefinedType "PeriodicTimer") _ _ _) = externC <+> periodicTimer <+> pretty identifier <> semi <> line
+ppGlobalDeclaration (Emitter identifier ts _ _ _) = externC <+> ppTypeSpecifier ts <+> pretty identifier <> ppDimension ts <> semi <> line
 ppGlobalDeclaration decl = error $ "unsupported global declaration: " ++ show decl
 
 ppGlobalDefinition :: Global SemanticAnns -> DocStyle

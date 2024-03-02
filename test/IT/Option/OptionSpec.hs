@@ -167,9 +167,9 @@ spec = do
               "        \n" ++
               "    } else {\n" ++
               "\n" ++   
-              "        __option__dyn_t __optionFoo__Some = optionFoo.Some.__0;\n" ++
+              "        __option__uint32__10_params_t __optionFoo__Some = optionFoo.Some;\n" ++
               "\n" ++
-              "        __optionFoo__Some[0] = 1;\n" ++
+              "        __optionFoo__Some.__0[0] = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

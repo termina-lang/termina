@@ -146,11 +146,11 @@ spec = do
               "        \n"  ++
               "    } else {\n" ++
               "\n" ++
-              "        __option__dyn_t __alloc_msg__Some = alloc_msg.Some.__0;\n" ++
+              "        __option__dyn_params_t __alloc_msg__Some = alloc_msg.Some;\n" ++
               "\n" ++
-              "        *((Message *)__alloc_msg__Some.data).urgent = 0;\n" ++
+              "        (*((Message *)(__alloc_msg__Some.__0.data))).urgent = 0;\n" ++
               "\n" ++
-              "        __termina__pool__free(self->message_pool, __alloc_msg__Some);\n" ++
+              "        __termina__pool__free(self->message_pool, __alloc_msg__Some.__0);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

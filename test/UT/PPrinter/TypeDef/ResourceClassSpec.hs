@@ -119,7 +119,7 @@ spec = do
           "    __termina__resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
-          "void Class0__procedure0(Class0 * const self, uint8_t param0, uint16_t param1,\n" ++
+          "void Class0__procedure0(void * const __this, uint8_t param0, uint16_t param1,\n" ++
           "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
           "                        int16_t param5, int32_t param6, int64_t param7);\n")
     it "Prints a class with two procedures and zero fields" $ do
@@ -129,10 +129,10 @@ spec = do
           "    __termina__resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
-          "void Class0__procedure0(Class0 * const self, uint8_t param0,\n" ++
+          "void Class0__procedure0(void * const __this, uint8_t param0,\n" ++
           "                        __option__dyn_t param1);\n" ++
           "\n" ++
-          "void Class0__procedure1(Class0 * const self, uint8_t param0,\n" ++
+          "void Class0__procedure1(void * const __this, uint8_t param0,\n" ++
           "                        uint8_t param1[32]);\n")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypedefDeclaration M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
@@ -141,7 +141,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a class marked as no_handler with two fields" $ do
       renderTypedefDeclaration M.empty noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
@@ -151,7 +151,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a class with one procedure and two fields" $ do
       renderTypedefDeclaration M.empty classWithOneProcedureAndTwoFields `shouldBe`
         pack (
@@ -161,7 +161,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a packed class" $ do
       renderTypedefDeclaration M.empty packedClass `shouldBe`
         pack (
@@ -172,7 +172,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} __attribute__((packed)) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self, char param0, uint8_t param1[16]);\n")
+            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16]);\n")
     it "Prints an aligned class" $ do
       renderTypedefDeclaration M.empty alignedClass `shouldBe`
         pack (
@@ -183,7 +183,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} __attribute__((align(16))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a packed & aligned class" $ do
       renderTypedefDeclaration M.empty packedAndAlignedClass `shouldBe`
         pack (
@@ -194,7 +194,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} __attribute__((packed, align(16))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a class with a fixed location field" $ do
       renderTypedefDeclaration M.empty classWithFixedLocationField `shouldBe`
         pack (
@@ -204,7 +204,7 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")
     it "Prints a class with an access port field" $ do
       renderTypedefDeclaration M.empty classWithAccessPortField `shouldBe`
         pack (
@@ -214,4 +214,4 @@ spec = do
             "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(Class0 * const self);\n")
+            "void Class0__procedure0(void * const __this);\n")

@@ -105,7 +105,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test1(id0 * const self, __termina__dyn_t dyn_var0);\n" ++
+              "void id0__assignment_test1(void * const __this, __termina__dyn_t dyn_var0);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of function assignment_test1" $ do
@@ -113,7 +113,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test1(id0 * const self, __termina__dyn_t dyn_var0) {\n" ++
+              "void id0__assignment_test1(void * const __this, __termina__dyn_t dyn_var0) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
@@ -140,7 +142,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test2(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "void id0__assignment_test2(void * const __this, __termina__dyn_t dyn_var0,\n" ++
               "                           __termina__dyn_t dyn_var1);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
@@ -149,18 +151,20 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test2(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "void id0__assignment_test2(void * const __this, __termina__dyn_t dyn_var0,\n" ++
               "                           __termina__dyn_t dyn_var1) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    *((uint32_t *)dyn_var0.data) = foo;\n" ++
+              "    *((uint32_t *)(dyn_var0.data)) = foo;\n" ++
               "\n" ++
-              "    foo = *((uint32_t *)dyn_var1.data);\n" ++
+              "    foo = *((uint32_t *)(dyn_var1.data));\n" ++
               "\n" ++
-              "    *((uint32_t *)dyn_var1.data) = *((uint32_t *)dyn_var0.data);\n" ++
+              "    *((uint32_t *)(dyn_var1.data)) = *((uint32_t *)(dyn_var0.data));\n" ++
               "\n" ++
               "    __termina__resource__unlock(&self->__resource);\n" ++
               "\n" ++
@@ -178,7 +182,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test3(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "void id0__assignment_test3(void * const __this, __termina__dyn_t dyn_var0,\n" ++
               "                           __termina__dyn_t dyn_var1);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
@@ -187,8 +191,10 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test3(id0 * const self, __termina__dyn_t dyn_var0,\n" ++
+              "void id0__assignment_test3(void * const __this, __termina__dyn_t dyn_var0,\n" ++
               "                           __termina__dyn_t dyn_var1) {\n" ++
+              "\n" ++
+              "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
@@ -199,15 +205,15 @@ spec = do
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
+              "        ((uint32_t *)(dyn_var0.data))[__i0] = foo[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
+              "        foo[__i0] = ((uint32_t *)(dyn_var1.data))[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
+              "        ((uint32_t *)(dyn_var1.data))[__i0] = ((uint32_t *)(dyn_var0.data))[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    __termina__resource__unlock(&self->__resource);\n" ++

@@ -46,13 +46,13 @@ spec = do
         pack "dyn_var0"
     it "Prints the undyned variable dyn_var0 : 'dyn u16" $ do
       renderExpression (AccessObject (Undyn dynVar0 (objSemAnn Mutable UInt16))) `shouldBe`
-        pack "*((uint16_t *)dyn_var0.data)"
+        pack "*((uint16_t *)(dyn_var0.data))"
     it "Prints the variable dyn_vector1 : 'dyn [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject dynVector1) `shouldBe`
         pack "dyn_vector1"
     it "Prints the undyned variable dyn_vector1 : 'dyn [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Undyn dynVector1 twoDymVectorAnn)) `shouldBe`
-        pack "((int64_t (*)[5])dyn_vector1.data)"
+        pack "((int64_t (*)[5])(dyn_vector1.data))"
     it "Prints the undyned variable dyn_vector2 : [[[char; 40 : u32]; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Undyn dynVector2 dynThreeDymVectorAnn)) `shouldBe`
-        pack "((char (*)[5][40])dyn_vector2.data)"
+        pack "((char (*)[5][40])(dyn_vector2.data))"

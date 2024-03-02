@@ -43,25 +43,25 @@ ppMatchCase :: Substitutions -> MatchSource -> TypeSpecifier -> MatchCase Semant
 ppMatchCase subs _ (Option {}) (MatchCase "None" _ body _) =
     vsep [ ppStatement subs s <> line | s <- body ]
 ppMatchCase subs Annonymous (Option {}) (MatchCase "Some" [sym] body _) =
-    let variable = namefy (pretty "match") <> pretty "." <> optionSomeField
+    let variable = namefy (pretty "match") <> pretty "." <> optionSomeVariant
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
         -- struct.
-        newSubs = subs `union` fromList [(sym, variable)]
+        newSubs = subs `union` fromList [(sym, variable <> pretty "." <> namefy (pretty "0"))]
     in
     vsep $ [ ppStatement newSubs s <> line | s <- body ]
-ppMatchCase subs (Named obj) (Option {}) (MatchCase "Some" [sym] body _) =
+ppMatchCase subs (Named obj) (Option ts) (MatchCase "Some" [sym] body _) =
     let variable = namefy $ obj <::> optionSomeVariant
         -- | New map of substitutions. This map contains the substitutions
         -- of the parameters of the match case. It maps each parameter
         -- identifier to the corresponding field of the enumeration variant's
         -- struct.
-        newSubs = subs `union` fromList [(sym, variable)]
+        newSubs = subs `union` fromList [(sym, variable <> pretty "." <> namefy (pretty "0"))]
     in
     vsep $
     [
-        optionDyn <+> variable <+> pretty "=" <+> obj <> pretty "." <> optionSomeField <> semi,
+        ppOptionSomeParameterStructName ts <+> variable <+> pretty "=" <+> obj <> pretty "." <> optionSomeVariant <> semi,
         emptyDoc
     ] ++
     [
@@ -76,7 +76,7 @@ ppMatchCase subs Annonymous (DefinedType _) (MatchCase variant params body _) =
         -- identifier to the corresponding field of the enumeration variant's
         -- struct.
         newKeyVals = zipWith
-            (\sym index -> (sym, variable <> pretty "." <> namefy (pretty (show (index :: Integer))))) params [0..]
+            (\sym index -> (sym, parens (variable <> pretty "." <> namefy (pretty (show (index :: Integer)))))) params [0..]
         -- | Union of the previous map with the new one. This allows the nesting
         -- of match statements.
         newSubs = subs `union` fromList newKeyVals
@@ -89,7 +89,7 @@ ppMatchCase subs (Named obj) (DefinedType identifier) (MatchCase variant params 
         -- identifier to the corresponding field of the enumeration variant's
         -- struct.
         newKeyVals = zipWith
-            (\sym index -> (sym, variable <> pretty "." <> namefy (pretty (show (index :: Integer))))) params [0..]
+            (\sym index -> (sym, parens (variable <> pretty "." <> namefy (pretty (show (index :: Integer)))))) params [0..]
         -- | Union of the previous map with the new one. This allows the nesting
         -- of match statements.
         newSubs = subs `union` fromList newKeyVals
@@ -184,11 +184,17 @@ ppStatement subs (AssignmentStmt obj expr  _) =
                 ppCDereferenceExpression (ppObject subs obj)
         _ -> case expr of
             (FieldAssignmentsExpression {}) ->
-                ppInitializeStruct subs 0 (ppObject subs obj) expr
+                case obj of
+                    (Dereference {}) -> ppInitializeStruct subs 0 (parens (ppObject subs obj)) expr
+                    _ -> ppInitializeStruct subs 0 (ppObject subs obj) expr
             (OptionVariantExpression {}) ->
-                ppInitializeOption subs 0 (ppObject subs obj) expr
+                case obj of
+                    (Dereference {}) -> ppInitializeOption subs 0 (parens (ppObject subs obj)) expr
+                    _ -> ppInitializeOption subs 0 (ppObject subs obj) expr
             (EnumVariantExpression {}) ->
-                ppInitializeEnum subs 0 (ppObject subs obj) expr
+                case obj of
+                    (Dereference {}) -> ppInitializeEnum subs 0 (parens (ppObject subs obj)) expr
+                    _ -> ppInitializeEnum subs 0 (ppObject subs obj) expr
             _ -> ppObject subs obj <+> pretty "=" <+> ppExpression subs expr <> semi
 -- | Print if-else-if statement
 ppStatement subs (IfElseStmt cond ifBody elifs elseBody _) =

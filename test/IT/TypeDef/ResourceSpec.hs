@@ -62,7 +62,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(TMChannel * const self, uint32_t * packets);\n" ++
+              "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -70,8 +70,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void TMChannel__get_tm_sent_packets(TMChannel * const self,\n" ++
-              "                                    uint32_t * packets) {\n" ++
+              "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets) {\n" ++
+              "\n" ++
+              "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
@@ -94,7 +95,7 @@ spec = do
               "    __termina__resource_t __resource;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void UARTDriver__get_status(UARTDriver * const self, uint32_t * ret);\n" ++
+              "void UARTDriver__get_status(void * const __this, uint32_t * ret);\n" ++
               "\n" ++
               "#endif // __TEST_H__\n")
     it "Prints definition of class UARTDriver" $ do
@@ -102,7 +103,9 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void UARTDriver__get_status(UARTDriver * const self, uint32_t * ret) {\n" ++
+              "void UARTDriver__get_status(void * const __this, uint32_t * ret) {\n" ++
+              "\n" ++
+              "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
               "    __termina__resource__lock(&self->__resource);\n" ++
               "\n" ++
