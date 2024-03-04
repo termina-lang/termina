@@ -14,6 +14,7 @@ import qualified AST.Seman as SAST
 import Data.Maybe (fromJust)
 import Data.List (find)
 import Semantic.Types (GEntry (GGlob), SemGlobal (SEmitter))
+import Extras.TopSort (TopSt(res))
 
 data RTEMSPort =
     RTEMSEventPort
@@ -464,16 +465,23 @@ ppInterruptEmitterDeclaration obj = error $ "Invalid global object (not an inter
 
 ppPoolMemoryArea :: RTEMSGlobal -> DocStyle
 ppPoolMemoryArea (RTEMSPool identifier ts size) =
-    staticC <+> ppTypeSpecifier ts <+> poolMemoryArea (pretty identifier) <> brackets (pretty (show size)) <> semi
+    staticC <+> ppTypeSpecifier UInt8 <+> poolMemoryArea (pretty identifier) <> brackets (
+        parens (ppSizeOf ts <+> pretty "+" <+> 
+            parens (pretty "TERMINA_POOL_MINIMUM_BLOCK_SIZE" <+> pretty "-" <+>
+                parens (ppSizeOf ts <+> pretty "%" <+> pretty "TERMINA_POOL_MINIMUM_BLOCK_SIZE"))) 
+        <+> pretty "*" <+> pretty (show size)) <> semi
 ppPoolMemoryArea obj = error $ "Invalid global object (not a pool): " ++ show obj
 
 pRTEMSCreateTimer :: RTEMSEmitter -> DocStyle
 pRTEMSCreateTimer (RTEMSPeriodicTimerEmitter identifier _) = 
     vsep [
         emptyDoc,
-        ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_timer") [
-            ppCReferenceExpression (pretty identifier <> pretty ".__timer.timer_id")
-        ] <> semi
+        pretty "status" <+> pretty "=" <+>
+            ppCFunctionCall (namefy $ pretty "rtems" <::> pretty "create_timer") [
+                ppCReferenceExpression (pretty identifier <> pretty ".__timer.timer_id")
+            ] <> semi,
+        ppCIfBlock (pretty "status" <+> pretty "!=" <+> pretty "RTEMS_SUCCESSFUL")
+            (vsep [pretty "rtems_shutdown_executive(1)" <> semi, emptyDoc])        
     ]
 pRTEMSCreateTimer obj = error $ "Invalid global object (not a timer): " ++ show obj
 
@@ -837,7 +845,7 @@ ppMainFile prjprogs =
                     ] else []) ++
                 (if not (null resources) then emptyDoc : map ppInitResource resources else [])
                 ++ map ppInitPool pools
-                ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) then
+                ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers) then
                     [
                         emptyDoc,
                         pretty "rtems_status_code" <+> pretty "status" <+> pretty "=" <+> pretty "RTEMS_SUCCESSFUL" <> semi
@@ -920,6 +928,7 @@ ppMainFile prjprogs =
         pretty "#define CONFIGURE_MAXIMUM_TASKS" <+> parens (pretty (show (length tasks + 1))),
         pretty "#define CONFIGURE_MAXIMUM_MESSAGE_QUEUES" <+> parens (pretty (show (length msgQueues))),
         pretty "#define CONFIGURE_MAXIMUM_TIMERS" <+> parens (pretty (show (length timers))),
+        pretty "#define CONFIGURE_MAXIMUM_SEMAPHORES" <+> parens (pretty (show (length mutexes))),
         emptyDoc
     ] ++
     (if not (null msgQueues) then
@@ -1108,3 +1117,5 @@ ppMainFile prjprogs =
                 getResLocking' ceilPrio ((RTEMSTask _ _ _ prio _ _) : gs') = getResLocking' (min prio ceilPrio) gs'
                 getResLocking' _ _ = error "Internal error when obtaining the resource dependencies."
         getResLocking _ = error "Internal error when obtaining the resource dependencies."
+
+        mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
