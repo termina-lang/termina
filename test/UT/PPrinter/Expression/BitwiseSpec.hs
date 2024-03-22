@@ -6,7 +6,9 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 var0 :: Expression SemanticAnns
@@ -66,7 +68,10 @@ var0BitwiseXorVar1 :: Expression SemanticAnns
 var0BitwiseXorVar1 = BinOp BitwiseXor var0 undynVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -76,19 +81,19 @@ spec = do
         pack "var0 << 8"
     it "Prints the expression: var1 << 8 : u8" $ do
       renderExpression var1LeftShiftConstant `shouldBe`
-        pack "*((uint16_t *)(var1.data)) << 8"
+        pack "*(uint16_t *)var1.data << 8"
     it "Prints the expression: 8 : u8 << var0" $ do
       renderExpression constantLeftShiftVar0 `shouldBe`
         pack "8 << var0"
     it "Prints the expression: 8 : u8 << var1" $ do
       renderExpression constantLeftShiftVar1 `shouldBe`
-        pack "8 << *((uint16_t *)(var1.data))"
+        pack "8 << *(uint16_t *)var1.data"
     it "Prints the expression: var0 << var1 : u16" $ do
       renderExpression var0LeftShiftVar1 `shouldBe`
-        pack "var0 << *((uint16_t *)(var1.data))"
+        pack "var0 << *(uint16_t *)var1.data"
     it "Prints the expression: var0 << var1 << 8 : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << *((uint16_t *)(var1.data))) << 8"
+        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 8"
     it "Prints the expression: var0 >> 8 : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
         pack "var0 >> 8"
@@ -103,18 +108,18 @@ spec = do
         pack "1024 & var0"
     it "Prints the expression: var0 & var1 : u16" $ do
       renderExpression var0BitwiseAndVar1 `shouldBe`
-        pack "var0 & *((uint16_t *)(var1.data))"
+        pack "var0 & *(uint16_t *)var1.data"
     it "Prints the expression: var1 | 1024 : u16" $ do
       renderExpression var1BitwiseOrconstant `shouldBe`
-        pack "*((uint16_t *)(var1.data)) | 1024"
+        pack "*(uint16_t *)var1.data | 1024"
     it "Prints the expression: var0 | var1 : u16" $ do
       renderExpression var0BitwiseOrVar1 `shouldBe`
-        pack "var0 | *((uint16_t *)(var1.data))"
+        pack "var0 | *(uint16_t *)var1.data"
     it "Prints the expression: var1 ^ 1024 : u16" $ do
       renderExpression var1BitwiseXorconstant `shouldBe`
-        pack "*((uint16_t *)(var1.data)) ^ 1024"
+        pack "*(uint16_t *)var1.data ^ 1024"
     it "Prints the expression: var0 ^ var1 : u16" $ do
       renderExpression var0BitwiseXorVar1 `shouldBe`
-        pack "var0 ^ *((uint16_t *)(var1.data))"
+        pack "var0 ^ *(uint16_t *)var1.data"
         
     

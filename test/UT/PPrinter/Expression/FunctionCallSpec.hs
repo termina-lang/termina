@@ -6,7 +6,9 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 var0, var1, pVar :: Object SemanticAnns
@@ -114,7 +116,10 @@ call4Parameters = FunctionExpression "foo4"
     ] Unit)
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -133,7 +138,7 @@ spec = do
         pack "foo(&var0)"
     it "Prints the expression: foo(&var1)" $ do
       renderExpression functionCallSingleRefDynVar1 `shouldBe`
-        pack "foo((uint16_t *)(var1.data))"
+        pack "foo((uint16_t *)var1.data)"
     it "Prints the expression: foo(*p_var)" $ do
       renderExpression functionCallSingleDerefpVar `shouldBe`
         pack "foo(*p_var)"
@@ -142,19 +147,19 @@ spec = do
         pack "foo(var0 + 1024)"
     it "Prints the expression: foo(var1 + 1024 : u16)" $ do
       renderExpression functionCallSingleDynVar1PlusConstant `shouldBe`
-        pack "foo(*((uint16_t *)(var1.data)) + 1024)"
+        pack "foo(*(uint16_t *)var1.data + 1024)"
     it "Prints the expression: foo(var0 + dynVar1)" $ do
       renderExpression functionCallSingleVar0PlusVar1 `shouldBe`
-        pack "foo(var0 + *((uint16_t *)(var1.data)))"
+        pack "foo(var0 + *(uint16_t *)var1.data)"
     it "Prints the expression: foo(*p_var + 1024 : u16)" $ do
       renderExpression functionCallSingleDerefpVarPlusConstant `shouldBe`
         pack "foo(*p_var + 1024)"
     it "Prints the expression: foo(*p_var + *p_dynVar3)" $ do
       renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
-        pack "foo(*p_var + *((uint16_t *)(var1.data)))"
+        pack "foo(*p_var + *(uint16_t *)var1.data)"
     it "Prints the expression: foo(vector0)" $ do
       renderExpression functionCallSingleVector0 `shouldBe`
-        pack "foo(*((__param_foo_param0_t *)vector0))"
+        pack "foo(*(__wrapper__uint32_10_t *)vector0)"
     it "Prints the expression: foo(&vector0)" $ do
       renderExpression functionCallSingleRefVector0 `shouldBe`
         pack "foo(vector0)"
@@ -167,16 +172,16 @@ spec = do
   describe "Pretty printing function call expressions with multiple parameters" $ do
     it "Prints the expression: foo2(var0 + 1024, var0 + var1)" $ do
       renderExpression call2Parameters `shouldBe`
-        pack "foo2(var0 + 1024, var0 + *((uint16_t *)(var1.data)))"
+        pack "foo2(var0 + 1024, var0 + *(uint16_t *)var1.data)"
     it "Prints the expression: foo3(vector0, &var0, var1 + 1024 : u16)" $ do
       renderExpression call3Parameters `shouldBe`
-        pack ("foo3(&var0, *((__param_foo3_param1_t *)vector0),\n" ++
-              "     *((uint16_t *)(var1.data)) + 1024)")
+        pack ("foo3(&var0, *(__wrapper__uint32_10_t *)vector0, " ++
+              "*(uint16_t *)var1.data + 1024)")
     it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + 1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`
         pack (
-          "foo4(dynVector0, (uint16_t *)(var1.data), foo(var0),\n" ++
-          "     foo2(var0 + 1024, var0 + *((uint16_t *)(var1.data))))")
+          "foo4(dynVector0, (uint16_t *)var1.data, foo(var0), " ++
+          "foo2(var0 + 1024, var0 + *(uint16_t *)var1.data))")
   describe "Pretty printing functions returning and receiving arrays" $ do
     it "Prints the expression foo() with a function returning an array" $ do
       renderExpression functionCallRetArray `shouldBe`

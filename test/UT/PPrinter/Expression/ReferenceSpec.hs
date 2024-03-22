@@ -5,7 +5,9 @@ import PPrinter
 import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
@@ -50,7 +52,10 @@ derefpVector0 = AccessObject (Dereference pVector0 vectorAnn) -- | *p_vector0 |
 derefpVector1 = AccessObject (Dereference pVector1 twoDymVectorAnn) -- | *p_vector1 |
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
  
 spec :: Spec
 spec = do
@@ -66,13 +71,13 @@ spec = do
         pack "vector1"
     it "Prints the expression: &dyn_var0" $ do
       renderExpression refDynVar0expr `shouldBe`
-        pack "(uint16_t *)(dyn_var0.data)"
+        pack "(uint16_t *)dyn_var0.data"
     it "Prints the expression: &dyn_vector0" $ do
       renderExpression refDynVector0expr `shouldBe`
-        pack "(uint32_t *)(dyn_vector0.data)"
+        pack "(uint32_t *)dyn_vector0.data"
     it "Prints the expression: &dyn_vector1" $ do
       renderExpression refDynVector1expr `shouldBe`
-        pack "(int64_t (*)[5])(dyn_vector1.data)"
+        pack "(int64_t (*)[5])dyn_vector1.data"
   describe "Pretty printing dereference expressions" $ do
     it "Prints the expression: *p_var0" $ do
       renderExpression derefpVar0 `shouldBe`

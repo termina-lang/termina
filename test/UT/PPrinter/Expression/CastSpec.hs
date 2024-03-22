@@ -6,7 +6,9 @@ import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
 import AST.Seman
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 
@@ -31,7 +33,10 @@ castTMDescriptor0field0toUInt8 :: Expression SemanticAnns
 castTMDescriptor0field0toUInt8 = Casting (AccessObject tmDescriptor0field0) UInt8 uint8SemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

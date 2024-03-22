@@ -6,7 +6,9 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 uint8Const0x8, uint16Const1024, uint32Const0xFFFF0000,
@@ -26,7 +28,10 @@ trueBool = Constant (B True) boolSemAnn
 falseBool = Constant (B False) boolSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

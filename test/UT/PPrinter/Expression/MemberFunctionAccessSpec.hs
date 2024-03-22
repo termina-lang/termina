@@ -5,7 +5,9 @@ import PPrinter
 import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
@@ -27,7 +29,10 @@ tmChannelsend = MemberFunctionAccess tmChannel "send" [AccessObject bar0] unitSe
 selfFoo0 = MemberFunctionAccess selfDereference "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

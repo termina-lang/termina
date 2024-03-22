@@ -26,12 +26,11 @@ class PPrint a where
     pprintPrec :: Integer -> a -> CPrinter
 
     pprint = pprintPrec 0
-    pprintPrec _ = pprint 
+    pprintPrec _ = pprint
 
 instance PPrint CDeclarator where
-  pprintPrec prec (CDeclarator name derivedDeclrs attrs _) = do
-    decls <- printCDerivedDeclarator prec derivedDeclrs
-    return $ decls
+  pprintPrec prec (CDeclarator name derivedDeclrs _ _) = do
+    printCDerivedDeclarator prec derivedDeclrs
         where
             printCDerivedDeclarator :: Integer -> [CDerivedDeclarator] -> CPrinter
             printCDerivedDeclarator _ [] = return $ maybe emptyDoc pretty name
@@ -43,23 +42,33 @@ instance PPrint CDeclarator where
                         return $ parenPrec p 5 $ pretty "*" <> hsep pquals
                     (_, []) -> do
                         pdeclrs <- printCDerivedDeclarator 5 declrs
-                        return $ parenPrec p 5 $ pretty "*" <> pdeclrs
+                        return $ parenPrec p 5 $ parens (pretty "*") <> pdeclrs
                     _ -> do
                         pdeclrs <- printCDerivedDeclarator 5 declrs
                         pquals <- mapM pprint quals
                         return $ parenPrec p 5 $ pretty "*" <> hsep pquals <> pdeclrs
             printCDerivedDeclarator p (CArrDeclr quals size _ : declrs) = do
-                pdeclrs <- printCDerivedDeclarator 6 declrs
-                pquals <- mapM pprint quals
                 psize <- pprint size
-                return $ parenPrec p 6 $ pdeclrs <> brackets (hsep pquals <+> psize)
+                case (declrs, quals) of
+                    ([], []) -> do
+                        return $ parenPrec p 6 $ brackets psize
+                    ([], _) -> do
+                        pquals <- mapM pprint quals
+                        return $ parenPrec p 6 $ brackets (hsep pquals <+> psize)
+                    (_, []) -> do
+                        pdeclrs <- printCDerivedDeclarator 5 declrs
+                        return $ parenPrec p 6 $ pdeclrs <> brackets psize
+                    _ -> do
+                        pdeclrs <- printCDerivedDeclarator 5 declrs
+                        pquals <- mapM pprint quals
+                        return $ parenPrec p 6 $ pdeclrs <> brackets (hsep pquals <+> psize)
             printCDerivedDeclarator p (CFunDeclr params funAttrs _ : declrs) = do
                 pdeclrs <- printCDerivedDeclarator 6 declrs
                 pFunAttrs <- pprintCAttributeList funAttrs
                 pparams <- printParams params
                 return $ parenPrec p 6 $ (if not (null funAttrs) then parens (pFunAttrs <+> pdeclrs) else pdeclrs)
                                     <> parens pparams
-            
+
             printParams :: [CDeclaration] -> CPrinter
             printParams decls = do
                 pdecls <- mapM pprint decls
@@ -93,7 +102,7 @@ instance PPrint CTypeSpecifier where
         pdecl <- pprint decl
         return $ pretty "_Atomic" <> parens pdecl
 
-pprintCAttributeList :: [CAttribute] -> CPrinter 
+pprintCAttributeList :: [CAttribute] -> CPrinter
 pprintCAttributeList [] = return emptyDoc
 pprintCAttributeList attrs = do
     pattrs <- mapM pprint attrs
@@ -115,13 +124,13 @@ instance PPrint CTypeQualifier where
     pprint CAtomicQual = return $ pretty "_Atomic"
     pprint (CAttrQual a) = pprintCAttributeList [a]
 
-instance PPrint CArraySize where 
+instance PPrint CArraySize where
     pprint (CNoArrSize completeType) = return $ if completeType then pretty "*" else emptyDoc
     pprint (CArrSize staticMod expr) = do
         pexpr <- pprintPrec 25 expr
-        return $ if staticMod then pretty "static" else emptyDoc <+> pexpr
+        return $ if staticMod then pretty "static" else pexpr
 
-instance PPrint CExpression where  
+instance PPrint CExpression where
     pprintPrec p (CComma exprs _) = do
         pexprs <- mapM (pprintPrec 2) exprs
         return $ parenPrec p (-1) $ hsep (punctuate comma pexprs)
@@ -135,8 +144,8 @@ instance PPrint CExpression where
         pexpr2 <- pprintPrec (prec + 1) expr2
         return $ parenPrec p prec $ pexpr1 <+> pretty op <+> pexpr2
     pprintPrec p (CUnary op expr _) = do
-        pexpr <- pprintPrec 26 expr
-        return $ parenPrec p 26 $ pretty op <> pexpr
+        pexpr <- pprintPrec 25 expr
+        return $ parenPrec p 25 $ pretty op <> pexpr
     pprintPrec p (CSizeofExpr expr _) = do
         pexpr <- pprintPrec 25 expr
         return $ parenPrec p 25 $ pretty "sizeof" <> parens pexpr
@@ -155,8 +164,8 @@ instance PPrint CExpression where
         return $ parenPrec p 25 $ parens pdecl <> pexpr
     pprintPrec p (CIndex expr1 expr2 _) = do
         pexpr1 <- pprintPrec 26 expr1
-        pexpr2 <- pprintPrec 26 expr2
-        return $ parenPrec p 25 $ pexpr1 <> brackets pexpr2
+        pexpr2 <- pprint expr2
+        return $ parenPrec p 26 $ pexpr1 <> brackets pexpr2
     pprintPrec p (CCall expr args _) = do
         pexpr <- pprintPrec 30 expr
         pargs <- mapM pprint args
@@ -201,7 +210,7 @@ instance PPrint CPartDesignator where
     pprint (CMemberDesig ident _) = return $ pretty "." <> pretty ident
 
 
-instance PPrint CInitializer where 
+instance PPrint CInitializer where
     pprint (CInitExpr expr _) = pprint expr
     pprint (CInitList initl _) = do
         pinitl <- mapM p initl
@@ -213,7 +222,7 @@ instance PPrint CInitializer where
                 pinit <- pprint initializer
                 return $ hsep (punctuate comma pdesigs) <+> pretty "=" <+> pinit
 
-instance PPrint CInitializerList where 
+instance PPrint CInitializerList where
     pprint initl = do
         pinitl <- mapM p initl
         return $ pretty "{" <+> hsep (punctuate comma pinitl) <+> pretty "}"
@@ -315,7 +324,7 @@ instance PPrint CStatement where
         pe <- pprint e
         return $ pretty "return" <+> pe <> semi
     pprint (CCompound items _) = do
-        pItems <- mapM pprint items 
+        pItems <- mapM pprint items
         return $ pretty "{" <+> vcat pItems <+> pretty "}"
 
 instance PPrint CCompoundBlockItem where

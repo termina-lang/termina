@@ -6,7 +6,9 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Expression
+import Control.Monad.Reader
+import Generator.CGenerator
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn :: SemanticAnns
@@ -55,7 +57,10 @@ derefpVector0IndexConstant = AccessObject (VectorIndexExpression derefpVector0 u
 derefpVector0IndexVar0 = AccessObject (VectorIndexExpression derefpVector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 renderExpression :: Expression SemanticAnns -> Text
-renderExpression = render . ppExpression empty
+renderExpression expr = 
+  case runReaderT (genExpression expr) empty of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -71,10 +76,10 @@ spec = do
         pack "vector1[3][4]"
     it "Prints the expression: dyn_vector0[0x08 : u8]" $ do
       renderExpression dynVector0IndexConstant `shouldBe`
-        pack "((uint32_t *)(dyn_vector0.data))[8]"
+        pack "((uint32_t *)dyn_vector0.data)[8]"
     it "Prints the expression: dyn_vector0[var0]" $ do
       renderExpression dynVector0IndexVar0 `shouldBe`
-        pack "((uint32_t *)(dyn_vector0.data))[var0]"
+        pack "((uint32_t *)dyn_vector0.data)[var0]"
     it "Prints the expression: *vector0[3 : u32]" $ do
       renderExpression derefpVector0IndexConstant `shouldBe`
         pack "p_vector0[3]"

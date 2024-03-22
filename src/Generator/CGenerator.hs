@@ -32,8 +32,8 @@ cBinOp RelationalNotEqual = CNeqOp
 cBinOp BitwiseAnd = CAndOp
 cBinOp BitwiseOr = COrOp
 cBinOp BitwiseXor = CXorOp
-cBinOp LogicalAnd = CAndOp
-cBinOp LogicalOr = COrOp
+cBinOp LogicalAnd = CLndOp
+cBinOp LogicalOr = CLorOp
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.
@@ -55,6 +55,16 @@ sinkPort = namefy $ "termina" <::> "sink_port_t"
 inPort = namefy $ "termina" <::> "in_port_t"
 outPort = namefy $ "termina" <::> "out_port_t"
 
+poolMethodName :: Identifier -> Identifier
+poolMethodName mName = namefy $ "termina" <::> "pool" <::> mName
+
+msgQueueMethodName :: Identifier -> Identifier
+msgQueueMethodName mName = namefy $ "termina" <::> "msg_queue" <::> mName
+
+
+thatField :: Identifier
+thatField = "__that"
+
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
@@ -68,6 +78,10 @@ getObjectType (VectorSliceExpression _ _ _ (SemAnn _ (ETy (ObjectType _ ts)))) =
 getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = return $ ts
 getObjectType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return $ ts
 getObjectType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
+
+getParameters :: Expression SemanticAnns -> CGenerator [Parameter]
+getParameters (FunctionExpression _ _ (SemAnn _ (ETy (AppType params _)))) = return params
+getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 getExprType :: Expression SemanticAnns -> CGenerator TypeSpecifier
 getExprType (AccessObject obj) = getObjectType obj
@@ -90,79 +104,118 @@ genOptionStructName Char = return $ namefy $ "option" <::> "char_t"
 genOptionStructName UInt8 = return $ namefy $ "option" <::> "uint8_t"
 genOptionStructName UInt16 = return $ namefy $ "option" <::> "uint16_t"
 genOptionStructName UInt32 = return $ namefy $ "option" <::> "uint32_t"
-genOptionStructName UInt64 = return $ namefy $ "option" <::> "uint64_t" 
+genOptionStructName UInt64 = return $ namefy $ "option" <::> "uint64_t"
 genOptionStructName Int8 = return $ namefy $ "option" <::> "int8_t"
 genOptionStructName Int16 = return $ namefy $ "option" <::> "int16_t"
 genOptionStructName Int32 = return $ namefy $ "option" <::> "int32_t"
 genOptionStructName Int64 = return $ namefy $ "option" <::> "int64_t"
 genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionStructName ts = do
-    tsName <- genTypeSpecName ts 
+genOptionStructName ts@(Vector {}) = do
+    tsName <- genTypeSpecName ts
     tsDimension <- genDimensionOptionTS ts
-    return $ namefy $ "option" <::> tsName <> tsDimension  where
-    genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
-    genTypeSpecName UInt8 = return $ "uint8"
-    genTypeSpecName UInt16 = return $ "uint16"
-    genTypeSpecName UInt32 = return $ "uint32"
-    genTypeSpecName UInt64 = return $ "uint64"
-    genTypeSpecName Int8 = return $ "int8"
-    genTypeSpecName Int16 = return $ "int16"
-    genTypeSpecName Int32 = return $ "int32"
-    genTypeSpecName Int64 = return $ "int64"
-    genTypeSpecName (Vector ts' _) = genTypeSpecName ts'
-    genTypeSpecName (DefinedType typeIdentifier) = return $ typeIdentifier
-    genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+    return $ namefy $ "option" <::> tsName <> tsDimension <> "_t"
 
-    genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
-    genDimensionOptionTS (Vector ts' (K s)) = (("__" <> show s) <>) <$> genDimensionOptionTS ts'
-    genDimensionOptionTS _ = return $ ""
+    where
+        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName UInt8 = return "uint8"
+        genTypeSpecName UInt16 = return "uint16"
+        genTypeSpecName UInt32 = return "uint32"
+        genTypeSpecName UInt64 = return "uint64"
+        genTypeSpecName Int8 = return "int8"
+        genTypeSpecName Int16 = return "int16"
+        genTypeSpecName Int32 = return "int32"
+        genTypeSpecName Int64 = return "int64"
+        genTypeSpecName (Vector ts' _) = genTypeSpecName ts'
+        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+
+        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
+        genDimensionOptionTS _ = return ""
+genOptionStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
+
+genArrayWrapStructName :: TypeSpecifier -> CGenerator Identifier
+genArrayWrapStructName ts@(Vector {}) = do
+    tsName <- genTypeSpecName ts
+    tsDimension <- genDimensionOptionTS ts
+    return $ namefy $ "wrapper" <::> tsName <> tsDimension <> "_t"
+
+    where
+        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName UInt8 = return "uint8"
+        genTypeSpecName UInt16 = return "uint16"
+        genTypeSpecName UInt32 = return "uint32"
+        genTypeSpecName UInt64 = return "uint64"
+        genTypeSpecName Int8 = return "int8"
+        genTypeSpecName Int16 = return "int16"
+        genTypeSpecName Int32 = return "int32"
+        genTypeSpecName Int64 = return "int64"
+        genTypeSpecName (Vector ts' _) = genTypeSpecName ts'
+        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+
+        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
+        genDimensionOptionTS _ = return ""
+genArrayWrapStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
 -- | Obtains the corresponding C type of a primitive type
 genDeclSpecifiers :: TypeSpecifier -> CGenerator [CDeclarationSpecifier]
 -- |  Unsigned integer types
-genDeclSpecifiers UInt8  = return $ [CTypeSpec CUInt8Type]
-genDeclSpecifiers UInt16 = return $ [CTypeSpec CUInt16Type]
-genDeclSpecifiers UInt32 = return $ [CTypeSpec CUInt32Type]
-genDeclSpecifiers UInt64 = return $ [CTypeSpec CUInt64Type]
+genDeclSpecifiers UInt8  = return [CTypeSpec CUInt8Type]
+genDeclSpecifiers UInt16 = return [CTypeSpec CUInt16Type]
+genDeclSpecifiers UInt32 = return [CTypeSpec CUInt32Type]
+genDeclSpecifiers UInt64 = return [CTypeSpec CUInt64Type]
 -- | Signed integer types
-genDeclSpecifiers Int8   = return $ [CTypeSpec CInt8Type]
-genDeclSpecifiers Int16  = return $ [CTypeSpec CInt16Type]
-genDeclSpecifiers Int32  = return $ [CTypeSpec CInt32Type]
-genDeclSpecifiers Int64  = return $ [CTypeSpec CInt64Type]
+genDeclSpecifiers Int8   = return [CTypeSpec CInt8Type]
+genDeclSpecifiers Int16  = return [CTypeSpec CInt16Type]
+genDeclSpecifiers Int32  = return [CTypeSpec CInt32Type]
+genDeclSpecifiers Int64  = return [CTypeSpec CInt64Type]
 -- | Other primitive types
-genDeclSpecifiers USize  = return $ [CTypeSpec CSizeTType]
-genDeclSpecifiers Bool   = return $ [CTypeSpec CBoolType]
-genDeclSpecifiers Char   = return $ [CTypeSpec CCharType]
+genDeclSpecifiers USize  = return [CTypeSpec CSizeTType]
+genDeclSpecifiers Bool   = return [CTypeSpec CBoolType]
+genDeclSpecifiers Char   = return [CTypeSpec CCharType]
 -- | Primitive type
-genDeclSpecifiers (DefinedType typeIdentifier) = return $ [CTypeSpec $ CTypeDef typeIdentifier]
+genDeclSpecifiers (DefinedType typeIdentifier) = return [CTypeSpec $ CTypeDef typeIdentifier]
 -- | Vector type
 -- The type of the vector is the type of the elements
 genDeclSpecifiers (Vector ts _) = genDeclSpecifiers ts
 -- | Option type
-genDeclSpecifiers (Option (DynamicSubtype _))  = return $ [CTypeSpec $ CTypeDef optionDyn]
+genDeclSpecifiers (Option (DynamicSubtype _))  = return [CTypeSpec $ CTypeDef optionDyn]
 genDeclSpecifiers (Option ts)                  = do
     optName <- genOptionStructName ts
-    return $ [CTypeSpec $ CTypeDef optName]
+    return [CTypeSpec $ CTypeDef optName]
 -- Non-primitive types:
 -- | Dynamic subtype
-genDeclSpecifiers (DynamicSubtype _)           = return $ [CTypeSpec $ CTypeDef dynamicStruct]
+genDeclSpecifiers (DynamicSubtype _)           = return [CTypeSpec $ CTypeDef dynamicStruct]
 -- | Pool type
-genDeclSpecifiers (Pool _ _)                   = return $ [CTypeSpec $ CTypeDef pool]
-genDeclSpecifiers (MsgQueue _ _)               = return $ [CTypeSpec $ CTypeDef msgQueue]
+genDeclSpecifiers (Pool _ _)                   = return [CTypeSpec $ CTypeDef pool]
+genDeclSpecifiers (MsgQueue _ _)               = return [CTypeSpec $ CTypeDef msgQueue]
 genDeclSpecifiers (Location ts)                = genDeclSpecifiers ts
 genDeclSpecifiers (AccessPort ts)              = genDeclSpecifiers ts
-genDeclSpecifiers (Allocator _)                = return $ [CTypeSpec $ CTypeDef pool]
+genDeclSpecifiers (Allocator _)                = return [CTypeSpec $ CTypeDef pool]
 -- | Type of the ports
-genDeclSpecifiers (SinkPort {})                = return $ [CTypeSpec $ CTypeDef sinkPort]
-genDeclSpecifiers (OutPort {})                 = return $ [CTypeSpec $ CTypeDef outPort]
-genDeclSpecifiers (InPort {})                  = return $ [CTypeSpec $ CTypeDef inPort]
+genDeclSpecifiers (SinkPort {})                = return [CTypeSpec $ CTypeDef sinkPort]
+genDeclSpecifiers (OutPort {})                 = return [CTypeSpec $ CTypeDef outPort]
+genDeclSpecifiers (InPort {})                  = return [CTypeSpec $ CTypeDef inPort]
 genDeclSpecifiers t                            = throwError $ InternalError $ "Unsupported type: " ++ show t
+
+genArrayDeclarator :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclarator
+genArrayDeclarator (Vector ts _) ann = do
+    return $ CDeclarator Nothing (CPtrDeclr [] ann : reverse (genArraySizeDeclarator ts)) [] ann
+    where
+        genArraySizeDeclarator :: TypeSpecifier -> [CDerivedDeclarator]
+        genArraySizeDeclarator (Vector ts' (K s)) = 
+            CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) ann)) ann : genArraySizeDeclarator ts'
+        genArraySizeDeclarator _ = []
+genArrayDeclarator ts _ = throwError $ InternalError $ "Invalid type specifier, not an array: " ++ show ts
 
 genCastDeclaration :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclaration
 genCastDeclaration (DynamicSubtype ts@(Vector _ _)) ann = do
     -- We must obtain the declaration specifier of the vector
     specs <- genDeclSpecifiers ts
-    return $ CDeclaration specs [] ann
+    decls <- genArrayDeclarator ts ann
+    return $ CDeclaration specs [(Just decls, Nothing, Nothing)] ann
 genCastDeclaration (DynamicSubtype ts) ann = do
     specs <- genDeclSpecifiers ts
     return $ CDeclaration specs [(Just (CDeclarator Nothing [CPtrDeclr [] ann] [] ann), Nothing, Nothing)] ann
@@ -176,27 +229,133 @@ genExpression (BinOp op left right ann) = do
     -- | We need to check if the left and right expressions are binary operations
     -- If they are, we need to cast them to ensure that the resulting value
     -- is truncated to the correct type
-    cLeft <- 
+    cLeft <-
         case left of
             (BinOp {}) -> do
                 ts <- getExprType left
-                decl <- genCastDeclaration ts ann
-                flip (CCast decl) ann <$> genExpression left
+                case ts of
+                    Bool -> genExpression left
+                    _ -> do
+                        decl <- genCastDeclaration ts ann
+                        flip (CCast decl) ann <$> genExpression left
             _ -> genExpression left
-    cRight <- 
+    cRight <-
         case right of
             (BinOp {}) -> do
                 ts <- getExprType right
-                decl <- genCastDeclaration ts ann
-                flip (CCast decl) ann <$> genExpression right
+                case ts of
+                    Bool -> genExpression right
+                    _ -> do
+                        decl <- genCastDeclaration ts ann
+                        flip (CCast decl) ann <$> genExpression right
             _ -> genExpression right
     return $ CBinary (cBinOp op) cLeft cRight ann
-genExpression (Constant c anns) = 
+genExpression (Constant c anns) =
     case c of
         (I _ i) -> return $ CConst (CIntConst (CInteger i DecRepr)) anns
         (B True) -> return $ CConst (CIntConst (CInteger 1 DecRepr)) anns
         (B False) -> return $ CConst (CIntConst (CInteger 0 DecRepr)) anns
         (C char) -> return $ CConst (CCharConst (CChar char)) anns
+genExpression (Casting expr ts ann) = do
+    decl <- genCastDeclaration ts ann
+    cExpr <- genExpression expr
+    return $ CCast decl cExpr ann
+genExpression (ReferenceExpression _ obj ann) = do
+    objType <- getObjectType obj
+    cObj <- genObject obj
+    case objType of
+        -- | If it is a vector, we need to generate the address of the data
+        (DynamicSubtype (Vector _ _)) -> do
+            -- We must obtain the declaration specifier of the vector
+            decl <- genCastDeclaration objType ann
+            return $ CCast decl (CMember cObj "data" False ann) ann
+            -- | Else, we print the address to the data
+        (DynamicSubtype _) -> do
+            decl <- genCastDeclaration objType ann
+            return $ CCast decl (CMember cObj "data" False ann) ann
+        (Vector {}) -> return cObj
+        _ -> return $ CUnary CAdrOp cObj ann
+genExpression expr@(FunctionExpression name args ann) = do
+    -- Obtain the substitutions map
+    subs <- ask
+    -- If the identifier is in the substitutions map, use the substituted identifier
+    let identifier = fromMaybe name (Data.Map.lookup name subs)
+    argsAnns <- getParameters expr
+    cArgs <- zipWithM
+            (\pExpr (Parameter _ ts) -> do
+                cParamExpr <- genExpression pExpr
+                case ts of
+                    Vector {} -> do
+                        structName <- genArrayWrapStructName ts
+                        return $  CUnary CIndOp
+                            (CCast (
+                                CDeclaration [CTypeSpec $ CTypeDef structName]
+                                    [(Just (CDeclarator Nothing [CPtrDeclr [] ann] [] ann), Nothing, Nothing)] ann
+                                ) cParamExpr ann) ann
+                    _ -> return cParamExpr) args argsAnns
+    expType <- getExprType expr
+    case expType of
+        Vector {} -> return $ CMember (CCall (CVar identifier ann) cArgs ann) "array" False ann
+        _ -> return $ CCall (CVar identifier ann) cArgs ann
+genExpression (MemberFunctionAccess obj ident args ann) = do
+    -- Generate the C code for the object
+    cObj <- genObject obj
+    -- Generate the C code for the parameters
+    cArgs <- mapM
+            (\pExpr -> do
+                cParamExpr <- genExpression pExpr
+                cParamExprTs <- getExprType pExpr
+                case cParamExprTs of
+                    Vector {} -> do
+                        structName <- genArrayWrapStructName cParamExprTs
+                        return $  CUnary CIndOp
+                            (CCast (
+                                CDeclaration [CTypeSpec $ CTypeDef structName]
+                                    [(Just (CDeclarator Nothing [CPtrDeclr [] ann] [] ann), Nothing, Nothing)] ann
+                                ) cParamExpr ann) ann
+                    _ -> return cParamExpr) args
+    objType <- getObjectType obj
+    case objType of
+        (DefinedType classId) ->
+            -- For the time being, the only way to access the member function of a class
+            -- is through the self object. Since the function in C expeects a reference to
+            -- the object, we would need to pass the address of the object. In order to avoid
+            -- derefecerencing a reference (&*self), we shortcut the process and pass the object
+            -- directly. This might change in the future if we finally implement traits.
+            return $ CCall (CVar (classId <::> ident) ann) (CVar "self" ann : cArgs) ann
+        -- | If the left hand size is a class:
+        AccessPort (DefinedType {}) ->
+            return $
+                CCall (CMember cObj ident False ann)
+                      (CMember cObj thatField False ann : cArgs) ann
+        -- | If the left hand side is a pool:
+        AccessPort (Allocator {}) ->
+            return $
+                CCall (CVar (poolMethodName ident) ann) (cObj : cArgs) ann
+        -- | If the left hand side is a message queue:
+        OutPort {} ->
+            -- | If it is a send, the first parameter is the object to be sent. The
+            -- function is expecting to receive a reference to that object.
+            case args of
+                [element] -> do
+                    paramTs <- getExprType element
+                    case paramTs of
+                        Vector {} ->
+                            return $
+                                CCall (CVar (msgQueueMethodName ident) ann) (cObj :
+                                    (flip (CCast (CDeclaration
+                                        [CTypeSpec CVoidType]
+                                        [(Just (CDeclarator Nothing [CPtrDeclr [] ann] [] ann), Nothing, Nothing)]
+                                        ann)) ann <$> cArgs))  ann
+                        _ -> return $
+                                CCall (CVar (msgQueueMethodName ident) ann) (cObj: 
+                                    (flip (CCast (CDeclaration
+                                        [CTypeSpec CVoidType]
+                                        [(Just (CDeclarator Nothing [CPtrDeclr [] ann] [] ann), Nothing, Nothing)]
+                                        ann)) ann . flip (CUnary CAdrOp) ann <$> cArgs))  ann
+                _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show args
+        -- | Anything else should not happen
+        _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genObject :: Object SemanticAnns -> CGenerator CExpression
@@ -222,7 +381,7 @@ genObject (VectorSliceExpression obj lower _ ann) =
         _ -> throwError $ InternalError ("Invalid constant expression: " ++ show lower)
 genObject (MemberAccess obj identifier ann) = do
     cObj <- genObject obj
-    objType <- getObjectType obj 
+    objType <- getObjectType obj
     case objType of
         (Location {}) -> return $ CMember cObj identifier True ann
         _ -> return $ CMember cObj identifier False ann
@@ -230,17 +389,17 @@ genObject (DereferenceMemberAccess obj identifier ann) = do
     cObj <- genObject obj
     return $ CMember cObj identifier True ann
 genObject (Dereference obj ann) = do
-    objType <- getObjectType obj 
+    objType <- getObjectType obj
     case objType of
         -- | A dereference to a vector is printed as the name of the vector
         (Reference _ (Vector _ _)) -> genObject obj
-        _ -> do 
+        _ -> do
             cObj <- genObject obj
             return $ CUnary CIndOp cObj ann
 -- | If the expression is a dynamic subtype treated as its base type, we need to
 -- check if it is a vector
 genObject o@(Undyn obj ann) = do
-    objType <- getObjectType obj 
+    objType <- getObjectType obj
     cObj <- genObject obj
     case objType of
         -- | If it is a vector, we need to generate the address of the data

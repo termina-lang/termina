@@ -118,4 +118,4 @@ msgQueueSemAnn :: TypeSpecifier -> SemanticAnns
 msgQueueSemAnn ts = objSemAnn Mutable (OutPort ts)
 
 funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
-funSemAnn params ts = SemAnn undefined (ETy (AppType params ts))
+funSemAnn params ts = SemAnn Internal (ETy (AppType params ts))
