@@ -6,8 +6,12 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Statement
+import Prettyprinter
 import UT.PPrinter.Expression.Common
+import Control.Monad.Reader
+import Generator.Statement
+import Generator.LanguageC.Printer
+
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
@@ -105,7 +109,10 @@ option0Assign = AssignmentStmt option0 (OptionVariantExpression (Some (AccessObj
 option1Assign = AssignmentStmt option1 (OptionVariantExpression None optionDynUInt32SemAnn) undefined
 
 renderStatement :: Statement SemanticAnns -> Text
-renderStatement = render . ppStatement empty
+renderStatement stmt = 
+  case runReaderT (genStatement stmt) empty of
+    Left err -> pack $ show err
+    Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -200,7 +207,7 @@ spec = do
   describe "Pretty printing undyn assignments" $ do
     it "Prints the statement dyn_var0 = foo1" $ do
       renderStatement undynVar0AssignFoo1 `shouldBe`
-        pack "*((uint32_t *)(dyn_var0.data)) = foo1;"
+        pack "*(uint32_t *)dyn_var0.data = foo1;"
     it "Prints the statement dyn_var0 = 1024 : u32" $ do
       renderStatement undynVar0AssignConst `shouldBe`
-        pack "*((uint32_t *)(dyn_var0.data)) = 1024;"
+        pack "*(uint32_t *)dyn_var0.data = 1024;"

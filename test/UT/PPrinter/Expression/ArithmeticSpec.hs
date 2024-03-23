@@ -8,7 +8,7 @@ import Semantic.Monad
 import UT.PPrinter.Expression.Common
 import Data.Map
 import Control.Monad.Reader
-import Generator.CGenerator
+import Generator.Expression
 import Generator.LanguageC.Printer
 
 

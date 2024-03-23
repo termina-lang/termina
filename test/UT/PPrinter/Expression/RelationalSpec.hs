@@ -7,7 +7,7 @@ import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
 import Control.Monad.Reader
-import Generator.CGenerator
+import Generator.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 

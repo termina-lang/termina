@@ -325,7 +325,7 @@ instance PPrint CStatement where
         return $ pretty "return" <+> pe <> semi
     pprint (CCompound items _) = do
         pItems <- mapM pprint items
-        return $ pretty "{" <+> vcat pItems <+> pretty "}"
+        return $ braces' ((indentTab . align) (vsep pItems))
 
 instance PPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
@@ -353,3 +353,9 @@ binPrec CXorOp = 14
 binPrec COrOp  = 13
 binPrec CLndOp = 12
 binPrec CLorOp = 11
+
+braces' :: DocStyle -> DocStyle
+braces' b = braces (line <> b <> line)
+
+indentTab :: DocStyle -> DocStyle
+indentTab = indent 4
