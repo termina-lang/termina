@@ -110,7 +110,7 @@ option1Assign = AssignmentStmt option1 (OptionVariantExpression None optionDynUI
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement stmt = 
-  case runReaderT (genStatement stmt) empty of
+  case runReaderT (genBlockItem stmt) empty of
     Left err -> pack $ show err
     Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -119,34 +119,34 @@ spec = do
   describe "Pretty printing integer variable declarations" $ do
     it "Prints the statement foo1 = foo0; where foo1 : u32" $ do
       renderStatement foo1Assign `shouldBe`
-        pack "foo1 = foo0;"
+        pack "\nfoo1 = foo0;"
     it "Prints the statement foo2 = 0 : u32; where foo2 : u32" $ do
       renderStatement foo2Assign `shouldBe`
-        pack "foo2 = 0;"
+        pack "\nfoo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
     it "Prints the statement option0 = Some(dyn_var0); where option0 : Option <'dyn u32>" $ do
       renderStatement option0Assign `shouldBe`
         pack (
-          "option0.__variant = Some;\n" ++
+          "\noption0.__variant = Some;\n" ++
           "option0.Some.__0 = dyn_var0;")
     it "Prints the statement option1 = None; where option1 : Option <'dyn u32>" $ do
       renderStatement option1Assign `shouldBe`
-        pack "option1.__variant = None;"
+        pack "\noption1.__variant = None;"
   describe "Pretty printing enum variable declarations" $ do
     it "Prints the statement enum0 = Message::Reset; where enum0 : Message" $ do
       renderStatement enum0Assign `shouldBe`
-        pack "enum0.__variant = Message__Reset;"
+        pack "\nenum0.__variant = Message__Reset;"
     it "Prints the statement enum1 = Message::In(0 : u32, 0 : u32); where enum1 : Message" $ do
       renderStatement enum1Assign `shouldBe`
         pack (
-          "enum1.__variant = Message__In;\n" ++
+          "\nenum1.__variant = Message__In;\n" ++
           "enum1.In.__0 = 0;\n" ++
           "enum1.In.__1 = 0;")
   describe "Pretty printing struct variable declarations" $ do
     it "Prints the statement struct0 = {field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; where struct0 : TMDescriptor" $ do
       renderStatement struct0Assign `shouldBe`
         pack (
-        "struct0.field0 = 0;\n" ++
+        "\nstruct0.field0 = 0;\n" ++
         "struct0.field1.field_a = 0;\n" ++
         "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
         "    struct0.field1.field_b[__i0] = 0;\n" ++
@@ -154,18 +154,18 @@ spec = do
         "struct0.field1.field_c = 4294901760;")
     it "Prints the statement struct1 = struct0; where struct1 : TMDescriptor" $ do
       renderStatement struct1Assign `shouldBe`
-        pack "struct1 = struct0;"
+        pack "\nstruct1 = struct0;"
   describe "Pretty printing vector variable declarations" $ do
     it "Prints the statement vector1 = vector0; where vector1 : [u32; 10 : u32]" $ do
       renderStatement vector1Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    vector1[__i0] = vector0[__i0];\n" ++
           "}")
     it "Prints the statement vector2 = vector0; where vector2 : [[u32; 5 : u32]; 10 : u32]" $ do
       renderStatement vector2Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "        vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
           "    }\n" ++
@@ -173,13 +173,13 @@ spec = do
     it "Prints the statement vector3 = [0 : u32; 10 : u32]; where vector3 : [u32; 10 : u32]" $ do
       renderStatement vector3Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    vector3[__i0] = 0;\n" ++
           "}")
     it "Prints the statement vector4 = [[0 : u32; 5 : u32]; 10 : u32]; where vector4 : [[u32; 5 : u32]; 10 : u32]s" $ do
       renderStatement vector4Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "        vector4[__i0][__i1] = 0;\n" ++
           "    }\n" ++
@@ -187,7 +187,7 @@ spec = do
     it "Prints the statement vector4 = [vector_row; 10 : u32]; where vector4 : [[u32; 5 : u32]; 10 : u32]" $ do
       renderStatement vector5Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
           "        vector5[__i0][__i1] = vector_row[__i1];\n" ++
           "    }\n" ++
@@ -196,7 +196,7 @@ spec = do
         "[{field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
       renderStatement vector6Assign `shouldBe`
         pack (
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nfor (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    vector6[__i0].field0 = 0;\n" ++
           "    vector6[__i0].field1.field_a = 0;\n" ++
           "    for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
@@ -207,7 +207,7 @@ spec = do
   describe "Pretty printing undyn assignments" $ do
     it "Prints the statement dyn_var0 = foo1" $ do
       renderStatement undynVar0AssignFoo1 `shouldBe`
-        pack "*(uint32_t *)dyn_var0.data = foo1;"
+        pack "\n*(uint32_t *)dyn_var0.data = foo1;"
     it "Prints the statement dyn_var0 = 1024 : u32" $ do
       renderStatement undynVar0AssignConst `shouldBe`
-        pack "*(uint32_t *)dyn_var0.data = 1024;"
+        pack "\n*(uint32_t *)dyn_var0.data = 1024;"

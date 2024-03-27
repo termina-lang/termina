@@ -5,6 +5,7 @@ import Semantic.Monad
 import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Map
+import Generator.LanguageC.AST
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -146,3 +147,87 @@ genArrayWrapStructName ts@(Vector {}) = do
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 genArrayWrapStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
+
+-- | Obtains the corresponding C type of a primitive type
+genDeclSpecifiers :: TypeSpecifier -> CGenerator [CDeclarationSpecifier]
+-- |  Unsigned integer types
+genDeclSpecifiers UInt8  = return [CTypeSpec CUInt8Type]
+genDeclSpecifiers UInt16 = return [CTypeSpec CUInt16Type]
+genDeclSpecifiers UInt32 = return [CTypeSpec CUInt32Type]
+genDeclSpecifiers UInt64 = return [CTypeSpec CUInt64Type]
+-- | Signed integer types
+genDeclSpecifiers Int8   = return [CTypeSpec CInt8Type]
+genDeclSpecifiers Int16  = return [CTypeSpec CInt16Type]
+genDeclSpecifiers Int32  = return [CTypeSpec CInt32Type]
+genDeclSpecifiers Int64  = return [CTypeSpec CInt64Type]
+-- | Other primitive types
+genDeclSpecifiers USize  = return [CTypeSpec CSizeTType]
+genDeclSpecifiers Bool   = return [CTypeSpec CBoolType]
+genDeclSpecifiers Char   = return [CTypeSpec CCharType]
+-- | Primitive type
+genDeclSpecifiers (DefinedType typeIdentifier) = return [CTypeSpec $ CTypeDef typeIdentifier]
+-- | Vector type
+-- The type of the vector is the type of the elements
+genDeclSpecifiers (Vector ts _) = genDeclSpecifiers ts
+-- | Option type
+genDeclSpecifiers (Option (DynamicSubtype _))  = return [CTypeSpec $ CTypeDef optionDyn]
+genDeclSpecifiers (Option ts)                  = do
+    optName <- genOptionStructName ts
+    return [CTypeSpec $ CTypeDef optName]
+-- Non-primitive types:
+-- | Dynamic subtype
+genDeclSpecifiers (DynamicSubtype _)           = return [CTypeSpec $ CTypeDef dynamicStruct]
+-- | Pool type
+genDeclSpecifiers (Pool _ _)                   = return [CTypeSpec $ CTypeDef pool]
+genDeclSpecifiers (MsgQueue _ _)               = return [CTypeSpec $ CTypeDef msgQueue]
+genDeclSpecifiers (Location ts)                = genDeclSpecifiers ts
+genDeclSpecifiers (AccessPort ts)              = genDeclSpecifiers ts
+genDeclSpecifiers (Allocator _)                = return [CTypeSpec $ CTypeDef pool]
+-- | Type of the ports
+genDeclSpecifiers (SinkPort {})                = return [CTypeSpec $ CTypeDef sinkPort]
+genDeclSpecifiers (OutPort {})                 = return [CTypeSpec $ CTypeDef outPort]
+genDeclSpecifiers (InPort {})                  = return [CTypeSpec $ CTypeDef inPort]
+genDeclSpecifiers t                            = throwError $ InternalError $ "Unsupported type: " ++ show t
+
+genArraySizeDeclarator :: TypeSpecifier -> SemanticAnns -> [CDerivedDeclarator]
+genArraySizeDeclarator (Vector ts' (K s)) ann = 
+    let cAnn = buildGenericAnn ann in
+    CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) cAnn)) cAnn : genArraySizeDeclarator ts' ann
+genArraySizeDeclarator _ _ = []
+
+genCastDeclaration :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclaration
+genCastDeclaration (DynamicSubtype ts@(Vector _ _)) ann = do
+    -- We must obtain the declaration specifier of the vector
+    specs <- genDeclSpecifiers ts
+    decls <- genPtrArrayDeclarator ts ann
+    return $ CDeclaration specs [(Just decls, Nothing, Nothing)] declAnn
+
+    where
+
+        cAnn, declAnn :: CAnns
+        cAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+
+        genPtrArrayDeclarator :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclarator
+        genPtrArrayDeclarator (Vector ts' _) ann' = do
+            return $ CDeclarator Nothing (CPtrDeclr [] cAnn : genArraySizeDeclarator ts' ann') [] cAnn
+        genPtrArrayDeclarator ts' _ = throwError $ InternalError $ "Invalid type specifier, not an array: " ++ show ts'
+
+genCastDeclaration (DynamicSubtype ts) ann = do
+    let cAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+    specs <- genDeclSpecifiers ts
+    return $ CDeclaration specs [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
+genCastDeclaration ts ann = do
+    let declAnn = buildDeclarationAnn ann False
+    specs <- genDeclSpecifiers ts
+    return $ CDeclaration specs [] declAnn
+
+buildGenericAnn :: SemanticAnns -> CAnns
+buildGenericAnn ann = CAnnotations (Semantic.Monad.location ann) CGenericAnn
+
+buildStatementAnn :: SemanticAnns -> Bool -> CAnns
+buildStatementAnn ann before = CAnnotations (Semantic.Monad.location ann) (CStatementAnn before)
+
+buildDeclarationAnn :: SemanticAnns -> Bool -> CAnns
+buildDeclarationAnn ann before = CAnnotations (Semantic.Monad.location ann) (CDeclarationAnn before)

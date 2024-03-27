@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
 module Generator.LanguageC.AST where
 import Prettyprinter
 import Semantic.Monad
@@ -284,39 +286,7 @@ data CExpression' a
   | CVar         Ident                   -- identifier (incl. enumeration const)
                  a
   | CConst       CConstant  a            -- ^ integer, character, floating point and string constants
-  | CCompoundLit (CDeclaration' a)
-                 (CInitializerList' a)   -- type name & initialiser list
-                 a                       -- ^ C99 compound literal
     deriving (Show)
-
-{--
--- deriving Functor does not work (type synonyms)
-instance Functor CExpression' where
-        fmap _f (CComma a1 a2) = CComma (fmap (fmap _f) a1) (_f a2)
-        fmap _f (CAssignment a1 a2 a3)
-          = CAssignment (fmap _f a1) (fmap _f a2) (_f a3)
-        fmap _f (CBinary a1 a2 a3 a4)
-          = CBinary a1 (fmap _f a2) (fmap _f a3) (_f a4)
-        fmap _f (CCast a1 a2 a3) = CCast (fmap _f a1) (fmap _f a2) (_f a3)
-        fmap _f (CUnary a1 a2 a3) = CUnary a1 (fmap _f a2) (_f a3)
-        fmap _f (CSizeofExpr a1 a2) = CSizeofExpr (fmap _f a1) (_f a2)
-        fmap _f (CSizeofType a1 a2) = CSizeofType (fmap _f a1) (_f a2)
-        fmap _f (CAlignofExpr a1 a2) = CAlignofExpr (fmap _f a1) (_f a2)
-        fmap _f (CAlignofType a1 a2) = CAlignofType (fmap _f a1) (_f a2)
-        fmap _f (CIndex a1 a2 a3)
-          = CIndex (fmap _f a1) (fmap _f a2) (_f a3)
-        fmap _f (CCall a1 a2 a3)
-          = CCall (fmap _f a1) (fmap (fmap _f) a2) (_f a3)
-        fmap _f (CMember a1 a2 a3 a4) = CMember (fmap _f a1) a2 a3 (_f a4)
-        fmap _f (CVar a1 a2) = CVar a1 (_f a2)
-        fmap _f (CConst a1) = CConst a1
-        fmap _f (CCompoundLit a1 a2 a3)
-          = CCompoundLit (fmap _f a1) (fmapInitList _f a2) (_f a3)
-
-
-fmapInitList :: (a->b) -> CInitializerList' a -> CInitializerList' b
-fmapInitList _f = map (\(desigs, initializer) -> (fmap (fmap _f) desigs, fmap _f initializer))
---}
 
 data CIntFlag = FlagUnsigned | FlagLong | FlagLongLong | FlagImag
   deriving (Eq,Ord,Enum,Bounded)
@@ -397,24 +367,41 @@ instance Pretty CUnaryOp where
     CCompOp    -> "~"
     CNegOp     -> "!"
 
-type CFile = CFile' SemanticAnns
-type CPreprocessorDirective = CPreprocessorDirective' SemanticAnns
-type CFileItem = CFileItem' SemanticAnns
-type CExternalDeclaration = CExternalDeclaration' SemanticAnns
-type CFunctionDef = CFunctionDef' SemanticAnns
-type CStatement = CStatement' SemanticAnns
-type CExpression = CExpression' SemanticAnns
-type CDeclaration = CDeclaration' SemanticAnns
-type CDeclarationSpecifier = CDeclarationSpecifier' SemanticAnns
-type CTypeSpecifier = CTypeSpecifier' SemanticAnns
-type CTypeQualifier = CTypeQualifier' SemanticAnns
-type CDeclarator = CDeclarator' SemanticAnns
-type CDerivedDeclarator = CDerivedDeclarator' SemanticAnns
-type CArraySize = CArraySize' SemanticAnns
-type CInitializer = CInitializer' SemanticAnns
-type CInitializerList = CInitializerList' SemanticAnns
-type CAttribute = CAttribute' SemanticAnns
-type CStructureUnion = CStructureUnion' SemanticAnns
-type CPartDesignator = CPartDesignator' SemanticAnns
-type CEnumeration = CEnumeration' SemanticAnns
-type CCompoundBlockItem = CCompoundBlockItem' SemanticAnns
+data CItemAnn = 
+    -- | Generic annotation
+    CGenericAnn
+    -- | C Statement annotation
+    | CStatementAnn 
+      Bool -- ^ Add new line before statement
+    | CDeclarationAnn
+      Bool -- ^ Add new line before declaration 
+  deriving (Show)
+
+data CAnns = CAnnotations
+  {
+    location :: Locations,
+    itemAnnotation :: CItemAnn
+  }
+  deriving (Show)
+
+type CFile = CFile' CAnns
+type CPreprocessorDirective = CPreprocessorDirective' CAnns
+type CFileItem = CFileItem' CAnns
+type CExternalDeclaration = CExternalDeclaration' CAnns
+type CFunctionDef = CFunctionDef' CAnns
+type CStatement = CStatement' CAnns
+type CExpression = CExpression' CAnns
+type CDeclaration = CDeclaration' CAnns
+type CDeclarationSpecifier = CDeclarationSpecifier' CAnns
+type CTypeSpecifier = CTypeSpecifier' CAnns
+type CTypeQualifier = CTypeQualifier' CAnns
+type CDeclarator = CDeclarator' CAnns
+type CDerivedDeclarator = CDerivedDeclarator' CAnns
+type CArraySize = CArraySize' CAnns
+type CInitializer = CInitializer' CAnns
+type CInitializerList = CInitializerList' CAnns
+type CAttribute = CAttribute' CAnns
+type CStructureUnion = CStructureUnion' CAnns
+type CPartDesignator = CPartDesignator' CAnns
+type CEnumeration = CEnumeration' CAnns
+type CCompoundBlockItem = CCompoundBlockItem' CAnns

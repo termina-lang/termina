@@ -7,6 +7,9 @@ import Parser.Parsing
 objSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnns
 objSemAnn ak ts = SemAnn Internal (ETy (ObjectType ak ts))
 
+stmtSemAnn :: SemanticAnns
+stmtSemAnn = SemAnn Internal STy
+
 simpleTySemAnn :: TypeSpecifier -> SemanticAnns
 simpleTySemAnn ts = SemAnn Internal (ETy (SimpleType ts))
 

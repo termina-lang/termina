@@ -30,36 +30,44 @@ class PPrint a where
 
 instance PPrint CDeclarator where
   pprintPrec prec (CDeclarator name derivedDeclrs _ _) = do
-    printCDerivedDeclarator prec derivedDeclrs
+    printCDerivedDeclarator prec (reverse derivedDeclrs)
         where
             printCDerivedDeclarator :: Integer -> [CDerivedDeclarator] -> CPrinter
-            printCDerivedDeclarator _ [] = return $ maybe emptyDoc pretty name
             printCDerivedDeclarator p (CPtrDeclr quals _ : declrs) = do
                 case (declrs, quals) of
-                    ([], []) -> return $ parenPrec p 5 $ pretty "*"
+                    ([], []) -> do
+                        case name of 
+                            Just n -> return $ parenPrec p 5 $ pretty "*" <+> pretty n
+                            Nothing -> return $ parenPrec p 5 $ pretty "*"
                     ([], _) -> do
                         pquals <- mapM pprint quals
-                        return $ parenPrec p 5 $ pretty "*" <> hsep pquals
+                        case name of 
+                            Just n -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals <+> pretty n
+                            Nothing -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals
                     (_, []) -> do
                         pdeclrs <- printCDerivedDeclarator 5 declrs
-                        return $ parenPrec p 5 $ parens (pretty "*") <> pdeclrs
+                        return $ parenPrec p 5 $ pretty "*" <+> pdeclrs
                     _ -> do
                         pdeclrs <- printCDerivedDeclarator 5 declrs
                         pquals <- mapM pprint quals
-                        return $ parenPrec p 5 $ pretty "*" <> hsep pquals <> pdeclrs
+                        return $ parenPrec p 5 $ pretty "*" <+> hsep pquals <+> pdeclrs
             printCDerivedDeclarator p (CArrDeclr quals size _ : declrs) = do
                 psize <- pprint size
                 case (declrs, quals) of
                     ([], []) -> do
-                        return $ parenPrec p 6 $ brackets psize
+                        case name of 
+                            Just n -> return $ parenPrec p 6 $ pretty n <> brackets psize
+                            Nothing -> return $ parenPrec p 6 $ brackets psize
                     ([], _) -> do
                         pquals <- mapM pprint quals
-                        return $ parenPrec p 6 $ brackets (hsep pquals <+> psize)
+                        case name of 
+                            Just n -> return $ parenPrec p 6 $ pretty n <> brackets (hsep pquals <+> psize)
+                            Nothing -> return $ parenPrec p 6 $ brackets (hsep pquals <+> psize)
                     (_, []) -> do
-                        pdeclrs <- printCDerivedDeclarator 5 declrs
+                        pdeclrs <- printCDerivedDeclarator 6 declrs
                         return $ parenPrec p 6 $ pdeclrs <> brackets psize
                     _ -> do
-                        pdeclrs <- printCDerivedDeclarator 5 declrs
+                        pdeclrs <- printCDerivedDeclarator 6 declrs
                         pquals <- mapM pprint quals
                         return $ parenPrec p 6 $ pdeclrs <> brackets (hsep pquals <+> psize)
             printCDerivedDeclarator p (CFunDeclr params funAttrs _ : declrs) = do
@@ -68,6 +76,7 @@ instance PPrint CDeclarator where
                 pparams <- printParams params
                 return $ parenPrec p 6 $ (if not (null funAttrs) then parens (pFunAttrs <+> pdeclrs) else pdeclrs)
                                     <> parens pparams
+            printCDerivedDeclarator _ [] = return $ maybe emptyDoc pretty name
 
             printParams :: [CDeclaration] -> CPrinter
             printParams decls = do
@@ -170,10 +179,6 @@ instance PPrint CExpression where
         pexpr <- pprintPrec 30 expr
         pargs <- mapM pprint args
         return $ parenPrec p 30 $ pexpr <> parens (hsep (punctuate comma pargs))
-    pprintPrec _ (CCompoundLit decl initl _) = do
-        pdecl <- pprint decl
-        pinitl <- pprint initl
-        return $ parens pdecl <+> pinitl
     pprintPrec _ (CVar ident _) = return $ pretty ident
     pprintPrec _ (CConst c _) = pprint c
     pprintPrec p (CMember expr ident False _) = do
@@ -234,41 +239,45 @@ instance PPrint CInitializerList where
                 return $ hsep (punctuate comma pdesigs) <+> pretty "=" <+> pinit
 
 instance PPrint CDeclaration where
-    pprint (CDeclaration specs divs _) = do
-        pspecs <- mapM pprint specs
-        pdivs <- mapM p divs
-        case pdivs of
-            [] -> return $ hsep pspecs
-            _ -> return $ hsep pspecs <+> hsep (punctuate comma pdivs)
-            where
-            p (Just declr, Nothing, Nothing) = do
-                pdeclr <- pprint declr
-                case getAttrs declr of
-                    [] -> return pdeclr
-                    _ -> do
-                        pattrs <- pprintCAttributeList (getAttrs declr)
-                        return $ pdeclr <+> pattrs
-            p (Just declr, Just initializer, Nothing) = do
-                pdeclr <- pprint declr
-                pinit <- pprint initializer
-                case getAttrs declr of
-                    [] -> do
-                        return $ pdeclr <+> pretty "=" <+> pinit
-                    _ -> do
-                        pattrs <- pprintCAttributeList (getAttrs declr)
-                        return $ pdeclr <+> pattrs <+> pretty "=" <+> pinit
-            p (Just declr, Nothing, Just expr) = do
-                pdeclr <- pprint declr
-                pexpr <- pprint expr
-                case getAttrs declr of
-                    [] -> return $ pdeclr <+> pretty ":" <+> pexpr
-                    _ -> do
-                        pattrs <- pprintCAttributeList (getAttrs declr)
-                        return $ pdeclr <+> pattrs <+> pretty ":" <+> pexpr
-            p decl = error $ "Invalid CDeclaration: " ++ show decl
+    pprint d@(CDeclaration specs divs ann) = do
+        case itemAnnotation ann of
+            CDeclarationAnn before -> do
+                pspecs <- mapM pprint specs
+                pdivs <- mapM p divs
+                case pdivs of
+                    [] -> return $ prependLine before $ hsep pspecs
+                    _ -> return $ prependLine before $ hsep pspecs <+> hsep (punctuate comma pdivs)
+            _ -> error $ "Invalid annotation: " ++ show d
 
-            getAttrs :: CDeclarator -> [CAttribute]
-            getAttrs (CDeclarator _ _ cattrs _) = cattrs
+        where
+        p (Just declr, Nothing, Nothing) = do
+            pdeclr <- pprint declr
+            case getAttrs declr of
+                [] -> return pdeclr
+                _ -> do
+                    pattrs <- pprintCAttributeList (getAttrs declr)
+                    return $ pdeclr <+> pattrs
+        p (Just declr, Just initializer, Nothing) = do
+            pdeclr <- pprint declr
+            pinit <- pprint initializer
+            case getAttrs declr of
+                [] -> do
+                    return $ pdeclr <+> pretty "=" <+> pinit
+                _ -> do
+                    pattrs <- pprintCAttributeList (getAttrs declr)
+                    return $ pdeclr <+> pattrs <+> pretty "=" <+> pinit
+        p (Just declr, Nothing, Just expr) = do
+            pdeclr <- pprint declr
+            pexpr <- pprint expr
+            case getAttrs declr of
+                [] -> return $ pdeclr <+> pretty ":" <+> pexpr
+                _ -> do
+                    pattrs <- pprintCAttributeList (getAttrs declr)
+                    return $ pdeclr <+> pattrs <+> pretty ":" <+> pexpr
+        p decl = error $ "Invalid CDeclaration: " ++ show decl
+
+        getAttrs :: CDeclarator -> [CAttribute]
+        getAttrs (CDeclarator _ _ cattrs _) = cattrs
 
 instance PPrint CEnumeration where
     pprint (CEnum ident Nothing cattrs) = do
@@ -288,44 +297,92 @@ instance PPrint CEnumeration where
                 return $ pretty ident' <+> pretty "=" <+> pexpr
             p (ident', Nothing) = return $ pretty ident'
 
+prependLine :: Bool -> DocStyle -> DocStyle
+prependLine True = (line <>)
+prependLine False = (emptyDoc <>)
+
 instance PPrint CStatement where
-    pprint (CCase expr stat _) = do
-        pexpr <- pprint expr
-        pstat <- pprint stat
-        return $ pretty "case" <+> pexpr <> pretty ":" <> pstat
-    pprint (CDefault stat _) = do
-        pstat <- pprint stat
-        return $ pretty "default:" <> pstat
-    pprint (CExpr expr _) = do
-        pexpr <- maybe (return emptyDoc) pprint expr
-        return $ pexpr <> semi
-    pprint (CIf expr stat estat _) = do
-        pexpr <- pprint expr
-        pstat <- pprint stat
-        pestat <- maybe (return emptyDoc) pprint estat
-        return $ pretty "if" <+> parens pexpr
-            <+> pstat
-            <> pestat
-    pprint (CSwitch expr stat _) = do
-        pexpr <- pprint expr
-        pstat <- pprint stat
-        return $ pretty "switch" <+> parens pexpr
-            <+> pstat
-    pprint (CFor for_init cond step stat _) = do
-        pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
-        pcond <- maybe (return emptyDoc) pprint cond
-        pstep <- maybe (return emptyDoc) pprint step
-        pstat <- pprint stat
-        return $ pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
-    pprint (CCont _) = return $ pretty "continue" <> semi
-    pprint (CBreak _) = return $ pretty "break" <> semi
-    pprint (CReturn Nothing _) = return $ pretty "return" <> semi
-    pprint (CReturn (Just e) _) = do
-        pe <- pprint e
-        return $ pretty "return" <+> pe <> semi
-    pprint (CCompound items _) = do
-        pItems <- mapM pprint items
-        return $ braces' ((indentTab . align) (vsep pItems))
+    pprint s@(CCase expr stat ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pexpr <- pprint expr
+                pstat <- pprint stat
+                return $ prependLine before $ pretty "case" <+> pexpr <> pretty ":" <> pstat
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CDefault stat ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pstat <- pprint stat
+                return $ prependLine before $ pretty "default:" <> pstat
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CExpr expr ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pexpr <- maybe (return emptyDoc) pprint expr
+                return $ prependLine before $ pexpr <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CIf expr stat estat ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pexpr <- pprint expr
+                pstat <- pprint stat
+                pestat <- maybe (return emptyDoc) pprint estat
+                return $ prependLine before $ 
+                    pretty "if" <+> parens pexpr
+                    <+> pstat
+                    <> pestat
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CSwitch expr stat ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pexpr <- pprint expr
+                pstat <- pprint stat
+                return $ prependLine before $ 
+                    pretty "switch" <+> parens pexpr
+                    <+> pstat
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CFor for_init cond step stat ann) = do
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
+                pcond <- maybe (return emptyDoc) pprint cond
+                pstep <- maybe (return emptyDoc) pprint step
+                pstat <- pprint stat
+                return $ prependLine before $ 
+                    pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CCont ann) = 
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                return $ prependLine before $ 
+                    pretty "continue" <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CBreak ann) = 
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                return $ prependLine before $ 
+                    pretty "break" <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CReturn Nothing ann) = 
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                return $ prependLine before $ 
+                    pretty "return" <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CReturn (Just e) ann) = 
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pe <- pprint e
+                return $ prependLine before $ 
+                    pretty "return" <+> pe <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CCompound items ann) =
+        case itemAnnotation ann of
+            CStatementAnn before -> do
+                pItems <- mapM pprint items
+                return $ prependLine before $ 
+                    braces' ((indentTab . align) (vsep pItems))
+            _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
