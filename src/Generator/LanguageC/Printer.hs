@@ -298,8 +298,8 @@ instance PPrint CEnumeration where
             p (ident', Nothing) = return $ pretty ident'
 
 prependLine :: Bool -> DocStyle -> DocStyle
-prependLine True = (line <>)
-prependLine False = (emptyDoc <>)
+prependLine True doc = line <> doc
+prependLine False doc = doc
 
 instance PPrint CStatement where
     pprint s@(CCase expr stat ann) = do
@@ -326,7 +326,11 @@ instance PPrint CStatement where
             CStatementAnn before -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                pestat <- maybe (return emptyDoc) pprint estat
+                pestat <- case estat of
+                    Nothing -> return emptyDoc
+                    Just alt -> do
+                        palt <- pprint alt
+                        return $ pretty " else" <+> palt
                 return $ prependLine before $ 
                     pretty "if" <+> parens pexpr
                     <+> pstat
@@ -378,10 +382,13 @@ instance PPrint CStatement where
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CCompound items ann) =
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CCompoundAnn before trailing -> do
                 pItems <- mapM pprint items
                 return $ prependLine before $ 
-                    braces' ((indentTab . align) (vsep pItems))
+                    if trailing then 
+                        braces' ((indentTab . align) (vsep pItems <> line)) 
+                    else
+                        braces' ((indentTab . align) (vsep pItems))                   
             _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where

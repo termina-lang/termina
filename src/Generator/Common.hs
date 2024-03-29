@@ -231,3 +231,6 @@ buildStatementAnn ann before = CAnnotations (Semantic.Monad.location ann) (CStat
 
 buildDeclarationAnn :: SemanticAnns -> Bool -> CAnns
 buildDeclarationAnn ann before = CAnnotations (Semantic.Monad.location ann) (CDeclarationAnn before)
+
+buildCompoundAnn :: SemanticAnns -> Bool -> Bool -> CAnns
+buildCompoundAnn ann before trailing = CAnnotations (Semantic.Monad.location ann) (CCompoundAnn before trailing)

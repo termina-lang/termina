@@ -5,7 +5,6 @@ import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
 import Generator.Common
-
 import Generator.Expression
 import Annotations
 
@@ -63,16 +62,16 @@ genArrayInitialization before level cObj expr = do
         (VectorInitExpression expr' (K s) ann) -> do
             let iterator = namefy $ "i" ++ show level
                 exprCAnn = buildGenericAnn ann
-                initExpr = Right $ CDeclaration 
-                    [CTypeSpec CSizeTType] 
-                    [(Just (CDeclarator (Just iterator) [] [] exprCAnn), 
-                      Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn), 
-                      Nothing)] 
+                initExpr = Right $ CDeclaration
+                    [CTypeSpec CSizeTType]
+                    [(Just (CDeclarator (Just iterator) [] [] exprCAnn),
+                      Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn),
+                      Nothing)]
                     (buildDeclarationAnn ann False)
                 condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger s DecRepr)) exprCAnn) exprCAnn
                 incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn) exprCAnn) exprCAnn
             arrayInit <- genArrayInitialization False (level + 1) (CIndex cObj (CVar iterator exprCAnn) exprCAnn) expr'
-            return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildStatementAnn ann False)) (buildStatementAnn ann before)]
+            return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann before)]
         (FieldAssignmentsExpression {}) -> genStructInitialization False level cObj expr
         (OptionVariantExpression {}) -> genOptionInitialization False level cObj expr
         (EnumVariantExpression {}) -> genEnumInitialization False level cObj expr
@@ -83,8 +82,8 @@ genArrayInitialization before level cObj expr = do
             let exprCAnn = buildGenericAnn ann
                 stmtAnn = buildStatementAnn ann before
                 declAnn = buildDeclarationAnn ann False
-                left = CUnary CIndOp (CCast 
-                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) 
+                left = CUnary CIndOp (CCast
+                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn)
                     cObj exprCAnn) exprCAnn
             return [CExpr (Just (CAssignment left cExpr exprCAnn)) stmtAnn]
         _ -> do
@@ -98,21 +97,21 @@ genArrayInitialization before level cObj expr = do
             CExpression ->
             TypeSpecifier ->
             SemanticAnns ->
-            CGenerator [CStatement] 
+            CGenerator [CStatement]
         genArrayInitializationFromExpression lvl cObj' cExpr ts ann = do
             case ts of
                 -- | If the initializer is a vector, we must iterate
                 (Vector ts' (K s)) -> do
                     let iterator = namefy $ "i" ++ show lvl
                         exprCAnn = buildGenericAnn ann
-                        initExpr = Right $ CDeclaration 
-                            [CTypeSpec CSizeTType] 
-                            [(Just (CDeclarator (Just iterator) [] [] exprCAnn), Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn), Nothing)] 
+                        initExpr = Right $ CDeclaration
+                            [CTypeSpec CSizeTType]
+                            [(Just (CDeclarator (Just iterator) [] [] exprCAnn), Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn), Nothing)]
                             (buildDeclarationAnn ann False)
                         condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger s DecRepr)) exprCAnn) exprCAnn
                         incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn) exprCAnn) exprCAnn
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndex cObj' (CVar iterator exprCAnn) exprCAnn) (CIndex cExpr (CVar iterator exprCAnn) exprCAnn) ts' ann
-                    return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildStatementAnn ann False)) (buildStatementAnn ann (before && lvl == 0))]
+                    return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann (before && lvl == 0))]
                 _ -> return [CExpr (Just (CAssignment cObj' cExpr (buildGenericAnn ann))) (buildStatementAnn ann (before && lvl == 0))]
 
 
@@ -195,7 +194,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
                     let exprCAnn = buildGenericAnn ann
                         stmtAnn = buildStatementAnn ann True
                         declAnn = buildDeclarationAnn ann False
-                        left = CUnary CIndOp (CCast 
+                        left = CUnary CIndOp (CCast
                             (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cObj exprCAnn) exprCAnn
                     return $ CBlockStmt <$> [CExpr (Just (CAssignment left cExpr exprCAnn)) stmtAnn]
                 _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
@@ -209,7 +208,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
             _ -> do
                 cExpr <- genExpression expr
                 let ann = getAnnotation expr
-                return $ CBlockStmt <$> 
+                return $ CBlockStmt <$>
                     [CExpr (Just (CAssignment cObj cExpr (buildGenericAnn ann))) (buildStatementAnn ann True)]
 genBlockItem (Declaration identifier _ ts expr ann) =
   let exprCAnn = buildGenericAnn ann in
@@ -245,10 +244,30 @@ genBlockItem (Declaration identifier _ ts expr ann) =
             return $
                 CBlockDecl (CDeclaration decls [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)] declStmt)
                 : enumInitialization
-        _ -> do 
+        _ -> do
             let declStmt = buildDeclarationAnn ann True
             decls <- genDeclSpecifiers ts
             cExpr <- genExpression expr
-            return $ CBlockDecl <$> 
+            return $ CBlockDecl <$>
                 [CDeclaration decls [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Just (CInitExpr cExpr exprCAnn), Nothing)] declStmt]
+genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
+    cExpr <- genExpression expr
+    cIfBlk <- concat <$> mapM genBlockItem ifBlk
+    cElseBlk <- if null elseBlk then return Nothing
+        else
+            mapM genBlockItem elseBlk >>= (return . Just) . flip CCompound (buildCompoundAnn ann False True) . concat
+    cAlts <- genAlternatives cElseBlk elifsBlks
+
+    return $ CBlockStmt <$> 
+        [CIf cExpr (CCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
+
+    where
+        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnns] -> CGenerator (Maybe CStatement)
+        genAlternatives prev [] = return prev
+        genAlternatives prev (ElseIf expr' blk ann' : xs) = do
+            prev' <- genAlternatives prev xs
+            cExpr' <- genExpression expr'
+            cBlk <- concat <$> mapM genBlockItem blk
+            return $ Just (CIf cExpr' (CCompound cBlk (buildCompoundAnn ann' False True)) prev' (buildStatementAnn ann' False))
+
 genBlockItem stmt = throwError $ InternalError $ "Unsupported statement: " ++ show stmt
