@@ -10,7 +10,7 @@ import Generator.LanguageC.AST
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-type Substitutions = Map Identifier Identifier
+type Substitutions = Map Identifier CExpression
 
 type CGenerator = ReaderT Substitutions (Either CGeneratorError)
 
@@ -42,6 +42,51 @@ msgQueueMethodName mName = namefy $ "termina" <::> "msg_queue" <::> mName
 
 thatField :: Identifier
 thatField = "__that"
+
+enumStructName :: Identifier -> Identifier
+enumStructName identifier = namefy ("enum_" <> identifier <> "_t")
+
+enumParameterStructName :: Identifier -> Identifier -> Identifier
+enumParameterStructName enumId variant = namefy $ enumId <::> variant <> "_params_t"
+
+-- | This function returns the name of the struct that represents the parameters
+-- of an option type. 
+genOptionParameterStructName :: TypeSpecifier -> CGenerator Identifier
+genOptionParameterStructName Bool = return $ namefy $ "option" <::> "bool_params_t"
+genOptionParameterStructName Char = return $ namefy $ "option" <::> "char_params_t"
+genOptionParameterStructName UInt8 = return $ namefy $ "option" <::> "uint8_params_t"
+genOptionParameterStructName UInt16 = return $ namefy $ "option" <::> "uint16_params_t"
+genOptionParameterStructName UInt32 = return $ namefy $ "option" <::> "uint32_params_t"
+genOptionParameterStructName UInt64 = return $ namefy $ "option" <::> "uint64_params_t"
+genOptionParameterStructName Int8 = return $ namefy $ "option" <::> "int8_params_t"
+genOptionParameterStructName Int16 = return $ namefy $ "option" <::> "int16_params_t"
+genOptionParameterStructName Int32 = return $ namefy $ "option" <::> "int32_params_t"
+genOptionParameterStructName Int64 = return $ namefy $ "option" <::> "int64_params_t"
+genOptionParameterStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
+genOptionParameterStructName (DynamicSubtype _) = return $ namefy $ "option" <::> "dyn_params_t"
+genOptionParameterStructName ts@(Vector {}) = do
+    tsName <- genTypeSpecName ts
+    tsDimension <- genDimensionOptionTS ts
+    return $ namefy $ "option" <::> tsName <> tsDimension <> "_params_t"
+
+    where
+        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName UInt8 = return "uint8"
+        genTypeSpecName UInt16 = return "uint16"
+        genTypeSpecName UInt32 = return "uint32"
+        genTypeSpecName UInt64 = return "uint64"
+        genTypeSpecName Int8 = return "int8"
+        genTypeSpecName Int16 = return "int16"
+        genTypeSpecName Int32 = return "int32"
+        genTypeSpecName Int64 = return "int64"
+        genTypeSpecName (Vector ts' _) = genTypeSpecName ts'
+        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+
+        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
+        genDimensionOptionTS _ = return ""
+genOptionParameterStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
 enumVariantsField :: Identifier
 enumVariantsField = namefy "variant"
@@ -99,6 +144,7 @@ genOptionStructName Int16 = return $ namefy $ "option" <::> "int16_t"
 genOptionStructName Int32 = return $ namefy $ "option" <::> "int32_t"
 genOptionStructName Int64 = return $ namefy $ "option" <::> "int64_t"
 genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
+genOptionStructName (DynamicSubtype _) = return optionDyn
 genOptionStructName ts@(Vector {}) = do
     tsName <- genTypeSpecName ts
     tsDimension <- genDimensionOptionTS ts

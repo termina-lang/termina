@@ -91,7 +91,7 @@ genExpression expr@(FunctionExpression name args ann) = do
     -- Obtain the substitutions map
     subs <- ask
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let identifier = fromMaybe name (Data.Map.lookup name subs)
+    let identifier = fromMaybe (CVar name cAnn) (Data.Map.lookup name subs)
     argsAnns <- getParameters expr
     cArgs <- zipWithM
             (\pExpr (Parameter _ ts) -> do
@@ -107,8 +107,8 @@ genExpression expr@(FunctionExpression name args ann) = do
                     _ -> return cParamExpr) args argsAnns
     expType <- getExprType expr
     case expType of
-        Vector {} -> return $ CMember (CCall (CVar identifier cAnn) cArgs cAnn) "array" False cAnn
-        _ -> return $ CCall (CVar identifier cAnn) cArgs cAnn
+        Vector {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
+        _ -> return $ CCall identifier cArgs cAnn
 genExpression (MemberFunctionAccess obj ident args ann) = do
     let cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
@@ -178,9 +178,9 @@ genObject (Variable identifier ann) = do
     -- Obtain the substitutions map
     subs <- ask
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe identifier (Data.Map.lookup identifier subs)
+    let ident = fromMaybe (CVar identifier cAnn) (Data.Map.lookup identifier subs)
     -- Return the C identifier
-    return $ CVar ident cAnn
+    return ident
 genObject (VectorIndexExpression obj index ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object

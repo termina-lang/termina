@@ -6,7 +6,10 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
-import PPrinter.Statement
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.Statement
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 vectorAnn :: SemanticAnns
@@ -35,7 +38,10 @@ forLoop1 :: Statement SemanticAnns
 forLoop1 = ForLoopStmt "i" USize (Constant (I USize 0) uint32SemAnn) (Constant (I USize 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
 renderStatement :: Statement SemanticAnns -> Text
-renderStatement = render . ppStatement empty
+renderStatement stmt = 
+  case runReaderT (genBlockItem stmt) empty of
+    Left err -> pack $ show err
+    Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -43,26 +49,16 @@ spec = do
     it "Prints a for loop statement without break condition" $ do
       renderStatement forLoop0 `shouldBe`
         pack (
-          "{\n" ++
-          "    size_t __start = 0;\n" ++
-          "    size_t __end = 10;\n" ++
+          "\nfor (size_t i = 0; i < 10; i = i + 1) {\n" ++
+          "    \n" ++
+          "    total = total + vector0[i];\n" ++
           "\n" ++
-          "    for (size_t i = __start; i < __end; i = i + 1) {\n" ++
-          "        \n" ++
-          "        total = total + vector0[i];\n" ++
-          "\n" ++
-          "    }\n" ++
           "}")
     it "Prints a for loop statement with break condition" $ do
       renderStatement forLoop1 `shouldBe`
         pack (
-          "{\n" ++
-          "    size_t __start = 0;\n" ++
-          "    size_t __end = 10;\n" ++
+          "\nfor (size_t i = 0; i < 10 && i != 5; i = i + 1) {\n" ++
+          "    \n" ++
+          "    total = total + vector0[i];\n" ++
           "\n" ++
-          "    for (size_t i = __start; i < __end && (i != 5); i = i + 1) {\n" ++
-          "        \n" ++
-          "        total = total + vector0[i];\n" ++
-          "\n" ++
-          "    }\n" ++
           "}")

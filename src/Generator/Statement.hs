@@ -7,6 +7,8 @@ import Control.Monad.Except
 import Generator.Common
 import Generator.Expression
 import Annotations
+import Data.Map (fromList, union)
+import qualified Control.Monad.Reader
 
 genEnumInitialization ::
     -- | Prepend a line to the initialization expression 
@@ -258,7 +260,7 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
             mapM genBlockItem elseBlk >>= (return . Just) . flip CCompound (buildCompoundAnn ann False True) . concat
     cAlts <- genAlternatives cElseBlk elifsBlks
 
-    return $ CBlockStmt <$> 
+    return $ CBlockStmt <$>
         [CIf cExpr (CCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
 
     where
@@ -269,5 +271,157 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
             cExpr' <- genExpression expr'
             cBlk <- concat <$> mapM genBlockItem blk
             return $ Just (CIf cExpr' (CCompound cBlk (buildCompoundAnn ann' False True)) prev' (buildStatementAnn ann' False))
+genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body ann) = do
+    let exprCAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+    initExpr <- genExpression initValue
+    endExpr <- genExpression endValue
+    condExpr <-
+        case breakCond of
+            Nothing -> return $ CBinary CLeOp (CVar iterator exprCAnn) endExpr exprCAnn
+            Just break' -> do
+                    cBreak <- genExpression break'
+                    return $ CBinary CLndOp
+                        (CBinary CLeOp (CVar iterator exprCAnn) endExpr exprCAnn) cBreak exprCAnn
+    cBody <- concat <$> mapM genBlockItem body
+    decls <- genDeclSpecifiers iteratorTS
+    return $ CBlockStmt <$>
+        [CFor
+            -- | Initialization expression
+            (Right $ CDeclaration decls
+                [(Just (CDeclarator (Just iterator) [] [] exprCAnn), Just (CInitExpr initExpr exprCAnn), Nothing)]
+                declAnn)
+            -- | Condition expression 
+            (Just condExpr)
+            -- | Increment expression
+            (Just $ CAssignment (CVar iterator exprCAnn)
+                (CBinary CAddOp
+                    (CVar iterator exprCAnn)
+                    (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn)
+                    exprCAnn)
+                exprCAnn)
+            -- | Body
+            (CCompound cBody (buildCompoundAnn ann False True))
+            (buildStatementAnn ann True)]
+genBlockItem match@(MatchStmt expr matchCases ann) = do
+    let exprCAnn = buildGenericAnn ann
+    exprType <- getExprType expr
+    (casePrefix, structName, paramsStructName) <-
+        case exprType of
+            -- | If the expression is an enumeration, the case identifier must 
+            -- be prefixed with the enumeration identifier.
+            (DefinedType enumId) -> return ((<::>) enumId, enumStructName enumId, enumParameterStructName enumId)
+            (Option ts) -> do
+                sname <- genOptionStructName ts
+                pname <- genOptionParameterStructName ts
+                return (id, sname, const pname)
+            _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
+    case expr of
+        (AccessObject {}) -> do
+            cExpr <- genExpression expr
+            case matchCases of
+                -- | If there is only one case, we do not need to check the variant
+                [m@(MatchCase identifier _ _ _)] -> do
+                    cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+                    genMatchCase cTs cExpr m
+                -- | The first one must add a preceding blank line
+                m@(MatchCase identifier _ _ ann') : xs -> do
+                    cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+                    rest <- genMatchCases cExpr casePrefix paramsStructName genMatchCase xs
+                    cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cExpr m
+                    return [CBlockStmt $ CIf
+                        (CBinary CEqOp (CMember cExpr enumVariantsField False exprCAnn) (CVar (casePrefix identifier) (buildGenericAnn ann')) (buildGenericAnn ann'))
+                        cBlk rest (buildStatementAnn ann' True)]
+                _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
+        _ -> do
+            cExpr <- genExpression expr
+            cTs <- genDeclSpecifiers (DefinedType structName)
+            let decl = CDeclaration cTs
+                    [(Just (CDeclarator (Just (namefy "match")) [] [] exprCAnn),
+                    Just (CInitExpr cExpr exprCAnn),
+                    Nothing)]
+                    (buildDeclarationAnn ann True)
+                cExpr' = CVar (namefy "match") exprCAnn
+            case matchCases of
+                [m@(MatchCase {})] -> do
+
+                    -- | The annonymous match case uses temporary structure to hold the parameters
+                    -- so we do not need to copy the parameters into a new structure.
+                    -- Thus, we pass "undefined" to the function, since we can safely assume that
+                    -- the function will not use them
+                    cBlk <- genAnonymousMatchCase undefined cExpr' m
+                    return [CBlockStmt $ CCompound (CBlockDecl decl : cBlk) (buildCompoundAnn ann True True)]
+                m@(MatchCase identifier _ _ ann') : xs -> do
+                    rest <- genMatchCases cExpr' casePrefix paramsStructName genAnonymousMatchCase xs
+                    cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genAnonymousMatchCase undefined cExpr' m
+                    return [CBlockStmt $ CCompound (CBlockDecl decl : [CBlockStmt $ CIf
+                        (CBinary CEqOp (CMember cExpr' enumVariantsField False exprCAnn) (CVar (casePrefix identifier) (buildGenericAnn ann')) (buildGenericAnn ann'))
+                        cBlk rest (buildStatementAnn ann' True)]) (buildCompoundAnn ann True True)]
+                _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
+
+    where
+
+        genMatchCases ::
+            -- | The expression to match
+            CExpression
+            -- | A function to prefix the case identifier
+            -> (Identifier -> Identifier)
+            -- | A function to get the parameter struct name 
+            -> (Identifier -> Identifier)
+            -- | A function to generate a match case (inside the monad)
+            -> ([CDeclarationSpecifier]
+                -> CExpression
+                -> MatchCase SemanticAnns
+                -> CGenerator [CCompoundBlockItem])
+            -- | The list of remaining match cases
+            -> [MatchCase SemanticAnns]
+            -> CGenerator (Maybe CStatement)
+        -- | This should never happen
+        genMatchCases _ _ _ _ [] = return Nothing
+        -- | The last one does not need to check the variant
+        genMatchCases cExpr _ paramsStructName genCase [m@(MatchCase identifier _ _ ann')] = do
+            cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+            cBlk <- genCase cTs cExpr m
+            return $ Just (CCompound cBlk (buildCompoundAnn ann' False True))
+        genMatchCases cExpr casePrefix paramsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
+            let cAnn = buildGenericAnn ann'
+                cExpr' = CBinary CEqOp (CMember cExpr identifier False cAnn) (CVar (casePrefix identifier) cAnn) cAnn
+            cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+            cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genCase cTs cExpr m
+            rest <- genMatchCases cExpr casePrefix paramsStructName genCase xs
+            return $ Just (CIf cExpr' cBlk rest (buildStatementAnn ann' False))
+
+        genAnonymousMatchCase ::
+            [CDeclarationSpecifier]
+            -> CExpression
+            -> MatchCase SemanticAnns -> CGenerator [CCompoundBlockItem]
+        genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
+            concat <$> mapM genBlockItem blk'
+        genAnonymousMatchCase _ cExpr (MatchCase variant params blk' _) = do
+            let cAnn = buildGenericAnn ann
+                cExpr' = CMember cExpr variant False cAnn
+                newKeyVals = fromList $ zipWith
+                    (\sym index -> (sym, CMember cExpr' (namefy (show (index :: Integer))) False cAnn)) params [0..]
+            Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlockItem blk'
+
+        genMatchCase ::
+            [CDeclarationSpecifier]
+            -> CExpression
+            -> MatchCase SemanticAnns
+            -> CGenerator [CCompoundBlockItem]
+        genMatchCase _ _ (MatchCase _ [] blk' _) = do
+            concat <$> mapM genBlockItem blk'
+        genMatchCase cTs cExpr (MatchCase variant params blk' ann') = do
+            let cAnn = buildGenericAnn ann'
+                cExpr' = CVar (namefy variant) cAnn
+                newKeyVals = fromList $ zipWith
+                    (\sym index -> (sym, CMember cExpr' (namefy (show (index :: Integer))) False cAnn)) params [0..]
+                decl = CDeclaration cTs
+                    [(Just (CDeclarator (Just (namefy variant)) [] [] cAnn),
+                      Just (CInitExpr (CMember cExpr variant False cAnn) cAnn),
+                      Nothing)]
+                    (buildDeclarationAnn ann True)
+            cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlockItem blk'
+            return $ CBlockDecl decl : cBlk
 
 genBlockItem stmt = throwError $ InternalError $ "Unsupported statement: " ++ show stmt
