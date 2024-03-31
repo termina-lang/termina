@@ -18,7 +18,7 @@ genEnumInitialization ::
     CExpression ->
     -- |  The initialization expression
     Expression SemanticAnns ->
-    CGenerator [CStatement]
+    CSourceGenerator [CStatement]
 genEnumInitialization before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
@@ -34,7 +34,7 @@ genOptionInitialization ::
     -> Integer
     -> CExpression
     -> Expression SemanticAnns
-    -> CGenerator [CStatement]
+    -> CSourceGenerator [CStatement]
 genOptionInitialization before level cObj expr =
     case expr of
         (OptionVariantExpression (Some e) ann) -> do
@@ -58,7 +58,7 @@ genArrayInitialization ::
     -> Integer
     -> CExpression
     -> Expression SemanticAnns
-    -> CGenerator [CStatement]
+    -> CSourceGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
         (VectorInitExpression expr' (K s) ann) -> do
@@ -99,7 +99,7 @@ genArrayInitialization before level cObj expr = do
             CExpression ->
             TypeSpecifier ->
             SemanticAnns ->
-            CGenerator [CStatement]
+            CSourceGenerator [CStatement]
         genArrayInitializationFromExpression lvl cObj' cExpr ts ann = do
             case ts of
                 -- | If the initializer is a vector, we must iterate
@@ -126,7 +126,7 @@ genFieldInitialization ::
     -> CExpression
     -> Identifier
     -> Expression SemanticAnns
-    -> CGenerator [CStatement]
+    -> CSourceGenerator [CStatement]
 genFieldInitialization before level cObj field expr =
     case expr of
         FieldAssignmentsExpression _ _ ann ->
@@ -156,7 +156,7 @@ genStructInitialization ::
     -> Integer
     -> CExpression
     -> Expression SemanticAnns
-    -> CGenerator [CStatement]
+    -> CSourceGenerator [CStatement]
 genStructInitialization before level cObj expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
@@ -164,7 +164,7 @@ genStructInitialization before level cObj expr =
 
         where
 
-            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnns] -> CGenerator [CStatement]
+            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnns] -> CSourceGenerator [CStatement]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment field expr' _: xs) = do
                 fieldInit <- genFieldInitialization before' level cObj field expr'
@@ -182,7 +182,7 @@ genStructInitialization before level cObj expr =
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
-genBlockItem :: Statement SemanticAnns -> CGenerator [CCompoundBlockItem]
+genBlockItem :: Statement SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
 genBlockItem (AssignmentStmt obj expr  _) = do
     objType <- getObjectType obj
     cObj <- genObject obj
@@ -264,7 +264,7 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
         [CIf cExpr (CCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
 
     where
-        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnns] -> CGenerator (Maybe CStatement)
+        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnns] -> CSourceGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
             prev' <- genAlternatives prev xs
@@ -372,10 +372,10 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             -> ([CDeclarationSpecifier]
                 -> CExpression
                 -> MatchCase SemanticAnns
-                -> CGenerator [CCompoundBlockItem])
+                -> CSourceGenerator [CCompoundBlockItem])
             -- | The list of remaining match cases
             -> [MatchCase SemanticAnns]
-            -> CGenerator (Maybe CStatement)
+            -> CSourceGenerator (Maybe CStatement)
         -- | This should never happen
         genMatchCases _ _ _ _ [] = return Nothing
         -- | The last one does not need to check the variant
@@ -394,7 +394,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
         genAnonymousMatchCase ::
             [CDeclarationSpecifier]
             -> CExpression
-            -> MatchCase SemanticAnns -> CGenerator [CCompoundBlockItem]
+            -> MatchCase SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
         genAnonymousMatchCase _ cExpr (MatchCase variant params blk' _) = do
@@ -408,7 +408,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             [CDeclarationSpecifier]
             -> CExpression
             -> MatchCase SemanticAnns
-            -> CGenerator [CCompoundBlockItem]
+            -> CSourceGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
         genMatchCase cTs cExpr (MatchCase variant params blk' ann') = do

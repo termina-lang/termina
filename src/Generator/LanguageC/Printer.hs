@@ -115,7 +115,7 @@ pprintCAttributeList :: [CAttribute] -> CPrinter
 pprintCAttributeList [] = return emptyDoc
 pprintCAttributeList attrs = do
     pattrs <- mapM pprint attrs
-    return $ pretty "__attribute__" <> parens (hsep (punctuate comma pattrs))
+    return $ pretty "__attribute__" <> (parens $ parens (hsep (punctuate comma pattrs)))
 
 instance PPrint CAttribute where
     pprint (CAttr attrName []) = return $ pretty attrName
@@ -195,18 +195,53 @@ instance PPrint CConstant where
 
 instance PPrint CStructureUnion where
     pprint (CStruct tag ident Nothing cattrs) = do
-        pattrs <- pprintCAttributeList cattrs
-        return $ pretty tag <+> pattrs <+> maybe emptyDoc pretty ident
+        case (cattrs, ident) of 
+            ([], Nothing) -> return $ pretty tag
+            ([], Just ident') -> return $ pretty tag <+> pretty ident'
+            (_, Nothing) -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty tag <+> pattrs
+            (_, Just ident') -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty tag <+> pretty ident' <+> pattrs
     pprint (CStruct tag ident (Just []) cattrs) = do
-        pattrs <- pprintCAttributeList cattrs
-        return $ pretty tag <+> pattrs <+> maybe emptyDoc pretty ident <+> pretty "{ }"
+        case (cattrs, ident) of
+            ([], Nothing) -> return $ pretty tag <+> pretty "{ }"
+            ([], Just ident') -> return $ pretty tag <+> pretty ident' <+> pretty "{ }"
+            (_, Nothing) -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty tag <+> pretty "{ }" <+> pattrs 
+            (_, Just ident') -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty tag <+> pretty ident' <+> pretty "{ }" <+> pattrs
     pprint (CStruct tag ident (Just decls) cattrs) = do
-        pattrs <- pprintCAttributeList cattrs
-        pdecls <- mapM pprint decls
-        return $ vcat [
-            pretty tag <+> pattrs <+> maybe emptyDoc pretty ident <+> pretty "{",
-            indent 4 $ sep (map (<> semi) pdecls),
-            pretty "}"]
+        case (cattrs, ident) of
+            ([], Nothing) -> do
+                pdecls <- mapM pprint decls
+                return $ vcat [
+                    pretty tag <+> pretty "{",
+                    indent 4 $ vsep (map (<> semi) pdecls),
+                    pretty "}"]
+            ([], Just ident') -> do
+                pdecls <- mapM pprint decls
+                return $ vcat [
+                    pretty tag <+> pretty ident' <+> pretty "{",
+                    indent 4 $ vsep (map (<> semi) pdecls),
+                    pretty "}"]
+            (_, Nothing) -> do
+                pattrs <- pprintCAttributeList cattrs
+                pdecls <- mapM pprint decls
+                return $ vcat [
+                    pretty tag  <+> pretty "{",
+                    indent 4 $ vsep (map (<> semi) pdecls),
+                    pretty "}" <+> pattrs]
+            (_, Just ident') -> do
+                pattrs <- pprintCAttributeList cattrs
+                pdecls <- mapM pprint decls
+                return $ vcat [
+                    pretty tag <+> pretty ident' <+> pretty "{",
+                    indent 4 $ vsep (map (<> semi) pdecls),
+                    pretty "}" <+> pattrs]
 
 instance PPrint CPartDesignator where
     pprint (CArrDesig expr _) = do
@@ -396,6 +431,19 @@ instance PPrint CCompoundBlockItem where
     pprint (CBlockDecl decl) = do
         pdecl <- pprint decl
         return $ pdecl <> semi
+
+instance PPrint CExternalDeclaration where
+    pprint (CDeclExt decl) = do
+        pdecl <- pprint decl
+        return $ pdecl <> semi
+    pprint (CFDefExt fund) = pprint fund
+
+instance PPrint CFunctionDef where
+    pprint (CFunDef declspecs declr stat _) = do
+        pdeclspecs <- mapM pprint declspecs
+        pdeclr <- pprint declr
+        pstat <- (pprintPrec 25) stat
+        return $ hsep pdeclspecs <+> pdeclr <+> pstat
 
 -- precedence of C operators
 binPrec :: CBinaryOp -> Integer

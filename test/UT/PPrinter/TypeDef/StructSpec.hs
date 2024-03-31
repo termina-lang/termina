@@ -5,10 +5,14 @@ import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
-import Semantic.Option (OptionMap)
-import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
+
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.LanguageC.Printer
+import Generator.Declaration
+import Generator.Common
 
 {- | Struct type with a single field.
 In Termina's concrete sytax:
@@ -65,7 +69,7 @@ alignedStruct = TypeDefinition
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
     FieldDefinition "field2" (Vector UInt32 (K 10))
-  ] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
+  ] [Modifier "aligned" (Just (KC (I UInt32 16)))]) undefined
 
 {- | Aligned Struct type.
 In Termina's concrete sytax:
@@ -85,19 +89,22 @@ packedAndAlignedStruct = TypeDefinition
     FieldDefinition "field2" (Vector UInt32 (K 10))
   ] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I UInt32 16)))
+      Modifier "aligned" (Just (KC (I UInt32 16)))
     ]) undefined
 
-renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
+renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDeclaration opts decl = 
+  case runReaderT (genTypeDeclaration decl) opts of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypedefDeclaration (M.fromList [(DefinedType "id0", S.fromList [Option (DefinedType "id0")])]) structWithOneField `shouldBe`
+       renderTypeDeclaration (M.fromList [(DefinedType "id0", S.fromList [Option (DefinedType "id0")])]) structWithOneField `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "} id0;\n" ++
             "\n" ++
@@ -106,40 +113,37 @@ spec = do
             "} __option__id0_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "\n" ++         
             "    __option__id0_params_t Some;\n" ++
-            "\n" ++     
             "    __enum_option_t __variant;\n" ++
-            "\n" ++     
-            "} __option__id0_t;\n")
+            "} __option__id0_t;")
     it "Prints a struct with two fields" $ do
-      renderTypedefDeclaration M.empty structWithTwoFields `shouldBe`
+      renderTypeDeclaration M.empty structWithTwoFields `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "} id0;\n")
+            "} id0;")
     it "Prints a packed struct" $ do
-      renderTypedefDeclaration M.empty packedStruct `shouldBe`
+      renderTypeDeclaration M.empty packedStruct `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed)) id0;\n")
+            "} __attribute__((packed)) id0;")
     it "Prints an aligned struct" $ do
-      renderTypedefDeclaration M.empty alignedStruct `shouldBe`
+      renderTypeDeclaration M.empty alignedStruct `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((align(16))) id0;\n")
+            "} __attribute__((aligned(16))) id0;")
     it "Prints a packet & aligned struct" $ do
-      renderTypedefDeclaration M.empty packedAndAlignedStruct `shouldBe`
+      renderTypeDeclaration M.empty packedAndAlignedStruct `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed, align(16))) id0;\n")
+            "} __attribute__((packed, aligned(16))) id0;")

@@ -30,7 +30,6 @@ data CFunctionDef' a
   = CFunDef
     [CDeclarationSpecifier' a] -- type specifier and qualifier
     (CDeclarator' a)           -- declarator
-    [CDeclaration' a]          -- optional declaration list
     (CStatement' a)            -- compound statement
     a
     deriving (Show)

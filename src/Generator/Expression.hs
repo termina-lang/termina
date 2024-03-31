@@ -29,7 +29,7 @@ cBinOp BitwiseXor = CXorOp
 cBinOp LogicalAnd = CLndOp
 cBinOp LogicalOr = CLorOp
 
-genExpression :: Expression SemanticAnns -> CGenerator CExpression
+genExpression :: Expression SemanticAnns -> CSourceGenerator CExpression
 genExpression (AccessObject obj) = genObject obj
 genExpression (BinOp op left right ann) = do
     let cAnn = buildGenericAnn ann
@@ -172,7 +172,7 @@ genExpression (MemberFunctionAccess obj ident args ann) = do
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
-genObject :: Object SemanticAnns -> CGenerator CExpression
+genObject :: Object SemanticAnns -> CSourceGenerator CExpression
 genObject (Variable identifier ann) = do
     let cAnn = buildGenericAnn ann
     -- Obtain the substitutions map

@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Generator.Common where
 
 import AST.Seman
@@ -5,14 +7,17 @@ import Semantic.Monad
 import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Map
+import Data.Set
 import Generator.LanguageC.AST
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
 type Substitutions = Map Identifier CExpression
+type OptionTypes = Map TypeSpecifier (Set TypeSpecifier)
 
-type CGenerator = ReaderT Substitutions (Either CGeneratorError)
+type CSourceGenerator = ReaderT Substitutions (Either CGeneratorError)
+type CHeaderGenerator = ReaderT OptionTypes (Either CGeneratorError)
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.
@@ -51,7 +56,7 @@ enumParameterStructName enumId variant = namefy $ enumId <::> variant <> "_param
 
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
-genOptionParameterStructName :: TypeSpecifier -> CGenerator Identifier
+genOptionParameterStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
 genOptionParameterStructName Bool = return $ namefy $ "option" <::> "bool_params_t"
 genOptionParameterStructName Char = return $ namefy $ "option" <::> "char_params_t"
 genOptionParameterStructName UInt8 = return $ namefy $ "option" <::> "uint8_params_t"
@@ -70,7 +75,7 @@ genOptionParameterStructName ts@(Vector {}) = do
     return $ namefy $ "option" <::> tsName <> tsDimension <> "_params_t"
 
     where
-        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genTypeSpecName UInt8 = return "uint8"
         genTypeSpecName UInt16 = return "uint16"
         genTypeSpecName UInt32 = return "uint32"
@@ -83,7 +88,7 @@ genOptionParameterStructName ts@(Vector {}) = do
         genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
-        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 genOptionParameterStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
@@ -98,12 +103,11 @@ optionNoneVariant = "None"
 optionSomeField :: Identifier
 optionSomeField = "__0"
 
-
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjectType :: Object SemanticAnns -> CGenerator TypeSpecifier
+getObjectType :: (MonadError CGeneratorError m) => Object SemanticAnns -> m TypeSpecifier
 getObjectType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = return $ ts
 getObjectType (VectorIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))   = return $ ts
 getObjectType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return $ ts
@@ -113,11 +117,11 @@ getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     =
 getObjectType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return $ ts
 getObjectType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getParameters :: Expression SemanticAnns -> CGenerator [Parameter]
+getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [Parameter]
 getParameters (FunctionExpression _ _ (SemAnn _ (ETy (AppType params _)))) = return params
 getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
-getExprType :: Expression SemanticAnns -> CGenerator TypeSpecifier
+getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m TypeSpecifier
 getExprType (AccessObject obj) = getObjectType obj
 getExprType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
@@ -132,7 +136,7 @@ getExprType (VectorInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | Generates the name of the option struct type
-genOptionStructName :: TypeSpecifier -> CGenerator Identifier
+genOptionStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
 genOptionStructName Bool = return $ namefy $ "option" <::> "bool_t"
 genOptionStructName Char = return $ namefy $ "option" <::> "char_t"
 genOptionStructName UInt8 = return $ namefy $ "option" <::> "uint8_t"
@@ -151,7 +155,7 @@ genOptionStructName ts@(Vector {}) = do
     return $ namefy $ "option" <::> tsName <> tsDimension <> "_t"
 
     where
-        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genTypeSpecName UInt8 = return "uint8"
         genTypeSpecName UInt16 = return "uint16"
         genTypeSpecName UInt32 = return "uint32"
@@ -164,19 +168,19 @@ genOptionStructName ts@(Vector {}) = do
         genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
-        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 genOptionStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
-genArrayWrapStructName :: TypeSpecifier -> CGenerator Identifier
+genArrayWrapStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
 genArrayWrapStructName ts@(Vector {}) = do
     tsName <- genTypeSpecName ts
     tsDimension <- genDimensionOptionTS ts
     return $ namefy $ "wrapper" <::> tsName <> tsDimension <> "_t"
 
     where
-        genTypeSpecName :: TypeSpecifier -> CGenerator Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genTypeSpecName UInt8 = return "uint8"
         genTypeSpecName UInt16 = return "uint16"
         genTypeSpecName UInt32 = return "uint32"
@@ -189,13 +193,13 @@ genArrayWrapStructName ts@(Vector {}) = do
         genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
-        genDimensionOptionTS :: TypeSpecifier -> CGenerator Identifier
+        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 genArrayWrapStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
 -- | Obtains the corresponding C type of a primitive type
-genDeclSpecifiers :: TypeSpecifier -> CGenerator [CDeclarationSpecifier]
+genDeclSpecifiers :: (MonadError CGeneratorError m) => TypeSpecifier -> m [CDeclarationSpecifier]
 -- |  Unsigned integer types
 genDeclSpecifiers UInt8  = return [CTypeSpec CUInt8Type]
 genDeclSpecifiers UInt16 = return [CTypeSpec CUInt16Type]
@@ -241,7 +245,7 @@ genArraySizeDeclarator (Vector ts' (K s)) ann =
     CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) cAnn)) cAnn : genArraySizeDeclarator ts' ann
 genArraySizeDeclarator _ _ = []
 
-genCastDeclaration :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclaration
+genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m CDeclaration
 genCastDeclaration (DynamicSubtype ts@(Vector _ _)) ann = do
     -- We must obtain the declaration specifier of the vector
     specs <- genDeclSpecifiers ts
@@ -254,7 +258,7 @@ genCastDeclaration (DynamicSubtype ts@(Vector _ _)) ann = do
         cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
 
-        genPtrArrayDeclarator :: TypeSpecifier -> SemanticAnns -> CGenerator CDeclarator
+        genPtrArrayDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m CDeclarator
         genPtrArrayDeclarator (Vector ts' _) ann' = do
             return $ CDeclarator Nothing (CPtrDeclr [] cAnn : genArraySizeDeclarator ts' ann') [] cAnn
         genPtrArrayDeclarator ts' _ = throwError $ InternalError $ "Invalid type specifier, not an array: " ++ show ts'
