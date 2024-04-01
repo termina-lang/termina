@@ -91,7 +91,7 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option__dyn_t option0;\n" ++
+          "    __option_dyn_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
           "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
@@ -106,13 +106,13 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option__dyn_t option0;\n" ++
+          "    __option_dyn_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
           "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option__dyn_t option1;\n" ++
+          "    __option_dyn_t option1;\n" ++
           "    option1.__variant = None;\n" ++
           "\n" ++
           "}")
@@ -126,7 +126,7 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option__dyn_t option0;\n" ++
+          "    __option_dyn_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
           "    option0.Some.__0 = dyn_var0;\n" ++
           "\n" ++
@@ -136,7 +136,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option__dyn_t option1;\n" ++
+          "    __option_dyn_t option1;\n" ++
           "    option1.__variant = None;\n" ++
           "\n" ++
           "}")

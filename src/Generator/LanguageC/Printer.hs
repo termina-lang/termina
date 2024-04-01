@@ -81,7 +81,7 @@ instance PPrint CDeclarator where
             printParams :: [CDeclaration] -> CPrinter
             printParams decls = do
                 pdecls <- mapM pprint decls
-                return $ sep (punctuate comma pdecls)
+                return $ align (fillSep (punctuate comma pdecls))
 
 instance PPrint CDeclarationSpecifier where
     pprint (CStorageSpec sp) = return $ pretty sp
@@ -316,15 +316,38 @@ instance PPrint CDeclaration where
 
 instance PPrint CEnumeration where
     pprint (CEnum ident Nothing cattrs) = do
-        pattrs <- pprintCAttributeList cattrs
-        return $ pretty "enum" <+> pattrs <+> maybe emptyDoc pretty ident
+        case (cattrs, ident) of
+            ([], Nothing) -> return $ pretty "enum"
+            ([], Just ident') -> return $ pretty "enum" <+> pretty ident'
+            (_, Nothing) -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty "enum" <+> pattrs 
+            (_, Just ident') -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ pretty "enum" <+> pattrs <+> pretty ident'
     pprint (CEnum ident (Just vals) cattrs) = do
-        pattrs <- pprintCAttributeList cattrs
         pvals <- mapM p vals
-        return $ vcat [
-            pretty "enum" <+> pattrs <+> maybe emptyDoc pretty ident <+> pretty "{",
-            indent 4 $ sep (punctuate comma pvals),
-            pretty "}"]
+        case (cattrs, ident) of
+            ([], Nothing) -> return $ vcat [
+                pretty "enum" <+> pretty "{",
+                indent 4 $ vsep (punctuate comma pvals),
+                pretty "}"]
+            ([], Just ident') -> return $ vcat [
+                pretty "enum" <+> pretty ident' <+> pretty "{",
+                indent 4 $ vsep (punctuate comma pvals),
+                pretty "}"]
+            (_, Nothing) -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ vcat [
+                    pretty "enum" <+> pattrs <+> pretty "{",
+                    indent 4 $ vsep (punctuate comma pvals),
+                    pretty "}"]
+            (_, Just ident') -> do
+                pattrs <- pprintCAttributeList cattrs
+                return $ vcat [
+                    pretty "enum" <+> pattrs <+> pretty ident' <+> pretty "{",
+                    indent 4 $ vsep (punctuate comma pvals),
+                    pretty "}"]
         where
             p :: (Ident, Maybe CExpression) -> CPrinter
             p (ident', Just expr) = do
@@ -442,7 +465,7 @@ instance PPrint CFunctionDef where
     pprint (CFunDef declspecs declr stat _) = do
         pdeclspecs <- mapM pprint declspecs
         pdeclr <- pprint declr
-        pstat <- (pprintPrec 25) stat
+        pstat <- pprintPrec 25 stat
         return $ hsep pdeclspecs <+> pdeclr <+> pstat
 
 -- precedence of C operators

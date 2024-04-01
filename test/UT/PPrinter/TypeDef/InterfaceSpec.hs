@@ -5,9 +5,13 @@ import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
-import Semantic.Option (OptionMap)
-import Data.Maybe
 import qualified Data.Map as M
+
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.LanguageC.Printer
+import Generator.Declaration
+import Generator.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnns
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
@@ -23,18 +27,21 @@ interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
     ] undefined
   ] []) undefined
 
-renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
+renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDeclaration opts decl = 
+  case runReaderT (genTypeDeclaration decl) opts of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints an interface with one procedure" $ do
-      renderTypedefDeclaration M.empty interfaceWithOneProcedure `shouldBe`
+      renderTypeDeclaration M.empty interfaceWithOneProcedure `shouldBe`
         pack (
-          "typedef struct {\n" ++
+          "\ntypedef struct {\n" ++
           "    void * __that;\n" ++
-          "    void (*procedure0)(void * __this, uint8_t param0, uint16_t param1,\n" ++
-          "                       uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                       int16_t param5, int32_t param6, int64_t param7);\n" ++
-          "} iface0;\n")
+          "    void (* procedure0)(void * __this, uint8_t param0, uint16_t param1,\n" ++
+          "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
+          "                        int16_t param5, int32_t param6, int64_t param7);\n" ++
+          "} iface0;")

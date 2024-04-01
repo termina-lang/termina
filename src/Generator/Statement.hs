@@ -306,15 +306,17 @@ genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body 
 genBlockItem match@(MatchStmt expr matchCases ann) = do
     let exprCAnn = buildGenericAnn ann
     exprType <- getExprType expr
-    (casePrefix, structName, paramsStructName) <-
+    (casePrefix, structName, genParamsStructName) <-
         case exprType of
             -- | If the expression is an enumeration, the case identifier must 
             -- be prefixed with the enumeration identifier.
-            (DefinedType enumId) -> return ((<::>) enumId, enumStructName enumId, enumParameterStructName enumId)
+            (DefinedType enumId) -> do
+                enumStructName <- genEnumStructName enumId
+                return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
             (Option ts) -> do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
-                return (id, sname, const pname)
+                return (id, sname, const (return pname))
             _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
     case expr of
         (AccessObject {}) -> do
@@ -322,12 +324,14 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             case matchCases of
                 -- | If there is only one case, we do not need to check the variant
                 [m@(MatchCase identifier _ _ _)] -> do
-                    cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+                    paramsStructName <- genParamsStructName identifier
+                    cTs <- genDeclSpecifiers (DefinedType paramsStructName)
                     genMatchCase cTs cExpr m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
-                    cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
-                    rest <- genMatchCases cExpr casePrefix paramsStructName genMatchCase xs
+                    paramsStructName <- genParamsStructName identifier
+                    cTs <- genDeclSpecifiers (DefinedType paramsStructName)
+                    rest <- genMatchCases cExpr casePrefix genParamsStructName genMatchCase xs
                     cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cExpr m
                     return [CBlockStmt $ CIf
                         (CBinary CEqOp (CMember cExpr enumVariantsField False exprCAnn) (CVar (casePrefix identifier) (buildGenericAnn ann')) (buildGenericAnn ann'))
@@ -352,7 +356,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
                     cBlk <- genAnonymousMatchCase undefined cExpr' m
                     return [CBlockStmt $ CCompound (CBlockDecl decl : cBlk) (buildCompoundAnn ann True True)]
                 m@(MatchCase identifier _ _ ann') : xs -> do
-                    rest <- genMatchCases cExpr' casePrefix paramsStructName genAnonymousMatchCase xs
+                    rest <- genMatchCases cExpr' casePrefix genParamsStructName genAnonymousMatchCase xs
                     cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genAnonymousMatchCase undefined cExpr' m
                     return [CBlockStmt $ CCompound (CBlockDecl decl : [CBlockStmt $ CIf
                         (CBinary CEqOp (CMember cExpr' enumVariantsField False exprCAnn) (CVar (casePrefix identifier) (buildGenericAnn ann')) (buildGenericAnn ann'))
@@ -367,7 +371,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             -- | A function to prefix the case identifier
             -> (Identifier -> Identifier)
             -- | A function to get the parameter struct name 
-            -> (Identifier -> Identifier)
+            -> (Identifier -> CSourceGenerator Identifier)
             -- | A function to generate a match case (inside the monad)
             -> ([CDeclarationSpecifier]
                 -> CExpression
@@ -379,16 +383,18 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
         -- | This should never happen
         genMatchCases _ _ _ _ [] = return Nothing
         -- | The last one does not need to check the variant
-        genMatchCases cExpr _ paramsStructName genCase [m@(MatchCase identifier _ _ ann')] = do
-            cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+        genMatchCases cExpr _ genParamsStructName genCase [m@(MatchCase identifier _ _ ann')] = do
+            paramsStructName <- genParamsStructName identifier
+            cTs <- genDeclSpecifiers (DefinedType paramsStructName)
             cBlk <- genCase cTs cExpr m
             return $ Just (CCompound cBlk (buildCompoundAnn ann' False True))
-        genMatchCases cExpr casePrefix paramsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
+        genMatchCases cExpr casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
             let cAnn = buildGenericAnn ann'
                 cExpr' = CBinary CEqOp (CMember cExpr identifier False cAnn) (CVar (casePrefix identifier) cAnn) cAnn
-            cTs <- genDeclSpecifiers (DefinedType (paramsStructName identifier))
+            paramsStructName <- genParamsStructName identifier
+            cTs <- genDeclSpecifiers (DefinedType paramsStructName)
             cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genCase cTs cExpr m
-            rest <- genMatchCases cExpr casePrefix paramsStructName genCase xs
+            rest <- genMatchCases cExpr casePrefix genParamsStructName genCase xs
             return $ Just (CIf cExpr' cBlk rest (buildStatementAnn ann' False))
 
         genAnonymousMatchCase ::

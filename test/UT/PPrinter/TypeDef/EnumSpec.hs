@@ -5,9 +5,14 @@ import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
-import Semantic.Option (OptionMap)
-import Data.Maybe
 import qualified Data.Map as M
+
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.LanguageC.Printer
+import Generator.Declaration
+import Generator.Common
+
 
 enumWithOneRegularField :: AnnASTElement SemanticAnns
 enumWithOneRegularField = TypeDefinition
@@ -37,41 +42,40 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant3" [Int8, Vector (Vector Char (K 20)) (K 35)]
   ] []) undefined
 
-renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
+renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDeclaration opts decl = 
+  case runReaderT (genTypeDeclaration decl) opts of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderTypedefDeclaration M.empty enumWithOneRegularField `shouldBe`
+      renderTypeDeclaration M.empty enumWithOneRegularField `shouldBe`
         pack (
-            "typedef enum {\n" ++
+            "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
             "} __enum_id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "\n" ++
-            "} id0;\n")
+            "} id0;")
     it "Prints an enum with two regular variants" $ do
-      renderTypedefDeclaration M.empty enumWithTwoRegularFields `shouldBe`
+      renderTypeDeclaration M.empty enumWithTwoRegularFields `shouldBe`
         pack (
-            "typedef enum {\n" ++
+            "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++
             "    id0__variant1\n" ++
             "} __enum_id0_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "\n" ++
-            "} id0;\n")
+            "} id0;")
     it "Prints an enum with one parameterized variant" $ do
-      renderTypedefDeclaration M.empty enumWithOneParameterizedField `shouldBe`
+      renderTypeDeclaration M.empty enumWithOneParameterizedField `shouldBe`
         pack (
-            "typedef enum {\n" ++
+            "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
             "} __enum_id0_t;\n" ++
             "\n" ++
@@ -80,16 +84,13 @@ spec = do
             "} __enum_id0__variant0_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "\n" ++
             "    __enum_id0__variant0_params_t variant0;\n" ++
-            "\n" ++
-            "} id0;\n")
+            "} id0;")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderTypedefDeclaration M.empty enumWithMultipleParameterizedFields `shouldBe`
+      renderTypeDeclaration M.empty enumWithMultipleParameterizedFields `shouldBe`
         pack (
-            "typedef enum {\n" ++
+            "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++
             "    id0__variant1,\n" ++
             "    id0__variant2,\n" ++
@@ -112,13 +113,10 @@ spec = do
             "} __enum_id0__variant3_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++
-            "\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "\n" ++
             "    union {\n" ++
             "        __enum_id0__variant0_params_t variant0;\n" ++
             "        __enum_id0__variant2_params_t variant2;\n" ++
             "        __enum_id0__variant3_params_t variant3;\n" ++
             "    };\n" ++
-            "\n" ++
-            "} id0;\n");
+            "} id0;");

@@ -110,10 +110,10 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    id0 __0;\n" ++
-            "} __option__id0_params_t;\n" ++
+            "} __option_id0_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __option__id0_params_t Some;\n" ++
+            "    __option_id0_params_t Some;\n" ++
             "    __enum_option_t __variant;\n" ++
             "} __option__id0_t;")
     it "Prints a struct with two fields" $ do

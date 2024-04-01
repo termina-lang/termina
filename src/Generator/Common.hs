@@ -29,15 +29,15 @@ namefy = ("__" <>)
 
 -- | Termina's pretty builtin types
 pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, sinkPort, inPort, outPort :: Identifier
-pool = namefy $ "termina" <::> "pool_t"
-msgQueue = namefy $ "termina" <::> "msg_queue_t"
-optionDyn = namefy $ "option" <::> "dyn_t"
-dynamicStruct = namefy $ "termina" <::> "dyn_t"
-taskID = namefy $ "termina" <::> "task_t"
-resourceID = namefy $ "termina" <::> "resource_t"
-sinkPort = namefy $ "termina" <::> "sink_port_t"
-inPort = namefy $ "termina" <::> "in_port_t"
-outPort = namefy $ "termina" <::> "out_port_t"
+pool = namefy "termina_pool_t"
+msgQueue = namefy "termina_msg_queue_t"
+optionDyn = namefy "option_dyn_t"
+dynamicStruct = namefy "termina_dyn_t"
+taskID = namefy "termina_task_t"
+resourceID = namefy "termina_resource_t"
+sinkPort = namefy "termina_sink_port_t"
+inPort = namefy "termina_in_port_t"
+outPort = namefy "termina_out_port_t"
 
 poolMethodName :: Identifier -> Identifier
 poolMethodName mName = namefy $ "termina" <::> "pool" <::> mName
@@ -45,34 +45,43 @@ poolMethodName mName = namefy $ "termina" <::> "pool" <::> mName
 msgQueueMethodName :: Identifier -> Identifier
 msgQueueMethodName mName = namefy $ "termina" <::> "msg_queue" <::> mName
 
-thatField :: Identifier
+thatField, thisParam :: Identifier
 thatField = "__that"
+thisParam = "__this"
 
-enumStructName :: Identifier -> Identifier
-enumStructName identifier = namefy ("enum_" <> identifier <> "_t")
+genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
+genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
 
-enumParameterStructName :: Identifier -> Identifier -> Identifier
-enumParameterStructName enumId variant = namefy $ enumId <::> variant <> "_params_t"
+genEnumVariantName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
+genEnumVariantName enumId variant = return $ enumId <::> variant
+
+genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
+genEnumParameterStructName enumId variant = return $ namefy $ "enum_" <> enumId <::> variant <> "_params_t"
 
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
 genOptionParameterStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
-genOptionParameterStructName Bool = return $ namefy $ "option" <::> "bool_params_t"
-genOptionParameterStructName Char = return $ namefy $ "option" <::> "char_params_t"
-genOptionParameterStructName UInt8 = return $ namefy $ "option" <::> "uint8_params_t"
-genOptionParameterStructName UInt16 = return $ namefy $ "option" <::> "uint16_params_t"
-genOptionParameterStructName UInt32 = return $ namefy $ "option" <::> "uint32_params_t"
-genOptionParameterStructName UInt64 = return $ namefy $ "option" <::> "uint64_params_t"
-genOptionParameterStructName Int8 = return $ namefy $ "option" <::> "int8_params_t"
-genOptionParameterStructName Int16 = return $ namefy $ "option" <::> "int16_params_t"
-genOptionParameterStructName Int32 = return $ namefy $ "option" <::> "int32_params_t"
-genOptionParameterStructName Int64 = return $ namefy $ "option" <::> "int64_params_t"
+genOptionParameterStructName Bool = return $ namefy "option_bool_params_t"
+genOptionParameterStructName Char = return $ namefy "option_char_params_t"
+genOptionParameterStructName UInt8 = return $ namefy "option_uint8_params_t"
+genOptionParameterStructName UInt16 = return $ namefy "option_uint16_params_t"
+genOptionParameterStructName UInt32 = return $ namefy "option_uint32_params_t"
+genOptionParameterStructName UInt64 = return $ namefy "option_uint64_params_t"
+genOptionParameterStructName Int8 = return $ namefy "option_int8_params_t"
+genOptionParameterStructName Int16 = return $ namefy "option_int16_params_t"
+genOptionParameterStructName Int32 = return $ namefy "option_int32_params_t"
+genOptionParameterStructName Int64 = return $ namefy "option_int64_params_t"
 genOptionParameterStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionParameterStructName (DynamicSubtype _) = return $ namefy $ "option" <::> "dyn_params_t"
-genOptionParameterStructName ts@(Vector {}) = do
-    tsName <- genTypeSpecName ts
-    tsDimension <- genDimensionOptionTS ts
-    return $ namefy $ "option" <::> tsName <> tsDimension <> "_params_t"
+genOptionParameterStructName (DynamicSubtype _) = return $ namefy "option_dyn_params_t"
+genOptionParameterStructName ts = 
+    case ts of
+        Vector {} -> do
+            tsName <- genTypeSpecName ts
+            tsDimension <- genDimensionOptionTS ts
+            return $ namefy $ "option_" <> tsName <::> tsDimension <> "_params_t"
+        _ -> do
+            tsName <- genTypeSpecName ts
+            return $ namefy $ "option_" <> tsName <> "_params_t"
 
     where
         genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
@@ -91,7 +100,6 @@ genOptionParameterStructName ts@(Vector {}) = do
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
-genOptionParameterStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
 enumVariantsField :: Identifier
 enumVariantsField = namefy "variant"
@@ -149,7 +157,7 @@ genOptionStructName Int32 = return $ namefy $ "option" <::> "int32_t"
 genOptionStructName Int64 = return $ namefy $ "option" <::> "int64_t"
 genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
 genOptionStructName (DynamicSubtype _) = return optionDyn
-genOptionStructName ts@(Vector {}) = do
+genOptionStructName ts = do
     tsName <- genTypeSpecName ts
     tsDimension <- genDimensionOptionTS ts
     return $ namefy $ "option" <::> tsName <> tsDimension <> "_t"
@@ -171,7 +179,6 @@ genOptionStructName ts@(Vector {}) = do
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
         genDimensionOptionTS (Vector ts' (K s)) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
-genOptionStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
 
 genArrayWrapStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
 genArrayWrapStructName ts@(Vector {}) = do

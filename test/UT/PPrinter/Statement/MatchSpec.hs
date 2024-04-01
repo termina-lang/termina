@@ -90,7 +90,7 @@ spec = do
         pack (
           "\nif (option_var.__variant == Some) {\n" ++
           "    \n" ++
-          "    __option__dyn_params_t __Some = option_var.Some;\n" ++
+          "    __option_dyn_params_t __Some = option_var.Some;\n" ++
           "\n" ++
           "    foo1 = *(uint32_t *)__Some.__0.data;\n" ++
           "\n" ++
@@ -108,7 +108,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option__dyn_params_t __Some = option_var.Some;\n" ++
+          "    __option_dyn_params_t __Some = option_var.Some;\n" ++
           "\n" ++
           "    foo1 = ((uint32_t *)__Some.__0.data)[8];\n" ++
           "\n" ++
@@ -118,7 +118,7 @@ spec = do
         pack (
           "\n{\n" ++
           "    \n" ++
-          "    __option__dyn_t __match = get_integer();\n" ++
+          "    __option_dyn_t __match = get_integer();\n" ++
           "\n" ++
           "    if (__match.__variant == Some) {\n" ++
           "        \n" ++
