@@ -1,4 +1,4 @@
-module UT.PPrinter.TypeDef.EnumSpec (spec) where
+module UT.PPrinter.TypeDefinition.EnumSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.Declaration
+import Generator.TypeDefinition
 import Generator.Common
 
 
@@ -42,9 +42,9 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant3" [Int8, Vector (Vector Char (K 20)) (K 35)]
   ] []) undefined
 
-renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
-renderTypeDeclaration opts decl = 
-  case runReaderT (genTypeDeclaration decl) opts of
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl opts decl = 
+  case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err
     Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -52,7 +52,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderTypeDeclaration M.empty enumWithOneRegularField `shouldBe`
+      renderTypeDefinitionDecl M.empty enumWithOneRegularField `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -62,7 +62,7 @@ spec = do
             "    __enum_id0_t __variant;\n" ++
             "} id0;")
     it "Prints an enum with two regular variants" $ do
-      renderTypeDeclaration M.empty enumWithTwoRegularFields `shouldBe`
+      renderTypeDefinitionDecl M.empty enumWithTwoRegularFields `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++
@@ -73,7 +73,7 @@ spec = do
             "    __enum_id0_t __variant;\n" ++
             "} id0;")
     it "Prints an enum with one parameterized variant" $ do
-      renderTypeDeclaration M.empty enumWithOneParameterizedField `shouldBe`
+      renderTypeDefinitionDecl M.empty enumWithOneParameterizedField `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -88,7 +88,7 @@ spec = do
             "    __enum_id0__variant0_params_t variant0;\n" ++
             "} id0;")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderTypeDeclaration M.empty enumWithMultipleParameterizedFields `shouldBe`
+      renderTypeDefinitionDecl M.empty enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++

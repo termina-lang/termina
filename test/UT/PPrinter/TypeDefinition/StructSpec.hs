@@ -1,4 +1,4 @@
-module UT.PPrinter.TypeDef.StructSpec (spec) where
+module UT.PPrinter.TypeDefinition.StructSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -11,7 +11,7 @@ import qualified Data.Set as S
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.Declaration
+import Generator.TypeDefinition
 import Generator.Common
 
 {- | Struct type with a single field.
@@ -92,9 +92,9 @@ packedAndAlignedStruct = TypeDefinition
       Modifier "aligned" (Just (KC (I UInt32 16)))
     ]) undefined
 
-renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
-renderTypeDeclaration opts decl = 
-  case runReaderT (genTypeDeclaration decl) opts of
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl opts decl = 
+  case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err
     Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -102,7 +102,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypeDeclaration (M.fromList [(DefinedType "id0", S.fromList [Option (DefinedType "id0")])]) structWithOneField `shouldBe`
+       renderTypeDefinitionDecl (M.fromList [(DefinedType "id0", S.fromList [Option (DefinedType "id0")])]) structWithOneField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -117,14 +117,14 @@ spec = do
             "    __enum_option_t __variant;\n" ++
             "} __option__id0_t;")
     it "Prints a struct with two fields" $ do
-      renderTypeDeclaration M.empty structWithTwoFields `shouldBe`
+      renderTypeDefinitionDecl M.empty structWithTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "} id0;")
     it "Prints a packed struct" $ do
-      renderTypeDeclaration M.empty packedStruct `shouldBe`
+      renderTypeDefinitionDecl M.empty packedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -132,7 +132,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((packed)) id0;")
     it "Prints an aligned struct" $ do
-      renderTypeDeclaration M.empty alignedStruct `shouldBe`
+      renderTypeDefinitionDecl M.empty alignedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -140,7 +140,7 @@ spec = do
             "    uint32_t field2[10];\n" ++
             "} __attribute__((aligned(16))) id0;")
     it "Prints a packet & aligned struct" $ do
-      renderTypeDeclaration M.empty packedAndAlignedStruct `shouldBe`
+      renderTypeDefinitionDecl M.empty packedAndAlignedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++

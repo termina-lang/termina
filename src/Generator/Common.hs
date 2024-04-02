@@ -49,6 +49,10 @@ thatField, thisParam :: Identifier
 thatField = "__that"
 thisParam = "__this"
 
+resourceClassIDField, taskClassIDField :: Identifier
+resourceClassIDField = "__resource"
+taskClassIDField = "__task"
+
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
 
@@ -57,6 +61,9 @@ genEnumVariantName enumId variant = return $ enumId <::> variant
 
 genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genEnumParameterStructName enumId variant = return $ namefy $ "enum_" <> enumId <::> variant <> "_params_t"
+
+genClassFunctionName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
+genClassFunctionName className functionName = return $ className <::> functionName
 
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
@@ -244,13 +251,52 @@ genDeclSpecifiers (Allocator _)                = return [CTypeSpec $ CTypeDef po
 genDeclSpecifiers (SinkPort {})                = return [CTypeSpec $ CTypeDef sinkPort]
 genDeclSpecifiers (OutPort {})                 = return [CTypeSpec $ CTypeDef outPort]
 genDeclSpecifiers (InPort {})                  = return [CTypeSpec $ CTypeDef inPort]
+genDeclSpecifiers (Reference Immutable ts)     = do
+    tsDecl <- genDeclSpecifiers ts
+    return $ CTypeQual CConstQual : tsDecl
+genDeclSpecifiers (Reference _ ts)             = genDeclSpecifiers ts
 genDeclSpecifiers t                            = throwError $ InternalError $ "Unsupported type: " ++ show t
 
 genArraySizeDeclarator :: TypeSpecifier -> SemanticAnns -> [CDerivedDeclarator]
-genArraySizeDeclarator (Vector ts' (K s)) ann = 
+genArraySizeDeclarator (Vector ts (K s)) ann = 
     let cAnn = buildGenericAnn ann in
-    CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) cAnn)) cAnn : genArraySizeDeclarator ts' ann
+    CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) cAnn)) cAnn : genArraySizeDeclarator ts ann
+genArraySizeDeclarator (Reference _ (Vector ts (K s))) ann = 
+    let cAnn = buildGenericAnn ann in
+    CArrDeclr [] (CArrSize False (CConst (CIntConst (CInteger s DecRepr)) cAnn)) cAnn : genArraySizeDeclarator ts ann
 genArraySizeDeclarator _ _ = []
+
+genReturnTypeDeclSpecifiers :: (MonadError CGeneratorError m) => TypeSpecifier -> m [CDeclarationSpecifier]
+genReturnTypeDeclSpecifiers ts@(Vector {}) = do
+    structName <- genArrayWrapStructName ts
+    return [CTypeSpec $ CTypeDef structName]
+genReturnTypeDeclSpecifiers ts = genDeclSpecifiers ts
+
+genParameterDeclaration :: (MonadError CGeneratorError m) => SemanticAnns -> Parameter -> m CDeclaration
+genParameterDeclaration ann (Parameter identifier (Reference accKind ts)) = do
+    declSpec <- genDeclSpecifiers ts
+    let exprCAnn = buildGenericAnn ann
+        arrayDecl = genArraySizeDeclarator ts ann
+        decl = case accKind of
+            Immutable -> CTypeQual CConstQual : declSpec
+            _ -> declSpec
+    case ts of
+        Vector {} -> do
+            return $ CDeclaration decl [(Just (CDeclarator (Just identifier) arrayDecl [] exprCAnn), Nothing, Nothing)]
+                (buildDeclarationAnn ann False)
+        _ -> return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
+            (buildDeclarationAnn ann False)
+genParameterDeclaration ann (Parameter identifier ts@(Vector {})) = do
+    structName <- genArrayWrapStructName ts
+    let exprCAnn = buildGenericAnn ann
+        decl = [CTypeSpec $ CTypeDef structName]
+    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
+genParameterDeclaration ann (Parameter identifier ts) = do
+    let exprCAnn = buildGenericAnn ann
+    decl <- genDeclSpecifiers ts
+    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
 
 genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m CDeclaration
 genCastDeclaration (DynamicSubtype ts@(Vector _ _)) ann = do

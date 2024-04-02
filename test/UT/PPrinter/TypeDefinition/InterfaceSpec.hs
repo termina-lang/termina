@@ -1,4 +1,4 @@
-module UT.PPrinter.TypeDef.InterfaceSpec (spec) where
+module UT.PPrinter.TypeDefinition.InterfaceSpec (spec) where
 
 import Test.Hspec
 import PPrinter
@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.Declaration
+import Generator.TypeDefinition
 import Generator.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnns
@@ -27,9 +27,9 @@ interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
     ] undefined
   ] []) undefined
 
-renderTypeDeclaration :: OptionTypes -> AnnASTElement SemanticAnns -> Text
-renderTypeDeclaration opts decl = 
-  case runReaderT (genTypeDeclaration decl) opts of
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl opts decl = 
+  case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err
     Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -37,7 +37,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints an interface with one procedure" $ do
-      renderTypeDeclaration M.empty interfaceWithOneProcedure `shouldBe`
+      renderTypeDefinitionDecl M.empty interfaceWithOneProcedure `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
           "    void * __that;\n" ++

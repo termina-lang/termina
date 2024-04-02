@@ -1,13 +1,17 @@
-module UT.PPrinter.TypeDef.ResourceClassSpec (spec) where
+module UT.PPrinter.TypeDefinition.ResourceClassSpec (spec) where
 
 import Test.Hspec
 import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad
-import Semantic.Option (OptionMap)
-import Data.Maybe
 import qualified Data.Map as M
+
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.LanguageC.Printer
+import Generator.TypeDefinition
+import Generator.Common
 
 
 classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnns
@@ -76,7 +80,7 @@ alignedClass = TypeDefinition
     ClassField (FieldDefinition "field1" UInt16) undefined,
     ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
     ClassProcedure "procedure0" [] [] undefined
-  ] ["Interface0"] [Modifier "align" (Just (KC (I UInt32 16)))]) undefined
+  ] ["Interface0"] [Modifier "aligned" (Just (KC (I UInt32 16)))]) undefined
 
 packedAndAlignedClass :: AnnASTElement SemanticAnns
 packedAndAlignedClass = TypeDefinition
@@ -87,7 +91,7 @@ packedAndAlignedClass = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] [
       Modifier "packed" Nothing,
-      Modifier "align" (Just (KC (I UInt32 16)))
+      Modifier "aligned" (Just (KC (I UInt32 16)))
     ]) undefined
 
 classWithFixedLocationField :: AnnASTElement SemanticAnns
@@ -106,112 +110,115 @@ classWithAccessPortField = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] []) undefined
 
-renderTypedefDeclaration :: OptionMap -> AnnASTElement SemanticAnns -> Text
-renderTypedefDeclaration opts = render . fromJust . (ppHeaderASTElement opts)
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl opts decl = 
+  case runReaderT (genTypeDefinitionDecl decl) opts of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints a class with one procedure and zero fields" $ do
-      renderTypedefDeclaration M.empty classWithOneProcedureAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl M.empty classWithOneProcedureAndZeroFields `shouldBe`
         pack (
-          "typedef struct {\n" ++
-          "    __termina__resource_t __resource;\n" ++
+          "\ntypedef struct {\n" ++
+          "    __termina_resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(void * const __this, uint8_t param0, uint16_t param1,\n" ++
           "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                        int16_t param5, int32_t param6, int64_t param7);\n")
+          "                        int16_t param5, int32_t param6, int64_t param7);")
     it "Prints a class with two procedures and zero fields" $ do
-      renderTypedefDeclaration M.empty classWithTwoProceduresAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl M.empty classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
-          "typedef struct {\n" ++
-          "    __termina__resource_t __resource;\n" ++
+          "\ntypedef struct {\n" ++
+          "    __termina_resource_t __resource;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(void * const __this, uint8_t param0,\n" ++
-          "                        __option__dyn_t param1);\n" ++
+          "                        __option_dyn_t param1);\n" ++
           "\n" ++
           "void Class0__procedure1(void * const __this, uint8_t param0,\n" ++
-          "                        uint8_t param1[32]);\n")
+          "                        uint8_t param1[32]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
-      renderTypedefDeclaration M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
-            "typedef struct {\n" ++
-            "    __termina__resource_t __resource;\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a class marked as no_handler with two fields" $ do
-      renderTypedefDeclaration M.empty noHandlerClassWithOneEmptyProcedure `shouldBe`
+      renderTypeDefinitionDecl M.empty noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a class with one procedure and two fields" $ do
-      renderTypedefDeclaration M.empty classWithOneProcedureAndTwoFields `shouldBe`
+      renderTypeDefinitionDecl M.empty classWithOneProcedureAndTwoFields `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24];\n" ++
-            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a packed class" $ do
-      renderTypedefDeclaration M.empty packedClass `shouldBe`
+      renderTypeDefinitionDecl M.empty packedClass `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina__resource_t __resource;\n" ++
             "} __attribute__((packed)) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16]);\n")
+            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16]);")
     it "Prints an aligned class" $ do
-      renderTypedefDeclaration M.empty alignedClass `shouldBe`
+      renderTypeDefinitionDecl M.empty alignedClass `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina__resource_t __resource;\n" ++
-            "} __attribute__((align(16))) Class0;\n" ++
+            "} __attribute__((aligned(16))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a packed & aligned class" $ do
-      renderTypedefDeclaration M.empty packedAndAlignedClass `shouldBe`
+      renderTypeDefinitionDecl M.empty packedAndAlignedClass `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32];\n" ++
-            "    __termina__resource_t __resource;\n" ++
-            "} __attribute__((packed, align(16))) Class0;\n" ++
+            "} __attribute__((packed, aligned(16))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a class with a fixed location field" $ do
-      renderTypedefDeclaration M.empty classWithFixedLocationField `shouldBe`
+      renderTypeDefinitionDecl M.empty classWithFixedLocationField `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
-            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
     it "Prints a class with an access port field" $ do
-      renderTypedefDeclaration M.empty classWithAccessPortField `shouldBe`
+      renderTypeDefinitionDecl M.empty classWithAccessPortField `shouldBe`
         pack (
-            "typedef struct {\n" ++
+            "\ntypedef struct {\n" ++
+            "    __termina_resource_t __resource;\n" ++
             "    uint32_t field0;\n" ++
             "    Interface1 field1;\n" ++
-            "    __termina__resource_t __resource;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n")
+            "void Class0__procedure0(void * const __this);")
