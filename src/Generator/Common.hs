@@ -40,10 +40,14 @@ inPort = namefy "termina_in_port_t"
 outPort = namefy "termina_out_port_t"
 
 poolMethodName :: Identifier -> Identifier
-poolMethodName mName = namefy $ "termina" <::> "pool" <::> mName
+poolMethodName mName = namefy "termina_pool" <::> mName
 
 msgQueueMethodName :: Identifier -> Identifier
-msgQueueMethodName mName = namefy $ "termina" <::> "msg_queue" <::> mName
+msgQueueMethodName mName = namefy "termina_msg_queue" <::> mName
+
+resourceLock, resourceUnlock :: Identifier
+resourceLock = namefy "termina_resource" <::> "lock"
+resourceUnlock = namefy "termina_resource" <::> "unlock"
 
 thatField, thisParam :: Identifier
 thatField = "__that"
@@ -191,7 +195,7 @@ genArrayWrapStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m I
 genArrayWrapStructName ts@(Vector {}) = do
     tsName <- genTypeSpecName ts
     tsDimension <- genDimensionOptionTS ts
-    return $ namefy $ "wrapper" <::> tsName <> tsDimension <> "_t"
+    return $ namefy $ "wrapper_" <> tsName <> "_" <> tsDimension <> "_t"
 
     where
         genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier

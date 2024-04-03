@@ -462,11 +462,62 @@ instance PPrint CExternalDeclaration where
     pprint (CFDefExt fund) = pprint fund
 
 instance PPrint CFunctionDef where
-    pprint (CFunDef declspecs declr stat _) = do
-        pdeclspecs <- mapM pprint declspecs
-        pdeclr <- pprint declr
-        pstat <- pprintPrec 25 stat
-        return $ hsep pdeclspecs <+> pdeclr <+> pstat
+    pprint (CFunDef declspecs declr stat ann) =
+        case itemAnnotation ann of
+            CDeclarationAnn before -> do
+                pdeclspecs <- mapM pprint declspecs
+                pdeclr <- pprint declr
+                pstat <- pprintPrec 25 stat
+                return $ prependLine before $ hsep pdeclspecs <+> pdeclr <+> pstat
+            _ -> error $ "Invalid annotation: " ++ show ann
+
+
+instance PPrint CPreprocessorDirective where
+    pprint (CPPDefine ident Nothing ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#define" <+> pretty ident
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDefine ident (Just token) ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#define" <+> pretty ident <+> pretty token
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPIfDef ident ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#ifdef" <+> pretty ident
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPInclude isSystem path ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#include" <+> 
+                    pretty (if isSystem then "<" else "\"") <> 
+                        pretty path <> pretty 
+                            (if isSystem then ">" else "\"")
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPIfNDef ident ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#ifndef" <+> pretty ident
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPEndif ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#endif"
+            _ -> error $ "Invalid annotation: " ++ show ann
+
+instance PPrint CFileItem where
+    pprint (CExtDecl decl) = pprint decl
+    pprint (CPPDirective directive) = pprint directive
+
+instance PPrint CFile where
+    pprint (CHeaderFile _path items) = do
+        pItems <- mapM pprint items
+        return $ vsep pItems
+    pprint (CSourceFile _path items) = do
+        pItems <- mapM pprint items
+        return $ vsep pItems
 
 -- precedence of C operators
 binPrec :: CBinaryOp -> Integer

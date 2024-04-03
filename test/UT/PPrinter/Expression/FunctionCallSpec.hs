@@ -159,7 +159,7 @@ spec = do
         pack "foo(*p_var + *(uint16_t *)var1.data)"
     it "Prints the expression: foo(vector0)" $ do
       renderExpression functionCallSingleVector0 `shouldBe`
-        pack "foo(*(__wrapper__uint32_10_t *)vector0)"
+        pack "foo(*(__wrapper_uint32__10_t *)vector0)"
     it "Prints the expression: foo(&vector0)" $ do
       renderExpression functionCallSingleRefVector0 `shouldBe`
         pack "foo(vector0)"
@@ -175,7 +175,7 @@ spec = do
         pack "foo2(var0 + 1024, var0 + *(uint16_t *)var1.data)"
     it "Prints the expression: foo3(vector0, &var0, var1 + 1024 : u16)" $ do
       renderExpression call3Parameters `shouldBe`
-        pack ("foo3(&var0, *(__wrapper__uint32_10_t *)vector0, " ++
+        pack ("foo3(&var0, *(__wrapper_uint32__10_t *)vector0, " ++
               "*(uint16_t *)var1.data + 1024)")
     it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + 1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`

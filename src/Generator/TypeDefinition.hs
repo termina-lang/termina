@@ -7,6 +7,7 @@ import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
 import Generator.Common
+import Generator.Statement
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.Reader
@@ -115,6 +116,29 @@ genEnumVariantParameterStruct ann identifier (EnumVariant variant params) = do
             return $ CDeclaration decl [(Just (CDeclarator (Just (namefy $ show index)) arrayDecl [] exprCAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann False)
 
+classifyClassMembers :: (MonadError CGeneratorError m) => TypeDef SemanticAnns -> m ([ClassMember SemanticAnns], [ClassMember SemanticAnns])
+classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
+    return $ foldr (\m (fields, funcs) -> case m of
+        field@(ClassField fieldDef _) -> case clsKind of
+            TaskClass -> (field : fields, funcs)
+            _ -> case fieldDef of
+                (FieldDefinition _ (SinkPort {})) -> (fields, funcs)
+                (FieldDefinition _ (InPort {})) -> (fields, funcs)
+                _ -> (field : fields, funcs)
+        func -> (fields, func : funcs)) ([], []) members
+classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
+
+genThisParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genThisParam (TypeDefinition (Class clsKind identifier _members _provides _modifiers) ann) =
+    case clsKind of
+    ResourceClass -> return $ CDeclaration [CTypeSpec CVoidType]
+        [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
+    _ -> return $ CDeclaration [CTypeSpec $ CTypeDef identifier]
+        [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
+genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
+
 -- | TypeDef pretty printer.
 genTypeDefinitionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]
 genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = do
@@ -139,7 +163,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                 CTypeSpec $ CEnumType $ CEnum Nothing (
                     Just ([(v, Nothing) | v <- pEnumVariants])) []]
                     [(Just (CDeclarator (Just enumName) [] [] (buildGenericAnn ann)), Nothing, Nothing)
-                    ] cAnn) 
+                    ] cAnn)
                 : pEnumParameterStructs ++ [enumStruct]
 
         where
@@ -151,14 +175,14 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                 decl <- genDeclSpecifiers (DefinedType paramsStructName)
                 return $ CDeclaration decl [(Just (CDeclarator (Just variant) [] [] exprCAnn), Nothing, Nothing)]
                     (buildDeclarationAnn ann False)
-            
+
             genParameterUnion :: [EnumVariant] -> CHeaderGenerator CDeclaration
             genParameterUnion variantsWithParams = do
                 let cAnn = buildDeclarationAnn ann False
                 pFields <- mapM genParameterUnionField variantsWithParams
                 return $ CDeclaration [CTypeSpec $ CSUType (
                             CStruct CUnionTag Nothing (Just pFields) [])] [] cAnn
-            
+
             genEnumStruct :: Identifier -> [EnumVariant] -> CHeaderGenerator CExternalDeclaration
             genEnumStruct enumName variantsWithParams = do
                 decl <- genDeclSpecifiers (DefinedType enumName)
@@ -186,7 +210,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
 genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         exprCAnn = buildGenericAnn ann
-        cThatField = CDeclaration [CTypeSpec CVoidType] 
+        cThatField = CDeclaration [CTypeSpec CVoidType]
                 [(Just (CDeclarator (Just thatField) [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann False)
     procedureFields <- mapM genInterfaceProcedureField members
@@ -196,21 +220,21 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
                                 ] cAnn)]
 
     where
-            
+
         genInterfaceProcedureField :: InterfaceMember SemanticAnns -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure params ann') = do
             cParams <- mapM (genParameterDeclaration ann') params
             let cAnn = buildDeclarationAnn ann' False
-                cThisParam = CDeclaration [CTypeSpec CVoidType] 
+                cThisParam = CDeclaration [CTypeSpec CVoidType]
                     [(Just (CDeclarator (Just thisParam) [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
                     (buildDeclarationAnn ann False)
-            return $ CDeclaration [CTypeSpec CVoidType] 
-                [(Just (CDeclarator (Just procedure) 
-                    [CPtrDeclr [] cAnn, CFunDeclr (cThisParam : cParams) [] (buildGenericAnn ann')] [] 
+            return $ CDeclaration [CTypeSpec CVoidType]
+                [(Just (CDeclarator (Just procedure)
+                    [CPtrDeclr [] cAnn, CFunDeclr (cThisParam : cParams) [] (buildGenericAnn ann')] []
                     (buildGenericAnn ann')), Nothing, Nothing)]
                 cAnn
-genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provides modifiers) ann) = do
-    let (fields, functions) = classifyClassMembers members
+genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
+    (fields, functions) <- classifyClassMembers cls
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
     fields' <- case clsKind of
         TaskClass -> return fields
@@ -223,17 +247,17 @@ genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provide
     let cAnn = buildDeclarationAnn ann True
         exprCAnn = buildGenericAnn ann
         structFields = case clsKind of
-            TaskClass -> 
-                let cIDField = CDeclaration [CTypeSpec $ CTypeDef taskID] 
+            TaskClass ->
+                let cIDField = CDeclaration [CTypeSpec $ CTypeDef taskID]
                         [(Just (CDeclarator (Just taskClassIDField) [] [] exprCAnn), Nothing, Nothing)]
                         (buildDeclarationAnn ann False) in
                 Just (cIDField : cFields)
-            ResourceClass -> 
-                let cIDField = CDeclaration [CTypeSpec $ CTypeDef resourceID] 
+            ResourceClass ->
+                let cIDField = CDeclaration [CTypeSpec $ CTypeDef resourceID]
                         [(Just (CDeclarator (Just resourceClassIDField) [] [] exprCAnn), Nothing, Nothing)]
                         (buildDeclarationAnn ann False) in
-                Just (cIDField : cFields)            
-            _ -> case cFields of 
+                Just (cIDField : cFields)
+            _ -> case cFields of
                 [] -> Nothing
                 _ -> Just cFields
     return $ CDeclExt (CDeclaration [CStorageSpec CTypedef, CTypeSpec $ CSUType (
@@ -243,33 +267,15 @@ genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provide
 
     where
 
-        classifyClassMembers :: [ClassMember SemanticAnns] -> ([ClassMember SemanticAnns], [ClassMember SemanticAnns])
-        classifyClassMembers = foldr (\m (fields, funcs) -> case m of
-            field@(ClassField fieldDef _) -> case clsKind of 
-                TaskClass -> (field : fields, funcs)
-                _ -> case fieldDef of
-                    (FieldDefinition _ (SinkPort {})) -> (fields, funcs)
-                    (FieldDefinition _ (InPort {})) -> (fields, funcs)
-                    _ -> (field : fields, funcs)
-            func -> (fields, func : funcs)) ([], [])
-
         genClassField :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
         genClassField (ClassField fld ann') = genFieldDeclaration ann' fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
-
-        cThisParam :: CDeclaration
-        cThisParam = case clsKind of
-            ResourceClass -> CDeclaration [CTypeSpec CVoidType] 
-                [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
-                (buildDeclarationAnn ann False)
-            _ -> CDeclaration [CTypeSpec $ CTypeDef identifier] 
-                [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
-                (buildDeclarationAnn ann False)
 
         genClassFunctionDeclaration :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
         genClassFunctionDeclaration (ClassViewer viewer params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            cThisParam <- genThisParam clsdef
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier viewer
             return $ CDeclaration retTypeDecl
@@ -277,6 +283,7 @@ genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provide
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassProcedure procedure params _ ann') = do
             let cAnn = buildGenericAnn ann'
+            cThisParam <- genThisParam clsdef
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier procedure
             return $ CDeclaration [CTypeSpec CVoidType]
@@ -286,12 +293,14 @@ genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provide
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
             clsFuncName <- genClassFunctionName identifier method
+            cThisParam <- genThisParam clsdef
             return $ CDeclaration retTypeDecl
                 [(Just (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam] [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction action param rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            cThisParam <- genThisParam clsdef
             cParam <- genParameterDeclaration ann' param
             clsFuncName <- genClassFunctionName identifier action
             return $ CDeclaration retTypeDecl
@@ -299,3 +308,108 @@ genTypeDefinitionDecl (TypeDefinition (Class clsKind identifier members _provide
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
+
+genClassDefinition :: AnnASTElement SemanticAnns -> CSourceGenerator [CExternalDeclaration]
+genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _members _provides _) _) = do
+    (_fields, functions) <- classifyClassMembers cls
+    mapM genClassFunctionDefinition functions
+
+    where
+
+        genClassFunctionDefinition :: ClassMember SemanticAnns -> CSourceGenerator CExternalDeclaration
+        genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
+            clsFuncName <- genClassFunctionName identifier viewer
+            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            cThisParam <- genThisParam clsdef
+            cParams <- mapM (genParameterDeclaration ann) parameters
+            cReturn <- genReturnStatement ret
+            let cAnn = buildGenericAnn ann
+                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Vector {})) <- parameters]
+            cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
+                cStmt <- genBlockItem x
+                return $ acc ++ cStmt) [] body
+            return $ CFDefExt $ CFunDef retTypeDecl
+                (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn)
+                (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
+                (buildDeclarationAnn ann True)
+        genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
+            clsFuncName <- genClassFunctionName identifier procedure
+            cThisParam <- genThisParam clsdef
+            cParams <- mapM (genParameterDeclaration ann) parameters
+            cReturn <- genReturnStatement (ReturnStmt Nothing ann)
+            let cAnn = buildGenericAnn ann
+                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Vector {})) <- parameters]
+                retTypeDecl = [CTypeSpec CVoidType]
+            selfCastStmt <- genSelfCastStmt
+            cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
+                cStmt <- genBlockItem x
+                return $ acc ++ cStmt) [] body
+            return $ CFDefExt $ CFunDef retTypeDecl
+                (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn)
+                (CCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True))
+                (buildDeclarationAnn ann True)
+
+            where
+
+                selfVariable :: Identifier
+                selfVariable = "self"
+
+                genSelfCastStmt :: CSourceGenerator CCompoundBlockItem
+                genSelfCastStmt = do
+                    let cAnn = buildGenericAnn ann
+                        declAnn = buildDeclarationAnn ann False
+                        cExpr = CCast
+                            (CDeclaration [CTypeSpec $ CTypeDef identifier] [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn)
+                            (CVar thisParam cAnn) cAnn
+                    decls <- genDeclSpecifiers (DefinedType identifier)
+                    return $ CBlockDecl $
+                        CDeclaration decls [(Just (CDeclarator (Just selfVariable) [CPtrDeclr [] cAnn] [] cAnn), Just (CInitExpr cExpr cAnn), Nothing)] (buildDeclarationAnn ann True)
+
+                genProcedureOnEntry, genProcedureOnExit :: CCompoundBlockItem
+                genProcedureOnEntry =
+                    let cAnn = buildGenericAnn ann
+                        selfResource = CUnary CAdrOp (CMember (CVar selfVariable cAnn) resourceClassIDField True cAnn) cAnn
+                    in
+                    CBlockStmt $ CExpr (Just $ CCall (CVar resourceLock cAnn) [selfResource] cAnn) (buildStatementAnn ann True)
+                genProcedureOnExit =
+                    let cAnn = buildGenericAnn ann
+                        selfResource = CUnary CAdrOp (CMember (CVar selfVariable cAnn) resourceClassIDField True cAnn) cAnn
+                    in
+                    CBlockStmt $ CExpr (Just $ CCall (CVar resourceUnlock cAnn) [selfResource] cAnn) (buildStatementAnn ann True)
+
+        genClassFunctionDefinition (ClassMethod method rts (BlockRet body ret) ann) = do
+            clsFuncName <- genClassFunctionName identifier method
+            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
+            cThisParam <- genThisParam clsdef
+            cReturn <- genReturnStatement ret
+            let cAnn = buildGenericAnn ann
+            cBody <- foldM (\acc x -> do
+                cStmt <- genBlockItem x
+                return $ acc ++ cStmt) [] body
+            return $ CFDefExt $ CFunDef retTypeDecl
+                (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam] [] cAnn] [] cAnn)
+                (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
+                (buildDeclarationAnn ann True)
+        genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
+            clsFuncName <- genClassFunctionName identifier action
+            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            cThisParam <- genThisParam clsdef
+            cParam <- genParameterDeclaration ann param
+            cReturn <- genReturnStatement ret
+            let cAnn = buildGenericAnn ann
+            cBody <- case param of
+                    (Parameter pid (Vector {})) -> do
+                        let newKeyVals = M.fromList [(pid, CMember (CVar pid cAnn) "array" False cAnn)]
+                        Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
+                            cStmt <- genBlockItem x
+                            return $ acc ++ cStmt) [] body
+                    _ -> foldM (\acc x -> do
+                        cStmt <- genBlockItem x
+                        return $ acc ++ cStmt) [] body
+            return $ CFDefExt $ CFunDef retTypeDecl
+                (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam, cParam] [] cAnn] [] cAnn)
+                (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
+                (buildDeclarationAnn ann True)
+        genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
+
+genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e

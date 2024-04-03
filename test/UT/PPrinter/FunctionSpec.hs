@@ -4,9 +4,14 @@ import Test.Hspec
 import PPrinter
 import AST.Seman
 import Data.Text hiding (empty)
+import qualified Data.Map as M
 import Semantic.Monad
 import UT.PPrinter.Expression.Common
-import PPrinter.Function
+import Prettyprinter
+import Control.Monad.Reader
+import Generator.LanguageC.Printer
+import Generator.Function
+import Generator.Common
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
@@ -134,41 +139,42 @@ function4 = Function "function4" [Parameter "param0" UInt32, Parameter "param1" 
     struct0Assignment0
     ] returnStructField0) [] unitSemAnn
 
-renderFunctionDeclaration :: AnnASTElement SemanticAnns -> Text
-renderFunctionDeclaration = render . ppFunctionDeclaration
+renderFunctionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderFunctionDecl opts decl = 
+  case runReaderT (genFunctionDecl decl) opts of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 renderFunction :: AnnASTElement SemanticAnns -> Text
-renderFunction = render . ppFunction
+renderFunction func = 
+  case runReaderT (genFunction func) M.empty of
+    Left err -> pack $ show err
+    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
   describe "Pretty printing function declarations" $ do
     it "Prints fuction0 declaration" $ do
-      renderFunctionDeclaration function0 `shouldBe`
-        pack "void function0();\n"
+      renderFunctionDecl M.empty function0 `shouldBe`
+        pack "\nvoid function0();"
     it "Prints fuction1 declaration" $ do
-      renderFunctionDeclaration function1 `shouldBe`
-        pack "uint32_t function1();\n"
+      renderFunctionDecl M.empty function1 `shouldBe`
+        pack "\nuint32_t function1();"
     it "Prints fuction2 declaration" $ do
-      renderFunctionDeclaration function2 `shouldBe`
-        pack "uint32_t function2(uint32_t param0);\n"
+      renderFunctionDecl M.empty function2 `shouldBe`
+        pack "\nuint32_t function2(uint32_t param0);"
     it "Prints fuction3 declaration" $ do
-      renderFunctionDeclaration function3 `shouldBe`
-        pack ("typedef struct {\n" ++
-              "    uint32_t array[10];\n" ++
-              "} __param_function3_param1_t;\n" ++
-              "\n" ++
-              "uint32_t function3(uint32_t param0, __param_function3_param1_t param1);\n")
+      renderFunctionDecl M.empty function3 `shouldBe`
+        pack ("\nuint32_t function3(uint32_t param0, __wrapper_uint32__10_t param1);")
     it "Prints fuction4 declaration" $ do
-      renderFunctionDeclaration function4 `shouldBe`
-        pack "uint32_t function4(uint32_t param0, uint32_t param1[10]);\n"
+      renderFunctionDecl M.empty function4 `shouldBe`
+        pack "\nuint32_t function4(uint32_t param0, uint32_t param1[10]);"
   describe "Pretty printing function definitions" $ do
     it "Prints fuction0 definition" $ do
       renderFunction function0 `shouldBe`
-        pack ("void function0() {\n" ++
-              "\n" ++
+        pack ("\nvoid function0() {\n" ++
+              "    \n" ++
               "    TMDescriptor struct0;\n" ++
-              "\n" ++
               "    struct0.field0 = 0;\n" ++
               "    struct0.field1.field_a = 0;\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
@@ -182,13 +188,12 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints fuction1 definition" $ do
       renderFunction function1 `shouldBe`
-        pack ("uint32_t function1() {\n" ++
-              "\n" ++
+        pack ("\nuint32_t function1() {\n" ++
+              "    \n" ++
               "    TMDescriptor struct0;\n" ++
-              "\n" ++
               "    struct0.field0 = 0;\n" ++
               "    struct0.field1.field_a = 0;\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
@@ -202,13 +207,12 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints fuction2 definition" $ do
       renderFunction function2 `shouldBe`
-        pack ("uint32_t function2(uint32_t param0) {\n" ++
-              "\n" ++
+        pack ("\nuint32_t function2(uint32_t param0) {\n" ++
+              "    \n" ++
               "    TMDescriptor struct0;\n" ++
-              "\n" ++
               "    struct0.field0 = 0;\n" ++
               "    struct0.field1.field_a = param0;\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
@@ -222,13 +226,12 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints fuction3 definition" $ do
       renderFunction function3 `shouldBe`
-        pack ("uint32_t function3(uint32_t param0, __param_function3_param1_t param1) {\n" ++
-              "\n" ++
+        pack ("\nuint32_t function3(uint32_t param0, __wrapper_uint32__10_t param1) {\n" ++
+              "    \n" ++
               "    TMDescriptor struct0;\n" ++
-              "\n" ++
               "    struct0.field0 = 0;\n" ++
               "    struct0.field1.field_a = param0;\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
@@ -242,13 +245,12 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints fuction4 definition" $ do
       renderFunction function4 `shouldBe`
-        pack ("uint32_t function4(uint32_t param0, uint32_t param1[10]) {\n" ++
-              "\n" ++
+        pack ("\nuint32_t function4(uint32_t param0, uint32_t param1[10]) {\n" ++
+              "    \n" ++
               "    TMDescriptor struct0;\n" ++
-              "\n" ++
               "    struct0.field0 = 0;\n" ++
               "    struct0.field1.field_a = param0;\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
@@ -262,4 +264,4 @@ spec = do
               "\n" ++
               "    return struct0.field0;\n" ++
               "\n" ++
-              "}\n")
+              "}")

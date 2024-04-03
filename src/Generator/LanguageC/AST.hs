@@ -12,8 +12,11 @@ data CFile' a
     deriving (Show)
 
 data CPreprocessorDirective' a
-    = CPPInclude FilePath Bool a
+    = CPPInclude Bool FilePath a
     | CPPDefine Ident (Maybe [String]) a
+    | CPPIfDef Ident a
+    | CPPIfNDef Ident a
+    | CPPEndif a
     deriving (Show)
 
 data CFileItem' a
@@ -377,6 +380,8 @@ data CItemAnn =
       Bool -- ^ Add trailing line inside the compound block
     | CDeclarationAnn
       Bool -- ^ Add new line before declaration 
+    | CPPDirectiveAnn
+      Bool -- ^ Add new line before directive
   deriving (Show)
 
 data CAnns = CAnnotations

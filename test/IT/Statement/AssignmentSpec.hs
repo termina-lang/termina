@@ -5,9 +5,13 @@ import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "function assignment_test0() {\n" ++
@@ -55,7 +59,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -63,7 +70,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -77,14 +87,14 @@ spec = do
               "\n" ++
               "void assignment_test0();\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function assignment_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void assignment_test0() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint32_t foo0 = 0;\n" ++
               "\n" ++
               "    uint32_t foo1 = 0;\n" ++
@@ -93,7 +103,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++ 
-              "}\n")    
+              "}")    
     it "Prints declaration of function assignment_test1" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -102,35 +112,34 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__resource_t __resource;\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test1(void * const __this, __termina__dyn_t dyn_var0);\n" ++
+              "void id0__assignment_test1(void * const __this, __termina_dyn_t dyn_var0);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function assignment_test1" $ do
      renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test1(void * const __this, __termina__dyn_t dyn_var0) {\n" ++
-              "\n" ++
+              "void id0__assignment_test1(void * const __this, __termina_dyn_t dyn_var0) {\n" ++
+              "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    __option__dyn_t opt;\n" ++
-              "\n" ++
+              "    __option_dyn_t opt;\n" ++
               "    opt.__variant = None;\n" ++
               "\n" ++
               "    opt.__variant = Some;\n" ++
               "    opt.Some.__0 = dyn_var0;\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")  
+              "}")  
     it "Prints declaration of function assignment_test2" $ do
      renderHeader test2 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -139,38 +148,38 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__resource_t __resource;\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test2(void * const __this, __termina__dyn_t dyn_var0,\n" ++
-              "                           __termina__dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test2(void * const __this, __termina_dyn_t dyn_var0,\n" ++
+              "                           __termina_dyn_t dyn_var1);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function assignment_test2" $ do
      renderSource test2 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test2(void * const __this, __termina__dyn_t dyn_var0,\n" ++
-              "                           __termina__dyn_t dyn_var1) {\n" ++
-              "\n" ++
+              "void id0__assignment_test2(void * const __this, __termina_dyn_t dyn_var0,\n" ++
+              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    *((uint32_t *)(dyn_var0.data)) = foo;\n" ++
+              "    *(uint32_t *)dyn_var0.data = foo;\n" ++
               "\n" ++
-              "    foo = *((uint32_t *)(dyn_var1.data));\n" ++
+              "    foo = *(uint32_t *)dyn_var1.data;\n" ++
               "\n" ++
-              "    *((uint32_t *)(dyn_var1.data)) = *((uint32_t *)(dyn_var0.data));\n" ++
+              "    *(uint32_t *)dyn_var1.data = *(uint32_t *)dyn_var0.data;\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")  
+              "}")  
     it "Prints declaration of function assignment_test3" $ do
      renderHeader test3 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -179,45 +188,44 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__resource_t __resource;\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test3(void * const __this, __termina__dyn_t dyn_var0,\n" ++
-              "                           __termina__dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test3(void * const __this, __termina_dyn_t dyn_var0,\n" ++
+              "                           __termina_dyn_t dyn_var1);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function assignment_test2" $ do
      renderSource test3 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test3(void * const __this, __termina__dyn_t dyn_var0,\n" ++
-              "                           __termina__dyn_t dyn_var1) {\n" ++
-              "\n" ++
+              "void id0__assignment_test3(void * const __this, __termina_dyn_t dyn_var0,\n" ++
+              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo[10];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        foo[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)(dyn_var0.data))[__i0] = foo[__i0];\n" ++
+              "        ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = ((uint32_t *)(dyn_var1.data))[__i0];\n" ++
+              "        foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)(dyn_var1.data))[__i0] = ((uint32_t *)(dyn_var0.data))[__i0];\n" ++
+              "        ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")  
+              "}")  

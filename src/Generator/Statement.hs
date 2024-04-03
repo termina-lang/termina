@@ -429,5 +429,15 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
                     (buildDeclarationAnn ann True)
             cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlockItem blk'
             return $ CBlockDecl decl : cBlk
+genBlockItem (SingleExpStmt expr ann) = do
+    cExpr <- genExpression expr
+    return [CBlockStmt $ CExpr (Just cExpr) (buildStatementAnn ann True)]
 
-genBlockItem stmt = throwError $ InternalError $ "Unsupported statement: " ++ show stmt
+genReturnStatement :: ReturnStmt SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
+genReturnStatement (ReturnStmt (Just expr) ann) = do
+    cExpr <- genExpression expr
+    let cAnn = buildStatementAnn ann True
+    return [CBlockStmt $ CReturn (Just cExpr) cAnn]
+genReturnStatement (ReturnStmt Nothing ann) = do
+    let cAnn = buildStatementAnn ann True
+    return [CBlockStmt $ CReturn Nothing cAnn]
