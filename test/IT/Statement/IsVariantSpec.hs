@@ -5,9 +5,13 @@ import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "resource class id0 {\n" ++
@@ -43,7 +47,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -51,7 +58,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -64,36 +74,36 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__resource_t __resource;\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(void * const __this, __option__dyn_t option0);\n" ++
+              "void id0__match_test0(void * const __this, __option_dyn_t option0);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of procedure match_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test0(void * const __this, __option__dyn_t option0) {\n" ++
-              "\n" ++
+              "void id0__match_test0(void * const __this, __option_dyn_t option0) {\n" ++
+              "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    if (option0.__variant == None) {\n" ++
-              "\n" ++
+              "        \n" ++
               "        foo = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints declaration of procedure match_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -118,40 +128,36 @@ spec = do
               "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "\n" ++
               "    __enum_Message_t __variant;\n" ++
-              "\n" ++
               "    union {\n" ++
               "        __enum_Message__In_params_t In;\n" ++
               "        __enum_Message__Out_params_t Out;\n" ++
               "    };\n" ++
-              "\n" ++
               "} Message;\n" ++
               "\n" ++
               "uint32_t match_test1();\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of procedure match_test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "uint32_t match_test1() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint32_t ret = 0;\n" ++
               "\n" ++
               "    Message msg;\n" ++
-              "\n" ++
               "    msg.__variant = Message__In;\n" ++
               "    msg.In.__0 = 10;\n" ++
               "    msg.In.__1 = 10;\n" ++
               "\n" ++
               "    if (msg.__variant == Message__In) {\n" ++
-              "\n" ++
+              "        \n" ++
               "        ret = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}\n")
+              "}")

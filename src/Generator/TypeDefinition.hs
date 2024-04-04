@@ -25,7 +25,7 @@ genFieldDeclaration ann (FieldDefinition identifier ts@(Location {})) = do
     decl <- genDeclSpecifiers ts
     return $ CDeclaration (CTypeQual CVolatQual : decl) [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
-genFieldDeclaration ann (FieldDefinition identifier ts@(Allocator {})) = do
+genFieldDeclaration ann (FieldDefinition identifier (AccessPort ts@(Allocator {}))) = do
     let exprCAnn = buildGenericAnn ann
     decl <- genDeclSpecifiers ts
     return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
@@ -135,9 +135,16 @@ genThisParam (TypeDefinition (Class clsKind identifier _members _provides _modif
         [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
     _ -> return $ CDeclaration [CTypeSpec $ CTypeDef identifier]
-        [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
+        [(Just (CDeclarator (Just selfParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
 genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
+
+genConstSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genConstSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) ann) =
+    return $ CDeclaration [CTypeQual CConstQual, CTypeSpec $ CTypeDef identifier]
+        [(Just (CDeclarator (Just selfParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
+genConstSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
 -- | TypeDef pretty printer.
 genTypeDefinitionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]
@@ -275,11 +282,11 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration (ClassViewer viewer params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genConstSelfParam clsdef
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier viewer
             return $ CDeclaration retTypeDecl
-                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn), Nothing, Nothing)]
+                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : cParams) [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassProcedure procedure params _ ann') = do
             let cAnn = buildGenericAnn ann'
@@ -320,7 +327,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
         genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genConstSelfParam clsdef
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
@@ -329,7 +336,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
-                (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn)
+                (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : cParams) [] cAnn] [] cAnn)
                 (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do

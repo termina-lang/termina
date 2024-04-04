@@ -5,9 +5,13 @@ import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "function test0() {\n" ++
@@ -48,7 +52,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -56,7 +63,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -70,14 +80,14 @@ spec = do
               "\n" ++
               "void test0();\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void test0() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint16_t foo = 0;\n" ++ 
               "\n" ++
               "    foo = foo + 1024;\n" ++
@@ -102,7 +112,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")    
+              "}")    
     it "Prints declaration of function test1" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -111,45 +121,45 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__resource_t __resource;\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__test1(void * const __this, __termina__dyn_t foo);\n" ++
+              "void id0__test1(void * const __this, __termina_dyn_t foo);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
        pack ("\n" ++
              "#include \"test.h\"\n" ++
              "\n" ++ 
-             "void id0__test1(void * const __this, __termina__dyn_t foo) {\n" ++
-             "\n" ++
+             "void id0__test1(void * const __this, __termina_dyn_t foo) {\n" ++
+             "    \n" ++
              "    id0 * self = (id0 *)__this;\n" ++
              "\n" ++
-             "    __termina__resource__lock(&self->__resource);\n" ++
+             "    __termina_resource__lock(&self->__resource);\n" ++
              "\n" ++
-             "    *((uint16_t *)(foo.data)) = *((uint16_t *)(foo.data)) + 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024;\n" ++
              "\n" ++
-             "    1024 + *((uint16_t *)(foo.data));\n" ++
+             "    1024 + *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *((uint16_t *)(foo.data)) = *((uint16_t *)(foo.data)) - 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data - 1024;\n" ++
              "\n" ++
-             "    1024 - *((uint16_t *)(foo.data));\n" ++
+             "    1024 - *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *((uint16_t *)(foo.data)) = *((uint16_t *)(foo.data)) * 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data * 1024;\n" ++
              "\n" ++
-             "    1024 * *((uint16_t *)(foo.data));\n" ++
+             "    1024 * *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *((uint16_t *)(foo.data)) = *((uint16_t *)(foo.data)) / 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data / 1024;\n" ++
              "\n" ++
-             "    1024 / *((uint16_t *)(foo.data));\n" ++
+             "    1024 / *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *((uint16_t *)(foo.data)) = *((uint16_t *)(foo.data)) % 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024;\n" ++
              "\n" ++
-             "    1024 % *((uint16_t *)(foo.data));\n" ++
+             "    1024 % *(uint16_t *)foo.data;\n" ++
              "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++
-             "}\n")
+             "}")

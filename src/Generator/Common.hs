@@ -49,9 +49,10 @@ resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"
 resourceUnlock = namefy "termina_resource" <::> "unlock"
 
-thatField, thisParam :: Identifier
+thatField, thisParam, selfParam :: Identifier
 thatField = "__that"
 thisParam = "__this"
+selfParam = "self"
 
 resourceClassIDField, taskClassIDField :: Identifier
 resourceClassIDField = "__resource"
@@ -156,22 +157,27 @@ getExprType ann = throwError $ InternalError $ "invalid expression annotation: "
 
 -- | Generates the name of the option struct type
 genOptionStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
-genOptionStructName Bool = return $ namefy $ "option" <::> "bool_t"
-genOptionStructName Char = return $ namefy $ "option" <::> "char_t"
-genOptionStructName UInt8 = return $ namefy $ "option" <::> "uint8_t"
-genOptionStructName UInt16 = return $ namefy $ "option" <::> "uint16_t"
-genOptionStructName UInt32 = return $ namefy $ "option" <::> "uint32_t"
-genOptionStructName UInt64 = return $ namefy $ "option" <::> "uint64_t"
-genOptionStructName Int8 = return $ namefy $ "option" <::> "int8_t"
-genOptionStructName Int16 = return $ namefy $ "option" <::> "int16_t"
-genOptionStructName Int32 = return $ namefy $ "option" <::> "int32_t"
-genOptionStructName Int64 = return $ namefy $ "option" <::> "int64_t"
+genOptionStructName Bool = return $ namefy "option_bool_t"
+genOptionStructName Char = return $ namefy "option_char_t"
+genOptionStructName UInt8 = return $ namefy "option_uint8_t"
+genOptionStructName UInt16 = return $ namefy "option_uint16_t"
+genOptionStructName UInt32 = return $ namefy "option_uint32_t"
+genOptionStructName UInt64 = return $ namefy "option_uint64_t"
+genOptionStructName Int8 = return $ namefy "option_int8_t"
+genOptionStructName Int16 = return $ namefy "option_int16_t"
+genOptionStructName Int32 = return $ namefy "option_int32_t"
+genOptionStructName Int64 = return $ namefy "option_int64_t"
 genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
 genOptionStructName (DynamicSubtype _) = return optionDyn
-genOptionStructName ts = do
-    tsName <- genTypeSpecName ts
-    tsDimension <- genDimensionOptionTS ts
-    return $ namefy $ "option" <::> tsName <> tsDimension <> "_t"
+genOptionStructName ts =
+    case ts of
+        Vector {} -> do
+            tsName <- genTypeSpecName ts
+            tsDimension <- genDimensionOptionTS ts
+            return $ namefy $ "option_" <> tsName <::> tsDimension <> "_t"
+        _ -> do
+            tsName <- genTypeSpecName ts
+            return $ namefy $ "option_" <> tsName <> "_t"
 
     where
         genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier

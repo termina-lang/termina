@@ -115,7 +115,7 @@ spec = do
             "typedef struct {\n" ++
             "    __option_id0_params_t Some;\n" ++
             "    __enum_option_t __variant;\n" ++
-            "} __option__id0_t;")
+            "} __option_id0_t;")
     it "Prints a struct with two fields" $ do
       renderTypeDefinitionDecl M.empty structWithTwoFields `shouldBe`
         pack (

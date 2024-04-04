@@ -390,7 +390,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             return $ Just (CCompound cBlk (buildCompoundAnn ann' False True))
         genMatchCases cExpr casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
             let cAnn = buildGenericAnn ann'
-                cExpr' = CBinary CEqOp (CMember cExpr identifier False cAnn) (CVar (casePrefix identifier) cAnn) cAnn
+                cExpr' = CBinary CEqOp (CMember cExpr enumVariantsField False cAnn) (CVar (casePrefix identifier) cAnn) cAnn
             paramsStructName <- genParamsStructName identifier
             cTs <- genDeclSpecifiers (DefinedType paramsStructName)
             cBlk <- flip CCompound (buildCompoundAnn ann' False True) <$> genCase cTs cExpr m

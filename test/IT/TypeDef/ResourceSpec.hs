@@ -5,9 +5,13 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "resource class TMChannel {\n" ++
@@ -37,7 +41,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -45,7 +52,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -58,31 +68,31 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
-              "    __termina__resource_t __resource;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
               "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets) {\n" ++
-              "\n" ++
+              "    \n" ++
               "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}")
     it "Prints declaration of class UARTDriver" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -91,28 +101,28 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    __termina_resource_t __resource;\n" ++
               "    volatile uint32_t * status;\n" ++
-              "    __termina__resource_t __resource;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
               "void UARTDriver__get_status(void * const __this, uint32_t * ret);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of class UARTDriver" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void UARTDriver__get_status(void * const __this, uint32_t * ret) {\n" ++
-              "\n" ++
+              "    \n" ++
               "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
-              "    __termina__resource__lock(&self->__resource);\n" ++
+              "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
               "    *ret = *self->status;\n" ++
               "\n" ++
-              "    __termina__resource__unlock(&self->__resource);\n" ++
+              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}")

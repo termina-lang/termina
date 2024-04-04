@@ -7,6 +7,7 @@ import Control.Monad.Reader
 import Data.Maybe
 import Data.Map
 import Generator.Common
+import Annotations
 
 
 cBinOp :: Op -> CBinaryOp
@@ -29,8 +30,88 @@ cBinOp BitwiseXor = CXorOp
 cBinOp LogicalAnd = CLndOp
 cBinOp LogicalOr = CLorOp
 
+genMemberFunctionAccess :: 
+    Object SemanticAnns 
+    -> Identifier 
+    -> [Expression SemanticAnns] 
+    -> SemanticAnns 
+    -> CSourceGenerator CExpression
+genMemberFunctionAccess obj ident args ann = do
+    let cAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+    -- Generate the C code for the object
+    cObj <- genObject obj
+    -- Generate the C code for the parameters
+    cArgs <- mapM
+            (\pExpr -> do
+                cParamExpr <- genExpression pExpr
+                cParamExprTs <- getExprType pExpr
+                case cParamExprTs of
+                    Vector {} -> do
+                        structName <- genArrayWrapStructName cParamExprTs
+                        return $  CUnary CIndOp
+                            (CCast (
+                                CDeclaration [CTypeSpec $ CTypeDef structName]
+                                    [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
+                                ) cParamExpr cAnn) cAnn
+                    _ -> return cParamExpr) args
+    objType <- getObjectType obj
+    case objType of
+        (Reference _ ts) ->
+            case ts of
+                -- | If the left hand size is a class:
+                (DefinedType classId) ->
+                    return $ CCall (CVar (classId <::> ident) cAnn) (cObj : cArgs) cAnn
+                -- | Anything else should not happen
+                _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
+        (DefinedType classId) ->
+            case obj of
+                (Dereference _ _) ->
+                    -- | If we are here, it means that we are dereferencing the self object
+                    return $ CCall (CVar (classId <::> ident) cAnn) (CVar "self" cAnn : cArgs) cAnn
+                    -- | If the left hand size is a class:
+                _ -> return $ CCall (CVar (classId <::> ident) cAnn) (cObj : cArgs) cAnn
+        AccessPort (DefinedType {}) ->
+            return $
+                CCall (CMember cObj ident False cAnn)
+                      (CMember cObj thatField False cAnn : cArgs) cAnn
+        -- | If the left hand side is a pool:
+        AccessPort (Allocator {}) ->
+            return $
+                CCall (CVar (poolMethodName ident) cAnn) (cObj : cArgs) cAnn
+        -- | If the left hand side is a message queue:
+        OutPort {} ->
+            -- | If it is a send, the first parameter is the object to be sent. The
+            -- function is expecting to receive a reference to that object.
+            case args of
+                [element] -> do
+                    paramTs <- getExprType element
+                    case paramTs of
+                        Vector {} ->
+                            return $
+                                CCall (CVar (msgQueueMethodName ident) cAnn) (cObj :
+                                    (flip (CCast (CDeclaration
+                                        [CTypeSpec CVoidType]
+                                        [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
+                                        declAnn)) cAnn <$> cArgs))  cAnn
+                        _ -> return $
+                                CCall (CVar (msgQueueMethodName ident) cAnn) (cObj: 
+                                    (flip (CCast (CDeclaration
+                                        [CTypeSpec CVoidType]
+                                        [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
+                                        declAnn)) cAnn . flip (CUnary CAdrOp) cAnn <$> cArgs))  cAnn
+                _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show args
+        -- | Anything else should not happen
+        _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
+
 genExpression :: Expression SemanticAnns -> CSourceGenerator CExpression
-genExpression (AccessObject obj) = genObject obj
+genExpression (AccessObject obj) = do
+    cObj <- genObject obj
+    cObjType <- getObjectType obj
+    case cObjType of
+        (Location _) ->
+            return $ CUnary CIndOp cObj (buildGenericAnn (getAnnotation obj))
+        _ -> return cObj
 genExpression (BinOp op left right ann) = do
     let cAnn = buildGenericAnn ann
     -- | We need to check if the left and right expressions are binary operations
@@ -110,66 +191,21 @@ genExpression expr@(FunctionExpression name args ann) = do
         Vector {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
         _ -> return $ CCall identifier cArgs cAnn
 genExpression (MemberFunctionAccess obj ident args ann) = do
-    let cAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
-    -- Generate the C code for the object
+    genMemberFunctionAccess obj ident args ann
+genExpression (DerefMemberFunctionAccess obj ident args ann) =
+    genMemberFunctionAccess obj ident args ann
+genExpression (IsEnumVariantExpression obj enum variant ann) = do
+    let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    -- Generate the C code for the parameters
-    cArgs <- mapM
-            (\pExpr -> do
-                cParamExpr <- genExpression pExpr
-                cParamExprTs <- getExprType pExpr
-                case cParamExprTs of
-                    Vector {} -> do
-                        structName <- genArrayWrapStructName cParamExprTs
-                        return $  CUnary CIndOp
-                            (CCast (
-                                CDeclaration [CTypeSpec $ CTypeDef structName]
-                                    [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
-                                ) cParamExpr cAnn) cAnn
-                    _ -> return cParamExpr) args
-    objType <- getObjectType obj
-    case objType of
-        (DefinedType classId) ->
-            -- For the time being, the only way to access the member function of a class
-            -- is through the self object. Since the function in C expeects a reference to
-            -- the object, we would need to pass the address of the object. In order to avoid
-            -- derefecerencing a reference (&*self), we shortcut the process and pass the object
-            -- directly. This might change in the future if we finally implement traits.
-            return $ CCall (CVar (classId <::> ident) cAnn) (CVar "self" cAnn : cArgs) cAnn
-        -- | If the left hand size is a class:
-        AccessPort (DefinedType {}) ->
-            return $
-                CCall (CMember cObj ident False cAnn)
-                      (CMember cObj thatField False cAnn : cArgs) cAnn
-        -- | If the left hand side is a pool:
-        AccessPort (Allocator {}) ->
-            return $
-                CCall (CVar (poolMethodName ident) cAnn) (cObj : cArgs) cAnn
-        -- | If the left hand side is a message queue:
-        OutPort {} ->
-            -- | If it is a send, the first parameter is the object to be sent. The
-            -- function is expecting to receive a reference to that object.
-            case args of
-                [element] -> do
-                    paramTs <- getExprType element
-                    case paramTs of
-                        Vector {} ->
-                            return $
-                                CCall (CVar (msgQueueMethodName ident) cAnn) (cObj :
-                                    (flip (CCast (CDeclaration
-                                        [CTypeSpec CVoidType]
-                                        [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
-                                        declAnn)) cAnn <$> cArgs))  cAnn
-                        _ -> return $
-                                CCall (CVar (msgQueueMethodName ident) cAnn) (cObj: 
-                                    (flip (CCast (CDeclaration
-                                        [CTypeSpec CVoidType]
-                                        [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)]
-                                        declAnn)) cAnn . flip (CUnary CAdrOp) cAnn <$> cArgs))  cAnn
-                _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show args
-        -- | Anything else should not happen
-        _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
+    return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar (enum <::> variant) cAnn) cAnn
+genExpression (IsOptionVariantExpression obj NoneLabel ann) = do
+    let cAnn = buildGenericAnn ann 
+    cObj <- genObject obj
+    return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar optionNoneVariant cAnn) cAnn
+genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
+    let cAnn = buildGenericAnn ann 
+    cObj <- genObject obj
+    return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar optionSomeVariant cAnn) cAnn
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genObject :: Object SemanticAnns -> CSourceGenerator CExpression

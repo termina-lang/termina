@@ -5,11 +5,13 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
-import qualified AST.Seman as SAST
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
-import qualified Data.Set as S
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "struct Message {\n" ++
@@ -62,18 +64,25 @@ test0 = "struct Message {\n" ++
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast ->
+  Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile True (M.fromList [(SAST.UInt32, S.fromList [SAST.Option SAST.UInt32])]) (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile True (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast ->
+  Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+
 
 spec :: Spec
 spec = do
@@ -89,75 +98,57 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t sender_id;\n" ++
-              "    __option__uint32_t destination_id;\n" ++
+              "    __option_uint32_t destination_id;\n" ++
               "    _Bool urgent;\n" ++
               "} Message;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__sink_port_t timer;\n" ++
-              "    __termina__pool_t * message_pool;\n" ++
+              "    __termina_task_t __task;\n" ++
+              "    __termina_sink_port_t timer;\n" ++
+              "    __termina_pool_t * message_pool;\n" ++
               "    uint32_t interval;\n" ++
-              "    __termina__task_t __task;\n" ++
               "} CHousekeeping;\n" ++
+              "\n" ++
+              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
               "\n" ++
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
-              "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
-              "                                    uint32_t limit) {\n" ++
-              "\n" ++
-              "    _Bool ret = 1;\n" ++
-              "\n" ++
-              "    if (self->interval > limit) {\n" ++
-              "\n" ++
-              "        ret = 0;\n" ++
-              "\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    return ret;\n" ++
-              "\n" ++
-              "}\n" ++
-              "\n" ++
-              "\n" ++
               "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
-              "\n" ++
+              "    \n" ++
               "    Result ret;\n" ++
-              "\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
-              "    __option__dyn_t alloc_msg;\n" ++
-              "\n" ++
+              "    __option_dyn_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
-              "    __termina__pool__alloc(self->message_pool, &alloc_msg);\n"  ++
+              "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++
               "    if (alloc_msg.__variant == None) {\n"  ++
-              "\n"  ++
               "        \n"  ++
+              "\n"  ++
               "    } else {\n" ++
+              "        \n" ++
+              "        __option_dyn_params_t __Some = alloc_msg.Some;\n" ++
               "\n" ++
-              "        __option__dyn_params_t __alloc_msg__Some = alloc_msg.Some;\n" ++
+              "        (*(Message *)__Some.__0.data).urgent = 0;\n" ++
               "\n" ++
-              "        (*((Message *)(__alloc_msg__Some.__0.data))).urgent = 0;\n" ++
-              "\n" ++
-              "        __termina__pool__free(self->message_pool, __alloc_msg__Some.__0);\n" ++
+              "        __termina_pool__free(self->message_pool, __Some.__0);\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
               "    _Bool check = CHousekeeping__check_interval(self, 10);\n" ++
               "\n" ++
               "    if (check == 0) {\n" ++
-              "\n" ++
+              "        \n" ++
               "        ret.__variant = Result__Error;\n" ++
               "\n" ++
               "    }\n" ++
@@ -165,4 +156,18 @@ spec = do
               "    return ret;\n" ++
               "\n" ++
               "}\n" ++
-              "\n")
+              "\n" ++
+              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "                                    uint32_t limit) {\n" ++
+              "    \n" ++
+              "    _Bool ret = 1;\n" ++
+              "\n" ++
+              "    if (self->interval > limit) {\n" ++
+              "        \n" ++
+              "        ret = 0;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    return ret;\n" ++
+              "\n" ++
+              "}")
