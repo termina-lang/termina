@@ -5,9 +5,13 @@ import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Text.Parsec
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "function vector_test0() {\n" ++
@@ -34,7 +38,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -42,7 +49,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -56,24 +66,22 @@ spec = do
               "\n" ++
               "void vector_test0();\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function vector_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void vector_test0() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    size_t foo = 0;\n" ++
               "\n" ++
               "    uint32_t vector0[10];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        vector0[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
               "    int64_t vector1[10][5];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
               "            vector1[__i0][__i1] = 0;\n" ++
@@ -88,7 +96,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")    
+              "}")    
     it "Prints declaration of function vector_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -96,16 +104,16 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void vector_test1(uint32_t p_vector0[10]);\n" ++
+              "void vector_test1(const uint32_t p_vector0[10]);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of function vector_test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void vector_test1(uint32_t p_vector0[10]) {\n" ++
-              "\n" ++
+              "void vector_test1(const uint32_t p_vector0[10]) {\n" ++
+              "    \n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
               "    p_vector0[3] = 10;\n" ++
@@ -114,4 +122,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")   
+              "}")   

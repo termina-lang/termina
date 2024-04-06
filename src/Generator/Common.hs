@@ -90,7 +90,7 @@ genOptionParameterStructName ts =
         Vector {} -> do
             tsName <- genTypeSpecName ts
             tsDimension <- genDimensionOptionTS ts
-            return $ namefy $ "option_" <> tsName <::> tsDimension <> "_params_t"
+            return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_params_t"
         _ -> do
             tsName <- genTypeSpecName ts
             return $ namefy $ "option_" <> tsName <> "_params_t"
@@ -174,7 +174,7 @@ genOptionStructName ts =
         Vector {} -> do
             tsName <- genTypeSpecName ts
             tsDimension <- genDimensionOptionTS ts
-            return $ namefy $ "option_" <> tsName <::> tsDimension <> "_t"
+            return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_t"
         _ -> do
             tsName <- genTypeSpecName ts
             return $ namefy $ "option_" <> tsName <> "_t"

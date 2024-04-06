@@ -435,9 +435,18 @@ genBlockItem (SingleExpStmt expr ann) = do
 
 genReturnStatement :: ReturnStmt SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
 genReturnStatement (ReturnStmt (Just expr) ann) = do
-    cExpr <- genExpression expr
     let cAnn = buildStatementAnn ann True
-    return [CBlockStmt $ CReturn (Just cExpr) cAnn]
+        exprCAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+    cExpr <- genExpression expr
+    exprType <- getExprType expr
+    case exprType of
+        (Vector {}) -> do
+            structName <- genArrayWrapStructName exprType
+            let left = CUnary CIndOp (CCast
+                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cExpr exprCAnn) exprCAnn
+            return [CBlockStmt $ CReturn (Just left) cAnn]
+        _ -> return [CBlockStmt $ CReturn (Just cExpr) cAnn]
 genReturnStatement (ReturnStmt Nothing ann) = do
     let cAnn = buildStatementAnn ann True
     return [CBlockStmt $ CReturn Nothing cAnn]

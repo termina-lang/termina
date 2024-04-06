@@ -5,9 +5,13 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "function func_test0_0(a : u16) -> u16 {\n" ++
@@ -38,7 +42,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -46,7 +53,10 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -61,25 +71,25 @@ spec = do
               "uint16_t func_test0_0(uint16_t a);\n\n" ++
               "uint16_t func_test0_1(uint16_t a);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of functions of test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "uint16_t func_test0_0(uint16_t a) {\n" ++
-              "\n" ++
+              "    \n" ++
               "    return a + 1;\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++
               "uint16_t func_test0_1(uint16_t a) {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint16_t foo = func_test0_0(2);\n" ++
               "\n" ++
               "    return foo * 2;\n" ++
               "\n" ++
-              "}\n")    
+              "}")    
     it "Prints declaration of functions test0 and test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -87,46 +97,39 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "typedef struct {\n" ++
-              "    uint32_t array[10];\n" ++
-              "} __ret_func_test1_0_t;\n" ++
-              "\n" ++
-              "__ret_func_test1_0_t func_test1_0();\n" ++
+              "__wrapper_uint32__10_t func_test1_0();\n" ++
               "\n" ++
               "uint32_t func_test1_1();\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints definition of functions test0 and test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "__ret_func_test1_0_t func_test1_0() {\n" ++
-              "\n" ++
+              "__wrapper_uint32__10_t func_test1_0() {\n" ++
+              "    \n" ++
               "    uint32_t foo[10];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        foo[__i0] = 1024;\n" ++
               "    }\n" ++
               "\n" ++
-              "    return *((__ret_func_test1_0_t *)foo);\n" ++
+              "    return *(__wrapper_uint32__10_t *)foo;\n" ++
               "\n" ++
               "}\n" ++
               "\n" ++
               "uint32_t func_test1_1() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint32_t bar0[10];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        bar0[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    *((__ret_func_test1_0_t *)bar0) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
+              "    *(__wrapper_uint32__10_t *)bar0 = func_test1_0().array;\n" ++
               "\n" ++
               "    uint32_t bar1[10];\n" ++
-              "\n" ++
-              "    *((__ret_func_test1_0_t *)bar1) = *((__ret_func_test1_0_t *)func_test1_0().array);\n" ++
+              "    *(__wrapper_uint32__10_t *)bar1 = func_test1_0().array;\n" ++
               "\n" ++
               "    return bar0[1] + bar1[2];\n" ++
               "\n" ++
-              "}\n")    
+              "}")    

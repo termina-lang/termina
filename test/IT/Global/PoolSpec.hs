@@ -5,9 +5,13 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
+import Control.Monad.Reader
+import Generator.Module
+import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
 
 test0 :: String
 test0 = "enum Message {\n" ++
@@ -25,7 +29,10 @@ renderHeader input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppHeaderFile False M.empty (pretty "__TEST_H__") emptyDoc tast
+      Right tast -> 
+        case runReaderT (genHeaderFile False (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -54,16 +61,13 @@ spec = do
               "} __enum_Message__Out_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "\n" ++
               "    __enum_Message_t __variant;\n" ++
-              "\n" ++
               "    union {\n" ++
               "        __enum_Message__In_params_t In;\n" ++
               "        __enum_Message__Out_params_t Out;\n" ++
               "    };\n" ++
-              "\n" ++
               "} Message;\n" ++
               "\n" ++
-              "extern __termina__pool_t message_pool;\n" ++
+              "extern __termina_pool_t message_pool;\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")

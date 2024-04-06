@@ -5,14 +5,17 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
-import Prettyprinter
-import Modules.Printing
 import qualified Data.Map as M
 import qualified Data.Set as S
 import AST.Core
 import Semantic.Option
-import PPrinter.Application.Option
+import Control.Monad.Reader
+import Generator.Module
 import PPrinter
+import Generator.LanguageC.Printer
+import System.Path
+import Modules.Modules
+import Generator.Application.Option
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++
@@ -62,13 +65,13 @@ test1OptionMap = M.fromList [(UInt32, S.fromList [Option (Vector UInt32 (K 10))]
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
-  Right ast ->
+  Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast ->
-        ppHeaderFile True test0OptionMap (pretty "__TEST_H__")
-          emptyDoc
-          tast
+      Right tast -> 
+        case runReaderT (genHeaderFile True (fragment "test") SrcFile [] tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -76,10 +79,15 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> ppSourceFile (pretty "test") tast
+      Right tast -> 
+        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+          Left err -> pack $ show err
+          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 renderOption :: OptionMap -> Text
-renderOption = render . ppSimpleOptionTypesFile
+renderOption optionMap = case runReaderT genOptionHeaderFile optionMap of
+    Left err -> pack $ show err
+    Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
@@ -94,12 +102,12 @@ spec = do
               "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina__task_t __task;\n" ++
+              "    __termina_task_t __task;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
               "Result CHousekeeping__run(CHousekeeping * const self);\n" ++
               "\n" ++
-              "#endif // __TEST_H__\n")
+              "#endif")
     it "Prints option header file of test0" $ do
       renderOption test0OptionMap `shouldBe`
         pack ("#ifndef __OPTION_H__\n" ++
@@ -109,17 +117,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __option__uint32_params_t;\n" ++
+              "} __option_uint32_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "\n" ++
-              "    __option__uint32_params_t Some;\n" ++
-              "\n" ++
+              "    __option_uint32_params_t Some;\n" ++
               "    __enum_option_t __variant;\n" ++
+              "} __option_uint32_t;\n" ++
               "\n" ++
-              "} __option__uint32_t;\n" ++
-              "\n" ++
-              "#endif // __OPTION_H__\n")
+              "#endif")
     it "Prints option header file of test1" $ do
       renderOption test1OptionMap `shouldBe`
         pack ("#ifndef __OPTION_H__\n" ++
@@ -129,32 +134,27 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0[10];\n" ++
-              "} __option__uint32__10_params_t;\n" ++
+              "} __option_uint32__10_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "\n" ++
-              "    __option__uint32__10_params_t Some;\n" ++
-              "\n" ++
+              "    __option_uint32__10_params_t Some;\n" ++
               "    __enum_option_t __variant;\n" ++
+              "} __option_uint32__10_t;\n" ++
               "\n" ++
-              "} __option__uint32__10_t;\n" ++
-              "\n" ++
-              "#endif // __OPTION_H__\n")
+              "#endif")
     it "Prints definition of function test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
               "void test1() {\n" ++
-              "\n" ++
+              "    \n" ++
               "    uint32_t foo[10];\n" ++
-              "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
               "        foo[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    __option__uint32__10_t optionFoo;\n" ++
-              "\n" ++
+              "    __option_uint32__10_t optionFoo;\n" ++
               "    optionFoo.__variant = None;\n" ++
               "\n" ++
               "    optionFoo.__variant = Some;\n" ++
@@ -163,16 +163,16 @@ spec = do
               "    }\n" ++
               "\n" ++   
               "    if (optionFoo.__variant == None) {\n" ++
-              "\n" ++
               "        \n" ++
-              "    } else {\n" ++
-              "\n" ++   
-              "        __option__uint32__10_params_t __optionFoo__Some = optionFoo.Some;\n" ++
               "\n" ++
-              "        __optionFoo__Some.__0[0] = 1;\n" ++
+              "    } else {\n" ++
+              "        \n" ++   
+              "        __option_uint32__10_params_t __Some = optionFoo.Some;\n" ++
+              "\n" ++
+              "        __Some.__0[0] = 1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}")
