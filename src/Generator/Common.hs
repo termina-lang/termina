@@ -331,6 +331,11 @@ genCastDeclaration (DynamicSubtype ts) ann = do
         declAnn = buildDeclarationAnn ann False
     specs <- genDeclSpecifiers ts
     return $ CDeclaration specs [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
+genCastDeclaration (Location ts) ann = do
+    let cAnn = buildGenericAnn ann
+        declAnn = buildDeclarationAnn ann False
+    specs <- genDeclSpecifiers ts
+    return $ CDeclaration (CTypeQual CVolatQual : specs) [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
 genCastDeclaration ts ann = do
     let declAnn = buildDeclarationAnn ann False
     specs <- genDeclSpecifiers ts

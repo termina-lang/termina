@@ -178,7 +178,7 @@ instance PPrint CExpression where
     pprintPrec p (CCall expr args _) = do
         pexpr <- pprintPrec 30 expr
         pargs <- mapM pprint args
-        return $ parenPrec p 30 $ pexpr <> parens (hsep (punctuate comma pargs))
+        return $ parenPrec p 30 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
     pprintPrec _ (CVar ident _) = return $ pretty ident
     pprintPrec _ (CConst c _) = pprint c
     pprintPrec p (CMember expr ident False _) = do

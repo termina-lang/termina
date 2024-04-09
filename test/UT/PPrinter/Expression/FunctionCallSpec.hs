@@ -180,7 +180,7 @@ spec = do
     it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + 1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`
         pack (
-          "foo4(dynVector0, (uint16_t *)var1.data, foo(var0), " ++
+          "foo4(dynVector0, (uint16_t *)var1.data, foo(var0),\n     " ++
           "foo2(var0 + 1024, var0 + *(uint16_t *)var1.data))")
   describe "Pretty printing functions returning and receiving arrays" $ do
     it "Prints the expression foo() with a function returning an array" $ do

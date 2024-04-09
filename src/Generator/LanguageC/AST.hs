@@ -94,26 +94,7 @@ data CStatement' a
   -- | return statement @CReturn returnExpr@
   | CReturn (Maybe (CExpression' a)) a
     deriving (Show)
-{--
-instance Functor CStatement' where
-        fmap _f (CCase a1 a2 a3) = CCase (fmap _f a1) (fmap _f a2) (_f a3)
-        fmap _f (CDefault a1 a2) = CDefault (fmap _f a1) (_f a2)
-        fmap _f (CExpr a1 a2) = CExpr (fmap (fmap _f) a1) (_f a2)
-        fmap _f (CCompound a1 a2)
-          = CCompound (fmap (fmap _f) a1) (_f a2)
-        fmap _f (CIf a1 a2 a3 a4)
-          = CIf (fmap _f a1) (fmap _f a2) (fmap (fmap _f) a3) (_f a4)
-        fmap _f (CSwitch a1 a2 a3)
-          = CSwitch (fmap _f a1) (fmap _f a2) (_f a3)
-        fmap _f (CFor a1 a2 a3 a4 a5)
-          = CFor (mapEither (fmap (fmap _f)) (fmap _f) a1)
-                 (fmap (fmap _f) a2) (fmap (fmap _f) a3) (fmap _f a4)
-                 (_f a5)
-          where mapEither f1 f2 = either (Left . f1) (Right . f2)
-        fmap _f (CCont a1) = CCont (_f a1)
-        fmap _f (CBreak a1) = CBreak (_f a1)
-        fmap _f (CReturn a1 a2) = CReturn (fmap (fmap _f) a1) (_f a2)
---}
+
 data CCompoundBlockItem' a
   = CBlockStmt    (CStatement' a)    -- ^ A statement
   | CBlockDecl    (CDeclaration' a)  -- ^ A local declaration

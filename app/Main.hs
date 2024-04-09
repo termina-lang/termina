@@ -15,7 +15,6 @@ import Text.Parsec (runParser)
 
 import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
-import qualified Data.Set as S
 
 import Control.Monad
 
@@ -34,9 +33,12 @@ import System.Path.IO
 
 -- Containers
 import qualified Data.Map.Strict as M
-import PPrinter.Application.Initialization (ppInitFile)
-import PPrinter.Application.Option (ppSimpleOptionTypesFile)
 import PPrinter.Application.OS.RTEMSNOEL (ppMainFile)
+import Generator.LanguageC.Printer
+import Control.Monad.Reader
+import Generator.Module
+import Generator.Application.Option
+import Generator.Application.Initialization
 
 data MainOptions = MainOptions
   { optREPL :: Bool
@@ -129,10 +131,13 @@ printModule includeOptionH opts mMode chatty srcdir hdrsdir mName deps tyModule 
   createDirectoryIfMissing True (takeDirectory (hdrFileRoute hdrsdir))
   -- Now, both files are no more.
   when chatty $ print $ "Writing to" ++ show hFile
-  let docMName = ppHeaderFileDefine $ MPP.moduleNameToText mName mMode
-  writeStrictText hFile (MPP.ppHeaderFile includeOptionH opts docMName (MPP.includes deps) tyModule)
+  case runReaderT (genHeaderFile includeOptionH mName mMode deps tyModule) opts of
+    Left err -> fail $ show err
+    Right cHeaderFile -> writeStrictText hFile $ render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
   when chatty $ print $ "Writing to" ++ show cFile
-  writeStrictText cFile (MPP.ppSourceFile (MPP.ppModuleName mName mMode) tyModule)
+  case runReaderT (genSourceFile mName tyModule) M.empty of
+    Left err -> fail $ show err
+    Right cSourceFile -> writeStrictText cFile $ render $ runReader (pprint cSourceFile) (CPrinterConfig False False)
   where
     srcFileRoute dd =
       case mMode of
@@ -150,7 +155,9 @@ printInitFile chatty targetDir prjprogs = do
   createDirectoryIfMissing True targetDir
   iExists <- doesFileExist initFile
   when iExists (renameFile initFile (initFile <.> FileExt "bkp"))
-  writeStrictText initFile (render $ ppInitFile prjprogs)
+  case runReaderT (genInitFile (fragment "init" <.> FileExt "c") prjprogs) M.empty of
+    Left err -> fail $ show err
+    Right cSourceFile -> writeStrictText initFile $ render $ runReader (pprint cSourceFile) (CPrinterConfig False False)
   where
     initFile = targetDir </> fragment "init" <.> FileExt "c"
 
@@ -170,7 +177,9 @@ printOptionsHeaderFile chatty targetDir opts = do
   createDirectoryIfMissing True targetDir
   iExists <- doesFileExist optionsHeaderFile
   when iExists (renameFile optionsHeaderFile (optionsHeaderFile <.> FileExt "bkp"))
-  writeStrictText optionsHeaderFile (render $ ppSimpleOptionTypesFile opts)
+  case runReaderT genOptionHeaderFile opts of
+    Left err -> fail $ show err
+    Right cHeaderFile -> writeStrictText optionsHeaderFile $ render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)  
   where
     optionsHeaderFile = targetDir </> fragment "include" </> fragment "option" <.> FileExt "h"
 

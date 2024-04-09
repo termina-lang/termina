@@ -164,6 +164,17 @@ genStructInitialization before level cObj expr =
 
         where
 
+            genProcedureAssignment :: Identifier -> TypeSpecifier -> SemanProcedure -> CSourceGenerator CStatement
+            genProcedureAssignment field (DefinedType interface) (SemanProcedure procid) = do
+                let exprCAnn = buildGenericAnn ann
+                    declStmtAnn = buildStatementAnn ann before
+                    portField = CMember cObj field False exprCAnn
+                clsFunctionName <- genClassFunctionName interface procid
+                return $ CExpr (Just $ CAssignment (
+                                CMember portField procid False exprCAnn
+                            ) (CVar clsFunctionName exprCAnn) exprCAnn) declStmtAnn
+            genProcedureAssignment _ _ _ = throwError $ InternalError "Unsupported procedure assignment"
+
             genFieldAssignments :: Bool -> [FieldAssignment SemanticAnns] -> CSourceGenerator [CStatement]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment field expr' _: xs) = do
@@ -177,8 +188,33 @@ genStructInitialization before level cObj expr =
                 rest <- genFieldAssignments False xs
                 return $ CExpr (Just $ CAssignment (
                                 CMember cObj field False exprCAnn
-                            ) (CCast decl (CConst (CIntConst (CInteger addr HexRepr)) exprCAnn) exprCAnn) exprCAnn) declStmtAnn : rest
-            genFieldAssignments _ expr' = throwError $ InternalError $ "Unsupported initialization expression: " ++ show expr'
+                            ) (CCast decl (CConst (CIntConst (CInteger addr DecRepr)) exprCAnn) exprCAnn) exprCAnn) declStmtAnn : rest
+            genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel _ : xs) = do
+                let exprCAnn = buildGenericAnn ann
+                    declStmtAnn = buildStatementAnn ann before'
+                    channelExpr = CUnary CAdrOp (CVar channel exprCAnn) exprCAnn
+                rest <- genFieldAssignments False xs
+                return $ CExpr (Just $ CAssignment (
+                                CMember cObj field False exprCAnn
+                            ) channelExpr exprCAnn) declStmtAnn : rest
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (SemAnn _ (CTy (APConnTy rts procedures))) : xs) = do
+                let exprCAnn = buildGenericAnn ann
+                    declStmtAnn = buildStatementAnn ann before'
+                    portField = CMember cObj field False exprCAnn
+                    resourceExpr = CUnary CAdrOp (CVar resource exprCAnn) exprCAnn
+                rest <- genFieldAssignments False xs
+                cProcedures <- mapM (genProcedureAssignment field rts) procedures
+                return $ CExpr (Just $ CAssignment (
+                                CMember portField thatField False exprCAnn
+                            ) resourceExpr exprCAnn) declStmtAnn : (cProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res _ : xs) = do
+                let exprCAnn = buildGenericAnn ann
+                    declStmtAnn = buildStatementAnn ann before'
+                rest <- genFieldAssignments False xs
+                return $ CExpr (Just $ CAssignment (
+                                CMember cObj field False exprCAnn
+                            ) (CUnary CAdrOp (CVar res exprCAnn) exprCAnn) exprCAnn) declStmtAnn : rest
+            genFieldAssignments before' (_ : xs) = genFieldAssignments before' xs
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 

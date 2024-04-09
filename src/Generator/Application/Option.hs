@@ -7,11 +7,11 @@ import Generator.Common
 import Parser.Parsing
 import Control.Monad.Reader
 import System.Path
-import AST.Core ( TypeSpecifier(Option) )
 import Generator.TypeDefinition
 import Semantic.Monad
 import qualified Data.Set as S
 import qualified Data.Map as M
+import AST.Seman
 
 genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
