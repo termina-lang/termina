@@ -356,6 +356,7 @@ data CItemAnn =
     -- | C Statement annotation
     | CStatementAnn 
       Bool -- ^ Add new line before statement
+      Bool -- ^ Indent statement
     | CCompoundAnn
       Bool -- ^ Add new line before the compound block
       Bool -- ^ Add trailing line inside the compound block

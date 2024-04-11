@@ -220,13 +220,13 @@ instance PPrint CStructureUnion where
                 pdecls <- mapM pprint decls
                 return $ vcat [
                     pretty tag <+> pretty "{",
-                    indent 4 $ vsep (map (<> semi) pdecls),
+                    indentTab $ vsep (map (<> semi) pdecls),
                     pretty "}"]
             ([], Just ident') -> do
                 pdecls <- mapM pprint decls
                 return $ vcat [
                     pretty tag <+> pretty ident' <+> pretty "{",
-                    indent 4 $ vsep (map (<> semi) pdecls),
+                    indentTab $ vsep (map (<> semi) pdecls),
                     pretty "}"]
             (_, Nothing) -> do
                 pattrs <- pprintCAttributeList cattrs
@@ -359,29 +359,33 @@ prependLine :: Bool -> DocStyle -> DocStyle
 prependLine True doc = line <> doc
 prependLine False doc = doc
 
+indentStmt :: Bool -> DocStyle -> DocStyle
+indentStmt True doc = indentTab doc
+indentStmt False doc = doc
+
 instance PPrint CStatement where
     pprint s@(CCase expr stat ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                return $ prependLine before $ pretty "case" <+> pexpr <> pretty ":" <> pstat
+                return $ prependLine before $ indentStmt expand $ pretty "case" <+> pexpr <> pretty ":" <> line <> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CDefault stat ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pstat <- pprint stat
-                return $ prependLine before $ pretty "default:" <> pstat
+                return $ prependLine before $ indentStmt expand $ pretty "default:" <> line <> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CExpr expr ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pexpr <- maybe (return emptyDoc) pprint expr
-                return $ prependLine before $ pexpr <> semi
+                return $ prependLine before $ indentStmt expand $ pexpr <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CIf expr stat estat ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
                 pestat <- case estat of
@@ -389,53 +393,66 @@ instance PPrint CStatement where
                     Just alt -> do
                         palt <- pprint alt
                         return $ pretty " else" <+> palt
-                return $ prependLine before $ 
+                return $ prependLine before $ indentStmt expand $ 
                     pretty "if" <+> parens pexpr
                     <+> pstat
                     <> pestat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSwitch expr stat ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                return $ prependLine before $ 
+                return $ prependLine before $ indentStmt expand $
                     pretty "switch" <+> parens pexpr
                     <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CFor for_init cond step stat ann) = do
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
-                pcond <- maybe (return emptyDoc) pprint cond
-                pstep <- maybe (return emptyDoc) pprint step
                 pstat <- pprint stat
-                return $ prependLine before $ 
-                    pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
+                case (cond, step) of
+                    (Nothing, Nothing) -> 
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <> semi) <+> pstat
+                    (Just cond', Nothing) -> do
+                        pcond <- pprint cond'
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi) <+> pstat
+                    (Nothing, Just step') -> do
+                        pstep <- pprint step'
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <> semi <+> pstep) <+> pstat
+                    (Just cond', Just step') -> do
+                        pcond <- pprint cond'
+                        pstep <- pprint step'
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CCont ann) = 
         case itemAnnotation ann of
-            CStatementAnn before -> do
-                return $ prependLine before $ 
+            CStatementAnn before expand -> do
+                return $ prependLine before $ indentStmt expand $
                     pretty "continue" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CBreak ann) = 
         case itemAnnotation ann of
-            CStatementAnn before -> do
-                return $ prependLine before $ 
+            CStatementAnn before expand -> do
+                return $ prependLine before $ indentStmt expand $
                     pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CReturn Nothing ann) = 
         case itemAnnotation ann of
-            CStatementAnn before -> do
-                return $ prependLine before $ 
+            CStatementAnn before expand -> do
+                return $ prependLine before $ indentStmt expand $
                     pretty "return" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CReturn (Just e) ann) = 
         case itemAnnotation ann of
-            CStatementAnn before -> do
+            CStatementAnn before expand -> do
                 pe <- pprint e
-                return $ prependLine before $ 
+                return $ prependLine before $ indentStmt expand $
                     pretty "return" <+> pe <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CCompound items ann) =
@@ -478,10 +495,24 @@ instance PPrint CPreprocessorDirective where
             CPPDirectiveAnn before -> 
                 return $ prependLine before $ pretty "#define" <+> pretty ident
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just token) ann) = 
+    pprint (CPPDefine ident (Just []) ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ pretty "#define" <+> pretty ident
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDefine ident (Just [token]) ann) = 
         case itemAnnotation ann of
             CPPDirectiveAnn before -> 
                 return $ prependLine before $ pretty "#define" <+> pretty ident <+> pretty token
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDefine ident (Just (t : ts)) ann) = 
+        case itemAnnotation ann of
+            CPPDirectiveAnn before -> 
+                return $ prependLine before $ vcat
+                    [ 
+                        pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
+                        indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
+                    ]
             _ -> error $ "Invalid annotation: " ++ show ann
     pprint (CPPIfDef ident ann) = 
         case itemAnnotation ann of
@@ -514,10 +545,10 @@ instance PPrint CFileItem where
 instance PPrint CFile where
     pprint (CHeaderFile _path items) = do
         pItems <- mapM pprint items
-        return $ vsep pItems
+        return $ vsep pItems <> line
     pprint (CSourceFile _path items) = do
         pItems <- mapM pprint items
-        return $ vsep pItems
+        return $ vsep pItems <> line
 
 -- precedence of C operators
 binPrec :: CBinaryOp -> Integer

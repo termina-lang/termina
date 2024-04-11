@@ -42,6 +42,9 @@ outPort = namefy "termina_out_port_t"
 poolMethodName :: Identifier -> Identifier
 poolMethodName mName = namefy "termina_pool" <::> mName
 
+poolMemoryArea :: Identifier -> Identifier
+poolMemoryArea identifier = namefy $ "pool_" <> identifier <> "_memory"
+
 msgQueueMethodName :: Identifier -> Identifier
 msgQueueMethodName mName = namefy "termina_msg_queue" <::> mName
 
@@ -345,7 +348,7 @@ buildGenericAnn :: SemanticAnns -> CAnns
 buildGenericAnn ann = CAnnotations (Semantic.Monad.location ann) CGenericAnn
 
 buildStatementAnn :: SemanticAnns -> Bool -> CAnns
-buildStatementAnn ann before = CAnnotations (Semantic.Monad.location ann) (CStatementAnn before)
+buildStatementAnn ann before = CAnnotations (Semantic.Monad.location ann) (CStatementAnn before False)
 
 buildDeclarationAnn :: SemanticAnns -> Bool -> CAnns
 buildDeclarationAnn ann before = CAnnotations (Semantic.Monad.location ann) (CDeclarationAnn before)

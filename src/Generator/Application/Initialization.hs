@@ -35,7 +35,7 @@ genInitFile :: ModuleName -> [(ModuleName, ModuleMode, AnnotatedProgram Semantic
 genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, _, objs) <- globals])
     let cAnn = CAnnotations Internal CGenericAnn
-        cStmtAnn = CAnnotations Internal (CStatementAnn True)
+        cStmtAnn = CAnnotations Internal (CStatementAnn True False)
         retTypeDecl = [CTypeSpec CVoidType]
         cReturn = [CBlockStmt $ CReturn Nothing cStmtAnn]
         initFunction = [ CExtDecl $ CFDefExt $ CFunDef retTypeDecl
