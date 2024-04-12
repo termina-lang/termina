@@ -355,17 +355,17 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
             decl <- getMsgDataVariable True action dts
             rest <- mapM (uncurry (getMsgDataVariable False) . (\(_, dts', action') -> (action', dts'))) xs
             return $ decl : rest
-        
+
         genCase :: (Identifier, TypeSpecifier, Identifier) -> CSourceGenerator [CCompoundBlockItem]
         genCase (port, _, action) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 stmt before expand = CAnnotations Internal (CStatementAnn before expand)
             variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action
-            return  
+            return
                 [
                     -- case variant:
-                    CBlockStmt $ CCase (CVar variant cAnn) 
+                    CBlockStmt $ CCase (CVar variant cAnn)
                     -- status = rtems_message_queue_receive(self->port, &action_msg_data, 
                     --                                      &size, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
                         (CExpr (Just $ CAssignment (CVar "status" cAnn)
@@ -398,9 +398,9 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
                         ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (stmt True True),
                     -- break;
                     CBlockStmt $ CBreak (stmt True True)
-                        
+
                 ]
-        
+
         genLoop :: CSourceGenerator CStatement
         genLoop = do
             let cAnn = CAnnotations Internal CGenericAnn
@@ -421,7 +421,7 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
                         (CCompound (cases ++
                             [
                                 -- default:
-                                CBlockStmt $ CDefault 
+                                CBlockStmt $ CDefault
                                     -- rtems_shutdown_executive(1);
                                     (CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
                                     [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn True True))) (stmt True),
@@ -487,8 +487,8 @@ genArmTimer cExpr identifier = do
             -- __termina__add_timeval(&timer.__timer.current, timer.period);
             CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina" <::> "add_timeval") cAnn)
                 [
-                    CMember (CMember cExpr (namefy "timer") False cAnn) "current" False cAnn, 
-                    CMember cExpr (namefy "period") False cAnn
+                    CUnary CAdrOp (CMember (CMember cExpr (namefy "timer") False cAnn) "current" False cAnn) cAnn,
+                    CUnary CAdrOp (CMember cExpr "period" False cAnn) cAnn
                 ] cAnn) stmtAnn,
             -- status = rtems_timer_fire_after(timer.__timer.timer_id, &timer.__timer.current, timer.period);
             CBlockStmt $ CExpr (Just $ CAssignment
@@ -510,8 +510,8 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId _ (
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_isr_interrupt(void * ignored) {
         CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr 
-                [CDeclaration 
+            (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr
+                [CDeclaration
                     [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound [
                 -- classId * self = &identifier;
@@ -544,8 +544,8 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) = do
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_isr_interrupt(void * ignored) {
         CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr 
-                [CDeclaration 
+            (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr
+                [CDeclaration
                     [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound [
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
@@ -591,8 +591,8 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
         CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_periodic_timer" <::> timer) [CFunDeclr 
-                [CDeclaration 
+            (CDeclarator (Just $ namefy "rtems_periodic_timer" <::> timer) [CFunDeclr
+                [CDeclaration
                     [CTypeSpec $ CTypeDef "rtems_id"] [(Just (CDeclarator (Just "_timer_id") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False)),
                  CDeclaration
                     [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
@@ -641,8 +641,8 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
         CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_periodic_timer" <::> timer) [CFunDeclr 
-                [CDeclaration 
+            (CDeclarator (Just $ namefy "rtems_periodic_timer" <::> timer) [CFunDeclr
+                [CDeclaration
                     [CTypeSpec $ CTypeDef "rtems_id"] [(Just (CDeclarator (Just "_timer_id") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False)),
                  CDeclaration
                     [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
@@ -692,8 +692,47 @@ genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEv
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
         CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_app" <::> "inital_event") [CFunDeclr 
-                [CDeclaration 
+            (CDeclarator (Just $ namefy "rtems_app" <::> "inital_event") [CFunDeclr
+                [CDeclaration
+                    [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
+            (CCompound [
+                -- classId * self = &identifier;
+                CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef classId]
+                    [(Just $ CDeclarator (Just "self") [CPtrDeclr [] cAnn] [] cAnn, Just $ CInitExpr (CUnary CAdrOp (CVar identifier cAnn) cAnn) cAnn, Nothing)] declStmt,
+                -- Result result;
+                CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef "Result"]
+                    [(Just $ CDeclarator (Just "result") [] [] cAnn, Nothing, Nothing)] declStmt,
+                -- result.__variant = Result__Ok;
+                CBlockStmt $ CExpr (Just $ CAssignment
+                    (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
+                    (CVar ("Result" <::> "Ok") cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
+                -- result = classFunctionName(self, *current);
+                CBlockStmt $ CExpr (Just $ CAssignment
+                    (CVar "result" cAnn)
+                    (CCall (CVar classFunctionName cAnn)
+                        [CVar "self" cAnn, CUnary CIndOp (CVar "current" cAnn) cAnn] cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
+                -- if (result.__variant != Result__Ok)
+                CBlockStmt $ CIf (CBinary CNeqOp (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
+                    (CVar ("Result" <::> "Ok") cAnn) cAnn)
+                    (CCompound [
+                        -- rtems_shutdown_executive(1);
+                        CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
+                            [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
+                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (CAnnotations Internal (CStatementAnn True False)),
+                CBlockStmt $ CReturn Nothing (CAnnotations Internal (CStatementAnn True False))
+            ] (CAnnotations Internal (CCompoundAnn False True))) declStmt
+genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ ports)) = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt = CAnnotations Internal (CDeclarationAnn True)
+    action <- case find (\case { RTEMSEventPort _ emitter _ _ -> event == emitter; _ -> False }) ports of
+        Just (RTEMSEventPort _ _ _ actionId) -> return actionId
+        _ -> throwError $ InternalError $ "Invalid port connection for interrupt: " ++ show event
+    classFunctionName <- genClassFunctionName classId action
+    return $ CExtDecl $ CFDefExt $
+        -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
+        CFunDef [CTypeSpec CVoidType]
+            (CDeclarator (Just $ namefy "rtems_app" <::> "inital_event") [CFunDeclr
+                [CDeclaration
                     [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound [
                 -- classId * self = &identifier;
@@ -721,45 +760,6 @@ genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEv
                     ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (CAnnotations Internal (CStatementAnn True False)),
                 CBlockStmt $ CReturn Nothing (CAnnotations Internal (CStatementAnn True False))
             ] (CAnnotations Internal (CCompoundAnn False True))) declStmt
-genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ ports)) = do
-    let cAnn = CAnnotations Internal CGenericAnn
-        declStmt = CAnnotations Internal (CDeclarationAnn True)
-    action <- case find (\case { RTEMSEventPort _ emitter _ _ -> event == emitter; _ -> False }) ports of
-        Just (RTEMSEventPort _ _ _ actionId) -> return actionId
-        _ -> throwError $ InternalError $ "Invalid port connection for interrupt: " ++ show event
-    classFunctionName <- genClassFunctionName classId action
-    return $ CExtDecl $ CFDefExt $
-        -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
-        CFunDef [CTypeSpec CVoidType]
-            (CDeclarator (Just $ namefy "rtems_app" <::> "inital_event") [CFunDeclr 
-                [CDeclaration 
-                    [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
-            (CCompound [
-                -- classId * self = &identifier;
-                CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef classId]
-                    [(Just $ CDeclarator (Just "self") [CPtrDeclr [] cAnn] [] cAnn, Just $ CInitExpr (CUnary CAdrOp (CVar identifier cAnn) cAnn) cAnn, Nothing)] declStmt,
-                -- Result result;
-                CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef "Result"]
-                    [(Just $ CDeclarator (Just "result") [] [] cAnn, Nothing, Nothing)] declStmt,
-                -- result.__variant = Result__Ok;
-                CBlockStmt $ CExpr (Just $ CAssignment
-                    (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
-                    (CVar ("Result" <::> "Ok") cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
-                -- result = classFunctionName(self, timer.current);
-                CBlockStmt $ CExpr (Just $ CAssignment
-                    (CVar "result" cAnn)
-                    (CCall (CVar classFunctionName cAnn)
-                        [CVar "self" cAnn, CVar "current" cAnn] cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
-                -- if (result.__variant != Result__Ok)
-                CBlockStmt $ CIf (CBinary CNeqOp (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
-                    (CVar ("Result" <::> "Ok") cAnn) cAnn)
-                    (CCompound [
-                        -- rtems_shutdown_executive(1);
-                        CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
-                            [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
-                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (CAnnotations Internal (CStatementAnn True False)),
-                CBlockStmt $ CReturn Nothing (CAnnotations Internal (CStatementAnn True False))
-            ] (CAnnotations Internal (CCompoundAnn False True))) declStmt    
 genEmitter _ = error "Invalid emitter"
 
 -- | Function __rtems_app__enable_protection. This function is called from the Init task.
@@ -772,7 +772,7 @@ genEnableProtection resLockingMap = do
     initResourcesProt <- concat <$> mapM genInitResourceProt (M.toList resLockingMap)
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_periodic_timer(void * _timer_id, void * _argument) {
-        CFunDef [CTypeSpec CVoidType]
+        CFunDef [CStorageSpec CStatic, CTypeSpec CVoidType]
             (CDeclarator (Just $ namefy "rtems_app" <::> "enable_protection") [CFunDeclr [] [] cAnn] [] cAnn)
             (CCompound ([
                 -- Result result;
@@ -782,7 +782,7 @@ genEnableProtection resLockingMap = do
                 CBlockStmt $ CExpr (Just $ CAssignment
                     (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
                     (CVar ("Result" <::> "Ok") cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False))
-            ] ++ initResourcesProt) (CAnnotations Internal (CCompoundAnn False True))) declStmt    
+            ] ++ initResourcesProt) (CAnnotations Internal (CCompoundAnn False True))) declStmt
     where
 
         genInitResourceProt :: (Identifier, RTEMSResourceLock) -> CSourceGenerator [CCompoundBlockItem]
@@ -801,14 +801,14 @@ genEnableProtection resLockingMap = do
                 CBlockStmt $ CExpr (Just $
                     CAssignment (CMember (CMember (CVar identifier cAnn) resourceClassIDField False cAnn) "lock" False cAnn)
                         (CVar (namefy "RTEMSResourceLock__Irq") cAnn) cAnn) (stmt True False)
-                ]            
+                ]
         genInitResourceProt (identifier, RTEMSResourceLockMutex ceilPrio) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 stmt before expand = CAnnotations Internal (CStatementAnn before expand)
             return [
                 CBlockStmt $ CExpr (Just $
                     CAssignment (CMember (CMember (CVar identifier cAnn) resourceClassIDField False cAnn) "lock" False cAnn)
-                        (CVar (namefy "RTEMSResourceLock__Mutex") cAnn) cAnn) (stmt True False), 
+                        (CVar (namefy "RTEMSResourceLock__Mutex") cAnn) cAnn) (stmt True False),
                 CBlockStmt $ CExpr (Just $
                     CAssignment (CMember (CMember (CMember (CVar identifier cAnn) resourceClassIDField False cAnn) "mutex" False cAnn) "policy" False cAnn)
                         (CVar (namefy "RTEMSMutexPolicy__Ceiling") cAnn) cAnn) (stmt False False),
@@ -827,14 +827,14 @@ genEnableProtection resLockingMap = do
                         -- rtems_shutdown_executive(1);
                         CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
                             [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
-                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (CAnnotations Internal (CStatementAnn True False))                
-                ]              
+                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing (CAnnotations Internal (CStatementAnn True False))
+                ]
 
 -- | Function __rtems_app__init_globals. This function is called from the Init task.
 -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
 -- the protection of the global resources, since it is not needed when running in the Init task. It also
 -- executes the init() method of the resources if defined.
-genInitGlobals :: 
+genInitGlobals ::
     -- | Resources 
     [RTEMSGlobal]
     -- | Pools
@@ -842,7 +842,7 @@ genInitGlobals ::
     -- | Task Message Queues
     -> [RTEMSMsgQueue]
     -- | Channel Message Queues  
-    -> [RTEMSMsgQueue] 
+    -> [RTEMSMsgQueue]
     -- | Interrupt emitters connected to tasks
     -> [RTEMSEmitter]
     -- | Timers connected to tasks
@@ -876,16 +876,16 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                     (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
                     (CVar ("Result" <::> "Ok") cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False))
             ] ++ initResources ++ initPools
-            ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers) then
+            ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers) then
                 [
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
                     CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
                         [(Just $ CDeclarator (Just "status") [] [] cAnn,
-                          Just (CInitExpr (CVar "RTEMS_SUCCESSFUL" cAnn) cAnn), Nothing)] (declStmt False)
-                ] else []) ++ cTaskMessageQueues ++ cChannelMessageQueues 
+                          Just (CInitExpr (CVar "RTEMS_SUCCESSFUL" cAnn) cAnn), Nothing)] (declStmt True)
+                ] else []) ++ cTaskMessageQueues ++ cChannelMessageQueues
                 ++ cInterruptEmittersToTasks ++ cTimersToTasks ++ cTaskInitialization ++ cCreateTimers
             ) (CAnnotations Internal (CCompoundAnn False True))) (declStmt True)
-    
+
     where
 
         genInitResource :: RTEMSGlobal -> CSourceGenerator CCompoundBlockItem
@@ -901,7 +901,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn = CAnnotations Internal (CStatementAnn True False)
             declSpec <- genDeclSpecifiers ts
-            return 
+            return
                 [
                     -- identifier.resource.lock = __RTEMSResourceLock__None;
                     CBlockStmt $ CExpr (Just $ CAssignment
@@ -912,7 +912,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                             (CCall (CVar (namefy "termina_pool" <::> "init") cAnn)
                                 [
                                     CUnary CAdrOp (CVar identifier cAnn) cAnn,
-                                    CCast (CDeclaration [CTypeSpec CVoidType] 
+                                    CCast (CDeclaration [CTypeSpec CVoidType]
                                         [(Just $ CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn, Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False)))
                                         (CVar (poolMemoryArea identifier) cAnn) cAnn,
                                     CSizeofExpr (CVar (poolMemoryArea identifier) cAnn) cAnn,
@@ -938,11 +938,11 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                 cStmtAnn before = CAnnotations Internal (CStatementAnn before False)
             declSpec <- genDeclSpecifiers ts
             variantForPort <- genVariantForPort classId port
-            return 
+            return
                 [
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CVar identifier cAnn) "task_msgq_id" False cAnn)
-                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True), 
+                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True),
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CVar identifier cAnn) "task_port" False cAnn)
                             (CVar variantForPort cAnn) cAnn) (cStmtAnn False),
@@ -976,7 +976,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
         genRTEMSCreateMsgQueue (RTEMSTaskMsgQueue identifier size) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn = CAnnotations Internal (CStatementAnn True False)
-            return 
+            return
                 [
                     -- statuss = __rtems__create_msg_queue(&identifier, (void *)memory_area_identifier)
                     CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
@@ -991,15 +991,15 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                             -- rtems_shutdown_executive(1);
                             CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
                                 [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
-                        ] (CAnnotations Internal (CCompoundAnn False False))) Nothing cStmtAnn              
+                        ] (CAnnotations Internal (CCompoundAnn False False))) Nothing cStmtAnn
                 ]
         genRTEMSCreateMsgQueue (RTEMSSinkPortMsgQueue taskId portId ts size) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn = CAnnotations Internal (CStatementAnn True False)
             declSpec <- genDeclSpecifiers ts
-            return 
+            return
                 [
-                    -- statuss = __rtems__create_msg_queue(&identifier, (void *)memory_area_identifier)
+                    -- status = __rtems__create_msg_queue(&identifier, (void *)memory_area_identifier)
                     CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
                             (CCall (CVar (namefy "rtems" <::> "create_msg_queue") cAnn)
                                 [
@@ -1020,11 +1020,11 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn before = CAnnotations Internal (CStatementAnn before False)
             variantForPort <- genVariantForPort classId port
-            return 
+            return
                 [
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CVar identifier cAnn) "task_msgq_id" False cAnn)
-                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True), 
+                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True),
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CVar identifier cAnn) "sink_msgq_id" False cAnn)
                             (CMember (CVar taskId cAnn) port False cAnn) cAnn) (cStmtAnn False),
@@ -1032,7 +1032,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                         CAssignment (CMember (CVar identifier cAnn) "task_port" False cAnn)
                             (CVar variantForPort cAnn) cAnn) (cStmtAnn False)
                 ]
-            
+
             where
                 port = case find (\case {
                     RTEMSEventPort _ chid _ _ -> chid == identifier;
@@ -1046,11 +1046,11 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn before = CAnnotations Internal (CStatementAnn before False)
             variantForPort <- genVariantForPort classId port
-            return 
+            return
                 [
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CMember (CVar identifier cAnn) "__timer" False cAnn) "task_msgq_id" False cAnn)
-                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True), 
+                            (CMember (CMember (CVar taskId cAnn) taskClassIDField False cAnn) "msgq_id" False cAnn) cAnn) (cStmtAnn True),
                     CBlockStmt $ CExpr (Just $
                         CAssignment (CMember (CMember (CVar identifier cAnn) "__timer" False cAnn) "sink_msgq_id" False cAnn)
                             (CMember (CVar taskId cAnn) port False cAnn) cAnn) (cStmtAnn False),
@@ -1077,7 +1077,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                 inputPorts = filter (\case {
                     RTEMSInputPort {} -> True;
                     _ -> False }) ports
-                
+
                 genInputPortInitialization :: RTEMSPort -> CSourceGenerator CCompoundBlockItem
                 genInputPortInitialization (RTEMSInputPort portId channelId _ _) = do
                     let cAnn = CAnnotations Internal CGenericAnn
@@ -1092,7 +1092,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
         genRTEMSCreateTimer (RTEMSPeriodicTimerEmitter identifier _) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 cStmtAnn = CAnnotations Internal (CStatementAnn True False)
-            return 
+            return
                 [
                     -- statuss = __rtems__create_msg_queue(&identifier, (void *)memory_area_identifier)
                     CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
@@ -1106,8 +1106,142 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                             CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
                                 [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
                         ] (CAnnotations Internal (CCompoundAnn False False))) Nothing cStmtAnn
-                ] 
+                ]
         genRTEMSCreateTimer obj = throwError $ InternalError $ "Invalid global object (not a timer): " ++ show obj
+
+-- | Function __rtems_app__install_emitters. This function is called from the Init task.
+-- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
+-- of the tasks and handlers.
+genInstallEmitters :: [RTEMSEmitter] -> CSourceGenerator CFileItem
+genInstallEmitters emitters = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt before = CAnnotations Internal (CDeclarationAnn before)
+    installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { RTEMSSystemInitEmitter {} -> False; _ -> True }) emitters
+    return $ CExtDecl $ CFDefExt $
+        -- static void __rtems_app__init_globals() {
+        CFunDef [CStorageSpec CStatic, CTypeSpec CVoidType]
+            (CDeclarator (Just $ namefy "rtems_app" <::> "install_emitters") [CFunDeclr
+                [CDeclaration
+                    [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))]
+                [] cAnn] [] cAnn)
+            (CCompound (
+                -- rtems_status_code status = RTEMS_SUCCESSFUL;
+                CBlockDecl (CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
+                    [(Just $ CDeclarator (Just "status") [] [] cAnn, Just $ CInitExpr (CVar "RTEMS_SUCCESSFUL" cAnn) cAnn, Nothing)] (declStmt True))
+             : installEmitters) (CAnnotations Internal (CCompoundAnn False True))) (declStmt True)
+
+    where
+
+        genRTEMSInstallEmitter :: RTEMSEmitter -> CSourceGenerator CCompoundBlockItem
+        genRTEMSInstallEmitter (RTEMSInterruptEmitter interrupt _) = do
+            let cAnn = CAnnotations Internal CGenericAnn
+                stmtAnn = CAnnotations Internal (CStatementAnn True False)
+            return $
+                CBlockStmt $ CIf (CBinary CEqOp (CVar "RTEMS_SUCCESSFUL" cAnn) (CVar "status" cAnn) cAnn)
+                    (CCompound [
+                        -- rtems_shutdown_executive(1);
+                        CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
+                                (CCall (CVar (namefy "rtems" <::> "install_isr") cAnn)
+                                    [CVar (show $ emitterToVectorMap M.! interrupt) cAnn,
+                                    CVar (namefy $ "rtems_isr" <::> interrupt) cAnn] cAnn) cAnn)
+                            stmtAnn
+                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing stmtAnn
+        genRTEMSInstallEmitter (RTEMSPeriodicTimerEmitter timer _) = do
+            let cAnn = CAnnotations Internal CGenericAnn
+                stmtAnn = CAnnotations Internal (CStatementAnn True False)
+                cExpr = CVar timer cAnn
+            armTimer <- genArmTimer cExpr timer
+            return $
+                CBlockStmt $ CIf (CBinary CEqOp (CVar "RTEMS_SUCCESSFUL" cAnn) (CVar "status" cAnn) cAnn)
+                    (CCompound
+                        (CBlockStmt (CExpr (Just $ CAssignment
+                            (CMember (CMember cExpr (namefy "timer") False cAnn) "current" False cAnn)
+                            (CUnary CIndOp (CVar "current" cAnn) cAnn) cAnn) stmtAnn) :
+                        armTimer)
+                    (CAnnotations Internal (CCompoundAnn False False))) Nothing stmtAnn
+        genRTEMSInstallEmitter (RTEMSSystemInitEmitter {}) = throwError $ InternalError $ "Initial event does not have to be installed"
+
+genCreateTasks :: [RTEMSGlobal] -> CSourceGenerator CFileItem
+genCreateTasks tasks = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt before = CAnnotations Internal (CDeclarationAnn before)
+    createTasks <- concat <$> mapM genRTEMSCreateTask tasks
+    return $ CExtDecl $ CFDefExt $
+        -- static void __rtems_app__create_tasks() {
+        CFunDef [CStorageSpec CStatic, CTypeSpec CVoidType]
+            (CDeclarator (Just $ namefy "rtems_app" <::> "create_tasks") [CFunDeclr
+                [CDeclaration
+                    [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))]
+                [] cAnn] [] cAnn)
+            (CCompound (
+                -- rtems_status_code status = RTEMS_SUCCESSFUL;
+                CBlockDecl (CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
+                    [(Just $ CDeclarator (Just "status") [] [] cAnn, Just $ CInitExpr (CVar "RTEMS_SUCCESSFUL" cAnn) cAnn, Nothing)] (declStmt True))
+             : createTasks) (CAnnotations Internal (CCompoundAnn False True))) (declStmt True)
+    where
+
+        genRTEMSCreateTask :: RTEMSGlobal -> CSourceGenerator [CCompoundBlockItem]
+        genRTEMSCreateTask (RTEMSTask identifier classId _ priority stackSize _) = do
+            let cAnn = CAnnotations Internal CGenericAnn
+                stmtAnn = CAnnotations Internal (CStatementAnn True False)
+            return [
+                CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
+                    (CCall (CVar (namefy "rtems" <::> "create_task") cAnn)
+                        [CConst (CIntConst (CInteger priority DecRepr)) cAnn,
+                        CConst (CIntConst (CInteger stackSize DecRepr)) cAnn,
+                        CVar (namefy $ "rtems_task" <::> classId) cAnn,
+                        CCast
+                            (CDeclaration [CTypeSpec $ CTypeDef "rtems_task_argument"]
+                                [] (CAnnotations Internal (CDeclarationAnn False)))
+                                (CUnary CAdrOp (CVar identifier cAnn) cAnn) cAnn,
+                        CUnary CAdrOp
+                            (CMember (CMember (CVar identifier cAnn) "__task" False cAnn) "task_id" False cAnn) cAnn
+                        ] cAnn) cAnn)
+                    stmtAnn,
+                CBlockStmt $ CIf (CBinary CNeqOp (CVar "RTEMS_SUCCESSFUL" cAnn) (CVar "status" cAnn) cAnn)
+                    (CCompound [
+                        -- rtems_shutdown_executive(1);
+                        CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
+                            [CConst (CIntConst (CInteger 1 DecRepr)) cAnn] cAnn) (CAnnotations Internal (CStatementAnn False False))
+                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing stmtAnn
+                ]
+        genRTEMSCreateTask obj = throwError $ InternalError $ "Invalid global object (not a task): " ++ show obj
+
+genInitTask :: [RTEMSEmitter] -> CSourceGenerator CFileItem
+genInitTask emitters = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt before = CAnnotations Internal (CDeclarationAnn before)
+        cStmtAnn = CAnnotations Internal (CStatementAnn True False)
+    return $ CExtDecl $ CFDefExt $
+        CFunDef [CTypeSpec $ CTypeDef "rtems_task"]
+            (CDeclarator (Just $ "Init") [CFunDeclr
+                [CDeclaration
+                    [CTypeSpec $ CTypeDef "rtems_task_argument"] [(Just (CDeclarator (Just "_ignored") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))]
+                [] cAnn] [] cAnn)
+            (CCompound ([
+                -- rtems_status_code status = RTEMS_SUCCESSFUL;
+                CBlockDecl (CDeclaration [CTypeSpec $ CTypeDef "TimeVal"]
+                    [(Just $ CDeclarator (Just "current") [] [] cAnn, Nothing, Nothing)] (declStmt True)),
+                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina" <::> "clock_get_uptime") cAnn)
+                                [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn,
+                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn,
+                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn
+             ] ++
+                -- Execute initialization action in case there is one
+                (case find (\case { RTEMSSystemInitEmitter {} -> True; _ -> False }) emitters of
+                    Just (RTEMSSystemInitEmitter {}) -> [
+                            CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "inital_event") cAnn)
+                                [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn
+                        ]
+                    _ -> []) ++
+                [
+                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "enable_protection") cAnn) [] cAnn) cStmtAnn,
+                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "install_emitters") cAnn)
+                        [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn,
+                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "create_tasks") cAnn) [] cAnn) cStmtAnn,
+                    CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_task_delete" cAnn) [CVar "RTEMS_SELF" cAnn] cAnn) cStmtAnn
+                ]
+             ) (CAnnotations Internal (CCompoundAnn False True))) (declStmt True)
 
 genMainFile :: ModuleName ->  [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
@@ -1126,9 +1260,9 @@ genMainFile mName prjprogs = do
     cEmitters <- mapM genEmitter emitters
     enableProtection <- genEnableProtection resLockingMap
     initGlobals <- genInitGlobals resources pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
---    installEmitters <- genInstallEmitters emitters
---    createTasks <- genCreateTasks tasks
---    initTask <- genInitTask tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks
+    installEmitters <- genInstallEmitters emitters
+    createTasks <- genCreateTasks tasks
+    initTask <- genInitTask emitters
 --    appConfig <- genAppConfig resources pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks
     return $ CSourceFile (genModulePathName mName SrcFile) $ [
             -- #include <rtems.h>
@@ -1140,7 +1274,7 @@ genMainFile mName prjprogs = do
             -- void __termina_app__init_globals(void);
             externInitGlobals
         ] ++ cVariantsForTaskPorts ++ cPoolMemoryAreas ++ cInterruptEmitterDeclarations
-        ++ cTaskClassesCode ++ cEmitters ++ [enableProtection, initGlobals]
+        ++ cTaskClassesCode ++ cEmitters ++ [enableProtection, initGlobals, installEmitters, createTasks, initTask]
 
     where
         -- | Original program list filtered to only include the global declaration
