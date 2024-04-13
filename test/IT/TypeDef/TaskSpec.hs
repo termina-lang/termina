@@ -114,7 +114,7 @@ spec = do
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -170,4 +170,4 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}")
+              "}\n")

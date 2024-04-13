@@ -70,4 +70,4 @@ spec = do
               "\n" ++
               "extern __termina_pool_t message_pool;\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")

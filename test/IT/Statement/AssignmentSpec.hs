@@ -87,7 +87,7 @@ spec = do
               "\n" ++
               "void assignment_test0();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function assignment_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -103,7 +103,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++ 
-              "}")    
+              "}\n")    
     it "Prints declaration of function assignment_test1" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -117,7 +117,7 @@ spec = do
               "\n" ++
               "void id0__assignment_test1(void * const __this, __termina_dyn_t dyn_var0);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function assignment_test1" $ do
      renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -139,7 +139,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")  
+              "}\n")  
     it "Prints declaration of function assignment_test2" $ do
      renderHeader test2 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -154,7 +154,7 @@ spec = do
               "void id0__assignment_test2(void * const __this, __termina_dyn_t dyn_var0,\n" ++
               "                           __termina_dyn_t dyn_var1);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function assignment_test2" $ do
      renderSource test2 `shouldBe`
         pack ("\n" ++
@@ -179,7 +179,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")  
+              "}\n")  
     it "Prints declaration of function assignment_test3" $ do
      renderHeader test3 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -194,7 +194,7 @@ spec = do
               "void id0__assignment_test3(void * const __this, __termina_dyn_t dyn_var0,\n" ++
               "                           __termina_dyn_t dyn_var1);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function assignment_test2" $ do
      renderSource test3 `shouldBe`
         pack ("\n" ++
@@ -228,4 +228,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")  
+              "}\n")  

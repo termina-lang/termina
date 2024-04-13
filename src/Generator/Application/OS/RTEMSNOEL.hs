@@ -17,6 +17,10 @@ import Data.Maybe
 import Data.List (find)
 import Semantic.Types (GEntry (GGlob), SemGlobal (SEmitter))
 import Control.Monad.Except
+import Generator.LanguageC.Printer
+import Control.Monad.Reader
+import PPrinter
+import Data.Text (unpack)
 
 data RTEMSPort =
     RTEMSEventPort
@@ -512,7 +516,7 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId _ (
         CFunDef [CTypeSpec CVoidType]
             (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr
                 [CDeclaration
-                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
+                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_ignored") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound [
                 -- classId * self = &identifier;
                 CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef classId]
@@ -546,7 +550,7 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) = do
         CFunDef [CTypeSpec CVoidType]
             (CDeclarator (Just $ namefy "rtems_isr" <::> interrupt) [CFunDeclr
                 [CDeclaration
-                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
+                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_ignored") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound [
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
                 CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
@@ -595,7 +599,7 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (
                 [CDeclaration
                     [CTypeSpec $ CTypeDef "rtems_id"] [(Just (CDeclarator (Just "_timer_id") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False)),
                  CDeclaration
-                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
+                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_ignored") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound ([
                 -- classId * self = &identifier;
                 CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef classId]
@@ -645,7 +649,7 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
                 [CDeclaration
                     [CTypeSpec $ CTypeDef "rtems_id"] [(Just (CDeclarator (Just "_timer_id") [] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False)),
                  CDeclaration
-                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_argument") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
+                    [CTypeSpec CVoidType] [(Just (CDeclarator (Just "_ignored") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))] [] cAnn] [] cAnn)
             (CCompound ([
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
                 CBlockDecl $ CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
@@ -1170,9 +1174,7 @@ genCreateTasks tasks = do
         -- static void __rtems_app__create_tasks() {
         CFunDef [CStorageSpec CStatic, CTypeSpec CVoidType]
             (CDeclarator (Just $ namefy "rtems_app" <::> "create_tasks") [CFunDeclr
-                [CDeclaration
-                    [CTypeSpec $ CTypeDef "TimeVal"] [(Just (CDeclarator (Just "current") [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] (CAnnotations Internal (CDeclarationAnn False))]
-                [] cAnn] [] cAnn)
+                [] [] cAnn] [] cAnn)
             (CCompound (
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
                 CBlockDecl (CDeclaration [CTypeSpec $ CTypeDef "rtems_status_code"]
@@ -1228,6 +1230,12 @@ genInitTask emitters = do
                 CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn
              ] ++
                 -- Execute initialization action in case there is one
+
+                -- Execute initialization action in case there is one
+                
+                -- Execute initialization action in case there is one
+
+                -- Execute initialization action in case there is one
                 (case find (\case { RTEMSSystemInitEmitter {} -> True; _ -> False }) emitters of
                     Just (RTEMSSystemInitEmitter {}) -> [
                             CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "inital_event") cAnn)
@@ -1243,10 +1251,98 @@ genInitTask emitters = do
                 ]
              ) (CAnnotations Internal (CCompoundAnn False True))) (declStmt True)
 
+genAppConfig ::
+    [RTEMSGlobal]
+    -> [RTEMSMsgQueue]
+    -> [RTEMSEmitter]
+    -> [RTEMSResourceLock]
+    -> CSourceGenerator [CFileItem]
+genAppConfig tasks msgQueues timers mutexes = do
+    let cppAnn before = CAnnotations Internal (CPPDirectiveAnn before)
+    messageBufferMemory <- genMessageBufferMemory msgQueues
+    return $ [
+            -- #define CONFIGURE_MAXIMUM_TASKS
+            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_TASKS" (Just [show (length tasks + 1)]) (cppAnn True),
+            -- #define CONFIGURE_MAXIMUM_MESSAGE_QUEUES
+            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_MESSAGE_QUEUES" (Just [show (length msgQueues)]) (cppAnn False),
+            -- #define CONFIGURE_MAXIMUM_TIMERS
+            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_TIMERS" (Just [show (length timers)]) (cppAnn False),
+            -- #define CONFIGURE_MAXIMUM_SEMAPHORES
+            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_SEMAPHORES" (Just [show (length mutexes)]) (cppAnn False)
+        ] ++ messageBufferMemory ++
+        [
+            CPPDirective $ CPPDefine "CONFIGURE_APPLICATION_DOES_NOT_NEED_CONSOLE_DRIVER" Nothing (cppAnn True),
+            CPPDirective $ CPPDefine "CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER" Nothing (cppAnn False),
+            CPPDirective $ CPPDefine "CONFIGURE_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]) (cppAnn False),
+            CPPDirective $ CPPDefine "CONFIGURE_RTEMS_INIT_TASKS_TABLE" Nothing (cppAnn True),
+            CPPDirective $ CPPDefine "CONFIGURE_INIT" Nothing (cppAnn True),
+            CPPDirective $ CPPInclude True "rtems/confdefs.h" (cppAnn True)
+        ]
+
+    where
+
+        genSizeOf :: TypeSpecifier -> CSourceGenerator CExpression
+        genSizeOf ts = do
+            let cAnn = CAnnotations Internal CGenericAnn
+            declSpec <- genDeclSpecifiers ts
+            return $ CSizeofType (CDeclaration declSpec [] (CAnnotations Internal (CDeclarationAnn False))) cAnn
+
+
+        genMessagesForQueue :: RTEMSMsgQueue -> CSourceGenerator [String]
+        genMessagesForQueue (RTEMSTaskMsgQueue _ size) = do
+            cSizeOf <- genSizeOf UInt32
+            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            return [
+                    "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
+                    "        " <> show size <> ", ",
+                    "        " <> ppSizeOf <> " ",
+                    "    ) "
+                ]
+        genMessagesForQueue (RTEMSChannelMsgQueue _ ts size _) = do
+            cSizeOf <- genSizeOf ts
+            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            return [
+                    "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
+                    "        " <> show size <> ", ",
+                    "        " <> ppSizeOf <> " ",
+                    "    ) "
+                ]
+        genMessagesForQueue (RTEMSSinkPortMsgQueue _ _ ts size) = do
+            cSizeOf <- genSizeOf ts
+            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            return [
+                    "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
+                    "        " <> show size <> ", ",
+                    "        " <> ppSizeOf <> " ",
+                    "    ) "
+                ]
+
+        genMessagesForQueues :: [RTEMSMsgQueue] -> CSourceGenerator [String]
+        genMessagesForQueues [msgq] = genMessagesForQueue msgq
+        genMessagesForQueues (msgq : xs) = do
+            msgsForQueue <- genMessagesForQueue msgq
+            msgsForQueues <- genMessagesForQueues xs
+            return $ msgsForQueue ++ ["+ "] ++ msgsForQueues
+        genMessagesForQueues [] = throwError $ InternalError "Invalid message queue list: empty list"
+
+        genMessageBufferMemory :: [RTEMSMsgQueue] -> CSourceGenerator [CFileItem]
+        genMessageBufferMemory [] = return []
+        genMessageBufferMemory msgq = do
+            messagesForQueue <- genMessagesForQueues msgq
+            return [
+                    CPPDirective $ CPPDefine "CONFIGURE_MESSAGE_BUFFER_MEMORY"
+                        (Just $
+                            "( " : messagesForQueue ++ [")"]
+                        ) (CAnnotations Internal (CPPDirectiveAnn True))
+                ]
+
+
+
+
+
 genMainFile :: ModuleName ->  [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
     let cAnn = CAnnotations Internal CGenericAnn
-        cStmtAnn = CAnnotations Internal (CStatementAnn True False)
         includeRTEMS = CPPDirective $ CPPInclude True "rtems.h" (CAnnotations Internal (CPPDirectiveAnn True))
         includeTermina = CPPDirective $ CPPInclude True "termina.h" (CAnnotations Internal (CPPDirectiveAnn True))
         externInitGlobals = CExtDecl $ CDeclExt $ CDeclaration
@@ -1263,7 +1359,7 @@ genMainFile mName prjprogs = do
     installEmitters <- genInstallEmitters emitters
     createTasks <- genCreateTasks tasks
     initTask <- genInitTask emitters
---    appConfig <- genAppConfig resources pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks
+    appConfig <- genAppConfig tasks msgQueues timers mutexes
     return $ CSourceFile (genModulePathName mName SrcFile) $ [
             -- #include <rtems.h>
             includeRTEMS,
@@ -1271,10 +1367,10 @@ genMainFile mName prjprogs = do
             includeTermina
         ] ++ includes
         ++ [
-            -- void __termina_app__init_globals(void);
             externInitGlobals
         ] ++ cVariantsForTaskPorts ++ cPoolMemoryAreas ++ cInterruptEmitterDeclarations
         ++ cTaskClassesCode ++ cEmitters ++ [enableProtection, initGlobals, installEmitters, createTasks, initTask]
+        ++ appConfig
 
     where
         -- | Original program list filtered to only include the global declaration

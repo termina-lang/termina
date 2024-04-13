@@ -111,7 +111,7 @@ spec = do
               "\n" ++
               "void id0__match_test0(void * const __this, __option_dyn_t option0);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of procedure match_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -141,7 +141,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of procedure match_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -155,7 +155,7 @@ spec = do
               "\n" ++
               "void id0__match_test1(void * const __this, __option_dyn_t option0);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of procedure match_test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -184,7 +184,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of function match_test2" $ do
       renderHeader test2 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -218,7 +218,7 @@ spec = do
               "\n" ++
               "uint32_t match_test1();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function match_test1" $ do
       renderSource test2 `shouldBe`
         pack ("\n" ++
@@ -257,4 +257,4 @@ spec = do
               "\n" ++
               "    return ret;\n" ++
               "\n" ++
-              "}")
+              "}\n")

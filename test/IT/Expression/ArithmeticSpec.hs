@@ -80,7 +80,7 @@ spec = do
               "\n" ++
               "void test0();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -112,7 +112,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of function test1" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -126,7 +126,7 @@ spec = do
               "\n" ++
               "void id0__test1(void * const __this, __termina_dyn_t foo);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function test1" $ do
      renderSource test1 `shouldBe`
        pack ("\n" ++
@@ -162,4 +162,4 @@ spec = do
              "\n" ++
              "    return;\n" ++
              "\n" ++
-             "}")
+             "}\n")

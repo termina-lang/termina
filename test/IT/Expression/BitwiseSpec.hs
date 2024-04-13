@@ -63,7 +63,7 @@ spec = do
               "\n" ++
               "void bitwise_test0(uint16_t foo);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function bitwise_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -95,4 +95,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    

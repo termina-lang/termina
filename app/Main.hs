@@ -33,12 +33,12 @@ import System.Path.IO
 
 -- Containers
 import qualified Data.Map.Strict as M
-import PPrinter.Application.OS.RTEMSNOEL (ppMainFile)
 import Generator.LanguageC.Printer
 import Control.Monad.Reader
 import Generator.Module
 import Generator.Application.Option
 import Generator.Application.Initialization
+import Generator.Application.OS.RTEMSNOEL
 
 data MainOptions = MainOptions
   { optREPL :: Bool
@@ -167,7 +167,10 @@ printMainFile chatty targetDir prjprogs = do
   createDirectoryIfMissing True targetDir
   iExists <- doesFileExist mainFile
   when iExists (renameFile mainFile (mainFile <.> FileExt "bkp"))
-  writeStrictText mainFile (render $ ppMainFile prjprogs)
+  case runReaderT (genMainFile (fragment "main" <.> FileExt "c") prjprogs) M.empty of
+    Left err -> fail $ show err
+    Right cSourceFile -> writeStrictText mainFile $ render $ runReader (pprint cSourceFile) (CPrinterConfig False False)
+
   where
     mainFile = targetDir </> fragment "main" <.> FileExt "c"
 

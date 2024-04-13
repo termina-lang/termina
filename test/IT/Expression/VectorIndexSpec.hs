@@ -66,7 +66,7 @@ spec = do
               "\n" ++
               "void vector_test0();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function vector_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -96,7 +96,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of function vector_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -106,7 +106,7 @@ spec = do
               "\n" ++
               "void vector_test1(const uint32_t p_vector0[10]);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function vector_test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -122,4 +122,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")   
+              "}\n")   

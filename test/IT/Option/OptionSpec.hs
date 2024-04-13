@@ -107,7 +107,7 @@ spec = do
               "\n" ++   
               "Result CHousekeeping__run(CHousekeeping * const self);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints option header file of test0" $ do
       renderOption test0OptionMap `shouldBe`
         pack ("#ifndef __OPTION_H__\n" ++
@@ -124,7 +124,7 @@ spec = do
               "    __enum_option_t __variant;\n" ++
               "} __option_uint32_t;\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints option header file of test1" $ do
       renderOption test1OptionMap `shouldBe`
         pack ("#ifndef __OPTION_H__\n" ++
@@ -141,7 +141,7 @@ spec = do
               "    __enum_option_t __variant;\n" ++
               "} __option_uint32__10_t;\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -175,4 +175,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")

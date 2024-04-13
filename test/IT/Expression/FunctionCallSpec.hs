@@ -71,7 +71,7 @@ spec = do
               "uint16_t func_test0_0(uint16_t a);\n\n" ++
               "uint16_t func_test0_1(uint16_t a);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of functions of test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -89,7 +89,7 @@ spec = do
               "\n" ++
               "    return foo * 2;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of functions test0 and test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -101,7 +101,7 @@ spec = do
               "\n" ++
               "uint32_t func_test1_1();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of functions test0 and test1" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -132,4 +132,4 @@ spec = do
               "\n" ++
               "    return bar0[1] + bar1[2];\n" ++
               "\n" ++
-              "}")    
+              "}\n")    

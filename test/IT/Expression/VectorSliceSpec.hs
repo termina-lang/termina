@@ -86,7 +86,7 @@ spec = do
               "\n" ++
               "void slice_test0();\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function slice_test0" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -103,7 +103,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")    
+              "}\n")    
     it "Prints declaration of function slice_test1" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -113,7 +113,7 @@ spec = do
               "\n" ++
               "void slice_test1(const uint32_t vector0[10][5][3]);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function slice_test0" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -131,7 +131,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}") 
+              "}\n") 
     it "Prints declaration of function slice_test2" $ do
       renderHeader test2 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -143,7 +143,7 @@ spec = do
               "\n" ++
               "void slice_test2(const uint32_t vector0[10][5]);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function slice_test2" $ do
       renderSource test2 `shouldBe`
         pack ("\n" ++
@@ -167,7 +167,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of function slice_test3" $ do
       renderHeader test3 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -179,7 +179,7 @@ spec = do
               "\n" ++
               "void slice_test3(const uint32_t vector0[10][5]);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of function slice_test3" $ do
       renderSource test3 `shouldBe`
         pack ("\n" ++
@@ -203,4 +203,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}") 
+              "}\n") 

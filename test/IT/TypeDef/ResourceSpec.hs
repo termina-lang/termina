@@ -74,7 +74,7 @@ spec = do
               "\n" ++
               "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of class TMChannel without no_handler" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
@@ -92,7 +92,7 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
     it "Prints declaration of class UARTDriver" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -107,7 +107,7 @@ spec = do
               "\n" ++
               "void UARTDriver__get_status(void * const __this, uint32_t * ret);\n" ++
               "\n" ++
-              "#endif")
+              "#endif\n")
     it "Prints definition of class UARTDriver" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
@@ -125,4 +125,4 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}")
+              "}\n")
