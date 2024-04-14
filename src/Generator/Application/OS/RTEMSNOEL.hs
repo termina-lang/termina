@@ -288,7 +288,7 @@ genPoolMemoryArea before (RTEMSPool identifier ts size) = do
         CDeclaration [CStorageSpec CStatic, CTypeSpec CUInt8Type]
             [(Just $ CDeclarator (Just $ poolMemoryArea identifier)
                 [
-                    CArrDeclr [] (CArrSize False (CCall (CVar "TERMINA_POOL_SIZE" cAnn) [
+                    CArrDeclr [] (CArrSize False (CCall (CVar "__termina_pool__size" cAnn) [
                         CSizeofType (CDeclaration declSpec [] (CAnnotations Internal (CDeclarationAnn False))) cAnn,
                         CConst (CIntConst (CInteger size DecRepr)) cAnn
                     ] cAnn)) cAnn
@@ -1427,6 +1427,7 @@ genMainFile mName prjprogs = do
                                 RTEMSEventPort portId _ ts _ -> RTEMSSinkPortMsgQueue identifier portId ts 1 : acc'
                                 _ -> acc'
                         ) acc ports
+                        in RTEMSTaskMsgQueue identifier (toInteger (length sinkPortMsgQueues)) : sinkPortMsgQueues
                     _ -> acc
             ) [] tasks
 
