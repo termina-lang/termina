@@ -1427,7 +1427,6 @@ genMainFile mName prjprogs = do
                                 RTEMSEventPort portId _ ts _ -> RTEMSSinkPortMsgQueue identifier portId ts 1 : acc'
                                 _ -> acc'
                         ) acc ports
-                        in RTEMSTaskMsgQueue identifier (toInteger (length sinkPortMsgQueues)) : sinkPortMsgQueues
                     _ -> acc
             ) [] tasks
 
