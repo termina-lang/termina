@@ -1,7 +1,6 @@
 module UT.PPrinter.Expression.CastSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad

@@ -1,7 +1,6 @@
 module UT.PPrinter.FunctionSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import AST.Seman
 import Data.Text hiding (empty)
 import qualified Data.Map as M

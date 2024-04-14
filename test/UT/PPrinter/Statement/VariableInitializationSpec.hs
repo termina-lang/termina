@@ -1,7 +1,6 @@
 module UT.PPrinter.Statement.VariableInitializationSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map

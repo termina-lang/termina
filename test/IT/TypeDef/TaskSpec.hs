@@ -8,7 +8,6 @@ import Semantic.TypeChecking
 import qualified Data.Map as M
 import Control.Monad.Reader
 import Generator.Module
-import PPrinter
 import Generator.LanguageC.Printer
 import System.Path
 import Modules.Modules

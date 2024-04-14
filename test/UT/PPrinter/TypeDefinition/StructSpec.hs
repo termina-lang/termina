@@ -1,7 +1,6 @@
 module UT.PPrinter.TypeDefinition.StructSpec (spec) where
 
 import Test.Hspec
-import PPrinter
 import AST.Seman
 import Data.Text
 import Semantic.Monad

@@ -19,7 +19,6 @@ import Semantic.Types (GEntry (GGlob), SemGlobal (SEmitter))
 import Control.Monad.Except
 import Generator.LanguageC.Printer
 import Control.Monad.Reader
-import PPrinter
 import Data.Text (unpack)
 
 data RTEMSPort =

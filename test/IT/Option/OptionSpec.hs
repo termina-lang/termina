@@ -11,7 +11,6 @@ import AST.Core
 import Semantic.Option
 import Control.Monad.Reader
 import Generator.Module
-import PPrinter
 import Generator.LanguageC.Printer
 import System.Path
 import Modules.Modules

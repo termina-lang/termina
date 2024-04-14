@@ -5,12 +5,15 @@ module Generator.LanguageC.Printer where
 
 import Generator.LanguageC.AST
 import Prettyprinter
-
+import Data.Text (Text)
 import Prettyprinter.Render.Terminal
 import Control.Monad.Reader
 
 
 type DocStyle = Doc AnsiStyle
+
+render :: DocStyle -> Text
+render = renderStrict . layoutSmart defaultLayoutOptions
 
 data CPrinterConfig = CPrinterConfig
   { printDebugLines :: Bool,
