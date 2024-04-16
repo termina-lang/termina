@@ -18,14 +18,14 @@ bar0 = Variable "bar0" (objSemAnn Mutable UInt16)
 bar1 = Variable "bar1" dynUInt16SemAnn
 
 tmPoolAlloc :: Expression SemanticAnns
-tmPoolAlloc = MemberFunctionAccess tmPool "alloc" [] unitSemAnn
+tmPoolAlloc = MemberFunctionAccess tmPool "alloc" [] [] unitSemAnn
 
 selfDereference :: Object SemanticAnns
 selfDereference = Dereference self (definedTypeSemAnn Private "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnns
-tmChannelsend = MemberFunctionAccess tmChannel "send" [AccessObject bar0] unitSemAnn
-selfFoo0 = MemberFunctionAccess selfDereference "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn
+tmChannelsend = MemberFunctionAccess tmChannel "send" [] [AccessObject bar0] unitSemAnn
+selfFoo0 = MemberFunctionAccess selfDereference "foo0" [] [AccessObject bar0, AccessObject bar1] unitSemAnn
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression expr = 

@@ -33,14 +33,17 @@ cBinOp LogicalOr = CLorOp
 genMemberFunctionAccess :: 
     Object SemanticAnns 
     -> Identifier 
+    -> [ConstExpression SemanticAnns]
     -> [Expression SemanticAnns] 
     -> SemanticAnns 
     -> CSourceGenerator CExpression
-genMemberFunctionAccess obj ident args ann = do
+genMemberFunctionAccess obj ident constArgs args ann = do
     let cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
     -- Generate the C code for the object
     cObj <- genObject obj
+    -- Generate the C code for the const generics
+    cConstArgs <- mapM genConstExpression constArgs
     -- Generate the C code for the parameters
     cArgs <- mapM
             (\pExpr -> do
@@ -61,7 +64,7 @@ genMemberFunctionAccess obj ident args ann = do
             case ts of
                 -- | If the left hand size is a class:
                 (DefinedType classId) ->
-                    return $ CCall (CVar (classId <::> ident) cAnn) (cObj : cArgs) cAnn
+                    return $ CCall (CVar (classId <::> ident) cAnn) (cObj : (cConstArgs ++ cArgs)) cAnn
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
         (DefinedType classId) ->
@@ -70,7 +73,7 @@ genMemberFunctionAccess obj ident args ann = do
                     -- | If we are here, it means that we are dereferencing the self object
                     return $ CCall (CVar (classId <::> ident) cAnn) (CVar "self" cAnn : cArgs) cAnn
                     -- | If the left hand size is a class:
-                _ -> return $ CCall (CVar (classId <::> ident) cAnn) (cObj : cArgs) cAnn
+                _ -> return $ CCall (CVar (classId <::> ident) cAnn) (cObj : (cConstArgs ++ cArgs)) cAnn
         AccessPort (DefinedType {}) ->
             return $
                 CCall (CMember cObj ident False cAnn)
@@ -78,7 +81,7 @@ genMemberFunctionAccess obj ident args ann = do
         -- | If the left hand side is a pool:
         AccessPort (Allocator {}) ->
             return $
-                CCall (CVar (poolMethodName ident) cAnn) (cObj : cArgs) cAnn
+                CCall (CVar (poolMethodName ident) cAnn) (cObj : (cConstArgs ++ cArgs)) cAnn
         -- | If the left hand side is a message queue:
         OutPort {} ->
             -- | If it is a send, the first parameter is the object to be sent. The
@@ -141,9 +144,11 @@ genExpression (BinOp op left right ann) = do
 genExpression (Constant c ann) = do
     let cAnn = buildGenericAnn ann 
     case c of
-        (I _ i) -> return $ CConst (CIntConst (CInteger i DecRepr)) cAnn
-        (B True) -> return $ CConst (CIntConst (CInteger 1 DecRepr)) cAnn
-        (B False) -> return $ CConst (CIntConst (CInteger 0 DecRepr)) cAnn
+        (I _ i) -> 
+            let cInteger = genInteger i in
+            return $ CConst (CIntConst cInteger) cAnn
+        (B True) -> return $ CConst (CIntConst (CInteger 1 CDecRepr)) cAnn
+        (B False) -> return $ CConst (CIntConst (CInteger 0 CDecRepr)) cAnn
         (C char) -> return $ CConst (CCharConst (CChar char)) cAnn
 genExpression (Casting expr ts ann) = do
     let cAnn = buildGenericAnn ann 
@@ -166,7 +171,7 @@ genExpression (ReferenceExpression _ obj ann) = do
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
         (Vector {}) -> return cObj
         _ -> return $ CUnary CAdrOp cObj cAnn
-genExpression expr@(FunctionExpression name args ann) = do
+genExpression expr@(FunctionExpression name constArgs args ann) = do
     let cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
     -- Obtain the substitutions map
@@ -174,6 +179,7 @@ genExpression expr@(FunctionExpression name args ann) = do
     -- If the identifier is in the substitutions map, use the substituted identifier
     let identifier = fromMaybe (CVar name cAnn) (Data.Map.lookup name subs)
     argsAnns <- getParameters expr
+    cConstArgs <- mapM genConstExpression constArgs
     cArgs <- zipWithM
             (\pExpr (Parameter _ ts) -> do
                 cParamExpr <- genExpression pExpr
@@ -189,11 +195,11 @@ genExpression expr@(FunctionExpression name args ann) = do
     expType <- getExprType expr
     case expType of
         Vector {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
-        _ -> return $ CCall identifier cArgs cAnn
-genExpression (MemberFunctionAccess obj ident args ann) = do
-    genMemberFunctionAccess obj ident args ann
-genExpression (DerefMemberFunctionAccess obj ident args ann) =
-    genMemberFunctionAccess obj ident args ann
+        _ -> return $ CCall identifier (cConstArgs ++ cArgs) cAnn
+genExpression (MemberFunctionAccess obj ident constArgs args ann) = do
+    genMemberFunctionAccess obj ident constArgs args ann
+genExpression (DerefMemberFunctionAccess obj ident constArgs args ann) =
+    genMemberFunctionAccess obj ident constArgs args ann
 genExpression (IsEnumVariantExpression obj enum variant ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
@@ -207,6 +213,15 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     cObj <- genObject obj
     return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar optionSomeVariant cAnn) cAnn
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
+
+genConstExpression :: ConstExpression SemanticAnns -> CSourceGenerator CExpression
+genConstExpression (KC (I _ i) ann) = do
+    let cInteger = genInteger i
+    return $ CConst (CIntConst cInteger) (buildGenericAnn ann)
+genConstExpression (KC (B True) ann) = return $ CConst (CIntConst (CInteger 1 CDecRepr)) (buildGenericAnn ann)
+genConstExpression (KC (B False) ann) = return $ CConst (CIntConst (CInteger 0 CDecRepr)) (buildGenericAnn ann)
+genConstExpression (KC (C char) ann) = return $ CConst (CCharConst (CChar char)) (buildGenericAnn ann)
+genConstExpression (KV ident ann) = return $ CVar ident (buildGenericAnn ann)
 
 genObject :: Object SemanticAnns -> CSourceGenerator CExpression
 genObject (Variable identifier ann) = do
@@ -228,9 +243,10 @@ genObject (VectorIndexExpression obj index ann) = do
 genObject (VectorSliceExpression obj lower _ ann) = do
     let cAnn = buildGenericAnn ann
     case lower of
-        KC (I _ lowInteger) -> do
+        KC (I _ lowInteger) _ -> do
+            let cInteger = genInteger lowInteger
             cObj <- genObject obj
-            return $ CUnary CAdrOp (CIndex cObj (CConst (CIntConst (CInteger lowInteger DecRepr)) cAnn) cAnn) cAnn
+            return $ CUnary CAdrOp (CIndex cObj (CConst (CIntConst cInteger) cAnn) cAnn) cAnn
         _ -> throwError $ InternalError ("Invalid constant expression: " ++ show lower)
 genObject (MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann

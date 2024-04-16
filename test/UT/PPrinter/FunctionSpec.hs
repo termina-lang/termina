@@ -17,21 +17,21 @@ tmDescriptorTS = DefinedType "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnns
 -- | 1024 : u32
-constUInt32 = Constant (I UInt32 1024) uint32SemAnn
+constUInt32 = Constant (I UInt32 (TInteger 1024 DecRepr)) uint32SemAnn
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
 refVectorAnn :: SemanticAnns
-refVectorAnn = refVectorSemAnn UInt32 (K 10)
+refVectorAnn = refVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 structASemAnn, tmDescriptorSemAnn :: SemanticAnns
 structASemAnn = definedTypeSemAnn Mutable "StructA"
 tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 0) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
+uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
+uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 4294901760 DecRepr)) uint32SemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -39,14 +39,14 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit1 :: Expression SemanticAnns
 structAFieldsInit1 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit2 :: Expression SemanticAnns
@@ -110,20 +110,20 @@ returnStructField0 :: ReturnStmt SemanticAnns
 returnStructField0 = ReturnStmt (Just struct0field0) uint32SemAnn
 
 function0 :: AnnASTElement SemanticAnns
-function0 = Function "function0" [] Nothing (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnVoid) [] unitSemAnn
+function0 = Function "function0" [] [] Nothing (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnVoid) [] unitSemAnn
 
 function1 :: AnnASTElement SemanticAnns
-function1 = Function "function1" [] (Just UInt32) (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnStructField0) [] unitSemAnn
+function1 = Function "function1" [] [] (Just UInt32) (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnStructField0) [] unitSemAnn
 
 function2 :: AnnASTElement SemanticAnns
-function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
+function2 = Function "function2" [] [Parameter "param0" UInt32] (Just UInt32)
   (BlockRet [
     struct0Declaration1, 
     struct1Declaration, 
     struct0Assignment0] returnStructField0) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnns
-function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (K 10))] (Just UInt32) 
+function3 = Function "function3" [] [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (K (TInteger 10 DecRepr)))] (Just UInt32) 
   (BlockRet [
     struct0Declaration2, 
     struct1Declaration, 
@@ -131,7 +131,7 @@ function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" 
     ] returnStructField0) [] unitSemAnn
 
 function4 :: AnnASTElement SemanticAnns
-function4 = Function "function4" [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Vector UInt32 (K 10)))] (Just UInt32) 
+function4 = Function "function4" [] [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Vector UInt32 (K (TInteger 10 DecRepr))))] (Just UInt32) 
   (BlockRet [
     struct0Declaration3, 
     struct1Declaration, 

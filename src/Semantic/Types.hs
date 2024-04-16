@@ -33,13 +33,13 @@ getTySemGlobal (SResource ty)   = ty
 getTySemGlobal (SHandler ty)   = ty
 getTySemGlobal (SEmitter ty)   = ty
 getTySemGlobal (SChannel ty)   = ty
-getTySemGlobal (SConst ty)    = ty
+getTySemGlobal (SConst ty) = ty
 
 ----------------------------------------
 
 -- | General global entities
 data GEntry a
-  = GFun [Parameter] TypeSpecifier
+  = GFun [Parameter] [Parameter] TypeSpecifier -- ^ const generic parameters, parameters, return type
   -- ^ Functions
   | GGlob SemGlobal
   -- ^ Globals
@@ -59,10 +59,10 @@ kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
 kClassMember (ClassField fld a) = ClassField fld a
 kClassMember (ClassMethod idx ps _blk ann) =
   ClassMethod idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
-kClassMember (ClassProcedure idx ps _blk ann) =
-  ClassProcedure idx ps [] ann
-kClassMember (ClassViewer idx ps ty _blk ann) =
-  ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+kClassMember (ClassProcedure idx cps ps _blk ann) =
+  ClassProcedure idx cps ps [] ann
+kClassMember (ClassViewer idx cps ps ty _blk ann) =
+  ClassViewer idx cps ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 kClassMember (ClassAction idx ps ty _blk ann) =
   ClassAction idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 

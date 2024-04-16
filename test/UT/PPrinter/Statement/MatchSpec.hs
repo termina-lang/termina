@@ -16,18 +16,18 @@ optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, dynVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
-dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+dynVectorAnn = dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnns
 param0 = Variable "param0" dynUInt32SemAnn
 param1 = Variable "param1" dynVectorAnn
 
 uint32Const0 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 0) uint32SemAnn
+uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
 
 usizeConst0x8 :: Expression SemanticAnns
-usizeConst0x8 = Constant (I USize 8) usizeSemAnn
+usizeConst0x8 = Constant (I USize (TInteger 8 DecRepr)) usizeSemAnn
 
 optionVar :: Expression SemanticAnns
 optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
@@ -70,7 +70,7 @@ matchOption1 :: Statement SemanticAnns
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnns
-getInteger = FunctionExpression "get_integer" [] (SemAnn undefined (ETy (AppType [] (Option (DynamicSubtype UInt32)))))
+getInteger = FunctionExpression "get_integer" [] [] (SemAnn undefined (ETy (AppType [] [] (Option (DynamicSubtype UInt32)))))
 
 matchOption2 :: Statement SemanticAnns
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn

@@ -63,14 +63,6 @@ numTy Int64  = True
 numTy USize  = True
 numTy _      = False
 
-numCons :: Const -> Bool
-numCons (I _ _) = True
-numCons _       = False
-
-numConstExpression :: ConstExpression -> Bool
-numConstExpression (KC c) = numCons c
-numConstExpression _      = error "TODO this is a bit weird."
-
 memberIntCons :: Integer -> TypeSpecifier -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
 memberIntCons i UInt16 = ( 0 <= i ) && ( i <= 65536)
@@ -129,12 +121,9 @@ hasDynOrDep Char = Right False
 --
 hasDynOrDep (Vector ty _s) = hasDynOrDep ty
 hasDynOrDep (Option ty) = hasDynOrDep ty
--- hasDynOrDep (MsgQueue ty _s) = hasDynOrDep ty
--- hasDynOrDep (Pool ty _s) = hasDynOrDep ty
 hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
 hasDynOrDep (DynamicSubtype _) = Right True
--- hasDynOrDep (Location ty) = hasDynOrDep ty
-hasDynOrDep Unit = Right False
+hasDynOrDep _ = Right False
 ----------------------------------------
 
 rootType :: TypeSpecifier -> TypeSpecifier

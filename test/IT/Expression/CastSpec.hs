@@ -82,7 +82,7 @@ spec = do
               "\n" ++
               "    int32_t bar_i32 = 0;\n" ++
               "\n" ++
-              "    bar_u8 = (uint8_t)4294901760;\n" ++
+              "    bar_u8 = (uint8_t)0xffff0000;\n" ++
               "\n" ++
               "    bar_u16 = (uint16_t)bar_u8;\n" ++
               "\n" ++

@@ -11,10 +11,10 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 vectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn, dynThreeDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
-dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (K 5) (K 10)
-dynThreeDymVectorAnn = dynThreeDymVectorSemAnn Char (K 40) (K 5) (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+dynThreeDymVectorAnn = dynThreeDymVectorSemAnn Char (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)

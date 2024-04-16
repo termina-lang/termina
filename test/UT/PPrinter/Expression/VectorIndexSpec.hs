@@ -11,12 +11,12 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
-dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+dynVectorAnn = dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 refVectorAnn :: SemanticAnns
-refVectorAnn = refSemAnn (Vector UInt32 (K 10))
+refVectorAnn = refSemAnn (Vector UInt32 (K (TInteger 10 DecRepr)))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
@@ -27,9 +27,9 @@ pVector0 :: Object SemanticAnns
 pVector0 = Variable "p_vector0" refVectorAnn
 
 usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnns
-usizeIndex3 = Constant (I USize 3) usizeSemAnn
-usizeIndex4 = Constant (I USize 4) usizeSemAnn
-usizeConst0x8 = Constant (I USize 8) usizeSemAnn
+usizeIndex3 = Constant (I USize (TInteger 3 DecRepr)) usizeSemAnn
+usizeIndex4 = Constant (I USize (TInteger 4 DecRepr)) usizeSemAnn
+usizeConst0x8 = Constant (I USize (TInteger 8 DecRepr)) usizeSemAnn
 
 dynVector0 :: Object SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn
@@ -43,7 +43,7 @@ dynVector0IndexConstant = AccessObject (VectorIndexExpression (Undyn dynVector0 
 dynVector0IndexVar0 = AccessObject (VectorIndexExpression (Undyn dynVector0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
 vector1IndexFirstDym :: Object SemanticAnns
-vector1IndexFirstDym = VectorIndexExpression vector1 usizeIndex3 (vectorSemAnn Mutable Int64 (K 5))
+vector1IndexFirstDym = VectorIndexExpression vector1 usizeIndex3 (vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)))
 
 vector1IndexExpression :: Expression SemanticAnns
 vector1IndexExpression = AccessObject (VectorIndexExpression vector1IndexFirstDym usizeIndex4 (objSemAnn Mutable Int64))

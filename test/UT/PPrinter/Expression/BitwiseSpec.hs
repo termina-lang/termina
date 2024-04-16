@@ -18,8 +18,8 @@ undynVar1 :: Expression SemanticAnns
 undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) (objSemAnn Mutable UInt16))
 
 constUInt8, constUInt16 :: Expression SemanticAnns
-constUInt8 = Constant (I UInt8 0x08) uint8SemAnn
-constUInt16 = Constant (I UInt16 1024) uint16SemAnn
+constUInt8 = Constant (I UInt8 (TInteger 0x08 HexRepr)) uint8SemAnn
+constUInt16 = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
 
 var0LeftShiftConstant :: Expression SemanticAnns
 var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16SemAnn
@@ -75,30 +75,30 @@ renderExpression expr =
 spec :: Spec
 spec = do
   describe "Pretty printing variable expression" $ do
-    it "Prints the expression: var0 << 8 : u8" $ do
+    it "Prints the expression: var0 << 0x8 : u8" $ do
       renderExpression var0LeftShiftConstant `shouldBe`
-        pack "var0 << 8"
-    it "Prints the expression: var1 << 8 : u8" $ do
+        pack "var0 << 0x8"
+    it "Prints the expression: var1 << 0x8 : u8" $ do
       renderExpression var1LeftShiftConstant `shouldBe`
-        pack "*(uint16_t *)var1.data << 8"
+        pack "*(uint16_t *)var1.data << 0x8"
     it "Prints the expression: 8 : u8 << var0" $ do
       renderExpression constantLeftShiftVar0 `shouldBe`
-        pack "8 << var0"
+        pack "0x8 << var0"
     it "Prints the expression: 8 : u8 << var1" $ do
       renderExpression constantLeftShiftVar1 `shouldBe`
-        pack "8 << *(uint16_t *)var1.data"
+        pack "0x8 << *(uint16_t *)var1.data"
     it "Prints the expression: var0 << var1 : u16" $ do
       renderExpression var0LeftShiftVar1 `shouldBe`
         pack "var0 << *(uint16_t *)var1.data"
-    it "Prints the expression: var0 << var1 << 8 : u8" $ do
+    it "Prints the expression: var0 << var1 << 0x8 : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 8"
-    it "Prints the expression: var0 >> 8 : u8" $ do
+        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 0x8"
+    it "Prints the expression: var0 >> 0x8 : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
-        pack "var0 >> 8"
-    it "Prints the expression: 1024 : u16 >> var0" $ do
+        pack "var0 >> 0x8"
+    it "Prints the expression: 0x8 >> var0" $ do
       renderExpression constantRightShiftVar0 `shouldBe`
-        pack "8 >> var0"
+        pack "0x8 >> var0"
     it "Prints the expression: var0 & 1024 : u16" $ do
       renderExpression var0BitwiseAndConstant `shouldBe`
         pack "var0 & 1024"

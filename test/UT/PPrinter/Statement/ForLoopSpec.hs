@@ -12,7 +12,7 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
 vector0 :: Object SemanticAnns
 vector0 = Variable "vector0" vectorAnn
@@ -28,13 +28,13 @@ forLoopBody :: [Statement SemanticAnns]
 forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
 
 breakCond :: Expression SemanticAnns
-breakCond = BinOp RelationalNotEqual i (Constant (I USize 5) uint32SemAnn) boolSemAnn
+breakCond = BinOp RelationalNotEqual i (Constant (I USize (TInteger 5 DecRepr)) uint32SemAnn) boolSemAnn
 
 forLoop0 :: Statement SemanticAnns
-forLoop0 = ForLoopStmt "i" USize (Constant (I USize 0) uint32SemAnn) (Constant (I USize 10) uint32SemAnn) Nothing forLoopBody undefined
+forLoop0 = ForLoopStmt "i" USize (Constant (I USize (TInteger 0 DecRepr)) uint32SemAnn) (Constant (I USize (TInteger 10 DecRepr)) uint32SemAnn) Nothing forLoopBody undefined
 
 forLoop1 :: Statement SemanticAnns
-forLoop1 = ForLoopStmt "i" USize (Constant (I USize 0) uint32SemAnn) (Constant (I USize 10) uint32SemAnn) (Just breakCond) forLoopBody undefined
+forLoop1 = ForLoopStmt "i" USize (Constant (I USize (TInteger 0 DecRepr)) uint32SemAnn) (Constant (I USize (TInteger 10 DecRepr)) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement stmt = 

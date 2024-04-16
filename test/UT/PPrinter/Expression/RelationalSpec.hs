@@ -11,7 +11,7 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 uint16Const1024 :: Expression SemanticAnns
-uint16Const1024 = Constant (I UInt16 1024) uint16SemAnn
+uint16Const1024 = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
 
 var0, var1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)

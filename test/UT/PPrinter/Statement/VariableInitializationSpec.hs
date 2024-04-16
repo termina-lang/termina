@@ -19,18 +19,18 @@ optionDynUInt32TS :: TypeSpecifier
 optionDynUInt32TS = Option (DynamicSubtype UInt32)
 
 vectorTS, vectorTMDescriptorTS, twoDimVectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (K 10)
-vectorTMDescriptorTS = Vector tmDescriptorTS (K 20)
-twoDimVectorTS = Vector (Vector Int64 (K 5)) (K 10)
+vectorTS = Vector UInt32 (K (TInteger 10 DecRepr))
+vectorTMDescriptorTS = Vector tmDescriptorTS (K (TInteger 20 DecRepr))
+twoDimVectorTS = Vector (Vector Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
-vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K 20)
-twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (K 5)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
+twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 vector0 :: Expression SemanticAnns
 vector0 = AccessObject (Variable "vector0" vectorAnn)
@@ -38,10 +38,10 @@ vector0 = AccessObject (Variable "vector0" vectorAnn)
 vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnns
 vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
 vector2 = Declaration "vector2" Mutable twoDimVectorTS (AccessObject (Variable "vector1" twoDymVectorAnn)) stmtSemAnn
-vector3 = Declaration "vector3" Mutable vectorTS (VectorInitExpression uint32Const0 (K 10) vectorAnn) stmtSemAnn
-vector4 = Declaration "vector4" Mutable twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (K 5) twoDymVectorRowAnn) (K 10) twoDymVectorAnn) stmtSemAnn
-vector5 = Declaration "vector5" Mutable twoDimVectorTS (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (K 10) twoDymVectorAnn) stmtSemAnn
-vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (K 10) vectorTMDescriptorAnn) stmtSemAnn
+vector3 = Declaration "vector3" Mutable vectorTS (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) stmtSemAnn
+vector4 = Declaration "vector4" Mutable twoDimVectorTS (VectorInitExpression (VectorInitExpression uint32Const0 (K (TInteger 5 DecRepr)) twoDymVectorRowAnn) (K (TInteger 10 DecRepr)) twoDymVectorAnn) stmtSemAnn
+vector5 = Declaration "vector5" Mutable twoDimVectorTS (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (K (TInteger 10 DecRepr)) twoDymVectorAnn) stmtSemAnn
+vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (VectorInitExpression tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnns
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -56,8 +56,8 @@ tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
 messageSemAnn = definedTypeSemAnn Mutable "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 0) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
+uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
+uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 4294901760 DecRepr)) uint32SemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -65,7 +65,7 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 =
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K 10) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns

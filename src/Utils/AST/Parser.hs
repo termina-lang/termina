@@ -24,7 +24,8 @@ groundTyEq  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = groundTyEq
 groundTyEq  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
 -- TODO: These are considered complex types and should be handled differently
-groundTyEq  (Vector typespecl (K sizel)) (Vector typespecr (K sizer)) = groundTyEq typespecl typespecr && sizel == sizer
+-- TODO: We are delaying the checking of the size of the vectors to a further stage
+groundTyEq  (Vector typespecl _sizel) (Vector typespecr _sizer) = groundTyEq typespecl typespecr
 groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
 groundTyEq  (Location tyspecl) (Location tyspecr) = groundTyEq tyspecl tyspecr
@@ -33,10 +34,10 @@ groundTyEq  tyspecl (Location tyspecr) = groundTyEq tyspecl tyspecr
 --
 groundTyEq  _ _ = False
 
-constExprEq :: ConstExpression -> ConstExpression -> Bool
-constExprEq (KC ((I tyspecl intl))) (KC ((I tyspecr intr))) = groundTyEq tyspecl tyspecr && intl == intr
-constExprEq (KC (B vall)) (KC (B valr)) = vall == valr
-constExprEq (KC (C charl)) (KC (C charr)) = charl == charr
+constExprEq :: ConstExpression a -> ConstExpression a -> Bool
+constExprEq (KC (I tyspecl intl) _) (KC (I tyspecr intr) _) = groundTyEq tyspecl tyspecr && intl == intr
+constExprEq (KC (B vall) _) (KC (B valr) _) = vall == valr
+constExprEq (KC (C charl) _) (KC (C charr) _) = charl == charr
 constExprEq _ _ = False
 
 -- Helper to detect invocations to 'self'

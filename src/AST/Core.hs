@@ -26,6 +26,12 @@ instance Annotated (ReturnStmt' expr) where
 instance HAnnotated ReturnStmt' where
   getHAnnotation = returnAnnotation
 
+data IntRepr = DecRepr | HexRepr | OctalRepr
+  deriving (Show, Eq, Ord)
+
+data TInteger = TInteger Integer IntRepr
+  deriving (Show, Eq, Ord)
+
 -- | |BlockRet| represent a body block with its return statement
 data BlockRet' expr obj a
   = BlockRet
@@ -40,6 +46,7 @@ data AnnASTElement' expr obj a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
+    [Parameter] -- ^ list of constant parameters (possibly empty)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
     (BlockRet' expr obj a) -- ^ statements block (with return)
@@ -57,7 +64,7 @@ data AnnASTElement' expr obj a =
   deriving (Show,Functor)
 
 instance Annotated (AnnASTElement' expr glb) where
-  getAnnotation (Function _ _ _ _ _ a) = a
+  getAnnotation (Function _ _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
@@ -74,22 +81,26 @@ instance Functor Module' where
 -- Since we are not implementing it right now, we only have constants.
 -- The idea is to eventually replace it by constant (at compilation time)
 -- expressions. We also annotate them for debbuging purposes.
-data ConstExpression
-  = KC Const -- ^ Literal const expression
-  | KV Identifier (Maybe Const) -- ^ Global constant? We keep the name for debugging process
-  deriving (Show)
+data ConstExpression a
+  = KC Const a -- ^ Literal const expression
+  | KV Identifier a -- ^ Identifier of a constant
+  deriving (Show, Functor)
+
+instance Annotated ConstExpression where
+  getAnnotation (KC _ a) = a
+  getAnnotation (KV _ a) = a
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier = Modifier Identifier (Maybe ConstExpression)
+data Modifier = Modifier Identifier (Maybe Const)
   deriving (Show)
 
 -- | Identifiers as `String`
 type Identifier = String
 
 -- | Addresses as `Integer`
-type Address = Integer
+type Address = TInteger
 
 -- | General type specifier
 data TypeSpecifier
@@ -123,8 +134,11 @@ data AccessKind = Immutable | Mutable | Private
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
   deriving (Show, Ord, Eq) 
 
-newtype Size = K Integer
- deriving (Show, Ord, Eq)
+data SizeBinOp = SAdd | SSub | SMul | SDiv 
+  deriving (Show, Ord, Eq)
+
+data Size = K TInteger | V Identifier | E SizeBinOp Size Size
+  deriving (Show, Ord, Eq) 
 
 data Op
   = Multiplication
@@ -201,7 +215,7 @@ data Global' expr a
     | Const
       Identifier -- ^ name of the constant
       TypeSpecifier -- ^ type of the constant
-      (expr a) -- ^ initialization expression
+      (ConstExpression a) -- ^ initialization expression
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
@@ -233,6 +247,7 @@ data InterfaceMember a
     -- | Procedure
     InterfaceProcedure
       Identifier -- ^ name of the procedure
+      [Parameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       a
   deriving (Show, Functor)
@@ -257,11 +272,13 @@ data ClassMember' expr obj a
     -- of statements. They do not return any value.
     | ClassProcedure
       Identifier -- ^ name of the procedure
+      [Parameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       (Block' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the viewer
+      [Parameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       TypeSpecifier -- ^ return type of the viewer
       (BlockRet' expr obj a) -- ^ statements block (with return) a
@@ -331,10 +348,10 @@ data Expression'
   | ReferenceExpression AccessKind (obj a) a
   | Casting (Expression' obj a) TypeSpecifier a
   -- Invocation expressions
-  | FunctionExpression Identifier [ Expression' obj a ] a
-  | MemberFunctionAccess (obj a) Identifier [Expression' obj a] a
+  | FunctionExpression Identifier [ConstExpression a] [ Expression' obj a ] a
+  | MemberFunctionAccess (obj a) Identifier [ConstExpression a] [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | DerefMemberFunctionAccess (obj a) Identifier [Expression' obj a] a
+  | DerefMemberFunctionAccess (obj a) Identifier [ConstExpression a] [Expression' obj a] a
   -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
@@ -368,13 +385,13 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (BinOp _ _ _ a)                          = a
   getAnnotation (ReferenceExpression _ _ a)              = a
   getAnnotation (Casting _ _ a)                          = a
-  getAnnotation (FunctionExpression _ _ a)               = a
+  getAnnotation (FunctionExpression _ _ _ a)               = a
   getAnnotation (FieldAssignmentsExpression _ _ a)       = a
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (VectorInitExpression _ _ a)             = a
   getAnnotation (OptionVariantExpression _ a)            = a
-  getAnnotation (MemberFunctionAccess _ _ _ a)           = a
-  getAnnotation (DerefMemberFunctionAccess _ _ _ a)      = a
+  getAnnotation (MemberFunctionAccess _ _ _ _ a)           = a
+  getAnnotation (DerefMemberFunctionAccess _ _ _ _ a)      = a
   getAnnotation (IsEnumVariantExpression _ _ _ a)        = a
   getAnnotation (IsOptionVariantExpression _ _ a)        = a
 
@@ -419,7 +436,7 @@ data Statement' expr obj a =
 -- - Booleans
 -- - Decimal integers
 -- - Characters
-data Const = B Bool | I TypeSpecifier Integer | C Char
+data Const = B Bool | I TypeSpecifier TInteger | C Char
   deriving (Show)
 
 ----------------------------------------

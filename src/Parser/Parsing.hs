@@ -21,6 +21,7 @@ import           Data.Functor
 import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
+import Data.Char
 
 {- | Type of the parsing annotations
 
@@ -175,24 +176,31 @@ reservedOp = Tok.reservedOp lexer
 identifierParser :: Parser String
 identifierParser = Tok.identifier lexer
 
-hexa :: Parser Integer
-hexa = char '0' >> Tok.hexadecimal lexer
-
 tails :: [a] -> [[a]]
 tails = L.tails
 
--- | Parser for natural numbers (positive integers + 0)
--- This parser is used solely when declaring a new vector to specify
--- its dimension, i.e. the parser checks that we specify the dimension
--- as a natural number.
-natural :: Parser Integer
-natural = Tok.natural lexer
+number :: Integer -> Parser Char -> Parser Integer
+number base baseDigit = do
+    digits <- many1 baseDigit
+    let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
+    seq n (return n)
 
--- | Parser for integer numbers
+sign :: Parser (Integer -> Integer)
+sign = (char '-' >> return negate)
+  <|> (char '+' >> return id)
+  <|> return id
+
+-- | Parser for integer decimal numbers
 -- This parser is used when defining regular integer literals
--- TODO: Change it to support Termina's hex format.
-integer :: Parser Integer
-integer = Tok.integer lexer
+decimal :: Parser Integer
+decimal =  Tok.lexeme lexer $ do
+  f <- Tok.lexeme lexer sign
+  n <- number 10 digit
+  return (f n)
+
+hexadecimal :: Parser Integer
+hexadecimal = Tok.lexeme lexer $
+  char '0' >> oneOf "xX" >> number 16 hexDigit
 
 ----------------------------------------
 -- Parser
@@ -236,6 +244,13 @@ parameterParser = do
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
+constParameterParser :: Parser Parameter
+constParameterParser = do
+  reserved "const"
+  identifier <- parameterIdentifierParser
+  reservedOp ":"
+  Parameter identifier <$> typeSpecifierParser
+
 -- | Parser for a field value assignments expression
 -- This expression is used to create annonymous structures to serve as right
 -- hand side of an assignment expression.
@@ -260,7 +275,7 @@ fieldAssignmentsExpressionParser = do
             identifier <- identifierParser
             _ <- reservedOp "@"
             p' <- getPosition
-            flip (FieldAddressAssignment identifier) (Position p') <$> hexa
+            flip (FieldAddressAssignment identifier) (Position p') <$> integerParser
       flAccessPortConnection = do
             identifier <- identifierParser
             _ <- reservedOp "<->"
@@ -292,9 +307,9 @@ modifierParser = do
   _ <- reservedOp "#"
   _ <- reservedOp "["
   identifier <- identifierParser
-  initializer <- optionMaybe (parens constExprParser')
+  initializer <- optionMaybe (parens constLiteralParser)
   _ <- reservedOp "]"
-  return $ Modifier identifier (KC <$> initializer)
+  return $ Modifier identifier initializer
 
 msgQueueParser :: Parser TypeSpecifier
 msgQueueParser = do
@@ -302,7 +317,7 @@ msgQueueParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- K <$> natural
+  size <- sizeParser
   _ <- reservedOp ">"
   return $ MsgQueue typeSpecifier size
 
@@ -312,7 +327,7 @@ poolParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- K <$> natural
+  size <- sizeParser
   _ <- reserved ">"
   return $ Pool typeSpecifier size
 
@@ -329,7 +344,7 @@ vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- K <$> natural
+  size <- sizeParser
   _ <- reserved "]"
   return $ Vector typeSpecifier size
 
@@ -412,6 +427,7 @@ functionCallParser :: Parser (Expression Annotation)
 functionCallParser =
   FunctionExpression
   <$> identifierParser
+  <*> (try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return [])
   <*> parens (sepBy (try expressionParser) comma)
   <*> (Position <$> getPosition)
 
@@ -489,7 +505,7 @@ referenceExprParser = do
   return $ ReferenceExpression Immutable object (Position p)
 
 expressionTermParser :: Parser (Expression Annotation)
-expressionTermParser = constExprParser
+expressionTermParser = try constantParser
   <|> try functionCallParser
   <|> try accessObjectParser
   <|> parensExprParser
@@ -553,9 +569,9 @@ objectParser = objectParser' objectTermParser
     vectorOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
-            low <- KC <$> constExprParser'
+            low <- constExprParser
             _ <- reservedOp ".."
-            up <- KC <$> constExprParser'
+            up <- constExprParser
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent ->  VectorSliceExpression parent low up (Position p)
@@ -593,9 +609,9 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
     vectorOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
-            low <- KC <$> constExprParser'
+            low <- constExprParser
             _ <- reservedOp ".."
-            up <- KC <$> constExprParser'
+            up <- constExprParser
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent -> case parent of
@@ -613,20 +629,22 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       _ <- reservedOp "->"
       p <- getPosition
       member <- identifierParser
+      constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionAccess obj member) (Position p)) params
+          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionAccess obj member constParams) (Position p))  params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."
       p <- getPosition
       member <- identifierParser
+      constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionAccess obj member) (Position p)) params
+          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionAccess obj member constParams) (Position p)) params
         _ -> error "Unexpected member access to a non object"))
     dereferencePrefix
       = Ex.Prefix (do
@@ -642,7 +660,7 @@ vectorInitParser = do
   p <- getPosition
   value <- expressionParser
   _ <- semi
-  size <- K <$> natural
+  size <- sizeParser
   _ <- reservedOp "]"
   return $ VectorInitExpression value size (Position p)
 
@@ -668,28 +686,44 @@ functionParser = do
   p <- getPosition
   reserved "function"
   name <- identifierParser
+  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
   blockRet <- braces blockParser
-  return $ Function name params typeSpec blockRet modifiers (Position p)
+  return $ Function name constParams params typeSpec blockRet modifiers (Position p)
 
-constExprParser' :: Parser Const
-constExprParser' = parseLitInteger <|> parseLitBool <|> parseLitChar
+constLiteralParser :: Parser Const
+constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
   where
     parseLitInteger =
       do
-        num <- integer
+        num <- integerParser
         reservedOp ":"
         ty <- typeSpecifierParser
         return (I ty num)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
 
-constExprParser :: Parser (Expression Annotation)
-constExprParser = flip Constant . Position  <$> getPosition <*> constExprParser'
-    -- parseLitString = S <$> stringLit
+constantParser :: Parser (Expression Annotation)
+constantParser = 
+  flip Constant . Position  <$> getPosition <*> constLiteralParser
+
+constExprParser :: Parser (ConstExpression Annotation)
+constExprParser = flip KC . Position <$> getPosition <*> constLiteralParser
+
+integerParser :: Parser TInteger
+integerParser = try hexParser <|> decParser
+  where
+    hexParser = flip TInteger HexRepr <$> hexadecimal
+    decParser = flip TInteger DecRepr <$> decimal
+
+sizeParser :: Parser Size
+sizeParser = constValueSizeParser <|> constSizeParser
+  where
+    constValueSizeParser = K <$> integerParser
+    constSizeParser = V <$> identifierParser
 
 mutableObjDeclarationParser :: Parser (Statement Annotation)
 mutableObjDeclarationParser = do
@@ -876,7 +910,7 @@ constDeclParser = do
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
   _ <- reservedOp "="
-  initializer <- expressionParser
+  initializer <- constExprParser
   _ <- semi
   return $ Const identifier typeSpecifier initializer modifiers (Position p)
 
@@ -945,12 +979,13 @@ classProcedureParser = do
   p <- getPosition
   reserved "procedure"
   name <- identifierParser
+  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
   reservedOp "{"
   block <- many blockItemParser
   emptyReturn
   reservedOp "}"
-  return $ ClassProcedure name params block (Position p)
+  return $ ClassProcedure name constParams params block (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -961,9 +996,10 @@ interfaceProcedureParser = do
   p <- getPosition
   reserved "procedure"
   name <- identifierParser
+  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
   reservedOp ";"
-  return $ InterfaceProcedure name params (Position p)
+  return $ InterfaceProcedure name constParams params (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -974,10 +1010,11 @@ classViewerParser = do
   p <- getPosition
   reserved "viewer"
   name <- identifierParser
+  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens viewerParamsParser
   typeSpec <- reservedOp "->" >> typeSpecifierParser
   blockRet <- braces blockParser
-  return $ ClassViewer name params typeSpec blockRet (Position p)
+  return $ ClassViewer name constParams params typeSpec blockRet (Position p)
   where
     viewerParamsParser :: Parser [Parameter]
     viewerParamsParser =
@@ -1045,7 +1082,7 @@ moduleIdentifierParser = sepBy1 firstCapital dot
 singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
 
-moduleInclusionParser :: Parser [ Module ]
+moduleInclusionParser :: Parser [Module]
 moduleInclusionParser = do
   reserved "import"
   modules <- braces (sepBy1 (wspcs *> singleModule <* wspcs) comma)

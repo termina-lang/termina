@@ -36,7 +36,7 @@ import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultin
 
 -- Constant expression could be global variables, should we check they are used
 -- too?
-useConstE :: ConstExpression -> UDM AnnotatedErrors ()
+useConstE :: ConstExpression a -> UDM AnnotatedErrors ()
 useConstE = const (return ())
 
 -- There are two types of arguments :
@@ -48,7 +48,7 @@ useArguments :: Expression SemanticAnns -> UDM AnnotatedErrors ()
 useArguments e@(AccessObject (Variable ident ann))
   = case getTypeSAnns ann of
      Just (DynamicSubtype _) ->
-       (SM.location ann) `annotateError` (useDynVar ident)
+       SM.location ann `annotateError` useDynVar ident
      _ -> useExpression e
 -- Dyn variables inside expressions are read as values.
 useArguments e = useExpression e
@@ -126,7 +126,7 @@ useExpression (IsEnumVariantExpression obj _ _ _)
   = useObject obj
 useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
-useExpression (MemberFunctionAccess obj ident args ann) = do
+useExpression (MemberFunctionAccess obj ident constArgs args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)
     case obj_type  of
@@ -155,7 +155,7 @@ useExpression (MemberFunctionAccess obj ident args ann) = do
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
-useExpression (DerefMemberFunctionAccess obj _ident args _ann)
+useExpression (DerefMemberFunctionAccess obj _ident constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
 useExpression (VectorInitExpression e _size _ann)
@@ -168,7 +168,7 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-useExpression (FunctionExpression ident args _ann)
+useExpression (FunctionExpression _ident constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = mapM_ useArguments args
 
@@ -333,13 +333,13 @@ useDefCMemb (ClassField fdef ann)
   = (SM.location ann) `annotateError` defVariable (fieldIdentifier fdef)
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
-useDefCMemb (ClassProcedure _ident ps blk ann)
+useDefCMemb (ClassProcedure _ident cps ps blk ann)
   = useDefBlock blk
-  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) ps
+  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) (cps ++ ps)
   -- >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
-useDefCMemb (ClassViewer _ident ps _tyret bret ann)
+useDefCMemb (ClassViewer _ident cps ps _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) (cps ++ ps)
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) [p]
@@ -364,9 +364,9 @@ useDefTypeDef (Enum {}) = return ()
 
 -- Globals
 useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
-useDefFrag (Function _ident ps _ty blk _mods anns)
+useDefFrag (Function _ident cps ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) ps
+ >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) (cps ++ ps)
  -- >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()

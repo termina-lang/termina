@@ -29,7 +29,6 @@ import           Utils.TypeSpecifier
 -- Monads
 import           Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import GHC.Base (build)
 
 type Locations = Parser.Annotation
 
@@ -55,7 +54,7 @@ instance Annotated SAnns where
 data ESeman
   = SimpleType TypeSpecifier
   | ObjectType AccessKind TypeSpecifier
-  | AppType [Parameter] TypeSpecifier
+  | AppType [Parameter] [Parameter] TypeSpecifier
   deriving Show
 
 newtype SemanProcedure = SemanProcedure Identifier
@@ -63,20 +62,20 @@ newtype SemanProcedure = SemanProcedure Identifier
 
 data ConnectionSeman =
     -- | Access port connection
-  APConnTy 
+  APConnTy
   -- | Type specifier of the connected resource
     TypeSpecifier
     -- | List of procedures that can be called on the connected resource
     [SemanProcedure]
   -- | Sink port connection
-  | SPConnTy
+  | SPConnTy
     -- | Type specifier of the connected event emitter
     TypeSpecifier
   -- | In port connection
-  | InPConnTy
+  | InPConnTy
     -- | Type specifier of the connected channel
     TypeSpecifier
-  | OutPConnTy
+  | OutPConnTy
     -- | Type specifier of the connected channel
     TypeSpecifier
   deriving Show
@@ -84,7 +83,7 @@ data ConnectionSeman =
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
-  = 
+  =
   -- | Expressions with their types
   ETy ESeman
   -- | Statements with no types
@@ -101,15 +100,15 @@ getEType (ETy t) = Just t
 getEType _ = Nothing
 
 getResultingType :: SemanticElems -> Maybe TypeSpecifier
-getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ t -> t})
+getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ _ t -> t})
 getResultingType _        = Nothing
 
 getObjectSAnns :: SemanticAnns -> Maybe (AccessKind, TypeSpecifier)
 getObjectSAnns (SemAnn _ (ETy (ObjectType ak ty))) = Just (ak, ty)
 getObjectSAnns _                                   = Nothing
 
-getArgumentsType :: SemanticElems -> Maybe [Parameter]
-getArgumentsType (ETy (AppType ts _)) = Just ts
+getArgumentsType :: SemanticElems -> Maybe ([Parameter], [Parameter])
+getArgumentsType (ETy (AppType pts ts _)) = Just (pts, ts)
 getArgumentsType _                    = Nothing
 
 isResultFromApp :: SemanticElems -> Bool
@@ -126,8 +125,8 @@ buildExpAnn loc = SemAnn loc . ETy . SimpleType
 buildExpAnnObj :: Locations -> AccessKind -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnnObj loc ak = SemAnn loc . ETy . ObjectType ak
 
-buildExpAnnApp :: Locations -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnnApp loc tys = SemAnn loc . ETy . AppType tys
+buildExpAnnApp :: Locations -> [Parameter] -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnnApp loc ctys tys = SemAnn loc . ETy . AppType ctys tys
 
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
@@ -165,7 +164,7 @@ getTypeSAnns  = getResultingType . ty_ann
 undynExpType :: ESeman -> ESeman
 undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
 undynExpType (ObjectType ak (DynamicSubtype ty)) = ObjectType ak ty
-undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
+undynExpType (AppType cts ts (DynamicSubtype ty)) = AppType cts ts ty
 undynExpType _ = error "impossible 888+1"
 
 undynTypeAnn :: SemanticAnns -> SemanticAnns
@@ -180,8 +179,8 @@ type GlobalEnv = Map Identifier (SAnns (GEntry SemanticAnns))
 -- | Local env
 -- variables to their type
 type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
--- | Read Only Environment.
-type ROEnv = Map Identifier (AccessKind, TypeSpecifier)
+-- | Constants Environment.
+type ConstEnv = Map Identifier TypeSpecifier
 -- This may seem a bad decision, but each envornment represent something
 -- different.
 -- TODO We can use empty types to disable envirnoments and make Haskell do part
@@ -192,8 +191,12 @@ data ExpressionState
  = ExprST
  { global :: GlobalEnv
  , local  :: LocalEnv
- , ro     :: ROEnv
+ , consts :: ConstEnv
  }
+
+data EnvKind =
+  LocalKind AccessKind | ConstKind | GlobalKind
+  deriving Show
 
  -- | This is the initial global environment.
  -- This is a temporary solution until we figure out how to manage the
@@ -211,8 +214,8 @@ initGlb =
    ("SystemInit", internalErrorSeman `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
    ("system_init", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
    ("PeriodicTimer", internalErrorSeman `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn internalErrorSeman (DefinedType "TimeVal"))] [] [])),
-   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
-   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
+   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [] [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
+   ("delay_in",internalErrorSeman `SemAnn` GFun [] [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
   -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
   --  ("Result", GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" [UInt32]] [])),
   --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
@@ -278,11 +281,11 @@ getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
   Enum _ fs _mods -> return fs
   ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
-getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier)
+getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter], [Parameter],TypeSpecifier)
 getFunctionTy loc iden =
   catchError (getGlobalGEnTy loc iden ) (\_ -> throwError $ annotateError loc (ENotAFun iden))
   >>= \case
-  GFun args retty -> return (args, retty)
+  GFun constArgs args retty -> return (constArgs, args, retty)
   ge -> throwError $ annotateError loc (ENotFoundFun iden (fmap forgetSemAnn ge))
 
 
@@ -305,14 +308,24 @@ insertLocalMutObj loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident (Mutable, ty) (local s)})
 
-insertROImmObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
-insertROImmObj loc ident ty =
+-- | Insert immutable object (variable) in local scope.
+insertLocalImmutObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
+insertLocalImmutObj loc ident ty =
   isDefined ident
   >>= \b -> if b
   then -- | if there is throw error
   throwError $ annotateError loc $ EVarDefined ident
   else -- | If there is no variable named |ident|
-  modify (\s -> s{ro = M.insert ident (Immutable, ty) (ro s)})
+  modify (\s -> s{local = M.insert ident (Immutable, ty) (local s)})
+
+insertConstObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
+insertConstObj loc ident ty =
+  isDefined ident
+  >>= \b -> if b
+  then -- | if there is throw error
+  throwError $ annotateError loc $ EVarDefined ident
+  else -- | If there is no variable named |ident|
+  modify (\s -> s{consts = M.insert ident ty (consts s)})
 
 insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
@@ -320,9 +333,9 @@ insertGlobalTy loc tydef =
  where
    type_name = identifierType tydef
 
-insertGlobalFun :: Locations -> Identifier -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
-insertGlobalFun loc ident ps rettype =
-  insertGlobal ident (loc `SemAnn` GFun ps rettype) (EUsedFunName ident)
+insertGlobalFun :: Locations -> Identifier -> [Parameter] -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
+insertGlobalFun loc ident cps ps rettype =
+  insertGlobal ident (loc `SemAnn` GFun cps ps rettype) (EUsedFunName ident)
 
 insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Locations -> Errors Locations) -> SemanticMonad ()
 insertGlobal ident entry err =
@@ -335,7 +348,9 @@ insertGlobal ident entry err =
   -- else
 
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
-insertLocalVariables loc = mapM_ (uncurry (insertROImmObj loc))
+insertLocalVariables loc = mapM_ (\case
+  (ident, ty@(DynamicSubtype _)) -> insertLocalMutObj loc ident ty;
+  (ident, ty) -> insertLocalImmutObj loc ident ty)
 
 -- | Get the type of a local (already) defined object. If it is not defined throw an error.
 getLocalObjTy :: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
@@ -348,13 +363,13 @@ getLocalObjTy loc ident =
     return . M.lookup ident =<< gets local
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
-getROObjTy :: Locations -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
-getROObjTy loc ident =
+getConstTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
+getConstTy loc ident =
   maybe
     -- | if |ident| is not a member throw error |ENotNamedObject|
     (throwError $ annotateError loc (ENotNamedObject ident))
     -- | if |ident| is a member return its type
-    return . M.lookup ident =<< gets ro
+    return . M.lookup ident =<< gets consts
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)
@@ -364,19 +379,18 @@ getGlobalGEnTy loc ident =
   >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) (return . ty_ann) . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
-getLHSVarTy, getRHSVarTy, getGlobalVarTy :: 
-  Locations 
-  -> Identifier 
-  -> SemanticMonad (AccessKind, TypeSpecifier)
+getLHSVarTy, getRHSVarTy, getGlobalVarTy ::
+  Locations
+  -> Identifier
+  -> SemanticMonad (EnvKind, TypeSpecifier)
 getLHSVarTy loc ident =
   -- | Try first local environment
-  catchError
-    (getLocalObjTy loc ident)
+  catchError (getLocalObjTy loc ident >>= (\(ak, ts) -> return (LocalKind ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case semError errorLocal of {
         ENotNamedObject _ ->
-          catchError (getROObjTy loc ident)
+          catchError (getConstTy loc ident)
           (\errorRO ->
             case semError errorRO of {
               ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
@@ -401,12 +415,12 @@ getLHSVarTy loc ident =
 getRHSVarTy loc ident =
   -- | Try first local environment
   catchError
-    (getLocalObjTy loc ident)
+    (getLocalObjTy loc ident >>= (\(ak, ts) -> return (LocalKind ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case semError errorLocal of {
         ENotNamedObject _ ->
-          catchError (getROObjTy loc ident)
+          catchError (getConstTy loc ident >>= (\ts -> return (ConstKind, ts)))
           (\errorRO ->
             case semError errorRO of {
               ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
@@ -440,7 +454,7 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        GGlob (SResource ts)  -> return (Immutable, ts);
+                        GGlob (SResource ts)  -> return (GlobalKind, ts);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 
@@ -462,7 +476,7 @@ isDefined :: Identifier -> SemanticMonad Bool
 isDefined ident =
   get >>= return . (\st -> isDefinedIn ident (global st)
                             || isDefinedIn ident (local st)
-                            || isDefinedIn ident (ro st))
+                            || isDefinedIn ident (consts st))
 
 -------------
 -- Type |Type| helpers!
@@ -499,7 +513,7 @@ blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   (void . sameOrErr (location ann) ty) (getResultingType (ty_ann ann))
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
-getIntConst _ (I _ i) = return i
+getIntConst _ (I _ (TInteger i _)) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
 -- Helper function failing if a given |TypeSpecifier| is not *simple* |simpleType|.
@@ -517,6 +531,10 @@ classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateErr
 -- Note that we do not change the |TypeSpecifier| in any way, that's why this
 -- function return |()|.
 
+checkSize :: Locations -> Size -> SemanticMonad ()
+checkSize loc (CAST.K s) = checkIntConstant loc USize s
+checkSize loc (CAST.V ident) = getConstTy loc ident >>= sameOrErr loc USize >> return ()
+
 checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
@@ -529,6 +547,12 @@ checkTypeDefinition loc (Vector ty (CAST.K s)) =
   -- Numeric contast
   checkIntConstant loc USize s >>
   --
+  checkTypeDefinition loc ty
+checkTypeDefinition loc (Vector ty (CAST.V ident)) =
+  -- Only arrays of simple types.
+  simpleTyorFail loc ty >>
+  getConstTy loc ident >>=
+  sameOrErr loc USize >>
   checkTypeDefinition loc ty
 checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
 checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
@@ -634,15 +658,20 @@ runTypeChecking initSt = flip ST.runState initSt . runExceptT
 -- Here we have that syntact constant expressions are quite right, but we want
 -- to check that integers are correct.
 checkConstant :: Locations -> Const -> SemanticMonad Const
-checkConstant loc t@(I type_c c) =
+checkConstant loc t@(I type_c ti) =
   -- |type_c| is correct
   checkTypeDefinition loc type_c >>
-  checkIntConstant loc type_c c >>
+  checkIntConstant loc type_c ti >>
   return t
 checkConstant _ t = pure t
 
-checkIntConstant :: Locations -> TypeSpecifier -> Integer -> SemanticMonad ()
-checkIntConstant loc tyI i =
+checkIntConstant :: Locations -> TypeSpecifier -> TInteger -> SemanticMonad ()
+checkIntConstant loc tyI ti@(TInteger i _) =
   if memberIntCons i tyI
   then return ()
-  else throwError $ annotateError loc (EConstantOutRange (I tyI i))
+  else throwError $ annotateError loc (EConstantOutRange (I tyI ti))
+
+buildSize :: ConstExpression SemanticAnns -> SemanticMonad Size
+buildSize (KC (I _ ti) _) = return (SAST.K ti)
+buildSize (KV ident _) = return (SAST.V ident)
+buildSize (KC c _) = throwError $ annotateError internalErrorSeman $ ENotIntConst c

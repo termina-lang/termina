@@ -61,23 +61,24 @@ genArrayInitialization ::
     -> CSourceGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
-        (VectorInitExpression expr' (K s) ann) -> do
+        (VectorInitExpression expr' size ann) -> do
+            cSize <- genArraySize size ann
             let iterator = namefy $ "i" ++ show level
                 exprCAnn = buildGenericAnn ann
                 initExpr = Right $ CDeclaration
                     [CTypeSpec CSizeTType]
                     [(Just (CDeclarator (Just iterator) [] [] exprCAnn),
-                      Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn),
+                      Just (CInitExpr (CConst (CIntConst (CInteger 0 CDecRepr)) exprCAnn) exprCAnn),
                       Nothing)]
                     (buildDeclarationAnn ann False)
-                condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger s DecRepr)) exprCAnn) exprCAnn
-                incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn) exprCAnn) exprCAnn
+                condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) cSize exprCAnn
+                incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 CDecRepr)) exprCAnn) exprCAnn) exprCAnn
             arrayInit <- genArrayInitialization False (level + 1) (CIndex cObj (CVar iterator exprCAnn) exprCAnn) expr'
             return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann before)]
         (FieldAssignmentsExpression {}) -> genStructInitialization False level cObj expr
         (OptionVariantExpression {}) -> genOptionInitialization False level cObj expr
         (EnumVariantExpression {}) -> genEnumInitialization False level cObj expr
-        (FunctionExpression _ _ ann) -> do
+        (FunctionExpression _ _ _ ann) -> do
             exprType <- getExprType expr
             structName <- genArrayWrapStructName exprType
             cExpr <- genExpression expr
@@ -108,10 +109,11 @@ genArrayInitialization before level cObj expr = do
                         exprCAnn = buildGenericAnn ann
                         initExpr = Right $ CDeclaration
                             [CTypeSpec CSizeTType]
-                            [(Just (CDeclarator (Just iterator) [] [] exprCAnn), Just (CInitExpr (CConst (CIntConst (CInteger 0 DecRepr)) exprCAnn) exprCAnn), Nothing)]
+                            [(Just (CDeclarator (Just iterator) [] [] exprCAnn), Just (CInitExpr (CConst (CIntConst (CInteger 0 CDecRepr)) exprCAnn) exprCAnn), Nothing)]
                             (buildDeclarationAnn ann False)
-                        condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger s DecRepr)) exprCAnn) exprCAnn
-                        incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn) exprCAnn) exprCAnn
+                        cSize = genInteger s
+                        condExpr = Just $ CBinary CLeOp (CVar iterator exprCAnn) (CConst (CIntConst cSize) exprCAnn) exprCAnn
+                        incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 CDecRepr)) exprCAnn) exprCAnn) exprCAnn
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndex cObj' (CVar iterator exprCAnn) exprCAnn) (CIndex cExpr (CVar iterator exprCAnn) exprCAnn) ts' ann
                     return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann (before && lvl == 0))]
                 _ -> return [CExpr (Just (CAssignment cObj' cExpr (buildGenericAnn ann))) (buildStatementAnn ann (before && lvl == 0))]
@@ -184,11 +186,12 @@ genStructInitialization before level cObj expr =
             genFieldAssignments before' (FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))):xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
+                    cAddress = genInteger addr
                 decl <- genCastDeclaration ts ann
                 rest <- genFieldAssignments False xs
                 return $ CExpr (Just $ CAssignment (
                                 CMember cObj field False exprCAnn
-                            ) (CCast decl (CConst (CIntConst (CInteger addr DecRepr)) exprCAnn) exprCAnn) exprCAnn) declStmtAnn : rest
+                            ) (CCast decl (CConst (CIntConst cAddress) exprCAnn) exprCAnn) exprCAnn) declStmtAnn : rest
             genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel _ : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
@@ -225,7 +228,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
     case objType of
         Vector _ _ ->
             case expr of
-                (FunctionExpression _ _ ann) -> do
+                (FunctionExpression _ _ _ ann) -> do
                     exprType <- getExprType expr
                     structName <- genArrayWrapStructName exprType
                     cExpr <- genExpression expr
@@ -253,7 +256,7 @@ genBlockItem (Declaration identifier _ ts expr ann) =
   case ts of
     Vector _ _ -> do
         let declStmt = buildDeclarationAnn ann True
-            arrayDecl = genArraySizeDeclarator ts ann
+        arrayDecl <- genArraySizeDeclarator ts ann
         arrayInitialization <- fmap CBlockStmt <$> genArrayInitialization False 0 (CVar identifier exprCAnn) expr
         decls <- genDeclSpecifiers ts
         return $
@@ -333,7 +336,7 @@ genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body 
             (Just $ CAssignment (CVar iterator exprCAnn)
                 (CBinary CAddOp
                     (CVar iterator exprCAnn)
-                    (CConst (CIntConst (CInteger 1 DecRepr)) exprCAnn)
+                    (CConst (CIntConst (CInteger 1 CDecRepr)) exprCAnn)
                     exprCAnn)
                 exprCAnn)
             -- | Body

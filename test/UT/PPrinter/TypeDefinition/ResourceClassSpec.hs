@@ -15,7 +15,7 @@ import Generator.Common
 
 classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnns
 classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
-    ClassProcedure "procedure0" [
+    ClassProcedure "procedure0" [] [
       Parameter "param0" UInt8,
       Parameter "param1" UInt16,
       Parameter "param2" UInt32,
@@ -29,35 +29,35 @@ classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0
 
 classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnns
 classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
-    ClassProcedure "procedure0" [
+    ClassProcedure "procedure0" [] [
       Parameter "param0" UInt8,
       Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
     ] [] undefined,
-    ClassProcedure "procedure1" [
+    ClassProcedure "procedure1" [] [
       Parameter "param0" UInt8,
-      Parameter "param1" (Reference Mutable (Vector UInt8 (K 32)))
+      Parameter "param1" (Reference Mutable (Vector UInt8 (K (TInteger 32 DecRepr))))
     ] [] undefined
   ] ["Interface0"] []) undefined
 
 noHandlerClassWithoutOneProcedureAndZeroFields :: AnnASTElement SemanticAnns
 noHandlerClassWithoutOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
-    ClassProcedure "procedure0" [] [] undefined
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] []) undefined
 
 classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnns
 classWithOneProcedureAndTwoFields = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
-    ClassField (FieldDefinition "field1" (Vector UInt64 (K 24))) undefined,
-    ClassProcedure "procedure0" [] [] undefined
+    ClassField (FieldDefinition "field1" (Vector UInt64 (K (TInteger 24 DecRepr)))) undefined,
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] []) undefined
 
 noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnns
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
-    ClassField (FieldDefinition "field1" (Vector UInt64 (K 24))) undefined,
-    ClassProcedure "procedure0" [] [] undefined
+    ClassField (FieldDefinition "field1" (Vector UInt64 (K (TInteger 24 DecRepr)))) undefined,
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] [Modifier "no_handler" Nothing]) undefined
 
 packedClass :: AnnASTElement SemanticAnns
@@ -65,10 +65,10 @@ packedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" UInt16) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
-    ClassProcedure "procedure0" [
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassProcedure "procedure0" [] [
       Parameter "param0" Char,
-      Parameter "param1" (Reference Mutable (Vector UInt8 (K 16)))
+      Parameter "param1" (Reference Mutable (Vector UInt8 (K (TInteger 16 DecRepr))))
     ] [] undefined
   ] ["Interface0"] [Modifier "packed" Nothing]) undefined
 
@@ -77,20 +77,20 @@ alignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" UInt16) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
-    ClassProcedure "procedure0" [] [] undefined
-  ] ["Interface0"] [Modifier "aligned" (Just (KC (I UInt32 16)))]) undefined
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassProcedure "procedure0" [] [] [] undefined
+  ] ["Interface0"] [Modifier "aligned" (Just (I UInt32 (TInteger 16 DecRepr)))]) undefined
 
 packedAndAlignedClass :: AnnASTElement SemanticAnns
 packedAndAlignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
     ClassField (FieldDefinition "field1" (DefinedType "TCDescriptor")) undefined,
-    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K 32))) undefined,
-    ClassProcedure "procedure0" [] [] undefined
+    ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] [
       Modifier "packed" Nothing,
-      Modifier "aligned" (Just (KC (I UInt32 16)))
+      Modifier "aligned" (Just (I UInt32 (TInteger 16 DecRepr)))
     ]) undefined
 
 classWithFixedLocationField :: AnnASTElement SemanticAnns
@@ -98,7 +98,7 @@ classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt32) undefined,
     ClassField (FieldDefinition "field1" (Location UInt32)) undefined,
-    ClassProcedure "procedure0" [] [] undefined
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] []) undefined
 
 classWithAccessPortField :: AnnASTElement SemanticAnns
@@ -106,7 +106,7 @@ classWithAccessPortField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt32) undefined,
     ClassField (FieldDefinition "field1" (AccessPort (DefinedType "Interface1"))) undefined,
-    ClassProcedure "procedure0" [] [] undefined
+    ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] []) undefined
 
 renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text

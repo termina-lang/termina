@@ -11,14 +11,14 @@ import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
 vectorAnn, dynVectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
-dynVectorAnn = dynVectorSemAnn UInt32 (K 10)
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K 5) (K 10)
-dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (K 5) (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+dynVectorAnn = dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
+twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
-refVectorAnn = refVectorSemAnn UInt32 (K 10)
-refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (K 5) (K 10)
+refVectorAnn = refVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
+refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)

@@ -14,8 +14,8 @@ import Modules.Modules
 
 test0 :: String
 test0 = "function assignment_test0() {\n" ++
-        "    var foo0 : u32 = 0 : u32;\n" ++
-        "    var foo1 : u32 = 0 : u32;\n" ++
+        "    var foo0 : u32 = 0:u32;\n" ++
+        "    var foo1 : u32 = 0:u32;\n" ++
         "    foo1 = foo0;\n" ++
         "    return;\n" ++
         "}"

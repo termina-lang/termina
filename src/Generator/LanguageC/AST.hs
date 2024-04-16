@@ -3,6 +3,7 @@
 module Generator.LanguageC.AST where
 import Prettyprinter
 import Semantic.Monad
+import Numeric
 
 type Ident = String
 
@@ -279,7 +280,7 @@ instance Show CIntFlag where
     show FlagLongLong = "LL"
     show FlagImag = "i"
 
-data CIntRepr = DecRepr | HexRepr | OctalRepr
+data CIntRepr = CDecRepr | CHexRepr | COctalRepr
   deriving (Show, Eq,Ord)
 
 data CInteger = CInteger
@@ -288,9 +289,9 @@ data CInteger = CInteger
                  deriving (Show, Eq,Ord)
 
 instance Pretty CInteger where
-  pretty (CInteger i DecRepr) = pretty i
-  pretty (CInteger i HexRepr) = pretty "0x" <> pretty i
-  pretty (CInteger i OctalRepr) = pretty "0" <> pretty i
+  pretty (CInteger i CDecRepr) = pretty i
+  pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (showHex i "")
+  pretty (CInteger i COctalRepr) = pretty "0" <> pretty (showOct i "")
 
 -- | C char constants (abstract)
 data CChar = CChar

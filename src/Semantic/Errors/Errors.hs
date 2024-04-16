@@ -84,8 +84,8 @@ data Errors a
   | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
   -- | Global Object but not a type
   | EGlobalNoType Identifier
-  -- | Vectors with dynamic length
-  | EVectorConst ConstExpression
+  -- | Vector with malformed size 
+  | EVectorConst Size
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -134,6 +134,8 @@ data Errors a
   | EUsedFunName Identifier a
   -- | Error getting type of expressions of objects.
   | EUnboxingObjectExpr
+  | EUnboxingConstExpr
+  | EUnboxingLocalEnvKind
   -- | Expected Simple Type
   | EExpectedSimple TypeSpecifier
   -- | Invalid class field type
@@ -206,8 +208,8 @@ data Errors a
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
   -- | Vector slicing
-  | ELowerBoundConst ConstExpression -- | Lower bound is not a numeric constant expression
-  | EUpperBoundConst ConstExpression -- | Upper bound is not a numeric constant expression
+  | ELowerBoundConst (ConstExpression a) -- | Lower bound is not a numeric constant expression
+  | EUpperBoundConst (ConstExpression a) -- | Upper bound is not a numeric constant expression
   | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type
   | EBoundsTypeNotUSize TypeSpecifier TypeSpecifier -- | Bounds are not of of type usize
   | EBoundsLowerGTUpper Integer Integer -- | Lower bound is greater than upper bound

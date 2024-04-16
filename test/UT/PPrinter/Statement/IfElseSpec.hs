@@ -15,13 +15,13 @@ optionDynUInt32TS :: TypeSpecifier
 optionDynUInt32TS = Option (DynamicSubtype UInt32)
 
 vectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (K 10)
+vectorTS = Vector UInt32 (K (TInteger 10 DecRepr))
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
 vectorAnn :: SemanticAnns
-vectorAnn = vectorSemAnn Mutable UInt32 (K 10)
+vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
 vector0 :: Expression SemanticAnns
 vector0 = AccessObject (Variable "vector0" vectorAnn)
@@ -33,8 +33,8 @@ foo0 :: Expression SemanticAnns
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 0) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 4294901760) uint32SemAnn
+uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
+uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 4294901760 DecRepr)) uint32SemAnn
 
 constToFoo0 :: Statement SemanticAnns
 constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn

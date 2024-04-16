@@ -14,7 +14,7 @@ import Generator.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnns
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
-    InterfaceProcedure "procedure0" [
+    InterfaceProcedure "procedure0" [] [
       Parameter "param0" UInt8,
       Parameter "param1" UInt16,
       Parameter "param2" UInt32,
