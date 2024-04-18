@@ -16,15 +16,15 @@ test0 :: String
 test0 = "function test0() {\n" ++
         "    var foo : u16 = 0 : u16;\n" ++
         "    foo = foo + 1024 : u16;\n" ++
-        "    1024 : u16 + foo;\n" ++
+        "    foo = 1024 : u16 + foo;\n" ++
         "    foo = foo - 1024 : u16;\n" ++
-        "    1024 : u16 - foo;\n" ++
+        "    foo = 1024 : u16 - foo;\n" ++
         "    foo = foo * 1024 : u16;\n" ++
-        "    1024 : u16 * foo;\n" ++
+        "    foo = 1024 : u16 * foo;\n" ++
         "    foo = foo / 1024 : u16;\n" ++
-        "    1024 : u16 / foo;\n" ++
+        "    foo = 1024 : u16 / foo;\n" ++
         "    foo = foo % 1024 : u16;\n" ++
-        "    1024 : u16 % foo;\n" ++
+        "    foo = 1024 : u16 % foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -32,15 +32,15 @@ test1 :: String
 test1 = "resource class id0 {\n" ++
         "    procedure test1(&priv self, foo : dyn u16) {\n" ++
         "        foo = foo + 1024 : u16;\n" ++
-        "        1024 : u16 + foo;\n" ++
+        "        foo = 1024 : u16 + foo;\n" ++
         "        foo = foo - 1024 : u16;\n" ++
-        "        1024 : u16 - foo;\n" ++
+        "        foo = 1024 : u16 - foo;\n" ++
         "        foo = foo * 1024 : u16;\n" ++
-        "        1024 : u16 * foo;\n" ++
+        "        foo = 1024 : u16 * foo;\n" ++
         "        foo = foo / 1024 : u16;\n" ++
-        "        1024 : u16 / foo;\n" ++
+        "        foo = 1024 : u16 / foo;\n" ++
         "        foo = foo % 1024 : u16;\n" ++
-        "        1024 : u16 % foo;\n" ++
+        "        foo = 1024 : u16 % foo;\n" ++
         "        return;\n" ++
         "    }\n" ++
         "};"
@@ -91,23 +91,23 @@ spec = do
               "\n" ++
               "    foo = foo + 1024;\n" ++
               "\n" ++
-              "    1024 + foo;\n" ++ 
+              "    foo = 1024 + foo;\n" ++ 
               "\n" ++
               "    foo = foo - 1024;\n" ++ 
               "\n" ++
-              "    1024 - foo;\n" ++
+              "    foo = 1024 - foo;\n" ++
               "\n" ++
               "    foo = foo * 1024;\n" ++
               "\n" ++
-              "    1024 * foo;\n" ++
+              "    foo = 1024 * foo;\n" ++
               "\n" ++
               "    foo = foo / 1024;\n" ++
               "\n" ++
-              "    1024 / foo;\n" ++
+              "    foo = 1024 / foo;\n" ++
               "\n" ++
               "    foo = foo % 1024;\n" ++
               "\n" ++
-              "    1024 % foo;\n" ++
+              "    foo = 1024 % foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -139,23 +139,23 @@ spec = do
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024;\n" ++
              "\n" ++
-             "    1024 + *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024 + *(uint16_t *)foo.data;\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data - 1024;\n" ++
              "\n" ++
-             "    1024 - *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024 - *(uint16_t *)foo.data;\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data * 1024;\n" ++
              "\n" ++
-             "    1024 * *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024 * *(uint16_t *)foo.data;\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data / 1024;\n" ++
              "\n" ++
-             "    1024 / *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024 / *(uint16_t *)foo.data;\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024;\n" ++
              "\n" ++
-             "    1024 % *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024 % *(uint16_t *)foo.data;\n" ++
              "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++
              "\n" ++

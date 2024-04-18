@@ -56,8 +56,8 @@ tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
 messageSemAnn = definedTypeSemAnn Mutable "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 4294901760 DecRepr)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA

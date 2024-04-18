@@ -484,11 +484,9 @@ isDefined ident =
 sameNumTy :: TypeSpecifier -> TypeSpecifier -> Bool
 sameNumTy a b = groundTyEq a b && numTy a
 
-sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad TypeSpecifier
+sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad ()
 sameOrErr loc t1 t2 =
-  if groundTyEq t1 t2
-  then return t1
-  else throwError $ annotateError loc $ EMismatch t1 t2
+  unless (groundTyEq t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
 unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
 unDyn t = Undyn t (undynTypeAnn (getAnnotation t))
@@ -513,7 +511,7 @@ blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   (void . sameOrErr (location ann) ty) (getResultingType (ty_ann ann))
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
-getIntConst _ (I _ (TInteger i _)) = return i
+getIntConst _ (I (TInteger i _) _) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
 -- Helper function failing if a given |TypeSpecifier| is not *simple* |simpleType|.
@@ -655,23 +653,31 @@ runTypeChecking
 runTypeChecking initSt = flip ST.runState initSt . runExceptT
 
 -- | Function checking that constant expressions are correct.
--- Here we have that syntact constant expressions are quite right, but we want
--- to check that integers are correct.
-checkConstant :: Locations -> Const -> SemanticMonad Const
-checkConstant loc t@(I type_c ti) =
+-- When checking a constant we have an expected type and, optionally,
+-- an explicit type attached to the constant definition.
+checkConstant :: Locations -> TypeSpecifier -> Const -> SemanticMonad ()
+checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTypeDefinition loc type_c >>
-  checkIntConstant loc type_c ti >>
-  return t
-checkConstant _ t = pure t
+  -- | Check that the explicit type matches the expected type
+  sameOrErr loc expected_type type_c >>
+  -- | Check that the constant is in the range of the type
+  checkIntConstant loc type_c ti
+checkConstant loc expected_type (I ti Nothing) =
+  -- | Check that the constant is in the range of the type
+  checkIntConstant loc expected_type ti
+checkConstant loc expected_type (B {}) =
+  sameOrErr loc expected_type Bool
+checkConstant loc expected_type (C {}) =
+  sameOrErr loc expected_type Char
 
 checkIntConstant :: Locations -> TypeSpecifier -> TInteger -> SemanticMonad ()
 checkIntConstant loc tyI ti@(TInteger i _) =
   if memberIntCons i tyI
   then return ()
-  else throwError $ annotateError loc (EConstantOutRange (I tyI ti))
+  else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
 
 buildSize :: ConstExpression SemanticAnns -> SemanticMonad Size
-buildSize (KC (I _ ti) _) = return (SAST.K ti)
+buildSize (KC (I ti _) _) = return (SAST.K ti)
 buildSize (KV ident _) = return (SAST.V ident)
 buildSize (KC c _) = throwError $ annotateError internalErrorSeman $ ENotIntConst c

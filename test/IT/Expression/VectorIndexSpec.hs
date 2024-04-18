@@ -14,12 +14,12 @@ import Modules.Modules
 
 test0 :: String
 test0 = "function vector_test0() {\n" ++
-        "    var foo : usize = 0 : usize;\n" ++
-        "    var vector0 : [u32; 10] = [0 : u32; 10];\n" ++
-        "    var vector1 : [[i64; 5]; 10] = [[0 : i64; 5]; 10];\n" ++
+        "    var foo : usize = 0;\n" ++
+        "    var vector0 : [u32; 10 : usize] = [0 : u32; 10 : usize];\n" ++
+        "    var vector1 : [[i64; 5]; 10] = [[0; 5 : usize]; 10];\n" ++
         "    vector0[3 : usize] = 10 : u32;\n" ++
         "    vector0[foo] = 1024 : u32;\n" ++
-        "    vector1[3 : usize][4 : usize] = 1024 : i64;\n" ++
+        "    vector1[3][4] = 1024;\n" ++
         "    return;\n" ++
         "}"
 

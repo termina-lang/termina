@@ -14,12 +14,12 @@ import Modules.Modules
 
 test0 :: String
 test0 = "function func_test0_0(a : u16) -> u16 {\n" ++
-        "    return (a + (1 : u16));\n" ++
+        "    return a + 1;\n" ++
         "}\n" ++
         "\n" ++
         "function func_test0_1(a : u16) -> u16 {\n" ++
-        "    var foo : u16 = func_test0_0(2 : u16);\n" ++
-        "    return (foo * (2 : u16));\n" ++
+        "    var foo : u16 = func_test0_0(2);\n" ++
+        "    return foo * 2;\n" ++
         "}"
 
 test1 :: String
@@ -29,10 +29,10 @@ test1 = "function func_test1_0() -> [u32; 10] {\n" ++
         "}\n" ++
         "\n" ++
         "function func_test1_1() -> u32 {\n" ++
-        "    var bar0 : [u32; 10] = [0 : u32; 10];\n" ++
+        "    var bar0 : [u32; 10] = [0; 10];\n" ++
         "    bar0 = func_test1_0();\n" ++
         "    var bar1 : [u32; 10] = func_test1_0();\n" ++
-        "    return bar0[1 : usize] + bar1[2 : usize];\n" ++
+        "    return bar0[1] + bar1[2];\n" ++
         "}"
 
 renderHeader :: String -> Text

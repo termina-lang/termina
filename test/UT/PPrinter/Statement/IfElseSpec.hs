@@ -33,8 +33,8 @@ foo0 :: Expression SemanticAnns
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 4294901760 DecRepr)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
 
 constToFoo0 :: Statement SemanticAnns
 constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn

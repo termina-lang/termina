@@ -35,7 +35,7 @@ groundTyEq  tyspecl (Location tyspecr) = groundTyEq tyspecl tyspecr
 groundTyEq  _ _ = False
 
 constExprEq :: ConstExpression a -> ConstExpression a -> Bool
-constExprEq (KC (I tyspecl intl) _) (KC (I tyspecr intr) _) = groundTyEq tyspecl tyspecr && intl == intr
+constExprEq (KC (I intl (Just tyspecl)) _) (KC (I intr (Just tyspecr)) _) = groundTyEq tyspecl tyspecr && intl == intr
 constExprEq (KC (B vall) _) (KC (B valr) _) = vall == valr
 constExprEq (KC (C charl) _) (KC (C charr) _) = charl == charr
 constExprEq _ _ = False

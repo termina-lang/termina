@@ -4,6 +4,7 @@ module Generator.LanguageC.AST where
 import Prettyprinter
 import Semantic.Monad
 import Numeric
+import Data.Char
 
 type Ident = String
 
@@ -290,7 +291,7 @@ data CInteger = CInteger
 
 instance Pretty CInteger where
   pretty (CInteger i CDecRepr) = pretty i
-  pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (showHex i "")
+  pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
   pretty (CInteger i COctalRepr) = pretty "0" <> pretty (showOct i "")
 
 -- | C char constants (abstract)

@@ -79,7 +79,7 @@ alignedClass = TypeDefinition
     ClassField (FieldDefinition "field1" UInt16) undefined,
     ClassField (FieldDefinition "field2" (Vector (DefinedType "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
     ClassProcedure "procedure0" [] [] [] undefined
-  ] ["Interface0"] [Modifier "aligned" (Just (I UInt32 (TInteger 16 DecRepr)))]) undefined
+  ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))]) undefined
 
 packedAndAlignedClass :: AnnASTElement SemanticAnns
 packedAndAlignedClass = TypeDefinition
@@ -90,7 +90,7 @@ packedAndAlignedClass = TypeDefinition
     ClassProcedure "procedure0" [] [] [] undefined
   ] ["Interface0"] [
       Modifier "packed" Nothing,
-      Modifier "aligned" (Just (I UInt32 (TInteger 16 DecRepr)))
+      Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))
     ]) undefined
 
 classWithFixedLocationField :: AnnASTElement SemanticAnns

@@ -122,15 +122,15 @@ instance Ord RTEMSGlobal where
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
 getPriority :: [Modifier] -> TInteger
-getPriority [] = (TInteger 255 DecRepr)
-getPriority ((Modifier "priority" (Just (I _ priority))) : _) = priority
+getPriority [] = TInteger 255 DecRepr
+getPriority ((Modifier "priority" (Just (I priority _))) : _) = priority
 getPriority (_ : modifiers) = getPriority modifiers
 
 -- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
 -- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
 getStackSize :: [Modifier] -> TInteger
-getStackSize [] = (TInteger 4096 DecRepr)
-getStackSize ((Modifier "stack_size" (Just (I _ stackSize))) : _) = stackSize
+getStackSize [] = TInteger 4096 DecRepr
+getStackSize ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
 getStackSize (_ : modifiers) = getStackSize modifiers
 
 addDependency :: RTEMSGlobal -> Maybe (S.Set RTEMSGlobal) -> Maybe (S.Set RTEMSGlobal)
@@ -1295,7 +1295,7 @@ genAppConfig tasks msgQueues timers mutexes = do
 
 
         genMessagesForQueue :: RTEMSMsgQueue -> CSourceGenerator [String]
-        genMessagesForQueue (RTEMSTaskMsgQueue _ size) = do
+        genMessagesForQueue (RTEMSTaskMsgQueue _ (TInteger size _)) = do
             cSizeOf <- genSizeOf UInt32
             let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
@@ -1304,7 +1304,7 @@ genAppConfig tasks msgQueues timers mutexes = do
                     "        " <> ppSizeOf <> " ",
                     "    ) "
                 ]
-        genMessagesForQueue (RTEMSChannelMsgQueue _ ts size _) = do
+        genMessagesForQueue (RTEMSChannelMsgQueue _ ts (TInteger size _) _) = do
             cSizeOf <- genSizeOf ts
             let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
@@ -1313,7 +1313,7 @@ genAppConfig tasks msgQueues timers mutexes = do
                     "        " <> ppSizeOf <> " ",
                     "    ) "
                 ]
-        genMessagesForQueue (RTEMSSinkPortMsgQueue _ _ ts size) = do
+        genMessagesForQueue (RTEMSSinkPortMsgQueue _ _ ts (TInteger size _)) = do
             cSizeOf <- genSizeOf ts
             let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [

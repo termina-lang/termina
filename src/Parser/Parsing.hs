@@ -700,9 +700,8 @@ constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
     parseLitInteger =
       do
         num <- integerParser
-        reservedOp ":"
-        ty <- typeSpecifierParser
-        return (I ty num)
+        ty <- optionMaybe (reservedOp ":" >> typeSpecifierParser)
+        return (I num ty)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
 
@@ -722,7 +721,10 @@ integerParser = try hexParser <|> decParser
 sizeParser :: Parser Size
 sizeParser = constValueSizeParser <|> constSizeParser
   where
-    constValueSizeParser = K <$> integerParser
+    constValueSizeParser = do
+      ks <- integerParser
+      optional (reservedOp ":" >> reserved "usize")
+      return $ K ks 
     constSizeParser = V <$> identifierParser
 
 mutableObjDeclarationParser :: Parser (Statement Annotation)

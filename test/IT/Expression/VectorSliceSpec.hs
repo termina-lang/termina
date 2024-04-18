@@ -34,7 +34,7 @@ test2 = "function add_one(input : & [u32; 5]) {\n" ++
         "}\n" ++
         "\n" ++
         "function slice_test2(vector0 : & [[u32; 5]; 10]) {\n" ++
-        "    add_one(&(*vector0)[2 : usize .. 3 : usize][0 : usize]);\n" ++
+        "    add_one(&((*vector0)[2 : usize .. 3 : usize][0 : usize]));\n" ++
         "    return;\n" ++
         "}"
 

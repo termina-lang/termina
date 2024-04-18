@@ -18,13 +18,13 @@ test0 = "function bitwise_test0(foo : u16) {\n" ++
         "    foo = foo << 8 : u8;\n" ++
         "    bar = 8 : u8 << foo;\n" ++
         "    foo = foo >> 8 : u8;\n" ++
-        "    8 : u8 << foo;\n" ++
+        "    bar = 8 : u8 << foo;\n" ++
         "    foo = foo & 1024: u16;\n" ++
-        "    1024 : u16 & foo;\n" ++
+        "    foo = 1024 : u16 & foo;\n" ++
         "    foo = foo | 1024: u16;\n" ++
-        "    1024 : u16 | foo;\n" ++
+        "    foo = 1024 : u16 | foo;\n" ++
         "    foo = foo ^ 1024: u16;\n" ++
-        "    1024 : u16 ^ foo;\n" ++
+        "    foo = 1024 : u16 ^ foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -78,19 +78,19 @@ spec = do
               "\n" ++
               "    foo = foo >> 8;\n" ++ 
               "\n" ++
-              "    8 << foo;\n" ++
+              "    bar = 8 << foo;\n" ++
               "\n" ++
               "    foo = foo & 1024;\n" ++
               "\n" ++
-              "    1024 & foo;\n" ++
+              "    foo = 1024 & foo;\n" ++
               "\n" ++
               "    foo = foo | 1024;\n" ++
               "\n" ++
-              "    1024 | foo;\n" ++
+              "    foo = 1024 | foo;\n" ++
               "\n" ++
               "    foo = foo ^ 1024;\n" ++
               "\n" ++
-              "    1024 ^ foo;\n" ++
+              "    foo = 1024 ^ foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

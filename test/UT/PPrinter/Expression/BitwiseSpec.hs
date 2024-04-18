@@ -18,8 +18,8 @@ undynVar1 :: Expression SemanticAnns
 undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) (objSemAnn Mutable UInt16))
 
 constUInt8, constUInt16 :: Expression SemanticAnns
-constUInt8 = Constant (I UInt8 (TInteger 0x08 HexRepr)) uint8SemAnn
-constUInt16 = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
+constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8SemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
 var0LeftShiftConstant :: Expression SemanticAnns
 var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16SemAnn

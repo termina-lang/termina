@@ -63,6 +63,14 @@ numTy Int64  = True
 numTy USize  = True
 numTy _      = False
 
+posTy :: TypeSpecifier -> Bool
+posTy UInt8  = True
+posTy UInt16 = True
+posTy UInt32 = True
+posTy UInt64 = True
+posTy USize  = True
+posTy _      = False
+
 memberIntCons :: Integer -> TypeSpecifier -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
 memberIntCons i UInt16 = ( 0 <= i ) && ( i <= 65536)

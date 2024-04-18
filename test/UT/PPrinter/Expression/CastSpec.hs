@@ -12,8 +12,8 @@ import UT.PPrinter.Expression.Common
 
 
 castUInt32toUInt8, castUInt32toUInt16 :: Expression SemanticAnns
-castUInt32toUInt8 = Casting (Constant (I UInt32 (TInteger 0xFFFF0000 HexRepr)) uint32SemAnn) UInt8 uint8SemAnn
-castUInt32toUInt16 = Casting (Constant (I UInt32 (TInteger 0xFFFF0000 HexRepr)) uint32SemAnn) UInt16 uint16SemAnn
+castUInt32toUInt8 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn) UInt8 uint8SemAnn
+castUInt32toUInt16 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn) UInt16 uint16SemAnn
 
 var0 :: Expression SemanticAnns
 var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt32))
@@ -42,10 +42,10 @@ spec = do
   describe "Pretty printing casting expressions" $ do
     it "Prints the expression ((0xFFFF0000 : u32) as u8)" $ do
       renderExpression castUInt32toUInt8 `shouldBe`
-        pack "(uint8_t)0xffff0000"
+        pack "(uint8_t)0xFFFF0000"
     it "Prints the expression ((0xFFFF0000 : u32) as u16)" $ do
       renderExpression castUInt32toUInt16 `shouldBe`
-        pack "(uint16_t)0xffff0000"
+        pack "(uint16_t)0xFFFF0000"
     it "Prints the expression (var0 as u8)" $ do
       renderExpression castVar0toUInt8 `shouldBe`
         pack "(uint8_t)var0"

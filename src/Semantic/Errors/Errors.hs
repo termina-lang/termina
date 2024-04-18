@@ -19,7 +19,13 @@ data Errors a
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
+  | EExpectedNumType TypeSpecifier
+  | EExpectedPosType TypeSpecifier
   | ECasteable TypeSpecifier TypeSpecifier
+  | EConstantWithoutKnownType Const
+  | EReturnValueExpected TypeSpecifier
+  | EReturnValueNotVoid 
+  | EExpectedType
   -- | Expected Numeric Types
   | ENumTs [TypeSpecifier]
   | EUSizeTs TypeSpecifier

@@ -24,10 +24,10 @@ param0 = Variable "param0" dynUInt32SemAnn
 param1 = Variable "param1" dynVectorAnn
 
 uint32Const0 :: Expression SemanticAnns
-uint32Const0 = Constant (I UInt32 (TInteger 0 DecRepr)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
 
 usizeConst0x8 :: Expression SemanticAnns
-usizeConst0x8 = Constant (I USize (TInteger 8 DecRepr)) usizeSemAnn
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
 optionVar :: Expression SemanticAnns
 optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)

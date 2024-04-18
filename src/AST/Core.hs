@@ -26,9 +26,15 @@ instance Annotated (ReturnStmt' expr) where
 instance HAnnotated ReturnStmt' where
   getHAnnotation = returnAnnotation
 
+-- | Integer representation.  
+-- A value of this type is used to indicate the representation in which the
+-- value was introduced. It will be later used by the code generator to generate
+-- the correspoding literal using the same representation.
 data IntRepr = DecRepr | HexRepr | OctalRepr
   deriving (Show, Eq, Ord)
 
+-- | Termina integers
+-- A Termina integer is defined by its value and its numeric representation.
 data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
 
@@ -434,9 +440,9 @@ data Statement' expr obj a =
 
 -- | Constant values:
 -- - Booleans
--- - Decimal integers
+-- - Integers
 -- - Characters
-data Const = B Bool | I TypeSpecifier TInteger | C Char
+data Const = B Bool | I TInteger (Maybe TypeSpecifier) | C Char
   deriving (Show)
 
 ----------------------------------------

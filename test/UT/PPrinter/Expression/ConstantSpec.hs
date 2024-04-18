@@ -14,14 +14,14 @@ uint8Const0x8, uint16Const1024, uint32Const0xFFFF0000,
   uint64Const1800000000, int8ConstMinux128, int16Const1024,
   int32ConstMinux1024, int64ConstMinux3000000000,
   charConsta, trueBool, falseBool :: Expression SemanticAnns
-uint8Const0x8 = Constant (I UInt8 (TInteger 0x08 HexRepr)) uint8SemAnn
-uint16Const1024 = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
-uint32Const0xFFFF0000 = Constant (I UInt32 (TInteger 0xFFFF0000 HexRepr)) uint32SemAnn
-uint64Const1800000000 = Constant (I UInt64 (TInteger 1800000000 DecRepr)) uint64SemAnn
-int8ConstMinux128 = Constant (I Int8 (TInteger (-128) DecRepr)) int8SemAnn
-int16Const1024 = Constant (I Int16 (TInteger 1024 DecRepr)) int16SemAnn
-int32ConstMinux1024 = Constant (I Int32 (TInteger (-1024) DecRepr)) int32SemAnn
-int64ConstMinux3000000000 = Constant (I Int64 (TInteger (-3000000000) DecRepr)) int64SemAnn
+uint8Const0x8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8SemAnn
+uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn
+uint64Const1800000000 = Constant (I (TInteger 1800000000 DecRepr) (Just UInt64)) uint64SemAnn
+int8ConstMinux128 = Constant (I (TInteger (-128) DecRepr) (Just Int8)) int8SemAnn
+int16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just Int16)) int16SemAnn
+int32ConstMinux1024 = Constant (I (TInteger (-1024) DecRepr) (Just Int32)) int32SemAnn
+int64ConstMinux3000000000 = Constant (I (TInteger (-3000000000) DecRepr) (Just Int64)) int64SemAnn
 charConsta = Constant (C 'a') charSemAnn
 trueBool = Constant (B True) boolSemAnn
 falseBool = Constant (B False) boolSemAnn
@@ -43,7 +43,7 @@ spec = do
         pack "1024"
     it "Prints the constant 0xFFFF0000 of type u32" $ do
       renderExpression uint32Const0xFFFF0000 `shouldBe`
-        pack "0xffff0000"
+        pack "0xFFFF0000"
     it "Prints the constant 1800000000 of type u64" $ do
       renderExpression uint64Const1800000000 `shouldBe`
         pack "1800000000"

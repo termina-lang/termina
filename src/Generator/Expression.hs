@@ -144,7 +144,7 @@ genExpression (BinOp op left right ann) = do
 genExpression (Constant c ann) = do
     let cAnn = buildGenericAnn ann 
     case c of
-        (I _ i) -> 
+        (I i _) -> 
             let cInteger = genInteger i in
             return $ CConst (CIntConst cInteger) cAnn
         (B True) -> return $ CConst (CIntConst (CInteger 1 CDecRepr)) cAnn
@@ -215,7 +215,7 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genConstExpression :: ConstExpression SemanticAnns -> CSourceGenerator CExpression
-genConstExpression (KC (I _ i) ann) = do
+genConstExpression (KC (I i _) ann) = do
     let cInteger = genInteger i
     return $ CConst (CIntConst cInteger) (buildGenericAnn ann)
 genConstExpression (KC (B True) ann) = return $ CConst (CIntConst (CInteger 1 CDecRepr)) (buildGenericAnn ann)
@@ -243,7 +243,7 @@ genObject (VectorIndexExpression obj index ann) = do
 genObject (VectorSliceExpression obj lower _ ann) = do
     let cAnn = buildGenericAnn ann
     case lower of
-        KC (I _ lowInteger) _ -> do
+        KC (I lowInteger _) _ -> do
             let cInteger = genInteger lowInteger
             cObj <- genObject obj
             return $ CUnary CAdrOp (CIndex cObj (CConst (CIntConst cInteger) cAnn) cAnn) cAnn

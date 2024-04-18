@@ -27,9 +27,9 @@ pVector0 :: Object SemanticAnns
 pVector0 = Variable "p_vector0" refVectorAnn
 
 usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnns
-usizeIndex3 = Constant (I USize (TInteger 3 DecRepr)) usizeSemAnn
-usizeIndex4 = Constant (I USize (TInteger 4 DecRepr)) usizeSemAnn
-usizeConst0x8 = Constant (I USize (TInteger 8 DecRepr)) usizeSemAnn
+usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just USize)) usizeSemAnn
+usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just USize)) usizeSemAnn
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
 dynVector0 :: Object SemanticAnns
 dynVector0 = Variable "dyn_vector0" dynVectorAnn

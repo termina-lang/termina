@@ -42,7 +42,7 @@ referenceVector0 :: Expression SemanticAnns
 referenceVector0 = ReferenceExpression Mutable vector0 (refVectorSemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 uint16Const :: Expression SemanticAnns
-uint16Const = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
+uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
 var0PlusConstant, var1PlusConstant :: Expression SemanticAnns
 var0PlusConstant = BinOp Addition (AccessObject var0) uint16Const uint16SemAnn

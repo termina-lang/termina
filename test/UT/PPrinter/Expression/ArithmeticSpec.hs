@@ -20,7 +20,7 @@ undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) (objSemAnn Mut
 
 constUInt16 :: Expression SemanticAnns
 -- | 1024 : u16
-constUInt16 = Constant (I UInt16 (TInteger 1024 DecRepr)) uint16SemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
 var0PlusConstant :: Expression SemanticAnns
 -- | var0 + 1024 : u16

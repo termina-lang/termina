@@ -92,7 +92,7 @@ genAttribute (Modifier name (Just expr)) = do
         genConst c = do
             let cAnn = CAnnotations Internal CGenericAnn
             case c of
-                (I _ i) -> 
+                (I i _) -> 
                     let cInteger = genInteger i in
                     return $ CConst (CIntConst cInteger) cAnn
                 (B True) -> return $ CConst (CIntConst (CInteger 1 CDecRepr)) cAnn
