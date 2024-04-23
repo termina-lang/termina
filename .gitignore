@@ -3,3 +3,4 @@
 stack.yaml
 stack.yaml.lock
 termina.cabal
+.vscode/
