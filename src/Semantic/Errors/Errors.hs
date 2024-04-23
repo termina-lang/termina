@@ -136,6 +136,7 @@ data Errors a
   | EDynPrim TypeSpecifier
   -- | Dynamic (type has a Dynamic inside) as Argument of a function
   | EArgHasDyn Parameter
+  | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier a
   -- | Error getting type of expressions of objects.

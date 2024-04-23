@@ -25,7 +25,7 @@ findClassField i
   L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
                  _ -> False;})
 
-findClassProcedure :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], [Parameter], a)
+findClassProcedure :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([ConstParameter], [Parameter], a)
 findClassProcedure i
   = fmap
   (\case {ClassProcedure _ cps ps _ a -> (cps, ps,a)
@@ -34,14 +34,14 @@ findClassProcedure i
   L.find (\case{ ClassProcedure ident _ _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([Parameter], [Parameter], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([ConstParameter], [Parameter], a)
 findInterfaceProcedure i
   = fmap
   (\case {InterfaceProcedure _ cps ps a -> (cps, ps, a)})
   .
   L.find (\case{InterfaceProcedure ident _ _ _ -> (ident == i)})
 
-findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], [Parameter], Maybe TypeSpecifier, a)
+findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([ConstParameter], [Parameter], Maybe TypeSpecifier, a)
 findClassViewerOrMethod i
   = fmap
   (\case {
@@ -161,3 +161,6 @@ globalsName :: AnnASTElement' expr obj a -> Identifier
 globalsName (Function fId _ _ _ _ _ _) = fId
 globalsName (GlobalDeclaration glb)    = glbName glb
 globalsName (TypeDefinition tyDef _)   = tyDefName tyDef
+
+unConstParam :: ConstParameter -> Parameter
+unConstParam (ConstParameter p) = p

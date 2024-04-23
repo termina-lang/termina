@@ -54,7 +54,7 @@ instance Annotated SAnns where
 data ESeman
   = SimpleType TypeSpecifier
   | ObjectType AccessKind TypeSpecifier
-  | AppType [Parameter] [Parameter] TypeSpecifier
+  | AppType [ConstParameter] [Parameter] TypeSpecifier
   deriving Show
 
 newtype SemanProcedure = SemanProcedure Identifier
@@ -107,7 +107,7 @@ getObjectSAnns :: SemanticAnns -> Maybe (AccessKind, TypeSpecifier)
 getObjectSAnns (SemAnn _ (ETy (ObjectType ak ty))) = Just (ak, ty)
 getObjectSAnns _                                   = Nothing
 
-getArgumentsType :: SemanticElems -> Maybe ([Parameter], [Parameter])
+getArgumentsType :: SemanticElems -> Maybe ([ConstParameter], [Parameter])
 getArgumentsType (ETy (AppType pts ts _)) = Just (pts, ts)
 getArgumentsType _                    = Nothing
 
@@ -125,7 +125,7 @@ buildExpAnn loc = SemAnn loc . ETy . SimpleType
 buildExpAnnObj :: Locations -> AccessKind -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnnObj loc ak = SemAnn loc . ETy . ObjectType ak
 
-buildExpAnnApp :: Locations -> [Parameter] -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnnApp :: Locations -> [ConstParameter] -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnnApp loc ctys tys = SemAnn loc . ETy . AppType ctys tys
 
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
@@ -281,7 +281,7 @@ getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
   Enum _ fs _mods -> return fs
   ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
-getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter], [Parameter],TypeSpecifier)
+getFunctionTy :: Locations -> Identifier -> SemanticMonad ([ConstParameter], [Parameter],TypeSpecifier)
 getFunctionTy loc iden =
   catchError (getGlobalGEnTy loc iden ) (\_ -> throwError $ annotateError loc (ENotAFun iden))
   >>= \case
@@ -333,7 +333,7 @@ insertGlobalTy loc tydef =
  where
    type_name = identifierType tydef
 
-insertGlobalFun :: Locations -> Identifier -> [Parameter] -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
+insertGlobalFun :: Locations -> Identifier -> [ConstParameter] -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
 insertGlobalFun loc ident cps ps rettype =
   insertGlobal ident (loc `SemAnn` GFun cps ps rettype) (EUsedFunName ident)
 

@@ -71,13 +71,13 @@ constParamType ::
   -- | Annotation of the function call
   Parser.Annotation
   -- | List of parameters
-  -> [Parameter]
+  -> [ConstParameter]
   -- | List of arguments of the function call
   -> [ConstExpression Parser.Annotation]
   -> SemanticMonad [SAST.ConstExpression SemanticAnns]
 constParamType _ann [] [] = return []
 constParamType ann (p : ps) (a : as) =
-  constExpressionType (paramTypeSpecifier p) a
+  constExpressionType (paramTypeSpecifier $ unConstParam p) a
   >>= \tyed_exp -> (tyed_exp :) <$> constParamType ann ps as
 
 constParamType ann (_p : _) [] = throwError $ annotateError ann EFunParams
@@ -199,7 +199,7 @@ memberFunctionAccessType ::
   -> Identifier
   -> [ConstExpression Parser.Annotation]
   -> [Expression Parser.Annotation]
-  -> SemanticMonad (([Parameter], [SAST.ConstExpression SemanticAnns]), ([Parameter], [SAST.Expression SemanticAnns]), TypeSpecifier)
+  -> SemanticMonad (([ConstParameter], [SAST.ConstExpression SemanticAnns]), ([Parameter], [SAST.Expression SemanticAnns]), TypeSpecifier)
 memberFunctionAccessType ann obj_ty ident constArgs args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
@@ -220,7 +220,7 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
                   when (cpsLen < casLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (cpsLen > casLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   typed_args <- zipWithM (\p e -> expressionType (Just (paramTypeSpecifier p)) rhsObjectType e) ps args
-                  typed_constArgs <- zipWithM (\p e -> do constExpressionType (paramTypeSpecifier p) e) cps constArgs
+                  typed_constArgs <- zipWithM (\p e -> do constExpressionType (paramTypeSpecifier $ unConstParam p) e) cps constArgs
                   fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
                   return ((cps, typed_constArgs), (ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -239,7 +239,7 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
               when (psLen > asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
               typed_args <- zipWithM (\p e -> expressionType (Just (paramTypeSpecifier p)) rhsObjectType e) ps args
               typed_constArgs <- zipWithM (\p e -> do
-                  constExpressionType (paramTypeSpecifier p) e) cps constArgs
+                  constExpressionType (paramTypeSpecifier $ unConstParam p) e) cps constArgs
               fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
               return ((cps, typed_constArgs), (ps, typed_args), fty)
          ;
@@ -932,6 +932,11 @@ parameterTypeChecking anns p =
             DynamicSubtype _ -> throwError (annotateError anns (EArgHasDyn p))
             _ -> return ()
 
+constParameterTypeChecking :: Locations -> ConstParameter -> SemanticMonad ()
+constParameterTypeChecking anns (ConstParameter p) =
+         let typeSpec = paramTypeSpecifier p in 
+          unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
+
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
 programSeman (Function ident cps ps mty bret mods anns) =
@@ -1032,7 +1037,7 @@ typeDefCheck ann (Class kind ident members provides mds)
                 in return (checkFs : fs, prcs, mths, vws, acts)
           -- Procedures
           prc@(ClassProcedure _fp_id cfp_tys fp_tys _body annCP)
-            -> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) cfp_tys
+            -> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier . unConstParam) cfp_tys
             >> mapM_ (checkTypeDefinition annCP . paramTypeSpecifier) fp_tys
             >> return (fs, prc : prcs, mths, vws, acts)
           -- Methods
@@ -1043,7 +1048,7 @@ typeDefCheck ann (Class kind ident members provides mds)
           view@(ClassViewer _fv_id cfv_tys fv_tys mty _body annCV)
             -> checkTypeDefinition annCV mty
             -- Parameters cannot have dyns inside.
-            >> mapM_ (parameterTypeChecking annCV) cfv_tys
+            >> mapM_ (constParameterTypeChecking annCV) cfv_tys
             >> mapM_ (parameterTypeChecking annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)

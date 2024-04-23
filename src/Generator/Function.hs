@@ -10,13 +10,14 @@ import Control.Monad.Reader
 import Generator.Common
 import Generator.Statement
 import Data.Map (fromList, union)
+import Utils.AST.Core
 
 
 genFunctionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]
 genFunctionDecl (Function identifier constParameters parameters rts _ _ ann) = do
     let cAnn = buildGenericAnn ann
     retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
-    cConstParams <- mapM (genParameterDeclaration ann) constParameters
+    cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
     cParams <- mapM (genParameterDeclaration ann) parameters
     return [ CDeclExt $ CDeclaration retTypeDecl
         [(Just (CDeclarator (Just identifier) [CFunDeclr (cConstParams ++ cParams) [] cAnn] [] cAnn), Nothing, Nothing)]
@@ -26,7 +27,7 @@ genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show i
 genFunction :: AnnASTElement SemanticAnns -> CSourceGenerator [CExternalDeclaration]
 genFunction (Function identifier constParameters parameters rts (BlockRet body ret) _ ann) = do
     retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
-    cConstParams <- mapM (genParameterDeclaration ann) constParameters
+    cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
     cParams <- mapM (genParameterDeclaration ann) parameters
     cReturn <- genReturnStatement ret
     let cAnn = buildGenericAnn ann

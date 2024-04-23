@@ -244,12 +244,12 @@ parameterParser = do
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
-constParameterParser :: Parser Parameter
+constParameterParser :: Parser ConstParameter
 constParameterParser = do
   reserved "const"
   identifier <- parameterIdentifierParser
   reservedOp ":"
-  Parameter identifier <$> typeSpecifierParser
+  ConstParameter . Parameter identifier <$> typeSpecifierParser
 
 -- | Parser for a field value assignments expression
 -- This expression is used to create annonymous structures to serve as right

@@ -141,7 +141,7 @@ getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     =
 getObjectType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return $ ts
 getObjectType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getConstParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [Parameter]
+getConstParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [ConstParameter]
 getConstParameters (FunctionExpression _ _ _ (SemAnn _ (ETy (AppType constParams _ _)))) = return constParams
 getConstParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 

@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.Reader
 import Parser.Parsing
+import Utils.AST.Core
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case
@@ -231,7 +232,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnns -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure constParams params ann') = do
-            cConstParams <- mapM (genParameterDeclaration ann') constParams
+            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
             let cAnn = buildDeclarationAnn ann' False
                 cThisParam = CDeclaration [CTypeSpec CVoidType]
@@ -285,7 +286,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann') constParams
+            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier viewer
             return $ CDeclaration retTypeDecl
@@ -294,7 +295,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration (ClassProcedure procedure constParams params _ ann') = do
             let cAnn = buildGenericAnn ann'
             cThisParam <- genThisParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann') constParams
+            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier procedure
             return $ CDeclaration [CTypeSpec CVoidType]
@@ -332,7 +333,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             clsFuncName <- genClassFunctionName identifier viewer
             retTypeDecl <- genReturnTypeDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann) constParameters
+            cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
@@ -347,7 +348,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
         genClassFunctionDefinition (ClassProcedure procedure constParameters parameters body ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann) constParameters
+            cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             let cAnn = buildGenericAnn ann

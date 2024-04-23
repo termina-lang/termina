@@ -30,6 +30,7 @@ import           AST.Seman            as SAST
 -- We need to know the type of objects.
 import qualified Semantic.Monad       as SM (location)
 import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
+import Utils.AST.Core
 
 
 --import Debug.Termina
@@ -335,11 +336,11 @@ useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident cps ps blk ann)
   = useDefBlock blk
-  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) (cps ++ ps)
+  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) (map unConstParam cps ++ ps)
   -- >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident cps ps _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) (cps ++ ps)
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) (map unConstParam cps ++ ps)
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) [p]
@@ -366,7 +367,7 @@ useDefTypeDef (Enum {}) = return ()
 useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
 useDefFrag (Function _ident cps ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) (cps ++ ps)
+ >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) (map unConstParam cps ++ ps)
  -- >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()

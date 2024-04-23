@@ -39,7 +39,7 @@ getTySemGlobal (SConst ty) = ty
 
 -- | General global entities
 data GEntry a
-  = GFun [Parameter] [Parameter] TypeSpecifier -- ^ const generic parameters, parameters, return type
+  = GFun [ConstParameter] [Parameter] TypeSpecifier -- ^ const generic parameters, parameters, return type
   -- ^ Functions
   | GGlob SemGlobal
   -- ^ Globals
