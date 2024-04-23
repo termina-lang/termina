@@ -1079,7 +1079,7 @@ moduleIdentifierParser = sepBy1 firstCapital dot
   where
     firstCapital = (:)
       <$> (lower <?> "Module paths begin with a lowercase letter.")
-      <*> (many (lower <|> char '_') <?> "Module names only accept lowercase letters or underscores.")
+      <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
 
 singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
