@@ -292,11 +292,11 @@ getFunctionTy loc iden =
 
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
-addLocalMutObjs :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
-addLocalMutObjs loc newVars ma  =
+addLocalImmutObjs :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
+addLocalImmutObjs loc newVars ma  =
   localScope (addVariables newVars >> ma)
   where
-    addVariables = mapM_ (uncurry (insertLocalMutObj loc))
+    addVariables = mapM_ (uncurry (insertLocalImmutObj loc))
 
 -- | Insert mutable object (variable) in local scope.
 insertLocalMutObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
@@ -364,12 +364,26 @@ getLocalObjTy loc ident =
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
 getConstTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getConstTy loc ident =
-  maybe
-    -- | if |ident| is not a member throw error |ENotNamedObject|
-    (throwError $ annotateError loc (ENotNamedObject ident))
-    -- | if |ident| is a member return its type
-    return . M.lookup ident =<< gets consts
+getConstTy loc ident = do
+    -- Check the local constants first
+    constants <- gets consts
+    case M.lookup ident constants of
+      Just ty -> return ty
+      Nothing -> -- throwError $ annotateError loc (ENotNamedObject ident)
+        -- If not found, then check the globals
+        catchError (getGlobalGEnTy loc ident) (\errorGlobal ->
+                case semError errorGlobal of {
+                  ENotNamedGlobal errvar ->
+                    if errvar == ident then
+                      throwError $ annotateError loc (ENotNamedObject ident);
+                    else
+                      throwError errorGlobal;
+                  _  -> throwError errorGlobal;
+                }
+              ) >>= (\case {
+                        GGlob (SConst ts)  -> return ts;
+                        _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+        });
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)

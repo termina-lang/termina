@@ -94,9 +94,9 @@ selfInvStmt isSelf = selfInvStmt'
                 ) bEls
         ++
         concatMap selfInvStmt' bEl
-    selfInvStmt' (ForLoopStmt _loopIdent _type initV endV cBreak body _ann) =
-      isSelfExpression initV ++ isSelfExpression endV
-      ++ concat (maybeToList (isSelfExpression <$> cBreak))
+    selfInvStmt' (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
+      -- isSelfExpression initV ++ isSelfExpression endV ++
+      concat (maybeToList (isSelfExpression <$> cBreak))
       ++ concatMap selfInvStmt' body
     selfInvStmt' (MatchStmt e mcases _ann) =
       isSelfExpression e

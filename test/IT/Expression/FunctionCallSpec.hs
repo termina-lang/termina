@@ -124,10 +124,10 @@ spec = do
               "        bar0[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    *(__wrapper_uint32__10_t *)bar0 = func_test1_0().array;\n" ++
+              "    *(__wrapper_uint32__10_t *)bar0 = *(__wrapper_uint32__10_t *)func_test1_0().array;\n" ++
               "\n" ++
               "    uint32_t bar1[10];\n" ++
-              "    *(__wrapper_uint32__10_t *)bar1 = func_test1_0().array;\n" ++
+              "    *(__wrapper_uint32__10_t *)bar1 = *(__wrapper_uint32__10_t *)func_test1_0().array;\n" ++
               "\n" ++
               "    return bar0[1] + bar1[2];\n" ++
               "\n" ++

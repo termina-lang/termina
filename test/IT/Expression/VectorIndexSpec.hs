@@ -24,7 +24,7 @@ test0 = "function vector_test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "function vector_test1(p_vector0 : & [u32; 10]) {\n" ++
+test1 = "function vector_test1(p_vector0 : &mut [u32; 10]) {\n" ++
         "    var foo : u32 = 0 : u32;\n" ++
         "    (*p_vector0)[3 : usize] = 10 : u32;\n" ++
         "    (*p_vector0)[foo as usize] = 1024 : u32;\n" ++
@@ -103,7 +103,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void vector_test1(const uint32_t p_vector0[10]);\n" ++
+              "void vector_test1(uint32_t p_vector0[10]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function vector_test1" $ do
@@ -111,7 +111,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void vector_test1(const uint32_t p_vector0[10]) {\n" ++
+              "void vector_test1(uint32_t p_vector0[10]) {\n" ++
               "    \n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++

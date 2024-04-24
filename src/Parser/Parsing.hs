@@ -22,6 +22,7 @@ import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
 import Data.Char
+import Data.List.NonEmpty (cons)
 
 {- | Type of the parsing annotations
 
@@ -582,21 +583,21 @@ objectParser = objectParser' objectTermParser
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
-      _ <- reservedOp "->"
-      p <- getPosition
-      member <- identifierParser
-      return $ \parent ->   DereferenceMemberAccess parent member (Position p))
+        _ <- reservedOp "->"
+        p <- getPosition
+        member <- identifierParser
+        return $ \parent ->   DereferenceMemberAccess parent member (Position p))
     memberAccessPostfix
       = Ex.Postfix (do
-      _ <- reservedOp "."
-      p <- getPosition
-      member <- identifierParser
-      return $ \parent ->  MemberAccess parent member (Position p))
+        _ <- reservedOp "."
+        p <- getPosition
+        member <- identifierParser
+        return $ \parent ->  MemberAccess parent member (Position p))
     dereferencePrefix
       = Ex.Prefix (do
-      p <- getPosition
-      _ <- reservedOp "*"
-      return $ flip Dereference (Position p))
+        p <- getPosition
+        _ <- reservedOp "*"
+        return $ flip Dereference (Position p))
 ----------------------------------------
 
 accessObjectParser :: Parser (Expression Annotation)
@@ -710,7 +711,11 @@ constantParser =
   flip Constant . Position  <$> getPosition <*> constLiteralParser
 
 constExprParser :: Parser (ConstExpression Annotation)
-constExprParser = flip KC . Position <$> getPosition <*> constLiteralParser
+constExprParser = 
+  constSymbolParser <|> constExprLiteral
+  where
+    constSymbolParser = flip KV . Position <$> getPosition <*> identifierParser
+    constExprLiteral = flip KC . Position <$> getPosition <*> constLiteralParser
 
 integerParser :: Parser TInteger
 integerParser = try hexParser <|> decParser
@@ -781,11 +786,11 @@ matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
   reserved "case"
   p <- getPosition
-  cons <- identifierParser
+  caseId <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   compound <- braces $ many blockItemParser
-  return $ MatchCase cons args compound (Position p)
+  return $ MatchCase caseId args compound (Position p)
 
 matchStmtParser :: Parser (Statement Annotation)
 matchStmtParser = do
@@ -824,9 +829,9 @@ forLoopStmtParser = do
   reservedOp ":"
   ty <- typeSpecifierParser
   _ <- reserved "in"
-  start <- expressionParser
+  start <- constExprParser
   _ <- reservedOp ".."
-  end <- expressionParser
+  end <- constExprParser
   breakCondition <- optionMaybe (do
     reserved "while"
     expressionParser)

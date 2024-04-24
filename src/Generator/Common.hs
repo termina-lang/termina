@@ -9,7 +9,8 @@ import Control.Monad.Except
 import Data.Map
 import Data.Set
 import Generator.LanguageC.AST
-import Generator.LanguageC.Printer
+import Data.Char
+import Numeric
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -375,3 +376,32 @@ buildDeclarationAnn ann before = CAnnotations (Semantic.Monad.location ann) (CDe
 
 buildCompoundAnn :: SemanticAnns -> Bool -> Bool -> CAnns
 buildCompoundAnn ann before trailing = CAnnotations (Semantic.Monad.location ann) (CCompoundAnn before trailing)
+
+buildCPPDirectiveAnn :: SemanticAnns -> Bool -> CAnns
+buildCPPDirectiveAnn ann before = CAnnotations (Semantic.Monad.location ann) (CPPDirectiveAnn before)
+
+printIntegerLiteral :: TInteger -> String
+printIntegerLiteral (TInteger i DecRepr) = show i
+printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
+printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
+
+printTypedInteger :: TypeSpecifier -> TInteger -> String
+printTypedInteger ts ti =
+    case ts of
+        UInt8 -> "UINT8_C(" <> printIntegerLiteral ti <> ")"
+        UInt16 -> "UINT16_C(" <> printIntegerLiteral ti <> ")"
+        UInt32 -> "UINT32_C(" <> printIntegerLiteral ti <> ")"
+        UInt64 -> "UINT64_C(" <> printIntegerLiteral ti <> ")"
+        Int8 -> "INT8_C(" <> printIntegerLiteral ti <> ")"
+        Int16 -> "INT16_C(" <> printIntegerLiteral ti <> ")"
+        Int32 -> "INT32_C(" <> printIntegerLiteral ti <> ")"
+        Int64 -> "INT64_C(" <> printIntegerLiteral ti <> ")"
+        _ -> error "Invalid type specifier: " <> show ts
+
+
+printLiteral :: Const -> String
+printLiteral (I ti (Just ts)) = printTypedInteger ts ti
+printLiteral (I ti Nothing) = printIntegerLiteral ti
+printLiteral (B True) = "1"
+printLiteral (B False) = "0"
+printLiteral (C c) = "'" <> [c] <> "'"

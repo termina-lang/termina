@@ -93,6 +93,7 @@ unboxConstSAnns = maybe (throwError $ annotateError internalErrorSeman EUnboxing
 
 unboxLocalEnvKind :: EnvKind -> SemanticMonad AccessKind
 unboxLocalEnvKind (LocalKind ak) = return ak
+unboxLocalEnvKind ConstKind = return Immutable
 unboxLocalEnvKind _ = throwError $ annotateError internalErrorSeman EUnboxingLocalEnvKind
 
 memberFieldAccessType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
@@ -139,8 +140,6 @@ objectType getVarTy (VectorIndexExpression obj idx ann) = do
   case obj_ty of
     Vector ty_elems _vexp -> do
         idx_typed  <- expressionType (Just USize) rhsObjectType idx
-        idx_ty     <- getExpType idx_typed
-        unless (groundTyEq idx_ty USize) (throwError $ annotateError ann (EUSizeTs idx_ty))
         return $ SAST.VectorIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
     ty -> throwError $ annotateError ann (EVector ty)
 objectType _ (MemberAccess obj ident ann) = do
@@ -155,8 +154,9 @@ objectType _ (MemberAccess obj ident ann) = do
   typed_obj' <- objectType (\loc ident' -> do
     (ak, ts) <- getLocalObjTy loc ident'
     return (LocalKind ak, ts)) obj
-  (obj_ak , obj_ty') <- unboxObjectSAnns typed_obj'
-  let (typed_obj, obj_ty) = maybe (typed_obj', obj_ty') (unDyn typed_obj',) (isDyn obj_ty')
+  (obj_ak', obj_ty') <- unboxObjectSAnns typed_obj'
+  let (typed_obj, obj_ak, obj_ty) = 
+        maybe (typed_obj', obj_ak', obj_ty') (unDyn typed_obj', Mutable, ) (isDyn obj_ty')
   fts <- memberFieldAccessType ann obj_ty ident
   return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fts
 objectType getVarTy (Dereference obj ann) = do
@@ -169,20 +169,15 @@ objectType getVarTy (VectorSliceExpression obj lower upper anns) = do
   typed_obj <- objectType getVarTy obj
   (obj_ak, obj_ty) <- unboxObjectSAnns typed_obj
   typed_lower <- constExpressionType USize lower
-  lower_ty <- unboxConstSAnns typed_lower
   typed_upper <- constExpressionType USize upper
-  upper_ty <- unboxConstSAnns typed_upper
   case obj_ty of
-    Vector ty_elems _ ->
-      case (lower_ty, upper_ty) of
-        (USize, USize) -> do
-          lowerInt <- buildSize typed_lower
-          upperInt <- buildSize typed_upper
--- TODO: We should check this later:
+    Vector ty_elems _ -> do
+      lowerInt <- buildSize typed_lower
+      upperInt <- buildSize typed_upper
+-- TODO: We should check the sizes of the vector and the bounds later
 --          when (lowerInt > upperInt) (throwError $ annotateError anns (EBoundsLowerGTUpper lowerInt upperInt))
 --          when (upperInt > size) (throwError $ annotateError anns (EUpperBoundGTSize upperInt size))
-          return $ SAST.VectorSliceExpression typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (CAST.E SSub upperInt lowerInt))
-        _ -> error "This should not happen, we already checked that the bounds are constant integers."
+      return $ SAST.VectorSliceExpression typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (CAST.E SSub upperInt lowerInt))
     ty -> throwError $ annotateError anns (EVector ty)
 objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- objectType getVarTy obj
@@ -208,7 +203,7 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
         -- This case corresponds to a call to an inner method or viewer from the self object.
         Class _ _identTy cls _provides _mods ->
           case findClassProcedure ident cls of
-            Just (_, _, _) -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
+            Just _ -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
             Nothing ->
               case findClassViewerOrMethod ident cls of
                 Just (cps, ps, _, anns) -> do
@@ -216,9 +211,9 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
                       (cpsLen, casLen) = (length cps, length constArgs)
                   -- Check that the number of parameters are OK
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
-                  when (psLen > asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
+                  when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
                   when (cpsLen < casLen) (throwError $ annotateError ann EMemberMethodExtraParams)
-                  when (cpsLen > casLen) (throwError $ annotateError ann EMemberMethodExtraParams)
+                  when (cpsLen > casLen) (throwError $ annotateError ann EMemberMethodMissingParams)
                   typed_args <- zipWithM (\p e -> expressionType (Just (paramTypeSpecifier p)) rhsObjectType e) ps args
                   typed_constArgs <- zipWithM (\p e -> do constExpressionType (paramTypeSpecifier $ unConstParam p) e) cps constArgs
                   fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
@@ -236,7 +231,7 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
            Just (cps, ps, anns) -> do
               let (psLen , asLen ) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
-              when (psLen > asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
+              when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
               typed_args <- zipWithM (\p e -> expressionType (Just (paramTypeSpecifier p)) rhsObjectType e) ps args
               typed_constArgs <- zipWithM (\p e -> do
                   constExpressionType (paramTypeSpecifier $ unConstParam p) e) cps constArgs
@@ -639,7 +634,7 @@ checkFieldValue
 checkFieldValue loc objType (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
-    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> (expressionType (Just fty) objType faexp)
+    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> expressionType (Just fty) objType faexp
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
@@ -737,7 +732,7 @@ retStmt (Just ts) (ReturnStmt (Just e) anns) = do
   -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExpType ety
   return $ ReturnStmt (Just typed_e) (buildExpAnn anns ts)
 retStmt (Just ty) (ReturnStmt Nothing anns) = throwError $ annotateError anns $ EReturnValueExpected ty
-retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns $ EReturnValueNotVoid
+retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotVoid
 
 retblockType :: Maybe TypeSpecifier -> BlockRet Parser.Annotation -> SemanticMonad (SAST.BlockRet SemanticAnns)
 retblockType ts (BlockRet bbody rete) = BlockRet <$> blockType bbody <*> retStmt ts rete
@@ -769,8 +764,10 @@ statementTySimple (Declaration lhs_id lhs_ak lhs_type expr anns) =
 statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
 {- TODO Q19 && Q20 -}
   lhs_o_typed' <- lhsObjectType lhs_o
-  (_, lhs_o_type') <- unboxObjectSAnns lhs_o_typed'
-  let (lhs_o_typed, lhs_o_type) = maybe (lhs_o_typed', lhs_o_type') (unDyn lhs_o_typed',) (isDyn lhs_o_type')
+  (lhs_o_ak', lhs_o_type') <- unboxObjectSAnns lhs_o_typed'
+  let (lhs_o_typed, lhs_o_ak, lhs_o_type) = 
+        maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unDyn lhs_o_typed', Mutable, ) (isDyn lhs_o_type')
+  unless (lhs_o_ak /= Immutable) (throwError $ annotateError anns EAssignmentToImmutable)
   rhs_expr_typed' <- expressionType (Just lhs_o_type) rhsObjectType rhs_expr
   type_rhs' <- getExpType rhs_expr_typed'
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
@@ -795,22 +792,17 @@ statementTySimple (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt an
   -- Both boundaries should have the same numeric type
   -- Since the type of the boundaries will force the type of the iterator, we must
   -- explicitely define the types of the boundaries.
-  typed_fromexpr <- expressionType Nothing rhsObjectType from_expr
-  from_ty <- getExpType typed_fromexpr
-  typed_toexpr <- expressionType Nothing rhsObjectType to_expr
-  to_ty <- getExpType typed_toexpr
-  -- If the from and to expressions are not numeric, and of the same type of the
-  -- iterator, then we must throw an error
-  unless (sameNumTy it_ty from_ty) (throwError $ annotateError anns EBadRange)
-  unless (sameNumTy it_ty to_ty) (throwError $ annotateError anns EBadRange)
+  typed_fromexpr <- constExpressionType it_ty from_expr
+  typed_toexpr <- constExpressionType it_ty to_expr
   ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr
     <$> (case mWhile of
               Nothing -> return Nothing
               Just whileC -> do
-                  typed_whileC <- expressionType (Just Bool) rhsObjectType whileC
+                  typed_whileC <- addLocalImmutObjs anns [(it_id, it_ty)] $ 
+                      expressionType (Just Bool) rhsObjectType whileC
                   return (Just typed_whileC)
         )
-    <*> addLocalMutObjs anns [(it_id, it_ty)] (blockType body_stmt)
+    <*> addLocalImmutObjs anns [(it_id, it_ty)] (blockType body_stmt)
     <*> return (buildStmtAnn anns)
 statementTySimple (SingleExpStmt expr anns) =
   flip SingleExpStmt (buildStmtAnn anns) <$> expressionType (Just Unit) rhsObjectType expr
@@ -858,7 +850,7 @@ matchCaseType c (EnumVariant vId vData) = matchCaseType' c vId vData
     matchCaseType' (MatchCase cIdent bVars bd ann) supIdent tVars
       | cIdent == supIdent =
         if length bVars == length tVars then
-        flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalMutObjs ann (zip bVars tVars) (blockType bd)
+        flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs ann (zip bVars tVars) (blockType bd)
         else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
       | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
 
@@ -952,7 +944,7 @@ programSeman (Function ident cps ps mty bret mods anns) =
   >>
   ----------------------------------------
   (Function ident cps ps mty
-  <$> (addLocalMutObjs anns
+  <$> (addLocalImmutObjs anns
           (fmap (\ p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
           (retblockType mty bret) >>= \ typed_bret ->
     maybe
@@ -1107,21 +1099,21 @@ typeDefCheck ann (Class kind ident members provides mds)
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mcps mps blk mann -> do
-              typed_blk <- addLocalMutObjs mann (("self", Reference Private (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
+              typed_blk <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (blockType blk)
               let newPrc = SAST.ClassProcedure mIdent mcps mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              typed_bret <- addLocalMutObjs mann [("self", Reference Private (DefinedType ident))] (retblockType mty mbody)
+              typed_bret <- addLocalImmutObjs mann [("self", Reference Private (DefinedType ident))] (retblockType mty mbody)
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mcps mps ty mbody mann -> do
-              typed_bret <- addLocalMutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (retblockType (Just ty) mbody)
               blockRetTy ty typed_bret
               let newVw = SAST.ClassViewer mIdent mcps mps ty typed_bret (buildExpAnn mann ty)
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalMutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (retblockType (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (retblockType (Just ty) mbody)
               blockRetTy ty typed_bret
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)

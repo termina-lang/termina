@@ -427,8 +427,8 @@ data Statement' expr obj a =
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
     TypeSpecifier -- ^ type of iterator variable
-    (expr a) -- ^ initial value of the iterator
-    (expr a) -- ^ final value of the iterator
+    (ConstExpression a) -- ^ initial value of the iterator
+    (ConstExpression a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)
     [ Statement' expr obj a ] -- ^ statements in the for loop
     a

@@ -88,7 +88,10 @@ genArrayInitialization before level cObj expr = do
                 left = CUnary CIndOp (CCast
                     (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn)
                     cObj exprCAnn) exprCAnn
-            return [CExpr (Just (CAssignment left cExpr exprCAnn)) stmtAnn]
+                right = CUnary CIndOp (CCast
+                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn)
+                    cExpr exprCAnn) exprCAnn
+            return [CExpr (Just (CAssignment left right exprCAnn)) stmtAnn]
         _ -> do
             cExpr <- genExpression expr
             exprType <- getExprType expr
@@ -237,7 +240,9 @@ genBlockItem (AssignmentStmt obj expr  _) = do
                         declAnn = buildDeclarationAnn ann False
                         left = CUnary CIndOp (CCast
                             (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cObj exprCAnn) exprCAnn
-                    return $ CBlockStmt <$> [CExpr (Just (CAssignment left cExpr exprCAnn)) stmtAnn]
+                        right = CUnary CIndOp (CCast
+                            (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cExpr exprCAnn) exprCAnn
+                    return $ CBlockStmt <$> [CExpr (Just (CAssignment left right exprCAnn)) stmtAnn]
                 _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
         (Location _) -> do
             let ann = getAnnotation obj
@@ -313,8 +318,8 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
 genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body ann) = do
     let exprCAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
-    initExpr <- genExpression initValue
-    endExpr <- genExpression endValue
+    initExpr <- genConstExpression initValue
+    endExpr <- genConstExpression endValue
     condExpr <-
         case breakCond of
             Nothing -> return $ CBinary CLeOp (CVar iterator exprCAnn) endExpr exprCAnn

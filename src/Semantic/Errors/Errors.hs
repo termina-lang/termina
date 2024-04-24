@@ -38,6 +38,7 @@ data Errors a
   -- | Invalid writing access to read only object
   | EObjectIsReadOnly Identifier
   | ENotNamedObject Identifier
+  | ENotConstant Identifier
   -- | Not Global Variable found
   | ENotNamedGlobal Identifier
   | EGlobalOtherType Identifier
@@ -139,6 +140,7 @@ data Errors a
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier a
+  | EAssignmentToImmutable
   -- | Error getting type of expressions of objects.
   | EUnboxingObjectExpr
   | EUnboxingConstExpr

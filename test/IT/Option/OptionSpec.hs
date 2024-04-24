@@ -29,7 +29,7 @@ test0 = "task class CHousekeeping {\n" ++
         "\n" ++
         "    match opt {\n" ++
         "        case Some(integer) => {\n" ++
-        "            integer = integer + 1 : u32\n;" ++
+        "            let foo : u32 = integer + 1 : u32\n;" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
@@ -47,7 +47,7 @@ test1 = "function test1() {\n" ++
         "    optionFoo = Some(foo);\n" ++
         "    match optionFoo {\n" ++
         "        case Some(value) => {\n" ++
-        "            value[0 : usize] = 1 : u32;\n" ++
+        "            foo[0] = value[0];\n" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
@@ -168,7 +168,7 @@ spec = do
               "        \n" ++   
               "        __option_uint32__10_params_t __Some = optionFoo.Some;\n" ++
               "\n" ++
-              "        __Some.__0[0] = 1;\n" ++
+              "        foo[0] = __Some.__0[0];\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

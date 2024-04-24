@@ -35,9 +35,7 @@ genHeaderASTElement :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem
 genHeaderASTElement typedef@(TypeDefinition {}) = do
     cTypeDef <- genTypeDefinitionDecl typedef
     return $ CExtDecl <$> cTypeDef
-genHeaderASTElement glb@(GlobalDeclaration {}) = do
-    cGlobal <- genGlobalDecl glb
-    return $ CExtDecl <$> cGlobal
+genHeaderASTElement glb@(GlobalDeclaration {}) = genGlobalDecl glb
 genHeaderASTElement func@(Function {}) = do
     cFunc <- genFunctionDecl func
     return $ CExtDecl <$> cFunc

@@ -31,10 +31,10 @@ breakCond :: Expression SemanticAnns
 breakCond = BinOp RelationalNotEqual i (Constant (I (TInteger 5 DecRepr) (Just USize)) uint32SemAnn) boolSemAnn
 
 forLoop0 :: Statement SemanticAnns
-forLoop0 = ForLoopStmt "i" USize (Constant (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (Constant (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) Nothing forLoopBody undefined
+forLoop0 = ForLoopStmt "i" USize (KC (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (KC (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) Nothing forLoopBody undefined
 
 forLoop1 :: Statement SemanticAnns
-forLoop1 = ForLoopStmt "i" USize (Constant (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (Constant (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) (Just breakCond) forLoopBody undefined
+forLoop1 = ForLoopStmt "i" USize (KC (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (KC (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement stmt = 

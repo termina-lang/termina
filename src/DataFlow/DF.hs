@@ -226,7 +226,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   -- Issue #40, forgot to use condition expression.
   useExpression eCond
   mapM_ (useExpression . elseIfCond) elseIfs
-useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
+useDefStmt (ForLoopStmt _itIdent _itTy eB eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
     -- It can only use variables /only/ only if they are declared inside the
@@ -259,8 +259,8 @@ useDefStmt (ForLoopStmt itIdent _itTy eB eE mBrk block ann)
     >> maybe (return ()) useExpression mBrk
     ----------------------------------------
     -- Use expression over begin and end.
-    >> useExpression eB
-    >> useExpression eE
+--    >> useExpression eB
+--    >> useExpression eE
 useDefStmt (MatchStmt e mcase ann)
   =
   -- Depending on expression |e| type

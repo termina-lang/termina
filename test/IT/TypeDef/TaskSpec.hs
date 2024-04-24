@@ -42,7 +42,6 @@ test0 = "struct Message {\n" ++
         "    self->message_pool.alloc(&mut alloc_msg);\n" ++
         "    match alloc_msg {\n" ++
         "        case Some(msg) => {\n" ++
-        "            msg.urgent = false;\n" ++
         "            self->message_pool.free(msg);\n" ++
         "        }\n" ++
         "        case None => {\n" ++
@@ -137,8 +136,6 @@ spec = do
               "    } else {\n" ++
               "        \n" ++
               "        __option_dyn_params_t __Some = alloc_msg.Some;\n" ++
-              "\n" ++
-              "        (*(Message *)__Some.__0.data).urgent = 0;\n" ++
               "\n" ++
               "        __termina_pool__free(self->message_pool, __Some.__0);\n" ++
               "\n" ++
