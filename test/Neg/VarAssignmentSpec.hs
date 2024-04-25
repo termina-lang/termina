@@ -47,6 +47,12 @@ test2 = "function f (n : u8) {\n" ++
         "\n" ++
         "}"
 
+test3 :: String
+test3 = "function init_val (array : &[u8;6]) -> u8 {\n" ++
+        "    (*array)[3] = 0 : u8;\n" ++
+        "    return 0 : u8;\n" ++
+        "}\n"
+
 spec :: Spec
 spec = do
   describe "Variable mutability" $ do
@@ -60,6 +66,10 @@ spec = do
         (testError EAssignmentToImmutable)
     it "Loop iterator assignment" $ do
      runNegativeTest test2
+       `shouldSatisfy`
+        (testError EAssignmentToImmutable)
+    it "Write to an immutable reference" $ do
+     runNegativeTest test3
        `shouldSatisfy`
         (testError EAssignmentToImmutable)
   
