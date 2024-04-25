@@ -1235,13 +1235,6 @@ genInitTask emitters = do
                 CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn,
                 CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn
              ] ++
-                -- Execute initialization action in case there is one
-
-                -- Execute initialization action in case there is one
-                
-                -- Execute initialization action in case there is one
-
-                -- Execute initialization action in case there is one
                 (case find (\case { RTEMSSystemInitEmitter {} -> True; _ -> False }) emitters of
                     Just (RTEMSSystemInitEmitter {}) -> [
                             CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "inital_event") cAnn)
@@ -1488,16 +1481,12 @@ genMainFile mName prjprogs = do
                         _ -> accMap
                 ) M.empty rtemsGlbs
 
-        emitters = foldr (\e acc -> case e of
-            Just emitter -> emitter : acc
-            Nothing -> acc) [] $ concatMap (\(_, _, objs) ->
-                map (`buildRTEMSEmitter` emitterConnectionsMap) $ objs
-                -- Manually add the missing global objects:
-                ++ [
+        emitters = catMaybes $ (concatMap (\(_, _, objs) ->
+                map (`buildRTEMSEmitter` emitterConnectionsMap) objs) glbs) ++ 
+                map (`buildRTEMSEmitter` emitterConnectionsMap) [
                         Emitter "irq_3" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
                         Emitter "system_init" (DefinedType "SystemInit") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "SystemInit"))))
                     ]
-                ) glbs
 
         timers = [t | t <- emitters, case t of { RTEMSPeriodicTimerEmitter {} -> True; _ -> False }]
         interruptEmittersToTasks = [e | e <- emitters, case e of { RTEMSInterruptEmitter _ (RTEMSTask{}) -> True; _ -> False }]
