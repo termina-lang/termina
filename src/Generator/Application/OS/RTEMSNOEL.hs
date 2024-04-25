@@ -1153,7 +1153,7 @@ genInstallEmitters emitters = do
                                     [CVar (show $ emitterToVectorMap M.! interrupt) cAnn,
                                     CVar (namefy $ "rtems_isr" <::> interrupt) cAnn] cAnn) cAnn)
                             stmtAnn
-                    ] (CAnnotations Internal (CCompoundAnn False False))) Nothing stmtAnn
+                    ] (CAnnotations Internal (CCompoundAnn False True))) Nothing stmtAnn
         genRTEMSInstallEmitter (RTEMSPeriodicTimerEmitter timer _) = do
             let cAnn = CAnnotations Internal CGenericAnn
                 stmtAnn = CAnnotations Internal (CStatementAnn True False)
