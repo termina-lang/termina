@@ -485,7 +485,6 @@ expressionParser = try optionVariantExprParser
   <|> try enumVariantExprParser
   <|> try mutableReferenceExprParser
   <|> try isOptionVariantExprParser
-  <|> try isEnumVariantExprParser
   <|> referenceExprParser
   <|> vectorInitParser
   <|> fieldAssignmentsExpressionParser
@@ -506,7 +505,8 @@ referenceExprParser = do
   return $ ReferenceExpression Immutable object (Position p)
 
 expressionTermParser :: Parser (Expression Annotation)
-expressionTermParser = try constantParser
+expressionTermParser = try isEnumVariantExprParser
+  <|> try constantParser
   <|> try functionCallParser
   <|> try accessObjectParser
   <|> parensExprParser
