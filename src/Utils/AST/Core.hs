@@ -92,8 +92,7 @@ selfInvStmt isSelf = selfInvStmt'
                      isSelfExpression (elseIfCond el)
                 ++ selfInvBlock isSelf (elseIfBody el)
                 ) bEls
-        ++
-        concatMap selfInvStmt' bEl
+        ++ maybe [] (concatMap selfInvStmt') bEl
     selfInvStmt' (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
       -- isSelfExpression initV ++ isSelfExpression endV ++
       concat (maybeToList (isSelfExpression <$> cBreak))

@@ -58,21 +58,21 @@ spec = do
   describe "Variable mutability" $ do
     it "Assignment to input variable" $ do
      runNegativeTest test0
-       `shouldBe`
-        Just (ENotNamedObject "ntimes")
+       `shouldSatisfy`
+        (\case Just (ENotNamedObject "ntimes") -> True; _ -> False)
     it "Loop bound not constant" $ do
      runNegativeTest test1
        `shouldSatisfy`
-        (testError EAssignmentToImmutable)
+        isEAssignmentToImmutable
     it "Loop iterator assignment" $ do
      runNegativeTest test2
        `shouldSatisfy`
-        (testError EAssignmentToImmutable)
+        isEAssignmentToImmutable
     it "Write to an immutable reference" $ do
      runNegativeTest test3
        `shouldSatisfy`
-        (testError EAssignmentToImmutable)
+        isEAssignmentToImmutable
   
   where
-    testError :: Errors Annotation -> Maybe (Errors Annotation) ->  Bool
-    testError e = \case Just e -> True; _ -> False
+    isEAssignmentToImmutable :: Maybe (Errors Annotation) -> Bool
+    isEAssignmentToImmutable = (\case Just EAssignmentToImmutable -> True; _ -> False)

@@ -773,7 +773,8 @@ statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
   ety <- mustBeTy lhs_o_type rhs_expr_typed
   return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
-statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
+statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
+  when (not (null elifs) && isNothing otherwise_branch) (throwError $ annotateError anns EIfElseNoOtherwise)
   IfElseStmt
     <$> expressionType (Just Bool) rhsObjectType cond_expr
     <*> localScope (blockType tt_branch)
@@ -783,7 +784,7 @@ statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
                           <*> localScope (blockType eBd)
                           <*> return (buildStmtAnn ann)
                     }) elifs
-    <*> localScope (blockType otherwise_branch)
+    <*> maybe (return Nothing) (fmap Just . localScope . blockType) otherwise_branch
     <*> return (buildStmtAnn anns)
 -- Here we could implement some abstract interpretation analysis
 statementTySimple (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt anns) = do

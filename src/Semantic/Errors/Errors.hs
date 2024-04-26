@@ -101,6 +101,7 @@ data Errors a
   | EMCMoreArgs [Identifier]
   | EMCMissingArgs [TypeSpecifier]
   | EMCEmpty
+  | EIfElseNoOtherwise
   -- | ForLoop
   | EForIteratorWrongType TypeSpecifier
   | EBadRange -- ^ Range conditions are not met

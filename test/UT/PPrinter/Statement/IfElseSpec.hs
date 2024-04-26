@@ -60,16 +60,16 @@ cond0 = BinOp RelationalEqual foo0 uint32Const0 boolSemAnn
 cond1 = BinOp RelationalNotEqual foo0 uint32Const0xFFFF0000 boolSemAnn
 
 singleIf :: Statement SemanticAnns
-singleIf = IfElseStmt cond0 twoDeclarations [] [] stmtSemAnn
+singleIf = IfElseStmt cond0 twoDeclarations [] Nothing stmtSemAnn
 
 ifElse :: Statement SemanticAnns
-ifElse = IfElseStmt cond1 twoDeclarations [] oneDeclaration stmtSemAnn
+ifElse = IfElseStmt cond1 twoDeclarations [] (Just oneDeclaration) stmtSemAnn
 
 elseIf :: ElseIf SemanticAnns
 elseIf = ElseIf cond0 oneAssignment stmtSemAnn
 
 ifElseIf :: Statement SemanticAnns
-ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] oneDeclaration stmtSemAnn
+ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] (Just oneDeclaration) stmtSemAnn
 
 renderStatement :: Statement SemanticAnns -> Text
 renderStatement stmt = 

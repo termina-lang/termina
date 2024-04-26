@@ -7,7 +7,6 @@ import Parser.Parsing
 
 import Semantic.TypeChecking
 import Semantic.Errors
-import AST.Parser
 
 runNegativeTest :: String -> Maybe (Errors Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
@@ -28,6 +27,6 @@ spec = do
   describe "Error Neg Test" $ do
     it "Undeclared variable" $ do
      runNegativeTest test0
-       `shouldBe`
-        Just (ENotNamedObject "foo")
+       `shouldSatisfy`
+        (\case Just (ENotNamedObject "foo") -> True; _ -> False)
 

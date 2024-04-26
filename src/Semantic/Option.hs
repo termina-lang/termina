@@ -7,6 +7,7 @@ import Utils.TypeSpecifier
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad
+import Semantic.Monad (ObjectAnn(accessKind))
 
 type OptionMap = M.Map TypeSpecifier (S.Set TypeSpecifier)
 
@@ -53,13 +54,13 @@ mapStatementOption :: Monad m
   -- | The resulting map
   -> m OptionMap
 mapStatementOption prevMap (Declaration _ _ ts _ _) = insertOptionType prevMap ts
-mapStatementOption prevMap (IfElseStmt _ stmts elseIfs esleStmts _) =
+mapStatementOption prevMap (IfElseStmt _ stmts elseIfs elseBlk _) =
   -- | Get the option types from the statements
   foldM mapStatementOption prevMap stmts >>=
   -- | Get the option types from the else if statements
   flip (foldM (\m (ElseIf _ stmts' _) -> foldM mapStatementOption m stmts')) elseIfs >>=
   -- | Get the option types from the else statements
-  flip (foldM mapStatementOption) esleStmts
+  (\acc -> maybe (return acc) (\elseStmts -> foldM mapStatementOption acc elseStmts) elseBlk)
 mapStatementOption prevMap (ForLoopStmt _ _ _ _ _ stmts _) = foldM mapStatementOption prevMap stmts
 mapStatementOption prevMap (MatchStmt _ cases _) =
   foldM (\m (MatchCase _ _ stmts _) -> foldM mapStatementOption m stmts) prevMap cases

@@ -299,9 +299,11 @@ genBlockItem (Declaration identifier _ ts expr ann) =
 genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
     cIfBlk <- concat <$> mapM genBlockItem ifBlk
-    cElseBlk <- if null elseBlk then return Nothing
-        else
-            mapM genBlockItem elseBlk >>= (return . Just) . flip CCompound (buildCompoundAnn ann False True) . concat
+    cElseBlk <- 
+        (case elseBlk of
+            Nothing -> return Nothing
+            Just elseBlk' ->
+                mapM genBlockItem elseBlk' >>= (return . Just) . flip CCompound (buildCompoundAnn ann False True) . concat)
     cAlts <- genAlternatives cElseBlk elifsBlks
 
     return $ CBlockStmt <$>

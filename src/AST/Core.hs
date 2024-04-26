@@ -421,7 +421,7 @@ data Statement' expr obj a =
     (expr a) -- ^ conditional expression
     [ Statement' expr obj a ] -- ^ statements in the if block
     [ ElseIf' expr obj a ] -- ^ list of else if blocks
-    [ Statement' expr obj a ] -- ^ statements in the else block
+    (Maybe [ Statement' expr obj a ]) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt

@@ -207,7 +207,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   -- All sets generated for all different branches.
   sets <- runEncaps
                 ([ useDefBlock bTrue >> get
-                 , useDefBlock bFalse >> get
+                 , (maybe (return ()) (\elseStmts -> useDefBlock elseStmts) bFalse) >> get
                 ]
                 ++
                  map ((\l -> mapM_ useDefStmt l >> get) . reverse . elseIfBody) elseIfs

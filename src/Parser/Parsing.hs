@@ -816,9 +816,10 @@ ifElseIfStmtParser = do
   expression <- expressionParser
   ifCompound <- braces $ many blockItemParser
   elseIfs <- many $ try elseIfParser
-  elseCompound <- option [] (do
+  elseCompound <- option Nothing (do
     _ <- reserved "else"
-    braces $ many $ try blockItemParser)
+    stmts <- braces $ many $ try blockItemParser
+    return $ Just stmts)
   return $ IfElseStmt expression ifCompound elseIfs elseCompound (Position p)
 
 forLoopStmtParser :: Parser (Statement Annotation)
