@@ -75,4 +75,4 @@ spec = do
   
   where
     isEAssignmentToImmutable :: Maybe (Errors Annotation) -> Bool
-    isEAssignmentToImmutable = (\case Just EAssignmentToImmutable -> True; _ -> False)
+    isEAssignmentToImmutable = \case Just EAssignmentToImmutable -> True; _ -> False

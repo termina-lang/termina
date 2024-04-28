@@ -918,45 +918,48 @@ globalCheck (Const ident ty expr mods anns) = do
 
 parameterTypeChecking :: Locations -> Parameter -> SemanticMonad ()
 parameterTypeChecking anns p =
-         let typeSpec = paramTypeSpecifier p in
-          -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
-          -- since we cannot have dynamic types as parameters.
-          case typeSpec of
-            DynamicSubtype _ -> throwError (annotateError anns (EArgHasDyn p))
-            _ -> return ()
+    let typeSpec = paramTypeSpecifier p in
+     -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
+     -- since we cannot have dynamic types as parameters.
+    case typeSpec of
+      DynamicSubtype _ -> throwError (annotateError anns (EArgHasDyn p))
+      Option (DynamicSubtype _) -> throwError (annotateError anns (EArgHasDyn p))
+      _ -> checkTypeDefinition anns typeSpec
 
 constParameterTypeChecking :: Locations -> ConstParameter -> SemanticMonad ()
 constParameterTypeChecking anns (ConstParameter p) =
-         let typeSpec = paramTypeSpecifier p in 
-          unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
+    let typeSpec = paramTypeSpecifier p in 
+    unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
 
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
 programSeman (Function ident cps ps mty bret mods anns) =
   ----------------------------------------
-  -- Check Type Definitions of types.
-  -- Ret type is okay.
-  maybe
-    (return ())
-    (checkTypeDefinition anns)
-    mty >>
-  -- Check params are not Dyn (or contains dyn)
-  forM_ ps (parameterTypeChecking anns)
-  >>
-  ----------------------------------------
-  (Function ident cps ps mty
-  <$> (addLocalImmutObjs anns
-          (fmap (\ p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
-          (retblockType mty bret) >>= \ typed_bret ->
-    maybe
-      -- Procedure
-      (blockRetTy Unit)
-      -- Function
-      blockRetTy
-      mty typed_bret >> return typed_bret
-      )
-  <*> pure mods
-  <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty))))
+  -- Check the return type 
+  maybe (return ()) (checkTypeDefinition anns) mty >>
+  -- Check generic const parameters
+  forM_ cps (constParameterTypeChecking anns) >>
+  addLocalConstants anns 
+      (fmap (\(ConstParameter p) -> (paramIdentifier p , paramTypeSpecifier p)) cps) checkFunction
+
+  where
+    checkFunction :: SemanticMonad (SAST.AnnASTElement SemanticAnns)
+    checkFunction = 
+          -- Check regular params
+        forM_ ps (parameterTypeChecking anns) >>
+        ----------------------------------------
+        Function ident cps ps mty
+          <$> (addLocalImmutObjs anns
+                (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
+                (retblockType mty bret) >>= \ typed_bret ->
+              maybe
+                  -- Procedure
+                  (blockRetTy Unit)
+                  -- Function
+                  blockRetTy
+                  mty typed_bret >> return typed_bret)
+          <*> pure mods
+          <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> globalCheck gbl

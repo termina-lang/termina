@@ -46,4 +46,4 @@ spec = do
   
   where
     isEIfElseNoOtherwise :: Maybe (Errors Annotation) -> Bool
-    isEIfElseNoOtherwise = (\case Just EIfElseNoOtherwise -> True; _ -> False)
+    isEIfElseNoOtherwise = \case Just EIfElseNoOtherwise -> True; _ -> False

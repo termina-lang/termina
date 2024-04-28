@@ -288,7 +288,12 @@ getFunctionTy loc iden =
   GFun constArgs args retty -> return (constArgs, args, retty)
   ge -> throwError $ annotateError loc (ENotFoundFun iden (fmap forgetSemAnn ge))
 
-
+-- | Add new *local* constant generic parameters.
+addLocalConstants :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
+addLocalConstants loc newVars ma  =
+  localScope (addConstants newVars >> ma)
+  where
+    addConstants = mapM_ (uncurry (insertConstObj loc))
 
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
