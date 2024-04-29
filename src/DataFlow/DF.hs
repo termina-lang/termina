@@ -82,7 +82,7 @@ useObject (DereferenceMemberAccess obj i ann)
   = SM.location ann `annotateError` safeAddUse i
   >> useObject obj
 useObject (VectorSliceExpression obj eB eT _ann)
-  = useObject obj >> useConstE eB >> useConstE eT
+  = useObject obj >> useExpression eB >> useExpression eT
 -- TODO Use Object undyn?
 useObject (Undyn obj _ann)
   = useObject obj
@@ -100,7 +100,7 @@ defObject (DereferenceMemberAccess obj i ann)
   = (SM.location ann) `annotateError` safeAddUse i
   >> useObject obj
 defObject (VectorSliceExpression obj eB eT _ann)
-  = useObject obj >> useConstE eB >> useConstE eT
+  = useObject obj >> useExpression eB >> useExpression eT
 defObject (Undyn obj _ann)
   = useObject obj
 

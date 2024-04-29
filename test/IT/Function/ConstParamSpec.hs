@@ -26,6 +26,19 @@ test1 = "function test1<const N : usize>(array0 : &[u16; N]) -> u16 {\n" ++
         "    return foo;\n" ++
         "}"
 
+test2 :: String
+test2 = "function addfunc<const N : u16>() -> u16 {\n" ++
+        "    var foo : u16 = N;\n" ++
+        "    foo = foo + 1024;\n" ++
+        "    return foo;\n" ++
+        "}\n" ++
+        "\n" ++
+        "function test2<const N : usize>(array0 : &[u16; N]) -> u16 {\n" ++
+        "    var foo : u16 = 0;\n" ++
+        "    foo = addfunc::<4>() + (*array0)[0];\n" ++
+        "    return foo;\n" ++
+        "}"
+
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
@@ -95,6 +108,42 @@ spec = do
               "    uint16_t foo = 0;\n" ++ 
               "\n" ++
               "    foo = foo + array0[0];\n" ++
+              "\n" ++
+              "    return foo;\n" ++
+              "\n" ++
+              "}\n")    
+    it "Prints declaration of function test2" $ do
+      renderHeader test2 `shouldBe`
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "uint16_t addfunc(uint16_t N);\n" ++
+              "\n" ++
+              "uint16_t test2(size_t N, const uint16_t array0[N]);\n" ++
+              "\n" ++
+              "#endif\n")
+    it "Prints definition of function test2" $ do
+      renderSource test2 `shouldBe`
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "uint16_t addfunc(uint16_t N) {\n" ++
+              "    \n" ++
+              "    uint16_t foo = N;\n" ++ 
+              "\n" ++
+              "    foo = foo + 1024;\n" ++
+              "\n" ++
+              "    return foo;\n" ++
+              "\n" ++
+              "}\n" ++
+              "\n" ++
+              "uint16_t test2(size_t N, const uint16_t array0[N]) {\n" ++
+              "    \n" ++
+              "    uint16_t foo = 0;\n" ++ 
+              "\n" ++
+              "    foo = addfunc(4) + array0[0];\n" ++
               "\n" ++
               "    return foo;\n" ++
               "\n" ++

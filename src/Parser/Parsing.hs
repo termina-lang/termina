@@ -570,9 +570,9 @@ objectParser = objectParser' objectTermParser
     vectorOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
-            low <- constExprParser
+            low <- expressionParser 
             _ <- reservedOp ".."
-            up <- constExprParser
+            up <- expressionParser
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent ->  VectorSliceExpression parent low up (Position p)
@@ -610,9 +610,9 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
     vectorOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
-            low <- constExprParser
+            low <- expressionParser
             _ <- reservedOp ".."
-            up <- constExprParser
+            up <- expressionParser
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent -> case parent of

@@ -36,19 +36,19 @@ test0 = "struct Message {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "\n" ++
-        "    self->interval = self->interval + 1 : u32;\n" ++
+        "    self->interval = self->interval + 1;\n" ++
         "\n" ++
         "    var alloc_msg : Option<dyn Message> = None;\n" ++
         "    self->message_pool.alloc(&mut alloc_msg);\n" ++
         "    match alloc_msg {\n" ++
-        "        case Some(msg) => {\n" ++
+        "        case Some (msg) => {\n" ++
         "            self->message_pool.free(msg);\n" ++
         "        }\n" ++
         "        case None => {\n" ++
         "        }\n" ++
         "    }\n" ++
         "\n" ++
-        "    var check : bool = (*self).check_interval(10 : u32);\n" ++
+        "    var check : bool = self->check_interval(10);\n" ++
         "\n" ++
         "    if (check == false) {\n" ++
         "      ret = Result::Error;\n" ++

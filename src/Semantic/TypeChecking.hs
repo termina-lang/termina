@@ -168,16 +168,11 @@ objectType getVarTy (Dereference obj ann) = do
 objectType getVarTy (VectorSliceExpression obj lower upper anns) = do
   typed_obj <- objectType getVarTy obj
   (obj_ak, obj_ty) <- unboxObjectSAnns typed_obj
-  typed_lower <- constExpressionType USize lower
-  typed_upper <- constExpressionType USize upper
+  typed_lower <- expressionType (Just USize) rhsObjectType lower
+  typed_upper <- expressionType (Just USize) rhsObjectType upper
   case obj_ty of
     Vector ty_elems _ -> do
-      lowerInt <- buildSize typed_lower
-      upperInt <- buildSize typed_upper
--- TODO: We should check the sizes of the vector and the bounds later
---          when (lowerInt > upperInt) (throwError $ annotateError anns (EBoundsLowerGTUpper lowerInt upperInt))
---          when (upperInt > size) (throwError $ annotateError anns (EUpperBoundGTSize upperInt size))
-      return $ SAST.VectorSliceExpression typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Vector ty_elems (CAST.E SSub upperInt lowerInt))
+      return $ SAST.VectorSliceExpression typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Vector ty_elems UnknownSize)
     ty -> throwError $ annotateError anns (EVector ty)
 objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- objectType getVarTy obj
@@ -566,13 +561,8 @@ expressionType expectedType objType (VectorInitExpression iexp size pann) = do
       typed_init <- expressionType (Just ts) objType iexp
       checkSize pann size
       case size of
-        CAST.K i ->
-          return (SAST.VectorInitExpression typed_init size (buildExpAnn pann (Vector ts (CAST.K i)))
-          )
-        CAST.V v ->
-          return (SAST.VectorInitExpression typed_init size (buildExpAnn pann (Vector ts (CAST.V v)))
-          )
-        _ -> throwError $ annotateError pann (EVectorConst size)
+        UnknownSize -> throwError $ annotateError pann (EVectorConst size)
+        s -> return $ SAST.VectorInitExpression typed_init size (buildExpAnn pann (Vector ts s))
     Just ts -> throwError $ annotateError pann (EVector ts)
     _ -> throwError $ annotateError pann EExpectedType
 -- DONE [Q5]

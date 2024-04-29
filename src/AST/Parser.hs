@@ -32,7 +32,7 @@ data Object a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
   | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
-  | VectorSliceExpression (Object a) (ConstExpression a) (ConstExpression a) a
+  | VectorSliceExpression (Object a) (Expression a) (Expression a) a
   -- ^ Array slicing | eI [ cEx .. cEy ]|,
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound

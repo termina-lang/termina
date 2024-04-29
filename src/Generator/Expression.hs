@@ -242,12 +242,9 @@ genObject (VectorIndexExpression obj index ann) = do
     return $ CIndex cObj cIndex cAnn
 genObject (VectorSliceExpression obj lower _ ann) = do
     let cAnn = buildGenericAnn ann
-    case lower of
-        KC (I lowInteger _) _ -> do
-            let cInteger = genInteger lowInteger
-            cObj <- genObject obj
-            return $ CUnary CAdrOp (CIndex cObj (CConst (CIntConst cInteger) cAnn) cAnn) cAnn
-        _ -> throwError $ InternalError ("Invalid constant expression: " ++ show lower)
+    cLower <- genExpression lower
+    cObj <- genObject obj
+    return $ CUnary CAdrOp (CIndex cObj cLower cAnn) cAnn
 genObject (MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj

@@ -143,10 +143,7 @@ data AccessKind = Immutable | Mutable | Private
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
   deriving (Show, Ord, Eq) 
 
-data SizeBinOp = SAdd | SSub | SMul | SDiv 
-  deriving (Show, Ord, Eq)
-
-data Size = K TInteger | V Identifier | E SizeBinOp Size Size
+data Size = K TInteger | V Identifier | UnknownSize
   deriving (Show, Ord, Eq) 
 
 data Op

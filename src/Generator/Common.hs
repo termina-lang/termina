@@ -284,7 +284,7 @@ genInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 genArraySize :: (MonadError CGeneratorError m) => Size -> SemanticAnns -> m CExpression
 genArraySize (K s) ann = return $ CConst (CIntConst (genInteger s)) (buildGenericAnn ann)
 genArraySize (V v) ann = return $ CVar v (buildGenericAnn ann)
-genArraySize e@(E {}) _ = throwError $ InternalError $ "Unsupported array size: " ++ show e
+genArraySize UnknownSize _ = throwError $ InternalError "Unknown size"
 
 genArraySizeDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m [CDerivedDeclarator]
 genArraySizeDeclarator (Vector ts arraySize) ann = do
