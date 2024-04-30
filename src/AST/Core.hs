@@ -117,7 +117,8 @@ data TypeSpecifier
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64 | USize
   | Bool | Char | DefinedType Identifier
-  | Vector TypeSpecifier Size
+  | Array TypeSpecifier Size
+  | Slice TypeSpecifier
   | Option TypeSpecifier
   -- Built-in polymorphic types
   | MsgQueue TypeSpecifier Size -- Message queues
@@ -143,7 +144,7 @@ data AccessKind = Immutable | Mutable | Private
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
   deriving (Show, Ord, Eq) 
 
-data Size = K TInteger | V Identifier | UnknownSize
+data Size = K TInteger | V Identifier
   deriving (Show, Ord, Eq) 
 
 data Op
@@ -343,64 +344,6 @@ data ElseIf' expr obj a = ElseIf
   , elseIfBody       :: Block' expr obj a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
-
-  -- | First AST after parsing
-data Expression'
-    obj -- ^ objects type
-    a -- ^ Annotations
-  = AccessObject (obj a)
-  | Constant Const a -- ^ | 24 : i8|
-  | BinOp Op (Expression' obj a) (Expression' obj a) a
-  | ReferenceExpression AccessKind (obj a) a
-  | Casting (Expression' obj a) TypeSpecifier a
-  -- Invocation expressions
-  | FunctionExpression Identifier [ConstExpression a] [ Expression' obj a ] a
-  | MemberFunctionAccess (obj a) Identifier [ConstExpression a] [Expression' obj a] a
-  -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | DerefMemberFunctionAccess (obj a) Identifier [ConstExpression a] [Expression' obj a] a
-  -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
-  --
-  -- These four constructors cannot be used on regular (primitive?) expressions
-  -- These two can only be used as the RHS of an assignment:
-  | VectorInitExpression (Expression' obj a) Size a -- ^ Vector initializer, | (13 : i8) + (2 : i8)|
-  | FieldAssignmentsExpression
-    Identifier -- ^ Structure type identifier
-    [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
-    a
-  -- These two can only be used as the RHS of an assignment or as a case of a match expression:
-  | EnumVariantExpression
-    Identifier -- ^ Enum identifier
-    Identifier -- ^ Variant identifier
-    [ Expression' obj a ] -- ^ list of expressions
-    a
-  | OptionVariantExpression (OptionVariant (Expression' obj a)) a
-  | IsEnumVariantExpression
-    (obj a) -- ^ Enum object
-    Identifier -- ^ Enum identifier
-    Identifier -- ^ Variant identifier a
-    a
-  | IsOptionVariantExpression
-    (obj a) -- ^ Opion object
-    OptionVariantLabel -- ^ Variant label
-    a
-  deriving (Show, Functor)
-
-instance (Annotated obj) => Annotated (Expression' obj) where
-  getAnnotation (AccessObject obj)                       = getAnnotation obj
-  getAnnotation (Constant _ a)                           = a
-  getAnnotation (BinOp _ _ _ a)                          = a
-  getAnnotation (ReferenceExpression _ _ a)              = a
-  getAnnotation (Casting _ _ a)                          = a
-  getAnnotation (FunctionExpression _ _ _ a)               = a
-  getAnnotation (FieldAssignmentsExpression _ _ a)       = a
-  getAnnotation (EnumVariantExpression _ _ _ a)          = a
-  getAnnotation (VectorInitExpression _ _ a)             = a
-  getAnnotation (OptionVariantExpression _ a)            = a
-  getAnnotation (MemberFunctionAccess _ _ _ _ a)           = a
-  getAnnotation (DerefMemberFunctionAccess _ _ _ _ a)      = a
-  getAnnotation (IsEnumVariantExpression _ _ _ a)        = a
-  getAnnotation (IsOptionVariantExpression _ _ a)        = a
-
 
 data Statement' expr obj a =
   -- | Declaration statement

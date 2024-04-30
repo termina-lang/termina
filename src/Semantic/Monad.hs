@@ -557,7 +557,7 @@ checkTypeDefinition loc (DefinedType identTy) =
   -- Check that the type was defined
   void (getGlobalTy loc identTy)
   -- we assume that only well-formed types are added to globals.
-checkTypeDefinition loc (Vector ty (CAST.K s)) =
+checkTypeDefinition loc (Array ty (CAST.K s)) =
   -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
@@ -565,7 +565,7 @@ checkTypeDefinition loc (Vector ty (CAST.K s)) =
   checkIntConstant loc USize s >>
   --
   checkTypeDefinition loc ty
-checkTypeDefinition loc (Vector ty (CAST.V ident)) =
+checkTypeDefinition loc (Array ty (CAST.V ident)) =
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
   getConstTy loc ident >>=

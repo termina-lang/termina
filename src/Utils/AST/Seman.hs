@@ -4,6 +4,7 @@ module Utils.AST.Seman where
 
 import Utils.AST.Parser
 import           AST.Seman
+import Data.Maybe
 
 -- A relation of type specifier.
 dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
@@ -16,3 +17,4 @@ dynPromotion _ _ = False
 cleanDyn :: TypeSpecifier -> TypeSpecifier
 cleanDyn (DynamicSubtype t) = cleanDyn t
 cleanDyn t = t
+

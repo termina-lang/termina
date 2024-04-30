@@ -31,7 +31,7 @@ genFunction (Function identifier constParameters parameters rts (BlockRet body r
     cParams <- mapM (genParameterDeclaration ann) parameters
     cReturn <- genReturnStatement ret
     let cAnn = buildGenericAnn ann
-        newKeyVals = fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Vector {})) <- parameters]
+        newKeyVals = fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Array {})) <- parameters]
     cBody <- Control.Monad.Reader.local (union newKeyVals) $ foldM (\acc x -> do
         cStmt <- genBlockItem x
         return $ acc ++ cStmt) [] body

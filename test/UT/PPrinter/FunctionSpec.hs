@@ -22,8 +22,8 @@ constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32SemAnn
 vectorAnn :: SemanticAnns
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-refVectorAnn :: SemanticAnns
-refVectorAnn = refVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
+refArrayAnn :: SemanticAnns
+refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 
 structASemAnn, tmDescriptorSemAnn :: SemanticAnns
 structASemAnn = definedTypeSemAnn Mutable "StructA"
@@ -39,14 +39,14 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit1 :: Expression SemanticAnns
 structAFieldsInit1 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit2 :: Expression SemanticAnns
@@ -60,7 +60,7 @@ structAFieldsInit3 :: Expression SemanticAnns
 structAFieldsInit3 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refVectorAnn) vectorAnn)) undefined,
+         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) vectorAnn)) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
@@ -123,7 +123,7 @@ function2 = Function "function2" [] [Parameter "param0" UInt32] (Just UInt32)
     struct0Assignment0] returnStructField0) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnns
-function3 = Function "function3" [] [Parameter "param0" UInt32, Parameter "param1" (Vector UInt32 (K (TInteger 10 DecRepr)))] (Just UInt32) 
+function3 = Function "function3" [] [Parameter "param0" UInt32, Parameter "param1" (Array UInt32 (K (TInteger 10 DecRepr)))] (Just UInt32) 
   (BlockRet [
     struct0Declaration2, 
     struct1Declaration, 
@@ -131,7 +131,7 @@ function3 = Function "function3" [] [Parameter "param0" UInt32, Parameter "param
     ] returnStructField0) [] unitSemAnn
 
 function4 :: AnnASTElement SemanticAnns
-function4 = Function "function4" [] [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Vector UInt32 (K (TInteger 10 DecRepr))))] (Just UInt32) 
+function4 = Function "function4" [] [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] (Just UInt32) 
   (BlockRet [
     struct0Declaration3, 
     struct1Declaration, 

@@ -480,8 +480,8 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
                 ]
 genTaskClassCode obj = throwError $ InternalError $ "Invalid global object (not a task): " ++ show obj
 
-emitterToVectorMap :: M.Map Identifier Integer
-emitterToVectorMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
+emitterToArrayMap :: M.Map Identifier Integer
+emitterToArrayMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
 
 genArmTimer :: CExpression -> Identifier -> CSourceGenerator [CCompoundBlockItem]
 genArmTimer cExpr identifier = do
@@ -509,7 +509,7 @@ genEmitter :: RTEMSEmitter -> CSourceGenerator CFileItem
 genEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) = do
     let cAnn = CAnnotations Internal CGenericAnn
         declStmt = CAnnotations Internal (CDeclarationAnn True)
-        irqVector = emitterToVectorMap M.! interrupt
+        irqArray = emitterToArrayMap M.! interrupt
     classFunctionName <- genClassFunctionName classId action
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_isr_interrupt(void * ignored) {
@@ -532,7 +532,7 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId _ (
                 CBlockStmt $ CExpr (Just $ CAssignment
                     (CVar "result" cAnn)
                     (CCall (CVar classFunctionName cAnn)
-                        [CVar "self" cAnn, CConst (CIntConst (CInteger irqVector CDecRepr)) cAnn] cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
+                        [CVar "self" cAnn, CConst (CIntConst (CInteger irqArray CDecRepr)) cAnn] cAnn) cAnn) (CAnnotations Internal (CStatementAnn True False)),
                 CBlockStmt $ CIf (CBinary CNeqOp (CMember (CVar "result" cAnn) enumVariantsField False cAnn)
                     (CVar ("Result" <::> "Ok") cAnn) cAnn)
                     (CCompound [
@@ -544,7 +544,7 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSHandler identifier classId _ (
 genEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) = do
     let cAnn = CAnnotations Internal CGenericAnn
         declStmt = CAnnotations Internal (CDeclarationAnn True)
-        irqVector = emitterToVectorMap M.! interrupt
+        irqArray = emitterToArrayMap M.! interrupt
     return $ CExtDecl $ CFDefExt $
         -- void * rtems_isr_interrupt(void * ignored) {
         CFunDef [CTypeSpec CVoidType]
@@ -557,7 +557,7 @@ genEmitter (RTEMSInterruptEmitter interrupt (RTEMSTask {})) = do
                     [(Just $ CDeclarator (Just "status") [] [] cAnn, Just $ CInitExpr (CVar "RTEMS_SUCCESSFUL" cAnn) cAnn, Nothing)] declStmt,
                 -- uint32_t vector = interrupt;
                 CBlockDecl $ CDeclaration [CTypeSpec CUInt32Type]
-                    [(Just $ CDeclarator (Just "vector") [] [] cAnn, Just $ CInitExpr (CConst (CIntConst (CInteger irqVector CDecRepr)) cAnn) cAnn, Nothing)] declStmt,
+                    [(Just $ CDeclarator (Just "vector") [] [] cAnn, Just $ CInitExpr (CConst (CIntConst (CInteger irqArray CDecRepr)) cAnn) cAnn, Nothing)] declStmt,
                 -- status = rtems_message_queue_send(interrupt.sink_msgq_id, &interrupt.task_port, sizeof(uint32_t));
                 CBlockStmt $ CExpr (Just $ CAssignment
                     (CVar "status" cAnn)
@@ -1150,7 +1150,7 @@ genInstallEmitters emitters = do
                         -- rtems_shutdown_executive(1);
                         CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
                                 (CCall (CVar (namefy "rtems" <::> "install_isr") cAnn)
-                                    [CVar (show $ emitterToVectorMap M.! interrupt) cAnn,
+                                    [CVar (show $ emitterToArrayMap M.! interrupt) cAnn,
                                     CVar (namefy $ "rtems_isr" <::> interrupt) cAnn] cAnn) cAnn)
                             stmtAnn
                     ] (CAnnotations Internal (CCompoundAnn False True))) Nothing stmtAnn

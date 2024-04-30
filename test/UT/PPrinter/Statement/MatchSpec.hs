@@ -15,13 +15,13 @@ import UT.PPrinter.Expression.Common
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
-vectorAnn, dynVectorAnn :: SemanticAnns
+vectorAnn, dynArrayAnn :: SemanticAnns
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-dynVectorAnn = dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
+dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnns
 param0 = Variable "param0" dynUInt32SemAnn
-param1 = Variable "param1" dynVectorAnn
+param1 = Variable "param1" dynArrayAnn
 
 uint32Const0 :: Expression SemanticAnns
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
@@ -33,7 +33,7 @@ optionVar :: Expression SemanticAnns
 optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
 
 vector0IndexConstant :: Expression SemanticAnns
-vector0IndexConstant = AccessObject (VectorIndexExpression (Undyn param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+vector0IndexConstant = AccessObject (ArrayIndexExpression (Undyn param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
 foo1 :: Object SemanticAnns
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)

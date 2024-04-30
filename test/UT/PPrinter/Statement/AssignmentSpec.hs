@@ -18,27 +18,27 @@ tmDescriptorTS = DefinedType "TMDescriptor"
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
-vectorAnn, vectorTMDescriptorAnn, twoDymVectorAnn, twoDymVectorRowAnn :: SemanticAnns
+vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnns
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymVectorRowAnn = vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+twoDymArrayRowAnn = vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
+twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
 vector1 = Variable "vector1" vectorAnn
-vector2 = Variable "vector2" twoDymVectorAnn
+vector2 = Variable "vector2" twoDymArrayAnn
 vector3 = Variable "vector3" vectorAnn
-vector4 = Variable "vector4" twoDymVectorAnn
-vector5 = Variable "vector5" twoDymVectorAnn
+vector4 = Variable "vector4" twoDymArrayAnn
+vector5 = Variable "vector5" twoDymArrayAnn
 vector6 = Variable "vector6" vectorTMDescriptorAnn
 
 vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnns
 vector1Assign = AssignmentStmt vector1 (AccessObject (Variable "vector0" vectorAnn)) undefined
-vector2Assign = AssignmentStmt vector2 (AccessObject (Variable "vector1" twoDymVectorAnn)) undefined
-vector3Assign = AssignmentStmt vector3 (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined
-vector4Assign = AssignmentStmt vector4 (VectorInitExpression (VectorInitExpression uint32Const0 (K (TInteger 5 DecRepr)) twoDymVectorRowAnn) (K (TInteger 10 DecRepr)) twoDymVectorAnn) undefined
-vector5Assign = AssignmentStmt vector5 (VectorInitExpression (AccessObject (Variable "vector_row" twoDymVectorRowAnn)) (K (TInteger 10 DecRepr)) twoDymVectorAnn) undefined
-vector6Assign = AssignmentStmt vector6 (VectorInitExpression tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorAnn) undefined
+vector2Assign = AssignmentStmt vector2 (AccessObject (Variable "vector1" twoDymArrayAnn)) undefined
+vector3Assign = AssignmentStmt vector3 (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined
+vector4Assign = AssignmentStmt vector4 (ArrayInitExpression (ArrayInitExpression uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowAnn) (K (TInteger 10 DecRepr)) twoDymArrayAnn) undefined
+vector5Assign = AssignmentStmt vector5 (ArrayInitExpression (AccessObject (Variable "vector_row" twoDymArrayRowAnn)) (K (TInteger 10 DecRepr)) twoDymArrayAnn) undefined
+vector6Assign = AssignmentStmt vector6 (ArrayInitExpression tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorAnn) undefined
 
 foo1, foo2 :: Object SemanticAnns
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
@@ -63,7 +63,7 @@ structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
     FieldAssignmentsExpression "StructA"
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (VectorInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns

@@ -22,7 +22,7 @@ total = AccessObject (Variable "total" (objSemAnn Mutable UInt32))
 i = AccessObject (Variable "i" (objSemAnn Mutable USize))
 
 vector0IndexI:: Expression SemanticAnns
-vector0IndexI = AccessObject (VectorIndexExpression vector0 i (objSemAnn Mutable UInt32))
+vector0IndexI = AccessObject (ArrayIndexExpression vector0 i (objSemAnn Mutable UInt32))
 
 forLoopBody :: [Statement SemanticAnns]
 forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]

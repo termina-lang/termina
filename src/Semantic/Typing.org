@@ -106,11 +106,11 @@
 \]
 #+end_src
 
-* VectorIndex Expression
+* ArrayIndex Expression
 #+begin_src latex
 \[
-\inference[eVectorIndex]
-{ G, L, RO \vdash v : \mathsf{Vector}(\tau) \\
+\inference[eArrayIndex]
+{ G, L, RO \vdash v : \mathsf{Array}(\tau) \\
   G, L, RO \vdash e : \theta \\
   \mathsf{Index}(\theta)
 }
@@ -120,7 +120,7 @@
 
 #+end_src
 
-* Vector InitExpresssion
+* Array InitExpresssion
 #+begin_src latex
 \inference[eVecInit]
 {
@@ -128,7 +128,7 @@ G, L, RO \vdash e : \tau \\
 c \in Ty \\ TODO Q16
 }
 % ----------------------------------------
-{G , L , RO \vdash [ e ; c : Ty ] : \mathsf{Vector}(\tau, c)}
+{G , L , RO \vdash [ e ; c : Ty ] : \mathsf{Array}(\tau, c)}
 #+end_src
 * MatchExpression
 This is not an Expression anymore.

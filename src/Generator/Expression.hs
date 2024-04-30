@@ -50,7 +50,7 @@ genMemberFunctionAccess obj ident constArgs args ann = do
                 cParamExpr <- genExpression pExpr
                 cParamExprTs <- getExprType pExpr
                 case cParamExprTs of
-                    Vector {} -> do
+                    Array {} -> do
                         structName <- genArrayWrapStructName cParamExprTs
                         return $  CUnary CIndOp
                             (CCast (
@@ -90,7 +90,7 @@ genMemberFunctionAccess obj ident constArgs args ann = do
                 [element] -> do
                     paramTs <- getExprType element
                     case paramTs of
-                        Vector {} ->
+                        Array {} ->
                             return $
                                 CCall (CVar (msgQueueMethodName ident) cAnn) (cObj :
                                     (flip (CCast (CDeclaration
@@ -161,7 +161,7 @@ genExpression (ReferenceExpression _ obj ann) = do
     cObj <- genObject obj
     case objType of
         -- | If it is a vector, we need to generate the address of the data
-        (DynamicSubtype (Vector _ _)) -> do
+        (DynamicSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
             decl <- genCastDeclaration objType ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
@@ -169,7 +169,7 @@ genExpression (ReferenceExpression _ obj ann) = do
         (DynamicSubtype _) -> do
             decl <- genCastDeclaration objType ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
-        (Vector {}) -> return cObj
+        (Array {}) -> return cObj
         _ -> return $ CUnary CAdrOp cObj cAnn
 genExpression expr@(FunctionExpression name constArgs args ann) = do
     let cAnn = buildGenericAnn ann
@@ -184,7 +184,7 @@ genExpression expr@(FunctionExpression name constArgs args ann) = do
             (\pExpr (Parameter _ ts) -> do
                 cParamExpr <- genExpression pExpr
                 case ts of
-                    Vector {} -> do
+                    Array {} -> do
                         structName <- genArrayWrapStructName ts
                         return $  CUnary CIndOp
                             (CCast (
@@ -194,7 +194,7 @@ genExpression expr@(FunctionExpression name constArgs args ann) = do
                     _ -> return cParamExpr) args argsAnns
     expType <- getExprType expr
     case expType of
-        Vector {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
+        Array {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
         _ -> return $ CCall identifier (cConstArgs ++ cArgs) cAnn
 genExpression (MemberFunctionAccess obj ident constArgs args ann) = do
     genMemberFunctionAccess obj ident constArgs args ann
@@ -212,6 +212,7 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
     return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar optionSomeVariant cAnn) cAnn
+genExpression (ArraySliceExpression _ak obj _size _ann) = genObject obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genConstExpression :: ConstExpression SemanticAnns -> CSourceGenerator CExpression
@@ -232,7 +233,7 @@ genObject (Variable identifier ann) = do
     let ident = fromMaybe (CVar identifier cAnn) (Data.Map.lookup identifier subs)
     -- Return the C identifier
     return ident
-genObject (VectorIndexExpression obj index ann) = do
+genObject (ArrayIndexExpression obj index ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -240,7 +241,9 @@ genObject (VectorIndexExpression obj index ann) = do
     cIndex <- genExpression index
     -- Return the C code for the vector index expression
     return $ CIndex cObj cIndex cAnn
-genObject (VectorSliceExpression obj lower _ ann) = do
+-- | TODO This is a temporary solution. We need to call a function that validates
+-- the bounds of the array slice.
+genObject (ArraySlice obj lower _ ann) = do
     let cAnn = buildGenericAnn ann
     cLower <- genExpression lower
     cObj <- genObject obj
@@ -261,7 +264,7 @@ genObject (Dereference obj ann) = do
     objType <- getObjectType obj
     case objType of
         -- | A dereference to a vector is printed as the name of the vector
-        (Reference _ (Vector _ _)) -> genObject obj
+        (Reference _ (Array _ _)) -> genObject obj
         _ -> do
             cObj <- genObject obj
             return $ CUnary CIndOp cObj cAnn
@@ -273,7 +276,7 @@ genObject o@(Undyn obj ann) = do
     cObj <- genObject obj
     case objType of
         -- | If it is a vector, we need to generate the address of the data
-        (DynamicSubtype (Vector _ _)) -> do
+        (DynamicSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
             decl <- genCastDeclaration objType ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn

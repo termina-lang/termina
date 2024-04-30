@@ -120,13 +120,13 @@ lexer = Tok.makeTokenParser langDef
                       ,"=" -- Assignment
                       ,"->" -- Function return type/Outbound connection
                       ,"=>" -- Match case
-                      ,"[" -- Vector init
-                      ,"]" -- Vector init
+                      ,"[" -- Array init
+                      ,"]" -- Array init
                       ,"{" -- Field values assignments
                       ,"}" -- Field values assignments
                       ,"(" -- Parens
                       ,")" -- Parens
-                      ,".." -- Vector slice and for loop range
+                      ,".." -- Array slice and for loop range
                       ,"&mut" -- Mutable reference creation
                       ,"@" -- Field address assignment
                       ,"<->" -- Access port connection
@@ -347,7 +347,7 @@ vectorParser = do
   _ <- semi
   size <- sizeParser
   _ <- reserved "]"
-  return $ Vector typeSpecifier size
+  return $ Array typeSpecifier size
 
 referenceParser :: Parser TypeSpecifier
 referenceParser = reservedOp "&" >> Reference Immutable <$> typeSpecifierParser
@@ -575,11 +575,11 @@ objectParser = objectParser' objectTermParser
             up <- expressionParser
             _ <- reservedOp "]"
             p <- getPosition
-            return $ \parent ->  VectorSliceExpression parent low up (Position p)
+            return $ \parent ->  ArraySlice parent low up (Position p)
           ) <|> (do
             index <- brackets expressionParser
             p <- getPosition
-            return $ \parent ->  VectorIndexExpression parent index (Position p)
+            return $ \parent ->  ArrayIndexExpression parent index (Position p)
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
@@ -616,13 +616,13 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
             _ <- reservedOp "]"
             p <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (VectorSliceExpression obj low up (Position p))
+              AccessObject obj -> AccessObject (ArraySlice obj low up (Position p))
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
             index <- brackets expressionParser
             p <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (VectorIndexExpression obj index (Position p))
+              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position p))
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
@@ -663,7 +663,7 @@ vectorInitParser = do
   _ <- semi
   size <- sizeParser
   _ <- reservedOp "]"
-  return $ VectorInitExpression value size (Position p)
+  return $ ArrayInitExpression value size (Position p)
 
 -- -- Task Definition
 

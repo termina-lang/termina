@@ -97,13 +97,13 @@ else print "Capaz que no"
 #+end_quote
 Name equality.
 
-However, Vectors are structural equivalent, no?
+However, Arrays are structural equivalent, no?
 
 #+begin_src termina
-type A Vector i32 5
+type A Array i32 5
 
 let a : A = [1,2,3,4,5]
-let b : Vector i32 5 = [1,2,3,4,5]
+let b : Array i32 5 = [1,2,3,4,5]
 
 if a == b
 then print("Capaz que sí")
@@ -170,8 +170,8 @@ Like in Rust,C, etc
 let t : FieldNameTy = FieldNameTy {fn1 : bla, ...}
 #+end_src
 
-** IDEA [Q4] Vectors -> Compiling time known length.
-Type ~Vector T E~, ~T~ is the type of elements, but what is ~E~? length?
+** IDEA [Q4] Arrays -> Compiling time known length.
+Type ~Array T E~, ~T~ is the type of elements, but what is ~E~? length?
 
 ~E~ should be an integer known at compiling time.
 

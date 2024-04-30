@@ -66,44 +66,44 @@ refCharSemAnn = refSemAnn Char
 refBoolSemAnn = refSemAnn Bool
 
 vectorSemAnn :: AccessKind -> TypeSpecifier -> Size -> SemanticAnns
-vectorSemAnn ak ts size = objSemAnn ak (Vector ts size)
+vectorSemAnn ak ts size = objSemAnn ak (Array ts size)
 
-dynVectorSemAnn :: TypeSpecifier -> Size -> SemanticAnns
-dynVectorSemAnn ts size = objSemAnn Mutable (DynamicSubtype (Vector ts size))
+dynArraySemAnn :: TypeSpecifier -> Size -> SemanticAnns
+dynArraySemAnn ts size = objSemAnn Mutable (DynamicSubtype (Array ts size))
 
-refVectorSemAnn :: TypeSpecifier -> Size -> SemanticAnns
-refVectorSemAnn ts size = objSemAnn Immutable (Reference Mutable (Vector ts size))
+refArraySemAnn :: TypeSpecifier -> Size -> SemanticAnns
+refArraySemAnn ts size = objSemAnn Immutable (Reference Mutable (Array ts size))
 
-refTwoDymVectorSemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnns
-refTwoDymVectorSemAnn ts size1 size2 = objSemAnn Immutable (Reference Mutable (Vector (Vector ts size1) size2))
+refTwoDymArraySemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnns
+refTwoDymArraySemAnn ts size1 size2 = objSemAnn Immutable (Reference Mutable (Array (Array ts size1) size2))
 
 uint16VecSemAnn, uint32VecSemAnn :: AccessKind -> Size -> SemanticAnns
 uint16VecSemAnn ak = vectorSemAnn ak UInt16
 uint32VecSemAnn ak = vectorSemAnn ak UInt32
 
-twoDymVectorSemAnn :: AccessKind -> TypeSpecifier -> Size -> Size -> SemanticAnns
-twoDymVectorSemAnn ak ts size1 size2 = objSemAnn ak (Vector (Vector ts size1) size2)
+twoDymArraySemAnn :: AccessKind -> TypeSpecifier -> Size -> Size -> SemanticAnns
+twoDymArraySemAnn ak ts size1 size2 = objSemAnn ak (Array (Array ts size1) size2)
 
 uint16TwoDymVecSemAnn, uint32TwoDymVecSemAnn :: AccessKind -> Size -> Size -> SemanticAnns
-uint16TwoDymVecSemAnn ak = twoDymVectorSemAnn ak UInt16
-uint32TwoDymVecSemAnn ak = twoDymVectorSemAnn ak UInt32
+uint16TwoDymVecSemAnn ak = twoDymArraySemAnn ak UInt16
+uint32TwoDymVecSemAnn ak = twoDymArraySemAnn ak UInt32
 
-dynTwoDymVectorSemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnns
-dynTwoDymVectorSemAnn ts size1 size2 = objSemAnn Mutable (DynamicSubtype (Vector (Vector ts size1) size2))
+dynTwoDymArraySemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnns
+dynTwoDymArraySemAnn ts size1 size2 = objSemAnn Mutable (DynamicSubtype (Array (Array ts size1) size2))
 
-dynThreeDymVectorSemAnn :: TypeSpecifier -> Size -> Size -> Size -> SemanticAnns
-dynThreeDymVectorSemAnn ts size1 size2 size3 = objSemAnn Mutable (DynamicSubtype (Vector (Vector (Vector ts size1) size2) size3))
+dynThreeDymArraySemAnn :: TypeSpecifier -> Size -> Size -> Size -> SemanticAnns
+dynThreeDymArraySemAnn ts size1 size2 size3 = objSemAnn Mutable (DynamicSubtype (Array (Array (Array ts size1) size2) size3))
 
 uint16DynTwoDymVecSemAnn, uint32DynTwoDymVecSemAnn :: Size -> Size -> SemanticAnns
-uint16DynTwoDymVecSemAnn = dynTwoDymVectorSemAnn UInt16
-uint32DynTwoDymVecSemAnn = dynTwoDymVectorSemAnn UInt32
+uint16DynTwoDymVecSemAnn = dynTwoDymArraySemAnn UInt16
+uint32DynTwoDymVecSemAnn = dynTwoDymArraySemAnn UInt32
 
-threeDymVectorSemAnn :: AccessKind -> TypeSpecifier -> Size -> Size -> Size -> SemanticAnns
-threeDymVectorSemAnn ak ts size1 size2 size3 = objSemAnn ak (Vector (Vector (Vector ts size1) size2) size3)
+threeDymArraySemAnn :: AccessKind -> TypeSpecifier -> Size -> Size -> Size -> SemanticAnns
+threeDymArraySemAnn ak ts size1 size2 size3 = objSemAnn ak (Array (Array (Array ts size1) size2) size3)
 
 uint16ThreeDymVecSemAnn, uint32ThreeDymVecSemAnn :: AccessKind -> Size -> Size -> Size -> SemanticAnns
-uint16ThreeDymVecSemAnn ak = threeDymVectorSemAnn ak UInt16
-uint32ThreeDymVecSemAnn ak = threeDymVectorSemAnn ak UInt32
+uint16ThreeDymVecSemAnn ak = threeDymArraySemAnn ak UInt16
+uint32ThreeDymVecSemAnn ak = threeDymArraySemAnn ak UInt32
 
 definedTypeSemAnn :: AccessKind -> Identifier -> SemanticAnns
 definedTypeSemAnn ak name = objSemAnn ak (DefinedType name)

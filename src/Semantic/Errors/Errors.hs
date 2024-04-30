@@ -16,6 +16,7 @@ import           Control.Monad.Except       (MonadError (..))
 data Errors a
   -- | Expected /similar/ types?
   = EMismatch TypeSpecifier TypeSpecifier
+  | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
@@ -70,7 +71,7 @@ data Errors a
   -- | Field does not have a fixed location
   | EFieldNotPort Identifier
   -- | Expecting a Vecotor got
-  | EVector TypeSpecifier
+  | EArray TypeSpecifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
   | EFunctionAccessNotResource TypeSpecifier
@@ -91,8 +92,8 @@ data Errors a
   | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
   -- | Global Object but not a type
   | EGlobalNoType Identifier
-  -- | Vector with malformed size 
-  | EVectorConst Size
+  -- | Array with malformed size 
+  | EArrayConst Size
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -123,7 +124,7 @@ data Errors a
   | EUsedHandlerName Identifier
   -- | Unique names Taks
   | EUsedTaskName Identifier
-  -- | Vector Type Primitive
+  -- | Array Type Primitive
   -- | ENoPrimitiveType TypeSpecifier
   -- | Only option Dyn
   | EOptionDyn TypeSpecifier
@@ -175,6 +176,7 @@ data Errors a
   | ETypeNotReference TypeSpecifier
   -- Error while forcing Undyn
   | EUndynForcingError
+  | EInvalidUseOfSlice
   -- Error using a method different than alloc on a pool
   | EPoolsAllocArgs
   | EPoolsMethods Identifier
@@ -217,7 +219,7 @@ data Errors a
   | EMsgQueueSendArgNotRefImmTimeout TypeSpecifier
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
-  -- | Vector slicing
+  -- | Array slicing
   | ELowerBoundConst (ConstExpression a) -- | Lower bound is not a numeric constant expression
   | EUpperBoundConst (ConstExpression a) -- | Upper bound is not a numeric constant expression
   | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type

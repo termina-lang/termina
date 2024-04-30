@@ -31,15 +31,15 @@ dereferencepVar :: Object SemanticAnns
 -- | *p_var : u16
 dereferencepVar = Dereference pVar (objSemAnn Mutable UInt16)
 
-vector0, dynVector0 :: Object SemanticAnns
+vector0, dynArray0 :: Object SemanticAnns
 vector0 = Variable "vector0" (vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
-dynVector0 = Variable "dynVector0" (dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr)))
+dynArray0 = Variable "dynArray0" (dynArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
-pVector1 :: Expression SemanticAnns
-pVector1 = AccessObject (Variable "p_vector1" (refVectorSemAnn UInt32 (K (TInteger 10 DecRepr))))
+pArray1 :: Expression SemanticAnns
+pArray1 = AccessObject (Variable "p_vector1" (refArraySemAnn UInt32 (K (TInteger 10 DecRepr))))
 
-referenceVector0 :: Expression SemanticAnns
-referenceVector0 = ReferenceExpression Mutable vector0 (refVectorSemAnn UInt32 (K (TInteger 10 DecRepr)))
+referenceArray0 :: Expression SemanticAnns
+referenceArray0 = ReferenceExpression Mutable vector0 (refArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 uint16Const :: Expression SemanticAnns
 uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
@@ -68,7 +68,7 @@ functionCallSingleRefDynVar1 = FunctionExpression "foo" [] [referenceVar1] (funS
 functionCallSingleDerefpVar = FunctionExpression "foo" [] [AccessObject dereferencepVar] (funSemAnn [] [Parameter "param0" UInt16] Unit)
 
 functionCallRetArray :: Expression SemanticAnns
-functionCallRetArray = FunctionExpression "foo" [] [] (funSemAnn [] [] (Vector UInt32 (K (TInteger 10 DecRepr))))
+functionCallRetArray = FunctionExpression "foo" [] [] (funSemAnn [] [] (Array UInt32 (K (TInteger 10 DecRepr))))
 
 functionCallSingleVar0PlusConstant, functionCallSingleDynVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
@@ -80,14 +80,14 @@ functionCallSingleVar0PlusVar1 = FunctionExpression "foo" [] [var0PlusVar1] (fun
 functionCallSingleDerefpVarPlusConstant = FunctionExpression "foo" [] [dereferencepVarPlusConstant] (funSemAnn [] [Parameter "param0" UInt16] Unit)
 functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionExpression "foo" [] [dereferencepVar2PlusVar1] (funSemAnn [] [Parameter "param0" UInt16] Unit)
 
-functionCallSingleVector0, functionCallSingleDynVector0,
-  functionCallSinglepVector1 :: Expression SemanticAnns
-functionCallSingleVector0 = FunctionExpression "foo" [] [AccessObject vector0] (funSemAnn [] [Parameter "param0" (Vector UInt32 (K (TInteger 10 DecRepr)))] Unit)
-functionCallSingleDynVector0 = FunctionExpression "foo" [] [AccessObject dynVector0] (funSemAnn [] [Parameter "param0" (DynamicSubtype (Vector UInt32 (K (TInteger 10 DecRepr))))] Unit)
-functionCallSinglepVector1 = FunctionExpression "foo" [] [pVector1] (funSemAnn [] [Parameter "param0" (Reference Mutable (Vector UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSingleArray0, functionCallSingleDynArray0,
+  functionCallSinglepArray1 :: Expression SemanticAnns
+functionCallSingleArray0 = FunctionExpression "foo" [] [AccessObject vector0] (funSemAnn [] [Parameter "param0" (Array UInt32 (K (TInteger 10 DecRepr)))] Unit)
+functionCallSingleDynArray0 = FunctionExpression "foo" [] [AccessObject dynArray0] (funSemAnn [] [Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSinglepArray1 = FunctionExpression "foo" [] [pArray1] (funSemAnn [] [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
-functionCallSingleRefVector0 :: Expression SemanticAnns
-functionCallSingleRefVector0 = FunctionExpression "foo" [] [referenceVector0] (funSemAnn [] [Parameter "param0" (Reference Mutable (Vector UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSingleRefArray0 :: Expression SemanticAnns
+functionCallSingleRefArray0 = FunctionExpression "foo" [] [referenceArray0] (funSemAnn [] [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
 call2Parameters, call3Parameters, call4Parameters :: Expression SemanticAnns
 call2Parameters = FunctionExpression "foo2" [] [var0PlusConstant, var0PlusVar1] (funSemAnn [] [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
@@ -98,17 +98,17 @@ call3Parameters = FunctionExpression "foo3" []
     var1PlusConstant
   ] (funSemAnn [] [
     Parameter "param0" (Reference Mutable UInt16),
-    Parameter "param1" (Vector UInt32 (K (TInteger 10 DecRepr))),
+    Parameter "param1" (Array UInt32 (K (TInteger 10 DecRepr))),
     Parameter "param2" UInt16
     ] Unit)
 call4Parameters = FunctionExpression "foo4" []
   [
-    AccessObject dynVector0,
+    AccessObject dynArray0,
     referenceVar1,
     functionCallSingleVar0,
     call2Parameters
   ] (funSemAnn [] [
-    Parameter "param0" (DynamicSubtype (Vector UInt32 (K (TInteger 10 DecRepr)))),
+    Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr)))),
     Parameter "param1" (Reference Mutable UInt16),
     Parameter "param2" UInt16,
     Parameter "param3" UInt16
@@ -157,16 +157,16 @@ spec = do
       renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
         pack "foo(*p_var + *(uint16_t *)var1.data)"
     it "Prints the expression: foo(vector0)" $ do
-      renderExpression functionCallSingleVector0 `shouldBe`
+      renderExpression functionCallSingleArray0 `shouldBe`
         pack "foo(*(__wrapper_uint32__10_t *)vector0)"
     it "Prints the expression: foo(&vector0)" $ do
-      renderExpression functionCallSingleRefVector0 `shouldBe`
+      renderExpression functionCallSingleRefArray0 `shouldBe`
         pack "foo(vector0)"
-    it "Prints the expression: foo(dynVector0)" $ do
-      renderExpression functionCallSingleDynVector0 `shouldBe`
-        pack "foo(dynVector0)"
+    it "Prints the expression: foo(dynArray0)" $ do
+      renderExpression functionCallSingleDynArray0 `shouldBe`
+        pack "foo(dynArray0)"
     it "Prints the expression: foo(p_vector1)" $ do
-      renderExpression functionCallSinglepVector1 `shouldBe`
+      renderExpression functionCallSinglepArray1 `shouldBe`
         pack "foo(p_vector1)"
   describe "Pretty printing function call expressions with multiple parameters" $ do
     it "Prints the expression: foo2(var0 + 1024, var0 + var1)" $ do
@@ -176,10 +176,10 @@ spec = do
       renderExpression call3Parameters `shouldBe`
         pack ("foo3(&var0, *(__wrapper_uint32__10_t *)vector0, " ++
               "*(uint16_t *)var1.data + 1024)")
-    it "Prints the expression: foo4(dynVector0, &dynVar1, foo(var0), foo2(var0 + 1024, var0 + dynVar1))" $ do
+    it "Prints the expression: foo4(dynArray0, &dynVar1, foo(var0), foo2(var0 + 1024, var0 + dynVar1))" $ do
       renderExpression call4Parameters `shouldBe`
         pack (
-          "foo4(dynVector0, (uint16_t *)var1.data, foo(var0),\n     " ++
+          "foo4(dynArray0, (uint16_t *)var1.data, foo(var0),\n     " ++
           "foo2(var0 + 1024, var0 + *(uint16_t *)var1.data))")
   describe "Pretty printing functions returning and receiving arrays" $ do
     it "Prints the expression foo() with a function returning an array" $ do

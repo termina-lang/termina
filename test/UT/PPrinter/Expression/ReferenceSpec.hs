@@ -10,45 +10,45 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
-vectorAnn, dynVectorAnn, twoDymVectorAnn, dynTwoDymVectorAnn :: SemanticAnns
+vectorAnn, dynArrayAnn, twoDymArrayAnn, dynTwoDymArrayAnn :: SemanticAnns
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-dynVectorAnn = dynVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
-twoDymVectorAnn = twoDymVectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-dynTwoDymVectorAnn = dynTwoDymVectorSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+dynTwoDymArrayAnn = dynTwoDymArraySemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-refVectorAnn, refTwoDymVectorAnn :: SemanticAnns
-refVectorAnn = refVectorSemAnn UInt32 (K (TInteger 10 DecRepr))
-refTwoDymVectorAnn = refTwoDymVectorSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+refArrayAnn, refTwoDymArrayAnn :: SemanticAnns
+refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+refTwoDymArrayAnn = refTwoDymArraySemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 var0, vector0, vector1 :: Object SemanticAnns
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
-vector1 = Variable "vector1" twoDymVectorAnn
+vector1 = Variable "vector1" twoDymArrayAnn
 
-dynVar0, dynVector0, dynVector1 :: Object SemanticAnns
+dynVar0, dynArray0, dynArray1 :: Object SemanticAnns
 dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
-dynVector0 = Variable "dyn_vector0" dynVectorAnn
-dynVector1 = Variable "dyn_vector1" dynTwoDymVectorAnn
+dynArray0 = Variable "dyn_vector0" dynArrayAnn
+dynArray1 = Variable "dyn_vector1" dynTwoDymArrayAnn
 
-pVar0, pVector0, pVector1 :: Object SemanticAnns
+pVar0, pArray0, pArray1 :: Object SemanticAnns
 pVar0 = Variable "p_var0" refUInt16SemAnn
-pVector0 = Variable "p_vector0" refVectorAnn
-pVector1 = Variable "p_vector1" refTwoDymVectorAnn
+pArray0 = Variable "p_vector0" refArrayAnn
+pArray1 = Variable "p_vector1" refTwoDymArrayAnn
 
-refVar0expr, refVector0expr, refVector1expr :: Expression SemanticAnns
+refVar0expr, refArray0expr, refArray1expr :: Expression SemanticAnns
 refVar0expr = ReferenceExpression Mutable var0 refUInt16SemAnn
-refVector0expr = ReferenceExpression Mutable vector0 refVectorAnn
-refVector1expr = ReferenceExpression Mutable vector1 refTwoDymVectorAnn
+refArray0expr = ReferenceExpression Mutable vector0 refArrayAnn
+refArray1expr = ReferenceExpression Mutable vector1 refTwoDymArrayAnn
 
-refDynVar0expr, refDynVector0expr, refDynVector1expr :: Expression SemanticAnns
+refDynVar0expr, refDynArray0expr, refDynArray1expr :: Expression SemanticAnns
 refDynVar0expr = ReferenceExpression Mutable dynVar0 refUInt16SemAnn
-refDynVector0expr = ReferenceExpression Mutable dynVector0 refVectorAnn
-refDynVector1expr = ReferenceExpression Mutable dynVector1 refTwoDymVectorAnn
+refDynArray0expr = ReferenceExpression Mutable dynArray0 refArrayAnn
+refDynArray1expr = ReferenceExpression Mutable dynArray1 refTwoDymArrayAnn
 
-derefpVar0, derefpVector0, derefpVector1 :: Expression SemanticAnns
+derefpVar0, derefpArray0, derefpArray1 :: Expression SemanticAnns
 derefpVar0 = AccessObject (Dereference pVar0 (objSemAnn Mutable UInt16)) -- | *p_var0 |
-derefpVector0 = AccessObject (Dereference pVector0 vectorAnn) -- | *p_vector0 |
-derefpVector1 = AccessObject (Dereference pVector1 twoDymVectorAnn) -- | *p_vector1 |
+derefpArray0 = AccessObject (Dereference pArray0 vectorAnn) -- | *p_vector0 |
+derefpArray1 = AccessObject (Dereference pArray1 twoDymArrayAnn) -- | *p_vector1 |
 
 renderExpression :: Expression SemanticAnns -> Text
 renderExpression expr = 
@@ -63,27 +63,27 @@ spec = do
       renderExpression refVar0expr `shouldBe`
         pack "&var0"
     it "Prints the expression: &vector0" $ do
-      renderExpression refVector0expr `shouldBe`
+      renderExpression refArray0expr `shouldBe`
         pack "vector0"
     it "Prints the expression: &vector1" $ do
-      renderExpression refVector1expr `shouldBe`
+      renderExpression refArray1expr `shouldBe`
         pack "vector1"
     it "Prints the expression: &dyn_var0" $ do
       renderExpression refDynVar0expr `shouldBe`
         pack "(uint16_t *)dyn_var0.data"
     it "Prints the expression: &dyn_vector0" $ do
-      renderExpression refDynVector0expr `shouldBe`
+      renderExpression refDynArray0expr `shouldBe`
         pack "(uint32_t *)dyn_vector0.data"
     it "Prints the expression: &dyn_vector1" $ do
-      renderExpression refDynVector1expr `shouldBe`
+      renderExpression refDynArray1expr `shouldBe`
         pack "(int64_t (*)[5])dyn_vector1.data"
   describe "Pretty printing dereference expressions" $ do
     it "Prints the expression: *p_var0" $ do
       renderExpression derefpVar0 `shouldBe`
         pack "*p_var0"
     it "Prints the expression: *p_vector0" $ do
-      renderExpression derefpVector0 `shouldBe`
+      renderExpression derefpArray0 `shouldBe`
         pack "p_vector0"
     it "Prints the expression: *p_vector1" $ do
-      renderExpression derefpVector1 `shouldBe`
+      renderExpression derefpArray1 `shouldBe`
         pack "p_vector1"

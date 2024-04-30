@@ -1,4 +1,4 @@
-module IT.Expression.VectorIndexSpec (spec) where
+module IT.Expression.ArrayIndexSpec (spec) where
 
 import Test.Hspec
 import Data.Text hiding (empty)

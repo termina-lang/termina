@@ -7,7 +7,6 @@ module Semantic.TypeChecking where
 -- Termina Ast and Utils
 import           Annotations
 import           AST.Parser                  as PAST
-import           AST.Core                    as CAST
 import           Utils.AST.Parser
 import           Utils.AST.Core
 import           Utils.TypeSpecifier
@@ -134,14 +133,14 @@ objectType getVarTy (Variable ident ann) = do
   (ek, ty) <- getVarTy ann ident
   ak <- unboxLocalEnvKind ek
   return $ SAST.Variable ident (buildExpAnnObj ann ak ty)
-objectType getVarTy (VectorIndexExpression obj idx ann) = do
+objectType getVarTy (ArrayIndexExpression obj idx ann) = do
   typed_obj <- objectType getVarTy obj
   (obj_ak, obj_ty) <- unboxObjectSAnns typed_obj
   case obj_ty of
-    Vector ty_elems _vexp -> do
+    Array ty_elems _vexp -> do
         idx_typed  <- expressionType (Just USize) rhsObjectType idx
-        return $ SAST.VectorIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
-    ty -> throwError $ annotateError ann (EVector ty)
+        return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
+    ty -> throwError $ annotateError ann (EArray ty)
 objectType _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
   -- This is a temporary solution pending confirmation that it works in all cases. 
@@ -165,15 +164,15 @@ objectType getVarTy (Dereference obj ann) = do
   case obj_ty of
     Reference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
     ty              -> throwError $ annotateError ann $ ETypeNotReference ty
-objectType getVarTy (VectorSliceExpression obj lower upper anns) = do
+objectType getVarTy (ArraySlice obj lower upper anns) = do
   typed_obj <- objectType getVarTy obj
   (obj_ak, obj_ty) <- unboxObjectSAnns typed_obj
   typed_lower <- expressionType (Just USize) rhsObjectType lower
   typed_upper <- expressionType (Just USize) rhsObjectType upper
   case obj_ty of
-    Vector ty_elems _ -> do
-      return $ SAST.VectorSliceExpression typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Vector ty_elems UnknownSize)
-    ty -> throwError $ annotateError anns (EVector ty)
+    Array ty_elems _ -> do
+      return $ SAST.ArraySlice typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Slice ty_elems)
+    ty -> throwError $ annotateError anns (EArray ty)
 objectType getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- objectType getVarTy obj
   (_, obj_ty) <- unboxObjectSAnns typed_obj
@@ -478,6 +477,13 @@ expressionType expectedType objType (ReferenceExpression refKind rhs_e pann) = d
     DynamicSubtype ty -> do
       maybe (return ()) (sameOrErr pann (Reference refKind ty)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
+    Slice ty -> do
+      case expectedType of
+        Just rtype@(Reference ak (Array ts size)) -> do
+          unless (groundTyEq ty ts) (throwError $ annotateError pann $ EMismatch ts ty) 
+          unless (refKind == ak) (throwError $ annotateError pann $ EMismatchAccessKind refKind ak)
+          return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
+        _ -> throwError $ annotateError pann EExpectedType
     _ -> do
       maybe (return ()) (sameOrErr pann (Reference refKind obj_type)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
@@ -554,16 +560,14 @@ expressionType expectedType objType (EnumVariantExpression id_ty variant args pa
    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
   }
 -- IDEA Q4
-expressionType expectedType objType (VectorInitExpression iexp size pann) = do
--- | Vector Initialization
+expressionType expectedType objType (ArrayInitExpression iexp size pann) = do
+-- | Array Initialization
   case expectedType of
-    Just (Vector ts _) -> do
+    Just (Array ts _) -> do
       typed_init <- expressionType (Just ts) objType iexp
       checkSize pann size
-      case size of
-        UnknownSize -> throwError $ annotateError pann (EVectorConst size)
-        s -> return $ SAST.VectorInitExpression typed_init size (buildExpAnn pann (Vector ts s))
-    Just ts -> throwError $ annotateError pann (EVector ts)
+      return $ SAST.ArrayInitExpression typed_init size (buildExpAnn pann (Array ts size))
+    Just ts -> throwError $ annotateError pann (EArray ts)
     _ -> throwError $ annotateError pann EExpectedType
 -- DONE [Q5]
 -- TODO [Q17]

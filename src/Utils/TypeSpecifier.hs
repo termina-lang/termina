@@ -18,7 +18,7 @@ primitiveTypes USize           = True
 primitiveTypes Bool            = True
 primitiveTypes Char            = True
 primitiveTypes (DefinedType _) = True
-primitiveTypes (Vector _ _)    = True
+primitiveTypes (Array _ _)    = True
 primitiveTypes  _              = False
 
 -- | The following function defines what we consider to be simple types.
@@ -127,7 +127,7 @@ hasDynOrDep USize = Right False
 hasDynOrDep Bool = Right False
 hasDynOrDep Char = Right False
 --
-hasDynOrDep (Vector ty _s) = hasDynOrDep ty
+hasDynOrDep (Array ty _s) = hasDynOrDep ty
 hasDynOrDep (Option ty) = hasDynOrDep ty
 hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
 hasDynOrDep (DynamicSubtype _) = Right True
@@ -136,7 +136,7 @@ hasDynOrDep _ = Right False
 
 rootType :: TypeSpecifier -> TypeSpecifier
 rootType (Option ts) = rootType ts
-rootType (Vector ts _) = rootType ts
+rootType (Array ts _) = rootType ts
 rootType (MsgQueue ts _) = rootType ts
 rootType (Pool ts _) = rootType ts
 rootType (Reference _ ts) = rootType ts

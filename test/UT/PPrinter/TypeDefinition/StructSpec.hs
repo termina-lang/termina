@@ -50,7 +50,7 @@ packedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K (TInteger 10 DecRepr)))
+    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
   ] [Modifier "packed" Nothing]) undefined
 
 {- | Aligned Struct type.
@@ -67,7 +67,7 @@ alignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K (TInteger 10 DecRepr)))
+    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
   ] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))]) undefined
 
 {- | Aligned Struct type.
@@ -85,7 +85,7 @@ packedAndAlignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
     FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Vector UInt32 (K (TInteger 10 DecRepr)))
+    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
   ] [
       Modifier "packed" Nothing,
       Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))

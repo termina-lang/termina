@@ -59,7 +59,7 @@ test0OptionMap :: OptionMap
 test0OptionMap = M.fromList [(UInt32, S.fromList [Option UInt32])]
 
 test1OptionMap :: OptionMap
-test1OptionMap = M.fromList [(UInt32, S.fromList [Option (Vector UInt32 (K (TInteger 10 DecRepr)))])]
+test1OptionMap = M.fromList [(UInt32, S.fromList [Option (Array UInt32 (K (TInteger 10 DecRepr)))])]
 
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of

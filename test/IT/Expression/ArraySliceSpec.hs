@@ -1,4 +1,4 @@
-module IT.Expression.VectorSliceSpec (spec) where
+module IT.Expression.ArraySliceSpec (spec) where
 
 import Test.Hspec
 import Data.Text hiding (empty)
@@ -13,43 +13,30 @@ import System.Path
 import Modules.Modules
 
 test0 :: String
-test0 = "function slice_test0() {\n" ++
-        "    var vector0 : [u32; 10] = [0 : u32; 10];\n" ++
-        "    vector0[3 : usize .. 10 : usize][1 : usize] = 10 : u32;\n" ++
-        "    return;\n" ++
-        "}"
-
-test1 :: String
-test1 = "function slice_test1(vector0 : &mut [[[u32; 3]; 5]; 10]) {\n" ++
-        "    (*vector0)[3 : usize .. 8 : usize] = [[[10 : u32; 3]; 5]; 5];\n" ++
-        "    return;\n" ++
-        "}"
-
-test2 :: String
-test2 = "function add_one(input : &mut [u32; 5]) {\n" ++ 
+test0 = "function add_one(input : &mut [u32; 5]) {\n" ++ 
         "    for i : usize in 0 : usize .. 5 : usize {\n" ++
         "        (*input)[i] = (*input)[i] + 1 : u32;\n" ++
         "    }\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "function slice_test2(vector0 : &mut [[u32; 5]; 10]) {\n" ++
-        "    add_one(&mut((*vector0)[2 : usize .. 3 : usize][0 : usize]));\n" ++
+        "function slice_test0(vector0 : &mut [[u32; 10]; 5]) {\n" ++
+        "    add_one(&mut(*vector0)[0][0..6]);\n" ++
         "    return;\n" ++
         "}"
 
-test3 :: String
-test3 = "function add_two(input : [u32; 5]) -> [u32; 5] {\n" ++ 
+test1 :: String
+test1 = "function add_two(input : &[u32; 5]) -> [u32; 5] {\n" ++ 
         "    var output : [u32; 5] = [0; 5];\n" ++
         "    for i : usize in 0 : usize .. 5 : usize {\n" ++
-        "        output[i] = output[i] + 2;\n" ++
+        "        output[i] = (*input)[i] + 2;\n" ++
         "    }\n" ++
         "    return output;\n" ++
         "}\n" ++
         "\n" ++
-        "function slice_test3(vector0 : & [[u32; 5]; 10]) {\n" ++
+        "function slice_test1(vector0 : & [[u32; 10]; 5]) {\n" ++
         "    var foo : [u32; 5] = [0; 5];\n" ++
-        "    foo = add_two((*vector0)[2 : usize .. 3 : usize][0 : usize]);\n" ++
+        "    foo = add_two(&(*vector0)[2][2..8]);\n" ++
         "    return;\n" ++
         "}"
 
@@ -85,68 +72,13 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void slice_test0();\n" ++
+              "void add_one(uint32_t input[5]);\n" ++
+              "\n" ++
+              "void slice_test0(uint32_t vector0[5][10]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function slice_test0" $ do
       renderSource test0 `shouldBe`
-        pack ("\n" ++
-              "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void slice_test0() {\n" ++
-              "    \n" ++
-              "    uint32_t vector0[10];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        vector0[__i0] = 0;\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    (&vector0[3])[1] = 10;\n" ++
-              "\n" ++
-              "    return;\n" ++
-              "\n" ++
-              "}\n")    
-    it "Prints declaration of function slice_test1" $ do
-      renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "void slice_test1(uint32_t vector0[10][5][3]);\n" ++
-              "\n" ++
-              "#endif\n")
-    it "Prints definition of function slice_test0" $ do
-      renderSource test1 `shouldBe`
-        pack ("\n" ++
-              "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void slice_test1(uint32_t vector0[10][5][3]) {\n" ++
-              "    \n" ++
-              "    for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
-              "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-              "            for (size_t __i2 = 0; __i2 < 3; __i2 = __i2 + 1) {\n" ++
-              "                (&vector0[3])[__i0][__i1][__i2] = 10;\n" ++
-              "            }\n" ++
-              "        }\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    return;\n" ++
-              "\n" ++
-              "}\n") 
-    it "Prints declaration of function slice_test2" $ do
-      renderHeader test2 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "void add_one(uint32_t input[5]);\n" ++
-              "\n" ++
-              "void slice_test2(uint32_t vector0[10][5]);\n" ++
-              "\n" ++
-              "#endif\n")
-    it "Prints definition of function slice_test2" $ do
-      renderSource test2 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
@@ -162,31 +94,31 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void slice_test2(uint32_t vector0[10][5]) {\n" ++
+              "void slice_test0(uint32_t vector0[5][10]) {\n" ++
               "    \n" ++
-              "    add_one((&vector0[2])[0]);\n" ++
+              "    add_one(&vector0[0][0]);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of function slice_test3" $ do
-      renderHeader test3 `shouldBe`
+    it "Prints declaration of function slice_test1" $ do
+      renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "__wrapper_uint32__5_t add_two(__wrapper_uint32__5_t input);\n" ++
+              "__wrapper_uint32__5_t add_two(const uint32_t input[5]);\n" ++
               "\n" ++
-              "void slice_test3(const uint32_t vector0[10][5]);\n" ++
+              "void slice_test1(const uint32_t vector0[5][10]);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function slice_test3" $ do
-      renderSource test3 `shouldBe`
+    it "Prints definition of function slice_test1" $ do
+      renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "__wrapper_uint32__5_t add_two(__wrapper_uint32__5_t input) {\n" ++
+              "__wrapper_uint32__5_t add_two(const uint32_t input[5]) {\n" ++
               "    \n" ++
               "    uint32_t output[5];\n" ++
               "    for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
@@ -195,7 +127,7 @@ spec = do
               "\n" ++
               "    for (size_t i = 0; i < 5; i = i + 1) {\n" ++
               "        \n" ++
-              "        output[i] = output[i] + 2;\n" ++
+              "        output[i] = input[i] + 2;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -203,14 +135,14 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void slice_test3(const uint32_t vector0[10][5]) {\n" ++
+              "void slice_test1(const uint32_t vector0[5][10]) {\n" ++
               "    \n" ++
               "    uint32_t foo[5];\n" ++
               "    for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
               "        foo[__i0] = 0;\n" ++
               "    }\n" ++
               "\n" ++
-              "    *(__wrapper_uint32__5_t *)foo = *(__wrapper_uint32__5_t *)add_two(*(__wrapper_uint32__5_t *)(&vector0[2])[0]).array;\n" ++
+              "    *(__wrapper_uint32__5_t *)foo = *(__wrapper_uint32__5_t *)add_two(&vector0[2][2]).array;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

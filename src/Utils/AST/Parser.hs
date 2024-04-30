@@ -3,6 +3,7 @@
 module Utils.AST.Parser where
 
 import           AST.Parser
+import Data.Maybe
 
 -- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
@@ -25,7 +26,7 @@ groundTyEq  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = ground
 groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
 -- TODO: These are considered complex types and should be handled differently
 -- TODO: We are delaying the checking of the size of the vectors to a further stage
-groundTyEq  (Vector typespecl _sizel) (Vector typespecr _sizer) = groundTyEq typespecl typespecr
+groundTyEq  (Array typespecl _sizel) (Array typespecr _sizer) = groundTyEq typespecl typespecr
 groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
 groundTyEq  (Location tyspecl) (Location tyspecr) = groundTyEq tyspecl tyspecr
@@ -44,3 +45,80 @@ constExprEq _ _ = False
 objIsSelf :: Object a -> Bool
 objIsSelf (Variable ident _ann ) = ident == "self"
 objIsSelf _ = False
+
+
+----------------------------------------
+-- Invokation Dependency in a block of code.
+-- Capturing the pattern `self->f()` on objects.
+-- As far as I understand it, all objects should have name, and thus, we cannot
+-- (or shoudln't) concatenate invocations.
+
+-- We do not have name shadowing, so technically there cannot be two things with
+-- the same name. We do not need to insepect 'self->f()', but I am afraid of
+-- breaking something else.
+
+selfInv :: Expression a -> (Object a -> Bool) -> Maybe Identifier
+selfInv (MemberFunctionAccess obj mident _constArgs _args _ann) isSelf =
+  if isSelf obj then Just mident else Nothing
+selfInv (DerefMemberFunctionAccess obj mident _constArgs _args _ann) isSelf =
+  if isSelf obj then Just mident else Nothing
+selfInv _ _isSelf = Nothing
+
+selfInvStmt :: (Object a -> Bool) -> Statement a -> [Identifier]
+selfInvStmt isSelf = selfInvStmt'
+ where
+    isSelfExpression e = maybeToList (selfInv e isSelf)
+    -- selfInvStmt' :: Statement' (Expression' obj) obj a -> [Identifier]
+    selfInvStmt' (Declaration _vident _accK _type e _ann) = isSelfExpression e
+    selfInvStmt' (AssignmentStmt _obj e _ann) = isSelfExpression e
+    selfInvStmt' (IfElseStmt eC bIf bEls bEl _ann) =
+      isSelfExpression eC
+        ++
+        concatMap selfInvStmt' bIf
+        ++
+        concatMap (\ el ->
+                     isSelfExpression (elseIfCond el)
+                ++ selfInvBlock isSelf (elseIfBody el)
+                ) bEls
+        ++ maybe [] (concatMap selfInvStmt') bEl
+    selfInvStmt' (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
+      -- isSelfExpression initV ++ isSelfExpression endV ++
+      concat (maybeToList (isSelfExpression <$> cBreak))
+      ++ concatMap selfInvStmt' body
+    selfInvStmt' (MatchStmt e mcases _ann) =
+      isSelfExpression e
+      ++  concatMap (selfInvBlock isSelf . matchBody) mcases
+    selfInvStmt' (SingleExpStmt e _ann) = isSelfExpression e
+
+selfInvBlock :: (Object a -> Bool) -> Block a -> [Identifier]
+selfInvBlock isSelf = concatMap (selfInvStmt isSelf)
+
+selfInvRetStmt :: (Object a -> Bool) -> ReturnStmt a -> [Identifier]
+selfInvRetStmt isSelf = maybe [] ( maybeToList . (`selfInv` isSelf)) . returnExpression
+
+selfInvBlockRet :: (Object a -> Bool) -> BlockRet a -> [Identifier]
+selfInvBlockRet isSelf bret
+  = selfInvBlock isSelf (blockBody bret)
+  ++ selfInvRetStmt isSelf (blockRet bret)
+
+
+selfDepClass
+  :: (Object a -> Bool)
+  -> ClassMember a
+  -> Maybe (Identifier, [Identifier])
+selfDepClass isSelf = selfDepClass'
+ where
+   -- Fields do not have self dependencies
+   selfDepClass' (ClassField {}) = Nothing
+   -- Methods can
+   selfDepClass' (ClassMethod mId _type bRet _ann) =
+     Just (mId,selfInvBlockRet isSelf bRet)
+   -- Procedures can
+   selfDepClass' (ClassProcedure pId _constParams _params blk _ann) =
+     Just (pId, selfInvBlock isSelf blk)
+   -- Viewers can
+   selfDepClass' (ClassViewer vId _constParams _params _type bRet _ann) =
+     Just (vId , selfInvBlockRet isSelf bRet)
+   -- Actions can
+   selfDepClass' (ClassAction aId _param _type bRet _ann) =
+      Just (aId , selfInvBlockRet isSelf bRet)

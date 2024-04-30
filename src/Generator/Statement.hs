@@ -61,7 +61,7 @@ genArrayInitialization ::
     -> CSourceGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
-        (VectorInitExpression expr' size ann) -> do
+        (ArrayInitExpression expr' size ann) -> do
             cSize <- genArraySize size ann
             let iterator = namefy $ "i" ++ show level
                 exprCAnn = buildGenericAnn ann
@@ -107,7 +107,7 @@ genArrayInitialization before level cObj expr = do
         genArrayInitializationFromExpression lvl cObj' cExpr ts ann = do
             case ts of
                 -- | If the initializer is a vector, we must iterate
-                (Vector ts' (K s)) -> do
+                (Array ts' (K s)) -> do
                     let iterator = namefy $ "i" ++ show lvl
                         exprCAnn = buildGenericAnn ann
                         initExpr = Right $ CDeclaration
@@ -138,7 +138,7 @@ genFieldInitialization before level cObj field expr =
             genStructInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
         OptionVariantExpression _ ann ->
             genOptionInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
-        VectorInitExpression _ _ ann ->
+        ArrayInitExpression _ _ ann ->
             genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
         EnumVariantExpression _ _ _ ann ->
             genEnumInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
@@ -146,7 +146,7 @@ genFieldInitialization before level cObj field expr =
             exprType <- getExprType expr
             let ann = getAnnotation expr
             case exprType of
-                Vector _ _ -> genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
+                Array _ _ -> genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
                 _ -> do
                     let exprCAnn = buildGenericAnn ann
                         declStmtAnn = buildStatementAnn ann before
@@ -229,7 +229,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
     objType <- getObjectType obj
     cObj <- genObject obj
     case objType of
-        Vector _ _ ->
+        Array _ _ ->
             case expr of
                 (FunctionExpression _ _ _ ann) -> do
                     exprType <- getExprType expr
@@ -259,7 +259,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
 genBlockItem (Declaration identifier _ ts expr ann) =
   let exprCAnn = buildGenericAnn ann in
   case ts of
-    Vector _ _ -> do
+    Array _ _ -> do
         let declStmt = buildDeclarationAnn ann True
         arrayDecl <- genArraySizeDeclarator ts ann
         arrayInitialization <- fmap CBlockStmt <$> genArrayInitialization False 0 (CVar identifier exprCAnn) expr
@@ -487,7 +487,7 @@ genReturnStatement (ReturnStmt (Just expr) ann) = do
     cExpr <- genExpression expr
     exprType <- getExprType expr
     case exprType of
-        (Vector {}) -> do
+        (Array {}) -> do
             structName <- genArrayWrapStructName exprType
             let left = CUnary CIndOp (CCast
                     (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cExpr exprCAnn) exprCAnn

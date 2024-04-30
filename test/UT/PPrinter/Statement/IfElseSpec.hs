@@ -15,7 +15,7 @@ optionDynUInt32TS :: TypeSpecifier
 optionDynUInt32TS = Option (DynamicSubtype UInt32)
 
 vectorTS :: TypeSpecifier
-vectorTS = Vector UInt32 (K (TInteger 10 DecRepr))
+vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 
 optionDynUInt32SemAnn :: SemanticAnns
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32

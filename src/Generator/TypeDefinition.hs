@@ -337,7 +337,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
-                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Vector {})) <- parameters]
+                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Array {})) <- parameters]
             cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
@@ -352,7 +352,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             let cAnn = buildGenericAnn ann
-                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Vector {})) <- parameters]
+                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Array {})) <- parameters]
                 retTypeDecl = [CTypeSpec CVoidType]
             selfCastStmt <- genSelfCastStmt
             cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
@@ -412,7 +412,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
             cBody <- case param of
-                    (Parameter pid (Vector {})) -> do
+                    (Parameter pid (Array {})) -> do
                         let newKeyVals = M.fromList [(pid, CMember (CVar pid cAnn) "array" False cAnn)]
                         Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
                             cStmt <- genBlockItem x

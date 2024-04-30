@@ -72,7 +72,7 @@ useObject (Variable ident ann)
                 _ ->
                 loc `annotateError` safeAddUse ident
         }) (getTypeSAnns ann)
-useObject (VectorIndexExpression obj e _ann)
+useObject (ArrayIndexExpression obj e _ann)
   = useObject obj >> useExpression e
 useObject (MemberAccess obj _i _ann)
   = useObject obj
@@ -81,7 +81,7 @@ useObject (Dereference obj _ann)
 useObject (DereferenceMemberAccess obj i ann)
   = SM.location ann `annotateError` safeAddUse i
   >> useObject obj
-useObject (VectorSliceExpression obj eB eT _ann)
+useObject (ArraySlice obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
 -- TODO Use Object undyn?
 useObject (Undyn obj _ann)
@@ -89,7 +89,7 @@ useObject (Undyn obj _ann)
 
 defObject (Variable ident ann)
   = (SM.location ann) `annotateError` defVariable ident
-defObject (VectorIndexExpression obj e _ann)
+defObject (ArrayIndexExpression obj e _ann)
   = useExpression e
   >> useObject obj
 defObject (MemberAccess obj _i _ann)
@@ -99,7 +99,7 @@ defObject (Dereference obj _ann)
 defObject (DereferenceMemberAccess obj i ann)
   = (SM.location ann) `annotateError` safeAddUse i
   >> useObject obj
-defObject (VectorSliceExpression obj eB eT _ann)
+defObject (ArraySlice obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
 defObject (Undyn obj _ann)
   = useObject obj
@@ -127,7 +127,9 @@ useExpression (IsEnumVariantExpression obj _ _ _)
   = useObject obj
 useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
-useExpression (MemberFunctionAccess obj ident constArgs args ann) = do
+useExpression (ArraySliceExpression _aK obj _size _ann)
+  = useObject obj
+useExpression (MemberFunctionAccess obj ident _constArgs args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)
     case obj_type  of
@@ -156,10 +158,10 @@ useExpression (MemberFunctionAccess obj ident constArgs args ann) = do
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
-useExpression (DerefMemberFunctionAccess obj _ident constArgs args _ann)
+useExpression (DerefMemberFunctionAccess obj _ident _constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
-useExpression (VectorInitExpression e _size _ann)
+useExpression (ArrayInitExpression e _size _ann)
   = useExpression e
 useExpression (FieldAssignmentsExpression _ident fs _ann)
   = mapM_ useFieldAssignment fs
@@ -169,7 +171,7 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-useExpression (FunctionExpression _ident constArgs args _ann)
+useExpression (FunctionExpression _ident _constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = mapM_ useArguments args
 
@@ -226,7 +228,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   -- Issue #40, forgot to use condition expression.
   useExpression eCond
   mapM_ (useExpression . elseIfCond) elseIfs
-useDefStmt (ForLoopStmt _itIdent _itTy eB eE mBrk block ann)
+useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
     -- It can only use variables /only/ only if they are declared inside the
