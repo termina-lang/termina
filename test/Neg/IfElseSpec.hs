@@ -31,7 +31,6 @@ test0 = "function keep_inside(n: usize, array : &mut[u8;64], range:[u8;2]) {\n" 
         "    else if (x > upper_limit) && (x - upper_limit < 5 :u8) {\n" ++
         "        //do nothing\n" ++
         "    }\n" ++
-        "    // else { (*array)[n] = 0 : u8; }\n" ++
         "    \n" ++
         "    return;\n" ++
         "}"

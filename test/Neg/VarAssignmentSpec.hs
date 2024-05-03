@@ -53,6 +53,13 @@ test3 = "function init_val (array : &[u8;6]) -> u8 {\n" ++
         "    return 0 : u8;\n" ++
         "}\n"
 
+test4 :: String
+test4 = "function f (n : u8) -> u8 {\n" ++
+        "    let foo : u8 = n;\n" ++
+        "    foo = foo + 32;\n" ++
+        "    return foo;\n" ++
+        "}\n"
+
 spec :: Spec
 spec = do
   describe "Variable mutability" $ do
@@ -70,6 +77,10 @@ spec = do
         isEAssignmentToImmutable
     it "Write to an immutable reference" $ do
      runNegativeTest test3
+       `shouldSatisfy`
+        isEAssignmentToImmutable
+    it "Write to an immutable local variable" $ do
+     runNegativeTest test4
        `shouldSatisfy`
         isEAssignmentToImmutable
   
