@@ -14,6 +14,31 @@ import Errata
 import Errata.Styles
 import AST.Seman
 
+
+
+printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> T.Text -> IO ()
+printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg = 
+    TL.putStrLn $ prettyErrors 
+        sourceLines
+        [genSimpleErrata]
+    
+    where
+
+        genSimpleBlock :: Errata.Block
+        genSimpleBlock = Block
+            fancyRedStyle
+            (fileName, lineNumber, lineColumn)
+            Nothing
+            [Pointer lineNumber lineColumn (lineColumn + len) False Nothing fancyRedPointer]
+            Nothing
+
+        genSimpleErrata :: Errata
+        genSimpleErrata = Errata
+            (Just errorMessage)
+            [genSimpleBlock]
+            (Just msg) 
+
+
 -- useful prettyprinter doc
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
 ppError :: TL.Text -> SemanticErrors -> IO ()
@@ -24,113 +49,48 @@ ppError sourceLines (AnnError e (Position pos)) =
   in
   case e of
     (EArray ts) -> 
-        let block = [ 
-                Block
-                    fancyRedStyle
-                    (fileName, lineNumber, lineColumn)
-                    Nothing
-                    [Pointer lineNumber lineColumn (lineColumn + 1) False Nothing fancyRedPointer]
-                    Nothing
-                ]
-            title = Just "error[E001]: invalid array indexing."
+        let title = "error[E001]: invalid array indexing."
         in
         case ts of
-            (Slice _) -> 
-                TL.putStrLn $ prettyErrors 
-                    sourceLines 
-                    [ 
-                        Errata
-                            title
-                            block
-                            (Just $ "You cannot index a slice. It is not an array. \n" <>
-                                    "A slice can only be used to create references  to a part of an array.")
-                    ]
-            _ -> 
-                TL.putStrLn $ prettyErrors 
-                    sourceLines 
-                    [ 
-                        Errata
-                            title
-                            block
-                            (Just "You are trying to index an object that is not an array")
-                    ]
+            (Slice _) -> printSimpleError 
+                sourceLines title fileName 
+                lineNumber lineColumn 1 
+                ("You cannot index a slice. It is not an array. \n" <>
+                "A slice can only be used to create references  to a part of an array.")
+            _ -> printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                "You are trying to index an object that is not an array."
     (ENotNamedObject ident) -> 
-        let block = [ 
-                Block
-                    fancyRedStyle
-                    (fileName, lineNumber, lineColumn)
-                    Nothing
-                    [Pointer lineNumber lineColumn (lineColumn + length ident) False Nothing fancyRedPointer]
-                    Nothing
-                ]
-            title = Just "error[E002]: undeclared variable."
+        let title = "error[E002]: undeclared variable."
         in
-        TL.putStrLn $ prettyErrors 
-            sourceLines 
-            [ 
-                Errata
-                    title
-                    block
-                    (Just $ "The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
-            ]
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
     (ENotConstant ident) -> 
-        let block = [ 
-                Block
-                    fancyRedStyle
-                    (fileName, lineNumber, lineColumn)
-                    Nothing
-                    [Pointer lineNumber lineColumn (lineColumn + length ident) False Nothing fancyRedPointer]
-                    Nothing
-                ]
-            title = Just "error[E003]: invalid use of a non-constant object."
+        let 
+            title = "error[E003]: invalid use of a non-constant object."
         in
-        TL.putStrLn $ prettyErrors 
-            sourceLines 
-            [ 
-                Errata
-                    title
-                    block
-                    (Just $ "The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant.")
-            ]
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant.")
     EAssignmentToImmutable -> 
-        let block = [ 
-                Block
-                    fancyRedStyle
-                    (fileName, lineNumber, lineColumn)
-                    Nothing
-                    [Pointer lineNumber lineColumn (lineColumn + 1) False Nothing fancyRedPointer]
-                    Nothing
-                ]
-            title = Just "error[E004]: assignment to immutable variable."
+        let title = "error[E004]: assignment to immutable variable."
         in
-        TL.putStrLn $ prettyErrors 
-            sourceLines 
-            [ 
-                Errata
-                    title
-                    block
-                    (Just "You are trying to assign a value to an immutable object.")
-            ]
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                "You are trying to assign a value to an immutable object."
     EIfElseNoOtherwise ->
-        let block = [ 
-                Block
-                    fancyRedStyle
-                    (fileName, lineNumber, lineColumn)
-                    Nothing
-                    [Pointer lineNumber lineColumn (lineColumn + 2) False Nothing fancyRedPointer]
-                    Nothing
-                ]
-            title = Just "error[E005]: missing else clause."
+        let title = "error[E005]: missing else clause."
         in
-        TL.putStrLn $ prettyErrors 
-            sourceLines 
-            [ 
-                Errata
-                    title
-                    block
-                    (Just $ "You are missing the else clause in an if-else-if statement.\n" <>
-                            "You must provide an else clause if you are not providing an else-if clause.")
-            ]
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 2
+                ("You are missing the else clause in an if-else-if statement.\n" <>
+                "You must provide an else clause if you are defining an else-if clause.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
