@@ -374,15 +374,18 @@ getConstTy loc ident = do
     constants <- gets consts
     case M.lookup ident constants of
       Just ty -> return ty
-      Nothing -> -- throwError $ annotateError loc (ENotNamedObject ident)
+      Nothing ->
         -- If not found, then check the globals
-        catchError (getGlobalGEnTy loc ident) (\errorGlobal ->
+        catchError (getGlobalGEnTy loc ident)
+            (\errorGlobal ->
                 case semError errorGlobal of {
-                  ENotNamedGlobal errvar ->
-                    if errvar == ident then
-                      throwError $ annotateError loc (ENotNamedObject ident);
-                    else
-                      throwError errorGlobal;
+                  ENotNamedGlobal _ ->
+                    catchError (getLocalObjTy loc ident)
+                    (\errorLocal ->
+                      case semError errorLocal of {
+                        ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                        _ -> throwError errorLocal;
+                      }) >> throwError (annotateError loc (ENotConstant ident));
                   _  -> throwError errorGlobal;
                 }
               ) >>= (\case {

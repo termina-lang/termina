@@ -32,7 +32,7 @@ ppError sourceLines (AnnError e (Position pos)) =
                     [Pointer lineNumber lineColumn (lineColumn + 1) False Nothing fancyRedPointer]
                     Nothing
                 ]
-            title = Just "error[E001]: invalid array indexing"
+            title = Just "error[E001]: invalid array indexing."
         in
         case ts of
             (Slice _) -> 
@@ -63,7 +63,7 @@ ppError sourceLines (AnnError e (Position pos)) =
                     [Pointer lineNumber lineColumn (lineColumn + length ident) False Nothing fancyRedPointer]
                     Nothing
                 ]
-            title = Just "error[E002]: undeclared variable"
+            title = Just "error[E002]: undeclared variable."
         in
         TL.putStrLn $ prettyErrors 
             sourceLines 
@@ -72,6 +72,64 @@ ppError sourceLines (AnnError e (Position pos)) =
                     title
                     block
                     (Just $ "The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
+            ]
+    (ENotConstant ident) -> 
+        let block = [ 
+                Block
+                    fancyRedStyle
+                    (fileName, lineNumber, lineColumn)
+                    Nothing
+                    [Pointer lineNumber lineColumn (lineColumn + length ident) False Nothing fancyRedPointer]
+                    Nothing
+                ]
+            title = Just "error[E003]: invalid use of a non-constant object."
+        in
+        TL.putStrLn $ prettyErrors 
+            sourceLines 
+            [ 
+                Errata
+                    title
+                    block
+                    (Just $ "The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant.")
+            ]
+    EAssignmentToImmutable -> 
+        let block = [ 
+                Block
+                    fancyRedStyle
+                    (fileName, lineNumber, lineColumn)
+                    Nothing
+                    [Pointer lineNumber lineColumn (lineColumn + 1) False Nothing fancyRedPointer]
+                    Nothing
+                ]
+            title = Just "error[E004]: assignment to immutable variable."
+        in
+        TL.putStrLn $ prettyErrors 
+            sourceLines 
+            [ 
+                Errata
+                    title
+                    block
+                    (Just "You are trying to assign a value to an immutable object.")
+            ]
+    EIfElseNoOtherwise ->
+        let block = [ 
+                Block
+                    fancyRedStyle
+                    (fileName, lineNumber, lineColumn)
+                    Nothing
+                    [Pointer lineNumber lineColumn (lineColumn + 2) False Nothing fancyRedPointer]
+                    Nothing
+                ]
+            title = Just "error[E005]: missing else clause."
+        in
+        TL.putStrLn $ prettyErrors 
+            sourceLines 
+            [ 
+                Errata
+                    title
+                    block
+                    (Just $ "You are missing the else clause in an if-else-if statement.\n" <>
+                            "You must provide an else clause if you are not providing an else-if clause.")
             ]
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is

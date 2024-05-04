@@ -66,7 +66,7 @@ spec = do
     it "Assignment to input variable" $ do
      runNegativeTest test0
        `shouldSatisfy`
-        (\case Just (ENotNamedObject "ntimes") -> True; _ -> False)
+        (\case Just (ENotConstant "ntimes") -> True; _ -> False)
     it "Loop bound not constant" $ do
      runNegativeTest test1
        `shouldSatisfy`
