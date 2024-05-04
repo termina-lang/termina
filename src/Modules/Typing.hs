@@ -27,16 +27,18 @@ import Semantic.TypeChecking (typeAndGetGlobals)
 
 -- Module system imports
 import qualified Data.Map.Strict as M
+import qualified Data.Text.Lazy as TL
 
 
 data ModuleAST a = MData
   { moduleDeps :: [ModuleName]
+  , moduleLines :: TL.Text
   , moduleData :: a
   }
   deriving Show
 
-mAstFromPair :: ([ModuleName] , a , PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
-mAstFromPair (deps, _ , tast) = MData deps tast
+mAstFromPair :: ([ModuleName] , a , TL.Text, PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
+mAstFromPair (deps, _ , src_lines, tast) = MData deps src_lines tast
 
 data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns
@@ -67,14 +69,14 @@ typeModule
 typeModule parserMap m typedDeps =
   case M.lookup m parserMap of
         Nothing -> Left (EModuleNotParsed m)
-        Just (MData deps parsedM) ->
+        Just (MData deps src_lines parsedM) ->
             addDeps deps >>= \env ->
             case typeAndGetGlobals env (frags parsedM) of
-               Left err -> Left (ELiftTypeCheckError err)
+               Left err -> Left (ELiftTypeCheckError err src_lines)
                Right t ->
                  let typedModule
                         = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst t)) (snd t)
-                 in Right (MData deps typedModule)
+                 in Right (MData deps src_lines typedModule)
   where
    -- Load globals defined by dependecies and create the environment
    -- used to type the current module.
@@ -95,18 +97,18 @@ typeProject parserMap mds =
     typeProject' (m:ms) tP =
       case M.lookup m parserMap of
         Nothing -> throwError (EModuleNotParsed m)
-        Just (MData deps parsedM) -> do
+        Just (MData deps src_lines parsedM) -> do
             -- Load globals defined by dependecies and create the environment
             -- used to type the current module.
             env <- foldM (flip (buildEnvironment tP)) M.empty deps
             -- Type the current module and get its globals.
             typedProg <- case typeAndGetGlobals env (frags parsedM) of
-                           Left err -> throwError (ELiftTypeCheckError err)
+                           Left err -> throwError (ELiftTypeCheckError err src_lines)
                            Right t -> return t
             -- Load stuff into project map
             let typedModule = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst typedProg)) (snd typedProg)
             -- Add it to the project and continue typing
-            typeProject' ms (M.insert m (MData deps typedModule) tP)
+            typeProject' ms (M.insert m (MData deps src_lines typedModule) tP)
 
 buildEnvironment
   :: SemanProject -> ModuleName -> Environment -> TProjectM Environment

@@ -11,6 +11,7 @@ import Extras.TopSort
 
 -- Containers
 import qualified Data.Map.Strict as M
+import qualified Data.Text.Lazy as TL
 
 -- /Folder1/Folder2/../ModName
 type ModuleName = Path Unrooted
@@ -48,19 +49,19 @@ terminaProgramImports = map ( fragments . moduleIdentifier) . modules
 loadProject
   :: Monad m
   -- ModuleName
-  => (ModuleName -> m (ModuleMode,PAST.TerminaProgram Annotation))
+  => (ModuleName -> m (ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName], ModuleMode, PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
 loadProject = loadProject' M.empty
 
 loadProject' :: Monad m
   -- Map loading every file imported
-  => M.Map ModuleName ([ModuleName], ModuleMode,PAST.TerminaProgram Annotation)
+  => M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaProgram Annotation)
   -- Loading function
-  -> (ModuleName -> m (ModuleMode,PAST.TerminaProgram Annotation))
+  -> (ModuleName -> m (ModuleMode, TL.Text,PAST.TerminaProgram Annotation))
   -- Modules to load
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName],ModuleMode, PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName],ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
 loadProject' fsLoaded _loadFile [] = return fsLoaded
 loadProject' fsLoaded loadFile (fs:fss) =
   if M.member fs fsLoaded
@@ -69,10 +70,10 @@ loadProject' fsLoaded loadFile (fs:fss) =
   then loadProject' fsLoaded loadFile fss
   -- Import and load it.
   else do
-    (tMode, terminaProg) <- loadFile fs
+    (tMode, src_lines, terminaProg) <- loadFile fs
     let deps = terminaProgramImports terminaProg
     loadProject'
-      (M.insert fs (deps,tMode, terminaProg) fsLoaded)
+      (M.insert fs (deps,tMode, src_lines, terminaProg) fsLoaded)
       loadFile
       (fss ++ deps)
 
@@ -99,9 +100,8 @@ sortOrLoop
   -> Either [ModuleName] [ModuleName]
 sortOrLoop = topErrorInternal . processProjectDeps
   where
-    topErrorInternal = (either
+    topErrorInternal = either
                         (\case { ELoop xs -> Left xs; ENotFound a -> error
                           ("Internal TopSort Error Node not found" ++ show a)})
                          Right
-                       )
                           . topSortFromDepList

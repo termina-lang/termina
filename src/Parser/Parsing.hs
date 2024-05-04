@@ -22,7 +22,6 @@ import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
 import Data.Char
-import Data.List.NonEmpty (cons)
 
 {- | Type of the parsing annotations
 
@@ -522,7 +521,10 @@ parensObjectParser = parens objectParser
 
 -- Object term parser.
 objectTermParser :: Parser (Object Annotation)
-objectTermParser = Variable <$> identifierParser <*> (Position <$> getPosition)
+objectTermParser = (do
+    p <- getPosition
+    ident <- identifierParser
+    return $ Variable ident (Position p))
   <|> parensObjectParser
 
 -- Expression parser
@@ -569,22 +571,22 @@ objectParser = objectParser' objectTermParser
       ,[dereferencePrefix]]
     vectorOpPostfix
       = Ex.Postfix (try (do
+            p <- getPosition
             _ <- reservedOp "["
             low <- expressionParser 
             _ <- reservedOp ".."
             up <- expressionParser
             _ <- reservedOp "]"
-            p <- getPosition
             return $ \parent ->  ArraySlice parent low up (Position p)
           ) <|> (do
-            index <- brackets expressionParser
             p <- getPosition
+            index <- brackets expressionParser
             return $ \parent ->  ArrayIndexExpression parent index (Position p)
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
-        _ <- reservedOp "->"
         p <- getPosition
+        _ <- reservedOp "->"
         member <- identifierParser
         return $ \parent ->   DereferenceMemberAccess parent member (Position p))
     memberAccessPostfix
@@ -609,26 +611,26 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       ,[dereferencePrefix]]
     vectorOpPostfix
       = Ex.Postfix (try (do
+            p <- getPosition
             _ <- reservedOp "["
             low <- expressionParser
             _ <- reservedOp ".."
             up <- expressionParser
             _ <- reservedOp "]"
-            p <- getPosition
             return $ \parent -> case parent of
               AccessObject obj -> AccessObject (ArraySlice obj low up (Position p))
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
-            index <- brackets expressionParser
             p <- getPosition
+            index <- brackets expressionParser
             return $ \parent -> case parent of
               AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position p))
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
-      _ <- reservedOp "->"
       p <- getPosition
+      _ <- reservedOp "->"
       member <- identifierParser
       constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
@@ -638,8 +640,8 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
-      _ <- reservedOp "."
       p <- getPosition
+      _ <- reservedOp "."
       member <- identifierParser
       constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))

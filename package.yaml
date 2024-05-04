@@ -38,6 +38,8 @@ dependencies:
 - mtl >= 2.3.1
 # File Paths
 - paths
+# Error messages pretty printer
+- errata
 
 ghc-options:
 - -Wall

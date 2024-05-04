@@ -3,11 +3,11 @@
 module Modules.Printing where
 
 import Modules.Errors
-import Prettyprinter
 import Semantic.Errors (ppError)
+import Errata
 
 -- Error Printing
 
-ppModError :: Errors -> Doc a
-ppModError (ELiftTypeCheckError e) = ppError e
-ppModError e = pretty "Other errors during module stuff" <+> viaShow e
+ppModError :: Errors -> IO ()
+ppModError (ELiftTypeCheckError e src_lines) = ppError src_lines e
+ppModError _ = putStrLn "Other errors during module stuff"

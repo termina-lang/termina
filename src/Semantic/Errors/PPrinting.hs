@@ -1,45 +1,78 @@
 -- | Semantic Error Printing
+{-# LANGUAGE OverloadedStrings #-}
 
 module Semantic.Errors.PPrinting where
 
 import Semantic.Errors.Errors
 
-import Prettyprinter
--- import PPrinter.Common (DocStyle)
-import Text.Parsec
-
-import Parser.Parsing (Annotation(..))
-
--- useful parsec doc
--- https://hackage.haskell.org/package/parsec-3.1.17.0/docs/Text-Parsec.html#g:4
-fileNameLineCol :: SourcePos -> Doc a
-fileNameLineCol e =
-  -- interspace everything with colon (":")
-  concatWith (\x y -> x<>colon<>y)
-                -- Pretty the source name
-                [ pretty $ sourceName e
-                -- Using Show pretty the line
-                , viaShow $ sourceLine e
-                -- Using Show pretty the column
-                , viaShow $ sourceColumn e ]
-
-fileNLC :: Annotation -> Doc a
-fileNLC (Position spos) = fileNameLineCol spos
-fileNLC Internal = pretty "Internal Error!! Throw the computer out of the buliding."
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.IO as TL
+import Parser.Parsing
+import Text.Parsec.Pos
+import Errata
+import Errata.Styles
+import AST.Seman
 
 -- useful prettyprinter doc
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
-ppError :: SemanticErrors -> Doc a
-ppError (AnnError e detectedPos) =
+ppError :: TL.Text -> SemanticErrors -> IO ()
+ppError sourceLines (AnnError e (Position pos)) =
+  let fileName = sourceName pos
+      lineNumber = sourceLine pos
+      lineColumn = sourceColumn pos
+  in
   case e of
-    (EUsedFunName funName parsedPos) ->
-        vsep
-        [ pretty "Error when defining function" <+> pretty funName
-        , pretty "At file" <+> fileNLC detectedPos
-        , pretty "Defined" <+> fileNLC parsedPos
-        ]
-    _ -> vsep
-         [ pretty "An Error ocurred, we are going on a beautyful printer, be patient."
-         , pretty "See:" <> fileNLC detectedPos
-         , pretty "Informally:" <+> viaShow e
-         ]
+    (EArray ts) -> 
+        let block = [ 
+                Block
+                    fancyRedStyle
+                    (fileName, lineNumber, lineColumn)
+                    Nothing
+                    [Pointer lineNumber lineColumn (lineColumn + 1) False Nothing fancyRedPointer]
+                    Nothing
+                ]
+            title = Just "error[E001]: invalid array indexing"
+        in
+        case ts of
+            (Slice _) -> 
+                TL.putStrLn $ prettyErrors 
+                    sourceLines 
+                    [ 
+                        Errata
+                            title
+                            block
+                            (Just $ "You cannot index a slice. It is not an array. \n" <>
+                                    "A slice can only be used to create references  to a part of an array.")
+                    ]
+            _ -> 
+                TL.putStrLn $ prettyErrors 
+                    sourceLines 
+                    [ 
+                        Errata
+                            title
+                            block
+                            (Just "You are trying to index an object that is not an array")
+                    ]
+    (ENotNamedObject ident) -> 
+        let block = [ 
+                Block
+                    fancyRedStyle
+                    (fileName, lineNumber, lineColumn)
+                    Nothing
+                    [Pointer lineNumber lineColumn (lineColumn + length ident) False Nothing fancyRedPointer]
+                    Nothing
+                ]
+            title = Just "error[E002]: undeclared variable"
+        in
+        TL.putStrLn $ prettyErrors 
+            sourceLines 
+            [ 
+                Errata
+                    title
+                    block
+                    (Just $ "The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
+            ]
+    _ -> putStrLn $ show pos ++ ": " ++ show e
+-- | Print the error as is
+ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

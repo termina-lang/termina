@@ -12,7 +12,6 @@ import Semantic.Option (mapOptions, OptionMap)
 
 import Text.Parsec (runParser)
 
-import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
 
 import Control.Monad
@@ -38,6 +37,7 @@ import Generator.Module
 import Generator.Application.Option
 import Generator.Application.Initialization
 import Generator.Application.OS.RTEMSNOEL
+import qualified Data.Text.Lazy as TL
 
 data MainOptions = MainOptions
   { optREPL :: Bool
@@ -85,16 +85,16 @@ getFileSrc path =
 
 -- We need to Module names and File Paths
 -- Load File takes an absolute path (could be something else but whatev)
-loadFile :: Path Absolute -> IO (ModuleMode , PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
+loadFile :: Path Absolute -> IO (ModuleMode , TL.Text, PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
 loadFile absPath = do
   -- Get file name
   (mMode, absPathFile) <- getFileSrc absPath
   -- read it
-  src_code <- readStrictText absPathFile
+  src_code <- readLazyText absPathFile
   -- parse it
-  case runParser terminaProgram () (toFilePath absPathFile) (T.unpack src_code) of
+  case runParser terminaProgram () (toFilePath absPathFile) (TL.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
-    Right term -> return (mMode , term)
+    Right term -> return (mMode , src_code, term)
 
 routeToMain :: Path Absolute -> Path Absolute
 routeToMain = takeDirectory
@@ -198,12 +198,14 @@ main = runCommand $ \opts args ->
               let rootDir = routeToMain absPath
               -- Main is special
               whenChatty opts (print ("Reading Main:" ++ show absPath))
-              (mMode , terminaMain) <- loadFile absPath
+              (mMode , src_lines, terminaMain) <- loadFile absPath
               when (isMDir mMode) (fail "Main cannot be in a folder")
               -- Termina Map from paths to Parser ASTs.
               whenChatty opts $ print "Loading project and parsing modules"
               let baseMainName = takeBaseName absPath
-              mapProject <- M.insert baseMainName (terminaProgramImports terminaMain, mMode, terminaMain) <$> loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
+              mapProject <- 
+                M.insert baseMainName (terminaProgramImports terminaMain, mMode, src_lines, terminaMain) 
+                  <$> loadProject (loadFile . (rootDir </>)) (terminaProgramImports terminaMain)
               whenChatty opts $ print "Finished Parsing"
               -- Prepare stuff to print.
               -- A little bit nonsense to do it here.
@@ -219,7 +221,7 @@ main = runCommand $ \opts args ->
                         unless exists (fail "Output Folder does not exist.")
                         return p)
               --
-              let modDeps = M.map fst3 mapProject
+              let modDeps = M.map (\(deps, _, _, _) -> deps) mapProject
               whenChatty opts $ print ("Deps:" ++ show modDeps)
 
               analyzeOrd <- either (fail . ("Cycle between modules: " ++) . show ) return (sortOrLoop modDeps)
@@ -233,9 +235,7 @@ main = runCommand $ \opts args ->
                    -- Here is something wrong!!
                    case typeModule toModuleAST m env of
                     Left err ->
-                      print "--------" >>
-                      TIO.putStrLn (render (MPP.ppModError err)) >>
-                      fail "[FAIL]"
+                      MPP.ppModError err >> fail "typing error"
                     Right typedM ->
                       whenChatty opts (print " >> [DONE]")
                       ----------------------------------------
@@ -251,7 +251,7 @@ main = runCommand $ \opts args ->
               ----------------------------------------
               -- Printing Project
               whenChatty opts $ print "Printing Project"
-              allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mMode,_) -> return (mName, mMode, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
+              allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_, mm, _, _) -> return (mName, mm, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
               allOptions <- foldM (\opts (_, mTyped) -> 
                 foldM mapOptions opts (SAST.frags $ typedModule $ moduleData mTyped)) M.empty $ M.toList typedProject
               (basicTypeOptions, definedTypeOptions) <- return $ M.partitionWithKey 
@@ -261,12 +261,12 @@ main = runCommand $ \opts args ->
               mapM_ (\(mName,mTyped) ->
                     --  Get deps modes
                     maybe (fail "Internal error: missing modulename in mapProject")
-                        (return . snd3) (M.lookup mName mapProject)
+                        (return . (\(_, mm, _, _) -> mm)) (M.lookup mName mapProject)
                     >>= \moduleMode ->
-                    mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_,mode,_) -> return (i, mode)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
+                    mapM (\i -> maybe (fail "Internal error: something went missing in mapProject") (\(_, mm, _, _) -> return (i, mm)) (M.lookup i mapProject)) (moduleDeps mTyped) >>= \depModes ->
                       printModule (not (M.null basicTypeOptions)) definedTypeOptions moduleMode (optChatty opts) srcDir hdrsDir mName depModes (SAST.frags $ typedModule $ moduleData mTyped))
                     (M.toList typedProject)
-              let prjprogs = map (\(mName, mMode, mTyped) -> (mName, mMode, SAST.frags $ typedModule $ moduleData mTyped)) allModules
+              let prjprogs = map (\(mName, mm, mTyped) -> (mName, mm, SAST.frags $ typedModule $ moduleData mTyped)) allModules
               printInitFile (optChatty opts) outputDir prjprogs
               printMainFile (optChatty opts) outputDir prjprogs
               unless (M.null basicTypeOptions) (printOptionsHeaderFile (optChatty opts) outputDir basicTypeOptions)

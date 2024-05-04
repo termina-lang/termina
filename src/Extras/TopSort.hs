@@ -13,7 +13,6 @@ import qualified Data.Map.Strict as M  -- We interpret map as graphs.
 
 import Control.Monad.State.Strict
 import Control.Monad.Except
-import Data.Functor
 
 data TopSt a
   = St
@@ -30,15 +29,15 @@ emptyTopS = St S.empty S.empty []
 -- Add to temp and perm sets
 addTemp, addPerm :: Ord a => a -> TopSt a -> Maybe (TopSt a)
 addTemp a sets =
-  (\s -> sets{getTemp = s}) <$> (S.insert a (getTemp sets))
+  (\s -> sets{getTemp = s}) <$> S.insert a (getTemp sets)
   -- maybe (error "TopSort Max Bound -addTemp-")
   -- sets{getTemp = S.insert a (getTemp sets)}
 addPerm a sets =
   -- maybe (error "TopSort Max Bound -addPerm-")
-  (\s -> sets{getPerm = s}) <$> (S.insert a (getPerm sets))
+  (\s -> sets{getPerm = s}) <$> S.insert a (getPerm sets)
 
-addL :: Ord a => a -> TopSt a -> TopSt a
-addL a st = st{res=a : (res st)}
+addL :: a -> TopSt a -> TopSt a
+addL a st = st{res=a : res st}
 
 -- Remove or nothing.
 rmTemp :: Ord a => a -> TopSt a -> TopSt a
@@ -74,7 +73,7 @@ lmodifyE m = getE >>= maybe (throwError MaxBound) putE . m
 -------------------------------------------------
 -- | Main function giving a solution to all contraints or a loop.
 topSort
-  :: (Ord a , Show a)
+  :: (Ord a)
   -- | Takes a dependency graph
   => Graph a
   -- Returns either a loop between elements [0] or an ordered list of them.
@@ -85,7 +84,7 @@ topSort graph = evalState (runExceptT (computation >> gets (reverse . res))) emp
     computation = topSortInternal graph nodes
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: (Ord a, Show a) => [(a, [a])] -> Either (TopE a) [a]
+topSortFromDepList :: (Ord a) => [(a, [a])] -> Either (TopE a) [a]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
