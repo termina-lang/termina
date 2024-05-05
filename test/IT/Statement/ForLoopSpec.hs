@@ -13,7 +13,7 @@ import System.Path
 import Modules.Modules
 
 test0 :: String
-test0 = "function for_loop_test0(array0 : [u16; 10]) -> u16 {\n" ++
+test0 = "function for_loop_test0(array0 : & [u16; 10]) -> u16 {\n" ++
         "    var total : u16 = 0 : u16;\n" ++
         "    for i : usize in 0 : usize .. 10 : usize {\n" ++
         "        total = total + array0[i];\n" ++  
@@ -64,7 +64,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint16_t for_loop_test0(__wrapper_uint16__10_t array0);\n" ++
+              "uint16_t for_loop_test0(const uint16_t array0[10]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function for_loop_test0_test0" $ do
@@ -72,13 +72,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint16_t for_loop_test0(__wrapper_uint16__10_t array0) {\n" ++
+              "uint16_t for_loop_test0(const uint16_t array0[10]) {\n" ++
               "    \n" ++
               "    uint16_t total = 0;\n" ++
               "\n" ++
               "    for (size_t i = 0; i < 10; i = i + 1) {\n" ++
               "        \n" ++
-              "        total = total + array0.array[i];\n" ++
+              "        total = total + array0[i];\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

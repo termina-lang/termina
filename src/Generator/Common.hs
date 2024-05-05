@@ -206,31 +206,6 @@ genOptionStructName ts =
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
-genArrayWrapStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
-genArrayWrapStructName ts@(Array {}) = do
-    tsName <- genTypeSpecName ts
-    tsDimension <- genDimensionOptionTS ts
-    return $ namefy $ "wrapper_" <> tsName <> "_" <> tsDimension <> "_t"
-
-    where
-        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
-        genTypeSpecName UInt8 = return "uint8"
-        genTypeSpecName UInt16 = return "uint16"
-        genTypeSpecName UInt32 = return "uint32"
-        genTypeSpecName UInt64 = return "uint64"
-        genTypeSpecName Int8 = return "int8"
-        genTypeSpecName Int16 = return "int16"
-        genTypeSpecName Int32 = return "int32"
-        genTypeSpecName Int64 = return "int64"
-        genTypeSpecName (Array ts' _) = genTypeSpecName ts'
-        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
-        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
-
-        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
-        genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
-        genDimensionOptionTS _ = return ""
-genArrayWrapStructName ts = throwError $ InternalError $ "invalid option type specifier: " ++ show ts
-
 -- | Obtains the corresponding C type of a primitive type
 genDeclSpecifiers :: (MonadError CGeneratorError m) => TypeSpecifier -> m [CDeclarationSpecifier]
 -- |  Unsigned integer types
@@ -298,12 +273,6 @@ genArraySizeDeclarator (Reference _ (Array ts arraySize)) ann = do
     return $ CArrDeclr [] (CArrSize False cSize) cAnn : rest
 genArraySizeDeclarator _ _ = return []
 
-genReturnTypeDeclSpecifiers :: (MonadError CGeneratorError m) => TypeSpecifier -> m [CDeclarationSpecifier]
-genReturnTypeDeclSpecifiers ts@(Array {}) = do
-    structName <- genArrayWrapStructName ts
-    return [CTypeSpec $ CTypeDef structName]
-genReturnTypeDeclSpecifiers ts = genDeclSpecifiers ts
-
 genParameterDeclaration :: (MonadError CGeneratorError m) => SemanticAnns -> Parameter -> m CDeclaration
 genParameterDeclaration ann (Parameter identifier (Reference accKind ts)) = do
     declSpec <- genDeclSpecifiers ts
@@ -318,12 +287,6 @@ genParameterDeclaration ann (Parameter identifier (Reference accKind ts)) = do
                 (buildDeclarationAnn ann False)
         _ -> return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
             (buildDeclarationAnn ann False)
-genParameterDeclaration ann (Parameter identifier ts@(Array {})) = do
-    structName <- genArrayWrapStructName ts
-    let exprCAnn = buildGenericAnn ann
-        decl = [CTypeSpec $ CTypeDef structName]
-    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)]
-        (buildDeclarationAnn ann False)
 genParameterDeclaration ann (Parameter identifier ts) = do
     let exprCAnn = buildGenericAnn ann
     decl <- genDeclSpecifiers ts

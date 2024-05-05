@@ -45,19 +45,7 @@ genMemberFunctionAccess obj ident constArgs args ann = do
     -- Generate the C code for the const generics
     cConstArgs <- mapM genConstExpression constArgs
     -- Generate the C code for the parameters
-    cArgs <- mapM
-            (\pExpr -> do
-                cParamExpr <- genExpression pExpr
-                cParamExprTs <- getExprType pExpr
-                case cParamExprTs of
-                    Array {} -> do
-                        structName <- genArrayWrapStructName cParamExprTs
-                        return $  CUnary CIndOp
-                            (CCast (
-                                CDeclaration [CTypeSpec $ CTypeDef structName]
-                                    [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
-                                ) cParamExpr cAnn) cAnn
-                    _ -> return cParamExpr) args
+    cArgs <- mapM genExpression args
     objType <- getObjectType obj
     case objType of
         (Reference _ ts) ->
@@ -180,22 +168,9 @@ genExpression expr@(FunctionExpression name constArgs args ann) = do
     let identifier = fromMaybe (CVar name cAnn) (Data.Map.lookup name subs)
     argsAnns <- getParameters expr
     cConstArgs <- mapM genConstExpression constArgs
-    cArgs <- zipWithM
-            (\pExpr (Parameter _ ts) -> do
-                cParamExpr <- genExpression pExpr
-                case ts of
-                    Array {} -> do
-                        structName <- genArrayWrapStructName ts
-                        return $  CUnary CIndOp
-                            (CCast (
-                                CDeclaration [CTypeSpec $ CTypeDef structName]
-                                    [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
-                                ) cParamExpr cAnn) cAnn
-                    _ -> return cParamExpr) args argsAnns
+    cArgs <- mapM genExpression args
     expType <- getExprType expr
-    case expType of
-        Array {} -> return $ CMember (CCall identifier cArgs cAnn) "array" False cAnn
-        _ -> return $ CCall identifier (cConstArgs ++ cArgs) cAnn
+    return $ CCall identifier (cConstArgs ++ cArgs) cAnn
 genExpression (MemberFunctionAccess obj ident constArgs args ann) = do
     genMemberFunctionAccess obj ident constArgs args ann
 genExpression (DerefMemberFunctionAccess obj ident constArgs args ann) =

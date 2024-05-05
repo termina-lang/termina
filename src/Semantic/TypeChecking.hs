@@ -140,6 +140,9 @@ objectType getVarTy (ArrayIndexExpression obj idx ann) = do
     Array ty_elems _vexp -> do
         idx_typed  <- expressionType (Just USize) rhsObjectType idx
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
+    Reference ref_ak (Array ty_elems _vexp) -> do
+        idx_typed  <- expressionType (Just USize) rhsObjectType idx
+        return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
     ty -> throwError $ annotateError ann (EArray ty)
 objectType _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
@@ -909,28 +912,30 @@ globalCheck (Const ident ty expr mods anns) = do
   typed_expr <- constExpressionType ty expr
   return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty)))
 
-
 parameterTypeChecking :: Locations -> Parameter -> SemanticMonad ()
 parameterTypeChecking anns p =
     let typeSpec = paramTypeSpecifier p in
      -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
      -- since we cannot have dynamic types as parameters.
-    case typeSpec of
-      DynamicSubtype _ -> throwError (annotateError anns (EArgHasDyn p))
-      Option (DynamicSubtype _) -> throwError (annotateError anns (EArgHasDyn p))
-      _ -> checkTypeDefinition anns typeSpec
+    unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
+    checkTypeDefinition anns typeSpec
 
 constParameterTypeChecking :: Locations -> ConstParameter -> SemanticMonad ()
 constParameterTypeChecking anns (ConstParameter p) =
     let typeSpec = paramTypeSpecifier p in 
     unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
 
+returnTypeChecking :: Locations -> TypeSpecifier -> SemanticMonad ()
+returnTypeChecking anns ty = 
+  unless (parameterTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
+  checkTypeDefinition anns ty
+
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
 programSeman (Function ident cps ps mty bret mods anns) =
   ----------------------------------------
   -- Check the return type 
-  maybe (return ()) (checkTypeDefinition anns) mty >>
+  maybe (return ()) (returnTypeChecking anns) mty >>
   -- Check generic const parameters
   forM_ cps (constParameterTypeChecking anns) >>
   addLocalConstants anns 

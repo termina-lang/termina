@@ -78,20 +78,6 @@ genArrayInitialization before level cObj expr = do
         (FieldAssignmentsExpression {}) -> genStructInitialization False level cObj expr
         (OptionVariantExpression {}) -> genOptionInitialization False level cObj expr
         (EnumVariantExpression {}) -> genEnumInitialization False level cObj expr
-        (FunctionExpression _ _ _ ann) -> do
-            exprType <- getExprType expr
-            structName <- genArrayWrapStructName exprType
-            cExpr <- genExpression expr
-            let exprCAnn = buildGenericAnn ann
-                stmtAnn = buildStatementAnn ann before
-                declAnn = buildDeclarationAnn ann False
-                left = CUnary CIndOp (CCast
-                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn)
-                    cObj exprCAnn) exprCAnn
-                right = CUnary CIndOp (CCast
-                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn)
-                    cExpr exprCAnn) exprCAnn
-            return [CExpr (Just (CAssignment left right exprCAnn)) stmtAnn]
         _ -> do
             cExpr <- genExpression expr
             exprType <- getExprType expr
@@ -229,21 +215,7 @@ genBlockItem (AssignmentStmt obj expr  _) = do
     objType <- getObjectType obj
     cObj <- genObject obj
     case objType of
-        Array _ _ ->
-            case expr of
-                (FunctionExpression _ _ _ ann) -> do
-                    exprType <- getExprType expr
-                    structName <- genArrayWrapStructName exprType
-                    cExpr <- genExpression expr
-                    let exprCAnn = buildGenericAnn ann
-                        stmtAnn = buildStatementAnn ann True
-                        declAnn = buildDeclarationAnn ann False
-                        left = CUnary CIndOp (CCast
-                            (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cObj exprCAnn) exprCAnn
-                        right = CUnary CIndOp (CCast
-                            (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cExpr exprCAnn) exprCAnn
-                    return $ CBlockStmt <$> [CExpr (Just (CAssignment left right exprCAnn)) stmtAnn]
-                _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
+        Array _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
         (Location _) -> do
             let ann = getAnnotation obj
             return $ CBlockStmt <$> [CExpr (Just (CUnary CIndOp cObj (buildGenericAnn ann))) (buildStatementAnn ann True)]
@@ -482,17 +454,8 @@ genBlockItem (SingleExpStmt expr ann) = do
 genReturnStatement :: ReturnStmt SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
 genReturnStatement (ReturnStmt (Just expr) ann) = do
     let cAnn = buildStatementAnn ann True
-        exprCAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
     cExpr <- genExpression expr
-    exprType <- getExprType expr
-    case exprType of
-        (Array {}) -> do
-            structName <- genArrayWrapStructName exprType
-            let left = CUnary CIndOp (CCast
-                    (CDeclaration [CTypeSpec $ CTypeDef structName] [(Just (CDeclarator Nothing [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)] declAnn) cExpr exprCAnn) exprCAnn
-            return [CBlockStmt $ CReturn (Just left) cAnn]
-        _ -> return [CBlockStmt $ CReturn (Just cExpr) cAnn]
+    return [CBlockStmt $ CReturn (Just cExpr) cAnn]
 genReturnStatement (ReturnStmt Nothing ann) = do
     let cAnn = buildStatementAnn ann True
     return [CBlockStmt $ CReturn Nothing cAnn]

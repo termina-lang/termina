@@ -13,8 +13,49 @@ import Text.Parsec.Pos
 import Errata
 import Errata.Styles
 import AST.Seman
+import Numeric
 
+class ShowText a where
+    showText :: a -> T.Text
 
+instance ShowText Size where
+    showText (K (TInteger value DecRepr)) = T.pack $ show value
+    showText (K (TInteger value HexRepr)) = T.toUpper . T.pack $ "0x" <> showHex value ""
+    showText (K (TInteger value OctalRepr)) = T.pack ("0" <> showOct value "")
+    showText (V ident) = T.pack ident
+
+instance ShowText AccessKind where
+    showText Mutable = "mut"
+    showText Immutable = ""
+    showText Private = "priv"
+
+instance ShowText TypeSpecifier where
+    showText UInt8 = "u8"
+    showText UInt16 = "u16"
+    showText UInt32 = "u32"
+    showText UInt64 = "u64"
+    showText Int8 = "i8"
+    showText Int16 = "i16"
+    showText Int32 = "i32"
+    showText Int64 = "i64"
+    showText USize = "usize"
+    showText Bool = "bool"
+    showText Char = "char"
+    showText (DefinedType ident) = T.pack ident
+    showText (Array ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (Slice ts) = "[" <> showText ts <> "]"
+    showText (Option ts) = "Option<" <> showText ts <> ">"
+    showText (MsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
+    showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
+    showText (Allocator ts) = "Allocator<" <> showText ts <> ">"
+    showText (Reference ak ts) = "&" <> showText ak <> " " <> showText ts
+    showText (DynamicSubtype ts) = "dyn " <> showText ts
+    showText (Location ts) = "loc " <> showText ts
+    showText (AccessPort ts) = "access " <> showText ts
+    showText (SinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (InPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (OutPort ts) = "out " <> showText ts
+    showText Unit = "()"
 
 printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg = 
@@ -62,7 +103,7 @@ ppError sourceLines (AnnError e (Position pos)) =
                 lineNumber lineColumn 1
                 "You are trying to index an object that is not an array."
     (ENotNamedObject ident) -> 
-        let title = "error[E002]: undeclared variable."
+        let title = "error[E002]: Object not found."
         in
             printSimpleError
                 sourceLines title fileName
@@ -91,6 +132,27 @@ ppError sourceLines (AnnError e (Position pos)) =
                 lineNumber lineColumn 2
                 ("You are missing the else clause in an if-else-if statement.\n" <>
                 "You must provide an else clause if you are defining an else-if clause.")
+    ECasteable ts1 ts2 -> 
+        let title = "error[E006]: invalid cast."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 2
+                ("You cannot cast a value of type \x1b[31m" <> showText ts1 <> "\x1b[0m to type \x1b[31m" <> showText ts2 <> "\x1b[0m.")
+    EInvalidParameterType (Parameter ident ts) -> 
+        let title = "error[E007]: invalid parameter type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
+    EInvalidReturnType ts -> 
+        let title = "error[E008]: invalid return type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                ("Function returns an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

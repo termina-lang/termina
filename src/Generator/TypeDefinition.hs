@@ -284,7 +284,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
         genClassFunctionDeclaration (ClassViewer viewer constParams params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
-            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
             cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
@@ -303,7 +303,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassMethod method rts _ ann') = do
             let cAnn = buildGenericAnn ann'
-            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
             clsFuncName <- genClassFunctionName identifier method
             cThisParam <- genThisParam clsdef
             return $ CDeclaration retTypeDecl
@@ -311,7 +311,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction action param rts _ ann') = do
             let cAnn = buildGenericAnn ann'
-            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- genDeclSpecifiers rts
             cThisParam <- genThisParam clsdef
             cParam <- genParameterDeclaration ann' param
             clsFuncName <- genClassFunctionName identifier action
@@ -331,14 +331,13 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
         genClassFunctionDefinition :: ClassMember SemanticAnns -> CSourceGenerator CExternalDeclaration
         genClassFunctionDefinition (ClassViewer viewer constParameters parameters rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
-            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
             cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
-                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Array {})) <- parameters]
-            cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
+            cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
@@ -352,10 +351,9 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             let cAnn = buildGenericAnn ann
-                newKeyVals = M.fromList $ [(pid, CMember (CVar pid cAnn) "array" False cAnn) | (Parameter pid (Array {})) <- parameters]
                 retTypeDecl = [CTypeSpec CVoidType]
             selfCastStmt <- genSelfCastStmt
-            cBody <- Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
+            cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
@@ -393,7 +391,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
 
         genClassFunctionDefinition (ClassMethod method rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier method
-            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
             cThisParam <- genThisParam clsdef
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
@@ -406,18 +404,12 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier action
-            retTypeDecl <- genReturnTypeDeclSpecifiers rts
+            retTypeDecl <- genDeclSpecifiers rts
             cThisParam <- genThisParam clsdef
             cParam <- genParameterDeclaration ann param
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
-            cBody <- case param of
-                    (Parameter pid (Array {})) -> do
-                        let newKeyVals = M.fromList [(pid, CMember (CVar pid cAnn) "array" False cAnn)]
-                        Control.Monad.Reader.local (M.union newKeyVals) $ foldM (\acc x -> do
-                            cStmt <- genBlockItem x
-                            return $ acc ++ cStmt) [] body
-                    _ -> foldM (\acc x -> do
+            cBody <- foldM (\acc x -> do
                         cStmt <- genBlockItem x
                         return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl

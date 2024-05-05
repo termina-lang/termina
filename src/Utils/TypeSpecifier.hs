@@ -3,6 +3,7 @@
 module Utils.TypeSpecifier where
 
 import           AST.Parser
+import GHC.Generics (UInt)
 
 -- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
 primitiveTypes :: TypeSpecifier -> Bool
@@ -18,8 +19,45 @@ primitiveTypes USize           = True
 primitiveTypes Bool            = True
 primitiveTypes Char            = True
 primitiveTypes (DefinedType _) = True
-primitiveTypes (Array _ _)    = True
+primitiveTypes (Array _ _)     = True
 primitiveTypes  _              = False
+
+parameterTy :: TypeSpecifier -> Bool
+parameterTy UInt8           = True
+parameterTy UInt16          = True
+parameterTy UInt32          = True
+parameterTy UInt64          = True
+parameterTy Int8            = True
+parameterTy Int16           = True
+parameterTy Int32           = True
+parameterTy Int64           = True
+parameterTy USize           = True
+parameterTy Bool            = True
+parameterTy Char            = True
+parameterTy (DefinedType _) = True
+parameterTy (Reference _ (DynamicSubtype _)) = False
+parameterTy (Reference _ (Option (DynamicSubtype _))) = False
+parameterTy (Reference {})  = True
+parameterTy (Option (DynamicSubtype _)) = False
+parameterTy (Option _)      = True
+parameterTy _               = False
+
+procedureParamTy :: TypeSpecifier -> Bool
+procedureParamTy UInt8           = True
+procedureParamTy UInt16          = True
+procedureParamTy UInt32          = True
+procedureParamTy UInt64          = True
+procedureParamTy Int8            = True
+procedureParamTy Int16           = True
+procedureParamTy Int32           = True
+procedureParamTy Int64           = True
+procedureParamTy USize           = True
+procedureParamTy Bool            = True
+procedureParamTy Char            = True
+procedureParamTy (DefinedType _) = True
+procedureParamTy (Reference {})  = True
+procedureParamTy (Option _)      = True
+procedureParamTy _               = False
 
 -- | The following function defines what we consider to be simple types.
 -- Simple types can be used at variable creation, inside arrays and user defined structures.

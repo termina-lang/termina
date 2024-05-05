@@ -25,21 +25,6 @@ test0 = "function add_one(input : &mut [u32; 5]) {\n" ++
         "    return;\n" ++
         "}"
 
-test1 :: String
-test1 = "function add_two(input : &[u32; 5]) -> [u32; 5] {\n" ++ 
-        "    var output : [u32; 5] = [0; 5];\n" ++
-        "    for i : usize in 0 : usize .. 5 : usize {\n" ++
-        "        output[i] = (*input)[i] + 2;\n" ++
-        "    }\n" ++
-        "    return output;\n" ++
-        "}\n" ++
-        "\n" ++
-        "function slice_test1(vector0 : & [[u32; 10]; 5]) {\n" ++
-        "    var foo : [u32; 5] = [0; 5];\n" ++
-        "    foo = add_two(&(*vector0)[2][2..8]);\n" ++
-        "    return;\n" ++
-        "}"
-
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
@@ -101,49 +86,3 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of function slice_test1" $ do
-      renderHeader test1 `shouldBe`
-        pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "__wrapper_uint32__5_t add_two(const uint32_t input[5]);\n" ++
-              "\n" ++
-              "void slice_test1(const uint32_t vector0[5][10]);\n" ++
-              "\n" ++
-              "#endif\n")
-    it "Prints definition of function slice_test1" $ do
-      renderSource test1 `shouldBe`
-        pack ("\n" ++
-              "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "__wrapper_uint32__5_t add_two(const uint32_t input[5]) {\n" ++
-              "    \n" ++
-              "    uint32_t output[5];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
-              "        output[__i0] = 0;\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    for (size_t i = 0; i < 5; i = i + 1) {\n" ++
-              "        \n" ++
-              "        output[i] = input[i] + 2;\n" ++
-              "\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    return *(__wrapper_uint32__5_t *)output;\n" ++
-              "\n" ++
-              "}\n" ++
-              "\n" ++
-              "void slice_test1(const uint32_t vector0[5][10]) {\n" ++
-              "    \n" ++
-              "    uint32_t foo[5];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 5; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = 0;\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    *(__wrapper_uint32__5_t *)foo = *(__wrapper_uint32__5_t *)add_two(&vector0[2][2]).array;\n" ++
-              "\n" ++
-              "    return;\n" ++
-              "\n" ++
-              "}\n") 

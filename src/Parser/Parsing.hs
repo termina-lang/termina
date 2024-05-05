@@ -418,8 +418,8 @@ expressionParser' = buildPrattParser -- New parser
           p <- getPosition
           return $ \l r -> BinOp f l r (Position p))
     castingPostfix = Ex.Postfix (do
-          _ <- reserved "as"
           p <- getPosition
+          _ <- reserved "as"
           typeSpecificer <- typeSpecifierParser
           return $ \parent -> Casting parent typeSpecificer (Position p))
 
@@ -686,8 +686,8 @@ emptyReturn = returnStmtParser >>= maybe mempty (const (fail "Expected Empty ret
 functionParser :: Parser (AnnASTElement  Annotation)
 functionParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "function"
+  p <- getPosition
   name <- identifierParser
   constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens (sepBy parameterParser comma)

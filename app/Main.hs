@@ -4,15 +4,11 @@ module Main (main) where
 import Parser.Parsing
 import Options
 -- import Control.Applicative
-import Semantic.TypeChecking
 import Semantic.Monad
-import Semantic.Errors (ppError) --Printing errors
 
 import Semantic.Option (mapOptions, OptionMap)
 
 import Text.Parsec (runParser)
-
-import qualified Data.Text as T
 
 import Control.Monad
 

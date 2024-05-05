@@ -4,7 +4,6 @@ module Modules.Printing where
 
 import Modules.Errors
 import Semantic.Errors (ppError)
-import Errata
 
 -- Error Printing
 

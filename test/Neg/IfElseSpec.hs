@@ -17,7 +17,7 @@ runNegativeTest input = case parse (contents topLevel) "" input of
       Right _ -> Nothing
 
 test0 :: String
-test0 = "function keep_inside(n: usize, array : &mut[u8;64], range:[u8;2]) {\n" ++
+test0 = "function keep_inside(n: usize, array : &mut[u8;64], range: &[u8;2]) {\n" ++
         "    let lower_limit : u8 = range[1 : usize];\n" ++
         "    let upper_limit : u8 = range[2 : usize];\n" ++
         "    let x : u8 = (*array)[n];\n" ++

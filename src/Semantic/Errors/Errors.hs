@@ -15,14 +15,22 @@ import           Control.Monad.Except       (MonadError (..))
 ----------------------------------------
 data Errors a
   -- | Expected /similar/ types?
-  = EMismatch TypeSpecifier TypeSpecifier
+  = 
+    EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
+  | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
+  | ENotNamedObject Identifier -- ^ Object not found (E002)
+  | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
+  | EAssignmentToImmutable -- ^ Assignment to immutable variable (E004)
+  | EIfElseNoOtherwise -- ^ Missing else clause (E005)
+  | ECasteable TypeSpecifier TypeSpecifier -- ^ Casting error (E006)
+  | EInvalidParameterType Parameter -- ^ Invalid parameter type (E007)
+  | EInvalidReturnType TypeSpecifier -- ^ Invalid return type (E008)
   | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
   | EExpectedNumType TypeSpecifier
   | EExpectedPosType TypeSpecifier
-  | ECasteable TypeSpecifier TypeSpecifier
   | EConstantWithoutKnownType Const
   | EReturnValueExpected TypeSpecifier
   | EReturnValueNotVoid 
@@ -38,8 +46,6 @@ data Errors a
   | EInvalidAccessToGlobal Identifier
   -- | Invalid writing access to read only object
   | EObjectIsReadOnly Identifier
-  | ENotNamedObject Identifier
-  | ENotConstant Identifier
   -- | Not Global Variable found
   | ENotNamedGlobal Identifier
   | EGlobalOtherType Identifier
@@ -62,7 +68,7 @@ data Errors a
   | ETyNotStructFound Identifier
   -- Something was found but it is not an identifier
   | ETyNotStruct Identifier (SemanTypeDef a)
-  -- | Record missing fields
+  -- | Record missing field^
   | EFieldMissing [Identifier]
   -- | Record extra fields
   | EFieldExtra [Identifier]
@@ -70,8 +76,6 @@ data Errors a
   | EFieldNotFixedLocation Identifier
   -- | Field does not have a fixed location
   | EFieldNotPort Identifier
-  -- | Expecting a Vecotor got
-  | EArray TypeSpecifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TypeSpecifier
   | EFunctionAccessNotResource TypeSpecifier
@@ -102,18 +106,12 @@ data Errors a
   | EMCMoreArgs [Identifier]
   | EMCMissingArgs [TypeSpecifier]
   | EMCEmpty
-  | EIfElseNoOtherwise
   -- | ForLoop
   | EForIteratorWrongType TypeSpecifier
-  | EBadRange -- ^ Range conditions are not met
   | EForWhileTy TypeSpecifier -- ^ Type of while is not Bool
-  -- | Static not literal constant
-  | EStaticK
   -- | Defined GEntry
   | EDefinedGEntry (GEntry a)
   -- | Impossible Cases. Internal Transpiler errors
-  | ERHSCatch
-  | ELookupVar
   | EUnboxingStmtExpr -- Unboxing statement as an expression.
   | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
@@ -138,11 +136,9 @@ data Errors a
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
   -- | Dynamic (type has a Dynamic inside) as Argument of a function
-  | EArgHasDyn Parameter
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier a
-  | EAssignmentToImmutable
   -- | Error getting type of expressions of objects.
   | EUnboxingObjectExpr
   | EUnboxingConstExpr
@@ -220,8 +216,6 @@ data Errors a
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
   -- | Array slicing
-  | ELowerBoundConst (ConstExpression a) -- | Lower bound is not a numeric constant expression
-  | EUpperBoundConst (ConstExpression a) -- | Upper bound is not a numeric constant expression
   | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type
   | EBoundsTypeNotUSize TypeSpecifier TypeSpecifier -- | Bounds are not of of type usize
   | EBoundsLowerGTUpper Integer Integer -- | Lower bound is greater than upper bound
