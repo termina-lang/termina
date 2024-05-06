@@ -25,6 +25,7 @@ data Errors a
   | ECasteable TypeSpecifier TypeSpecifier -- ^ Casting error (E006)
   | EInvalidParameterType Parameter -- ^ Invalid parameter type (E007)
   | EInvalidReturnType TypeSpecifier -- ^ Invalid return type (E008)
+  | EProcedureExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)
   | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
@@ -87,8 +88,11 @@ data Errors a
   | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
+  | EMemberMethodExtraConstParams
+  | EMemberMethodMissingConstParams
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
+  | EProcedureMissingParams (Identifier, [Parameter], a) Integer
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some

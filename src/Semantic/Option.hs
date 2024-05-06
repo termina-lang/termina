@@ -7,7 +7,6 @@ import Utils.TypeSpecifier
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad
-import Semantic.Monad (ObjectAnn(accessKind))
 
 type OptionMap = M.Map TypeSpecifier (S.Set TypeSpecifier)
 

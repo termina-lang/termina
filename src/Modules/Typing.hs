@@ -40,6 +40,9 @@ data ModuleAST a = MData
 mAstFromPair :: ([ModuleName] , a , TL.Text, PAST.TerminaProgram Annotation) -> ModuleAST (PAST.TerminaProgram Annotation)
 mAstFromPair (deps, _ , src_lines, tast) = MData deps src_lines tast
 
+mLazyTextFromPair :: ([ModuleName] , a , TL.Text, PAST.TerminaProgram Annotation) -> TL.Text
+mLazyTextFromPair (_, _ , src_lines, _) = src_lines
+
 data TypedModule = Typed
    { typedModule :: SAST.TerminaProgram SemanticAnns
    , defsModule  :: [ (SAST.Identifier , SAnns (GEntry SemanticAnns)) ]
@@ -72,7 +75,7 @@ typeModule parserMap m typedDeps =
         Just (MData deps src_lines parsedM) ->
             addDeps deps >>= \env ->
             case typeAndGetGlobals env (frags parsedM) of
-               Left err -> Left (ELiftTypeCheckError err src_lines)
+               Left err -> Left (ELiftTypeCheckError err)
                Right t ->
                  let typedModule
                         = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst t)) (snd t)
@@ -103,7 +106,7 @@ typeProject parserMap mds =
             env <- foldM (flip (buildEnvironment tP)) M.empty deps
             -- Type the current module and get its globals.
             typedProg <- case typeAndGetGlobals env (frags parsedM) of
-                           Left err -> throwError (ELiftTypeCheckError err src_lines)
+                           Left err -> throwError (ELiftTypeCheckError err)
                            Right t -> return t
             -- Load stuff into project map
             let typedModule = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst typedProg)) (snd typedProg)

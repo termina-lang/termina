@@ -986,8 +986,8 @@ classActionParser = do
 
 classProcedureParser :: Parser (ClassMember Annotation)
 classProcedureParser = do
-  p <- getPosition
   reserved "procedure"
+  p <- getPosition
   name <- identifierParser
   constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
@@ -1003,8 +1003,8 @@ classProcedureParser = do
 
 interfaceProcedureParser :: Parser (InterfaceMember Annotation)
 interfaceProcedureParser = do
-  p <- getPosition
   reserved "procedure"
+  p <- getPosition
   name <- identifierParser
   constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
@@ -1017,8 +1017,8 @@ interfaceProcedureParser = do
 
 classViewerParser :: Parser (ClassMember Annotation)
 classViewerParser = do
-  p <- getPosition
   reserved "viewer"
+  p <- getPosition
   name <- identifierParser
   constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens viewerParamsParser

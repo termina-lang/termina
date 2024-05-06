@@ -6,8 +6,6 @@ import AST.Core (Identifier)
 
 import Parser.Parsing (Annotation)
 
-import Semantic.Monad (SemanticAnns)
-
 import DataFlow.Types
 
 import qualified Data.Set as S

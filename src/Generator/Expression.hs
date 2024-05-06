@@ -159,17 +159,14 @@ genExpression (ReferenceExpression _ obj ann) = do
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
         (Array {}) -> return cObj
         _ -> return $ CUnary CAdrOp cObj cAnn
-genExpression expr@(FunctionExpression name constArgs args ann) = do
+genExpression (FunctionExpression name constArgs args ann) = do
     let cAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
     -- Obtain the substitutions map
     subs <- ask
     -- If the identifier is in the substitutions map, use the substituted identifier
     let identifier = fromMaybe (CVar name cAnn) (Data.Map.lookup name subs)
-    argsAnns <- getParameters expr
     cConstArgs <- mapM genConstExpression constArgs
     cArgs <- mapM genExpression args
-    expType <- getExprType expr
     return $ CCall identifier (cConstArgs ++ cArgs) cAnn
 genExpression (MemberFunctionAccess obj ident constArgs args ann) = do
     genMemberFunctionAccess obj ident constArgs args ann

@@ -56,11 +56,6 @@ instance Options MainOptions where
         <*> simpleOption "chatty" False
             "Chatty compilation"
 
-fst3 :: (a ,b ,c ) -> a
-fst3 (a,_,_) = a
-snd3 :: (a , b , c) -> b
-snd3 (_,b,_) = b
-
 getFileSrc :: Path Absolute -> IO ( ModuleMode, Path Absolute)
 getFileSrc path =
   doesDirectoryExist path >>= \isDir ->
@@ -224,6 +219,7 @@ main = runCommand $ \opts args ->
               whenChatty opts $ print ("Project Order: " ++ show analyzeOrd)
               --
               let toModuleAST = M.map mAstFromPair mapProject
+                  toLazyText = M.mapKeys (toFilePath . (rootDir </>) . (<.> FileExt "fin")) (M.map mLazyTextFromPair mapProject)
               -- Let's make it interactive (for the use)
               -- typedProject :: Map ModuleName (ModuleAST TypedModule)
               typedProject <- foldM (\env m -> do
@@ -231,7 +227,7 @@ main = runCommand $ \opts args ->
                    -- Here is something wrong!!
                    case typeModule toModuleAST m env of
                     Left err ->
-                      MPP.ppModError err >> fail "typing error"
+                      MPP.ppModError toLazyText err >> fail "typing error"
                     Right typedM ->
                       whenChatty opts (print " >> [DONE]")
                       ----------------------------------------

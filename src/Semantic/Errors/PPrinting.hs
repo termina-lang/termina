@@ -14,6 +14,7 @@ import Errata
 import Errata.Styles
 import AST.Seman
 import Numeric
+import qualified Data.Map as M
 
 class ShowText a where
     showText :: a -> T.Text
@@ -57,7 +58,7 @@ instance ShowText TypeSpecifier where
     showText (OutPort ts) = "out " <> showText ts
     showText Unit = "()"
 
-printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> T.Text -> IO ()
+printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> Maybe T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg = 
     TL.putStrLn $ prettyErrors 
         sourceLines
@@ -77,16 +78,18 @@ printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg
         genSimpleErrata = Errata
             (Just errorMessage)
             [genSimpleBlock]
-            (Just msg) 
+            msg
 
 
 -- useful prettyprinter doc
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
-ppError :: TL.Text -> SemanticErrors -> IO ()
-ppError sourceLines (AnnError e (Position pos)) =
+ppError :: M.Map FilePath TL.Text -> 
+    SemanticErrors -> IO ()
+ppError toModuleAST (AnnError e (Position pos)) =
   let fileName = sourceName pos
       lineNumber = sourceLine pos
       lineColumn = sourceColumn pos
+      sourceLines = toModuleAST M.! fileName
   in
   case e of
     (EArray ts) -> 
@@ -96,19 +99,19 @@ ppError sourceLines (AnnError e (Position pos)) =
             (Slice _) -> printSimpleError 
                 sourceLines title fileName 
                 lineNumber lineColumn 1 
-                ("You cannot index a slice. It is not an array. \n" <>
-                "A slice can only be used to create references  to a part of an array.")
+                (Just ("You cannot index a slice. It is not an array. \n" <>
+                "A slice can only be used to create references  to a part of an array."))
             _ -> printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                "You are trying to index an object that is not an array."
+                (Just "You are trying to index an object that is not an array.")
     (ENotNamedObject ident) -> 
         let title = "error[E002]: Object not found."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
-                ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")
+                (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared"))
     (ENotConstant ident) -> 
         let 
             title = "error[E003]: invalid use of a non-constant object."
@@ -116,43 +119,61 @@ ppError sourceLines (AnnError e (Position pos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
-                ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant.")
+                (Just ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant."))
     EAssignmentToImmutable -> 
         let title = "error[E004]: assignment to immutable variable."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                "You are trying to assign a value to an immutable object."
+                (Just "You are trying to assign a value to an immutable object.")
     EIfElseNoOtherwise ->
         let title = "error[E005]: missing else clause."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 2
-                ("You are missing the else clause in an if-else-if statement.\n" <>
-                "You must provide an else clause if you are defining an else-if clause.")
+                (Just ("You are missing the else clause in an if-else-if statement.\n" <>
+                    "You must provide an else clause if you are defining an else-if clause."))
     ECasteable ts1 ts2 -> 
         let title = "error[E006]: invalid cast."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 2
-                ("You cannot cast a value of type \x1b[31m" <> showText ts1 <> "\x1b[0m to type \x1b[31m" <> showText ts2 <> "\x1b[0m.")
+                (Just ("You cannot cast a value of type \x1b[31m" <> showText ts1 <> "\x1b[0m to type \x1b[31m" <> showText ts2 <> "\x1b[0m."))
     EInvalidParameterType (Parameter ident ts) -> 
         let title = "error[E007]: invalid parameter type."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
+                (Just ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
     EInvalidReturnType ts -> 
         let title = "error[E008]: invalid return type."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                ("Function returns an invalid type \x1b[31m" <> showText ts <> "\x1b[0m.")
+                (Just ("Function returns an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
+    EProcedureExtraParams (procId, params, Position procPos) paramNumber ->
+        let title = "error[E009]: extra parameters in procedure call."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
