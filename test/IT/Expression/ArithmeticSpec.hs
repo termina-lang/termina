@@ -29,7 +29,11 @@ test0 = "function test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "resource class id0 {\n" ++
+test1 = "interface test_iface {\n" ++
+        "    procedure test1(&priv self, foo : dyn u16);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure test1(&priv self, foo : dyn u16) {\n" ++
         "        foo = foo + 1024 : u16;\n" ++
         "        foo = 1024 : u16 + foo;\n" ++
@@ -118,6 +122,11 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* test1)(void * __this, __termina_dyn_t foo);\n" ++
+              "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++

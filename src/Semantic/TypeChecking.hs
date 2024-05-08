@@ -34,7 +34,7 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\))
+import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\), sort)
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -227,8 +227,8 @@ memberFunctionAccessType ann obj_ty ident constArgs args =
            Nothing -> throwError $ annotateError ann (EMemberAccessNotProcedure ident)
            Just (cps, ps, anns) -> do
               let (psLen , asLen) = (length ps, length args)
-              when (psLen < asLen) (throwError $ annotateError ann (EProcedureExtraParams (ident, ps, location anns) (fromIntegral asLen)))
-              when (psLen > asLen) (throwError $ annotateError ann (EProcedureMissingParams (ident, ps, location anns) (fromIntegral asLen)))
+              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
+              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
               typed_args <- zipWithM (\p e -> expressionType (Just (paramTypeSpecifier p)) rhsObjectType e) ps args
               typed_constArgs <- zipWithM (\p e -> do
                   constExpressionType (paramTypeSpecifier $ unConstParam p) e) cps constArgs
@@ -946,25 +946,18 @@ programSeman (Function ident cps ps mty bret mods anns) =
     checkFunction =
           -- Check regular params
         forM_ ps (parameterTypeChecking anns) >>
-        ----------------------------------------
-        
-        ----------------------------------------
-        
-        ----------------------------------------
-        
-        ----------------------------------------
-        Function ident cps ps mty
-          <$> (addLocalImmutObjs anns
-                (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
-                (retblockType mty bret) >>= \ typed_bret ->
-              maybe
-                  -- Procedure
-                  (blockRetTy Unit)
-                  -- Function
-                  blockRetTy
-                  mty typed_bret >> return typed_bret)
-          <*> pure mods
-          <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty)))
+          Function ident cps ps mty
+            <$> (addLocalImmutObjs anns
+                  (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
+                  (retblockType mty bret) >>= \ typed_bret ->
+                maybe
+                    -- Procedure
+                    (blockRetTy Unit)
+                    -- Function
+                    blockRetTy
+                    mty typed_bret >> return typed_bret)
+            <*> pure mods
+            <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> globalCheck gbl
@@ -985,6 +978,83 @@ interfaceProcedureTy :: InterfaceMember Locations -> SemanticMonad (SAST.Interfa
 interfaceProcedureTy (InterfaceProcedure ident cps ps annIP) = do
   mapM_ (checkTypeDefinition annIP . paramTypeSpecifier) ps
   return $ InterfaceProcedure ident cps ps (buildExpAnn annIP Unit)
+
+checkClassKind :: Locations -> Identifier -> ClassKind 
+  -> ([SAST.ClassMember SemanticAnns], 
+      [PAST.ClassMember Locations], 
+      [PAST.ClassMember Locations], 
+      [PAST.ClassMember Locations], 
+      [PAST.ClassMember Locations])
+  -> [Identifier] -> SemanticMonad ()
+checkClassKind anns clsId ResourceClass (fs, prcs, _mths, _vws, acts) provides = do
+  -- A resource must provide at least one interface
+  when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
+  -- A resource must not have any actions
+  case acts of
+    [] -> return ()
+    (ClassAction actionId _ _ _ ann):_  -> throwError $ annotateError ann (EResourceClassAction actionId)
+    _ -> throwError (annotateError internalErrorSeman EClassTyping)
+  -- Check that the resource class does not define any in and out ports
+  mapM_ (
+    \case {
+      ClassField (FieldDefinition fs_id fs_ty) annCF ->
+        case fs_ty of
+          InPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort fs_id)
+          OutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort fs_id)
+          _ -> return ()
+      ;
+      _ -> return ();
+    }) fs
+  -- Check that all the procedures are provided
+  providedProcedures <- concat <$> foldM (\acc ifaceId ->
+    getGlobalTy anns ifaceId >>= \case {
+      Interface _ iface_prcs _ -> return $ map (, ifaceId) iface_prcs : acc;
+      _ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)
+    }) [] provides
+  let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _ _, _) -> ifaceId) providedProcedures
+  let sorted_prcs = Data.List.sortOn (
+        \case {
+          (ClassProcedure prcId _ _ _ _) -> prcId;
+          _ -> error "internal error: checkClassKind"
+        }) prcs
+  -- Check that all procedures are provided and that the parameters match
+  checkSortedProcedures sorted_provided sorted_prcs
+
+  where
+
+    checkSortedProcedures :: [(InterfaceMember SemanticAnns, Identifier)] -> [ClassMember Locations] -> SemanticMonad ()
+    checkSortedProcedures [] [] = return ()
+    checkSortedProcedures [] ((ClassProcedure prcId _ _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces prcId)
+    checkSortedProcedures ((InterfaceProcedure procId _ _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
+    checkSortedProcedures ((InterfaceProcedure prcId cps ps pann, ifaceId):ds) ((ClassProcedure prcId' cps' ps' _ ann):as) =
+      unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
+      let cpsLen = length cps
+          cpsLen' = length cps'
+          psLen = length ps
+          psLen' = length ps'
+      when (cpsLen < cpsLen') (throwError $ annotateError ann (EProcedureExtraConstParams (ifaceId, prcId, cps, location pann) (fromIntegral cpsLen')))
+      when (cpsLen > cpsLen') (throwError $ annotateError ann (EProcedureMissingConstParams (ifaceId, prcId, cps, location pann) (fromIntegral cpsLen')))
+      when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
+      when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
+      zipWithM_ (checkProcedureConstParam ann) cps cps'
+      zipWithM_ (checkProcedureParam ann) ps ps'
+      checkSortedProcedures ds as
+    checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
+
+    checkProcedureConstParam :: Locations -> ConstParameter -> ConstParameter -> SemanticMonad ()
+    checkProcedureConstParam ann (ConstParameter (Parameter _ ts)) (ConstParameter (Parameter ident ts')) =
+      unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureConstParamMismatch ident ts ts'))
+    
+    checkProcedureParam :: Locations -> Parameter -> Parameter -> SemanticMonad ()
+    checkProcedureParam ann (Parameter _ ts) (Parameter ident ts') =
+      unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamMismatch ident ts ts'))
+
+checkClassKind _anns _clsId _kind _members _provides = return ()
+  
+
+
+
+  
 
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
@@ -1013,17 +1083,16 @@ typeDefCheck ann (Enum ident evs mds) =
   >> return (Enum ident evs mds)
 typeDefCheck ann (Interface ident cls mds) = do
   -- Check that the interface is not empty
-  when (Prelude.null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
+  when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
   -- Check procedure names are unique
   checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ _ -> ifaceId) cls)
   -- Check that every procedure is well-defined
   procedures <- mapM interfaceProcedureTy cls
   -- If everything is fine, return the same definition.
   return (Interface ident procedures mds)
-typeDefCheck ann (Class kind ident members provides mds)
+typeDefCheck ann (Class kind ident members provides mds) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
   -- check that it defines at least one method.
-  =
   -- TODO: Check class well-formedness depending on its kind
   -- TODO: Check the class procedures belong to a provided interface
   -- when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
@@ -1066,6 +1135,7 @@ typeDefCheck ann (Class kind ident members provides mds)
        -- introduce a semi-well formed type.
        ) ->
   do
+    checkClassKind ann ident kind (fls, prcs, mths, vws, acts) provides
   -- Now we can go function by function checking everything is well typed.
   ----------------------------------------
   -- Loop between methods, procedures and viewers.
@@ -1127,7 +1197,7 @@ typeDefCheck ann (Class kind ident members provides mds)
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
-    return (Class kind ident (fls ++ fnChecked) provides mds)
+    return (SAST.Class kind ident (fls ++ fnChecked) provides mds)
 
 ----------------------------------------
 -- Field definition helpers.

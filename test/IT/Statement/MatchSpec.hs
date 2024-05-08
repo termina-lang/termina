@@ -14,7 +14,11 @@ import Modules.Modules
 
 
 test0 :: String
-test0 = "resource class id0 {\n" ++
+test0 = "interface test_iface {\n" ++
+        "    procedure match_test0(&priv self, option0 : Option<dyn u32>);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure match_test0(&priv self, option0 : Option<dyn u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
@@ -30,7 +34,11 @@ test0 = "resource class id0 {\n" ++
         "};"
 
 test1 :: String
-test1 = "resource class id0 {\n" ++
+test1 = "interface test_iface {\n" ++
+        "    procedure match_test1(&priv self, option0 : Option<dyn u32>);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure match_test1(&priv self, option0 : Option<dyn u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
@@ -105,6 +113,11 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* match_test0)(void * __this, __option_dyn_t option0);\n" ++
+              "} test_iface;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
@@ -148,6 +161,11 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* match_test1)(void * __this, __option_dyn_t option0);\n" ++
+              "} test_iface;\n" ++
+              "\n" ++              
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++

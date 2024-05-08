@@ -25,7 +25,21 @@ data Errors a
   | ECasteable TypeSpecifier TypeSpecifier -- ^ Casting error (E006)
   | EInvalidParameterType Parameter -- ^ Invalid parameter type (E007)
   | EInvalidReturnType TypeSpecifier -- ^ Invalid return type (E008)
-  | EProcedureExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)
+  | EProcedureCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)
+  | EProcedureCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure call (E010)
+  | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (E011)
+  | EResourceClassAction Identifier -- ^ Resource class defines an action (E012)
+  | EResourceClassInPort Identifier -- ^ Resource class defines an in port (E013)
+  | EResourceClassOutPort Identifier -- ^ Resource class defines an out port (E014)
+  | EInterfaceNotFound Identifier -- ^ Interface not found (E015)
+  | EProcedureNotFromProvidedInterfaces Identifier -- ^ Procedure not from provided interfaces (E016)
+  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (E017)
+  | EProcedureExtraParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure definition (E018)
+  | EProcedureMissingParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure definition (E019)
+  | EProcedureExtraConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Extra const parameters in procedure definition (E020)
+  | EProcedureMissingConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in procedure definition (E021)
+  | EProcedureConstParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Const parameter type mismatch (E022)
+  | EProcedureParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Parameter type mismatch (E023)
   | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
@@ -92,7 +106,6 @@ data Errors a
   | EMemberMethodMissingConstParams
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
-  | EProcedureMissingParams (Identifier, [Parameter], a) Integer
   -- | Pattern Matching Missing cases
   | EPMMissingOption0 -- Missing None
   | EPMMissingOption1 -- Missing Some

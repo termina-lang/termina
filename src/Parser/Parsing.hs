@@ -934,11 +934,8 @@ globalDeclParser = do
     <|> constDeclParser
   return $ GlobalDeclaration g
 
-typeDefintionParser :: Parser (AnnASTElement  Annotation)
-typeDefintionParser = flip TypeDefinition
-  -- First we get the position, at the beginning of the definition
-  <$> (Position <$> getPosition)
-  <*> (structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser <|> interfaceDefinitionParser)
+typeDefintionParser :: Parser (AnnASTElement Annotation)
+typeDefintionParser = structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser <|> interfaceDefinitionParser
 
 fieldDefinitionParser :: Parser FieldDefinition
 fieldDefinitionParser = do
@@ -948,15 +945,15 @@ fieldDefinitionParser = do
   _ <- semi
   return $ FieldDefinition identifier typeSpecifier
 
-structDefinitionParser :: Parser (TypeDef Annotation)
+structDefinitionParser :: Parser (AnnASTElement Annotation)
 structDefinitionParser = do
   modifiers <- many modifierParser
-  -- p <- getPosition
   reserved "struct"
+  p <- getPosition
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ Struct identifier fields modifiers -- (Position p)
+  return $ TypeDefinition (Struct identifier fields modifiers) (Position p)
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
@@ -976,8 +973,8 @@ classMethodParser = do
 
 classActionParser :: Parser (ClassMember Annotation)
 classActionParser = do
-  p <- getPosition
   reserved "action"
+  p <- getPosition
   name <- identifierParser
   param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
@@ -1030,21 +1027,22 @@ classViewerParser = do
     viewerParamsParser =
       reserved "&self" >> option [] (comma >> sepBy parameterParser comma)
 
-interfaceDefinitionParser :: Parser (TypeDef Annotation)
+interfaceDefinitionParser :: Parser (AnnASTElement Annotation)
 interfaceDefinitionParser = do
   modifiers <- many modifierParser
   reserved "interface"
+  p <- getPosition
   identifier <- identifierParser
   procedures <- braces (many1 interfaceProcedureParser)
   _ <- semi
-  return $ Interface identifier procedures modifiers
+  return $ TypeDefinition (Interface identifier procedures modifiers) (Position p)
 
-classDefinitionParser :: Parser (TypeDef Annotation)
+classDefinitionParser :: Parser (AnnASTElement Annotation)
 classDefinitionParser = do
   modifiers <- many modifierParser
   classKind <- classKindParser
-  -- p <- getPosition
   reserved "class"
+  p <- getPosition
   identifier <- identifierParser
   provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
   fields <-
@@ -1054,7 +1052,7 @@ classDefinitionParser = do
       <|> classActionParser
       <|> classFieldDefinitionParser)
   _ <- semi
-  return $ Class classKind identifier fields provides modifiers
+  return $ TypeDefinition (Class classKind identifier fields provides modifiers) (Position p)
   where
     classKindParser :: Parser ClassKind
     classKindParser =
@@ -1067,14 +1065,15 @@ variantDefinitionParser = identifierParser >>= \identifier ->
   try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
   <|> return (EnumVariant identifier [])
 
-enumDefinitionParser :: Parser (TypeDef Annotation)
+enumDefinitionParser :: Parser (AnnASTElement Annotation)
 enumDefinitionParser = do
   modifiers <- many modifierParser
   reserved "enum"
+  p <- getPosition
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
   _ <- semi
-  return $ Enum identifier variants modifiers
+  return $ TypeDefinition (Enum identifier variants modifiers) (Position p)
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)

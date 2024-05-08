@@ -21,7 +21,11 @@ test0 = "function assignment_test0() {\n" ++
         "}"
 
 test1 :: String
-test1 = "resource class id0 {\n" ++
+test1 = "interface test_iface {\n" ++
+        "    procedure assignment_test1(&priv self, dyn_var0 : dyn u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure assignment_test1(&priv self, dyn_var0 : dyn u32) {\n" ++
         "        var opt : Option<dyn u32> = None;\n" ++
         "        opt = Some(dyn_var0);\n" ++
@@ -30,7 +34,11 @@ test1 = "resource class id0 {\n" ++
         "};"
 
 test2 :: String
-test2 = "resource class id0 {\n" ++
+test2 = "interface test_iface {\n" ++
+        "    procedure assignment_test2(&priv self, dyn_var0 : dyn u32, dyn_var1 : dyn u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure assignment_test2(&priv self, dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        dyn_var0 = foo;\n" ++
@@ -41,7 +49,12 @@ test2 = "resource class id0 {\n" ++
         "};"
 
 test3 :: String
-test3 = "resource class id0 {\n" ++
+test3 = "interface test_iface {\n" ++
+        "    procedure assignment_test3(&priv self, dyn_var0 : dyn [u32; 10],\n" ++
+        "                               dyn_var1 : dyn [u32; 10]);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure assignment_test3(&priv self, dyn_var0 : dyn [u32; 10],\n" ++
         "                               dyn_var1 : dyn [u32; 10]) {\n" ++
         "        var foo : [u32; 10] = [0 : u32; 10];\n" ++
@@ -111,6 +124,11 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* assignment_test1)(void * __this, __termina_dyn_t dyn_var0);\n" ++
+              "} test_iface;\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
@@ -145,6 +163,12 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* assignment_test2)(void * __this, __termina_dyn_t dyn_var0,\n" ++
+              "                              __termina_dyn_t dyn_var1);\n" ++
+              "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
@@ -185,6 +209,12 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* assignment_test3)(void * __this, __termina_dyn_t dyn_var0,\n" ++
+              "                              __termina_dyn_t dyn_var1);\n" ++
+              "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++

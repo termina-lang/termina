@@ -13,7 +13,11 @@ import System.Path
 import Modules.Modules
 
 test0 :: String
-test0 = "resource class id0 {\n" ++
+test0 = "interface test_iface {\n" ++
+        "    procedure match_test0(&priv self, option0 : Option<dyn u32>);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class id0 provides test_iface {\n" ++
         "    procedure match_test0(&priv self, option0 : Option<dyn u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        if option0 is None {\n" ++
@@ -71,6 +75,11 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* match_test0)(void * __this, __option_dyn_t option0);\n" ++
+              "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++

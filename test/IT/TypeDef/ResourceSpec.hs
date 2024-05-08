@@ -13,7 +13,11 @@ import System.Path
 import Modules.Modules
 
 test0 :: String
-test0 = "resource class TMChannel {\n" ++
+test0 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
         "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
@@ -24,7 +28,11 @@ test0 = "resource class TMChannel {\n" ++
         "};\n"
 
 test1 :: String
-test1 = "resource class UARTDriver {\n" ++
+test1 = "interface UARTDriverInterface {\n" ++
+        "    procedure get_status(&priv self, ret : &mut u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class UARTDriver provides UARTDriverInterface {\n" ++
         "  status : loc u32;\n" ++
         "\n" ++
         "  procedure get_status(&priv self, ret : &mut u32) {\n" ++
@@ -67,6 +75,11 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* get_tm_sent_packets)(void * __this, uint32_t * packets);\n" ++
+              "} TMChannelInterface;\n" ++
+              "\n" ++              
+              "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
@@ -98,6 +111,11 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
+              "\n" ++
+              "typedef struct {\n" ++
+              "    void * __that;\n" ++
+              "    void (* get_status)(void * __this, uint32_t * ret);\n" ++
+              "} UARTDriverInterface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++

@@ -156,8 +156,92 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Function returns an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EProcedureExtraParams (procId, params, Position procPos) paramNumber ->
+    EProcedureCallExtraParams (procId, params, Position procPos) paramNumber ->
         let title = "error[E009]: extra parameters in procedure call."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length procId)
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EProcedureCallMissingParams (procId, params, Position procPos) paramNumber ->
+        let title = "error[E010]: missing parameters in procedure call."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length procId)
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EResourceClassNoProvides ident ->
+        let title = "error[E011]: resource class does not provide any interface."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
+                    "A resource class must provide at least one interface."))
+    EResourceClassAction ident ->
+        let title = "error[E012]: resource class defines an action."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just "Resource classes cannot define actions.")
+    EResourceClassInPort ident ->
+        let title = "error[E013]: resource class defines an in port."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just "Resource classes cannot define in ports.")
+    EResourceClassOutPort ident ->
+        let title = "error[E014]: resource class defines an out port."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just "Resource classes cannot define out ports.")
+    EInterfaceNotFound ident ->
+        let title = "error[E015]: interface not found."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
+    EProcedureNotFromProvidedInterfaces ident ->
+        let title = "error[E016]: procedure not from provided interfaces."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m does not belong to the provided interfaces."))
+    EMissingProcedure ifaceId procId ->
+        let title = "error[E017]: missing procedure."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
+    EProcedureExtraParams (ifaceId, procId, params, Position procPos) paramNumber ->
+        let title = "error[E018]: extra parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -167,12 +251,86 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
                 procSourceLines "The interface of the procedure is defined as follows:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
+    EProcedureMissingParams (ifaceId, procId, params, Position procPos) paramNumber ->
+        let title = "error[E019]: missing parameters in procedure definition."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EProcedureExtraConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
+        let title = "error[E020]: extra const parameters in procedure definition."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m const parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EProcedureMissingConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
+        let title = "error[E021]: missing const parameters in procedure definition."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m const parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EProcedureConstParamMismatch paramId expectedTy actualTy ->
+        let title = "error[E022]: const parameter type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length paramId)
+                (Just ("Const parameter \x1b[31m" <> T.pack paramId <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EProcedureParamMismatch paramId expectedTy actualTy ->
+        let title = "error[E023]: parameter type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length paramId)
+                (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+
 
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
