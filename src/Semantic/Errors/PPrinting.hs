@@ -198,50 +198,134 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 lineNumber lineColumn (length ident)
                 (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
                     "A resource class must provide at least one interface."))
-    EResourceClassAction ident ->
+    EResourceClassAction (classId, Position posClass) ident ->
         let title = "error[E012]: resource class defines an action."
         in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn (length ident)
-                (Just "Resource classes cannot define actions.")
-    EResourceClassInPort ident ->
+            TL.putStrLn $ prettyErrors 
+                sourceLines
+                [
+                    Errata
+                        (Just title)
+                        [
+                            Block
+                                fancyRedStyle
+                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                Nothing
+                                [
+                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
+                                            (sourceColumn posClass + length classId) 
+                                            True Nothing fancyRedPointer,
+                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                            True (Just " \x1b[31minvalid action definition\x1b[0m") fancyRedPointer
+                                ]
+                                Nothing
+                        ]
+                        (Just 
+                            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                            <> "Resource classes cannot define actions."))
+                ]
+    EResourceClassInPort (classId, Position posClass) ident ->
         let title = "error[E013]: resource class defines an in port."
         in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn (length ident)
-                (Just "Resource classes cannot define in ports.")
-    EResourceClassOutPort ident ->
+            TL.putStrLn $ prettyErrors 
+                sourceLines
+                [
+                    Errata
+                        (Just title)
+                        [
+                            Block
+                                fancyRedStyle
+                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                Nothing
+                                [
+                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
+                                            (sourceColumn posClass + length classId) 
+                                            True Nothing fancyRedPointer,
+                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                            True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
+                                ]
+                                Nothing
+                        ]
+                        (Just 
+                            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                            <> "Resource classes cannot define in ports."))
+                ]
+    EResourceClassOutPort (classId, Position posClass) ident ->
         let title = "error[E014]: resource class defines an out port."
         in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn (length ident)
-                (Just "Resource classes cannot define out ports.")
+            TL.putStrLn $ prettyErrors 
+                sourceLines
+                [
+                    Errata
+                        (Just title)
+                        [
+                            Block
+                                fancyRedStyle
+                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                Nothing
+                                [
+                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
+                                            (sourceColumn posClass + length classId) 
+                                            True Nothing fancyRedPointer,
+                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                            True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
+                                ]
+                                Nothing
+                        ]
+                        (Just 
+                            ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the out port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                            <> "Resource classes cannot define out ports."))
+                ]
     EInterfaceNotFound ident ->
         let title = "error[E015]: interface not found."
         in
             printSimpleError
                 sourceLines title fileName
-                lineNumber lineColumn (length ident)
+                lineNumber lineColumn 1
                 (Just ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
-    EProcedureNotFromProvidedInterfaces ident ->
-        let title = "error[E016]: procedure not from provided interfaces."
+    EMismatchIdNotInterface ident -> 
+        let title = "error[E016]: identifier not an interface."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
-                (Just ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m does not belong to the provided interfaces."))
+                (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface."))
+    EProcedureNotFromProvidedInterfaces (classId, Position posClass) ident ->
+        let title = "error[E017]: procedure not from provided interfaces."
+        in
+            TL.putStrLn $ prettyErrors 
+                sourceLines
+                [
+                    Errata
+                        (Just title)
+                        [
+                            Block
+                                fancyRedStyle
+                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                Nothing
+                                [
+                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
+                                            (sourceColumn posClass + length classId) 
+                                            True Nothing fancyRedPointer,
+                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                            True (Just " \x1b[31munknown procedure\x1b[0m") fancyRedPointer
+                                ]
+                                Nothing
+                        ]
+                        (Just 
+                            ("The procedure \x1b[31m" <> T.pack ident 
+                                <> "\x1b[0m does not belong to any of the provided interfaces of resource class \x1b[31m" 
+                                <> T.pack classId <> "\x1b[0m.\n"))
+                ]
     EMissingProcedure ifaceId procId ->
-        let title = "error[E017]: missing procedure."
+        let title = "error[E018]: missing procedure."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
     EProcedureExtraParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E018]: extra parameters in procedure definition."
+        let title = "error[E019]: extra parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -259,7 +343,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureMissingParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E019]: missing parameters in procedure definition."
+        let title = "error[E020]: missing parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -277,7 +361,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureExtraConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E020]: extra const parameters in procedure definition."
+        let title = "error[E021]: extra const parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -295,7 +379,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureMissingConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E021]: missing const parameters in procedure definition."
+        let title = "error[E022]: missing const parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -313,7 +397,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureConstParamMismatch paramId expectedTy actualTy ->
-        let title = "error[E022]: const parameter type mismatch."
+        let title = "error[E023]: const parameter type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -322,7 +406,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EProcedureParamMismatch paramId expectedTy actualTy ->
-        let title = "error[E023]: parameter type mismatch."
+        let title = "error[E024]: parameter type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -330,8 +414,6 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-
-
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

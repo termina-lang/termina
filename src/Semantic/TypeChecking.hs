@@ -992,24 +992,26 @@ checkClassKind anns clsId ResourceClass (fs, prcs, _mths, _vws, acts) provides =
   -- A resource must not have any actions
   case acts of
     [] -> return ()
-    (ClassAction actionId _ _ _ ann):_  -> throwError $ annotateError ann (EResourceClassAction actionId)
+    (ClassAction actionId _ _ _ ann):_  -> 
+        throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
     _ -> throwError (annotateError internalErrorSeman EClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
     \case {
       ClassField (FieldDefinition fs_id fs_ty) annCF ->
         case fs_ty of
-          InPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort fs_id)
-          OutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort fs_id)
+          InPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort (clsId, anns) fs_id)
+          OutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort (clsId, anns) fs_id)
           _ -> return ()
       ;
       _ -> return ();
     }) fs
   -- Check that all the procedures are provided
   providedProcedures <- concat <$> foldM (\acc ifaceId ->
-    getGlobalTy anns ifaceId >>= \case {
+    catchError (getGlobalTy anns ifaceId)
+      (\_ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)) >>= \case {
       Interface _ iface_prcs _ -> return $ map (, ifaceId) iface_prcs : acc;
-      _ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)
+      _ -> throwError $ annotateError anns (EMismatchIdNotInterface ifaceId)
     }) [] provides
   let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _ _, _) -> ifaceId) providedProcedures
   let sorted_prcs = Data.List.sortOn (
@@ -1024,7 +1026,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, _mths, _vws, acts) provides =
 
     checkSortedProcedures :: [(InterfaceMember SemanticAnns, Identifier)] -> [ClassMember Locations] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
-    checkSortedProcedures [] ((ClassProcedure prcId _ _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces prcId)
+    checkSortedProcedures [] ((ClassProcedure prcId _ _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure procId _ _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
     checkSortedProcedures ((InterfaceProcedure prcId cps ps pann, ifaceId):ds) ((ClassProcedure prcId' cps' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do

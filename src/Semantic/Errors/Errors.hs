@@ -17,6 +17,7 @@ data Errors a
   -- | Expected /similar/ types?
   = 
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
+  | ENoTyFound Identifier -- ^ Type not found (Internal)
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -28,18 +29,19 @@ data Errors a
   | EProcedureCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)
   | EProcedureCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure call (E010)
   | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (E011)
-  | EResourceClassAction Identifier -- ^ Resource class defines an action (E012)
-  | EResourceClassInPort Identifier -- ^ Resource class defines an in port (E013)
-  | EResourceClassOutPort Identifier -- ^ Resource class defines an out port (E014)
+  | EResourceClassAction (Identifier, a) Identifier -- ^ Resource class defines an action (E012)
+  | EResourceClassInPort (Identifier, a) Identifier -- ^ Resource class defines an in port (E013)
+  | EResourceClassOutPort (Identifier, a) Identifier -- ^ Resource class defines an out port (E014)
   | EInterfaceNotFound Identifier -- ^ Interface not found (E015)
-  | EProcedureNotFromProvidedInterfaces Identifier -- ^ Procedure not from provided interfaces (E016)
-  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (E017)
-  | EProcedureExtraParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure definition (E018)
-  | EProcedureMissingParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure definition (E019)
-  | EProcedureExtraConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Extra const parameters in procedure definition (E020)
-  | EProcedureMissingConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in procedure definition (E021)
-  | EProcedureConstParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Const parameter type mismatch (E022)
-  | EProcedureParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Parameter type mismatch (E023)
+  | EMismatchIdNotInterface Identifier -- ^ The type is not an interface (E016)
+  | EProcedureNotFromProvidedInterfaces (Identifier, a) Identifier -- ^ Procedure not from provided interfaces (E017)
+  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (E018)
+  | EProcedureExtraParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure definition (E019)
+  | EProcedureMissingParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure definition (E020)
+  | EProcedureExtraConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Extra const parameters in procedure definition (E021)
+  | EProcedureMissingConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in procedure definition (E022)
+  | EProcedureConstParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Const parameter type mismatch (E023)
+  | EProcedureParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Parameter type mismatch (E024)
   | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
@@ -70,8 +72,6 @@ data Errors a
   | EVarDefined Identifier
   -- | Not Function found
   | ENotFoundFun Identifier (GEntry a)
-  -- | Type Id not found
-  | ENoTyFound Identifier
   -- | Not a function
   | ENotAFun Identifier
   -- | Parameter and argument type mismatch
