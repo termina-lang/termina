@@ -73,6 +73,7 @@ simpleType (Reference {})      = False
 simpleType (Location {})       = False
 simpleType (SinkPort {})       = False
 simpleType (AccessPort {})     = False
+simpleType (Slice {})          = False
 simpleType _                   = True
 
 classFieldType :: TypeSpecifier -> Bool
@@ -82,6 +83,7 @@ classFieldType (Option (DynamicSubtype {})) = False
 classFieldType (MsgQueue {})                = False
 classFieldType (Pool {})                    = False
 classFieldType (Reference {})               = False
+classFieldType (Slice {})                   = False
 classFieldType _                            = True
 
 boolTy :: TypeSpecifier -> Bool
@@ -169,6 +171,7 @@ hasDynOrDep (Array ty _s) = hasDynOrDep ty
 hasDynOrDep (Option ty) = hasDynOrDep ty
 hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
 hasDynOrDep (DynamicSubtype _) = Right True
+hasDynOrDep (Slice ty) = hasDynOrDep ty
 hasDynOrDep _ = Right False
 ----------------------------------------
 
@@ -180,4 +183,5 @@ rootType (Pool ts _) = rootType ts
 rootType (Reference _ ts) = rootType ts
 rootType (DynamicSubtype ts) = rootType ts
 rootType (Location ts) = rootType ts
+rootType (Slice ts) = rootType ts
 rootType t = t

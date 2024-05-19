@@ -7,6 +7,7 @@ import Parser.Parsing
 
 import Semantic.TypeChecking
 import Semantic.Errors
+import AST.Seman
 
 runNegativeTest :: String -> Maybe (Errors Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
@@ -91,6 +92,135 @@ test4 = "resource class TMChannel provides TMChannelInterface {\n" ++
         "\n" ++
         "};\n"
 
+test5 :: String
+test5 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self, input : u32) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test6 :: String
+test6 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self, input : u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test7 :: String
+test7 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self, input : u32) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test8 :: String
+test8 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self, input : u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test9 :: String
+test9 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets<const N : usize>(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self, input : u32) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test10 :: String
+test10 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets<const N : usize>(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self, input : u32);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
+test11 :: String
+test11 = "interface TMChannelInterface {\n" ++
+        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&priv self);\n" ++
+        "};\n" ++
+        "\n"++
+        "resource class TMChannel provides TMChannelInterface {\n" ++
+        "  tm_sent_packets : u32;\n" ++
+        "\n" ++
+        "  procedure get_tm_sent_packets(&priv self, packets : &mut u16) {\n" ++
+        "    *packets = self->tm_sent_packets;\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "  procedure send_packet(&priv self) {\n" ++
+        "    return;\n" ++
+        "  }\n" ++
+        "\n" ++
+        "};\n"
+
 spec :: Spec
 spec = do
   describe "Resource class definition" $ do
@@ -114,6 +244,34 @@ spec = do
      runNegativeTest test4
        `shouldSatisfy`
         isEInterfaceNotFound
+    it "Resource class implements a procedure that does not belong to an interface" $ do
+     runNegativeTest test5
+       `shouldSatisfy`
+        isEProcedureNotFromProvidedInterfaces
+    it "Resource class does not implement a procedure from the provided interfaces" $ do
+     runNegativeTest test6
+       `shouldSatisfy`
+        isEMissingProcedure
+    it "A procedure defines an extra parameter" $ do
+     runNegativeTest test7
+       `shouldSatisfy`
+        isEProcedureExtraParams
+    it "A procedure has a missing parameter" $ do
+     runNegativeTest test8
+       `shouldSatisfy`
+        isEProcedureMissingParams
+    it "A procedure defines an extra const parameter" $ do
+     runNegativeTest test9
+       `shouldSatisfy`
+        isEProcedureExtraConstParams
+    it "A procedure has a missing const parameter" $ do
+     runNegativeTest test10
+       `shouldSatisfy`
+        isEProcedureMissingConstParams
+    it "A procedure has a missing const parameter" $ do
+     runNegativeTest test11
+       `shouldSatisfy`
+        isEProcedureParamMismatch
     
   
   where
@@ -132,3 +290,24 @@ spec = do
 
     isEInterfaceNotFound :: Maybe (Errors Annotation) -> Bool
     isEInterfaceNotFound = \case Just (EInterfaceNotFound "TMChannelInterface") -> True; _ -> False
+
+    isEProcedureNotFromProvidedInterfaces :: Maybe (Errors Annotation) -> Bool
+    isEProcedureNotFromProvidedInterfaces = \case Just (EProcedureNotFromProvidedInterfaces ("TMChannel", Position _pos) "send_packet") -> True; _ -> False
+  
+    isEMissingProcedure :: Maybe (Errors Annotation) -> Bool
+    isEMissingProcedure = \case Just (EMissingProcedure "TMChannelInterface" "send_packet") -> True; _ -> False
+
+    isEProcedureExtraParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureExtraParams = \case Just (EProcedureExtraParams ("TMChannelInterface", "send_packet", [], Position _pos) 1) -> True; _ -> False
+
+    isEProcedureMissingParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [Parameter "input" UInt32], Position _pos) 0) -> True; _ -> False
+
+    isEProcedureExtraConstParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureExtraConstParams = \case Just (EProcedureExtraConstParams ("TMChannelInterface", "get_tm_sent_packets", [], Position _pos) 1) -> True; _ -> False
+
+    isEProcedureMissingConstParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureMissingConstParams = \case Just (EProcedureMissingConstParams ("TMChannelInterface", "get_tm_sent_packets", [ConstParameter (Parameter "N" USize)], Position _pos) 0) -> True; _ -> False
+
+    isEProcedureParamMismatch :: Maybe (Errors Annotation) -> Bool
+    isEProcedureParamMismatch = \case Just (EProcedureParamMismatch "packets" (Reference Mutable UInt32) (Reference Mutable UInt16)) -> True; _ -> False

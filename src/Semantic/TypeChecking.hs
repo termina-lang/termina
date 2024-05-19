@@ -392,8 +392,9 @@ expressionType expectedType objType (BinOp op le re pann) = do
           tyre <- expressionType Nothing objType re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
+          unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
           unless (numTy tyre_ty) (throwError $ annotateError pann (EExpectedNumType tyre_ty))
+          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyre_ty)
 
     leftExpNumType :: SemanticMonad (SAST.Expression SemanticAnns)
@@ -979,14 +980,14 @@ interfaceProcedureTy (InterfaceProcedure ident cps ps annIP) = do
   mapM_ (checkTypeDefinition annIP . paramTypeSpecifier) ps
   return $ InterfaceProcedure ident cps ps (buildExpAnn annIP Unit)
 
+-- | This function type checks the members of a class depending on its kind.
 checkClassKind :: Locations -> Identifier -> ClassKind 
   -> ([SAST.ClassMember SemanticAnns], 
       [PAST.ClassMember Locations], 
-      [PAST.ClassMember Locations], 
-      [PAST.ClassMember Locations], 
       [PAST.ClassMember Locations])
   -> [Identifier] -> SemanticMonad ()
-checkClassKind anns clsId ResourceClass (fs, prcs, _mths, _vws, acts) provides = do
+-- | Resource class type checking
+checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- A resource must provide at least one interface
   when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
   -- A resource must not have any actions
@@ -1137,7 +1138,7 @@ typeDefCheck ann (Class kind ident members provides mds) =
        -- introduce a semi-well formed type.
        ) ->
   do
-    checkClassKind ann ident kind (fls, prcs, mths, vws, acts) provides
+    checkClassKind ann ident kind (fls, prcs, acts) provides
   -- Now we can go function by function checking everything is well typed.
   ----------------------------------------
   -- Loop between methods, procedures and viewers.
@@ -1230,7 +1231,6 @@ allUnique :: Eq a => [a] -> Bool
 allUnique xs = Data.List.nub xs == xs
 
 repeated :: Eq a => [a] -> [a]
-
 repeated xs = Data.List.nub $ xs Data.List.\\ Data.List.nub xs
 -----------------------------------------
 

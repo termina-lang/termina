@@ -401,19 +401,19 @@ ppError toModuleAST (AnnError e (Position pos)) =
         in
             printSimpleError
                 sourceLines title fileName
-                lineNumber lineColumn (length paramId)
+                lineNumber lineColumn 1
                 (Just ("Const parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
-                    "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EProcedureParamMismatch paramId expectedTy actualTy ->
         let title = "error[E024]: parameter type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
-                lineNumber lineColumn (length paramId)
+                lineNumber lineColumn 1
                 (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
-                    "\x1b[0m but you are providing a value of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
