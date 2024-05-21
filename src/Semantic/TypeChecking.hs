@@ -792,7 +792,7 @@ typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
     typeCondExpr :: Expression Parser.Annotation -> SemanticMonad (SAST.Expression SemanticAnns)
     typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr) 
       (\err -> case semError err of
-        EMismatch Bool ty -> throwError $ annotateError anns $ EIfElseIfCondNotBool ty
+        EMismatch Bool ty -> throwError $ annotateError (annError err) $ EIfElseIfCondNotBool ty
         e -> throwError $ annotateError anns e
       )
 -- Here we could implement some abstract interpretation analysis
