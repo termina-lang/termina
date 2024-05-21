@@ -425,7 +425,7 @@ expressionParser' = buildPrattParser -- New parser
 
 functionCallParser :: Parser (Expression Annotation)
 functionCallParser =
-  FunctionExpression
+  FunctionCall
   <$> identifierParser
   <*> (try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return [])
   <*> parens (sepBy (try expressionParser) comma)
@@ -636,7 +636,7 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionAccess obj member constParams) (Position p))  params
+          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionCall obj member constParams) (Position p))  params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
@@ -647,7 +647,7 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionAccess obj member constParams) (Position p)) params
+          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionCall obj member constParams) (Position p)) params
         _ -> error "Unexpected member access to a non object"))
     dereferencePrefix
       = Ex.Prefix (do

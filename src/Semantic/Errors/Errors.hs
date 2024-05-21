@@ -42,6 +42,7 @@ data Errors a
   | EProcedureMissingConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in procedure definition (E022)
   | EProcedureConstParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Const parameter type mismatch (E023)
   | EProcedureParamMismatch Identifier TypeSpecifier TypeSpecifier -- ^ Parameter type mismatch (E024)
+  | EIfElseIfCondNotBool TypeSpecifier -- ^ If-else-if condition is not a boolean (E025)
   | EMismatchAccessKind AccessKind AccessKind
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)

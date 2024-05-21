@@ -370,27 +370,35 @@ getLocalObjTy loc ident =
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
 getConstTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
 getConstTy loc ident = do
-    -- Check the local constants first
+    -- Check the local constants (i.e., the const parameters) first
     constants <- gets consts
     case M.lookup ident constants of
-      Just ty -> return ty
+      -- | OK, we found it. It refers to a constant parameter.
+      Just ty -> return ty  
       Nothing ->
         -- If not found, then check the globals
         catchError (getGlobalGEnTy loc ident)
             (\errorGlobal ->
+                -- | We have not found a global object with the name |ident|
                 case semError errorGlobal of {
                   ENotNamedGlobal _ ->
+                    -- | If we have not found a global object with the name |ident|, then check the local objects.
+                    -- Any path that goes through here is an error.
                     catchError (getLocalObjTy loc ident)
                     (\errorLocal ->
                       case semError errorLocal of {
                         ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
                         _ -> throwError errorLocal;
-                      }) >> throwError (annotateError loc (ENotConstant ident));
-                  _  -> throwError errorGlobal;
+                      }) >> 
+                        -- | Ooops! We found a local object with the name |ident| but it is not a constant.
+                        throwError (annotateError loc (ENotConstant ident));
+                  err  -> error $ "Impossible error: " ++ show err;
                 }
               ) >>= (\case {
+                        -- | It is a global constant!
                         GGlob (SConst ts)  -> return ts;
-                        _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        -- | It is a global object, but not a constant.
+                        _ -> throwError $ annotateError loc (ENotConstant ident);
         });
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.

@@ -133,7 +133,7 @@ c \in Ty \\ TODO Q16
 * MatchExpression
 This is not an Expression anymore.
 #+begin_src haskell
-expressionType (MatchExpression e cs) =
+typeExpression (MatchExpression e cs) =
   -- | Pattern Matching.
   {-
 \[
@@ -154,7 +154,7 @@ expressionType (MatchExpression e cs) =
 \end{array}
 \]
 -}
-  expressionType e >>= \case {
+  typeExpression e >>= \case {
   -- Base Types PM
    Option pty     -> pmOption pty cs;
    ;
@@ -180,7 +180,7 @@ expressionType (MatchExpression e cs) =
 --         either throwError
 --         (\scope -> addTempVars
 --           scope
---           (retblockType (matchBody mc)))
+--           (typeBlockRet (matchBody mc)))
 --         (zipSameLength EMCMissingArgs EMCMoreArgs (,) (matchBVars mc) (assocData ev))
 --       else throwError (EMCMissingEnum (variantIdentifier ev))
 
@@ -197,9 +197,9 @@ pmOption ty [cs1, cs2] =
      if noneConditions csnone
      then if someConditions cssome
           then do
-            tyNone <- retblockType (matchBody csnone)
+            tyNone <- typeBlockRet (matchBody csnone)
             tySome <- case matchBVars cssome of
-              [v] -> addTempVars [(v,ty)] (retblockType (matchBody cssome))
+              [v] -> addTempVars [(v,ty)] (typeBlockRet (matchBody cssome))
               _   -> throwError EPMMoreOptionsVariables
             tyNone =?= tySome
           else throwError EPMMissingOption1

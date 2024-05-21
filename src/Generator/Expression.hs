@@ -159,7 +159,7 @@ genExpression (ReferenceExpression _ obj ann) = do
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
         (Array {}) -> return cObj
         _ -> return $ CUnary CAdrOp cObj cAnn
-genExpression (FunctionExpression name constArgs args ann) = do
+genExpression (FunctionCall name constArgs args ann) = do
     let cAnn = buildGenericAnn ann
     -- Obtain the substitutions map
     subs <- ask
@@ -168,9 +168,9 @@ genExpression (FunctionExpression name constArgs args ann) = do
     cConstArgs <- mapM genConstExpression constArgs
     cArgs <- mapM genExpression args
     return $ CCall identifier (cConstArgs ++ cArgs) cAnn
-genExpression (MemberFunctionAccess obj ident constArgs args ann) = do
+genExpression (MemberFunctionCall obj ident constArgs args ann) = do
     genMemberFunctionAccess obj ident constArgs args ann
-genExpression (DerefMemberFunctionAccess obj ident constArgs args ann) =
+genExpression (DerefMemberFunctionCall obj ident constArgs args ann) =
     genMemberFunctionAccess obj ident constArgs args ann
 genExpression (IsEnumVariantExpression obj enum variant ann) = do
     let cAnn = buildGenericAnn ann 

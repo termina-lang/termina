@@ -129,7 +129,7 @@ useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj _size _ann)
   = useObject obj
-useExpression (MemberFunctionAccess obj ident _constArgs args ann) = do
+useExpression (MemberFunctionCall obj ident _constArgs args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)
     case obj_type  of
@@ -158,7 +158,7 @@ useExpression (MemberFunctionAccess obj ident _constArgs args ann) = do
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
-useExpression (DerefMemberFunctionAccess obj _ident _constArgs args _ann)
+useExpression (DerefMemberFunctionCall obj _ident _constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitExpression e _size _ann)
@@ -171,7 +171,7 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-useExpression (FunctionExpression _ident _constArgs args _ann)
+useExpression (FunctionCall _ident _constArgs args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = mapM_ useArguments args
 

@@ -70,7 +70,7 @@ matchOption1 :: Statement SemanticAnns
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnns
-getInteger = FunctionExpression "get_integer" [] [] (SemAnn undefined (ETy (AppType [] [] (Option (DynamicSubtype UInt32)))))
+getInteger = FunctionCall "get_integer" [] [] (SemAnn undefined (ETy (AppType [] [] (Option (DynamicSubtype UInt32)))))
 
 matchOption2 :: Statement SemanticAnns
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn

@@ -58,9 +58,9 @@ objIsSelf _ = False
 -- breaking something else.
 
 selfInv :: Expression a -> (Object a -> Bool) -> Maybe Identifier
-selfInv (MemberFunctionAccess obj mident _constArgs _args _ann) isSelf =
+selfInv (MemberFunctionCall obj mident _constArgs _args _ann) isSelf =
   if isSelf obj then Just mident else Nothing
-selfInv (DerefMemberFunctionAccess obj mident _constArgs _args _ann) isSelf =
+selfInv (DerefMemberFunctionCall obj mident _constArgs _args _ann) isSelf =
   if isSelf obj then Just mident else Nothing
 selfInv _ _isSelf = Nothing
 

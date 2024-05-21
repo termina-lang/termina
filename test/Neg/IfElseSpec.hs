@@ -7,6 +7,7 @@ import Parser.Parsing
 
 import Semantic.TypeChecking
 import Semantic.Errors
+import AST.Seman
 
 runNegativeTest :: String -> Maybe (Errors Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
@@ -35,6 +36,19 @@ test0 = "function keep_inside(n: usize, array : &mut[u8;64], range: &[u8;2]) {\n
         "    return;\n" ++
         "}"
 
+test1 :: String
+test1 = "function keep_inside(n: usize, array : &mut[u8;64], range: &[u8;2]) {\n" ++
+        "    let lower_limit : u8 = range[1 : usize];\n" ++
+        "    let upper_limit : u8 = range[2 : usize];\n" ++
+        "    let x : u8 = (*array)[n];\n" ++
+        "\n" ++
+        "    if (1 : u32) {\n" ++
+        "        //do nothing\n" ++
+        "    }\n" ++
+        "    \n" ++
+        "    return;\n" ++
+        "}"
+
 spec :: Spec
 spec = do
   describe "Variable mutability" $ do
@@ -42,7 +56,14 @@ spec = do
      runNegativeTest test0
        `shouldSatisfy`
         isEIfElseNoOtherwise
+    it "If condition not bool" $ do
+     runNegativeTest test1
+       `shouldSatisfy`
+        isEIfElseIfCondNotBool
   
   where
     isEIfElseNoOtherwise :: Maybe (Errors Annotation) -> Bool
     isEIfElseNoOtherwise = \case Just EIfElseNoOtherwise -> True; _ -> False
+
+    isEIfElseIfCondNotBool :: Maybe (Errors Annotation) -> Bool
+    isEIfElseIfCondNotBool = \case Just (EIfElseIfCondNotBool UInt32) -> True; _ -> False
