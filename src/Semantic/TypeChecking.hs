@@ -738,13 +738,13 @@ typeBlockRet :: Maybe TypeSpecifier -> BlockRet Parser.Annotation -> SemanticMon
 typeBlockRet ts (BlockRet bbody rete) = BlockRet <$> typeBlock bbody <*> retStmt ts rete
 
 typeBlock :: Block Parser.Annotation -> SemanticMonad (SAST.Block SemanticAnns)
-typeBlock = mapM statementTySimple
+typeBlock = mapM typeStatement
 
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.
-statementTySimple :: Statement Parser.Annotation -> SemanticMonad (SAST.Statement SemanticAnns)
+typeStatement :: Statement Parser.Annotation -> SemanticMonad (SAST.Statement SemanticAnns)
 -- Declaration semantic analysis
-statementTySimple (Declaration lhs_id lhs_ak lhs_type expr anns) =
+typeStatement (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- Check type is alright
   checkTypeSpecifier anns lhs_type >>
   -- Expression and type must match
@@ -761,7 +761,7 @@ statementTySimple (Declaration lhs_id lhs_ak lhs_type expr anns) =
       Private -> throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) >>
   -- Return annotated declaration
   return (Declaration lhs_id lhs_ak lhs_type ety (buildStmtAnn anns))
-statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
+typeStatement (AssignmentStmt lhs_o rhs_expr anns) = do
 {- TODO Q19 && Q20 -}
   lhs_o_typed' <- typeLHSObject lhs_o
   (lhs_o_ak', lhs_o_type') <- getObjectType lhs_o_typed'
@@ -773,7 +773,7 @@ statementTySimple (AssignmentStmt lhs_o rhs_expr anns) = do
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
   ety <- mustBeTy lhs_o_type rhs_expr_typed
   return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
-statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
+typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
   when (not (null elifs) && isNothing otherwise_branch) (throwError $ annotateError anns EIfElseNoOtherwise)
   IfElseStmt 
@@ -796,7 +796,7 @@ statementTySimple (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) =
         e -> throwError $ annotateError anns e
       )
 -- Here we could implement some abstract interpretation analysis
-statementTySimple (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt anns) = do
+typeStatement (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt anns) = do
   -- Check the iterator is of numeric type
   unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorWrongType it_ty))
   -- Both boundaries should have the same numeric type
@@ -814,9 +814,9 @@ statementTySimple (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt an
         )
     <*> addLocalImmutObjs anns [(it_id, it_ty)] (typeBlock body_stmt)
     <*> return (buildStmtAnn anns)
-statementTySimple (SingleExpStmt expr anns) =
+typeStatement (SingleExpStmt expr anns) =
   flip SingleExpStmt (buildStmtAnn anns) <$> typeExpression (Just Unit) typeRHSObject expr
-statementTySimple (MatchStmt matchE cases ann) = do
+typeStatement (MatchStmt matchE cases ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   type_matchE <- getExpType typed_matchE
   case type_matchE of
@@ -829,7 +829,7 @@ statementTySimple (MatchStmt matchE cases ann) = do
           case zipSameLength
                 (const (annotateError ann EMatchExtraCases))
                 (const (annotateError ann EMatchExtraCases))
-                matchCaseType ord_cases ord_flsDef of
+                typeMatchCase ord_cases ord_flsDef of
             Left e -> throwError e
             Right cs -> flip (MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
           ;
@@ -837,32 +837,36 @@ statementTySimple (MatchStmt matchE cases ann) = do
         }
     Option t ->
       let ord_cases = Data.List.sortOn matchIdentifier cases in
-      optionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
+      checkOptionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
       >>
-      MatchStmt typed_matchE <$> zipWithM matchCaseType ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
+      MatchStmt typed_matchE <$> zipWithM typeMatchCase ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
     where
-      optionCases :: [MatchCase Parser.Annotation] -> SemanticMonad Bool
-      optionCases [a,b] = return $ (optionNone a && optionSome b) || (optionSome a && optionNone b)
-      optionCases _ = throwError $ annotateError ann EMatchOptionBadArgs
-      optionNone :: MatchCase Parser.Annotation -> Bool
-      optionNone c =
+
+      checkOptionCases :: [MatchCase Parser.Annotation] -> SemanticMonad Bool
+      checkOptionCases [a,b] = return $ (isOptionNone a && isOptionSome b) || (isOptionSome a && isOptionNone b)
+      checkOptionCases _ = throwError $ annotateError ann EMatchOptionBadArgs
+
+      isOptionNone :: MatchCase Parser.Annotation -> Bool
+      isOptionNone c =
         matchIdentifier c == "None"
           && Prelude.null (matchBVars c)
-      optionSome ::MatchCase Parser.Annotation -> Bool
-      optionSome c =
+
+      isOptionSome ::MatchCase Parser.Annotation -> Bool
+      isOptionSome c =
         matchIdentifier c == "Some"
            && length (matchBVars c) == 1
 
-matchCaseType :: MatchCase Parser.Annotation -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnns)
-matchCaseType c (EnumVariant vId vData) = matchCaseType' c vId vData
-  where
-    matchCaseType' (MatchCase cIdent bVars bd ann) supIdent tVars
-      | cIdent == supIdent =
-        if length bVars == length tVars then
-        flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs ann (zip bVars tVars) (typeBlock bd)
-        else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
-      | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
+      typeMatchCase :: MatchCase Parser.Annotation -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnns)
+      typeMatchCase c (EnumVariant vId vData) = typeMatchCase' c vId vData
+        where
+          typeMatchCase' (MatchCase cIdent bVars bd ann) supIdent tVars
+            | cIdent == supIdent =
+              if length bVars == length tVars then
+              flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs ann (zip bVars tVars) (typeBlock bd)
+              else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
+            | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
+
 
 ----------------------------------------
 -- Programs Semantic Analyzer
@@ -871,8 +875,8 @@ matchCaseType c (EnumVariant vId vData) = matchCaseType' c vId vData
 
 -- Keeping only type information
 -- TODO Check ident is not defined?
-checkGlobal :: Global Parser.Annotation -> SemanticMonad (SAST.Global SemanticAnns)
-checkGlobal (Task ident ty mexpr mods anns) = do
+typeGlobal :: Global Parser.Annotation -> SemanticMonad (SAST.Global SemanticAnns)
+typeGlobal (Task ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
@@ -880,7 +884,7 @@ checkGlobal (Task ident ty mexpr mods anns) = do
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Task ident ty exprty mods (buildGlobalAnn anns (STask ty)))
-checkGlobal (Handler ident ty mexpr mods anns) = do
+typeGlobal (Handler ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
@@ -888,7 +892,7 @@ checkGlobal (Handler ident ty mexpr mods anns) = do
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Handler ident ty exprty mods (buildGlobalAnn anns (SHandler ty)))
-checkGlobal (Resource ident ty mexpr mods anns) = do
+typeGlobal (Resource ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
@@ -896,7 +900,7 @@ checkGlobal (Resource ident ty mexpr mods anns) = do
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Resource ident ty exprty mods (buildGlobalAnn anns (SResource ty)))
-checkGlobal (Emitter ident ty mexpr mods anns) = do
+typeGlobal (Emitter ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
@@ -910,7 +914,7 @@ checkGlobal (Emitter ident ty mexpr mods anns) = do
         (DefinedType "SystemInit") -> return $ SEmitter ty
         _ -> throwError $ annotateError internalErrorSeman EInternalNoGTY
   return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns glb))
-checkGlobal (Channel ident ty mexpr mods anns) = do
+typeGlobal (Channel ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
@@ -919,21 +923,21 @@ checkGlobal (Channel ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   return (SAST.Channel ident ty exprty mods (buildGlobalAnn anns (SChannel ty)))
 -- TODO [Q14]
-checkGlobal (Const ident ty expr mods anns) = do
+typeGlobal (Const ident ty expr mods anns) = do
   checkTypeSpecifier anns ty
   typed_expr <- typeConstExpression ty expr
   return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty)))
 
-parameterTypeChecking :: Locations -> Parameter -> SemanticMonad ()
-parameterTypeChecking anns p =
+checkParameterType :: Locations -> Parameter -> SemanticMonad ()
+checkParameterType anns p =
     let typeSpec = paramTypeSpecifier p in
      -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
      -- since we cannot have dynamic types as parameters.
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
     checkTypeSpecifier anns typeSpec
 
-constParameterTypeChecking :: Locations -> ConstParameter -> SemanticMonad ()
-constParameterTypeChecking anns (ConstParameter p) =
+checkConstParameterType :: Locations -> ConstParameter -> SemanticMonad ()
+checkConstParameterType anns (ConstParameter p) =
     let typeSpec = paramTypeSpecifier p in
     unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
 
@@ -949,7 +953,7 @@ programSeman (Function ident cps ps mty bret mods anns) =
   -- Check the return type 
   maybe (return ()) (checkReturnType anns) mty >>
   -- Check generic const parameters
-  forM_ cps (constParameterTypeChecking anns) >>
+  forM_ cps (checkConstParameterType anns) >>
   addLocalConstants anns
       (fmap (\(ConstParameter p) -> (paramIdentifier p , paramTypeSpecifier p)) cps) checkFunction
 
@@ -957,7 +961,7 @@ programSeman (Function ident cps ps mty bret mods anns) =
     checkFunction :: SemanticMonad (SAST.AnnASTElement SemanticAnns)
     checkFunction =
           -- Check regular params
-        forM_ ps (parameterTypeChecking anns) >>
+        forM_ ps (checkParameterType anns) >>
           Function ident cps ps mty
             <$> (addLocalImmutObjs anns
                   (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
@@ -972,9 +976,9 @@ programSeman (Function ident cps ps mty bret mods anns) =
             <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
-  GlobalDeclaration <$> checkGlobal gbl
+  GlobalDeclaration <$> typeGlobal gbl
 programSeman (TypeDefinition tydef ann) =
-  typeDefCheck ann tydef >>= \t ->
+  typeTypeDefinition ann tydef >>= \t ->
     -- let stdef = semanticTypeDef t in
     -- and we can add it to the global environment.
     -- insertGlobalTy ann stdef >>
@@ -986,10 +990,7 @@ semanticTypeDef (Enum i e m)    = Enum i e m
 semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMember cls) ps m
 semanticTypeDef (Interface i cls m) = Interface i cls m
 
-interfaceProcedureTy :: InterfaceMember Locations -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
-interfaceProcedureTy (InterfaceProcedure ident cps ps annIP) = do
-  mapM_ (checkTypeSpecifier annIP . paramTypeSpecifier) ps
-  return $ InterfaceProcedure ident cps ps (buildExpAnn annIP Unit)
+
 
 -- | This function type checks the members of a class depending on its kind.
 checkClassKind :: Locations -> Identifier -> ClassKind 
@@ -1065,17 +1066,12 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
   
-
-
-
-  
-
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeDefCheck :: Locations -> TypeDef Locations -> SemanticMonad (SAST.TypeDef SemanticAnns)
+typeTypeDefinition :: Locations -> TypeDef Locations -> SemanticMonad (SAST.TypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
-typeDefCheck ann (Struct ident fs mds) =
+typeTypeDefinition ann (Struct ident fs mds) =
   -- Check every type is well-defined:
   -- Check that the struct is not empty
   when (Prelude.null fs) (throwError $ annotateError ann (EStructDefEmptyStruct ident))
@@ -1085,7 +1081,7 @@ typeDefCheck ann (Struct ident fs mds) =
   >> checkUniqueNames ann EStructDefNotUniqueField (Data.List.map fieldIdentifier fs)
   -- If everything is fine, return same struct
   >> return (Struct ident fs mds)
-typeDefCheck ann (Enum ident evs mds) =
+typeTypeDefinition ann (Enum ident evs mds) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Enumeration-definitions
   -- Check that the enum is not empty
   when (Prelude.null evs) (throwError $ annotateError ann (EEnumDefEmpty ident))
@@ -1095,16 +1091,24 @@ typeDefCheck ann (Enum ident evs mds) =
   >> checkUniqueNames ann EEnumDefNotUniqueField (Data.List.map variantIdentifier evs)
   -- If everything is fine, return the same definition.
   >> return (Enum ident evs mds)
-typeDefCheck ann (Interface ident cls mds) = do
+typeTypeDefinition ann (Interface ident cls mds) = do
   -- Check that the interface is not empty
   when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
   -- Check procedure names are unique
   checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ _ -> ifaceId) cls)
   -- Check that every procedure is well-defined
-  procedures <- mapM interfaceProcedureTy cls
+  procedures <- mapM typeInterfaceProcedure cls
   -- If everything is fine, return the same definition.
   return (Interface ident procedures mds)
-typeDefCheck ann (Class kind ident members provides mds) =
+
+  where 
+
+    typeInterfaceProcedure :: InterfaceMember Locations -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
+    typeInterfaceProcedure (InterfaceProcedure procId cps ps annIP) = do
+      mapM_ (checkTypeSpecifier annIP . paramTypeSpecifier) ps
+      return $ InterfaceProcedure procId cps ps (buildExpAnn annIP Unit)
+
+typeTypeDefinition ann (Class kind ident members provides mds) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
   -- check that it defines at least one method.
   -- TODO: Check class well-formedness depending on its kind
@@ -1132,8 +1136,8 @@ typeDefCheck ann (Class kind ident members provides mds) =
           view@(ClassViewer _fv_id cfv_tys fv_tys mty _body annCV)
             -> checkTypeSpecifier annCV mty
             -- Parameters cannot have dyns inside.
-            >> mapM_ (constParameterTypeChecking annCV) cfv_tys
-            >> mapM_ (parameterTypeChecking annCV) fv_tys
+            >> mapM_ (checkConstParameterType annCV) cfv_tys
+            >> mapM_ (checkParameterType annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)
             -> checkTypeSpecifier annCA mty
