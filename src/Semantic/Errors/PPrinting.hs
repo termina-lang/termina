@@ -414,6 +414,13 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EIfElseIfCondNotBool ts ->
+        let title = "error[E025]: if-else-if condition not boolean."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
