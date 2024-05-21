@@ -135,7 +135,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 lineNumber lineColumn 2
                 (Just ("You are missing the else clause in an if-else-if statement.\n" <>
                     "You must provide an else clause if you are defining an else-if clause."))
-    ECasteable ts1 ts2 -> 
+    ENotCasteable ts1 ts2 -> 
         let title = "error[E006]: invalid cast."
         in
             printSimpleError

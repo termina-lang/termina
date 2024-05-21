@@ -46,7 +46,7 @@ genMemberFunctionAccess obj ident constArgs args ann = do
     cConstArgs <- mapM genConstExpression constArgs
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
-    objType <- getObjectType obj
+    objType <- getObjType obj
     case objType of
         (Reference _ ts) ->
             case ts of
@@ -98,7 +98,7 @@ genMemberFunctionAccess obj ident constArgs args ann = do
 genExpression :: Expression SemanticAnns -> CSourceGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
-    cObjType <- getObjectType obj
+    cObjType <- getObjType obj
     case cObjType of
         (Location _) ->
             return $ CUnary CIndOp cObj (buildGenericAnn (getAnnotation obj))
@@ -145,7 +145,7 @@ genExpression (Casting expr ts ann) = do
     return $ CCast decl cExpr cAnn
 genExpression (ReferenceExpression _ obj ann) = do
     let cAnn = buildGenericAnn ann 
-    objType <- getObjectType obj
+    objType <- getObjType obj
     cObj <- genObject obj
     case objType of
         -- | If it is a vector, we need to generate the address of the data
@@ -223,7 +223,7 @@ genObject (ArraySlice obj lower _ ann) = do
 genObject (MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
-    objType <- getObjectType obj
+    objType <- getObjType obj
     case objType of
         (Location {}) -> return $ CMember cObj identifier True cAnn
         _ -> return $ CMember cObj identifier False cAnn
@@ -233,7 +233,7 @@ genObject (DereferenceMemberAccess obj identifier ann) = do
     return $ CMember cObj identifier True cAnn
 genObject (Dereference obj ann) = do
     let cAnn = buildGenericAnn ann
-    objType <- getObjectType obj
+    objType <- getObjType obj
     case objType of
         -- | A dereference to a vector is printed as the name of the vector
         (Reference _ (Array _ _)) -> genObject obj
@@ -244,7 +244,7 @@ genObject (Dereference obj ann) = do
 -- check if it is a vector
 genObject o@(Undyn obj ann) = do
     let cAnn = buildGenericAnn ann
-    objType <- getObjectType obj
+    objType <- getObjType obj
     cObj <- genObject obj
     case objType of
         -- | If it is a vector, we need to generate the address of the data

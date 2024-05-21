@@ -37,4 +37,4 @@ spec = do
   
   where
     isECasteable :: Maybe (Errors Annotation) -> Bool
-    isECasteable = \case Just (ECasteable Bool UInt32) -> True; _ -> False
+    isECasteable = \case Just (ENotCasteable Bool UInt32) -> True; _ -> False

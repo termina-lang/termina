@@ -132,15 +132,15 @@ optionSomeField = "__0"
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjectType :: (MonadError CGeneratorError m) => Object SemanticAnns -> m TypeSpecifier
-getObjectType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = return ts
-getObjectType (ArrayIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))    = return ts
-getObjectType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
-getObjectType (Dereference _ (SemAnn _ (ETy (ObjectType _ ts))))               = return ts
-getObjectType (ArraySlice _ _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
-getObjectType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = return ts
-getObjectType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return ts
-getObjectType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
+getObjType :: (MonadError CGeneratorError m) => Object SemanticAnns -> m TypeSpecifier
+getObjType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = return ts
+getObjType (ArrayIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))    = return ts
+getObjType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
+getObjType (Dereference _ (SemAnn _ (ETy (ObjectType _ ts))))               = return ts
+getObjType (ArraySlice _ _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
+getObjType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return ts
+getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 getConstParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [ConstParameter]
 getConstParameters (FunctionCall _ _ _ (SemAnn _ (ETy (AppType constParams _ _)))) = return constParams
@@ -151,7 +151,7 @@ getParameters (FunctionCall _ _ _ (SemAnn _ (ETy (AppType _ params _)))) = retur
 getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m TypeSpecifier
-getExprType (AccessObject obj) = getObjectType obj
+getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts

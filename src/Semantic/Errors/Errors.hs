@@ -23,7 +23,7 @@ data Errors a
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
   | EAssignmentToImmutable -- ^ Assignment to immutable variable (E004)
   | EIfElseNoOtherwise -- ^ Missing else clause (E005)
-  | ECasteable TypeSpecifier TypeSpecifier -- ^ Casting error (E006)
+  | ENotCasteable TypeSpecifier TypeSpecifier -- ^ Casting error (E006)
   | EInvalidParameterType Parameter -- ^ Invalid parameter type (E007)
   | EInvalidReturnType TypeSpecifier -- ^ Invalid return type (E008)
   | EProcedureCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)

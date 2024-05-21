@@ -264,8 +264,8 @@ localScope comp = do
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTy :: Locations -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnns)
-getGlobalTy loc tid  = gets global >>=
+getGlobalTypeDef :: Locations -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnns)
+getGlobalTypeDef loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
   (throwError $ annotateError loc (ENoTyFound tid))
@@ -277,7 +277,7 @@ getGlobalTy loc tid  = gets global >>=
 
 -- | From a global name get enum variations
 getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
-getGlobalEnumTy loc tid  = getGlobalTy loc tid  >>= \case
+getGlobalEnumTy loc tid  = getGlobalTypeDef loc tid  >>= \case
   Enum _ fs _mods -> return fs
   ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
@@ -563,76 +563,76 @@ checkSize :: Locations -> Size -> SemanticMonad ()
 checkSize loc (CAST.K s) = checkIntConstant loc USize s
 checkSize loc (CAST.V ident) = getConstTy loc ident >>= sameOrErr loc USize >> return ()
 
-checkTypeDefinition :: Locations -> TypeSpecifier -> SemanticMonad ()
-checkTypeDefinition loc (DefinedType identTy) =
+checkTypeSpecifier :: Locations -> TypeSpecifier -> SemanticMonad ()
+checkTypeSpecifier loc (DefinedType identTy) =
   -- Check that the type was defined
-  void (getGlobalTy loc identTy)
+  void (getGlobalTypeDef loc identTy)
   -- we assume that only well-formed types are added to globals.
-checkTypeDefinition loc (Array ty (CAST.K s)) =
+checkTypeSpecifier loc (Array ty (CAST.K s)) =
   -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
   -- Numeric contast
   checkIntConstant loc USize s >>
   --
-  checkTypeDefinition loc ty
-checkTypeDefinition loc (Array ty (CAST.V ident)) =
+  checkTypeSpecifier loc ty
+checkTypeSpecifier loc (Array ty (CAST.V ident)) =
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
   getConstTy loc ident >>=
   sameOrErr loc USize >>
-  checkTypeDefinition loc ty
-checkTypeDefinition loc (MsgQueue ty _)       = checkTypeDefinition loc ty
-checkTypeDefinition loc (Pool ty _)           = checkTypeDefinition loc ty
+  checkTypeSpecifier loc ty
+checkTypeSpecifier loc (MsgQueue ty _)       = checkTypeSpecifier loc ty
+checkTypeSpecifier loc (Pool ty _)           = checkTypeSpecifier loc ty
 -- Dynamic Subtyping
-checkTypeDefinition loc (Option tyd@(DynamicSubtype _ty)) = checkTypeDefinition loc tyd
+checkTypeSpecifier loc (Option tyd@(DynamicSubtype _ty)) = checkTypeSpecifier loc tyd
 -- Regular option subtyping
-checkTypeDefinition loc (Option (Option _))     = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (Option ty) = simpleTyorFail loc ty >> checkTypeDefinition loc ty
-checkTypeDefinition loc (Reference _ ty)        =
+checkTypeSpecifier loc (Option (Option _))     = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (Option ty) = simpleTyorFail loc ty >> checkTypeSpecifier loc ty
+checkTypeSpecifier loc (Reference _ ty)        =
   -- Unless we are referencing a reference we are good
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
-  checkTypeDefinition loc ty
-checkTypeDefinition loc (DynamicSubtype (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (DynamicSubtype ty) =
+  checkTypeSpecifier loc ty
+checkTypeSpecifier loc (DynamicSubtype (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (DynamicSubtype ty) =
   simpleTyorFail loc ty >>
-  checkTypeDefinition loc ty
-checkTypeDefinition loc (Location ty) =
+  checkTypeSpecifier loc ty
+checkTypeSpecifier loc (Location ty) =
   simpleTyorFail loc ty >>
-  checkTypeDefinition loc ty
-checkTypeDefinition loc (AccessPort ty) =
+  checkTypeSpecifier loc ty
+checkTypeSpecifier loc (AccessPort ty) =
   case ty of
     (Allocator (Option _))  -> throwError $ annotateError loc EOptionNested
-    (Allocator ty') -> simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+    (Allocator ty') -> simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
     (DefinedType identTy) ->
-      getGlobalTy loc identTy >>=
+      getGlobalTypeDef loc identTy >>=
         \case
           (Interface {}) -> return ()
           _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
     _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
-checkTypeDefinition loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-checkTypeDefinition loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (InPort (DynamicSubtype ty') _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-checkTypeDefinition loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-checkTypeDefinition loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (OutPort (DynamicSubtype ty')) = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-checkTypeDefinition loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
-checkTypeDefinition loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeDefinition loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeDefinition loc ty'
+checkTypeSpecifier loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (InPort (DynamicSubtype ty') _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (OutPort (DynamicSubtype ty')) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 -- This is explicit just in case
-checkTypeDefinition _ UInt8                   = return ()
-checkTypeDefinition _ UInt16                  = return ()
-checkTypeDefinition _ UInt32                  = return ()
-checkTypeDefinition _ UInt64                  = return ()
-checkTypeDefinition _ Int8                    = return ()
-checkTypeDefinition _ Int16                   = return ()
-checkTypeDefinition _ Int32                   = return ()
-checkTypeDefinition _ Int64                   = return ()
-checkTypeDefinition _ USize                   = return ()
-checkTypeDefinition _ Char                    = return ()
-checkTypeDefinition _ Bool                    = return ()
-checkTypeDefinition _ Unit                    = return ()
+checkTypeSpecifier _ UInt8                   = return ()
+checkTypeSpecifier _ UInt16                  = return ()
+checkTypeSpecifier _ UInt32                  = return ()
+checkTypeSpecifier _ UInt64                  = return ()
+checkTypeSpecifier _ Int8                    = return ()
+checkTypeSpecifier _ Int16                   = return ()
+checkTypeSpecifier _ Int32                   = return ()
+checkTypeSpecifier _ Int64                   = return ()
+checkTypeSpecifier _ USize                   = return ()
+checkTypeSpecifier _ Char                    = return ()
+checkTypeSpecifier _ Bool                    = return ()
+checkTypeSpecifier _ Unit                    = return ()
 
 -- | Type does not have Dynamic Subtyping.
 -- Note to self: I still do not have the complete type system in my head.
@@ -651,7 +651,7 @@ checkTypeDefinition _ Unit                    = return ()
 
 -- userDefHasDyn :: Locations -> Identifier -> SemanticMonad Bool
 -- userDefHasDyn loc ident =
---  getGlobalTy loc ident >>= stypedefHasDyn
+--  getGlobalTypeDef loc ident >>= stypedefHasDyn
 --  where
     --
 --    stypedefHasDyn :: SemanTypeDef SemanticAnns -> SemanticMonad Bool
@@ -669,7 +669,10 @@ checkTypeDefinition _ Unit                    = return ()
 --    clsMemberHasDyn (ClassProcedure _ident _params _blk _anns) = return False -- It is not a value, it takes one
 --    clsMemberHasDyn (ClassViewer _ident _params _retTy _blk _ann) = return False
 
-
+-- | This function gets the access kind and type of an already semantically
+-- annotated object. If the object is not annotated properly, it throws an internal error.
+getObjectType :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
+getObjectType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getObjectSAnns . getAnnotation
 
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
@@ -688,7 +691,7 @@ runTypeChecking initSt = flip ST.runState initSt . runExceptT
 checkConstant :: Locations -> TypeSpecifier -> Const -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
-  checkTypeDefinition loc type_c >>
+  checkTypeSpecifier loc type_c >>
   -- | Check that the explicit type matches the expected type
   sameOrErr loc expected_type type_c >>
   -- | Check that the constant is in the range of the type
