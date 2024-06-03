@@ -26,9 +26,9 @@ instance ShowText Size where
     showText (V ident) = T.pack ident
 
 instance ShowText AccessKind where
-    showText Mutable = "mut"
+    showText Mutable = "mut "
     showText Immutable = ""
-    showText Private = "priv"
+    showText Private = "priv "
 
 instance ShowText TypeSpecifier where
     showText UInt8 = "u8"
@@ -49,7 +49,7 @@ instance ShowText TypeSpecifier where
     showText (MsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
     showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (Allocator ts) = "Allocator<" <> showText ts <> ">"
-    showText (Reference ak ts) = "&" <> showText ak <> " " <> showText ts
+    showText (Reference ak ts) = "&" <> showText ak <> showText ts
     showText (DynamicSubtype ts) = "dyn " <> showText ts
     showText (Location ts) = "loc " <> showText ts
     showText (AccessPort ts) = "access " <> showText ts
@@ -170,7 +170,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureCallMissingParams (procId, params, Position procPos) paramNumber ->
@@ -187,7 +187,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EResourceClassNoProvides ident ->
@@ -339,7 +339,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureMissingParams (ifaceId, procId, params, Position procPos) paramNumber ->
@@ -357,7 +357,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureExtraConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
@@ -375,7 +375,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m const parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureMissingConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
@@ -393,7 +393,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
                     "\x1b[0m const parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
             printSimpleError 
-                procSourceLines "The interface of the procedure is defined as follows:" procFileName
+                procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureConstParamMismatch (ifaceId, procId, ConstParameter (Parameter paramId expectedTy), Position procPos) actualTy ->
@@ -413,11 +413,11 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines 
                     ("The procedure \x1b[31m" <> T.pack procId <> 
                      "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
-                     "\x1b[0m is defined as follows:") 
+                     "\x1b[0m is defined here:") 
                     procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureParamMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
+    EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
         let title = "error[E024]: parameter type mismatch in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -434,7 +434,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines 
                     ("The procedure \x1b[31m" <> T.pack procId <> 
                      "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
-                     "\x1b[0m is defined as follows:") 
+                     "\x1b[0m is defined here:") 
                     procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -445,6 +445,94 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
+    EFunctionCallExtraParams (funcId, params, Position funcPos) paramNumber ->
+        let title = "error[E026]: extra parameters in function call."
+            funcFileName = sourceName funcPos
+            funcLineNumber = sourceLine funcPos
+            funcLineColumn = sourceColumn funcPos
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length funcId)
+                (Just ("Function \x1b[31m" <> T.pack funcId <> 
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                funcSourceLines "The interface of the function is defined here:" funcFileName
+                funcLineNumber funcLineColumn (length funcId)
+                Nothing
+    EFunctionCallMissingParams (funcId, params, Position funcPos) paramNumber ->
+        let title = "error[E027]: missing parameters in function call."
+            funcFileName = sourceName funcPos
+            funcLineNumber = sourceLine funcPos
+            funcLineColumn = sourceColumn funcPos
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length funcId)
+                (Just ("Function \x1b[31m" <> T.pack funcId <> 
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                funcSourceLines "The interface of the function is defined here:" funcFileName
+                funcLineNumber funcLineColumn (length funcId)
+                Nothing
+    EFunctionCallExtraConstParams (funcId, params, Position funcPos) paramNumber ->
+        let title = "error[E028]: extra const parameters in function call."
+            funcFileName = sourceName funcPos
+            funcLineNumber = sourceLine funcPos
+            funcLineColumn = sourceColumn funcPos
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length funcId)
+                (Just ("Function \x1b[31m" <> T.pack funcId <> 
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m const parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                funcSourceLines "The interface of the function is defined here:" funcFileName
+                funcLineNumber funcLineColumn (length funcId)
+                Nothing
+    EFunctionCallMissingConstParams (funcId, params, Position funcPos) paramNumber ->
+        let title = "error[E029]: missing const parameters in function call."
+            funcFileName = sourceName funcPos
+            funcLineNumber = sourceLine funcPos
+            funcLineColumn = sourceColumn funcPos
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length funcId)
+                (Just ("Function \x1b[31m" <> T.pack funcId <> 
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                    "\x1b[0m const parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError 
+                funcSourceLines "The interface of the function is defined here:" funcFileName
+                funcLineNumber funcLineColumn (length funcId)
+                Nothing
+    EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos) actualTy ->
+        let title = "error[E030]: parameter type mismatch in function call."
+            funcFileName = sourceName funcPos
+            funcLineNumber = sourceLine funcPos
+            funcLineColumn = sourceColumn funcPos
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length funcId)
+                (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            printSimpleError 
+                funcSourceLines 
+                    ("The function \x1b[31m" <> T.pack funcId <> 
+                     "\x1b[0m is defined here:") 
+                    funcFileName
+                funcLineNumber funcLineColumn (length funcId)
+                Nothing
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

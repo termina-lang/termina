@@ -212,9 +212,9 @@ genStructInitialization before level cObj expr =
 
 genBlockItem :: Statement SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
 genBlockItem (AssignmentStmt obj expr  _) = do
-    objType <- getObjType obj
+    typeObj <- getObjType obj
     cObj <- genObject obj
-    case objType of
+    case typeObj of
         Array _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
         (Location _) -> do
             let ann = getAnnotation obj

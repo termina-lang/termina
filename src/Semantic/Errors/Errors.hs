@@ -41,13 +41,16 @@ data Errors a
   | EProcedureExtraConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Extra const parameters in procedure definition (E021)
   | EProcedureMissingConstParams (Identifier, Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in procedure definition (E022)
   | EProcedureConstParamMismatch (Identifier, Identifier, ConstParameter, a) TypeSpecifier -- ^ Const parameter type mismatch in procedure definition (E023)
-  | EProcedureParamMismatch (Identifier, Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in procedure definition (E024)
+  | EProcedureParamTypeMismatch (Identifier, Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in procedure definition (E024)
   | EIfElseIfCondNotBool TypeSpecifier -- ^ If-else-if condition is not a boolean (E025)
   | EFunctionCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in function call (E026)
   | EFunctionCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in function call (E027)
   | EFunctionCallExtraConstParams (Identifier, [ConstParameter], a) Integer -- ^ Extra const parameters in function call (E028)
   | EFunctionCallMissingConstParams (Identifier, [ConstParameter], a) Integer -- ^ Missing const parameters in function call (E029)
-  | EMismatchAccessKind AccessKind AccessKind
+  | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E030)
+  | EFunctionCallConstParamTypeMismatch (Identifier, ConstParameter, a) TypeSpecifier -- ^ Const parameter type mismatch in function call (E031)
+  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E032)
+  | EMutableReferenceToPrivate -- ^ Mutable reference to private object (E033)
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
@@ -77,8 +80,6 @@ data Errors a
   | EVarDefined Identifier
   -- | Not Function found
   | EFunctionNotFound Identifier
-  -- | Parameter and argument type mismatch
-  | EParam TypeSpecifier TypeSpecifier
   -- | TypeSpecifier Identifier is not Union/Struct
   -- Not struct type found with identifier
   | ETyNotStructFound Identifier

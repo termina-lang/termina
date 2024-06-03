@@ -424,13 +424,12 @@ expressionParser' = buildPrattParser -- New parser
           return $ \parent -> Casting parent typeSpecificer (Position p))
 
 functionCallParser :: Parser (Expression Annotation)
-functionCallParser =
-  FunctionCall
-  <$> identifierParser
-  <*> (try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return [])
-  <*> parens (sepBy (try expressionParser) comma)
-  <*> (Position <$> getPosition)
-
+functionCallParser = do
+  p <- getPosition
+  ident <- identifierParser
+  constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
+  params <- parens (sepBy (try expressionParser) comma)
+  return $ FunctionCall ident constParams params (Position p)
 
 optionVariantExprParser :: Parser (Expression Annotation)
 optionVariantExprParser =

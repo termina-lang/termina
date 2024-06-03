@@ -46,8 +46,8 @@ genMemberFunctionAccess obj ident constArgs args ann = do
     cConstArgs <- mapM genConstExpression constArgs
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
-    objType <- getObjType obj
-    case objType of
+    typeObj <- getObjType obj
+    case typeObj of
         (Reference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
@@ -145,17 +145,17 @@ genExpression (Casting expr ts ann) = do
     return $ CCast decl cExpr cAnn
 genExpression (ReferenceExpression _ obj ann) = do
     let cAnn = buildGenericAnn ann 
-    objType <- getObjType obj
+    typeObj <- getObjType obj
     cObj <- genObject obj
-    case objType of
+    case typeObj of
         -- | If it is a vector, we need to generate the address of the data
         (DynamicSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
-            decl <- genCastDeclaration objType ann
+            decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
             -- | Else, we print the address to the data
         (DynamicSubtype _) -> do
-            decl <- genCastDeclaration objType ann
+            decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
         (Array {}) -> return cObj
         _ -> return $ CUnary CAdrOp cObj cAnn
@@ -223,8 +223,8 @@ genObject (ArraySlice obj lower _ ann) = do
 genObject (MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
-    objType <- getObjType obj
-    case objType of
+    typeObj <- getObjType obj
+    case typeObj of
         (Location {}) -> return $ CMember cObj identifier True cAnn
         _ -> return $ CMember cObj identifier False cAnn
 genObject (DereferenceMemberAccess obj identifier ann) = do
@@ -233,8 +233,8 @@ genObject (DereferenceMemberAccess obj identifier ann) = do
     return $ CMember cObj identifier True cAnn
 genObject (Dereference obj ann) = do
     let cAnn = buildGenericAnn ann
-    objType <- getObjType obj
-    case objType of
+    typeObj <- getObjType obj
+    case typeObj of
         -- | A dereference to a vector is printed as the name of the vector
         (Reference _ (Array _ _)) -> genObject obj
         _ -> do
@@ -244,17 +244,17 @@ genObject (Dereference obj ann) = do
 -- check if it is a vector
 genObject o@(Undyn obj ann) = do
     let cAnn = buildGenericAnn ann
-    objType <- getObjType obj
+    typeObj <- getObjType obj
     cObj <- genObject obj
-    case objType of
+    case typeObj of
         -- | If it is a vector, we need to generate the address of the data
         (DynamicSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
-            decl <- genCastDeclaration objType ann
+            decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
             -- | Else, we print the derefence to the data
         (DynamicSubtype _) -> do
-            decl <- genCastDeclaration objType ann
+            decl <- genCastDeclaration typeObj ann
             return $ CUnary CIndOp (CCast decl (CMember cObj "data" False cAnn) cAnn) cAnn
         -- | An undyn can only be applied to a dynamic subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic

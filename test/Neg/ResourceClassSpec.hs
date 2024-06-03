@@ -310,4 +310,4 @@ spec = do
     isEProcedureMissingConstParams = \case Just (EProcedureMissingConstParams ("TMChannelInterface", "get_tm_sent_packets", [ConstParameter (Parameter "N" USize)], Position _pos) 0) -> True; _ -> False
 
     isEProcedureParamMismatch :: Maybe (Errors Annotation) -> Bool
-    isEProcedureParamMismatch = \case Just (EProcedureParamMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position _pos) (Reference Mutable UInt16)) -> True; _ -> False
+    isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position _pos) (Reference Mutable UInt16)) -> True; _ -> False

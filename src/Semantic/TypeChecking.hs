@@ -300,9 +300,9 @@ typeExpression ::
   -> Expression Parser.Annotation
   -> SemanticMonad (SAST.Expression SemanticAnns)
 -- Object access
-typeExpression expectedType objType (AccessObject obj) = do
+typeExpression expectedType typeObj (AccessObject obj) = do
     -- | Type the object
-    typed_obj <- objType obj
+    typed_obj <- typeObj obj
     -- | Get the type of the object
     (_, obj_type) <- getObjectType typed_obj
     case (expectedType, obj_type) of
@@ -343,15 +343,15 @@ typeExpression Nothing _ (Constant c@(B {}) pann) = do
 -- | Character literals without an expected type.
 typeExpression Nothing _ (Constant c@(C {}) pann) = do
   return $ SAST.Constant c (buildExpAnn pann Char)
-typeExpression expectedType objType (Casting e nty pann) = do
+typeExpression expectedType typeObj (Casting e nty pann) = do
   maybe (return ()) (sameOrErr pann nty) expectedType
   -- | Casting Expressions.
-  typed_exp <- typeExpression Nothing objType e
+  typed_exp <- typeExpression Nothing typeObj e
   type_exp <- getExpType typed_exp
   if casteableTys type_exp nty
   then return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
   else throwError (annotateError pann $ ENotCasteable type_exp nty)
-typeExpression expectedType objType (BinOp op le re pann) = do
+typeExpression expectedType typeObj (BinOp op le re pann) = do
 
   case op of
     Addition -> sameNumType
@@ -384,12 +384,12 @@ typeExpression expectedType objType (BinOp op le re pann) = do
       case expectedType of
         ty@(Just ty') -> do
           unless (numTy ty') (throwError $ annotateError pann (EExpectedNumType ty'))
-          tyle <- typeExpression ty objType le
-          tyre <- typeExpression ty objType re
+          tyle <- typeExpression ty typeObj le
+          tyre <- typeExpression ty typeObj re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
@@ -401,15 +401,15 @@ typeExpression expectedType objType (BinOp op le re pann) = do
     leftExpNumType =
       case expectedType of
         ty@(Just ty') -> do
-          tyle <- typeExpression ty objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression ty typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyre_ty <- getExpType tyre
           unless (numTy ty') (throwError $ annotateError pann (EExpectedNumType ty'))
           unless (posTy tyre_ty) (throwError $ annotateError pann (EExpectedPosType tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
@@ -420,15 +420,15 @@ typeExpression expectedType objType (BinOp op le re pann) = do
     sameGroundTyBool =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Nothing -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
@@ -439,16 +439,16 @@ typeExpression expectedType objType (BinOp op le re pann) = do
     sameNumTyBool =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
           unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Nothing -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
@@ -460,12 +460,12 @@ typeExpression expectedType objType (BinOp op le re pann) = do
     sameBoolType =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression (Just Bool) objType le
-          tyre <- typeExpression (Just Bool) objType re
+          tyle <- typeExpression (Just Bool) typeObj le
+          tyre <- typeExpression (Just Bool) typeObj re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Nothing -> do
-          tyle <- typeExpression Nothing objType le
-          tyre <- typeExpression Nothing objType re
+          tyle <- typeExpression Nothing typeObj le
+          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
           unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
@@ -473,24 +473,39 @@ typeExpression expectedType objType (BinOp op le re pann) = do
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         _ -> throwError $ annotateError pann EExpectedType
 
-typeExpression expectedType objType (ReferenceExpression refKind rhs_e pann) = do
-  -- TODO [Q15] ??
-  typed_obj <- objType rhs_e
-  (_, obj_type) <- getObjectType typed_obj
+typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = do
+  -- | Type object
+  typed_obj <- typeObj rhs_e
+  -- | Get the type of the object
+  (obj_ak, obj_type) <- getObjectType typed_obj
+  -- | Check if the we are allowed to create that kind of reference from the object
+  checkReferenceAccessKind obj_ak
   case obj_type of
+    -- | If the object is of a dynamic subtype, then the reference will be to an object of
+    -- the base type.
     DynamicSubtype ty -> do
+      -- | Check that the expected type is the same as the base type.  
       maybe (return ()) (sameOrErr pann (Reference refKind ty)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
     Slice ty -> do
       case expectedType of
-        Just rtype@(Reference ak (Array ts size)) -> do
+        Just rtype@(Reference _ak (Array ts size)) -> do
           unless (groundTyEq ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
-          unless (refKind == ak) (throwError $ annotateError pann $ EMismatchAccessKind refKind ak)
           return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
         _ -> throwError $ annotateError pann EExpectedType
     _ -> do
-      maybe (return ()) (sameOrErr pann (Reference refKind obj_type)) expectedType
+      maybe (return ()) (flip (sameOrErr pann) (Reference refKind obj_type)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
+  
+  where
+
+    checkReferenceAccessKind :: AccessKind -> SemanticMonad ()
+    checkReferenceAccessKind obj_ak =
+      case (obj_ak, refKind) of
+        (Immutable, Mutable) -> throwError $ annotateError pann EMutableReferenceToImmutable
+        (Private, Mutable) -> throwError $ annotateError pann EMutableReferenceToPrivate
+        _ -> return ()
+
 ---------------------------------------
 -- | Function Expression.  A tradicional function call
 typeExpression expectedType _ (FunctionCall ident constArgs args ann) = do
@@ -503,21 +518,26 @@ typeExpression expectedType _ (FunctionCall ident constArgs args ann) = do
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
   when (cpsLen < casLen) (throwError $ annotateError ann (EFunctionCallExtraConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
   when (cpsLen > casLen) (throwError $ annotateError ann (EFunctionCallMissingConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
-  typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
+  typed_args <- zipWithM (\p e -> catchError 
+      (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)
+      (\err -> case semError err of
+          EMismatch _ ty -> throwError $ annotateError ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation) ty)
+          _ -> throwError err
+      )) ps args
   typed_constArgs <- zipWithM (\p e -> do
       typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
   maybe (return ()) (sameOrErr ann retty) expectedType
   return $ SAST.FunctionCall ident typed_constArgs typed_args expAnn
 
 ----------------------------------------
-typeExpression expectedType objType (MemberFunctionCall obj ident constArgs args ann) = do
-  obj_typed <- objType obj
+typeExpression expectedType typeObj (MemberFunctionCall obj ident constArgs args ann) = do
+  obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   ((cps, typed_constArgs), (ps, typed_args), fty) <- typeMemberFunctionCall ann obj_ty ident constArgs args
   maybe (return ()) (sameOrErr ann fty) expectedType
   return $ SAST.MemberFunctionCall obj_typed ident typed_constArgs typed_args (buildExpAnnApp ann cps ps fty)
-typeExpression expectedType objType (DerefMemberFunctionCall obj ident constArgs args ann) = do
-  obj_typed <- objType obj
+typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident constArgs args ann) = do
+  obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   case obj_ty of
     Reference _ refTy -> do
@@ -530,7 +550,7 @@ typeExpression expectedType objType (DerefMemberFunctionCall obj ident constArgs
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_constArgs typed_args (buildExpAnnApp ann cps ps fty)
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
 ----------------------------------------
-typeExpression expectedType objType (FieldAssignmentsExpression id_ty fs pann) =
+typeExpression expectedType typeObj (FieldAssignmentsExpression id_ty fs pann) =
   -- | Field Type
   catchError
     (getGlobalTypeDef pann id_ty )
@@ -539,17 +559,17 @@ typeExpression expectedType objType (FieldAssignmentsExpression id_ty fs pann) =
     Struct _ ty_fs _mods  ->
       maybe (return ()) (sameOrErr pann (DefinedType id_ty)) expectedType >>
       flip (SAST.FieldAssignmentsExpression id_ty) (buildExpAnn pann (DefinedType id_ty))
-        <$> checkFieldValues pann objType ty_fs fs;
+        <$> checkFieldValues pann typeObj ty_fs fs;
     Class _clsKind _ident members _provides _mods ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
         maybe (return ()) (sameOrErr pann (DefinedType id_ty)) expectedType >>
         flip (SAST.FieldAssignmentsExpression id_ty)
             (buildExpAnn pann (DefinedType id_ty))
         <$>
-        checkFieldValues pann objType fields fs;
+        checkFieldValues pann typeObj fields fs;
    x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap forgetSemAnn x));
   }
-typeExpression expectedType objType (EnumVariantExpression id_ty variant args pann) =
+typeExpression expectedType typeObj (EnumVariantExpression id_ty variant args pann) =
   -- | Enum Variant
   catchError
     (getGlobalTypeDef pann id_ty)
@@ -564,7 +584,7 @@ typeExpression expectedType objType (EnumVariantExpression id_ty variant args pa
          then
             maybe (return ()) (sameOrErr pann (DefinedType id_ty)) expectedType >>
             flip (SAST.EnumVariantExpression id_ty variant) (buildExpAnn pann (DefinedType id_ty))
-             <$> zipWithM (\p e -> typeExpression (Just p) objType e) ps args
+             <$> zipWithM (\p e -> typeExpression (Just p) typeObj e) ps args
          else if psLen < asLen
          then throwError $ annotateError pann EEnumVariantExtraParams
          else throwError $ annotateError pann EEnumVariantMissingParams
@@ -572,28 +592,28 @@ typeExpression expectedType objType (EnumVariantExpression id_ty variant args pa
    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
   }
 -- IDEA Q4
-typeExpression expectedType objType (ArrayInitExpression iexp size pann) = do
+typeExpression expectedType typeObj (ArrayInitExpression iexp size pann) = do
 -- | Array Initialization
   case expectedType of
     Just (Array ts _) -> do
-      typed_init <- typeExpression (Just ts) objType iexp
+      typed_init <- typeExpression (Just ts) typeObj iexp
       checkSize pann size
       return $ SAST.ArrayInitExpression typed_init size (buildExpAnn pann (Array ts size))
     Just ts -> throwError $ annotateError pann (EArray ts)
     _ -> throwError $ annotateError pann EExpectedType
 -- DONE [Q5]
 -- TODO [Q17]
-typeExpression expectedType objType (OptionVariantExpression vexp anns) =
+typeExpression expectedType typeObj (OptionVariantExpression vexp anns) =
   case expectedType of
     Just (Option ts) -> do
       case vexp of
         None -> return $ SAST.OptionVariantExpression None (buildExpAnn anns (Option ts))
         Some e -> do
-          typed_e <- typeExpression (Just ts) objType e
+          typed_e <- typeExpression (Just ts) typeObj e
           return $ SAST.OptionVariantExpression (Some typed_e) (buildExpAnn anns (Option ts))
     _ -> throwError $ annotateError anns EExpectedType
-typeExpression expectedType objType (IsEnumVariantExpression obj id_ty variant_id pann) = do
-  obj_typed <- objType obj
+typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
+  obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   lhs_ty <- case obj_ty of
     DefinedType dident ->
@@ -610,8 +630,8 @@ typeExpression expectedType objType (IsEnumVariantExpression obj id_ty variant_i
           Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant_id)
       else throwError $ annotateError pann (EIsVariantEnumMismatch lhs_enum id_ty)
     x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
-typeExpression expectedType objType (IsOptionVariantExpression obj variant_id pann) = do
-  obj_typed <- objType obj
+typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pann) = do
+  obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   case obj_ty of
     (Option {}) -> do
@@ -637,10 +657,10 @@ checkFieldValue
   -> FieldDefinition
   -> FieldAssignment Parser.Annotation
   -> SemanticMonad (SAST.FieldAssignment SemanticAnns)
-checkFieldValue loc objType (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
+checkFieldValue loc typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
-    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeExpression (Just fty) objType faexp
+    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeExpression (Just fty) typeObj faexp
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
@@ -713,7 +733,7 @@ checkFieldValues
   -> [FieldDefinition]
   -> [FieldAssignment Parser.Annotation]
   -> SemanticMonad [SAST.FieldAssignment SemanticAnns]
-checkFieldValues loc objType fds fas = checkSortedFields sorted_fds sorted_fas []
+checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas []
   where
     tError = throwError . annotateError loc
     getFid = \case {
@@ -728,7 +748,7 @@ checkFieldValues loc objType fds fas = checkSortedFields sorted_fds sorted_fas [
     checkSortedFields [] es _ = tError (EFieldExtra (fmap getFid es))
     checkSortedFields ms [] _ = tError (EFieldMissing (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
-      checkFieldValue loc objType d a >>= checkSortedFields ds as . (:acc)
+      checkFieldValue loc typeObj d a >>= checkSortedFields ds as . (:acc)
 
 retStmt :: Maybe TypeSpecifier -> ReturnStmt Parser.Annotation -> SemanticMonad (SAST.ReturnStmt SemanticAnns)
 retStmt Nothing (ReturnStmt Nothing anns) = do
@@ -799,7 +819,7 @@ typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
     typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr) 
       (\err -> case semError err of
         EMismatch Bool ty -> throwError $ annotateError (annError err) $ EIfElseIfCondNotBool ty
-        e -> throwError $ annotateError anns e
+        _ -> throwError err
       )
 -- Here we could implement some abstract interpretation analysis
 typeStatement (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt anns) = do
@@ -1060,7 +1080,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       zipWithM_ (\cp@(ConstParameter (Parameter _ ts)) (ConstParameter (Parameter _ ts')) ->
         unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureConstParamMismatch (ifaceId, prcId, cp, location pann) ts'))) cps cps'
       zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
-        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
+        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
 
