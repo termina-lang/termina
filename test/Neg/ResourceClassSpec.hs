@@ -268,7 +268,7 @@ spec = do
      runNegativeTest test10
        `shouldSatisfy`
         isEProcedureMissingConstParams
-    it "A procedure has a missing const parameter" $ do
+    it "A procedure defines a parameter different from the one specified by the interface" $ do
      runNegativeTest test11
        `shouldSatisfy`
         isEProcedureParamMismatch
@@ -310,4 +310,4 @@ spec = do
     isEProcedureMissingConstParams = \case Just (EProcedureMissingConstParams ("TMChannelInterface", "get_tm_sent_packets", [ConstParameter (Parameter "N" USize)], Position _pos) 0) -> True; _ -> False
 
     isEProcedureParamMismatch :: Maybe (Errors Annotation) -> Bool
-    isEProcedureParamMismatch = \case Just (EProcedureParamMismatch "packets" (Reference Mutable UInt32) (Reference Mutable UInt16)) -> True; _ -> False
+    isEProcedureParamMismatch = \case Just (EProcedureParamMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position _pos) (Reference Mutable UInt16)) -> True; _ -> False

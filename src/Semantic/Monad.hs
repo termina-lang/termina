@@ -281,12 +281,12 @@ getGlobalEnumTy loc tid  = getGlobalTypeDef loc tid  >>= \case
   Enum _ fs _mods -> return fs
   ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
-getFunctionTy :: Locations -> Identifier -> SemanticMonad ([ConstParameter], [Parameter],TypeSpecifier)
+getFunctionTy :: Locations -> Identifier -> SemanticMonad ([ConstParameter], [Parameter],TypeSpecifier, Locations)
 getFunctionTy loc iden =
-  catchError (getGlobalGEnTy loc iden ) (\_ -> throwError $ annotateError loc (ENotAFun iden))
+  catchError (getGlobalEntry loc iden ) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-  GFun constArgs args retty -> return (constArgs, args, retty)
-  ge -> throwError $ annotateError loc (ENotFoundFun iden (fmap forgetSemAnn ge))
+  SemAnn entryLoc (GFun constArgs args retty) -> return (constArgs, args, retty, entryLoc)
+  SemAnn {} -> throwError $ annotateError loc (EFunctionNotFound iden)
 
 -- | Add new *local* constant generic parameters.
 addLocalConstants :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
@@ -377,7 +377,7 @@ getConstTy loc ident = do
       Just ty -> return ty  
       Nothing ->
         -- If not found, then check the globals
-        catchError (getGlobalGEnTy loc ident)
+        catchError (getGlobalEntry loc ident)
             (\errorGlobal ->
                 -- | We have not found a global object with the name |ident|
                 case semError errorGlobal of {
@@ -396,17 +396,17 @@ getConstTy loc ident = do
                 }
               ) >>= (\case {
                         -- | It is a global constant!
-                        GGlob (SConst ts)  -> return ts;
+                        SemAnn _ (GGlob (SConst ts))  -> return ts;
                         -- | It is a global object, but not a constant.
                         _ -> throwError $ annotateError loc (ENotConstant ident);
         });
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
-getGlobalGEnTy :: Locations -> Identifier -> SemanticMonad (GEntry SemanticAnns)
-getGlobalGEnTy loc ident =
+getGlobalEntry :: Locations -> Identifier -> SemanticMonad (SAnns (GEntry SemanticAnns))
+getGlobalEntry loc ident =
   gets global
   -- | Get local variables map and check if |ident| is a member of that map
-  >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) (return . ty_ann) . M.lookup ident
+  >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
 getLHSVarTy, getRHSVarTy, getGlobalVarTy ::
@@ -423,7 +423,7 @@ getLHSVarTy loc ident =
           catchError (getConstTy loc ident)
           (\errorRO ->
             case semError errorRO of {
-              ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
+              ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
                     ENotNamedGlobal errvar ->
@@ -434,7 +434,7 @@ getLHSVarTy loc ident =
                     _  -> throwError errorGlobal;
                   }
                 ) >>= (\case{
-                        GGlob _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        SemAnn _ (GGlob _) -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                         _ -> throwError $ annotateError loc (ENotNamedObject ident);
                       });
               _ -> throwError errorRO;
@@ -453,7 +453,7 @@ getRHSVarTy loc ident =
           catchError (getConstTy loc ident >>= (\ts -> return (ConstKind, ts)))
           (\errorRO ->
             case semError errorRO of {
-              ENotNamedObject _ -> catchError (getGlobalGEnTy loc ident)
+              ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
                     ENotNamedGlobal errvar ->
@@ -464,7 +464,7 @@ getRHSVarTy loc ident =
                     _  -> throwError errorGlobal;
                   }
                 ) >>= (\case{
-                        GGlob _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        SemAnn _ (GGlob _) -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                         _ -> throwError $ annotateError loc (ENotNamedObject ident);
                       });
               _ -> throwError errorRO;
@@ -473,7 +473,7 @@ getRHSVarTy loc ident =
         _  -> throwError errorLocal;
       })
 getGlobalVarTy loc ident =
-  catchError (getGlobalGEnTy loc ident)
+  catchError (getGlobalEntry loc ident)
              (\errorGlobal ->
                 case semError errorGlobal of {
                   ENotNamedGlobal errvar ->
@@ -484,7 +484,7 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        GGlob (SResource ts)  -> return (GlobalKind, ts);
+                        SemAnn _ (GGlob (SResource ts))  -> return (GlobalKind, ts);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 

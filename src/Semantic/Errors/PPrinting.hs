@@ -396,24 +396,48 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined as follows:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureConstParamMismatch paramId expectedTy actualTy ->
-        let title = "error[E023]: const parameter type mismatch."
+    EProcedureConstParamMismatch (ifaceId, procId, ConstParameter (Parameter paramId expectedTy), Position procPos) actualTy ->
+        let title = "error[E023]: const parameter type mismatch in procedure definition."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Const parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
-                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-    EProcedureParamMismatch paramId expectedTy actualTy ->
-        let title = "error[E024]: parameter type mismatch."
+                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines 
+                    ("The procedure \x1b[31m" <> T.pack procId <> 
+                     "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
+                     "\x1b[0m is defined as follows:") 
+                    procFileName
+                procLineNumber procLineColumn 1
+                Nothing
+    EProcedureParamMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
+        let title = "error[E024]: parameter type mismatch in procedure definition."
+            procFileName = sourceName procPos
+            procLineNumber = sourceLine procPos
+            procLineColumn = sourceColumn procPos
+            procSourceLines = toModuleAST M.! procFileName
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
-                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            printSimpleError 
+                procSourceLines 
+                    ("The procedure \x1b[31m" <> T.pack procId <> 
+                     "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
+                     "\x1b[0m is defined as follows:") 
+                    procFileName
+                procLineNumber procLineColumn 1
+                Nothing
     EIfElseIfCondNotBool ts ->
         let title = "error[E025]: if-else-if condition not boolean."
         in

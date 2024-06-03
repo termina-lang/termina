@@ -51,7 +51,7 @@ type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 -- This function performs the following operations:
 -- - It types the expressions that make up the call argument list of a function.
 -- - It checks that the type of each of the arguments matches the type set in the function definition.
-typeArguments ::
+{--typeArguments ::
   -- | Annotation of the function call
   Parser.Annotation
   -- | List of parameters
@@ -64,7 +64,7 @@ typeArguments ann (p : ps) (a : as) =
   typeExpression (Just (paramTypeSpecifier p)) typeRHSObject a
   >>= \tyed_exp -> (tyed_exp :) <$> typeArguments ann ps as
 typeArguments ann (_p : _) [] = throwError $ annotateError ann EFunParams
-typeArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams
+typeArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams 
 
 typeConstArguments ::
   -- | Annotation of the function call
@@ -78,9 +78,8 @@ typeConstArguments _ann [] [] = return []
 typeConstArguments ann (p : ps) (a : as) =
   typeConstExpression (paramTypeSpecifier $ unConstParam p) a
   >>= \tyed_exp -> (tyed_exp :) <$> typeConstArguments ann ps as
-
 typeConstArguments ann (_p : _) [] = throwError $ annotateError ann EFunParams
-typeConstArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams
+typeConstArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams --}
 
 getMemberFieldType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
 getMemberFieldType ann obj_ty ident =
@@ -227,8 +226,7 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
               typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
               typed_constArgs <- zipWithM (\p e -> do
                   typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
-              fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
-              return ((cps, typed_constArgs), (ps, typed_args), fty)
+              return ((cps, typed_constArgs), (ps, typed_args), Unit)
          ;
          -- Other User defined types do not define methods
          ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
@@ -495,13 +493,21 @@ typeExpression expectedType objType (ReferenceExpression refKind rhs_e pann) = d
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
 ---------------------------------------
 -- | Function Expression.  A tradicional function call
-typeExpression expectedType _ (FunctionCall fun_name constArgs args pann) = do
-  (constParams, params, retty) <- getFunctionTy pann fun_name
-  let expAnn = buildExpAnnApp pann constParams params retty
-  typed_constArgs <- typeConstArguments pann constParams constArgs
-  typed_args <- typeArguments pann params args
-  maybe (return ()) (sameOrErr pann retty) expectedType
-  return $ SAST.FunctionCall fun_name typed_constArgs typed_args expAnn
+typeExpression expectedType _ (FunctionCall ident constArgs args ann) = do
+  (cps, ps, retty, funcLocation) <- getFunctionTy ann ident
+  let expAnn = buildExpAnnApp ann cps ps retty
+      (psLen , asLen) = (length ps, length args)
+      (cpsLen, casLen) = (length cps, length constArgs)
+  -- Check that the number of parameters are OK
+  when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
+  when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
+  when (cpsLen < casLen) (throwError $ annotateError ann (EFunctionCallExtraConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
+  when (cpsLen > casLen) (throwError $ annotateError ann (EFunctionCallMissingConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
+  typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
+  typed_constArgs <- zipWithM (\p e -> do
+      typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
+  maybe (return ()) (sameOrErr ann retty) expectedType
+  return $ SAST.FunctionCall ident typed_constArgs typed_args expAnn
 
 ----------------------------------------
 typeExpression expectedType objType (MemberFunctionCall obj ident constArgs args ann) = do
@@ -646,44 +652,44 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid add
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalGEnTy loc sid >>=
+    getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
       SinkPort _ _  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
-          GGlob (SEmitter ets) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets)
+          SemAnn _ (GGlob (SEmitter ets)) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets)
           _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
       InPort _ _  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
-          GGlob (SChannel cts) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts)
+          SemAnn _ (GGlob (SChannel cts)) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EInboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalGEnTy loc sid >>=
+    getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
       OutPort _ ->
         case gentry of
           -- TODO: Check that the type of the outbound port and the type of the channel match
-          GGlob (SChannel cts) -> return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
+          SemAnn _ (GGlob (SChannel cts)) -> return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EOutboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalGEnTy loc sid >>=
+    getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
       AccessPort (Allocator {}) ->
         case gentry of
           -- TODO: Check that the types match
-          GGlob (SResource (Pool {})) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildStmtAnn pann)
+          SemAnn _ (GGlob (SResource (Pool {}))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildStmtAnn pann)
           _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
       AccessPort (DefinedType iface) ->
         getGlobalTypeDef loc iface >>=
@@ -691,7 +697,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
             Interface _ members _ ->
               -- Check that the resource provides the interface
               case gentry of
-                GGlob (SResource rts@(DefinedType {})) ->
+                SemAnn _ (GGlob (SResource rts@(DefinedType {}))) ->
                   let procs = [SemanProcedure procid | (InterfaceProcedure procid _ _ _) <- members] in
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
@@ -860,10 +866,10 @@ typeStatement (MatchStmt matchE cases ann) = do
       typeMatchCase :: MatchCase Parser.Annotation -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnns)
       typeMatchCase c (EnumVariant vId vData) = typeMatchCase' c vId vData
         where
-          typeMatchCase' (MatchCase cIdent bVars bd ann) supIdent tVars
+          typeMatchCase' (MatchCase cIdent bVars bd mcann) supIdent tVars
             | cIdent == supIdent =
               if length bVars == length tVars then
-              flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs ann (zip bVars tVars) (typeBlock bd)
+              flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock bd)
               else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
             | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
 
@@ -1051,18 +1057,12 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       when (cpsLen > cpsLen') (throwError $ annotateError ann (EProcedureMissingConstParams (ifaceId, prcId, cps, location pann) (fromIntegral cpsLen')))
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
-      zipWithM_ (checkProcedureConstParam ann) cps cps'
-      zipWithM_ (checkProcedureParam ann) ps ps'
+      zipWithM_ (\cp@(ConstParameter (Parameter _ ts)) (ConstParameter (Parameter _ ts')) ->
+        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureConstParamMismatch (ifaceId, prcId, cp, location pann) ts'))) cps cps'
+      zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
+        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
-
-    checkProcedureConstParam :: Locations -> ConstParameter -> ConstParameter -> SemanticMonad ()
-    checkProcedureConstParam ann (ConstParameter (Parameter _ ts)) (ConstParameter (Parameter ident ts')) =
-      unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureConstParamMismatch ident ts ts'))
-    
-    checkProcedureParam :: Locations -> Parameter -> Parameter -> SemanticMonad ()
-    checkProcedureParam ann (Parameter _ ts) (Parameter ident ts') =
-      unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamMismatch ident ts ts'))
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
   
