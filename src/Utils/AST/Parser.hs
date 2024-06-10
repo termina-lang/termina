@@ -57,17 +57,19 @@ objIsSelf _ = False
 -- the same name. We do not need to insepect 'self->f()', but I am afraid of
 -- breaking something else.
 
-selfInv :: Expression a -> (Object a -> Bool) -> Maybe Identifier
+selfInv :: Expression a -> (Object a -> Bool) -> [Identifier]
 selfInv (MemberFunctionCall obj mident _args _ann) isSelf =
-  if isSelf obj then Just mident else Nothing
+  [mident | isSelf obj]
 selfInv (DerefMemberFunctionCall obj mident _args _ann) isSelf =
-  if isSelf obj then Just mident else Nothing
-selfInv _ _isSelf = Nothing
+  [mident | isSelf obj]
+selfInv (BinOp _ left right _ann) isSelf =
+  selfInv left isSelf ++ selfInv right isSelf
+selfInv _ _isSelf = []
 
 selfInvStmt :: (Object a -> Bool) -> Statement a -> [Identifier]
 selfInvStmt isSelf = selfInvStmt'
  where
-    isSelfExpression e = maybeToList (selfInv e isSelf)
+    isSelfExpression e = selfInv e isSelf
     -- selfInvStmt' :: Statement' (Expression' obj) obj a -> [Identifier]
     selfInvStmt' (Declaration _vident _accK _type e _ann) = isSelfExpression e
     selfInvStmt' (AssignmentStmt _obj e _ann) = isSelfExpression e
@@ -94,7 +96,7 @@ selfInvBlock :: (Object a -> Bool) -> Block a -> [Identifier]
 selfInvBlock isSelf = concatMap (selfInvStmt isSelf)
 
 selfInvRetStmt :: (Object a -> Bool) -> ReturnStmt a -> [Identifier]
-selfInvRetStmt isSelf = maybe [] ( maybeToList . (`selfInv` isSelf)) . returnExpression
+selfInvRetStmt isSelf = maybe [] (`selfInv` isSelf) . returnExpression
 
 selfInvBlockRet :: (Object a -> Bool) -> BlockRet a -> [Identifier]
 selfInvBlockRet isSelf bret
