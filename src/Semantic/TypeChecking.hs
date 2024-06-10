@@ -34,7 +34,7 @@ import           Semantic.Monad
 ----------------------------------------
 -- Libaries and stuff
 
-import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\), sort)
+import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
@@ -183,10 +183,9 @@ typeMemberFunctionCall ::
   Parser.Annotation
   -> TypeSpecifier
   -> Identifier
-  -> [ConstExpression Parser.Annotation]
   -> [Expression Parser.Annotation]
-  -> SemanticMonad (([ConstParameter], [SAST.ConstExpression SemanticAnns]), ([Parameter], [SAST.Expression SemanticAnns]), TypeSpecifier)
-typeMemberFunctionCall ann obj_ty ident constArgs args =
+  -> SemanticMonad (([Parameter], [SAST.Expression SemanticAnns]), TypeSpecifier)
+typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
     DefinedType dident -> getGlobalTypeDef ann dident >>=
@@ -197,18 +196,14 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
             Just _ -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
             Nothing ->
               case findClassViewerOrMethod ident cls of
-                Just (cps, ps, _, anns) -> do
+                Just (ps, _, anns) -> do
                   let (psLen , asLen ) = (length ps, length args)
-                      (cpsLen, casLen) = (length cps, length constArgs)
                   -- Check that the number of parameters are OK
-                  when (cpsLen < casLen) (throwError $ annotateError ann EMemberMethodExtraConstParams)
-                  when (cpsLen > casLen) (throwError $ annotateError ann EMemberMethodMissingConstParams)
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
                   typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
-                  typed_constArgs <- zipWithM (\p e -> do typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
                   fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
-                  return ((cps, typed_constArgs), (ps, typed_args), fty)
+                  return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
           ;
         -- Other User defined types do not define methods
@@ -219,14 +214,12 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
          Interface _identTy cls _mods ->
          case findInterfaceProcedure ident cls of
            Nothing -> throwError $ annotateError ann (EMemberAccessNotProcedure ident)
-           Just (cps, ps, anns) -> do
+           Just (ps, anns) -> do
               let (psLen , asLen) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
               typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
-              typed_constArgs <- zipWithM (\p e -> do
-                  typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
-              return ((cps, typed_constArgs), (ps, typed_args), Unit)
+              return ((ps, typed_args), Unit)
          ;
          -- Other User defined types do not define methods
          ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
@@ -237,7 +230,7 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
           case args of
             [refM] -> do
               typed_ref <- typeExpression (Just (Reference Mutable (Option (DynamicSubtype ty_pool))) ) typeRHSObject refM
-              return (([], []), ([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_ref]), Unit)
+              return (([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_ref]), Unit)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
         "free" ->
           case args of
@@ -247,7 +240,7 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
               case element_type of
                   (DynamicSubtype tyref) ->
                       unless (groundTyEq ty_pool tyref) (throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)) >>
-                      return (([], []), ([Parameter "element" element_type], [element_typed]), Unit)
+                      return (([Parameter "element" element_type], [element_typed]), Unit)
                   _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
         _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
@@ -262,7 +255,7 @@ typeMemberFunctionCall ann obj_ty ident constArgs args =
               case element_typed of
                 (SAST.AccessObject (SAST.Variable {})) -> return ()
                 _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
-              return (([], []), ([Parameter "element" ty] , [element_typed]), Unit)
+              return (([Parameter "element" ty] , [element_typed]), Unit)
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
         _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
     ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
@@ -508,35 +501,30 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
 
 ---------------------------------------
 -- | Function Expression.  A tradicional function call
-typeExpression expectedType _ (FunctionCall ident constArgs args ann) = do
-  (cps, ps, retty, funcLocation) <- getFunctionTy ann ident
-  let expAnn = buildExpAnnApp ann cps ps retty
+typeExpression expectedType _ (FunctionCall ident args ann) = do
+  (ps, retty, funcLocation) <- getFunctionTy ann ident
+  let expAnn = buildExpAnnApp ann ps retty
       (psLen , asLen) = (length ps, length args)
-      (cpsLen, casLen) = (length cps, length constArgs)
   -- Check that the number of parameters are OK
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
-  when (cpsLen < casLen) (throwError $ annotateError ann (EFunctionCallExtraConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
-  when (cpsLen > casLen) (throwError $ annotateError ann (EFunctionCallMissingConstParams (ident, cps, funcLocation) (fromIntegral casLen)))
   typed_args <- zipWithM (\p e -> catchError 
       (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)
       (\err -> case semError err of
           EMismatch _ ty -> throwError $ annotateError ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation) ty)
           _ -> throwError err
       )) ps args
-  typed_constArgs <- zipWithM (\p e -> do
-      typeConstExpression (paramTypeSpecifier $ unConstParam p) e) cps constArgs
   maybe (return ()) (sameOrErr ann retty) expectedType
-  return $ SAST.FunctionCall ident typed_constArgs typed_args expAnn
+  return $ SAST.FunctionCall ident typed_args expAnn
 
 ----------------------------------------
-typeExpression expectedType typeObj (MemberFunctionCall obj ident constArgs args ann) = do
+typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
-  ((cps, typed_constArgs), (ps, typed_args), fty) <- typeMemberFunctionCall ann obj_ty ident constArgs args
+  ((ps, typed_args), fty) <- typeMemberFunctionCall ann obj_ty ident args
   maybe (return ()) (sameOrErr ann fty) expectedType
-  return $ SAST.MemberFunctionCall obj_typed ident typed_constArgs typed_args (buildExpAnnApp ann cps ps fty)
-typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident constArgs args ann) = do
+  return $ SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
+typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   case obj_ty of
@@ -545,9 +533,9 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident constArgs
       -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
-      ((cps, typed_constArgs), (ps, typed_args), fty) <- typeMemberFunctionCall ann refTy ident constArgs args
+      ((ps, typed_args), fty) <- typeMemberFunctionCall ann refTy ident args
       maybe (return ()) (sameOrErr ann fty) expectedType
-      return $ SAST.DerefMemberFunctionCall obj_typed ident typed_constArgs typed_args (buildExpAnnApp ann cps ps fty)
+      return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
 ----------------------------------------
 typeExpression expectedType typeObj (FieldAssignmentsExpression id_ty fs pann) =
@@ -718,7 +706,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
               -- Check that the resource provides the interface
               case gentry of
                 SemAnn _ (GGlob (SResource rts@(DefinedType {}))) ->
-                  let procs = [SemanProcedure procid | (InterfaceProcedure procid _ _ _) <- members] in
+                  let procs = [SemanProcedure procid | (InterfaceProcedure procid _ _) <- members] in
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
               ;
@@ -962,11 +950,6 @@ checkParameterType anns p =
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
     checkTypeSpecifier anns typeSpec
 
-checkConstParameterType :: Locations -> ConstParameter -> SemanticMonad ()
-checkConstParameterType anns (ConstParameter p) =
-    let typeSpec = paramTypeSpecifier p in
-    unless (numTy typeSpec) (throwError (annotateError anns (EConstParameterNotNum p)))
-
 checkReturnType :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkReturnType anns ty =
   unless (parameterTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
@@ -974,21 +957,18 @@ checkReturnType anns ty =
 
 -- Here we actually only need Global
 programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnns)
-programSeman (Function ident cps ps mty bret mods anns) =
+programSeman (Function ident ps mty bret mods anns) =
   ----------------------------------------
   -- Check the return type 
   maybe (return ()) (checkReturnType anns) mty >>
-  -- Check generic const parameters
-  forM_ cps (checkConstParameterType anns) >>
-  addLocalConstants anns
-      (fmap (\(ConstParameter p) -> (paramIdentifier p , paramTypeSpecifier p)) cps) checkFunction
+  checkFunction
 
   where
     checkFunction :: SemanticMonad (SAST.AnnASTElement SemanticAnns)
     checkFunction =
           -- Check regular params
         forM_ ps (checkParameterType anns) >>
-          Function ident cps ps mty
+          Function ident ps mty
             <$> (addLocalImmutObjs anns
                   (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
                   (typeBlockRet mty bret) >>= \ typed_bret ->
@@ -999,7 +979,7 @@ programSeman (Function ident cps ps mty bret mods anns) =
                     blockRetTy
                     mty typed_bret >> return typed_bret)
             <*> pure mods
-            <*> pure (buildGlobal anns (GFun cps ps (fromMaybe Unit mty)))
+            <*> pure (buildGlobal anns (GFun ps (fromMaybe Unit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> typeGlobal gbl
@@ -1052,10 +1032,10 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       Interface _ iface_prcs _ -> return $ map (, ifaceId) iface_prcs : acc;
       _ -> throwError $ annotateError anns (EMismatchIdNotInterface ifaceId)
     }) [] provides
-  let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _ _, _) -> ifaceId) providedProcedures
+  let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _, _) -> ifaceId) providedProcedures
   let sorted_prcs = Data.List.sortOn (
         \case {
-          (ClassProcedure prcId _ _ _ _) -> prcId;
+          (ClassProcedure prcId _ _ _) -> prcId;
           _ -> error "internal error: checkClassKind"
         }) prcs
   -- Check that all procedures are provided and that the parameters match
@@ -1065,20 +1045,14 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
 
     checkSortedProcedures :: [(InterfaceMember SemanticAnns, Identifier)] -> [ClassMember Locations] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
-    checkSortedProcedures [] ((ClassProcedure prcId _ _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
-    checkSortedProcedures ((InterfaceProcedure procId _ _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
-    checkSortedProcedures ((InterfaceProcedure prcId cps ps pann, ifaceId):ds) ((ClassProcedure prcId' cps' ps' _ ann):as) =
+    checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
+    checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
+    checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId):ds) ((ClassProcedure prcId' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
-      let cpsLen = length cps
-          cpsLen' = length cps'
-          psLen = length ps
+      let psLen = length ps
           psLen' = length ps'
-      when (cpsLen < cpsLen') (throwError $ annotateError ann (EProcedureExtraConstParams (ifaceId, prcId, cps, location pann) (fromIntegral cpsLen')))
-      when (cpsLen > cpsLen') (throwError $ annotateError ann (EProcedureMissingConstParams (ifaceId, prcId, cps, location pann) (fromIntegral cpsLen')))
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
-      zipWithM_ (\cp@(ConstParameter (Parameter _ ts)) (ConstParameter (Parameter _ ts')) ->
-        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureConstParamMismatch (ifaceId, prcId, cp, location pann) ts'))) cps cps'
       zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
         unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
@@ -1115,7 +1089,7 @@ typeTypeDefinition ann (Interface ident cls mds) = do
   -- Check that the interface is not empty
   when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
   -- Check procedure names are unique
-  checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ _ -> ifaceId) cls)
+  checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) cls)
   -- Check that every procedure is well-defined
   procedures <- mapM typeInterfaceProcedure cls
   -- If everything is fine, return the same definition.
@@ -1124,9 +1098,9 @@ typeTypeDefinition ann (Interface ident cls mds) = do
   where 
 
     typeInterfaceProcedure :: InterfaceMember Locations -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
-    typeInterfaceProcedure (InterfaceProcedure procId cps ps annIP) = do
+    typeInterfaceProcedure (InterfaceProcedure procId ps annIP) = do
       mapM_ (checkTypeSpecifier annIP . paramTypeSpecifier) ps
-      return $ InterfaceProcedure procId cps ps (buildExpAnn annIP Unit)
+      return $ InterfaceProcedure procId ps (buildExpAnn annIP Unit)
 
 typeTypeDefinition ann (Class kind ident members provides mds) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
@@ -1144,19 +1118,17 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               >> let checkFs = SAST.ClassField fld (buildExpAnn annCF fs_ty)
                 in return (checkFs : fs, prcs, mths, vws, acts)
           -- Procedures
-          prc@(ClassProcedure _fp_id cfp_tys fp_tys _body annCP)
-            -> mapM_ (checkTypeSpecifier annCP . paramTypeSpecifier . unConstParam) cfp_tys
-            >> mapM_ (checkTypeSpecifier annCP . paramTypeSpecifier) fp_tys
+          prc@(ClassProcedure _fp_id fp_tys _body annCP)
+            -> mapM_ (checkTypeSpecifier annCP . paramTypeSpecifier) fp_tys
             >> return (fs, prc : prcs, mths, vws, acts)
           -- Methods
           mth@(ClassMethod _fm_id mty _body annCM)
             -> maybe (return ()) (checkTypeSpecifier annCM) mty
             >> return (fs, prcs, mth : mths, vws, acts)
           -- Viewers
-          view@(ClassViewer _fv_id cfv_tys fv_tys mty _body annCV)
+          view@(ClassViewer _fv_id fv_tys mty _body annCV)
             -> checkTypeSpecifier annCV mty
             -- Parameters cannot have dyns inside.
-            >> mapM_ (checkConstParameterType annCV) cfv_tys
             >> mapM_ (checkParameterType annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)
@@ -1215,19 +1187,19 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             -- Filtered Cases
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
-            ClassProcedure mIdent mcps mps blk mann -> do
+            ClassProcedure mIdent mps blk mann -> do
               typed_blk <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlock blk)
-              let newPrc = SAST.ClassProcedure mIdent mcps mps typed_blk (buildExpAnn mann Unit)
+              let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
               typed_bret <- addLocalImmutObjs mann [("self", Reference Private (DefinedType ident))] (typeBlockRet mty mbody)
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
-            ClassViewer mIdent mcps mps ty mbody mann -> do
+            ClassViewer mIdent mps ty mbody mann -> do
               typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet (Just ty) mbody)
               blockRetTy ty typed_bret
-              let newVw = SAST.ClassViewer mIdent mcps mps ty typed_bret (buildExpAnn mann ty)
+              let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
               typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
@@ -1274,9 +1246,9 @@ checkUniqueNames ann err is =
 -- Adding Global elements to the environment.
 programAdd :: SAST.AnnASTElement SemanticAnns
   -> SemanticMonad (Identifier, SAnns (GEntry SemanticAnns))
-programAdd (Function ident constParams params mretType _bd _mods anns) =
+programAdd (Function ident params mretType _bd _mods anns) =
   let
-    gbl = GFun constParams params (fromMaybe Unit mretType)
+    gbl = GFun params (fromMaybe Unit mretType)
     el = location anns `SemAnn` gbl
   in
   insertGlobal ident el

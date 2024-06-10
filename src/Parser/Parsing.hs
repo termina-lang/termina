@@ -244,13 +244,6 @@ parameterParser = do
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
-constParameterParser :: Parser ConstParameter
-constParameterParser = do
-  reserved "const"
-  identifier <- parameterIdentifierParser
-  reservedOp ":"
-  ConstParameter . Parameter identifier <$> typeSpecifierParser
-
 -- | Parser for a field value assignments expression
 -- This expression is used to create annonymous structures to serve as right
 -- hand side of an assignment expression.
@@ -427,9 +420,8 @@ functionCallParser :: Parser (Expression Annotation)
 functionCallParser = do
   p <- getPosition
   ident <- identifierParser
-  constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
   params <- parens (sepBy (try expressionParser) comma)
-  return $ FunctionCall ident constParams params (Position p)
+  return $ FunctionCall ident params (Position p)
 
 optionVariantExprParser :: Parser (Expression Annotation)
 optionVariantExprParser =
@@ -631,22 +623,20 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       p <- getPosition
       _ <- reservedOp "->"
       member <- identifierParser
-      constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionCall obj member constParams) (Position p))  params
+          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionCall obj member) (Position p)) params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
       p <- getPosition
       _ <- reservedOp "."
       member <- identifierParser
-      constParams <- try (reserved "::" >> angles (sepBy constExprParser comma)) <|> return []
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionCall obj member constParams) (Position p)) params
+          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionCall obj member) (Position p)) params
         _ -> error "Unexpected member access to a non object"))
     dereferencePrefix
       = Ex.Prefix (do
@@ -688,13 +678,12 @@ functionParser = do
   reserved "function"
   p <- getPosition
   name <- identifierParser
-  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
   blockRet <- braces blockParser
-  return $ Function name constParams params typeSpec blockRet modifiers (Position p)
+  return $ Function name params typeSpec blockRet modifiers (Position p)
 
 constLiteralParser :: Parser Const
 constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
@@ -985,13 +974,12 @@ classProcedureParser = do
   reserved "procedure"
   p <- getPosition
   name <- identifierParser
-  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
   reservedOp "{"
   block <- many blockItemParser
   emptyReturn
   reservedOp "}"
-  return $ ClassProcedure name constParams params block (Position p)
+  return $ ClassProcedure name params block (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -1002,10 +990,9 @@ interfaceProcedureParser = do
   reserved "procedure"
   p <- getPosition
   name <- identifierParser
-  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens procedureParamsParser
   reservedOp ";"
-  return $ InterfaceProcedure name constParams params (Position p)
+  return $ InterfaceProcedure name params (Position p)
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -1016,11 +1003,10 @@ classViewerParser = do
   reserved "viewer"
   p <- getPosition
   name <- identifierParser
-  constParams <- try (angles (sepBy constParameterParser comma)) <|> return []
   params <- parens viewerParamsParser
   typeSpec <- reservedOp "->" >> typeSpecifierParser
   blockRet <- braces blockParser
-  return $ ClassViewer name constParams params typeSpec blockRet (Position p)
+  return $ ClassViewer name params typeSpec blockRet (Position p)
   where
     viewerParamsParser :: Parser [Parameter]
     viewerParamsParser =

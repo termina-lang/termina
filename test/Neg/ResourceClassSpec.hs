@@ -173,44 +173,6 @@ test9 = "interface TMChannelInterface {\n" ++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets<const N : usize>(&priv self, packets : &mut u32) {\n" ++
-        "    *packets = self->tm_sent_packets;\n" ++
-        "    return;\n" ++
-        "  }\n" ++
-        "  procedure send_packet(&priv self, input : u32) {\n" ++
-        "    return;\n" ++
-        "  }\n" ++
-        "\n" ++
-        "};\n"
-
-test10 :: String
-test10 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets<const N : usize>(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self, input : u32);\n" ++
-        "};\n" ++
-        "\n"++
-        "resource class TMChannel provides TMChannelInterface {\n" ++
-        "  tm_sent_packets : u32;\n" ++
-        "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
-        "    *packets = self->tm_sent_packets;\n" ++
-        "    return;\n" ++
-        "  }\n" ++
-        "  procedure send_packet(&priv self) {\n" ++
-        "    return;\n" ++
-        "  }\n" ++
-        "\n" ++
-        "};\n"
-
-test11 :: String
-test11 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self);\n" ++
-        "};\n" ++
-        "\n"++
-        "resource class TMChannel provides TMChannelInterface {\n" ++
-        "  tm_sent_packets : u32;\n" ++
-        "\n" ++
         "  procedure get_tm_sent_packets(&priv self, packets : &mut u16) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
@@ -260,16 +222,8 @@ spec = do
      runNegativeTest test8
        `shouldSatisfy`
         isEProcedureMissingParams
-    it "A procedure defines an extra const parameter" $ do
-     runNegativeTest test9
-       `shouldSatisfy`
-        isEProcedureExtraConstParams
-    it "A procedure has a missing const parameter" $ do
-     runNegativeTest test10
-       `shouldSatisfy`
-        isEProcedureMissingConstParams
     it "A procedure defines a parameter different from the one specified by the interface" $ do
-     runNegativeTest test11
+     runNegativeTest test9
        `shouldSatisfy`
         isEProcedureParamMismatch
     
@@ -302,12 +256,6 @@ spec = do
 
     isEProcedureMissingParams :: Maybe (Errors Annotation) -> Bool
     isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [Parameter "input" UInt32], Position _pos) 0) -> True; _ -> False
-
-    isEProcedureExtraConstParams :: Maybe (Errors Annotation) -> Bool
-    isEProcedureExtraConstParams = \case Just (EProcedureExtraConstParams ("TMChannelInterface", "get_tm_sent_packets", [], Position _pos) 1) -> True; _ -> False
-
-    isEProcedureMissingConstParams :: Maybe (Errors Annotation) -> Bool
-    isEProcedureMissingConstParams = \case Just (EProcedureMissingConstParams ("TMChannelInterface", "get_tm_sent_packets", [ConstParameter (Parameter "N" USize)], Position _pos) 0) -> True; _ -> False
 
     isEProcedureParamMismatch :: Maybe (Errors Annotation) -> Bool
     isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position _pos) (Reference Mutable UInt16)) -> True; _ -> False

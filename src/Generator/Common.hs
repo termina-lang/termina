@@ -142,12 +142,8 @@ getObjType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = re
 getObjType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getConstParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [ConstParameter]
-getConstParameters (FunctionCall _ _ _ (SemAnn _ (ETy (AppType constParams _ _)))) = return constParams
-getConstParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
-
 getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [Parameter]
-getParameters (FunctionCall _ _ _ (SemAnn _ (ETy (AppType _ params _)))) = return params
+getParameters (FunctionCall _ _ (SemAnn _ (ETy (AppType params _)))) = return params
 getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m TypeSpecifier
@@ -157,8 +153,8 @@ getExprType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = retur
 getExprType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (ReferenceExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (FunctionCall _ _ _ (SemAnn _ (ETy (AppType _ _ ts)))) = return $ ts
-getExprType (MemberFunctionCall _ _ _ _ (SemAnn _ (ETy (AppType _ _ ts)))) = return $ ts
+getExprType (FunctionCall _ _ (SemAnn _ (ETy (AppType _ ts)))) = return $ ts
+getExprType (MemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return $ ts
 getExprType (FieldAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
 getExprType (ArrayInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts

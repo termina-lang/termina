@@ -21,10 +21,10 @@ data Expression'
   | ReferenceExpression AccessKind (obj a) a
   | Casting (Expression' obj a) TypeSpecifier a
   -- Invocation expressions
-  | FunctionCall Identifier [ConstExpression a] [ Expression' obj a ] a
-  | MemberFunctionCall (obj a) Identifier [ConstExpression a] [Expression' obj a] a
+  | FunctionCall Identifier [ Expression' obj a ] a
+  | MemberFunctionCall (obj a) Identifier [Expression' obj a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | DerefMemberFunctionCall (obj a) Identifier [ConstExpression a] [Expression' obj a] a
+  | DerefMemberFunctionCall (obj a) Identifier [Expression' obj a] a
   -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
@@ -94,13 +94,13 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (BinOp _ _ _ a)                          = a
   getAnnotation (ReferenceExpression _ _ a)              = a
   getAnnotation (Casting _ _ a)                          = a
-  getAnnotation (FunctionCall _ _ _ a)             = a
+  getAnnotation (FunctionCall _ _ a)             = a
   getAnnotation (FieldAssignmentsExpression _ _ a)       = a
   getAnnotation (EnumVariantExpression _ _ _ a)          = a
   getAnnotation (ArrayInitExpression _ _ a)              = a
   getAnnotation (OptionVariantExpression _ a)            = a
-  getAnnotation (MemberFunctionCall _ _ _ _ a)         = a
-  getAnnotation (DerefMemberFunctionCall _ _ _ _ a)    = a
+  getAnnotation (MemberFunctionCall _ _ _ a)         = a
+  getAnnotation (DerefMemberFunctionCall _ _ _ a)    = a
   getAnnotation (IsEnumVariantExpression _ _ _ a)        = a
   getAnnotation (IsOptionVariantExpression _ _ a)        = a
   getAnnotation (ArraySliceExpression _ _ _ a)           = a

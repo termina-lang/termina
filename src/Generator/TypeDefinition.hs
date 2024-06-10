@@ -12,7 +12,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.Reader
 import Parser.Parsing
-import Utils.AST.Core
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case
@@ -231,8 +230,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnns -> CHeaderGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure constParams params ann') = do
-            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
+        genInterfaceProcedureField (InterfaceProcedure procedure params ann') = do
             cParams <- mapM (genParameterDeclaration ann') params
             let cAnn = buildDeclarationAnn ann' False
                 cThisParam = CDeclaration [CTypeSpec CVoidType]
@@ -240,7 +238,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
                     (buildDeclarationAnn ann False)
             return $ CDeclaration [CTypeSpec CVoidType]
                 [(Just (CDeclarator (Just procedure)
-                    [CPtrDeclr [] cAnn, CFunDeclr (cThisParam : (cConstParams ++ cParams)) [] (buildGenericAnn ann')] []
+                    [CPtrDeclr [] cAnn, CFunDeclr (cThisParam : cParams) [] (buildGenericAnn ann')] []
                     (buildGenericAnn ann')), Nothing, Nothing)]
                 cAnn
 genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
@@ -282,24 +280,22 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
         genClassFunctionDeclaration :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
-        genClassFunctionDeclaration (ClassViewer viewer constParams params rts _ ann') = do
+        genClassFunctionDeclaration (ClassViewer viewer params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier viewer
             return $ CDeclaration retTypeDecl
-                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : (cConstParams ++ cParams)) [] cAnn] [] cAnn), Nothing, Nothing)]
+                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : cParams) [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassProcedure procedure constParams params _ ann') = do
+        genClassFunctionDeclaration (ClassProcedure procedure params _ ann') = do
             let cAnn = buildGenericAnn ann'
             cThisParam <- genThisParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann' . unConstParam) constParams
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier procedure
             return $ CDeclaration [CTypeSpec CVoidType]
-                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : (cConstParams ++ cParams)) [] cAnn] [] cAnn), Nothing, Nothing)]
+                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassMethod method rts _ ann') = do
             let cAnn = buildGenericAnn ann'
@@ -329,11 +325,10 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
     where
 
         genClassFunctionDefinition :: ClassMember SemanticAnns -> CSourceGenerator CExternalDeclaration
-        genClassFunctionDefinition (ClassViewer viewer constParameters parameters rts (BlockRet body ret) ann) = do
+        genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
             retTypeDecl <- genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
@@ -341,13 +336,12 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
-                (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : (cParams ++ cConstParams)) [] cAnn] [] cAnn)
+                (CDeclarator (Just clsFuncName) [CFunDeclr (cSelfParam : cParams) [] cAnn] [] cAnn)
                 (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassProcedure procedure constParameters parameters body ann) = do
+        genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam clsdef
-            cConstParams <- mapM (genParameterDeclaration ann . unConstParam) constParameters
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             let cAnn = buildGenericAnn ann
@@ -357,7 +351,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
-                (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : (cConstParams ++ cParams)) [] cAnn] [] cAnn)
+                (CDeclarator (Just clsFuncName) [CFunDeclr (cThisParam : cParams) [] cAnn] [] cAnn)
                 (CCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True)
 

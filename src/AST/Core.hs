@@ -47,15 +47,11 @@ data BlockRet' expr obj a
   }
   deriving (Show, Functor)
 
-newtype ConstParameter = ConstParameter Parameter
-  deriving (Show)
-
 -- | Annotated AST element
 data AnnASTElement' expr obj a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
-    [ConstParameter] -- ^ list of constant parameters (possibly empty)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
     (BlockRet' expr obj a) -- ^ statements block (with return)
@@ -73,7 +69,7 @@ data AnnASTElement' expr obj a =
   deriving (Show,Functor)
 
 instance Annotated (AnnASTElement' expr glb) where
-  getAnnotation (Function _ _ _ _ _ _ a) = a
+  getAnnotation (Function _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
@@ -254,7 +250,6 @@ data InterfaceMember a
     -- | Procedure
     InterfaceProcedure
       Identifier -- ^ name of the procedure
-      [ConstParameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       a
   deriving (Show, Functor)
@@ -279,13 +274,11 @@ data ClassMember' expr obj a
     -- of statements. They do not return any value.
     | ClassProcedure
       Identifier -- ^ name of the procedure
-      [ConstParameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       (Block' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the viewer
-      [ConstParameter] -- ^ list of constant parameters (possibly empty)
       [Parameter] -- ^ list of parameters (possibly empty)
       TypeSpecifier -- ^ return type of the viewer
       (BlockRet' expr obj a) -- ^ statements block (with return) a

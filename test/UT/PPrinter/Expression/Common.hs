@@ -120,5 +120,5 @@ poolSemAnn ts = objSemAnn Mutable (AccessPort (Allocator ts))
 msgQueueSemAnn :: TypeSpecifier -> SemanticAnns
 msgQueueSemAnn ts = objSemAnn Mutable (OutPort ts)
 
-funSemAnn :: [ConstParameter] -> [Parameter] -> TypeSpecifier -> SemanticAnns
-funSemAnn constParams params ts = SemAnn Internal (ETy (AppType constParams params ts))
+funSemAnn :: [Parameter] -> TypeSpecifier -> SemanticAnns
+funSemAnn params ts = SemAnn Internal (ETy (AppType params ts))

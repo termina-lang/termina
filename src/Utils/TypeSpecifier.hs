@@ -3,7 +3,6 @@
 module Utils.TypeSpecifier where
 
 import           AST.Parser
-import GHC.Generics (UInt)
 
 -- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
 primitiveTypes :: TypeSpecifier -> Bool

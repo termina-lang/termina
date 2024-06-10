@@ -1,6 +1,4 @@
 {-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE TupleSections #-}
-
 
 -- | Semantic Monad.
 -- Here lives the monad we use to handle semantic pass effects.
@@ -54,7 +52,7 @@ instance Annotated SAnns where
 data ESeman
   = SimpleType TypeSpecifier
   | ObjectType AccessKind TypeSpecifier
-  | AppType [ConstParameter] [Parameter] TypeSpecifier
+  | AppType [Parameter] TypeSpecifier
   deriving Show
 
 newtype SemanProcedure = SemanProcedure Identifier
@@ -100,15 +98,15 @@ getEType (ETy t) = Just t
 getEType _ = Nothing
 
 getResultingType :: SemanticElems -> Maybe TypeSpecifier
-getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ _ t -> t})
+getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ t -> t})
 getResultingType _        = Nothing
 
 getObjectSAnns :: SemanticAnns -> Maybe (AccessKind, TypeSpecifier)
 getObjectSAnns (SemAnn _ (ETy (ObjectType ak ty))) = Just (ak, ty)
 getObjectSAnns _                                   = Nothing
 
-getArgumentsType :: SemanticElems -> Maybe ([ConstParameter], [Parameter])
-getArgumentsType (ETy (AppType pts ts _)) = Just (pts, ts)
+getArgumentsType :: SemanticElems -> Maybe [Parameter]
+getArgumentsType (ETy (AppType ts _)) = Just ts
 getArgumentsType _                    = Nothing
 
 isResultFromApp :: SemanticElems -> Bool
@@ -125,8 +123,8 @@ buildExpAnn loc = SemAnn loc . ETy . SimpleType
 buildExpAnnObj :: Locations -> AccessKind -> TypeSpecifier -> SAnns SemanticElems
 buildExpAnnObj loc ak = SemAnn loc . ETy . ObjectType ak
 
-buildExpAnnApp :: Locations -> [ConstParameter] -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnnApp loc ctys tys = SemAnn loc . ETy . AppType ctys tys
+buildExpAnnApp :: Locations -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
+buildExpAnnApp loc tys = SemAnn loc . ETy . AppType tys
 
 buildGlobalAnn :: Locations -> SemGlobal -> SAnns SemanticElems
 buildGlobalAnn loc = SemAnn loc . GTy . GGlob
@@ -164,7 +162,7 @@ getTypeSAnns  = getResultingType . ty_ann
 undynExpType :: ESeman -> ESeman
 undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
 undynExpType (ObjectType ak (DynamicSubtype ty)) = ObjectType ak ty
-undynExpType (AppType cts ts (DynamicSubtype ty)) = AppType cts ts ty
+undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
 undynExpType _ = error "impossible 888+1"
 
 undynTypeAnn :: SemanticAnns -> SemanticAnns
@@ -214,8 +212,8 @@ initGlb =
    ("SystemInit", internalErrorSeman `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
    ("system_init", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
    ("PeriodicTimer", internalErrorSeman `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn internalErrorSeman (DefinedType "TimeVal"))] [] [])),
-   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [] [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
-   ("delay_in",internalErrorSeman `SemAnn` GFun [] [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
+   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
+   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
   -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
   --  ("Result", GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" [UInt32]] [])),
   --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
@@ -281,11 +279,11 @@ getGlobalEnumTy loc tid  = getGlobalTypeDef loc tid  >>= \case
   Enum _ fs _mods -> return fs
   ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
 
-getFunctionTy :: Locations -> Identifier -> SemanticMonad ([ConstParameter], [Parameter],TypeSpecifier, Locations)
+getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier, Locations)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden ) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-  SemAnn entryLoc (GFun constArgs args retty) -> return (constArgs, args, retty, entryLoc)
+  SemAnn entryLoc (GFun args retty) -> return (args, retty, entryLoc)
   SemAnn {} -> throwError $ annotateError loc (EFunctionNotFound iden)
 
 -- | Add new *local* constant generic parameters.
@@ -338,9 +336,9 @@ insertGlobalTy loc tydef =
  where
    type_name = identifierType tydef
 
-insertGlobalFun :: Locations -> Identifier -> [ConstParameter] -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
-insertGlobalFun loc ident cps ps rettype =
-  insertGlobal ident (loc `SemAnn` GFun cps ps rettype) (EUsedFunName ident)
+insertGlobalFun :: Locations -> Identifier -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
+insertGlobalFun loc ident ps rettype =
+  insertGlobal ident (loc `SemAnn` GFun ps rettype) (EUsedFunName ident)
 
 insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Locations -> Errors Locations) -> SemanticMonad ()
 insertGlobal ident entry err =

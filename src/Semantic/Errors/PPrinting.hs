@@ -360,65 +360,8 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureExtraConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E021]: extra const parameters in procedure definition."
-            procFileName = sourceName procPos
-            procLineNumber = sourceLine procPos
-            procLineColumn = sourceColumn procPos
-            procSourceLines = toModuleAST M.! procFileName
-        in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn 1
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
-                    "\x1b[0m const parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
-                procSourceLines "The interface of the procedure is defined here:" procFileName
-                procLineNumber procLineColumn 1
-                Nothing
-    EProcedureMissingConstParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E022]: missing const parameters in procedure definition."
-            procFileName = sourceName procPos
-            procLineNumber = sourceLine procPos
-            procLineColumn = sourceColumn procPos
-            procSourceLines = toModuleAST M.! procFileName
-        in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn 1
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
-                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
-                    "\x1b[0m const parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
-                procSourceLines "The interface of the procedure is defined here:" procFileName
-                procLineNumber procLineColumn 1
-                Nothing
-    EProcedureConstParamMismatch (ifaceId, procId, ConstParameter (Parameter paramId expectedTy), Position procPos) actualTy ->
-        let title = "error[E023]: const parameter type mismatch in procedure definition."
-            procFileName = sourceName procPos
-            procLineNumber = sourceLine procPos
-            procLineColumn = sourceColumn procPos
-            procSourceLines = toModuleAST M.! procFileName
-        in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn 1
-                (Just ("Const parameter \x1b[31m" <> T.pack paramId <> 
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
-                    "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
-            printSimpleError 
-                procSourceLines 
-                    ("The procedure \x1b[31m" <> T.pack procId <> 
-                     "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
-                     "\x1b[0m is defined here:") 
-                    procFileName
-                procLineNumber procLineColumn 1
-                Nothing
     EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
-        let title = "error[E024]: parameter type mismatch in procedure definition."
+        let title = "error[E021]: parameter type mismatch in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -439,14 +382,14 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EIfElseIfCondNotBool ts ->
-        let title = "error[E025]: if-else-if condition not boolean."
+        let title = "error[E022]: if-else-if condition not boolean."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
     EFunctionCallExtraParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E026]: extra parameters in function call."
+        let title = "error[E023]: extra parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos
@@ -463,7 +406,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
     EFunctionCallMissingParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E027]: missing parameters in function call."
+        let title = "error[E024]: missing parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos
@@ -479,42 +422,8 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
-    EFunctionCallExtraConstParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E028]: extra const parameters in function call."
-            funcFileName = sourceName funcPos
-            funcLineNumber = sourceLine funcPos
-            funcLineColumn = sourceColumn funcPos
-            funcSourceLines = toModuleAST M.! funcFileName
-        in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn (length funcId)
-                (Just ("Function \x1b[31m" <> T.pack funcId <> 
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
-                    "\x1b[0m const parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
-                funcSourceLines "The interface of the function is defined here:" funcFileName
-                funcLineNumber funcLineColumn (length funcId)
-                Nothing
-    EFunctionCallMissingConstParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E029]: missing const parameters in function call."
-            funcFileName = sourceName funcPos
-            funcLineNumber = sourceLine funcPos
-            funcLineColumn = sourceColumn funcPos
-            funcSourceLines = toModuleAST M.! funcFileName
-        in
-            printSimpleError
-                sourceLines title fileName
-                lineNumber lineColumn (length funcId)
-                (Just ("Function \x1b[31m" <> T.pack funcId <> 
-                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
-                    "\x1b[0m const parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
-                funcSourceLines "The interface of the function is defined here:" funcFileName
-                funcLineNumber funcLineColumn (length funcId)
-                Nothing
     EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos) actualTy ->
-        let title = "error[E030]: parameter type mismatch in function call."
+        let title = "error[E025]: parameter type mismatch in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos

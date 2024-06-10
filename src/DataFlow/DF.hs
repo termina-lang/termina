@@ -129,7 +129,7 @@ useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj _size _ann)
   = useObject obj
-useExpression (MemberFunctionCall obj ident _constArgs args ann) = do
+useExpression (MemberFunctionCall obj ident args ann) = do
     useObject obj
     obj_type <- annotateError (SM.location ann) (getObjectType obj)
     case obj_type  of
@@ -158,7 +158,7 @@ useExpression (MemberFunctionCall obj ident _constArgs args ann) = do
           _ -> annotateError (SM.location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
-useExpression (DerefMemberFunctionCall obj _ident _constArgs args _ann)
+useExpression (DerefMemberFunctionCall obj _ident args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitExpression e _size _ann)
@@ -171,7 +171,7 @@ useExpression (OptionVariantExpression opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
-useExpression (FunctionCall _ident _constArgs args _ann)
+useExpression (FunctionCall _ident args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = mapM_ useArguments args
 
@@ -336,13 +336,13 @@ useDefCMemb (ClassField fdef ann)
   = (SM.location ann) `annotateError` defVariable (fieldIdentifier fdef)
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
-useDefCMemb (ClassProcedure _ident cps ps blk ann)
+useDefCMemb (ClassProcedure _ident ps blk ann)
   = useDefBlock blk
-  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) (map unConstParam cps ++ ps)
+  >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) ps
   -- >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
-useDefCMemb (ClassViewer _ident cps ps _tyret bret ann)
+useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) (map unConstParam cps ++ ps)
+  >> mapM_ (annotateError (SM.location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) [p]
@@ -367,9 +367,9 @@ useDefTypeDef (Enum {}) = return ()
 
 -- Globals
 useDefFrag :: AnnASTElement SemanticAnns -> UDM AnnotatedErrors ()
-useDefFrag (Function _ident cps ps _ty blk _mods anns)
+useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) (map unConstParam cps ++ ps)
+ >> mapM_ ((annotateError (SM.location anns)) . defArgumentsProc ) ps
  -- >> mapM_ ((annotateError (SM.location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()

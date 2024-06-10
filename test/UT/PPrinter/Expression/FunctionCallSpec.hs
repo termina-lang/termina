@@ -57,42 +57,42 @@ dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) undynVa
 
 functionCallSingleVar0, functionCallSingleDynVar1,
   functionCallSinglepVar :: Expression SemanticAnns
-functionCallSingleVar0 = FunctionCall "foo" [] [AccessObject var0] (funSemAnn [] [Parameter "param0" UInt16] UInt16)
-functionCallSingleDynVar1 = FunctionCall "foo" [] [AccessObject var1] (funSemAnn [] [Parameter "param0" (DynamicSubtype UInt16)] Unit)
-functionCallSinglepVar = FunctionCall "foo" [] [AccessObject pVar] (funSemAnn [] [Parameter "param0" (Reference Mutable UInt16)] Unit)
+functionCallSingleVar0 = FunctionCall "foo" [AccessObject var0] (funSemAnn [Parameter "param0" UInt16] UInt16)
+functionCallSingleDynVar1 = FunctionCall "foo" [AccessObject var1] (funSemAnn [Parameter "param0" (DynamicSubtype UInt16)] Unit)
+functionCallSinglepVar = FunctionCall "foo" [AccessObject pVar] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
   functionCallSingleDerefpVar :: Expression SemanticAnns
-functionCallSingleRefVar0 = FunctionCall "foo" [] [referenceVar0] (funSemAnn [] [Parameter "param0" (Reference Mutable UInt16)] Unit)
-functionCallSingleRefDynVar1 = FunctionCall "foo" [] [referenceVar1] (funSemAnn [] [Parameter "param0" (Reference Mutable UInt16)] Unit)
-functionCallSingleDerefpVar = FunctionCall "foo" [] [AccessObject dereferencepVar] (funSemAnn [] [Parameter "param0" UInt16] Unit)
+functionCallSingleRefVar0 = FunctionCall "foo" [referenceVar0] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
+functionCallSingleRefDynVar1 = FunctionCall "foo" [referenceVar1] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
+functionCallSingleDerefpVar = FunctionCall "foo" [AccessObject dereferencepVar] (funSemAnn [Parameter "param0" UInt16] Unit)
 
 functionCallSingleVar0PlusConstant, functionCallSingleDynVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
   functionCallSingleDerefpVarPlusConstant,
   functionCallSingleDerefpVarPlusDerefRefVar1 :: Expression SemanticAnns
-functionCallSingleVar0PlusConstant = FunctionCall "foo" [] [var0PlusConstant] (funSemAnn [] [Parameter "param0" UInt16] Unit)
-functionCallSingleDynVar1PlusConstant = FunctionCall "foo" [] [var1PlusConstant] (funSemAnn [] [Parameter "param0" UInt16] Unit)
-functionCallSingleVar0PlusVar1 = FunctionCall "foo" [] [var0PlusVar1] (funSemAnn [] [Parameter "param0" UInt16] Unit)
-functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [] [dereferencepVarPlusConstant] (funSemAnn [] [Parameter "param0" UInt16] Unit)
-functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [] [dereferencepVar2PlusVar1] (funSemAnn [] [Parameter "param0" UInt16] Unit)
+functionCallSingleVar0PlusConstant = FunctionCall "foo" [var0PlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleDynVar1PlusConstant = FunctionCall "foo" [var1PlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleVar0PlusVar1 = FunctionCall "foo" [var0PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [dereferencepVarPlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
+functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [dereferencepVar2PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
 
 functionCallSingleDynArray0, functionCallSinglepArray1 :: Expression SemanticAnns
-functionCallSingleDynArray0 = FunctionCall "foo" [] [AccessObject dynArray0] (funSemAnn [] [Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
-functionCallSinglepArray1 = FunctionCall "foo" [] [pArray1] (funSemAnn [] [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSingleDynArray0 = FunctionCall "foo" [AccessObject dynArray0] (funSemAnn [Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
 functionCallSingleRefArray0 :: Expression SemanticAnns
-functionCallSingleRefArray0 = FunctionCall "foo" [] [referenceArray0] (funSemAnn [] [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
+functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
 call2Parameters, call3Parameters :: Expression SemanticAnns
-call2Parameters = FunctionCall "foo2" [] [var0PlusConstant, var0PlusVar1] (funSemAnn [] [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
-call3Parameters = FunctionCall "foo4" []
+call2Parameters = FunctionCall "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
+call3Parameters = FunctionCall "foo4"
   [
     AccessObject dynArray0,
     referenceVar1,
     functionCallSingleVar0,
     call2Parameters
-  ] (funSemAnn [] [
+  ] (funSemAnn [
     Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr)))),
     Parameter "param1" (Reference Mutable UInt16),
     Parameter "param2" UInt16,

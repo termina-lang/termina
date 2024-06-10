@@ -24,34 +24,34 @@ findClassField i
   L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
                  _ -> False;})
 
-findClassProcedure :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([ConstParameter], [Parameter], a)
+findClassProcedure :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], a)
 findClassProcedure i
   = fmap
-  (\case {ClassProcedure _ cps ps _ a -> (cps, ps,a)
+  (\case {ClassProcedure _ ps _ a -> (ps,a)
          ; _ -> error "Impossible after find"})
   .
-  L.find (\case{ ClassProcedure ident _ _ _ _ -> (ident == i)
+  L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([ConstParameter], [Parameter], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([Parameter], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ cps ps a -> (cps, ps, a)})
+  (\case {InterfaceProcedure _ ps a -> (ps, a)})
   .
-  L.find (\case{InterfaceProcedure ident _ _ _ -> (ident == i)})
+  L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
 
-findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([ConstParameter], [Parameter], Maybe TypeSpecifier, a)
+findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([Parameter], Maybe TypeSpecifier, a)
 findClassViewerOrMethod i
   = fmap
   (\case {
-    ClassViewer _ cps ps ty _ a -> (cps, ps, Just ty, a);
-    ClassMethod _ ty _ a -> ([], [], ty, a);
+    ClassViewer _ ps ty _ a -> (ps, Just ty, a);
+    ClassMethod _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })
   .
   L.find (
     \case{
-      ClassViewer ident _ _ _ _ _ -> (ident == i);
+      ClassViewer ident _ _ _ _ -> (ident == i);
       ClassMethod ident _ _ _ -> (ident == i);
       _ -> False
     }
@@ -63,8 +63,8 @@ findClassViewerOrMethod i
 className :: ClassMember' expr obj a -> Identifier
 className (ClassField e _)                = fieldIdentifier e
 className (ClassMethod mIdent _ _ _)      = mIdent
-className (ClassProcedure pIdent _ _ _ _) = pIdent
-className (ClassViewer vIdent _ _ _ _ _)  = vIdent
+className (ClassProcedure pIdent _ _ _) = pIdent
+className (ClassViewer vIdent _ _ _ _)  = vIdent
 className (ClassAction aIdent _ _ _ _)    = aIdent
 ----------------------------------------
 
@@ -83,9 +83,6 @@ tyDefName (Class _ sId _ _ _ )=sId
 tyDefName (Interface sId _ _ )=sId
 
 globalsName :: AnnASTElement' expr obj a -> Identifier
-globalsName (Function fId _ _ _ _ _ _) = fId
+globalsName (Function fId _ _ _ _ _) = fId
 globalsName (GlobalDeclaration glb)    = glbName glb
 globalsName (TypeDefinition tyDef _)   = tyDefName tyDef
-
-unConstParam :: ConstParameter -> Parameter
-unConstParam (ConstParameter p) = p

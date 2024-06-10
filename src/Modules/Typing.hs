@@ -77,9 +77,9 @@ typeModule parserMap m typedDeps =
             case typeAndGetGlobals env (frags parsedM) of
                Left err -> Left (ELiftTypeCheckError err)
                Right t ->
-                 let typedModule
+                 let tm
                         = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst t)) (snd t)
-                 in Right (MData deps src_lines typedModule)
+                 in Right (MData deps src_lines tm)
   where
    -- Load globals defined by dependecies and create the environment
    -- used to type the current module.
@@ -109,9 +109,9 @@ typeProject parserMap mds =
                            Left err -> throwError (ELiftTypeCheckError err)
                            Right t -> return t
             -- Load stuff into project map
-            let typedModule = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst typedProg)) (snd typedProg)
+            let tm = Typed (Termina (map (fmap buildModuleName) (modules parsedM)) (fst typedProg)) (snd typedProg)
             -- Add it to the project and continue typing
-            typeProject' ms (M.insert m (MData deps src_lines typedModule) tP)
+            typeProject' ms (M.insert m (MData deps src_lines tm) tP)
 
 buildEnvironment
   :: SemanProject -> ModuleName -> Environment -> TProjectM Environment

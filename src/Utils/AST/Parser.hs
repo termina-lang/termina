@@ -58,9 +58,9 @@ objIsSelf _ = False
 -- breaking something else.
 
 selfInv :: Expression a -> (Object a -> Bool) -> Maybe Identifier
-selfInv (MemberFunctionCall obj mident _constArgs _args _ann) isSelf =
+selfInv (MemberFunctionCall obj mident _args _ann) isSelf =
   if isSelf obj then Just mident else Nothing
-selfInv (DerefMemberFunctionCall obj mident _constArgs _args _ann) isSelf =
+selfInv (DerefMemberFunctionCall obj mident _args _ann) isSelf =
   if isSelf obj then Just mident else Nothing
 selfInv _ _isSelf = Nothing
 
@@ -114,10 +114,10 @@ selfDepClass isSelf = selfDepClass'
    selfDepClass' (ClassMethod mId _type bRet _ann) =
      Just (mId,selfInvBlockRet isSelf bRet)
    -- Procedures can
-   selfDepClass' (ClassProcedure pId _constParams _params blk _ann) =
+   selfDepClass' (ClassProcedure pId _params blk _ann) =
      Just (pId, selfInvBlock isSelf blk)
    -- Viewers can
-   selfDepClass' (ClassViewer vId _constParams _params _type bRet _ann) =
+   selfDepClass' (ClassViewer vId _params _type bRet _ann) =
      Just (vId , selfInvBlockRet isSelf bRet)
    -- Actions can
    selfDepClass' (ClassAction aId _param _type bRet _ann) =

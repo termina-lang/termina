@@ -4,7 +4,6 @@ module Utils.AST.Seman where
 
 import Utils.AST.Parser
 import           AST.Seman
-import Data.Maybe
 
 -- A relation of type specifier.
 dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool

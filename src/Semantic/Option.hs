@@ -72,7 +72,7 @@ mapInterfaceProcedureOption :: Monad m
   -> InterfaceMember a
   -- | The resulting map
   -> m OptionMap
-mapInterfaceProcedureOption prevMap (InterfaceProcedure _ _ params _) =
+mapInterfaceProcedureOption prevMap (InterfaceProcedure _ params _) =
   -- | Get the option types from the parameters
   foldM mapParameterOption prevMap params
 
@@ -89,12 +89,12 @@ mapClassMemberOption prevMap (ClassMethod _ maybeRet blkRet _) =
   mapMaybeOption prevMap maybeRet >>=
   -- | Get the option types from the block return type
   flip (foldM mapStatementOption) (blockBody blkRet)
-mapClassMemberOption prevMap (ClassProcedure _ _ params blk _) =
+mapClassMemberOption prevMap (ClassProcedure _ params blk _) =
   -- | Get the option types from the parameters
   foldM mapParameterOption prevMap params >>=
   -- | Get the option types from the block return type
   flip (foldM mapStatementOption) blk
-mapClassMemberOption prevMap (ClassViewer _ _ params ret blkRet _) =
+mapClassMemberOption prevMap (ClassViewer _ params ret blkRet _) =
   -- | Get the option types from the parameters
   foldM mapParameterOption prevMap params >>=
   -- | Get the option types from the return type
@@ -136,7 +136,7 @@ mapOptions :: Monad m
   -> AnnASTElement a
   -- | The resulting map
   -> m OptionMap
-mapOptions prevMap (Function _ _ params maybeRet blkRet _ _) =
+mapOptions prevMap (Function _ params maybeRet blkRet _ _) =
   -- | Get the option types from the parameters
   foldM mapParameterOption prevMap params >>=
   -- | Get the option types from the return type (it may return a regular Option)
