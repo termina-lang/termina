@@ -358,6 +358,8 @@ printTypedInteger ts ti =
         Int16 -> "INT16_C(" <> printIntegerLiteral ti <> ")"
         Int32 -> "INT32_C(" <> printIntegerLiteral ti <> ")"
         Int64 -> "INT64_C(" <> printIntegerLiteral ti <> ")"
+        -- | No correct way to do this for the time being
+        USize -> printIntegerLiteral ti
         _ -> error "Invalid type specifier: " <> show ts
 
 
