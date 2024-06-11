@@ -101,7 +101,7 @@ sortOrLoop
 sortOrLoop = topErrorInternal . processProjectDeps
   where
     topErrorInternal = either
-                        (\case { ELoop xs -> Left xs; ENotFound a -> error
+                        (\case { ELoop xs -> Left xs; ENotFound a _ -> error
                           ("Internal TopSort Error Node not found" ++ show a)})
                          Right
                           . topSortFromDepList

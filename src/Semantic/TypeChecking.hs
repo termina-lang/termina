@@ -12,7 +12,6 @@ import           Utils.AST.Core
 import           Utils.TypeSpecifier
 
 -- Top Sort
-import Extras.TopSort (TopE(..) , topSortFromDepList)
 import qualified Data.Map.Strict as M
 
 -- Termina Semantic AST
@@ -30,6 +29,8 @@ import           Control.Monad.Except (MonadError (..))
 import           Semantic.Errors
 -- Semantic Monad
 import           Semantic.Monad
+
+import           Extras.TopSort
 
 ----------------------------------------
 -- Libaries and stuff
@@ -119,7 +120,7 @@ typeObject getVarTy (Variable ident ann) = do
   (ek, ty) <- getVarTy ann ident
   ak <- toAccessKind ek
   return $ SAST.Variable ident (buildExpAnnObj ann ak ty)
-  
+
   where
 
     toAccessKind :: EnvKind -> SemanticMonad AccessKind
@@ -489,7 +490,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
     _ -> do
       maybe (return ()) (flip (sameOrErr pann) (Reference refKind obj_type)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
-  
+
   where
 
     checkReferenceAccessKind :: AccessKind -> SemanticMonad ()
@@ -508,7 +509,7 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   -- Check that the number of parameters are OK
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
-  typed_args <- zipWithM (\p e -> catchError 
+  typed_args <- zipWithM (\p e -> catchError
       (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)
       (\err -> case semError err of
           EMismatch _ ty -> throwError $ annotateError ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation) ty)
@@ -790,7 +791,7 @@ typeStatement (AssignmentStmt lhs_o rhs_expr anns) = do
 typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
   when (not (null elifs) && isNothing otherwise_branch) (throwError $ annotateError anns EIfElseNoOtherwise)
-  IfElseStmt 
+  IfElseStmt
     -- | Check that the condition is a boolean expression
     <$> typeCondExpr cond_expr
     <*> localScope (typeBlock tt_branch)
@@ -804,7 +805,7 @@ typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
     <*> return (buildStmtAnn anns)
   where
     typeCondExpr :: Expression Parser.Annotation -> SemanticMonad (SAST.Expression SemanticAnns)
-    typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr) 
+    typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr)
       (\err -> case semError err of
         EMismatch Bool ty -> throwError $ annotateError (annError err) $ EIfElseIfCondNotBool ty
         _ -> throwError err
@@ -999,11 +1000,11 @@ semanticTypeDef (Interface i cls m) = Interface i cls m
 
 
 -- | This function type checks the members of a class depending on its kind.
-checkClassKind :: Locations -> Identifier -> ClassKind 
-  -> ([SAST.ClassMember SemanticAnns], 
-      [PAST.ClassMember Locations], 
+checkClassKind :: Locations -> Identifier -> ClassKind
+  -> ([SAST.ClassMember SemanticAnns],
+      [PAST.ClassMember Locations],
       [PAST.ClassMember Locations])
-  -> [Identifier] -> SemanticMonad ()
+  -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
 checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- A resource must provide at least one interface
@@ -1011,7 +1012,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- A resource must not have any actions
   case acts of
     [] -> return ()
-    (ClassAction actionId _ _ _ ann):_  -> 
+    (ClassAction actionId _ _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
     _ -> throwError (annotateError internalErrorSeman EClassTyping)
   -- Check that the resource class does not define any in and out ports
@@ -1059,7 +1060,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
-  
+
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
@@ -1095,7 +1096,7 @@ typeTypeDefinition ann (Interface ident cls mds) = do
   -- If everything is fine, return the same definition.
   return (Interface ident procedures mds)
 
-  where 
+  where
 
     typeInterfaceProcedure :: InterfaceMember Locations -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
     typeInterfaceProcedure (InterfaceProcedure procId ps annIP) = do
@@ -1153,15 +1154,25 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
   -- ...}`, then `g > f`.
     let elements = prcs ++ mths ++ vws ++ acts
     -- Dependencies emplying the assumption.
-    let dependencies =
-          foldr (\a res -> maybe res (:res) (selfDepClass objIsSelf a)) [] elements
+    let dependenciesMap =
+          foldr (selfDepClass objIsSelf) M.empty elements
+    let dependencies = fmap M.keys dependenciesMap
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
     -- Sort and see if there is a loop
-    topSortOrder <- case topSortFromDepList dependencies of
+    topSortOrder <- case topSort dependencies of
             -- Tell the user a loop is in the room
             Left (ELoop loop) -> throwError (annotateError ann (EClassLoop loop))
-            Left _ -> error "Internal TopSort Error"
+            Left (ENotFound dep parent) ->
+              case parent of
+                Nothing -> error "Internal TopSort Error. This should not happen"
+                Just parentId -> do
+                  let parentDepsMap = fromJust $ M.lookup parentId dependenciesMap
+                  case fromJust $ M.lookup dep parentDepsMap of
+                    (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
+                    (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
+                    _ -> error "Internal TopSort Error. This should not happen"
+            Left e -> error $ "Internal TopSort Error" ++ show e
             -- Get the proper order of inclusion and get their definitions from names.
             Right order ->
               mapM
@@ -1230,7 +1241,7 @@ enumDefinitionTy ann ev
 
 checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
-  if allUnique is then return () 
+  if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))
   where
     -----------------------------------------

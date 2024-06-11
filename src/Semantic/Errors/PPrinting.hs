@@ -442,6 +442,13 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
+    EMemberAccessNotFunction ident ->
+        let title = "error[E026]: Access to a member that is not a function."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid member function."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

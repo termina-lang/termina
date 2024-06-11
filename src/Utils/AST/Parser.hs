@@ -3,7 +3,7 @@
 module Utils.AST.Parser where
 
 import           AST.Parser
-import Data.Maybe
+import qualified Data.Map as M
 
 -- Ground Type equality
 groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
@@ -48,7 +48,7 @@ objIsSelf _ = False
 
 
 ----------------------------------------
--- Invokation Dependency in a block of code.
+-- Invocation Dependency in a block of code.
 -- Capturing the pattern `self->f()` on objects.
 -- As far as I understand it, all objects should have name, and thus, we cannot
 -- (or shoudln't) concatenate invocations.
@@ -57,70 +57,70 @@ objIsSelf _ = False
 -- the same name. We do not need to insepect 'self->f()', but I am afraid of
 -- breaking something else.
 
-selfInv :: Expression a -> (Object a -> Bool) -> [Identifier]
-selfInv (MemberFunctionCall obj mident _args _ann) isSelf =
-  [mident | isSelf obj]
-selfInv (DerefMemberFunctionCall obj mident _args _ann) isSelf =
-  [mident | isSelf obj]
-selfInv (BinOp _ left right _ann) isSelf =
-  selfInv left isSelf ++ selfInv right isSelf
-selfInv _ _isSelf = []
+type SelfInvocation a = M.Map Identifier (Expression a)
+type SelfDepMap a = M.Map Identifier (SelfInvocation a)
 
-selfInvStmt :: (Object a -> Bool) -> Statement a -> [Identifier]
-selfInvStmt isSelf = selfInvStmt'
- where
-    isSelfExpression e = selfInv e isSelf
-    -- selfInvStmt' :: Statement' (Expression' obj) obj a -> [Identifier]
-    selfInvStmt' (Declaration _vident _accK _type e _ann) = isSelfExpression e
-    selfInvStmt' (AssignmentStmt _obj e _ann) = isSelfExpression e
-    selfInvStmt' (IfElseStmt eC bIf bEls bEl _ann) =
-      isSelfExpression eC
-        ++
-        concatMap selfInvStmt' bIf
-        ++
-        concatMap (\ el ->
-                     isSelfExpression (elseIfCond el)
-                ++ selfInvBlock isSelf (elseIfBody el)
-                ) bEls
-        ++ maybe [] (concatMap selfInvStmt') bEl
-    selfInvStmt' (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
-      -- isSelfExpression initV ++ isSelfExpression endV ++
-      concat (maybeToList (isSelfExpression <$> cBreak))
-      ++ concatMap selfInvStmt' body
-    selfInvStmt' (MatchStmt e mcases _ann) =
-      isSelfExpression e
-      ++  concatMap (selfInvBlock isSelf . matchBody) mcases
-    selfInvStmt' (SingleExpStmt e _ann) = isSelfExpression e
+selfInv :: (Object a -> Bool) -> Expression a -> SelfInvocation a -> SelfInvocation a
+selfInv isSelf expr@(MemberFunctionCall obj mident _args _ann) prevMap =
+  if isSelf obj then M.insert mident expr prevMap else prevMap
+selfInv isSelf expr@(DerefMemberFunctionCall obj mident _args _ann) prevMap =
+  if isSelf obj then M.insert mident expr prevMap else prevMap
+selfInv isSelf (BinOp _ left right _ann) prevMap =
+  (selfInv isSelf right . selfInv isSelf left) prevMap
+selfInv isSelf (Casting expr _ts _ann) prevMap = selfInv isSelf expr prevMap
+selfInv _isSelf _ prevMap  = prevMap
 
-selfInvBlock :: (Object a -> Bool) -> Block a -> [Identifier]
-selfInvBlock isSelf = concatMap (selfInvStmt isSelf)
+selfInvStmt :: (Object a -> Bool) -> Statement a -> SelfInvocation a -> SelfInvocation a
+selfInvStmt isSelf (Declaration _vident _accK _type e _ann) = selfInv isSelf e
+selfInvStmt isSelf (AssignmentStmt _obj e _ann) = selfInv isSelf e
+selfInvStmt isSelf (IfElseStmt eC bIf bEls bEl _ann) =
+  selfInv isSelf eC .
+  flip (foldr (selfInvStmt isSelf)) bIf .
+  flip (foldr (selfInvElseIf isSelf)) bEls . 
+  (\prevMap -> maybe prevMap (foldr (selfInvStmt isSelf) prevMap) bEl)
 
-selfInvRetStmt :: (Object a -> Bool) -> ReturnStmt a -> [Identifier]
-selfInvRetStmt isSelf = maybe [] (`selfInv` isSelf) . returnExpression
+  where
 
-selfInvBlockRet :: (Object a -> Bool) -> BlockRet a -> [Identifier]
-selfInvBlockRet isSelf bret
-  = selfInvBlock isSelf (blockBody bret)
-  ++ selfInvRetStmt isSelf (blockRet bret)
+    selfInvElseIf :: (Object a -> Bool) -> ElseIf a -> SelfInvocation a -> SelfInvocation a
+    selfInvElseIf isSelf' (ElseIf cond blk _) =
+      selfInv isSelf' cond . flip (foldr (selfInvStmt isSelf')) blk
 
+selfInvStmt isSelf (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
+  (\prevMap -> maybe prevMap (flip (selfInv isSelf) prevMap) cBreak) .
+  flip (foldr (selfInvStmt isSelf)) body
+selfInvStmt isSelf (MatchStmt e mcases _ann) =
+  selfInv isSelf e .
+  flip (foldr (selfInvCase isSelf)) mcases
+
+  where
+
+    selfInvCase :: (Object a -> Bool) -> MatchCase a -> SelfInvocation a -> SelfInvocation a
+    selfInvCase isSelf' (MatchCase _ _ body _) =
+      flip (foldr (selfInvStmt isSelf')) body
+
+selfInvStmt isSelf (SingleExpStmt e _ann) = selfInv isSelf e
+
+selfInvBlock :: (Object a -> Bool) -> Block a -> SelfInvocation a -> SelfInvocation a
+selfInvBlock isSelf = flip (foldr (selfInvStmt isSelf))
+
+selfInvRetStmt :: (Object a -> Bool) -> ReturnStmt a -> SelfInvocation a -> SelfInvocation a
+selfInvRetStmt isSelf (ReturnStmt ret _) prevMap =
+  maybe prevMap (flip (selfInv isSelf) prevMap) ret
+
+selfInvBlockRet :: (Object a -> Bool) -> BlockRet a -> SelfInvocation a -> SelfInvocation a
+selfInvBlockRet isSelf (BlockRet body bret)
+  = flip (foldr (selfInvStmt isSelf)) body . selfInvRetStmt isSelf bret
 
 selfDepClass
   :: (Object a -> Bool)
   -> ClassMember a
-  -> Maybe (Identifier, [Identifier])
-selfDepClass isSelf = selfDepClass'
- where
-   -- Fields do not have self dependencies
-   selfDepClass' (ClassField {}) = Nothing
-   -- Methods can
-   selfDepClass' (ClassMethod mId _type bRet _ann) =
-     Just (mId,selfInvBlockRet isSelf bRet)
-   -- Procedures can
-   selfDepClass' (ClassProcedure pId _params blk _ann) =
-     Just (pId, selfInvBlock isSelf blk)
-   -- Viewers can
-   selfDepClass' (ClassViewer vId _params _type bRet _ann) =
-     Just (vId , selfInvBlockRet isSelf bRet)
-   -- Actions can
-   selfDepClass' (ClassAction aId _param _type bRet _ann) =
-      Just (aId , selfInvBlockRet isSelf bRet)
+  -> SelfDepMap a -> SelfDepMap a
+selfDepClass _ (ClassField {}) = id
+selfDepClass isSelf (ClassMethod mId _type bRet _ann) =
+  M.insert mId (selfInvBlockRet isSelf bRet M.empty)
+selfDepClass isSelf (ClassProcedure pId _params blk _ann) =
+  M.insert pId (selfInvBlock isSelf blk M.empty)
+selfDepClass isSelf (ClassViewer vId _params _type bRet _ann) =
+  M.insert vId (selfInvBlockRet isSelf bRet M.empty)
+selfDepClass isSelf (ClassAction aId _param _type bRet _ann) =
+  M.insert aId (selfInvBlockRet isSelf bRet M.empty)

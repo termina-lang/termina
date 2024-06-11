@@ -43,8 +43,9 @@ data Errors a
   | EFunctionCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in function call (E023)
   | EFunctionCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in function call (E024)
   | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E025)
-  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E026)
-  | EMutableReferenceToPrivate -- ^ Mutable reference to private object (E027)
+  | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (E026)
+  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E027)
+  | EMutableReferenceToPrivate -- ^ Mutable reference to private object (E028)
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
@@ -94,7 +95,6 @@ data Errors a
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
   | EMemberAccessNotProcedure Identifier
-  | EMemberAccessNotFunction Identifier
   | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType

@@ -45,7 +45,7 @@ rmTemp a st = st{getTemp = S.delete a (getTemp st)}
 
 data TopE a
   = ELoop [a] -- ^ Loop Error fund.
-  | ENotFound a -- ^ Internal error.
+  | ENotFound a (Maybe a) -- ^ Internal error.
   | MaxBound
   deriving Show
 
@@ -103,11 +103,11 @@ topSortInternal graph =
     then -- skip if marked
       return ()
     else -- if a is unmarked
-        visit graph a
+        visit graph Nothing a
    )
 
-visit :: Ord a => Graph a -> a -> TopSort a ()
-visit graph src
+visit :: Ord a => Graph a -> Maybe a -> a ->TopSort a ()
+visit graph parent src
   = gets getPerm >>= \permSet ->
   if S.member src permSet
   then return ()
@@ -119,8 +119,8 @@ visit graph src
       lmodifyE (addTemp src)
       --
       accms <- case M.lookup src graph of
-                    Nothing -> throwError (ENotFound src)
-                    Just adj_src -> mapM (visit graph) adj_src
+                    Nothing -> throwError (ENotFound src parent)
+                    Just adj_src -> mapM (visit graph (Just src)) adj_src
       lmodify (rmTemp src)
       lmodifyE (addPerm src)
       lmodify (addL src)
