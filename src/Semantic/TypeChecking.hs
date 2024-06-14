@@ -953,7 +953,7 @@ checkParameterType anns p =
 
 checkReturnType :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkReturnType anns ty =
-  unless (parameterTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
+  unless (returnValueTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
   checkTypeSpecifier anns ty
 
 -- Here we actually only need Global
@@ -1124,16 +1124,16 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             >> return (fs, prc : prcs, mths, vws, acts)
           -- Methods
           mth@(ClassMethod _fm_id mty _body annCM)
-            -> maybe (return ()) (checkTypeSpecifier annCM) mty
+            -> maybe (return ()) (checkReturnType annCM) mty
             >> return (fs, prcs, mth : mths, vws, acts)
           -- Viewers
           view@(ClassViewer _fv_id fv_tys mty _body annCV)
-            -> checkTypeSpecifier annCV mty
+            -> checkReturnType annCV mty
             -- Parameters cannot have dyns inside.
             >> mapM_ (checkParameterType annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)
-            -> checkTypeSpecifier annCA mty
+            -> checkReturnType annCA mty
             >> (checkTypeSpecifier annCA . paramTypeSpecifier) fa_ty
             >> return (fs, prcs, mths, vws , action : acts)
         )
@@ -1213,7 +1213,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
               blockRetTy ty typed_bret
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)

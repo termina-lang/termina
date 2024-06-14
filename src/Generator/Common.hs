@@ -148,16 +148,17 @@ getParameters ann = throwError $ InternalError $ "invalid expression annotation:
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m TypeSpecifier
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (ReferenceExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (FunctionCall _ _ (SemAnn _ (ETy (AppType _ ts)))) = return $ ts
-getExprType (MemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return $ ts
-getExprType (FieldAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
-getExprType (ArrayInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return $ ts
+getExprType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (OptionVariantExpression _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (ReferenceExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (FunctionCall _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
+getExprType (MemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
+getExprType (FieldAssignmentsExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (EnumVariantExpression _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (ArrayInitExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | Generates the name of the option struct type

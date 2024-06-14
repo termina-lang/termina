@@ -155,7 +155,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Function returns an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
+                (Just ("Invalid return type \x1b[31m" <> showText ts <> "\x1b[0m."))
     EProcedureCallExtraParams (procId, params, Position procPos) paramNumber ->
         let title = "error[E009]: extra parameters in procedure call."
             procFileName = sourceName procPos

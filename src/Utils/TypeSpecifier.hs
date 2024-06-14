@@ -21,6 +21,21 @@ primitiveTypes (DefinedType _) = True
 primitiveTypes (Array _ _)     = True
 primitiveTypes  _              = False
 
+returnValueTy :: TypeSpecifier -> Bool
+returnValueTy UInt8           = True
+returnValueTy UInt16          = True
+returnValueTy UInt32          = True
+returnValueTy UInt64          = True
+returnValueTy Int8            = True
+returnValueTy Int16           = True
+returnValueTy Int32           = True
+returnValueTy Int64           = True
+returnValueTy USize           = True
+returnValueTy Bool            = True
+returnValueTy Char            = True
+returnValueTy (DefinedType _) = True
+returnValueTy _               = False
+
 parameterTy :: TypeSpecifier -> Bool
 parameterTy UInt8           = True
 parameterTy UInt16          = True

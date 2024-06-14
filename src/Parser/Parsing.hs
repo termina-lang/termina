@@ -951,8 +951,8 @@ classFieldDefinitionParser = do
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
-  p <- getPosition
   reserved "method"
+  p <- getPosition
   name <- identifierParser
   parens (reserved "&priv" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
