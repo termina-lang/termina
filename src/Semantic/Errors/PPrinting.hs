@@ -448,6 +448,13 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid member function."))
+    EMutableReferenceToImmutable ->
+        let title = "error[E027]: mutable reference to immutable object."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 4 -- ^ Size of "&mut"
+                (Just "You are trying to create a mutable reference to an immutable object.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
