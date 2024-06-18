@@ -111,7 +111,7 @@ getMemberFieldType ann obj_ty ident =
 
 
 typeObject ::
-  -- | Scope of variables. It returns its access kind (mutable, immutable or private) and its type
+  -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
   (Parser.Annotation -> Identifier -> SemanticMonad (EnvKind, TypeSpecifier))
   -- The object to type
   -> Object Parser.Annotation
@@ -497,7 +497,6 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
     checkReferenceAccessKind obj_ak =
       case (obj_ak, refKind) of
         (Immutable, Mutable) -> throwError $ annotateError pann EMutableReferenceToImmutable
-        (Private, Mutable) -> throwError $ annotateError pann EMutableReferenceToPrivate
         _ -> return ()
 
 ---------------------------------------
@@ -770,10 +769,7 @@ typeStatement (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- otherwise we insert it in the read-only environment
     (case lhs_ak of
       Mutable -> insertLocalMutObj anns lhs_id lhs_type
-      Immutable -> insertLocalImmutObj anns lhs_id lhs_type
-      -- | This should not happen since the parser can only generate declarations
-      -- of mutable and immutable objects.
-      Private -> throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) >>
+      Immutable -> insertLocalImmutObj anns lhs_id lhs_type) >>
   -- Return annotated declaration
   return (Declaration lhs_id lhs_ak lhs_type ety (buildStmtAnn anns))
 typeStatement (AssignmentStmt lhs_o rhs_expr anns) = do
@@ -1199,11 +1195,11 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
-              typed_blk <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlock blk)
+              typed_blk <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlock blk)
               let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann [("self", Reference Private (DefinedType ident))] (typeBlockRet mty mbody)
+              typed_bret <- addLocalImmutObjs mann [("self", Reference Mutable (DefinedType ident))] (typeBlockRet mty mbody)
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
@@ -1213,7 +1209,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
               blockRetTy ty typed_bret
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)

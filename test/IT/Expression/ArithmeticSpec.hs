@@ -30,11 +30,11 @@ test0 = "function test0() {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure test1(&priv self, foo : dyn u16);\n" ++
+        "    procedure test1(&mut self, foo : dyn u16);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure test1(&priv self, foo : dyn u16) {\n" ++
+        "    procedure test1(&mut self, foo : dyn u16) {\n" ++
         "        foo = foo + 1024 : u16;\n" ++
         "        foo = 1024 : u16 + foo;\n" ++
         "        foo = foo - 1024 : u16;\n" ++

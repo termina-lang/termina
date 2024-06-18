@@ -134,7 +134,7 @@ data TypeSpecifier
   | Unit
   deriving (Show, Ord, Eq)
 
-data AccessKind = Immutable | Mutable | Private
+data AccessKind = Immutable | Mutable
   deriving (Show, Ord, Eq)
 
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
@@ -262,7 +262,7 @@ data ClassMember' expr obj a
     ClassField 
       FieldDefinition -- ^ the field
       a -- ^ transpiler annotation
-    -- | Methods. Methods are internal functions that can privately access the
+    -- | Methods. Methods are internal functions that can access the
     -- state of the object and call other methods of the same class.
     | ClassMethod 
       Identifier  -- ^ name of the method

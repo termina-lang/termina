@@ -21,7 +21,7 @@ tmPoolAlloc :: Expression SemanticAnns
 tmPoolAlloc = MemberFunctionCall tmPool "alloc" [] unitSemAnn
 
 selfDereference :: Object SemanticAnns
-selfDereference = Dereference self (definedTypeSemAnn Private "Resource")
+selfDereference = Dereference self (definedTypeSemAnn Mutable "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnns
 tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] unitSemAnn

@@ -19,7 +19,7 @@ runNegativeTest input = case parse (contents topLevel) "" input of
 
 test0 :: String
 test0 = "resource class id0 {\n" ++
-        "    procedure assignment_test1(&priv self, dyn_var0 : dyn u32) {\n" ++
+        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32) {\n" ++
         "        var opt : Option<dyn u32> = None;\n" ++
         "        opt = Some(dyn_var0);\n" ++
         "        return;\n" ++
@@ -28,18 +28,18 @@ test0 = "resource class id0 {\n" ++
 
 test1 :: String
 test1 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  action send_packet(&priv self, input : u32) -> Result {\n" ++
+        "  action send_packet(&mut self, input : u32) -> Result {\n" ++
         "    var ret : Result = Result::Ok;" ++
         "    return ret;\n" ++
         "  }\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -48,7 +48,7 @@ test1 = "interface TMChannelInterface {\n" ++
 
 test2 :: String
 test2 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
@@ -56,7 +56,7 @@ test2 = "interface TMChannelInterface {\n" ++
         "\n" ++
         "  input_msg : in u32 triggers get_tm_sent_packets;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -65,7 +65,7 @@ test2 = "interface TMChannelInterface {\n" ++
 
 test3 :: String
 test3 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
@@ -73,7 +73,7 @@ test3 = "interface TMChannelInterface {\n" ++
         "\n" ++
         "  output_msg : out u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -85,7 +85,7 @@ test4 = "resource class TMChannel provides TMChannelInterface {\n" ++
         "\n"++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -94,17 +94,17 @@ test4 = "resource class TMChannel provides TMChannelInterface {\n" ++
 
 test5 :: String
 test5 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
-        "  procedure send_packet(&priv self, input : u32) {\n" ++
+        "  procedure send_packet(&mut self, input : u32) {\n" ++
         "    return;\n" ++
         "  }\n" ++
         "\n" ++
@@ -112,14 +112,14 @@ test5 = "interface TMChannelInterface {\n" ++
 
 test6 :: String
 test6 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self, input : u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&mut self, input : u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -128,18 +128,18 @@ test6 = "interface TMChannelInterface {\n" ++
 
 test7 :: String
 test7 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&mut self);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
-        "  procedure send_packet(&priv self, input : u32) {\n" ++
+        "  procedure send_packet(&mut self, input : u32) {\n" ++
         "    return;\n" ++
         "  }\n" ++
         "\n" ++
@@ -147,18 +147,18 @@ test7 = "interface TMChannelInterface {\n" ++
 
 test8 :: String
 test8 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self, input : u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&mut self, input : u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
-        "  procedure send_packet(&priv self) {\n" ++
+        "  procedure send_packet(&mut self) {\n" ++
         "    return;\n" ++
         "  }\n" ++
         "\n" ++
@@ -166,18 +166,18 @@ test8 = "interface TMChannelInterface {\n" ++
 
 test9 :: String
 test9 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
-        "    procedure send_packet(&priv self);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
+        "    procedure send_packet(&mut self);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u16) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u16) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
-        "  procedure send_packet(&priv self) {\n" ++
+        "  procedure send_packet(&mut self) {\n" ++
         "    return;\n" ++
         "  }\n" ++
         "\n" ++

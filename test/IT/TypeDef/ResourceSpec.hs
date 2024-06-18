@@ -14,13 +14,13 @@ import Modules.Modules
 
 test0 :: String
 test0 = "interface TMChannelInterface {\n" ++
-        "    procedure get_tm_sent_packets(&priv self, packets : &mut u32);\n" ++
+        "    procedure get_tm_sent_packets(&mut self, packets : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  procedure get_tm_sent_packets(&priv self, packets : &mut u32) {\n" ++
+        "  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {\n" ++
         "    *packets = self->tm_sent_packets;\n" ++
         "    return;\n" ++
         "  }\n" ++
@@ -29,13 +29,13 @@ test0 = "interface TMChannelInterface {\n" ++
 
 test1 :: String
 test1 = "interface UARTDriverInterface {\n" ++
-        "    procedure get_status(&priv self, ret : &mut u32);\n" ++
+        "    procedure get_status(&mut self, ret : &mut u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class UARTDriver provides UARTDriverInterface {\n" ++
         "  status : loc u32;\n" ++
         "\n" ++
-        "  procedure get_status(&priv self, ret : &mut u32) {\n" ++
+        "  procedure get_status(&mut self, ret : &mut u32) {\n" ++
         "    *ret = self->status;\n" ++
         "    return;\n" ++
         "  }\n" ++

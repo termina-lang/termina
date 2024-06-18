@@ -28,7 +28,6 @@ instance ShowText Size where
 instance ShowText AccessKind where
     showText Mutable = "mut "
     showText Immutable = ""
-    showText Private = "priv "
 
 instance ShowText TypeSpecifier where
     showText UInt8 = "u8"

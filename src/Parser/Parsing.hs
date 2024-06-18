@@ -59,8 +59,6 @@ lexer = Tok.makeTokenParser langDef
              ["loc"]
       ++ -- Ports Subtyping
              ["access", "sink", "in", "out"]
-      ++ -- Private reference typing
-             ["&priv"]
       ++ -- Global declarations
              ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
@@ -954,7 +952,7 @@ classMethodParser = do
   reserved "method"
   p <- getPosition
   name <- identifierParser
-  parens (reserved "&priv" >> reserved "self")
+  parens (reserved "&mut" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
   return $ ClassMethod name typeSpec blockRet (Position p)
@@ -964,7 +962,7 @@ classActionParser = do
   reserved "action"
   p <- getPosition
   name <- identifierParser
-  param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
+  param <- parens (reserved "&mut" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
   blockRet <- braces blockParser
   return $ ClassAction name param typeSpec blockRet (Position p)
@@ -983,7 +981,7 @@ classProcedureParser = do
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
-      reserved "&priv" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
+      reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
 
 interfaceProcedureParser :: Parser (InterfaceMember Annotation)
 interfaceProcedureParser = do
@@ -996,7 +994,7 @@ interfaceProcedureParser = do
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
-      reserved "&priv" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
+      reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
 
 classViewerParser :: Parser (ClassMember Annotation)
 classViewerParser = do

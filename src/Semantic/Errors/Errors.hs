@@ -45,7 +45,6 @@ data Errors a
   | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E025)
   | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (E026)
   | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E027)
-  | EMutableReferenceToPrivate -- ^ Mutable reference to private object (E028)
   | EOpMismatch Op TypeSpecifier TypeSpecifier
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier

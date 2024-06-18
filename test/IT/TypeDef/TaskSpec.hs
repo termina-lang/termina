@@ -32,7 +32,7 @@ test0 = "struct Message {\n" ++
         "    return ret;\n" ++
         "  }\n" ++
         "\n" ++
-        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&mut self, current : TimeVal) -> Result {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "\n" ++

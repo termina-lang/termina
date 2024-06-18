@@ -22,11 +22,11 @@ test0 = "function assignment_test0() {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure assignment_test1(&priv self, dyn_var0 : dyn u32);\n" ++
+        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test1(&priv self, dyn_var0 : dyn u32) {\n" ++
+        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32) {\n" ++
         "        var opt : Option<dyn u32> = None;\n" ++
         "        opt = Some(dyn_var0);\n" ++
         "        return;\n" ++
@@ -35,11 +35,11 @@ test1 = "interface test_iface {\n" ++
 
 test2 :: String
 test2 = "interface test_iface {\n" ++
-        "    procedure assignment_test2(&priv self, dyn_var0 : dyn u32, dyn_var1 : dyn u32);\n" ++
+        "    procedure assignment_test2(&mut self, dyn_var0 : dyn u32, dyn_var1 : dyn u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test2(&priv self, dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" ++
+        "    procedure assignment_test2(&mut self, dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        dyn_var0 = foo;\n" ++
         "        foo = dyn_var1;\n" ++
@@ -50,12 +50,12 @@ test2 = "interface test_iface {\n" ++
 
 test3 :: String
 test3 = "interface test_iface {\n" ++
-        "    procedure assignment_test3(&priv self, dyn_var0 : dyn [u32; 10],\n" ++
+        "    procedure assignment_test3(&mut self, dyn_var0 : dyn [u32; 10],\n" ++
         "                               dyn_var1 : dyn [u32; 10]);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test3(&priv self, dyn_var0 : dyn [u32; 10],\n" ++
+        "    procedure assignment_test3(&mut self, dyn_var0 : dyn [u32; 10],\n" ++
         "                               dyn_var1 : dyn [u32; 10]) {\n" ++
         "        var foo : [u32; 10] = [0 : u32; 10];\n" ++
         "        dyn_var0 = foo;\n" ++

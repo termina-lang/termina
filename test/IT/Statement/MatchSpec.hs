@@ -15,11 +15,11 @@ import Modules.Modules
 
 test0 :: String
 test0 = "interface test_iface {\n" ++
-        "    procedure match_test0(&priv self, option0 : Option<dyn u32>);\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<dyn u32>);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure match_test0(&priv self, option0 : Option<dyn u32>) {\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<dyn u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
         "            case Some(value) => {\n" ++
@@ -35,11 +35,11 @@ test0 = "interface test_iface {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure match_test1(&priv self, option0 : Option<dyn u32>);\n" ++
+        "    procedure match_test1(&mut self, option0 : Option<dyn u32>);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure match_test1(&priv self, option0 : Option<dyn u32>) {\n" ++
+        "    procedure match_test1(&mut self, option0 : Option<dyn u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
         "            case None => {\n" ++
