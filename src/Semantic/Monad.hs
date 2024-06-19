@@ -17,7 +17,7 @@ import           Annotations
 import           AST.Parser
 import           AST.Seman                   as SAST
 import           AST.Core                    as CAST
-import           Utils.AST.Parser                  (groundTyEq)
+import           Utils.AST.Parser                  (checkEqTypes)
 
 import qualified Parser.Parsing                    as Parser (Annotation (..))
 import           Semantic.Errors
@@ -510,11 +510,11 @@ isDefined ident =
 -- Type |Type| helpers!
 -- | Checks if two type are the same numeric type.
 sameNumTy :: TypeSpecifier -> TypeSpecifier -> Bool
-sameNumTy a b = groundTyEq a b && numTy a
+sameNumTy a b = checkEqTypes a b && numTy a
 
 sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad ()
 sameOrErr loc t1 t2 =
-  unless (groundTyEq t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
+  unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
 unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
 unDyn t = Undyn t (undynTypeAnn (getAnnotation t))

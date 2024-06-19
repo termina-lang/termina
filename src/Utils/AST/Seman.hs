@@ -7,9 +7,9 @@ import           AST.Seman
 
 -- A relation of type specifier.
 dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
-dynPromotion (DynamicSubtype t) (DynamicSubtype t') = groundTyEq t t'
-dynPromotion (DynamicSubtype t) q = groundTyEq t q
-dynPromotion t (DynamicSubtype q) = groundTyEq t q
+dynPromotion (DynamicSubtype t) (DynamicSubtype t') = checkEqTypes t t'
+dynPromotion (DynamicSubtype t) q = checkEqTypes t q
+dynPromotion t (DynamicSubtype q) = checkEqTypes t q
 dynPromotion _ _ = False
 -- TODO Q23
 

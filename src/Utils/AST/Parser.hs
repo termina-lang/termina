@@ -5,41 +5,34 @@ module Utils.AST.Parser where
 import           AST.Parser
 import qualified Data.Map as M
 
--- Ground Type equality
-groundTyEq :: TypeSpecifier -> TypeSpecifier -> Bool
-groundTyEq  UInt8  UInt8 = True
-groundTyEq  UInt16  UInt16 = True
-groundTyEq  UInt32  UInt32 = True
-groundTyEq  UInt64  UInt64 = True
-groundTyEq  Int8  Int8 = True
-groundTyEq  Int16  Int16 = True
-groundTyEq  Int32  Int32 = True
-groundTyEq  Int64  Int64 = True
-groundTyEq  USize  USize = True
-groundTyEq  Bool  Bool = True
-groundTyEq  Unit Unit = True
-groundTyEq  (Option _) (Option Unit) = True
-groundTyEq  (Option Unit) (Option _) = True
-groundTyEq  (Option tyspecl) (Option tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = groundTyEq tyspecl tyspecr
--- TODO: These are considered complex types and should be handled differently
+-- Type equality
+checkEqTypes :: TypeSpecifier -> TypeSpecifier -> Bool
+checkEqTypes  UInt8  UInt8 = True
+checkEqTypes  UInt16  UInt16 = True
+checkEqTypes  UInt32  UInt32 = True
+checkEqTypes  UInt64  UInt64 = True
+checkEqTypes  Int8  Int8 = True
+checkEqTypes  Int16  Int16 = True
+checkEqTypes  Int32  Int32 = True
+checkEqTypes  Int64  Int64 = True
+checkEqTypes  USize  USize = True
+checkEqTypes  Bool  Bool = True
+checkEqTypes  Unit Unit = True
+checkEqTypes  (Option _) (Option Unit) = True
+checkEqTypes  (Option Unit) (Option _) = True
+checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = checkEqTypes tyspecl tyspecr
 -- TODO: We are delaying the checking of the size of the vectors to a further stage
-groundTyEq  (Array typespecl _sizel) (Array typespecr _sizer) = groundTyEq typespecl typespecr
-groundTyEq  (DefinedType idl) (DefinedType idr) = idl == idr
+checkEqTypes  (Array typespecl _sizel) (Array typespecr _sizer) = checkEqTypes typespecl typespecr
+checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
-groundTyEq  (Location tyspecl) (Location tyspecr) = groundTyEq tyspecl tyspecr
-groundTyEq  (Location tyspecl) tyspecr = groundTyEq tyspecl tyspecr
-groundTyEq  tyspecl (Location tyspecr) = groundTyEq tyspecl tyspecr
+checkEqTypes  (Location tyspecl) (Location tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Location tyspecl) tyspecr = checkEqTypes tyspecl tyspecr
+checkEqTypes  tyspecl (Location tyspecr) = checkEqTypes tyspecl tyspecr
 --
-groundTyEq  _ _ = False
-
-constExprEq :: ConstExpression a -> ConstExpression a -> Bool
-constExprEq (KC (I intl (Just tyspecl)) _) (KC (I intr (Just tyspecr)) _) = groundTyEq tyspecl tyspecr && intl == intr
-constExprEq (KC (B vall) _) (KC (B valr) _) = vall == valr
-constExprEq (KC (C charl) _) (KC (C charr) _) = charl == charr
-constExprEq _ _ = False
+checkEqTypes  _ _ = False
 
 -- Helper to detect invocations to 'self'
 objIsSelf :: Object a -> Bool

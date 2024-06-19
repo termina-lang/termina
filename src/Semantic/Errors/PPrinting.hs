@@ -29,6 +29,26 @@ instance ShowText AccessKind where
     showText Mutable = "mut "
     showText Immutable = ""
 
+instance ShowText Op where
+    showText Addition = "+"
+    showText Subtraction = "-"
+    showText Multiplication = "*"
+    showText Division = "/"
+    showText Modulo = "%"
+    showText BitwiseAnd = "&"
+    showText BitwiseOr = "|"
+    showText BitwiseXor = "^"
+    showText BitwiseLeftShift = "<<"
+    showText BitwiseRightShift = ">>"
+    showText RelationalLT = "<"
+    showText RelationalLTE = "<="
+    showText RelationalGT = ">"
+    showText RelationalGTE = ">="
+    showText RelationalEqual = "=="
+    showText RelationalNotEqual = "!="
+    showText LogicalAnd = "&&"
+    showText LogicalOr = "||"
+
 instance ShowText TypeSpecifier where
     showText UInt8 = "u8"
     showText UInt16 = "u16"
@@ -455,6 +475,44 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 4 -- ^ Size of "&mut"
                 (Just "You are trying to create a mutable reference to an immutable object.")
+    EBinOpExpectedTypeLeft op expectedTy actualTy ->
+        let title = "error[E028]: Binary operation expected type on the left (E028)."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The result of the binary operation \x1b[31m" <> showText op <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but the left operand you are providing is of type \x1b[31m" <> 
+                    showText actualTy <> "\x1b[0m."))
+    EBinOpExpectedTypeRight op expectedTy actualTy ->
+        let title = "error[E029]: Binary operation expected type on the right (E029)."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The result of the binary operation \x1b[31m" <> showText op <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but the right operand you are providing is of type \x1b[31m" <> 
+                    showText actualTy <> "\x1b[0m."))
+    EBinOpTypeMismatch op ty_le ty_re ->
+        let title = "error[E030]: binary operation type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The binary operation \x1b[31m" <> showText op <> 
+                    "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
+                    showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
+    EBinOpExpectedTypeNotBool op ty ->
+        let title = "error[E031]: binary operation expected result type not boolean."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The binary operation \x1b[31m" <> showText op <> 
+                    "will result in a value of type \x1b[31m" <> showText Bool <> 
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

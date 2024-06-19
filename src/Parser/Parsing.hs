@@ -405,8 +405,8 @@ expressionParser' = buildPrattParser -- New parser
     expressionTermParser
   where 
     binaryInfix s f = Ex.Infix (do
-          _ <- reservedOp s
           p <- getPosition
+          _ <- reservedOp s
           return $ \l r -> BinOp f l r (Position p))
     castingPostfix = Ex.Postfix (do
           p <- getPosition

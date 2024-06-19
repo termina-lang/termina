@@ -45,11 +45,20 @@ data Errors a
   | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E025)
   | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (E026)
   | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E027)
-  | EOpMismatch Op TypeSpecifier TypeSpecifier
+  | EBinOpExpectedTypeLeft Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the left (E028)
+  | EBinOpExpectedTypeRight Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the right (E029)
+  | EBinOpTypeMismatch Op TypeSpecifier TypeSpecifier -- ^ Binary operation type mismatch (E030)
+  | EBinOpExpectedTypeNotBool Op TypeSpecifier -- ^ Binary operation expected result type not boolean (E031)
+  | EBinOpLeftTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the left (E032)
+  | EBinOpRightTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the right (E033)
+  | EBinOpExpectedTypeNotNum Op TypeSpecifier -- ^ Binary operation expected result type not numeric (E034)
+  | EBinOpLeftTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the left (E035)
+  | EBinOpRightTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the right (E036)
+  | EBinOpRightTypeNotPos Op TypeSpecifier -- ^ Binary operation expected positive type on the right (E037)
+  | EBinOpLeftTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the left (E038)
+  | EBinOpRightTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the right (E039)
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
-  | EExpectedNumType TypeSpecifier
-  | EExpectedPosType TypeSpecifier
   | EConstantWithoutKnownType Const
   | EReturnValueExpected TypeSpecifier
   | EReturnValueNotVoid 

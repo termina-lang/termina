@@ -125,6 +125,21 @@ posTy UInt64 = True
 posTy USize  = True
 posTy _      = False
 
+-- | Predicate defining when a |TypeSpecifier| can be used in a comparison.
+equatableTy :: TypeSpecifier -> Bool
+equatableTy UInt8  = True
+equatableTy UInt16 = True
+equatableTy UInt32 = True
+equatableTy UInt64 = True
+equatableTy Int8   = True
+equatableTy Int16  = True
+equatableTy Int32  = True
+equatableTy Int64  = True
+equatableTy USize  = True
+equatableTy Bool   = True
+equatableTy Char   = True
+equatableTy _      = False
+
 memberIntCons :: Integer -> TypeSpecifier -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
 memberIntCons i UInt16 = ( 0 <= i ) && ( i <= 65536)

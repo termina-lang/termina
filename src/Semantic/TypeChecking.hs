@@ -240,7 +240,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               element_type <- getExpType element_typed
               case element_type of
                   (DynamicSubtype tyref) ->
-                      unless (groundTyEq ty_pool tyref) (throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)) >>
+                      unless (checkEqTypes ty_pool tyref) (throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)) >>
                       return (([Parameter "element" element_type], [element_typed]), Unit)
                   _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
@@ -355,8 +355,8 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     Modulo -> sameNumType
     BitwiseLeftShift -> leftExpNumType
     BitwiseRightShift -> leftExpNumType
-    RelationalEqual -> sameGroundTyBool
-    RelationalNotEqual -> sameGroundTyBool
+    RelationalEqual -> sameEquatableTyBool
+    RelationalNotEqual -> sameEquatableTyBool
     RelationalLT -> sameNumTyBool
     RelationalLTE -> sameNumTyBool
     RelationalGT -> sameNumTyBool
@@ -377,57 +377,74 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameNumType =
       case expectedType of
         ty@(Just ty') -> do
-          unless (numTy ty') (throwError $ annotateError pann (EExpectedNumType ty'))
-          tyle <- typeExpression ty typeObj le
-          tyre <- typeExpression ty typeObj re
+          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          tyle <- catchError
+            (typeExpression ty typeObj le)
+            (\err -> case semError err of
+                EMismatch _ actualTy -> throwError $ annotateError (getAnnotation le) (EBinOpExpectedTypeLeft op ty' actualTy)
+                _ -> throwError err
+            )
+          tyre <- catchError
+            (typeExpression ty typeObj re)
+            (\err -> case semError err of
+                EMismatch _ actualTy -> throwError $ annotateError (getAnnotation re) (EBinOpExpectedTypeRight op ty' actualTy)
+                _ -> throwError err
+            )
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
-          unless (numTy tyre_ty) (throwError $ annotateError pann (EExpectedNumType tyre_ty))
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
+          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
+          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyre_ty)
 
     leftExpNumType :: SemanticMonad (SAST.Expression SemanticAnns)
     leftExpNumType =
       case expectedType of
         ty@(Just ty') -> do
-          tyle <- typeExpression ty typeObj le
+          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          tyle <- catchError
+            (typeExpression ty typeObj le)
+            (\err -> case semError err of
+                EMismatch _ actualTy -> throwError $ annotateError (getAnnotation le) (EBinOpExpectedTypeLeft op ty' actualTy)
+                _ -> throwError err
+            )
           tyre <- typeExpression Nothing typeObj re
           tyre_ty <- getExpType tyre
-          unless (numTy ty') (throwError $ annotateError pann (EExpectedNumType ty'))
-          unless (posTy tyre_ty) (throwError $ annotateError pann (EExpectedPosType tyre_ty))
+          unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
-          unless (posTy tyre_ty) (throwError $ annotateError pann (EExpectedPosType tyre_ty))
+          unless (numTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotNum op tyle_ty))
+          unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
-    sameGroundTyBool :: SemanticMonad (SAST.Expression SemanticAnns)
-    sameGroundTyBool =
+    sameEquatableTyBool :: SemanticMonad (SAST.Expression SemanticAnns)
+    sameEquatableTyBool =
       case expectedType of
         (Just Bool) -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
+          unless (equatableTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotEquatable op tyle_ty))
+          unless (equatableTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotEquatable op tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
-        _ -> throwError $ annotateError pann EExpectedType
 
     sameNumTyBool :: SemanticMonad (SAST.Expression SemanticAnns)
     sameNumTyBool =
@@ -437,18 +454,20 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
-          unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
+          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
+          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
-          unless (numTy tyle_ty) (throwError $ annotateError pann (EExpectedNumType tyle_ty))
+          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
+          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
-        _ -> throwError $ annotateError pann EExpectedType
 
     sameBoolType :: SemanticMonad (SAST.Expression SemanticAnns)
     sameBoolType =
@@ -457,15 +476,15 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           tyle <- typeExpression (Just Bool) typeObj le
           tyre <- typeExpression (Just Bool) typeObj re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+        Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExpType tyle
           tyre_ty <- getExpType tyre
-          unless (groundTyEq tyle_ty tyre_ty) (throwError $ annotateError pann (EOpMismatch op tyle_ty tyre_ty))
+          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
           unless (boolTy tyle_ty) (throwError $ annotateError pann (EMismatch Bool tyle_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
-        _ -> throwError $ annotateError pann EExpectedType
 
 typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = do
   -- | Type object
@@ -484,7 +503,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
     Slice ty -> do
       case expectedType of
         Just rtype@(Reference _ak (Array ts size)) -> do
-          unless (groundTyEq ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
+          unless (checkEqTypes ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
           return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
         _ -> throwError $ annotateError pann EExpectedType
     _ -> do
@@ -1051,7 +1070,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
       zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
-        unless (groundTyEq ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
+        unless (checkEqTypes ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
 
