@@ -130,15 +130,18 @@ classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
 classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
 genThisParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
-genThisParam (TypeDefinition (Class clsKind identifier _members _provides _modifiers) ann) =
-    case clsKind of
-    ResourceClass -> return $ CDeclaration [CTypeSpec CVoidType]
+genThisParam (TypeDefinition (Class _clsKind _identifier _members _provides _modifiers) ann) =
+    return $ CDeclaration [CTypeSpec CVoidType]
         [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
-    _ -> return $ CDeclaration [CTypeSpec $ CTypeDef identifier]
+genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
+
+genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) ann) =
+    return $ CDeclaration [CTypeSpec $ CTypeDef identifier]
         [(Just (CDeclarator (Just selfParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
-genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
+genSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
 genConstSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
 genConstSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) ann) =
@@ -301,18 +304,18 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
             clsFuncName <- genClassFunctionName identifier method
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genSelfParam clsdef
             return $ CDeclaration retTypeDecl
-                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam] [] cAnn] [] cAnn), Nothing, Nothing)]
+                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr [cSelfParam] [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction action param rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- genDeclSpecifiers rts
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genSelfParam clsdef
             cParam <- genParameterDeclaration ann' param
             clsFuncName <- genClassFunctionName identifier action
             return $ CDeclaration retTypeDecl
-                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam, cParam] [] cAnn] [] cAnn), Nothing, Nothing)]
+                [(Just (CDeclarator (Just clsFuncName) [CFunDeclr [cSelfParam, cParam] [] cAnn] [] cAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann True)
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
@@ -386,20 +389,20 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
         genClassFunctionDefinition (ClassMethod method rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier method
             retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genSelfParam clsdef
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
-                (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam] [] cAnn] [] cAnn)
+                (CDeclarator (Just clsFuncName) [CFunDeclr [cSelfParam] [] cAnn] [] cAnn)
                 (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             retTypeDecl <- genDeclSpecifiers rts
-            cThisParam <- genThisParam clsdef
+            cSelfParam <- genSelfParam clsdef
             cParam <- genParameterDeclaration ann param
             cReturn <- genReturnStatement ret
             let cAnn = buildGenericAnn ann
@@ -407,7 +410,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                         cStmt <- genBlockItem x
                         return $ acc ++ cStmt) [] body
             return $ CFDefExt $ CFunDef retTypeDecl
-                (CDeclarator (Just clsFuncName) [CFunDeclr [cThisParam, cParam] [] cAnn] [] cAnn)
+                (CDeclarator (Just clsFuncName) [CFunDeclr [cSelfParam, cParam] [] cAnn] [] cAnn)
                 (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
