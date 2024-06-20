@@ -65,6 +65,19 @@ data ConnectionSeman =
     TypeSpecifier
     -- | List of procedures that can be called on the connected resource
     [SemanProcedure]
+  | APAtomicConnTy
+    -- | Type specifier of the connected atomic
+    TypeSpecifier    
+  | APAtomicArrayConnTy
+    -- | type specifier of the connected atomic array
+    TypeSpecifier
+    -- | Size of the connected atomic array
+    Size
+  | APPoolConnTy
+    -- | Type specifier of the connected pool
+    TypeSpecifier
+    -- | Size of the connected pool
+    Size
   -- | Sink port connection
   | SPConnTy
     -- | Type specifier of the connected event emitter
@@ -143,6 +156,15 @@ buildOutPortConnAnn loc ts = SemAnn loc (CTy (OutPConnTy ts))
 
 buildAccessPortConnAnn :: Locations -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
 buildAccessPortConnAnn loc ts procs = SemAnn loc (CTy (APConnTy ts procs))
+
+buildPoolConnAnn :: Locations -> TypeSpecifier -> Size -> SAnns SemanticElems
+buildPoolConnAnn loc ts s = SemAnn loc (CTy (APPoolConnTy ts s))
+
+buildAtomicConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
+buildAtomicConnAnn loc ts = SemAnn loc (CTy (APAtomicConnTy ts))
+
+buildAtomicArrayConnAnn :: Locations -> TypeSpecifier -> Size -> SAnns SemanticElems
+buildAtomicArrayConnAnn loc ts s = SemAnn loc (CTy (APAtomicArrayConnTy ts s))
 
 buildSinkPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
 buildSinkPortConnAnn loc ts = SemAnn loc (CTy (SPConnTy ts))
@@ -569,22 +591,18 @@ checkTypeSpecifier loc (DefinedType identTy) =
   -- Check that the type was defined
   void (getGlobalTypeDef loc identTy)
   -- we assume that only well-formed types are added to globals.
-checkTypeSpecifier loc (Array ty (CAST.K s)) =
+checkTypeSpecifier loc (Array ty s) =
   -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
   -- Only arrays of simple types.
   simpleTyorFail loc ty >>
-  -- Numeric contast
-  checkIntConstant loc USize s >>
-  --
-  checkTypeSpecifier loc ty
-checkTypeSpecifier loc (Array ty (CAST.V ident)) =
-  -- Only arrays of simple types.
+  checkTypeSpecifier loc ty >>
+  checkSize loc s
+checkTypeSpecifier loc (Slice ty) =
+  -- Only slices of simple types.
   simpleTyorFail loc ty >>
-  getConstTy loc ident >>=
-  sameOrErr loc USize >>
   checkTypeSpecifier loc ty
-checkTypeSpecifier loc (MsgQueue ty _)       = checkTypeSpecifier loc ty
-checkTypeSpecifier loc (Pool ty _)           = checkTypeSpecifier loc ty
+checkTypeSpecifier loc (MsgQueue ty s) = checkTypeSpecifier loc ty >> checkSize loc s
+checkTypeSpecifier loc (Pool ty s) = checkTypeSpecifier loc ty >> checkSize loc s
 -- Dynamic Subtyping
 checkTypeSpecifier loc (Option tyd@(DynamicSubtype _ty)) = checkTypeSpecifier loc tyd
 -- Regular option subtyping
@@ -605,6 +623,8 @@ checkTypeSpecifier loc (AccessPort ty) =
   case ty of
     (Allocator (Option _))  -> throwError $ annotateError loc EOptionNested
     (Allocator ty') -> simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+    (AtomicAccess ty') -> unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
+    (AtomicArrayAccess ty') -> unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty'))
     (DefinedType identTy) ->
       getGlobalTypeDef loc identTy >>=
         \case
@@ -621,6 +641,11 @@ checkTypeSpecifier loc (OutPort (DynamicSubtype ty')) = simpleTyorFail loc ty' >
 checkTypeSpecifier loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
 checkTypeSpecifier loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (AtomicAccess ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
+checkTypeSpecifier loc (AtomicArrayAccess ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty'))
+checkTypeSpecifier loc (Atomic ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicInvalidType ty'))
+checkTypeSpecifier loc (AtomicArray ty' s) = 
+  unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayInvalidType ty')) >> checkSize loc s
 -- This is explicit just in case
 checkTypeSpecifier _ UInt8                   = return ()
 checkTypeSpecifier _ UInt16                  = return ()

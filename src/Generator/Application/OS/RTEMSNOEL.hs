@@ -65,6 +65,13 @@ data RTEMSGlobal =
       Identifier -- ^ pool identifier
       TypeSpecifier -- ^ type of the elements of the pool
       TInteger -- ^ pool size
+    | RTEMSAtomic
+      Identifier -- ^ atomic identifier
+      TypeSpecifier -- ^ type of the atomic
+    | RTEMSAtomicArray
+      Identifier -- ^ atomic array identifier
+      TypeSpecifier -- ^ type of the elements of the atomic array
+      TInteger -- ^ atomic array size
     deriving Show
 
 data RTEMSEmitter =
@@ -118,6 +125,8 @@ instance Ord RTEMSGlobal where
     compare (RTEMSHandler {}) _ = LT
     compare (RTEMSResource {}) _ = LT
     compare (RTEMSPool {}) _ = LT
+    compare (RTEMSAtomic {}) _ = LT
+    compare (RTEMSAtomicArray {}) _ = LT
 
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
@@ -226,6 +235,8 @@ buildRTEMSGlobal (Resource identifier (DefinedType ty) (Just (FieldAssignmentsEx
                         _ -> error $ "Invalid port connection: " ++ show portIdentifier;
                 _ -> []) clsMembers
 buildRTEMSGlobal (Resource identifier (Pool ty (K size)) _ _ _) _ = RTEMSPool identifier ty size
+buildRTEMSGlobal (Resource identifier (Atomic ty) _ _ _) _ = RTEMSAtomic identifier ty
+buildRTEMSGlobal (Resource identifier (AtomicArray ty (K size)) _ _ _) _ = RTEMSAtomicArray identifier ty size
 buildRTEMSGlobal obj _ = error $ "Invalid global object: " ++ show obj
 
 buildRTEMSEmitter :: Global SemanticAnns -> M.Map Identifier RTEMSGlobal -> Maybe RTEMSEmitter
@@ -303,13 +314,52 @@ genPoolMemoryAreas (obj : objs) = do
     rest <- mapM (genPoolMemoryArea False) objs
     return $ memArea : rest
 
+genAtomicDeclaration :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
+genAtomicDeclaration before (RTEMSAtomic identifier ts) = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt = CAnnotations Internal (CDeclarationAnn before)
+    declSpec <- genDeclSpecifiers ts
+    return $ CExtDecl $ CDeclExt $
+        CDeclaration (CTypeQual CAtomicQual : declSpec)
+            [(Just $ CDeclarator (Just identifier)
+                [] [] cAnn, Nothing, Nothing)]
+            declStmt
+genAtomicDeclaration _ obj = error $ "Invalid global object (not an atomic): " ++ show obj
+
+genAtomicDeclarations :: [RTEMSGlobal] -> CSourceGenerator [CFileItem]
+genAtomicDeclarations [] = return []
+genAtomicDeclarations (obj : objs) = do
+    decl <- genAtomicDeclaration True obj
+    rest <- mapM (genAtomicDeclaration False) objs
+    return $ decl : rest
+
+genAtomicArrayDeclaration :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
+genAtomicArrayDeclaration before (RTEMSAtomicArray identifier ts size) = do
+    let cAnn = CAnnotations Internal CGenericAnn
+        declStmt = CAnnotations Internal (CDeclarationAnn before)
+        cSize = genInteger size
+    declSpec <- genDeclSpecifiers ts
+    return $ CExtDecl $ CDeclExt $
+        CDeclaration (CTypeQual CAtomicQual : declSpec)
+            [(Just $ CDeclarator (Just identifier)
+                [CArrDeclr [] (CArrSize False (CConst (CIntConst cSize) cAnn)) cAnn] [] cAnn, Nothing, Nothing)]
+            declStmt
+genAtomicArrayDeclaration _ obj = error $ "Invalid global object (not an atomic array): " ++ show obj
+
+genAtomicArrayDeclarations :: [RTEMSGlobal] -> CSourceGenerator [CFileItem]
+genAtomicArrayDeclarations [] = return []
+genAtomicArrayDeclarations (obj : objs) = do
+    decl <- genAtomicArrayDeclaration True obj
+    rest <- mapM (genAtomicArrayDeclaration False) objs
+    return $ decl : rest
+
 genInterruptEmitterDeclaration :: Bool -> RTEMSEmitter -> CSourceGenerator CFileItem
 genInterruptEmitterDeclaration before (RTEMSInterruptEmitter identifier (RTEMSTask {})) = do
     let cAnn = CAnnotations Internal CGenericAnn
         declStmt = CAnnotations Internal (CDeclarationAnn before)
     return $ CExtDecl $ CDeclExt $
         CDeclaration [CStorageSpec CStatic, CTypeSpec $ CTypeDef ("rtems" <::> "interrupt_emitter_t")]
-            [(Just $ CDeclarator (Just $ identifier) [] [] cAnn, Nothing, Nothing)]
+            [(Just $ CDeclarator (Just identifier) [] [] cAnn, Nothing, Nothing)]
             declStmt
 genInterruptEmitterDeclaration _ obj = error $ "Invalid global object (not an interrupt emitter): " ++ show obj
 
@@ -1350,6 +1400,8 @@ genMainFile mName prjprogs = do
             (CAnnotations Internal (CDeclarationAnn True))
     cVariantsForTaskPorts <- concat <$> mapM genVariantsForTaskPorts (M.elems taskClss)
     cPoolMemoryAreas <- genPoolMemoryAreas pools
+    cAtomicDeclarations <- genAtomicDeclarations atomics
+    cAtomicArrayDeclarations <- genAtomicArrayDeclarations atomicArrays
     cInterruptEmitterDeclarations <- genInterruptEmitterDeclarations interruptEmittersToTasks
     cTaskClassesCode <- mapM genTaskClassCode (M.elems taskClss)
     cEmitters <- mapM genEmitter emitters
@@ -1367,7 +1419,8 @@ genMainFile mName prjprogs = do
         ] ++ includes
         ++ [
             externInitGlobals
-        ] ++ cVariantsForTaskPorts ++ cPoolMemoryAreas ++ cInterruptEmitterDeclarations
+        ] ++ cVariantsForTaskPorts ++ cAtomicDeclarations ++ cAtomicArrayDeclarations 
+        ++ cPoolMemoryAreas ++ cInterruptEmitterDeclarations
         ++ cTaskClassesCode ++ cEmitters ++ [enableProtection, initGlobals, installEmitters, createTasks, initTask]
         ++ appConfig
 
@@ -1405,6 +1458,8 @@ genMainFile mName prjprogs = do
         tasks = [t | t@(RTEMSTask {}) <- rtemsGlbs]
         pools = [p | p@(RTEMSPool {}) <- rtemsGlbs]
         resources = [r | r@(RTEMSResource {}) <- rtemsGlbs]
+        atomics = [a | a@(RTEMSAtomic {}) <- rtemsGlbs]
+        atomicArrays = [a | a@(RTEMSAtomicArray {}) <- rtemsGlbs]
 
         targetChannelConnections = foldr
                 (\glb accMap ->

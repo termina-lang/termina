@@ -57,6 +57,22 @@ data Errors a
   | EBinOpRightTypeNotPos Op TypeSpecifier -- ^ Binary operation expected positive type on the right (E037)
   | EBinOpLeftTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the left (E038)
   | EBinOpRightTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the right (E039)
+  | EAtomicAccessInvalidType TypeSpecifier -- ^ Atomic access invalid type (E040)
+  | EAtomicArrayAccessInvalidType TypeSpecifier -- ^ Atomic array access invalid type (E041)
+  | EAtomicInvalidType TypeSpecifier -- ^ Atomic invalid type (E042)
+  | EAtomicArrayInvalidType TypeSpecifier -- ^ Atomic array invalid type (E043)
+  | EAtomicAccessLoadObjectTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic access load object type mismatch (E044)
+  | EAtomicAccessLoadWrongNumArgs Integer -- ^ Atomic access load wrong number of arguments (E045)
+  | EAtomicAccessStoreValueTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic access store parameter type mismatch (E046)
+  | EAtomicAccessStoreWrongNumArgs Integer -- ^ Atomic access store wrong number of arguments (E047)
+  | EAtomicAccessWrongProcedure Identifier -- ^ Atomic access wrong procedure (E048)
+  | EAtomicArrayAccessLoadIndexTypeMismatch TypeSpecifier -- ^ Atomic array access load index type mismatch (E049)
+  | EAtomicArrayAccessLoadObjectTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic array access object type mismatch (E050)
+  | EAtomicArrayAccessLoadWrongNumArgs Integer -- ^ Atomic array access load wrong number of arguments (E051)
+  | EAtomicArrayAccessStoreIndexTypeMismatch TypeSpecifier -- ^ Atomic array access store index type mismatch (E052)
+  | EAtomicArrayAccessStoreValueTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic array access store value type mismatch (E053)
+  | EAtomicArrayAccessStoreWrongNumArgs Integer -- ^ Atomic array access store wrong number of arguments (E054)
+  | EAtomicArrayAccessWrongProcedure Identifier -- ^ Atomic array access wrong procedure (E055)
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
   | EConstantWithoutKnownType Const
@@ -154,6 +170,8 @@ data Errors a
   | EInboundPortNotChannel Identifier
   | EOutboundPortNotChannel Identifier
   | EAccessPortNotPool Identifier
+  | EAccessPortNotAtomic Identifier
+  | EAccessPortNotAtomicArray Identifier
   -- | Dynamic a non primitive type
   | EDynPrim TypeSpecifier
   -- | Dynamic (type has a Dynamic inside) as Argument of a function

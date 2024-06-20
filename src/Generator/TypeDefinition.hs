@@ -30,6 +30,16 @@ genFieldDeclaration ann (FieldDefinition identifier (AccessPort ts@(Allocator {}
     decl <- genDeclSpecifiers ts
     return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
+genFieldDeclaration ann (FieldDefinition identifier (AccessPort ts@(AtomicAccess {}))) = do
+    let exprCAnn = buildGenericAnn ann
+    decl <- genDeclSpecifiers ts
+    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
+genFieldDeclaration ann (FieldDefinition identifier (AccessPort ts@(AtomicArrayAccess {}))) = do
+    let exprCAnn = buildGenericAnn ann
+    decl <- genDeclSpecifiers ts
+    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
+        (buildDeclarationAnn ann False)
 genFieldDeclaration ann (FieldDefinition identifier ts) = do
     let exprCAnn = buildGenericAnn ann
     arrayDecl <- genArraySizeDeclarator ts ann

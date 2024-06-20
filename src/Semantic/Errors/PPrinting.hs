@@ -68,6 +68,10 @@ instance ShowText TypeSpecifier where
     showText (MsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
     showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (Allocator ts) = "Allocator<" <> showText ts <> ">"
+    showText (AtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
+    showText (AtomicArrayAccess ts) = "AtomicArrayAccess<" <> showText ts <> ">"
+    showText (Atomic ts) = "Atomic<" <> showText ts <> ">"
+    showText (AtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (Reference ak ts) = "&" <> showText ak <> showText ts
     showText (DynamicSubtype ts) = "dyn " <> showText ts
     showText (Location ts) = "loc " <> showText ts

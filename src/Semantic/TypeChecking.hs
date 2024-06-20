@@ -245,6 +245,68 @@ typeMemberFunctionCall ann obj_ty ident args =
                   _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)
             _ -> throwError $ annotateError ann EPoolsWrongNumArgs
         _ -> throwError $ annotateError ann (EPoolsWrongProcedure ident)
+    AccessPort (AtomicAccess ty_atomic) ->
+      case ident of
+        "load" ->
+          case args of
+            [refM] -> do
+              typed_ref <- catchError
+                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject refM)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicAccessLoadObjectTypeMismatch ty_atomic ty)
+                    _ -> throwError err
+                )
+              return (([Parameter "retval" (Reference Mutable ty_atomic)], [typed_ref]), Unit)
+            _ -> throwError $ annotateError ann (EAtomicAccessLoadWrongNumArgs (fromIntegral (length args)))
+        "store" ->
+          case args of
+            [value] -> do
+              typed_value <- catchError
+                (typeExpression (Just ty_atomic) typeRHSObject value)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicAccessStoreValueTypeMismatch ty_atomic ty)
+                    _ -> throwError err
+                )
+              return (([Parameter "value" ty_atomic], [typed_value]), Unit)
+            _ -> throwError $ annotateError ann (EAtomicAccessStoreWrongNumArgs (fromIntegral (length args)))
+        _ -> throwError $ annotateError ann (EAtomicAccessWrongProcedure ident)
+    AccessPort (AtomicArrayAccess ty_atomic) ->
+      case ident of
+        "load_index" ->
+          case args of
+            [idx, refM] -> do
+              typed_idx <- catchError
+                (typeExpression (Just USize) typeRHSObject idx)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicArrayAccessLoadIndexTypeMismatch ty)
+                    _ -> throwError err
+                )
+              typed_ref <- catchError
+                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject refM)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicArrayAccessLoadObjectTypeMismatch ty_atomic ty)
+                    _ -> throwError err
+                )
+              return (([Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], [typed_idx, typed_ref]), Unit)
+            _ -> throwError $ annotateError ann (EAtomicArrayAccessLoadWrongNumArgs (fromIntegral (length args)))
+        "store_index" ->
+          case args of
+            [idx, value] -> do
+              typed_idx <- catchError
+                (typeExpression (Just USize) typeRHSObject idx)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicArrayAccessStoreIndexTypeMismatch ty)
+                    _ -> throwError err
+                )
+              typed_value <- catchError
+                (typeExpression (Just ty_atomic) typeRHSObject value)
+                (\err -> case semError err of
+                    EMismatch _ ty -> throwError $ annotateError ann (EAtomicArrayAccessStoreValueTypeMismatch ty_atomic ty)
+                    _ -> throwError err
+                )
+              return (([Parameter "index" USize, Parameter "value" ty_atomic], [typed_idx, typed_value]), Unit)
+            _ -> throwError $ annotateError ann (EAtomicArrayAccessStoreWrongNumArgs (fromIntegral (length args)))
+        _ -> throwError $ annotateError ann (EAtomicArrayAccessWrongProcedure ident)
     OutPort ty ->
       case ident of
         -- send(T)
@@ -491,22 +553,26 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
   typed_obj <- typeObj rhs_e
   -- | Get the type of the object
   (obj_ak, obj_type) <- getObjectType typed_obj
-  -- | Check if the we are allowed to create that kind of reference from the object
-  checkReferenceAccessKind obj_ak
   case obj_type of
     -- | If the object is of a dynamic subtype, then the reference will be to an object of
-    -- the base type.
+    -- the base type. Objects of a dynamic subtype are always immutable, BUT a reference
+    -- to an object of a dynamic subtype can be mutable. Thus, we do not need to check
+    -- the access kind of the object.
     DynamicSubtype ty -> do
       -- | Check that the expected type is the same as the base type.  
       maybe (return ()) (sameOrErr pann (Reference refKind ty)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
     Slice ty -> do
+      -- | Check if the we are allowed to create that kind of reference from the object
+      checkReferenceAccessKind obj_ak
       case expectedType of
         Just rtype@(Reference _ak (Array ts size)) -> do
           unless (checkEqTypes ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
           return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
         _ -> throwError $ annotateError pann EExpectedType
     _ -> do
+      -- | Check if the we are allowed to create that kind of reference from the object
+      checkReferenceAccessKind obj_ak
       maybe (return ()) (flip (sameOrErr pann) (Reference refKind obj_type)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
 
@@ -716,8 +782,18 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
       AccessPort (Allocator {}) ->
         case gentry of
           -- TODO: Check that the types match
-          SemAnn _ (GGlob (SResource (Pool {}))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildStmtAnn pann)
+          SemAnn _ (GGlob (SResource (Pool ty s))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
+      AccessPort (AtomicAccess {}) ->
+        case gentry of
+          -- TODO: Check that the types match
+          SemAnn _ (GGlob (SResource (Atomic ty))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
+          _ -> throwError $ annotateError loc $ EAccessPortNotAtomic sid
+      AccessPort (AtomicArrayAccess {}) ->
+        case gentry of
+          -- TODO: Check that the types match
+          SemAnn _ (GGlob (SResource (AtomicArray ty s))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
+          _ -> throwError $ annotateError loc $ EAccessPortNotAtomicArray sid
       AccessPort (DefinedType iface) ->
         getGlobalTypeDef loc iface >>=
           \case {

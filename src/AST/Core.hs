@@ -119,7 +119,11 @@ data TypeSpecifier
   -- Built-in polymorphic types
   | MsgQueue TypeSpecifier Size -- Message queues
   | Pool TypeSpecifier Size -- Memory pools
+  | Atomic TypeSpecifier -- Atomic variables
+  | AtomicArray TypeSpecifier Size -- Atomic arrays
   | Allocator TypeSpecifier -- Interface of memory pools
+  | AtomicAccess TypeSpecifier -- Interface to access atomic variables
+  | AtomicArrayAccess TypeSpecifier -- Interface to access atomic arrays
   -- Non-primitive types
   | Reference AccessKind TypeSpecifier
   | DynamicSubtype TypeSpecifier

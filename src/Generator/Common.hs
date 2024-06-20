@@ -44,6 +44,9 @@ outPort = namefy "termina_out_port_t"
 poolMethodName :: Identifier -> Identifier
 poolMethodName mName = namefy "termina_pool" <::> mName
 
+atomicMethodName :: Identifier -> Identifier
+atomicMethodName mName = "atomic_" <> mName
+
 poolMemoryArea :: Identifier -> Identifier
 poolMemoryArea identifier = namefy $ "pool_" <> identifier <> "_memory"
 
@@ -238,6 +241,18 @@ genDeclSpecifiers (MsgQueue _ _)               = return [CTypeSpec $ CTypeDef ms
 genDeclSpecifiers (Location ts)                = genDeclSpecifiers ts
 genDeclSpecifiers (AccessPort ts)              = genDeclSpecifiers ts
 genDeclSpecifiers (Allocator _)                = return [CTypeSpec $ CTypeDef pool]
+genDeclSpecifiers (Atomic ts)                  = do
+    tsDecl <- genDeclSpecifiers ts
+    return $ CTypeQual CAtomicQual : tsDecl
+genDeclSpecifiers (AtomicArray ts _)           = do
+    tsDecl <- genDeclSpecifiers ts
+    return $ CTypeQual CAtomicQual : tsDecl
+genDeclSpecifiers (AtomicAccess ts)            = do
+    tsDecl <- genDeclSpecifiers ts
+    return $ CTypeQual CAtomicQual : tsDecl
+genDeclSpecifiers (AtomicArrayAccess ts)     = do
+    tsDecl <- genDeclSpecifiers ts
+    return $ CTypeQual CAtomicQual : tsDecl
 -- | Type of the ports
 genDeclSpecifiers (SinkPort {})                = return [CTypeSpec $ CTypeDef sinkPort]
 genDeclSpecifiers (OutPort {})                 = return [CTypeSpec $ CTypeDef outPort]

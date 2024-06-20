@@ -67,6 +67,38 @@ genMemberFunctionAccess obj ident args ann = do
         AccessPort (Allocator {}) ->
             return $
                 CCall (CVar (poolMethodName ident) cAnn) (cObj : cArgs) cAnn
+        AccessPort (AtomicAccess {}) ->
+            case ident of
+                "load" -> 
+                    case args of 
+                        [ReferenceExpression _ refObj _] -> do
+                            cRefObj <- genObject refObj
+                            return $ CAssignment cRefObj
+                                (CCall (CVar (atomicMethodName ident) cAnn) [cObj] cAnn) cAnn
+                        _ -> throwError $ InternalError $ "invalid params for atomic load: " ++ show args
+                "store" -> return $
+                    CCall (CVar (atomicMethodName ident) cAnn) (cObj : cArgs) cAnn
+                _ -> throwError $ InternalError $ "This should not happen. Unsupported atomic access method: " ++ ident
+        AccessPort (AtomicArrayAccess {}) ->
+            case ident of
+                "load_index" -> 
+                    case args of 
+                        [_, ReferenceExpression _ refObj _] -> do
+                            let idx = head cArgs
+                                cIndexedObj = CIndex cObj idx cAnn
+                                cRefIndexedObj = CUnary CAdrOp cIndexedObj cAnn
+                            cRefObj <- genObject refObj
+                            return $ CAssignment cRefObj
+                                (CCall (CVar (atomicMethodName "load") cAnn) [cRefIndexedObj] cAnn) cAnn
+                        _ -> throwError $ InternalError $ "invalid params for atomic load_index: " ++ show args
+                "store_index" -> 
+                    case cArgs of
+                        [idx, value] ->
+                            let cIndexedObj = CIndex cObj idx cAnn
+                                cRefIndexedObj = CUnary CAdrOp cIndexedObj cAnn
+                            in return $ CCall (CVar (atomicMethodName "store") cAnn) (cRefIndexedObj : [value]) cAnn
+                        _ -> throwError $ InternalError $ "invalid params for atomic store_index: " ++ show args
+                _ -> throwError $ InternalError $ "This should not happen. Unsupported atomic access method: " ++ ident
         -- | If the left hand side is a message queue:
         OutPort {} ->
             -- | If it is a send, the first parameter is the object to be sent. The

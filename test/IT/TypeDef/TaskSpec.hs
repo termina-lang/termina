@@ -85,7 +85,7 @@ renderSource input = case parse (contents topLevel) "" input of
 spec :: Spec
 spec = do
   describe "Pretty printing class methods" $ do
-    it "Prints declaration of class TMChannel without no_handler" $ do
+    it "Prints declaration of task class CHousekeeping" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -113,7 +113,7 @@ spec = do
               "                                    uint32_t limit);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of class TMChannel without no_handler" $ do
+    it "Prints definition of task class CHousekeeping" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

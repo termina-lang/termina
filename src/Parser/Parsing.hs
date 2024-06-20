@@ -50,7 +50,8 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
-             ["MsgQueue", "Pool", "Option", "Allocator"]
+             ["MsgQueue", "Pool", "Option", "Allocator", "Atomic", 
+              "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
       ++ -- Struct and enum types
              ["struct", "enum"]
       ++ -- Dynamic Subtyping
@@ -215,6 +216,10 @@ typeSpecifierParser =
   <|> dynamicSubtypeParser
   <|> locationSubtypeParser
   <|> allocatorParser
+  <|> atomicParser
+  <|> atomicArrayParser
+  <|> atomicAccessParser
+  <|> atomicArrayAccessParser
   <|> sinkPortParser
   <|> inPortParser
   <|> outPortParser
@@ -329,6 +334,40 @@ allocatorParser = do
   typeSpecifier <- typeSpecifierParser
   _ <- reserved ">"
   return $ Allocator typeSpecifier
+
+atomicParser :: Parser TypeSpecifier
+atomicParser = do
+  reserved "Atomic"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reserved ">"
+  return $ Atomic typeSpecifier
+
+atomicAccessParser :: Parser TypeSpecifier
+atomicAccessParser = do
+  reserved "AtomicAccess"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reserved ">"
+  return $ AtomicAccess typeSpecifier
+
+atomicArrayParser :: Parser TypeSpecifier
+atomicArrayParser = do
+  reserved "AtomicArray"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- semi
+  size <- sizeParser
+  _ <- reserved ">"
+  return $ AtomicArray typeSpecifier size
+
+atomicArrayAccessParser :: Parser TypeSpecifier
+atomicArrayAccessParser = do
+  reserved "AtomicArrayAccess"
+  _ <- reservedOp "<"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reserved ">"
+  return $ AtomicArrayAccess typeSpecifier
 
 vectorParser :: Parser TypeSpecifier
 vectorParser = do

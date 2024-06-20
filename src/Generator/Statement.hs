@@ -199,6 +199,13 @@ genStructInitialization before level cObj expr =
                 return $ CExpr (Just $ CAssignment (
                                 CMember portField thatField False exprCAnn
                             ) resourceExpr exprCAnn) declStmtAnn : (cProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (SemAnn _ (CTy (APAtomicArrayConnTy {}))) : xs) = do
+                let exprCAnn = buildGenericAnn ann
+                    declStmtAnn = buildStatementAnn ann before'
+                rest <- genFieldAssignments False xs
+                return $ CExpr (Just $ CAssignment (
+                                CMember cObj field False exprCAnn
+                            ) (CVar res exprCAnn) exprCAnn) declStmtAnn : rest
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field res _ : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
