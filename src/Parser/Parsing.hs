@@ -1113,17 +1113,18 @@ moduleIdentifierParser = sepBy1 firstCapital dot
 singleModule :: Parser ([ Modifier ], [String], Annotation )
 singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
 
-moduleInclusionParser :: Parser [Module]
+moduleInclusionParser :: Parser Module
 moduleInclusionParser = do
-  reserved "import"
-  modules <- braces (sepBy1 (wspcs *> singleModule <* wspcs) comma)
-  return $ map (\(mod, ident, _ann) -> ModInclusion ident mod) modules
+  reserved "import" 
+  (m, ident, _ann) <- singleModule
+  _ <- semi
+  return $ ModInclusion ident m
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
 
 terminaProgram :: Parser (TerminaProgram Annotation)
-terminaProgram = wspcs *> (Termina <$> option [] moduleInclusionParser <*> contents topLevel)
+terminaProgram = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
 
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram Annotation)
