@@ -24,8 +24,7 @@ checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = checkEqTypes tyspecl tyspecr
--- TODO: We are delaying the checking of the size of the vectors to a further stage
-checkEqTypes  (Array typespecl _sizel) (Array typespecr _sizer) = checkEqTypes typespecl typespecr
+checkEqTypes  (Array typespecl sizel) (Array typespecr sizer) = checkEqTypes typespecl typespecr && (sizel == sizer)
 checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
 checkEqTypes  (Location tyspecl) (Location tyspecr) = checkEqTypes tyspecl tyspecr
