@@ -43,8 +43,8 @@ dynVar0 :: Expression SemanticAnns
 dynVar0 = AccessObject (Variable "dyn_var0" dynUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnns
-option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantExpression (Some dynVar0) optionDynUInt32SemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantExpression None optionDynUInt32SemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantInitializer (Some dynVar0) optionDynUInt32SemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantInitializer None optionDynUInt32SemAnn) stmtSemAnn
 
 twoDeclarations :: [Statement SemanticAnns]
 twoDeclarations = [vector1, option0]

@@ -37,40 +37,40 @@ uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32))
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
 structAFieldsInit0 :: Expression SemanticAnns
 structAFieldsInit0 = 
-    FieldAssignmentsExpression "StructA"
+    StructInitializer "StructA"
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit1 :: Expression SemanticAnns
 structAFieldsInit1 = 
-    FieldAssignmentsExpression "StructA"
+    StructInitializer "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (ArrayInitExpression uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 structAFieldsInit3 :: Expression SemanticAnns
 structAFieldsInit3 = 
-    FieldAssignmentsExpression "StructA"
+    StructInitializer "StructA"
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
          FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) vectorAnn)) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] structASemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnns
 tmDescriptorFieldsInit0 = 
-    FieldAssignmentsExpression "TMDescriptor"
+    StructInitializer "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0 undefined,
          FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorSemAnn
 
 tmDescriptorFieldsInit1 :: Expression SemanticAnns
 tmDescriptorFieldsInit1 = 
-    FieldAssignmentsExpression "TMDescriptor"
+    StructInitializer "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0 undefined,
          FieldValueAssignment "field1" structAFieldsInit1 undefined] tmDescriptorSemAnn
 
 tmDescriptorFieldsInit3 :: Expression SemanticAnns
 tmDescriptorFieldsInit3 = 
-    FieldAssignmentsExpression "TMDescriptor"
+    StructInitializer "TMDescriptor"
         [FieldValueAssignment "field0" uint32Const0 undefined,
          FieldValueAssignment "field1" structAFieldsInit3 undefined] tmDescriptorSemAnn
 

@@ -29,18 +29,18 @@ data Expression'
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitExpression (Expression' obj a) Size a -- ^ Array initializer, | (13 : i8) + (2 : i8)|
-  | FieldAssignmentsExpression
+  | ArrayInitializer (Expression' obj a) Size a -- ^ Array initializer, | (13 : i8) + (2 : i8)|
+  | StructInitializer
     Identifier -- ^ Structure type identifier
     [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
-  | EnumVariantExpression
+  | EnumVariantInitializer
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier
     [ Expression' obj a ] -- ^ list of expressions
     a
-  | OptionVariantExpression (OptionVariant (Expression' obj a)) a
+  | OptionVariantInitializer (OptionVariant (Expression' obj a)) a
   | IsEnumVariantExpression
     (obj a) -- ^ Enum object
     Identifier -- ^ Enum identifier
@@ -95,10 +95,10 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (ReferenceExpression _ _ a)              = a
   getAnnotation (Casting _ _ a)                          = a
   getAnnotation (FunctionCall _ _ a)             = a
-  getAnnotation (FieldAssignmentsExpression _ _ a)       = a
-  getAnnotation (EnumVariantExpression _ _ _ a)          = a
-  getAnnotation (ArrayInitExpression _ _ a)              = a
-  getAnnotation (OptionVariantExpression _ a)            = a
+  getAnnotation (StructInitializer _ _ a)       = a
+  getAnnotation (EnumVariantInitializer _ _ _ a)          = a
+  getAnnotation (ArrayInitializer _ _ a)              = a
+  getAnnotation (OptionVariantInitializer _ a)            = a
   getAnnotation (MemberFunctionCall _ _ _ a)         = a
   getAnnotation (DerefMemberFunctionCall _ _ _ a)    = a
   getAnnotation (IsEnumVariantExpression _ _ _ a)        = a

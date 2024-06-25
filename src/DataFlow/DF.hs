@@ -30,7 +30,6 @@ import           AST.Seman            as SAST
 -- We need to know the type of objects.
 import qualified Semantic.Monad       as SM (location)
 import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
-import Utils.AST.Core
 
 
 --import Debug.Termina
@@ -161,13 +160,13 @@ useExpression (MemberFunctionCall obj ident args ann) = do
 useExpression (DerefMemberFunctionCall obj _ident args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
-useExpression (ArrayInitExpression e _size _ann)
+useExpression (ArrayInitializer e _size _ann)
   = useExpression e
-useExpression (FieldAssignmentsExpression _ident fs _ann)
+useExpression (StructInitializer _ident fs _ann)
   = mapM_ useFieldAssignment fs
-useExpression (EnumVariantExpression _ident _ident2 es _ann)
+useExpression (EnumVariantInitializer _ident _ident2 es _ann)
   = mapM_ useExpression es
-useExpression (OptionVariantExpression opt _ann)
+useExpression (OptionVariantInitializer opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e

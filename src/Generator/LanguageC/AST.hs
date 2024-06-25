@@ -62,8 +62,7 @@ data CDerivedDeclarator' a
     deriving (Show)
 
 data CArraySize' a
-  = CNoArrSize Bool               -- ^ @CUnknownSize isCompleteType@
-  | CArrSize Bool (CExpression' a) -- ^ @CArrSize isStatic expr@
+  = CArrSize Bool (CExpression' a) -- ^ @CArrSize isStatic expr@
     deriving (Show)
 
 data CStatement' a
@@ -106,7 +105,6 @@ data CDeclarationSpecifier' a
   = CStorageSpec CStorageSpecifier     -- ^ storage-class specifier or typedef
   | CTypeSpec    (CTypeSpecifier' a)   -- ^ type name
   | CTypeQual    (CTypeQualifier' a)   -- ^ type qualifier
-  | CFunSpec     CFunctionSpecifier -- ^ function specifier
     deriving (Show)
 
 data CStorageSpecifier
@@ -272,14 +270,6 @@ data CExpression' a
                  a
   | CConst       CConstant  a            -- ^ integer, character, floating point and string constants
     deriving (Show)
-
-data CIntFlag = FlagUnsigned | FlagLong | FlagLongLong | FlagImag
-  deriving (Eq,Ord,Enum,Bounded)
-instance Show CIntFlag where
-    show FlagUnsigned = "u"
-    show FlagLong = "L"
-    show FlagLongLong = "LL"
-    show FlagImag = "i"
 
 data CIntRepr = CDecRepr | CHexRepr | COctalRepr
   deriving (Show, Eq,Ord)

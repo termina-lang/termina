@@ -22,7 +22,7 @@ genEnumInitialization ::
 genEnumInitialization before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
-        (EnumVariantExpression ts variant params ann) -> do
+        (EnumVariantInitializer ts variant params ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
             cParams <- zipWithM (\e index -> genFieldInitialization False level (CMember cObj variant False exprCAnn) (namefy (show (index :: Integer))) e) params [0..]
@@ -37,14 +37,14 @@ genOptionInitialization ::
     -> CSourceGenerator [CStatement]
 genOptionInitialization before level cObj expr =
     case expr of
-        (OptionVariantExpression (Some e) ann) -> do
+        (OptionVariantInitializer (Some e) ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
             fieldInitalization <- genFieldInitialization False level (CMember cObj optionSomeVariant False exprCAnn) optionSomeField e
             return $
                 CExpr (Just (CAssignment (CMember cObj enumVariantsField False exprCAnn) (CVar optionSomeVariant exprCAnn) exprCAnn)) declStmtAnn :
                 fieldInitalization
-        (OptionVariantExpression None ann) -> do
+        (OptionVariantInitializer None ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
             return [CExpr (Just (CAssignment (CMember cObj enumVariantsField False exprCAnn) (CVar optionNoneVariant exprCAnn) exprCAnn)) declStmtAnn]
@@ -61,7 +61,7 @@ genArrayInitialization ::
     -> CSourceGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
-        (ArrayInitExpression expr' size ann) -> do
+        (ArrayInitializer expr' size ann) -> do
             cSize <- genArraySize size ann
             let iterator = namefy $ "i" ++ show level
                 exprCAnn = buildGenericAnn ann
@@ -75,9 +75,9 @@ genArrayInitialization before level cObj expr = do
                 incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 CDecRepr)) exprCAnn) exprCAnn) exprCAnn
             arrayInit <- genArrayInitialization False (level + 1) (CIndex cObj (CVar iterator exprCAnn) exprCAnn) expr'
             return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann before)]
-        (FieldAssignmentsExpression {}) -> genStructInitialization False level cObj expr
-        (OptionVariantExpression {}) -> genOptionInitialization False level cObj expr
-        (EnumVariantExpression {}) -> genEnumInitialization False level cObj expr
+        (StructInitializer {}) -> genStructInitialization False level cObj expr
+        (OptionVariantInitializer {}) -> genOptionInitialization False level cObj expr
+        (EnumVariantInitializer {}) -> genEnumInitialization False level cObj expr
         _ -> do
             cExpr <- genExpression expr
             exprType <- getExprType expr
@@ -120,13 +120,13 @@ genFieldInitialization ::
     -> CSourceGenerator [CStatement]
 genFieldInitialization before level cObj field expr =
     case expr of
-        FieldAssignmentsExpression _ _ ann ->
+        StructInitializer _ _ ann ->
             genStructInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
-        OptionVariantExpression _ ann ->
+        OptionVariantInitializer _ ann ->
             genOptionInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
-        ArrayInitExpression _ _ ann ->
+        ArrayInitializer _ _ ann ->
             genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
-        EnumVariantExpression _ _ _ ann ->
+        EnumVariantInitializer _ _ _ ann ->
             genEnumInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
         _ -> do
             exprType <- getExprType expr
@@ -151,7 +151,7 @@ genStructInitialization ::
 genStructInitialization before level cObj expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
-    (FieldAssignmentsExpression _ vas ann) -> genFieldAssignments before vas
+    (StructInitializer _ vas ann) -> genFieldAssignments before vas
 
         where
 
@@ -227,9 +227,9 @@ genBlockItem (AssignmentStmt obj expr  _) = do
             let ann = getAnnotation obj
             return $ CBlockStmt <$> [CExpr (Just (CUnary CIndOp cObj (buildGenericAnn ann))) (buildStatementAnn ann True)]
         _ -> case expr of
-            (FieldAssignmentsExpression {}) -> fmap CBlockStmt <$> genStructInitialization True 0 cObj expr
-            (OptionVariantExpression {}) -> fmap CBlockStmt <$> genOptionInitialization True 0 cObj expr
-            (EnumVariantExpression {}) -> fmap CBlockStmt <$> genEnumInitialization True 0 cObj expr
+            (StructInitializer {}) -> fmap CBlockStmt <$> genStructInitialization True 0 cObj expr
+            (OptionVariantInitializer {}) -> fmap CBlockStmt <$> genOptionInitialization True 0 cObj expr
+            (EnumVariantInitializer {}) -> fmap CBlockStmt <$> genEnumInitialization True 0 cObj expr
             _ -> do
                 cExpr <- genExpression expr
                 let ann = getAnnotation expr
@@ -248,21 +248,21 @@ genBlockItem (Declaration identifier _ ts expr ann) =
                 (Just (CDeclarator (Just identifier) arrayDecl [] exprCAnn), Nothing, Nothing)] declStmt)
             : arrayInitialization
     _ -> case expr of
-        (FieldAssignmentsExpression {}) -> do
+        (StructInitializer {}) -> do
             let declStmt = buildDeclarationAnn ann True
             structInitialization <- fmap CBlockStmt <$> genStructInitialization False 0 (CVar identifier exprCAnn) expr
             decls <- genDeclSpecifiers ts
             return $
                 CBlockDecl (CDeclaration decls [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)] declStmt)
                 : structInitialization
-        (OptionVariantExpression {}) -> do
+        (OptionVariantInitializer {}) -> do
             let declStmt = buildDeclarationAnn ann True
             optionInitialization <- fmap CBlockStmt <$> genOptionInitialization False 0 (CVar identifier exprCAnn) expr
             decls <- genDeclSpecifiers ts
             return $
                 CBlockDecl (CDeclaration decls [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)] declStmt)
                 : optionInitialization
-        (EnumVariantExpression {}) -> do
+        (EnumVariantInitializer {}) -> do
             let declStmt = buildDeclarationAnn ann True
             enumInitialization <- fmap CBlockStmt <$> genEnumInitialization False 0 (CVar identifier exprCAnn) expr
             decls <- genDeclSpecifiers ts

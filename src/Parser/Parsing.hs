@@ -260,7 +260,7 @@ fieldAssignmentsExpressionParser = do
       comma)
     _ <- reservedOp ":"
     identifier <- identifierParser
-    return $ FieldAssignmentsExpression identifier assignments (Position p)
+    return $ StructInitializer identifier assignments (Position p)
     where
       flValues = do
             identifier <- identifierParser
@@ -465,12 +465,12 @@ optionVariantExprParser =
   (do
     p <- getPosition
     _ <- reserved "None"
-    return $ OptionVariantExpression None (Position p)) <|>
+    return $ OptionVariantInitializer None (Position p)) <|>
   (do
     p <- getPosition
     _ <- reserved "Some"
     someExpr <- parens expressionParser
-    return $ OptionVariantExpression (Some someExpr) (Position p))
+    return $ OptionVariantInitializer (Some someExpr) (Position p))
 
 enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
@@ -480,7 +480,7 @@ enumVariantExprParser = do
   variant <- identifierParser
   parameterList <-
     option [] (parens (sepBy (try expressionParser) comma))
-  return $ EnumVariantExpression enum variant parameterList (Position p)
+  return $ EnumVariantInitializer enum variant parameterList (Position p)
 
 isEnumVariantExprParser :: Parser (Expression Annotation)
 isEnumVariantExprParser = do
@@ -691,7 +691,7 @@ vectorInitParser = do
   _ <- semi
   size <- sizeParser
   _ <- reservedOp "]"
-  return $ ArrayInitExpression value size (Position p)
+  return $ ArrayInitializer value size (Position p)
 
 -- -- Task Definition
 

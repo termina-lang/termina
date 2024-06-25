@@ -39,12 +39,12 @@ instance PPrint CDeclarator where
             printCDerivedDeclarator p (CPtrDeclr quals _ : declrs) = do
                 case (declrs, quals) of
                     ([], []) -> do
-                        case name of 
+                        case name of
                             Just n -> return $ parenPrec p 5 $ pretty "*" <+> pretty n
                             Nothing -> return $ parenPrec p 5 $ pretty "*"
                     ([], _) -> do
                         pquals <- mapM pprint quals
-                        case name of 
+                        case name of
                             Just n -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals <+> pretty n
                             Nothing -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals
                     (_, []) -> do
@@ -58,12 +58,12 @@ instance PPrint CDeclarator where
                 psize <- pprint size
                 case (declrs, quals) of
                     ([], []) -> do
-                        case name of 
+                        case name of
                             Just n -> return $ parenPrec p 6 $ pretty n <> brackets psize
                             Nothing -> return $ parenPrec p 6 $ brackets psize
                     ([], _) -> do
                         pquals <- mapM pprint quals
-                        case name of 
+                        case name of
                             Just n -> return $ parenPrec p 6 $ pretty n <> brackets (hsep pquals <+> psize)
                             Nothing -> return $ parenPrec p 6 $ brackets (hsep pquals <+> psize)
                     (_, []) -> do
@@ -90,7 +90,6 @@ instance PPrint CDeclarationSpecifier where
     pprint (CStorageSpec sp) = return $ pretty sp
     pprint (CTypeSpec sp) = pprint sp
     pprint (CTypeQual qu) = pprint qu
-    pprint (CFunSpec fs) = return $ pretty fs
 
 instance PPrint CTypeSpecifier where
     pprint CVoidType = return $ pretty "void"
@@ -118,7 +117,7 @@ pprintCAttributeList :: [CAttribute] -> CPrinter
 pprintCAttributeList [] = return emptyDoc
 pprintCAttributeList attrs = do
     pattrs <- mapM pprint attrs
-    return $ pretty "__attribute__" <> (parens $ parens (hsep (punctuate comma pattrs)))
+    return $ pretty "__attribute__" <> parens (parens (hsep (punctuate comma pattrs)))
 
 instance PPrint CAttribute where
     pprint (CAttr attrName []) = return $ pretty attrName
@@ -137,7 +136,6 @@ instance PPrint CTypeQualifier where
     pprint (CAttrQual a) = pprintCAttributeList [a]
 
 instance PPrint CArraySize where
-    pprint (CNoArrSize completeType) = return $ if completeType then pretty "*" else emptyDoc
     pprint (CArrSize staticMod expr) = do
         pexpr <- pprintPrec 25 expr
         return $ if staticMod then pretty "static" else pexpr
@@ -198,7 +196,7 @@ instance PPrint CConstant where
 
 instance PPrint CStructureUnion where
     pprint (CStruct tag ident Nothing cattrs) = do
-        case (cattrs, ident) of 
+        case (cattrs, ident) of
             ([], Nothing) -> return $ pretty tag
             ([], Just ident') -> return $ pretty tag <+> pretty ident'
             (_, Nothing) -> do
@@ -213,7 +211,7 @@ instance PPrint CStructureUnion where
             ([], Just ident') -> return $ pretty tag <+> pretty ident' <+> pretty "{ }"
             (_, Nothing) -> do
                 pattrs <- pprintCAttributeList cattrs
-                return $ pretty tag <+> pretty "{ }" <+> pattrs 
+                return $ pretty tag <+> pretty "{ }" <+> pattrs
             (_, Just ident') -> do
                 pattrs <- pprintCAttributeList cattrs
                 return $ pretty tag <+> pretty ident' <+> pretty "{ }" <+> pattrs
@@ -324,7 +322,7 @@ instance PPrint CEnumeration where
             ([], Just ident') -> return $ pretty "enum" <+> pretty ident'
             (_, Nothing) -> do
                 pattrs <- pprintCAttributeList cattrs
-                return $ pretty "enum" <+> pattrs 
+                return $ pretty "enum" <+> pattrs
             (_, Just ident') -> do
                 pattrs <- pprintCAttributeList cattrs
                 return $ pretty "enum" <+> pattrs <+> pretty ident'
@@ -396,7 +394,7 @@ instance PPrint CStatement where
                     Just alt -> do
                         palt <- pprint alt
                         return $ pretty " else" <+> palt
-                return $ prependLine before $ indentStmt expand $ 
+                return $ prependLine before $ indentStmt expand $
                     pretty "if" <+> parens pexpr
                     <+> pstat
                     <> pestat
@@ -416,7 +414,7 @@ instance PPrint CStatement where
                 pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
                 pstat <- pprint stat
                 case (cond, step) of
-                    (Nothing, Nothing) -> 
+                    (Nothing, Nothing) ->
                         return $ prependLine before $ indentStmt expand $
                             pretty "for" <+> parens (pfor_init <> semi <> semi) <+> pstat
                     (Just cond', Nothing) -> do
@@ -433,25 +431,25 @@ instance PPrint CStatement where
                         return $ prependLine before $ indentStmt expand $
                             pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CCont ann) = 
+    pprint s@(CCont ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 return $ prependLine before $ indentStmt expand $
                     pretty "continue" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CBreak ann) = 
+    pprint s@(CBreak ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 return $ prependLine before $ indentStmt expand $
                     pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CReturn Nothing ann) = 
+    pprint s@(CReturn Nothing ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 return $ prependLine before $ indentStmt expand $
                     pretty "return" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CReturn (Just e) ann) = 
+    pprint s@(CReturn (Just e) ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pe <- pprint e
@@ -462,11 +460,11 @@ instance PPrint CStatement where
         case itemAnnotation ann of
             CCompoundAnn before trailing -> do
                 pItems <- mapM pprint items
-                return $ prependLine before $ 
-                    if trailing then 
-                        braces' ((indentTab . align) (vsep pItems <> line)) 
+                return $ prependLine before $
+                    if trailing then
+                        braces' ((indentTab . align) (vsep pItems <> line))
                     else
-                        braces' ((indentTab . align) (vsep pItems))                   
+                        braces' ((indentTab . align) (vsep pItems))
             _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where
@@ -493,51 +491,51 @@ instance PPrint CFunctionDef where
 
 
 instance PPrint CPreprocessorDirective where
-    pprint (CPPDefine ident Nothing ann) = 
+    pprint (CPPDefine ident Nothing ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#define" <+> pretty ident
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just []) ann) = 
+    pprint (CPPDefine ident (Just []) ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#define" <+> pretty ident
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just [token]) ann) = 
+    pprint (CPPDefine ident (Just [token]) ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#define" <+> pretty ident <+> pretty token
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just (t : ts)) ann) = 
+    pprint (CPPDefine ident (Just (t : ts)) ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ vcat
-                    [ 
+                    [
                         pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
                         indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
                     ]
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfDef ident ann) = 
+    pprint (CPPIfDef ident ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#ifdef" <+> pretty ident
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPInclude isSystem path ann) = 
+    pprint (CPPInclude isSystem path ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
-                return $ prependLine before $ pretty "#include" <+> 
-                    pretty (if isSystem then "<" else "\"") <> 
-                        pretty path <> pretty 
+            CPPDirectiveAnn before ->
+                return $ prependLine before $ pretty "#include" <+>
+                    pretty (if isSystem then "<" else "\"") <>
+                        pretty path <> pretty
                             (if isSystem then ">" else "\"")
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfNDef ident ann) = 
+    pprint (CPPIfNDef ident ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#ifndef" <+> pretty ident
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPEndif ann) = 
+    pprint (CPPEndif ann) =
         case itemAnnotation ann of
-            CPPDirectiveAnn before -> 
+            CPPDirectiveAnn before ->
                 return $ prependLine before $ pretty "#endif"
             _ -> error $ "Invalid annotation: " ++ show ann
 
