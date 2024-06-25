@@ -199,8 +199,7 @@ type GlobalEnv = Map Identifier (SAnns (GEntry SemanticAnns))
 -- | Local env
 -- variables to their type
 type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
--- | Constants Environment.
-type ConstEnv = Map Identifier TypeSpecifier
+
 -- This may seem a bad decision, but each envornment represent something
 -- different.
 -- TODO We can use empty types to disable envirnoments and make Haskell do part
@@ -211,12 +210,7 @@ data ExpressionState
  = ExprST
  { global :: GlobalEnv
  , local  :: LocalEnv
- , consts :: ConstEnv
  }
-
-data EnvKind =
-  LocalKind AccessKind | ConstKind | GlobalKind
-  deriving Show
 
  -- | This is the initial global environment.
  -- This is a temporary solution until we figure out how to manage the
@@ -246,10 +240,10 @@ initGlb =
   --  ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
 
 makeInitial :: GlobalEnv -> ExpressionState
-makeInitial e = ExprST e empty empty
+makeInitial e = ExprST e empty
 
 initialExpressionSt :: ExpressionState
-initialExpressionSt = ExprST initialGlobalEnv empty empty
+initialExpressionSt = ExprST initialGlobalEnv empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State ExpressionState)
 
@@ -311,13 +305,6 @@ getFunctionTy loc iden =
   SemAnn entryLoc (GFun args retty) -> return (args, retty, entryLoc)
   SemAnn {} -> throwError $ annotateError loc (EFunctionNotFound iden)
 
--- | Add new *local* constant generic parameters.
-addLocalConstants :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
-addLocalConstants loc newVars ma  =
-  localScope (addConstants newVars >> ma)
-  where
-    addConstants = mapM_ (uncurry (insertConstObj loc))
-
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
 addLocalImmutObjs :: Locations -> [(Identifier, TypeSpecifier)] -> SemanticMonad a -> SemanticMonad a
@@ -345,15 +332,6 @@ insertLocalImmutObj loc ident ty =
   throwError $ annotateError loc $ EVarDefined ident
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident (Immutable, ty) (local s)})
-
-insertConstObj :: Locations -> Identifier -> TypeSpecifier -> SemanticMonad ()
-insertConstObj loc ident ty =
-  isDefined ident
-  >>= \b -> if b
-  then -- | if there is throw error
-  throwError $ annotateError loc $ EVarDefined ident
-  else -- | If there is no variable named |ident|
-  modify (\s -> s{consts = M.insert ident ty (consts s)})
 
 insertGlobalTy :: Locations -> SemanTypeDef SemanticAnns -> SemanticMonad ()
 insertGlobalTy loc tydef =
@@ -391,38 +369,31 @@ getLocalObjTy loc ident =
     return . M.lookup ident =<< gets local
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
-getConstTy :: Locations -> Identifier -> SemanticMonad TypeSpecifier
-getConstTy loc ident = do
-    -- Check the local constants (i.e., the const parameters) first
-    constants <- gets consts
-    case M.lookup ident constants of
-      -- | OK, we found it. It refers to a constant parameter.
-      Just ty -> return ty  
-      Nothing ->
-        -- If not found, then check the globals
-        catchError (getGlobalEntry loc ident)
-            (\errorGlobal ->
-                -- | We have not found a global object with the name |ident|
-                case semError errorGlobal of {
-                  ENotNamedGlobal _ ->
-                    -- | If we have not found a global object with the name |ident|, then check the local objects.
-                    -- Any path that goes through here is an error.
-                    catchError (getLocalObjTy loc ident)
-                    (\errorLocal ->
-                      case semError errorLocal of {
-                        ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
-                        _ -> throwError errorLocal;
-                      }) >> 
-                        -- | Ooops! We found a local object with the name |ident| but it is not a constant.
-                        throwError (annotateError loc (ENotConstant ident));
-                  err  -> error $ "Impossible error: " ++ show err;
-                }
-              ) >>= (\case {
-                        -- | It is a global constant!
-                        SemAnn _ (GGlob (SConst ts))  -> return ts;
-                        -- | It is a global object, but not a constant.
-                        _ -> throwError $ annotateError loc (ENotConstant ident);
-        });
+getConst :: Locations -> Identifier -> SemanticMonad (TypeSpecifier, Const)
+getConst loc ident = do
+    catchError (getGlobalEntry loc ident)
+        (\errorGlobal ->
+            -- | We have not found a global object with the name |ident|
+            case semError errorGlobal of {
+              ENotNamedGlobal _ ->
+                -- | If we have not found a global object with the name |ident|, then check the local objects.
+                -- Any path that goes through here is an error.
+                catchError (getLocalObjTy loc ident)
+                (\errorLocal ->
+                  case semError errorLocal of {
+                    ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                    _ -> throwError errorLocal;
+                  }) >> 
+                    -- | Ooops! We found a local object with the name |ident| but it is not a constant.
+                    throwError (annotateError loc (ENotConstant ident));
+              err  -> error $ "Impossible error: " ++ show err;
+            }
+          ) >>= (\case {
+                    -- | It is a global constant!
+                    SemAnn _ (GGlob (SConst ts value))  -> return (ts, value);
+                    -- | It is a global object, but not a constant.
+                    _ -> throwError $ annotateError loc (ENotConstant ident);
+    });
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalEntry :: Locations -> Identifier -> SemanticMonad (SAnns (GEntry SemanticAnns))
@@ -435,18 +406,18 @@ getGlobalEntry loc ident =
 getLHSVarTy, getRHSVarTy, getGlobalVarTy ::
   Locations
   -> Identifier
-  -> SemanticMonad (EnvKind, TypeSpecifier)
+  -> SemanticMonad (AccessKind, TypeSpecifier)
 getLHSVarTy loc ident =
   -- | Try first local environment
-  catchError (getLocalObjTy loc ident >>= (\(ak, ts) -> return (LocalKind ak, ts)))
+  catchError (getLocalObjTy loc ident >>= (\(ak, ts) -> return (ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case semError errorLocal of {
         ENotNamedObject _ ->
-          catchError (getConstTy loc ident)
+          catchError (getConst loc ident)
           (\errorRO ->
             case semError errorRO of {
-              ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
+              ENotConstant _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
                     ENotNamedGlobal errvar ->
@@ -468,12 +439,12 @@ getLHSVarTy loc ident =
 getRHSVarTy loc ident =
   -- | Try first local environment
   catchError
-    (getLocalObjTy loc ident >>= (\(ak, ts) -> return (LocalKind ak, ts)))
+    (getLocalObjTy loc ident >>= (\(ak, ts) -> return (ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case semError errorLocal of {
         ENotNamedObject _ ->
-          catchError (getConstTy loc ident >>= (\ts -> return (ConstKind, ts)))
+          catchError (getConst loc ident >>= (\(ts, _) -> return (Immutable, ts)))
           (\errorRO ->
             case semError errorRO of {
               ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
@@ -507,7 +478,7 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        SemAnn _ (GGlob (SResource ts))  -> return (GlobalKind, ts);
+                        SemAnn _ (GGlob (SResource ts))  -> return (Mutable, ts);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 
@@ -528,8 +499,7 @@ glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
 isDefined :: Identifier -> SemanticMonad Bool
 isDefined ident =
   get >>= return . (\st -> isDefinedIn ident (global st)
-                            || isDefinedIn ident (local st)
-                            || isDefinedIn ident (consts st))
+                            || isDefinedIn ident (local st))
 
 -------------
 -- Type |Type| helpers!
@@ -584,7 +554,7 @@ classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateErr
 
 checkSize :: Locations -> Size -> SemanticMonad ()
 checkSize loc (CAST.K s) = checkIntConstant loc USize s
-checkSize loc (CAST.V ident) = getConstTy loc ident >>= sameOrErr loc USize >> return ()
+checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> sameOrErr loc USize ty) >> return ()
 
 checkTypeSpecifier :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeSpecifier loc (DefinedType identTy) =

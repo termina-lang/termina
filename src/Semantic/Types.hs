@@ -22,7 +22,7 @@ data SemGlobal
   | SHandler TypeSpecifier
   | SEmitter TypeSpecifier
   | SChannel TypeSpecifier
-  | SConst TypeSpecifier
+  | SConst TypeSpecifier Const
   deriving Show
 
 -- type SemGlobal = SemGlobal' SemAnn
@@ -33,7 +33,7 @@ getTySemGlobal (SResource ty)   = ty
 getTySemGlobal (SHandler ty)   = ty
 getTySemGlobal (SEmitter ty)   = ty
 getTySemGlobal (SChannel ty)   = ty
-getTySemGlobal (SConst ty) = ty
+getTySemGlobal (SConst ty _) = ty
 
 ----------------------------------------
 

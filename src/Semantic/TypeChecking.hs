@@ -112,22 +112,13 @@ getMemberFieldType ann obj_ty ident =
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
-  (Parser.Annotation -> Identifier -> SemanticMonad (EnvKind, TypeSpecifier))
+  (Parser.Annotation -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier))
   -- The object to type
   -> Object Parser.Annotation
   -> SemanticMonad (SAST.Object SemanticAnns)
 typeObject getVarTy (Variable ident ann) = do
-  (ek, ty) <- getVarTy ann ident
-  ak <- toAccessKind ek
+  (ak, ty) <- getVarTy ann ident
   return $ SAST.Variable ident (buildExpAnnObj ann ak ty)
-
-  where
-
-    toAccessKind :: EnvKind -> SemanticMonad AccessKind
-    toAccessKind (LocalKind ak) = return ak
-    toAccessKind ConstKind = return Immutable
-    toAccessKind _ = throwError $ annotateError internalErrorSeman EUnboxingLocalEnvKind
-
 typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
   typed_obj <- typeObject getVarTy obj
   (obj_ak, obj_ty) <- getObjectType typed_obj
@@ -150,7 +141,7 @@ typeObject _ (MemberAccess obj ident ann) = do
   -- function can be accessed.
   typed_obj' <- typeObject (\loc ident' -> do
     (ak, ts) <- getLocalObjTy loc ident'
-    return (LocalKind ak, ts)) obj
+    return (ak, ts)) obj
   (obj_ak', obj_ty') <- getObjectType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
         maybe (typed_obj', obj_ak', obj_ty') (unDyn typed_obj', Mutable, ) (isDyn obj_ty')
@@ -338,7 +329,7 @@ typeConstExpression expected_ty (KC constant ann) = do
   checkConstant ann expected_ty constant
   return $ SAST.KC constant (buildExpAnn ann expected_ty)
 typeConstExpression expected_ty (KV identifier ann) = do
-  ty <- getConstTy ann identifier
+  (ty, _value) <- getConst ann identifier
   sameOrErr ann expected_ty ty
   return $ SAST.KV identifier (buildExpAnn ann ty)
 
@@ -1028,11 +1019,15 @@ typeGlobal (Channel ident ty mexpr mods anns) = do
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Channel ident ty exprty mods (buildGlobalAnn anns (SChannel ty)))
--- TODO [Q14]
 typeGlobal (Const ident ty expr mods anns) = do
   checkTypeSpecifier anns ty
   typed_expr <- typeConstExpression ty expr
-  return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty)))
+  case expr of
+    KC value _ -> return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
+    KV cident _ -> do
+      (_ty, value) <- getConst anns cident
+      -- TODO: Check that the types match
+      return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
 
 checkParameterType :: Locations -> Parameter -> SemanticMonad ()
 checkParameterType anns p =
@@ -1373,8 +1368,8 @@ programAdd (GlobalDeclaration glb) =
             (ident, fromJust (getGEntry (ty_ann ann)), ann)
       el = (location ann_glb `SemAnn` sem) in
   insertGlobal global_name el
-  (EUsedGlobalName global_name)
-  >> return (global_name , el)
+  (EUsedGlobalName global_name) >>
+  return (global_name , el)
 programAdd (TypeDefinition ty anns) =
   let type_name = identifierType ty in
     case ty_ann anns of
