@@ -118,7 +118,7 @@ data Errors a
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
-  | EMemberAccessNotProcedure Identifier
+  | EUnknownProcedure Identifier
   | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
@@ -215,7 +215,7 @@ data Errors a
   -- Error using a method different than alloc on a pool
   | EPoolsAllocArgs
   | EPoolsMethods Identifier
-  | EPoolsWrongProcedure Identifier
+  |   EPoolUnknownProcedure Identifier
   | EPoolsWrongNumArgs
   | EPoolsWrongArgType TypeSpecifier
   | EPoolsWrongArgTypeW TypeSpecifier

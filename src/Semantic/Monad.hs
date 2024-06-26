@@ -507,8 +507,10 @@ isDefined ident =
 sameNumTy :: TypeSpecifier -> TypeSpecifier -> Bool
 sameNumTy a b = checkEqTypes a b && numTy a
 
-sameOrErr :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad ()
-sameOrErr loc t1 t2 =
+-- | Checks if two type are the same numeric type.
+-- If they are not, it throws a mismatch error.
+checkEqTypesOrError :: Locations -> TypeSpecifier -> TypeSpecifier -> SemanticMonad ()
+checkEqTypesOrError loc t1 t2 =
   unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
 unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
@@ -521,7 +523,7 @@ unDynExp _ = throwError $ annotateError internalErrorSeman EUnDynExpression
 mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
 mustBeTy ty expression =
   getExpType expression >>=
-  sameOrErr loc ty
+  checkEqTypesOrError loc ty
   >> return expression
   where
     ann_exp = getAnnotation expression
@@ -531,7 +533,7 @@ blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
   (throwError (annotateError internalErrorSeman EUnboxingBlockRet))
-  (void . sameOrErr (location ann) ty) (getResultingType (ty_ann ann))
+  (void . checkEqTypesOrError (location ann) ty) (getResultingType (ty_ann ann))
 
 getIntConst :: Locations -> Const -> SemanticMonad Integer
 getIntConst _ (I (TInteger i _) _) = return i
@@ -554,7 +556,7 @@ classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateErr
 
 checkSize :: Locations -> Size -> SemanticMonad ()
 checkSize loc (CAST.K s) = checkIntConstant loc USize s
-checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> sameOrErr loc USize ty) >> return ()
+checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> checkEqTypesOrError loc USize ty) >> return ()
 
 checkTypeSpecifier :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeSpecifier loc (DefinedType identTy) =
@@ -689,16 +691,16 @@ checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTypeSpecifier loc type_c >>
   -- | Check that the explicit type matches the expected type
-  sameOrErr loc expected_type type_c >>
+  checkEqTypesOrError loc expected_type type_c >>
   -- | Check that the constant is in the range of the type
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
   -- | Check that the constant is in the range of the type
   checkIntConstant loc expected_type ti
 checkConstant loc expected_type (B {}) =
-  sameOrErr loc expected_type Bool
+  checkEqTypesOrError loc expected_type Bool
 checkConstant loc expected_type (C {}) =
-  sameOrErr loc expected_type Char
+  checkEqTypesOrError loc expected_type Char
 
 checkIntConstant :: Locations -> TypeSpecifier -> TInteger -> SemanticMonad ()
 checkIntConstant loc tyI ti@(TInteger i _) =
