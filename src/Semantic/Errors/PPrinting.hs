@@ -81,6 +81,17 @@ instance ShowText TypeSpecifier where
     showText (OutPort ts) = "out " <> showText ts
     showText Unit = "()"
 
+instance ShowText Const where
+    showText (I (TInteger value DecRepr) Nothing) = T.pack $ show value
+    showText (I (TInteger value HexRepr) Nothing) = T.toUpper . T.pack $ "0x" <> showHex value ""
+    showText (I (TInteger value DecRepr) (Just ts)) = T.pack (show value) <> " : " <> showText ts
+    showText (I (TInteger value HexRepr) (Just ts)) = T.toUpper $ T.pack ("0x" <> showHex value "" <> " : ") <> showText ts
+    showText (I (TInteger value OctalRepr) Nothing) = T.pack ("0" <> showOct value "")
+    showText (I (TInteger value OctalRepr) (Just ts)) = T.pack ("0" <> showOct value "") <> " : " <> showText ts
+    showText (B True) = "true"
+    showText (B False) = "false"
+    showText (C c) = T.pack [c]
+
 printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> Maybe T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg = 
     TL.putStrLn $ prettyErrors 
@@ -504,8 +515,8 @@ ppError toModuleAST (AnnError e (Position pos)) =
         in
             printSimpleError
                 sourceLines title fileName
-                lineNumber lineColumn 1
-                (Just ("The binary operation \x1b[31m" <> showText op <> 
+                lineNumber lineColumn (T.length (showText op))
+                (Just ("Binary operation \x1b[31m" <> showText op <> 
                     "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
                     showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
     EBinOpExpectedTypeNotBool op ty ->
@@ -517,6 +528,14 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The binary operation \x1b[31m" <> showText op <> 
                     "will result in a value of type \x1b[31m" <> showText Bool <> 
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EConstantWithoutKnownType c ->
+        let title = "error[E032]: constant without known type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type of the constant \x1b[31m" <> showText c <> 
+                    "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

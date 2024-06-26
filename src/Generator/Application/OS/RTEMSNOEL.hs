@@ -155,7 +155,7 @@ findPortConnection identifier (assignment : assignments) =
         _ -> findPortConnection identifier assignments
 
 buildRTEMSGlobal :: Global SemanticAnns -> M.Map Identifier (TypeDef SemanticAnns) -> RTEMSGlobal
-buildRTEMSGlobal (Task identifier (DefinedType ty) (Just (StructInitializer _ assignments _)) modifiers _) classMap =
+buildRTEMSGlobal (Task identifier (DefinedType ty) (Just (StructInitializer assignments _ _)) modifiers _) classMap =
     RTEMSTask identifier clsIdentifier clsTypeDefinition (getPriority modifiers) (getStackSize modifiers) ports
     where
         -- Task class
@@ -186,7 +186,7 @@ buildRTEMSGlobal (Task identifier (DefinedType ty) (Just (StructInitializer _ as
                             [RTEMSOutputPort portIdentifier channelIdentifier]
                         _ -> error $ "Invalid port connections: " ++ show portIdentifier;
                 _ -> []) clsMembers
-buildRTEMSGlobal (Handler identifier (DefinedType ty) (Just (StructInitializer _ assignments _)) _ _) classMap =
+buildRTEMSGlobal (Handler identifier (DefinedType ty) (Just (StructInitializer assignments _ _)) _ _) classMap =
     RTEMSHandler identifier clsIdentifier clsTypeDefinition eventPort ports
     where
         -- Handler class
@@ -218,7 +218,7 @@ buildRTEMSGlobal (Handler identifier (DefinedType ty) (Just (StructInitializer _
                             [RTEMSOutputPort portIdentifier channelIdentifier]
                         _ -> error $ "Invalid port connection: " ++ show portIdentifier;
                 _ -> []) clsMembers
-buildRTEMSGlobal (Resource identifier (DefinedType ty) (Just (StructInitializer _ assignments _)) _ _) classMap =
+buildRTEMSGlobal (Resource identifier (DefinedType ty) (Just (StructInitializer assignments _ _)) _ _) classMap =
     RTEMSResource identifier clsIdentifier ports
     where
         -- Resource class

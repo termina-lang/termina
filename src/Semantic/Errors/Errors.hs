@@ -73,9 +73,10 @@ data Errors a
   | EAtomicArrayAccessStoreValueTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic array access store value type mismatch (E053)
   | EAtomicArrayAccessStoreWrongNumArgs Integer -- ^ Atomic array access store wrong number of arguments (E054)
   | EAtomicArrayAccessWrongProcedure Identifier -- ^ Atomic array access wrong procedure (E055)
+  | EConstantWithoutKnownType Const -- ^ Constant without known type (E056)
+  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (E056)
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
-  | EConstantWithoutKnownType Const
   | EReturnValueExpected TypeSpecifier
   | EReturnValueNotVoid 
   | EExpectedType

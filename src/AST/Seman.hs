@@ -31,8 +31,8 @@ data Expression'
   -- These two can only be used as the RHS of an assignment:
   | ArrayInitializer (Expression' obj a) Size a -- ^ Array initializer, | (13 : i8) + (2 : i8)|
   | StructInitializer
-    Identifier -- ^ Structure type identifier
     [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
+    (Maybe Identifier)
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantInitializer

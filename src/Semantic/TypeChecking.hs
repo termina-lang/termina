@@ -397,8 +397,8 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     Multiplication -> sameNumType
     Division -> sameNumType
     Modulo -> sameNumType
-    BitwiseLeftShift -> leftExpNumType
-    BitwiseRightShift -> leftExpNumType
+    BitwiseLeftShift -> leftNumRightPosType
+    BitwiseRightShift -> leftNumRightPosType
     RelationalEqual -> sameEquatableTyBool
     RelationalNotEqual -> sameEquatableTyBool
     RelationalLT -> sameNumTyBool
@@ -413,8 +413,41 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
 
   where
 
+    -- | This helper function checks that the type of the lhs and the rhs is
+    -- the same. It also applies a function to check that the type is valid.
+    sameTypeExpressions :: 
+      (TypeSpecifier -> Bool)
+      -- | Left hand side error constructor
+      -> (TypeSpecifier -> Errors Parser.Annotation)
+      -- | Right hand side error constructor
+      -> (TypeSpecifier -> Errors Parser.Annotation)
+      -- | Left hand side expression
+      -> Expression Parser.Annotation 
+      -- | Right hand side expression
+      -> Expression Parser.Annotation 
+      -- | Typed expressions
+      -> SemanticMonad (TypeSpecifier, SAST.Expression SemanticAnns, SAST.Expression SemanticAnns)
+    sameTypeExpressions isValid lerror rerror lnume rnume = do
+      tyle <- catchError 
+        (typeExpression Nothing typeObj lnume)
+        (\err -> case semError err of
+          -- | If the type of the left hand side is unknown, then we must
+          -- check the right hand side. This could be implemented in a more
+          -- efficient way, but for now, we will check the right hand side and
+          -- then check it again.
+          EConstantWithoutKnownType _ -> do
+            tyre <- typeExpression Nothing typeObj rnume
+            tyre_ty <- getExpType tyre
+            unless (isValid tyre_ty) (throwError $ annotateError (getAnnotation rnume) (rerror tyre_ty))
+            catchMismatch pann (EBinOpTypeMismatch op tyre_ty) (typeExpression (Just tyre_ty) typeObj lnume)
+          _ -> throwError err)
+      tyle_ty <- getExpType tyle
+      unless (isValid tyle_ty) (throwError $ annotateError (getAnnotation lnume) (lerror tyle_ty))
+      tyre <- catchMismatch pann (EBinOpTypeMismatch op tyle_ty) (typeExpression (Just tyle_ty) typeObj rnume)
+      return (tyle_ty, tyle, tyre)
+
     -- | This function checks the that the lhs and the rhs are both
-    -- equal to the expected type and that the expected type is
+    -- equal to the expected type (if any) and that the expected type is
     -- a numeric type. This function is used to check the
     -- binary expressions multiplication, division, addition and subtraction.
     sameNumType :: SemanticMonad (SAST.Expression SemanticAnns)
@@ -428,17 +461,15 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
             (typeExpression ty typeObj re)
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
-          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyre_ty)
+          (ty, tyle, tyre) <- sameTypeExpressions numTy (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty)
 
-    leftExpNumType :: SemanticMonad (SAST.Expression SemanticAnns)
-    leftExpNumType =
+    -- | This function checks that the lhs is equal to the expected type (if any)
+    -- and that that type is numeric. The rhs must be a positive (i.e. unsigned) type.
+    -- This function is used to check the binary expressions bitwise left shift and
+    -- bitwise right shift.
+    leftNumRightPosType :: SemanticMonad (SAST.Expression SemanticAnns)
+    leftNumRightPosType =
       case expectedType of
         ty@(Just ty') -> do
           unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
@@ -457,65 +488,53 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
+    -- | This function checks that the lhs and the rhs are both of the same type and that the
+    -- type is equatable. This function is used to check the binary expressions == and !=.
     sameEquatableTyBool :: SemanticMonad (SAST.Expression SemanticAnns)
     sameEquatableTyBool =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (equatableTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotEquatable op tyle_ty))
-          unless (equatableTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotEquatable op tyre_ty))
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
+          (_, tyle, tyre) <- 
+            sameTypeExpressions equatableTy 
+              (EBinOpLeftTypeNotEquatable op) (EBinOpRightTypeNotEquatable op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
+          (_, tyle, tyre) <- 
+            sameTypeExpressions equatableTy 
+              (EBinOpLeftTypeNotEquatable op) (EBinOpRightTypeNotEquatable op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
 
+    -- | This function checks that the lhs and the rhs are both of the same type and that the
+    -- type is numeric. This function is used to check the binary expressions <, <=, > and >=.
     sameNumTyBool :: SemanticMonad (SAST.Expression SemanticAnns)
     sameNumTyBool =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
-          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
+          (_, tyle, tyre) <- 
+            sameTypeExpressions numTy 
+              (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (numTy tyle_ty) (throwError $ annotateError (getAnnotation le) (EBinOpLeftTypeNotNum op tyle_ty))
-          unless (numTy tyre_ty) (throwError $ annotateError (getAnnotation re) (EBinOpRightTypeNotNum op tyre_ty))
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
+          (_, tyle, tyre) <- 
+            sameTypeExpressions numTy 
+              (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
 
+    -- | This function checks that the lhs and the rhs are both of the same type and that the
+    -- type is boolean. This function is used to check the binary expressions && and ||.
     sameBoolType :: SemanticMonad (SAST.Expression SemanticAnns)
     sameBoolType =
       case expectedType of
         (Just Bool) -> do
-          tyle <- typeExpression (Just Bool) typeObj le
-          tyre <- typeExpression (Just Bool) typeObj re
+          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just Bool) typeObj le)
+          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just Bool) typeObj re)
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
-          tyle_ty <- getExpType tyle
-          tyre_ty <- getExpType tyre
-          unless (checkEqTypes tyle_ty tyre_ty) (throwError $ annotateError pann (EBinOpTypeMismatch op tyle_ty tyre_ty))
-          unless (boolTy tyle_ty) (throwError $ annotateError pann (EMismatch Bool tyle_ty))
+          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just Bool) typeObj le)
+          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just Bool) typeObj re)
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
 
 typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = do
@@ -589,25 +608,31 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
 ----------------------------------------
-typeExpression expectedType typeObj (StructInitializer id_ty fs pann) =
-  -- | Field Type
+-- | Struct Initializer
+typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty pann) = do
+  -- | Check field type
+  maybe (return ()) (checkEqTypesOrError pann ty . DefinedType) mty
   catchError
-    (getGlobalTypeDef pann id_ty )
+    (getGlobalTypeDef pann id_ty)
     (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
   >>= \case{
     Struct _ ty_fs _mods  ->
-      maybe (return ()) (checkEqTypesOrError pann (DefinedType id_ty)) expectedType >>
-      flip (SAST.StructInitializer id_ty) (buildExpAnn pann (DefinedType id_ty))
-        <$> checkFieldValues pann typeObj ty_fs fs;
+      SAST.StructInitializer
+        <$> checkFieldValues pann typeObj ty_fs fs
+        <*> pure (Just id_ty)
+        <*> pure (buildExpAnn pann (DefinedType id_ty));
     Class _clsKind _ident members _provides _mods ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
-        maybe (return ()) (checkEqTypesOrError pann (DefinedType id_ty)) expectedType >>
-        flip (SAST.StructInitializer id_ty)
-            (buildExpAnn pann (DefinedType id_ty))
-        <$>
-        checkFieldValues pann typeObj fields fs;
+        SAST.StructInitializer
+        <$> checkFieldValues pann typeObj fields fs
+        <*> pure (Just id_ty)
+        <*> pure (buildExpAnn pann (DefinedType id_ty));
    x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap forgetSemAnn x));
   }
+-- We shall always expect a type for the struct initializer. If we do not expect a type
+-- it means that we are using the expression in the wild.
+typeExpression _ _ (StructInitializer _fs _mty pann) =
+  throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression expectedType typeObj (EnumVariantInitializer id_ty variant args pann) =
   -- | Enum Variant
   catchError

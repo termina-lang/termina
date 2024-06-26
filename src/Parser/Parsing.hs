@@ -252,15 +252,14 @@ parameterParser = do
 -- hand side of an assignment expression.
 -- Examples of this expression:
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
-fieldAssignmentsExpressionParser :: Parser (Expression Annotation)
-fieldAssignmentsExpressionParser = do
+structInitializerParser :: Parser (Expression Annotation)
+structInitializerParser = do
     p <- getPosition
     assignments <- braces (sepBy
       (wspcs *> (try flValues <|> try flAddresses <|> try flAccessPortConnection <|> try flInboundPortConnection <|> flOutboundPortConnection) <* wspcs)
       comma)
-    _ <- reservedOp ":"
-    identifier <- identifierParser
-    return $ StructInitializer identifier assignments (Position p)
+    identifier <- optionMaybe (reservedOp ":" >> identifierParser)
+    return $ StructInitializer assignments identifier (Position p)
     where
       flValues = do
             identifier <- identifierParser
@@ -514,7 +513,7 @@ expressionParser = try optionVariantExprParser
   <|> try isOptionVariantExprParser
   <|> referenceExprParser
   <|> vectorInitParser
-  <|> fieldAssignmentsExpressionParser
+  <|> structInitializerParser
   <|> expressionParser'
 
 mutableReferenceExprParser :: Parser (Expression Annotation)

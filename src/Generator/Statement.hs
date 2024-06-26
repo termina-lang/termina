@@ -151,7 +151,7 @@ genStructInitialization ::
 genStructInitialization before level cObj expr =
   case expr of
     -- \| This function can only be called with a field values assignments expressions
-    (StructInitializer _ vas ann) -> genFieldAssignments before vas
+    (StructInitializer vas _ ann) -> genFieldAssignments before vas
 
         where
 
