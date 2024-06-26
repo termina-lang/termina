@@ -1,5 +1,6 @@
 -- | Semantic Error Printing
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Semantic.Errors.PPrinting where
 
@@ -15,6 +16,7 @@ import Errata.Styles
 import AST.Seman
 import Numeric
 import qualified Data.Map as M
+import Semantic.Types (SemanTypeDef)
 
 class ShowText a where
     showText :: a -> T.Text
@@ -91,6 +93,16 @@ instance ShowText Const where
     showText (B True) = "true"
     showText (B False) = "false"
     showText (C c) = T.pack [c]
+
+instance ShowText (SemanTypeDef a) where
+    showText (Struct ident _ _) = T.pack $ "struct " <> ident
+    showText (Enum ident _ _) = T.pack $ "enum " <> ident
+    showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
+    showText (Class ResourceClass ident _ _ _) = T.pack $ "resource class " <> ident
+    showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
+    showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
+    showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
+    showText (Interface ident _ _) = T.pack $ "interface " <> ident
 
 printSimpleError :: TL.Text -> T.Text -> String -> Int -> Int -> Int -> Maybe T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg = 
@@ -529,13 +541,54 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "will result in a value of type \x1b[31m" <> showText Bool <> 
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EConstantWithoutKnownType c ->
-        let title = "error[E032]: constant without known type."
+        let title = "error[E056]: constant without known type."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The type of the constant \x1b[31m" <> showText c <> 
                     "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
+    EStructInitializerInvalidUse ->
+        let title = "error[E057]: invalid use of struct initializer."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just $ "You are trying to use a struct initializer in an invalid context.\n" <>
+                        "Struct initializers can only be used to initialize struct objects.")
+    EStructInitializerTypeMismatch expectedTy actualTy ->
+        let title = "error[E058]: struct initializer type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EStructInitializerGlobalNotStruct tydef ->
+        let title = "error[E059]: struct initializer expected global type not struct."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Invalid use of a struct initializer.\n" <> 
+                    "You are using a struct initializer but the expected type is \x1b[31m" <> 
+                    showText tydef <> "\x1b[0m."))
+    EStructInitializerExpectedTypeNotStruct ty ->
+        let title = "error[E060]: struct initializer expected type not struct."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Invalid use of a struct initializer.\n" <> 
+                    "You are using a struct initializer but the expected type is \x1b[31m" <> 
+                    showText ty <> "\x1b[0m."))
+    EStructInitializerUnknownType ident ->
+        let title = "error[E061]: struct initializer unknown type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m of the struct initializer is unknown."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

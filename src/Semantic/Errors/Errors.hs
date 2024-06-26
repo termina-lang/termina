@@ -18,6 +18,7 @@ data Errors a
   = 
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
   | ENoTyFound Identifier -- ^ Type not found (Internal)
+  | ENotStructFound Identifier -- ^ Struct not found (Internal)s
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -74,7 +75,11 @@ data Errors a
   | EAtomicArrayAccessStoreWrongNumArgs Integer -- ^ Atomic array access store wrong number of arguments (E054)
   | EAtomicArrayAccessWrongProcedure Identifier -- ^ Atomic array access wrong procedure (E055)
   | EConstantWithoutKnownType Const -- ^ Constant without known type (E056)
-  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (E056)
+  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (E057)
+  | EStructInitializerTypeMismatch TypeSpecifier TypeSpecifier -- ^ Struct initializer type mismatch (E058)
+  | EStructInitializerGlobalNotStruct (SemanTypeDef a) -- ^ Struct initializer expected global type not struct (E059)  
+  | EStructInitializerExpectedTypeNotStruct TypeSpecifier -- ^ Struct initializer expected type not struct (E060)
+  | EStructInitializerUnknownType Identifier -- ^ Struct initializer unknown type (E061)
   | EMismatchIdNotEnum Identifier (SemanTypeDef a)
   | EMismatchDyn TypeSpecifier TypeSpecifier
   | EReturnValueExpected TypeSpecifier
@@ -100,9 +105,6 @@ data Errors a
   | EVarDefined Identifier
   -- | Not Function found
   | EFunctionNotFound Identifier
-  -- | TypeSpecifier Identifier is not Union/Struct
-  -- Not struct type found with identifier
-  | ETyNotStructFound Identifier
   -- Something was found but it is not an identifier
   | ETyNotStruct Identifier (SemanTypeDef a)
   -- | Record missing field^

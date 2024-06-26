@@ -40,6 +40,7 @@ import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Control.Monad
+import Generator.Common (CGeneratorError(InternalError))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -611,10 +612,20 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
 -- | Struct Initializer
 typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty pann) = do
   -- | Check field type
-  maybe (return ()) (checkEqTypesOrError pann ty . DefinedType) mty
-  catchError
-    (getGlobalTypeDef pann id_ty)
-    (\_ -> throwError $ annotateError pann (ETyNotStructFound id_ty))
+  case mty of
+    (Just id_ty') -> do
+      struct_ty <-
+        catchError
+          (getGlobalTypeDef pann id_ty')
+          (\_ -> throwError $ annotateError pann (EStructInitializerUnknownType id_ty))
+      catchMismatch pann (EStructInitializerTypeMismatch ty) (checkEqTypesOrError pann ty (DefinedType id_ty'))
+      return struct_ty
+    Nothing ->
+      catchError
+        (getGlobalTypeDef pann id_ty)
+        -- | Internal error. This should not happen, since we must have checked the
+        -- expected type before calling this function. 
+        (\_ -> throwError $ annotateError internalErrorSeman (ENotStructFound id_ty))
   >>= \case{
     Struct _ ty_fs _mods  ->
       SAST.StructInitializer
@@ -627,10 +638,12 @@ typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty p
         <$> checkFieldValues pann typeObj fields fs
         <*> pure (Just id_ty)
         <*> pure (buildExpAnn pann (DefinedType id_ty));
-   x -> throwError $ annotateError pann (ETyNotStruct id_ty (fmap forgetSemAnn x));
+    x -> throwError $ annotateError pann (EStructInitializerGlobalNotStruct (fmap forgetSemAnn x));
   }
 -- We shall always expect a type for the struct initializer. If we do not expect a type
 -- it means that we are using the expression in the wild.
+typeExpression (Just ty) _ (StructInitializer _fs _mty pann) =
+  throwError $ annotateError pann (EStructInitializerExpectedTypeNotStruct ty)
 typeExpression _ _ (StructInitializer _fs _mty pann) =
   throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression expectedType typeObj (EnumVariantInitializer id_ty variant args pann) =
