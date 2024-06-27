@@ -41,6 +41,7 @@ import           Data.Maybe
 -- import Control.Monad.State as ST
 import           Control.Monad
 import Generator.Common (CGeneratorError(InternalError))
+import AST.Parser (Expression'(ArrayExprListInitializer))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -680,12 +681,24 @@ typeExpression expectedType typeObj (EnumVariantInitializer id_ty variant args p
 typeExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
 -- | Array Initialization
   case expectedType of
-    Just (Array ts _) -> do
+    Just (Array ts arrsize) -> do
       typed_init <- typeExpression (Just ts) typeObj iexp
-      checkSize pann size
+      unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
       return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (Array ts size))
     Just ts -> throwError $ annotateError pann (EArray ts)
     _ -> throwError $ annotateError pann EArrayIntitalizerInvalidUse
+typeExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
+  case expectedType of
+    Just (Array ts arrsize) -> do
+      typed_exprs <- mapM (\e ->
+        catchMismatch (getAnnotation e) 
+          (EArrayExprListInitializerExprTypeMismatch ts) (typeExpression (Just ts) typeObj e)) exprs
+      size_value <- getIntSize pann arrsize
+      unless (length typed_exprs == fromIntegral size_value) 
+        (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
+      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (Array ts arrsize))
+    Just ts -> throwError $ annotateError pann (EArray ts)
+    _ -> throwError $ annotateError pann EArrayExprListIntitalizerInvalidUse
 typeExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
   case expectedType of
     Just (Option ts) -> do

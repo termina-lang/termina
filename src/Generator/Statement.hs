@@ -75,6 +75,8 @@ genArrayInitialization before level cObj expr = do
                 incrExpr = Just $ CAssignment (CVar iterator exprCAnn) (CBinary CAddOp (CVar iterator exprCAnn) (CConst (CIntConst (CInteger 1 CDecRepr)) exprCAnn) exprCAnn) exprCAnn
             arrayInit <- genArrayInitialization False (level + 1) (CIndex cObj (CVar iterator exprCAnn) exprCAnn) expr'
             return [CFor initExpr condExpr incrExpr (CCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann before)]
+        (ArrayExprListInitializer exprs _ann) ->
+            genArrayItemsInitialization before level 0 exprs
         (StructInitializer {}) -> genStructInitialization False level cObj expr
         (OptionVariantInitializer {}) -> genOptionInitialization False level cObj expr
         (EnumVariantInitializer {}) -> genEnumInitialization False level cObj expr
@@ -84,6 +86,20 @@ genArrayInitialization before level cObj expr = do
             let ann = getAnnotation expr
             genArrayInitializationFromExpression level cObj cExpr exprType ann
     where
+
+        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnns] -> CSourceGenerator [CStatement]
+        genArrayItemsInitialization _before _level _idx [] = return []
+        genArrayItemsInitialization before' level' idx (x:xs) = do
+            cExpr <- genExpression x
+            let ann = getAnnotation x
+            let declStmtAnn = buildStatementAnn ann before'
+            rest <- genArrayItemsInitialization False level' (idx + 1) xs
+            return $ 
+                CExpr (Just 
+                    (CAssignment 
+                        (CIndex cObj (CConst (CIntConst (CInteger idx CDecRepr)) (buildGenericAnn ann)) (buildGenericAnn ann))
+                        cExpr (buildGenericAnn ann))) declStmtAnn : rest
+        
         genArrayInitializationFromExpression :: Integer ->
             CExpression ->
             CExpression ->
@@ -125,6 +141,8 @@ genFieldInitialization before level cObj field expr =
         OptionVariantInitializer _ ann ->
             genOptionInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
         ArrayInitializer _ _ ann ->
+            genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
+        ArrayExprListInitializer _ ann ->
             genArrayInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr
         EnumVariantInitializer _ _ _ ann ->
             genEnumInitialization before level (CMember cObj field False (buildGenericAnn ann)) expr

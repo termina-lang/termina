@@ -512,8 +512,9 @@ expressionParser = try optionVariantExprParser
   <|> try enumVariantExprParser
   <|> try mutableReferenceExprParser
   <|> try isOptionVariantExprParser
+  <|> try arrayExprListInitializerParser
+  <|> arrayInitializerParser
   <|> referenceExprParser
-  <|> vectorInitParser
   <|> structInitializerParser
   <|> expressionParser'
 
@@ -683,15 +684,21 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
         AccessObject obj -> AccessObject (Dereference obj (Position p))
         _ -> error "Unexpected member access to a non object"))
 
-vectorInitParser :: Parser (Expression Annotation)
-vectorInitParser = do
-  _ <- reservedOp "["
+arrayInitializerParser :: Parser (Expression Annotation)
+arrayInitializerParser = do
   p <- getPosition
+  _ <- reservedOp "["
   value <- expressionParser
   _ <- semi
   size <- sizeParser
   _ <- reservedOp "]"
   return $ ArrayInitializer value size (Position p)
+
+arrayExprListInitializerParser :: Parser (Expression Annotation)
+arrayExprListInitializerParser = do
+  p <- getPosition
+  exprs <- braces (sepBy expressionParser comma)
+  return $ ArrayExprListInitializer exprs (Position p)
 
 -- -- Task Definition
 

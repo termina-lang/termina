@@ -30,6 +30,7 @@ data Expression'
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
   | ArrayInitializer (Expression' obj a) Size a -- ^ Array initializer, | (13 : i8) + (2 : i8)|
+  | ArrayExprListInitializer [Expression' obj a] a -- ^ Array expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
     [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
     (Maybe Identifier)
@@ -89,21 +90,22 @@ instance Annotated Object where
   getAnnotation (Undyn _ a)                   = a
 
 instance (Annotated obj) => Annotated (Expression' obj) where
-  getAnnotation (AccessObject obj)                       = getAnnotation obj
-  getAnnotation (Constant _ a)                           = a
-  getAnnotation (BinOp _ _ _ a)                          = a
-  getAnnotation (ReferenceExpression _ _ a)              = a
-  getAnnotation (Casting _ _ a)                          = a
-  getAnnotation (FunctionCall _ _ a)             = a
-  getAnnotation (StructInitializer _ _ a)       = a
-  getAnnotation (EnumVariantInitializer _ _ _ a)          = a
-  getAnnotation (ArrayInitializer _ _ a)              = a
-  getAnnotation (OptionVariantInitializer _ a)            = a
-  getAnnotation (MemberFunctionCall _ _ _ a)         = a
-  getAnnotation (DerefMemberFunctionCall _ _ _ a)    = a
-  getAnnotation (IsEnumVariantExpression _ _ _ a)        = a
-  getAnnotation (IsOptionVariantExpression _ _ a)        = a
-  getAnnotation (ArraySliceExpression _ _ _ a)           = a
+  getAnnotation (AccessObject obj)                = getAnnotation obj
+  getAnnotation (Constant _ a)                    = a
+  getAnnotation (BinOp _ _ _ a)                   = a
+  getAnnotation (ReferenceExpression _ _ a)       = a
+  getAnnotation (Casting _ _ a)                   = a
+  getAnnotation (FunctionCall _ _ a)              = a
+  getAnnotation (StructInitializer _ _ a)         = a
+  getAnnotation (EnumVariantInitializer _ _ _ a)  = a
+  getAnnotation (ArrayInitializer _ _ a)          = a
+  getAnnotation (ArrayExprListInitializer _ a)    = a
+  getAnnotation (OptionVariantInitializer _ a)    = a
+  getAnnotation (MemberFunctionCall _ _ _ a)      = a
+  getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
+  getAnnotation (IsEnumVariantExpression _ _ _ a) = a
+  getAnnotation (IsOptionVariantExpression _ _ a) = a
+  getAnnotation (ArraySliceExpression _ _ _ a)    = a
 ----------------------------------------
 
 -- type OptionVariant a = OptionVariant' (Expression a)

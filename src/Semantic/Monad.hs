@@ -27,6 +27,7 @@ import           Utils.TypeSpecifier
 -- Monads
 import           Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
+import Text.Parsec.Token (GenLanguageDef(identLetter))
 
 type Locations = Parser.Annotation
 
@@ -388,6 +389,13 @@ getConst loc ident = do
                     -- | It is a global object, but not a constant.
                     _ -> throwError $ annotateError loc (ENotConstant ident);
     });
+
+getIntSize :: Locations -> Size -> SemanticMonad Integer
+getIntSize loc (CAST.V ident) = do
+  (ty, value) <- getConst loc ident
+  checkEqTypesOrError loc USize ty
+  getIntConst loc value
+getIntSize _loc (CAST.K (TInteger value _)) = return value
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalEntry :: Locations -> Identifier -> SemanticMonad (SAnns (GEntry SemanticAnns))
