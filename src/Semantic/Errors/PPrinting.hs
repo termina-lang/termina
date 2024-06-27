@@ -775,6 +775,13 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 lineNumber lineColumn 1
                 (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EReturnValueExpected ty ->
+        let title = "error[E059]: expected return value."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The function is expected to return a value of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

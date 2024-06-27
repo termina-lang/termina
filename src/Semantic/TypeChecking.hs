@@ -40,8 +40,6 @@ import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Control.Monad
-import Generator.Common (CGeneratorError(InternalError))
-import AST.Parser (Expression'(ArrayExprListInitializer))
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -864,7 +862,7 @@ retStmt (Just ts) (ReturnStmt (Just e) anns) = do
   -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExpType ety
   return $ ReturnStmt (Just typed_e) (buildExpAnn anns ts)
 retStmt (Just ty) (ReturnStmt Nothing anns) = throwError $ annotateError anns $ EReturnValueExpected ty
-retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotVoid
+retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotUnit
 
 typeBlockRet :: Maybe TypeSpecifier -> BlockRet Parser.Annotation -> SemanticMonad (SAST.BlockRet SemanticAnns)
 typeBlockRet ts (BlockRet bbody rete) = BlockRet <$> typeBlock bbody <*> retStmt ts rete

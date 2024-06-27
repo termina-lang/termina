@@ -8,8 +8,6 @@ import AST.Parser
 import Semantic.Types
 import Parser.Parsing (Annotation)
 
-import           Control.Monad.Except       (MonadError (..))
-
 ----------------------------------------
 -- Type checker error handling
 ----------------------------------------
@@ -19,6 +17,7 @@ data Errors a
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
   | ENoTyFound Identifier -- ^ Type not found (Internal)
   | ENotStructFound Identifier -- ^ Struct not found (Internal)
+  | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -77,8 +76,8 @@ data Errors a
   | EArrayInitializerSizeMismatch Size Size -- ^ Array initializer size mismatch (E056)
   | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch (E057)
   | EArrayExprListInitializerExprTypeMismatch TypeSpecifier TypeSpecifier -- ^ Array initializing expression type mismatch (E058)
-  | EReturnValueExpected TypeSpecifier
-  | EReturnValueNotVoid 
+  | EReturnValueExpected TypeSpecifier -- ^ Expected return value (E059)
+  | EReturnValueNotUnit -- ^ Return value not unit (E060)
   -- | Invalid access to global object
   | EInvalidAccessToGlobal Identifier
   -- | Invalid writing access to read only object
@@ -125,11 +124,6 @@ data Errors a
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
-  -- | PM Enum errors
-  | EMCMissingEnum Identifier
-  | EMCMoreArgs [Identifier]
-  | EMCMissingArgs [TypeSpecifier]
-  | EMCEmpty
   -- | ForLoop
   | EForIteratorWrongType TypeSpecifier
   | EForWhileTy TypeSpecifier -- ^ Type of while is not Bool
@@ -142,14 +136,6 @@ data Errors a
   | EUsedTypeName Identifier a
   -- | Unique names for Global
   | EUsedGlobalName Identifier a
-  -- | Unique names Handler
-  | EUsedHandlerName Identifier
-  -- | Unique names Taks
-  | EUsedTaskName Identifier
-  -- | Array Type Primitive
-  -- | ENoPrimitiveType TypeSpecifier
-  -- | Only option Dyn
-  | EOptionDyn TypeSpecifier
   -- | Access port does not have an Interface type
   | EAccessPortNotInterface TypeSpecifier
   | EAccessPortNotResource Identifier 
@@ -159,16 +145,10 @@ data Errors a
   | EAccessPortNotPool Identifier
   | EAccessPortNotAtomic Identifier
   | EAccessPortNotAtomicArray Identifier
-  -- | Dynamic a non primitive type
-  | EDynPrim TypeSpecifier
   -- | Dynamic (type has a Dynamic inside) as Argument of a function
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier a
-  -- | Error getting type of expressions of objects.
-  | EUnboxingObjectExpr
-  | EUnboxingConstExpr
-  | EUnboxingLocalEnvKind
   -- | Expected Simple Type
   | EExpectedSimple TypeSpecifier
   -- | Invalid class field type
@@ -196,10 +176,6 @@ data Errors a
   | EClassTyping
   -- Dereference Object
   | ETypeNotReference TypeSpecifier
-  -- Error while forcing Undyn
-  | EUndynForcingError
-  -- Error when constructing an option variant expression with a non-dynamic type
-  | EOptionVariantNotDynamic TypeSpecifier
   -- Internal Undyn
   | EUnDynExpression
   -- Match
@@ -233,21 +209,7 @@ data Errors a
   | EMsgQueueSendArgNotRefImmTimeout TypeSpecifier
   | EMsgQueueWrongType TypeSpecifier TypeSpecifier
   | EMsgQueueRcvWrongArgTy TypeSpecifier
-  -- | Array slicing
-  | EBoundsTypeMismatch TypeSpecifier TypeSpecifier -- | Lower and upper bounds are not of the same type
-  | EBoundsTypeNotUSize TypeSpecifier TypeSpecifier -- | Bounds are not of of type usize
-  | EBoundsLowerGTUpper Integer Integer -- | Lower bound is greater than upper bound
-  | EUpperBoundGTSize Integer Integer -- | Upper bound is greater than the size of the vector
   deriving Show
-
-instance Eq (Errors a) where
-  (ENotNamedObject idls) == (ENotNamedObject idrs) = idls == idrs
-  _ == _ = False
-
-
-withError :: MonadError e m => (e -> e) -> m a -> m a
-withError = flip catchError . (throwError .)
-----------------------------------------
 
 data AnnotatedErrors a = AnnError {semError :: Errors a , annError :: a }
   deriving Show

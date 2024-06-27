@@ -27,7 +27,6 @@ import           Utils.TypeSpecifier
 -- Monads
 import           Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import Text.Parsec.Token (GenLanguageDef(identLetter))
 
 type Locations = Parser.Annotation
 
@@ -672,7 +671,7 @@ checkTypeSpecifier _ Unit                    = return ()
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
 getObjectType :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
-getObjectType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObjectExpr) return . getObjectSAnns . getAnnotation
+getObjectType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObject) return . getObjectSAnns . getAnnotation
 
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
