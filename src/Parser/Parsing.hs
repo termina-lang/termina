@@ -256,37 +256,51 @@ parameterParser = do
 structInitializerParser :: Parser (Expression Annotation)
 structInitializerParser = do
     p <- getPosition
-    assignments <- braces (sepBy
-      (wspcs *> (try flValues <|> try flAddresses <|> try flAccessPortConnection <|> try flInboundPortConnection <|> flOutboundPortConnection) <* wspcs)
-      comma)
+    assignments <- braces (sepBy (wspcs *> fieldAssignmentParser <* wspcs) comma)
     identifier <- optionMaybe (reservedOp ":" >> identifierParser)
     return $ StructInitializer assignments identifier (Position p)
     where
-      flValues = do
-            identifier <- identifierParser
-            _ <- reservedOp "="
-            p' <- getPosition
-            flip (FieldValueAssignment identifier) (Position p')  <$> expressionParser
-      flAddresses = do
-            identifier <- identifierParser
-            _ <- reservedOp "@"
-            p' <- getPosition
-            flip (FieldAddressAssignment identifier) (Position p') <$> integerParser
-      flAccessPortConnection = do
-            identifier <- identifierParser
-            _ <- reservedOp "<->"
-            p' <- getPosition
-            flip (FieldPortConnection AccessPortConnection identifier) (Position p') <$> identifierParser
-      flInboundPortConnection = do
-            identifier <- identifierParser
-            _ <- reservedOp "<-"
-            p' <- getPosition
-            flip (FieldPortConnection InboundPortConnection identifier) (Position p') <$> identifierParser
-      flOutboundPortConnection = do
-            identifier <- identifierParser
-            _ <- reservedOp "->"
-            p' <- getPosition
-            flip (FieldPortConnection OutboundPortConnection identifier) (Position p') <$> identifierParser
+
+      fieldAssignmentParser :: Parser (FieldAssignment Annotation)
+      fieldAssignmentParser = do
+        identifier <- identifierParser
+        fieldValueParser identifier <|> fieldAddressParser identifier <|> fieldAccessPortConnectionParser identifier
+            <|> fieldInboundPortConnectionParser identifier <|> fieldOutboundPortConnectionParser identifier
+
+      fieldValueParser :: Identifier -> Parser (FieldAssignment Annotation)
+      fieldValueParser ident = do
+        _ <- reservedOp "="
+        p' <- getPosition
+        expr <- expressionParser
+        return $ FieldValueAssignment ident expr (Position p')
+      
+      fieldAddressParser :: Identifier -> Parser (FieldAssignment Annotation)
+      fieldAddressParser ident = do
+        _ <- reservedOp "@"
+        p' <- getPosition
+        address <- integerParser
+        return $ FieldAddressAssignment ident address (Position p')
+      
+      fieldAccessPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
+      fieldAccessPortConnectionParser ident = do
+        _ <- reservedOp "<->"
+        p' <- getPosition
+        port <- identifierParser
+        return $ FieldPortConnection AccessPortConnection ident port (Position p')
+      
+      fieldInboundPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
+      fieldInboundPortConnectionParser ident = do
+        _ <- reservedOp "<-"
+        p' <- getPosition
+        port <- identifierParser
+        return $ FieldPortConnection InboundPortConnection ident port (Position p')
+
+      fieldOutboundPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
+      fieldOutboundPortConnectionParser ident = do
+        _ <- reservedOp "->"
+        p' <- getPosition
+        port <- identifierParser
+        return $ FieldPortConnection OutboundPortConnection ident port (Position p')
 
 -- | Parser for an element modifier
 -- A modifier is of the form:

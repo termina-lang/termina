@@ -162,6 +162,7 @@ getExprType (DerefMemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = re
 getExprType (StructInitializer _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
 getExprType (EnumVariantInitializer _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
 getExprType (ArrayInitializer _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (ArrayExprListInitializer _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | Generates the name of the option struct type

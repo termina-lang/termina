@@ -90,15 +90,10 @@ genArrayInitialization before level cObj expr = do
         genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnns] -> CSourceGenerator [CStatement]
         genArrayItemsInitialization _before _level _idx [] = return []
         genArrayItemsInitialization before' level' idx (x:xs) = do
-            cExpr <- genExpression x
             let ann = getAnnotation x
-            let declStmtAnn = buildStatementAnn ann before'
             rest <- genArrayItemsInitialization False level' (idx + 1) xs
-            return $ 
-                CExpr (Just 
-                    (CAssignment 
-                        (CIndex cObj (CConst (CIntConst (CInteger idx CDecRepr)) (buildGenericAnn ann)) (buildGenericAnn ann))
-                        cExpr (buildGenericAnn ann))) declStmtAnn : rest
+            current <- genArrayInitialization before' level' (CIndex cObj (CConst (CIntConst (CInteger idx CDecRepr)) (buildGenericAnn ann)) (buildGenericAnn ann)) x
+            return $ current ++ rest
         
         genArrayInitializationFromExpression :: Integer ->
             CExpression ->
