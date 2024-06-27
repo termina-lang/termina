@@ -224,7 +224,9 @@ typeMemberFunctionCall ann obj_ty ident args =
               let (psLen , asLen) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
-              typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
+              typed_args <- zipWithM (\p e -> 
+                catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns)) 
+                  (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)) ps args
               return ((ps, typed_args), Unit)
          ;
          -- Other User defined types do not define methods
@@ -234,60 +236,65 @@ typeMemberFunctionCall ann obj_ty ident args =
       case ident of
         "alloc" ->
           case args of
-            [refM] -> do
-              typed_ref <- typeExpression (Just (Reference Mutable (Option (DynamicSubtype ty_pool))) ) typeRHSObject refM
-              return (([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_ref]), Unit)
-            _ -> throwError $ annotateError ann EPoolsWrongNumArgs
+            [opt] -> do
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool))), Parser.Builtin))
+                (typeExpression (Just (Reference Mutable (Option (DynamicSubtype ty_pool)))) typeRHSObject opt)
+              return (([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Parser.Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Parser.Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [element] -> do
-              element_typed <- typeExpression (Just (DynamicSubtype ty_pool)) typeRHSObject element
-              element_type <- getExpType element_typed
-              case element_type of
-                  (DynamicSubtype tyref) ->
-                      unless (checkEqTypes ty_pool tyref) (throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)) >>
-                      return (([Parameter "element" element_type], [element_typed]), Unit)
-                  _ -> throwError $ annotateError ann (EPoolsWrongArgTypeW element_type)
-            _ -> throwError $ annotateError ann EPoolsWrongNumArgs
-        _ -> throwError $ annotateError ann (EPoolUnknownProcedure ident)
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (DynamicSubtype ty_pool), Parser.Builtin))
+                (typeExpression (Just (DynamicSubtype ty_pool)) typeRHSObject element)
+              return (([Parameter "element" (DynamicSubtype ty_pool)], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Parser.Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Parser.Builtin) (fromIntegral (length args)))
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicAccess ty_atomic) ->
       case ident of
         "load" ->
           case args of
-            [refM] -> do
-              typed_ref <- catchMismatch ann (EAtomicAccessLoadObjectTypeMismatch ty_atomic)
-                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject refM)
-              return (([Parameter "retval" (Reference Mutable ty_atomic)], [typed_ref]), Unit)
-            _ -> throwError $ annotateError ann (EAtomicAccessLoadWrongNumArgs (fromIntegral (length args)))
+            [retval] -> do
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Parameter "retval" (Reference Mutable ty_atomic), Parser.Builtin))
+                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
+              return (([Parameter "retval" (Reference Mutable ty_atomic)], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
         "store" ->
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EAtomicAccessStoreValueTypeMismatch ty_atomic)
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", Parameter "value" ty_atomic, Parser.Builtin))
                 (typeExpression (Just ty_atomic) typeRHSObject value)
               return (([Parameter "value" ty_atomic], [typed_value]), Unit)
-            _ -> throwError $ annotateError ann (EAtomicAccessStoreWrongNumArgs (fromIntegral (length args)))
-        _ -> throwError $ annotateError ann (EAtomicAccessWrongProcedure ident)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicArrayAccess ty_atomic) ->
       case ident of
         "load_index" ->
           case args of
-            [idx, refM] -> do
-              typed_idx <- catchMismatch ann EAtomicArrayAccessLoadIndexTypeMismatch
-                (typeExpression (Just USize) typeRHSObject idx)
-              typed_ref <- catchMismatch ann (EAtomicArrayAccessLoadObjectTypeMismatch ty_atomic)
-                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject refM)
+            [index, retval] -> do
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "index" USize, Parser.Builtin))
+                (typeExpression (Just USize) typeRHSObject index)
+              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "retval" (Reference Mutable ty_atomic), Parser.Builtin))
+                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
               return (([Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], [typed_idx, typed_ref]), Unit)
-            _ -> throwError $ annotateError ann (EAtomicArrayAccessLoadWrongNumArgs (fromIntegral (length args)))
+            _ -> if length args < 2 then 
+              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
         "store_index" ->
           case args of
-            [idx, value] -> do
-              typed_idx <- catchMismatch ann EAtomicArrayAccessStoreIndexTypeMismatch
-                (typeExpression (Just USize) typeRHSObject idx)
-              typed_value <- catchMismatch ann (EAtomicArrayAccessStoreValueTypeMismatch ty_atomic)
-                (typeExpression (Just ty_atomic) typeRHSObject value)
+            [index, retval] -> do
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "index" USize, Parser.Builtin))
+                (typeExpression (Just USize) typeRHSObject index)
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "value" ty_atomic, Parser.Builtin))
+                (typeExpression (Just ty_atomic) typeRHSObject retval)
               return (([Parameter "index" USize, Parameter "value" ty_atomic], [typed_idx, typed_value]), Unit)
-            _ -> throwError $ annotateError ann (EAtomicArrayAccessStoreWrongNumArgs (fromIntegral (length args)))
-        _ -> throwError $ annotateError ann (EAtomicArrayAccessWrongProcedure ident)
+            _ -> if length args < 2 then 
+              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
+        _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     OutPort ty ->
       case ident of
         -- send(T)
@@ -559,7 +566,8 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
         Just rtype@(Reference _ak (Array ts size)) -> do
           unless (checkEqTypes ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
           return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
-        _ -> throwError $ annotateError pann EExpectedType
+        Just ety -> throwError $ annotateError pann $ EMismatch (Reference refKind ty) ety
+        _ -> throwError $ annotateError pann ESliceInvalidUse
     _ -> do
       -- | Check if the we are allowed to create that kind of reference from the object
       checkReferenceAccessKind obj_ak
@@ -677,9 +685,7 @@ typeExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
       checkSize pann size
       return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (Array ts size))
     Just ts -> throwError $ annotateError pann (EArray ts)
-    _ -> throwError $ annotateError pann EExpectedType
--- DONE [Q5]
--- TODO [Q17]
+    _ -> throwError $ annotateError pann EArrayIntitalizerInvalidUse
 typeExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
   case expectedType of
     Just (Option ts) -> do
@@ -688,7 +694,7 @@ typeExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
         Some e -> do
           typed_e <- typeExpression (Just ts) typeObj e
           return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (Option ts))
-    _ -> throwError $ annotateError anns EExpectedType
+    _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed

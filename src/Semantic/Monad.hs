@@ -292,12 +292,6 @@ getGlobalTypeDef loc tid  = gets global >>=
         _         -> throwError $ annotateError loc (EGlobalNoType tid)
       } . ty_ann) . M.lookup tid
 
--- | From a global name get enum variations
-getGlobalEnumTy :: Locations -> Identifier -> SemanticMonad [EnumVariant]
-getGlobalEnumTy loc tid  = getGlobalTypeDef loc tid  >>= \case
-  Enum _ fs _mods -> return fs
-  ty              -> throwError $ annotateError loc $ EMismatchIdNotEnum tid (fmap forgetSemAnn ty)
-
 getFunctionTy :: Locations -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier, Locations)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden ) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))

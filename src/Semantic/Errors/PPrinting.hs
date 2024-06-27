@@ -236,8 +236,39 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
+    EProcedureCallParamTypeMismatch (ident, Parameter param expectedTy, ann) actualTy ->
+        let title = "error[E011]: parameter type mismatch in procedure call."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("Parameter \x1b[31m" <> T.pack param <> 
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            case ann of
+                Position procPos ->
+                    let procFileName = sourceName procPos
+                        procLineNumber = sourceLine procPos
+                        procLineColumn = sourceColumn procPos
+                        procSourceLines = toModuleAST M.! procFileName
+                    in
+                    printSimpleError 
+                        procSourceLines 
+                            ("The procedure \x1b[31m" <> T.pack ident <> 
+                            "\x1b[0m is defined here:") 
+                            procFileName
+                        procLineNumber procLineColumn 1
+                        Nothing
+                _ -> return ()
+    EUnknownProcedure ident ->
+        let title = "error[E012]: unknown procedure."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Unknown procedure \x1b[31m" <> T.pack ident <> "\x1b[0m."))
     EResourceClassNoProvides ident ->
-        let title = "error[E011]: resource class does not provide any interface."
+        let title = "error[E013]: resource class does not provide any interface."
         in
             printSimpleError
                 sourceLines title fileName
@@ -245,7 +276,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
                     "A resource class must provide at least one interface."))
     EResourceClassAction (classId, Position posClass) ident ->
-        let title = "error[E012]: resource class defines an action."
+        let title = "error[E014]: resource class defines an action."
         in
             TL.putStrLn $ prettyErrors 
                 sourceLines
@@ -271,7 +302,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                             <> "Resource classes cannot define actions."))
                 ]
     EResourceClassInPort (classId, Position posClass) ident ->
-        let title = "error[E013]: resource class defines an in port."
+        let title = "error[E015]: resource class defines an in port."
         in
             TL.putStrLn $ prettyErrors 
                 sourceLines
@@ -297,7 +328,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                             <> "Resource classes cannot define in ports."))
                 ]
     EResourceClassOutPort (classId, Position posClass) ident ->
-        let title = "error[E014]: resource class defines an out port."
+        let title = "error[E016]: resource class defines an out port."
         in
             TL.putStrLn $ prettyErrors 
                 sourceLines
@@ -323,21 +354,21 @@ ppError toModuleAST (AnnError e (Position pos)) =
                             <> "Resource classes cannot define out ports."))
                 ]
     EInterfaceNotFound ident ->
-        let title = "error[E015]: interface not found."
+        let title = "error[E017]: interface not found."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
     EMismatchIdNotInterface ident -> 
-        let title = "error[E016]: identifier not an interface."
+        let title = "error[E018]: identifier not an interface."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface."))
     EProcedureNotFromProvidedInterfaces (classId, Position posClass) ident ->
-        let title = "error[E017]: procedure not from provided interfaces."
+        let title = "error[E019]: procedure not from provided interfaces."
         in
             TL.putStrLn $ prettyErrors 
                 sourceLines
@@ -364,14 +395,14 @@ ppError toModuleAST (AnnError e (Position pos)) =
                                 <> T.pack classId <> "\x1b[0m.\n"))
                 ]
     EMissingProcedure ifaceId procId ->
-        let title = "error[E018]: missing procedure."
+        let title = "error[E020]: missing procedure."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
     EProcedureExtraParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E019]: extra parameters in procedure definition."
+        let title = "error[E021]: extra parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -389,7 +420,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureMissingParams (ifaceId, procId, params, Position procPos) paramNumber ->
-        let title = "error[E020]: missing parameters in procedure definition."
+        let title = "error[E022]: missing parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -407,7 +438,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
-        let title = "error[E021]: parameter type mismatch in procedure definition."
+        let title = "error[E023]: parameter type mismatch in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
             procLineColumn = sourceColumn procPos
@@ -428,14 +459,14 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procLineNumber procLineColumn 1
                 Nothing
     EIfElseIfCondNotBool ts ->
-        let title = "error[E022]: if-else-if condition not boolean."
+        let title = "error[E024]: if-else-if condition not boolean."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
     EFunctionCallExtraParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E023]: extra parameters in function call."
+        let title = "error[E025]: extra parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos
@@ -452,7 +483,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
     EFunctionCallMissingParams (funcId, params, Position funcPos) paramNumber ->
-        let title = "error[E024]: missing parameters in function call."
+        let title = "error[E026]: missing parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos
@@ -469,7 +500,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
     EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos) actualTy ->
-        let title = "error[E025]: parameter type mismatch in function call."
+        let title = "error[E027]: parameter type mismatch in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
             funcLineColumn = sourceColumn funcPos
@@ -489,21 +520,21 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
     EMemberAccessNotFunction ident ->
-        let title = "error[E026]: Access to a member that is not a function."
+        let title = "error[E028]: Access to a member that is not a function."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid member function."))
     EMutableReferenceToImmutable ->
-        let title = "error[E027]: mutable reference to immutable object."
+        let title = "error[E029]: mutable reference to immutable object."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 4 -- ^ Size of "&mut"
                 (Just "You are trying to create a mutable reference to an immutable object.")
     EBinOpExpectedTypeLeft op expectedTy actualTy ->
-        let title = "error[E028]: Binary operation expected type on the left (E028)."
+        let title = "error[E030]: Binary operation expected type on the left."
         in
             printSimpleError
                 sourceLines title fileName
@@ -513,7 +544,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m but the left operand you are providing is of type \x1b[31m" <> 
                     showText actualTy <> "\x1b[0m."))
     EBinOpExpectedTypeRight op expectedTy actualTy ->
-        let title = "error[E029]: Binary operation expected type on the right (E029)."
+        let title = "error[E031]: Binary operation expected type on the right."
         in
             printSimpleError
                 sourceLines title fileName
@@ -523,7 +554,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m but the right operand you are providing is of type \x1b[31m" <> 
                     showText actualTy <> "\x1b[0m."))
     EBinOpTypeMismatch op ty_le ty_re ->
-        let title = "error[E030]: binary operation type mismatch."
+        let title = "error[E032]: binary operation type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -532,16 +563,42 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
                     showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
     EBinOpExpectedTypeNotBool op ty ->
-        let title = "error[E031]: binary operation expected result type not boolean."
+        let title = "error[E033]: binary operation expected result type not boolean."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (T.length (showText op))
+                (Just ("The binary operation \x1b[31m" <> showText op <> 
+                    "will result in a value of type \x1b[31m" <> showText Bool <> 
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EBinOpLeftTypeNotBool op ty ->
+        let title = "error[E034]: binary operation expected boolean type on the left."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
+                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <> 
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
+    EBinOpRightTypeNotBool op ty ->
+        let title = "error[E035]: binary operation expected boolean type on the right."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <> 
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
+    EBinOpExpectedTypeNotNum op ty ->
+        let title = "error[E036]: binary operation expected result type not numeric."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (T.length (showText op))
                 (Just ("The binary operation \x1b[31m" <> showText op <> 
-                    "will result in a value of type \x1b[31m" <> showText Bool <> 
-                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+                    "\x1b[0m will result in a numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
     EConstantWithoutKnownType c ->
-        let title = "error[E056]: constant without known type."
+        let title = "error[E034]: constant without known type."
         in
             printSimpleError
                 sourceLines title fileName

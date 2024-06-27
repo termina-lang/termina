@@ -11,14 +11,14 @@ import Parser.Parsing (Annotation)
 import           Control.Monad.Except       (MonadError (..))
 
 ----------------------------------------
--- Error Handling
+-- Type checker error handling
 ----------------------------------------
 data Errors a
   -- | Expected /similar/ types?
   = 
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
   | ENoTyFound Identifier -- ^ Type not found (Internal)
-  | ENotStructFound Identifier -- ^ Struct not found (Internal)s
+  | ENotStructFound Identifier -- ^ Struct not found (Internal)
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -29,69 +29,52 @@ data Errors a
   | EInvalidReturnType TypeSpecifier -- ^ Invalid return type (E008)
   | EProcedureCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure call (E009)
   | EProcedureCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure call (E010)
-  | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (E011)
-  | EResourceClassAction (Identifier, a) Identifier -- ^ Resource class defines an action (E012)
-  | EResourceClassInPort (Identifier, a) Identifier -- ^ Resource class defines an in port (E013)
-  | EResourceClassOutPort (Identifier, a) Identifier -- ^ Resource class defines an out port (E014)
-  | EInterfaceNotFound Identifier -- ^ Interface not found (E015)
-  | EMismatchIdNotInterface Identifier -- ^ The type is not an interface (E016)
-  | EProcedureNotFromProvidedInterfaces (Identifier, a) Identifier -- ^ Procedure not from provided interfaces (E017)
-  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (E018)
-  | EProcedureExtraParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure definition (E019)
-  | EProcedureMissingParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure definition (E020)
-  | EProcedureParamTypeMismatch (Identifier, Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in procedure definition (E021)
-  | EIfElseIfCondNotBool TypeSpecifier -- ^ If-else-if condition is not a boolean (E022)
-  | EFunctionCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in function call (E023)
-  | EFunctionCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in function call (E024)
-  | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E025)
-  | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (E026)
-  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E027)
-  | EBinOpExpectedTypeLeft Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the left (E028)
-  | EBinOpExpectedTypeRight Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the right (E029)
-  | EBinOpTypeMismatch Op TypeSpecifier TypeSpecifier -- ^ Binary operation type mismatch (E030)
-  | EBinOpExpectedTypeNotBool Op TypeSpecifier -- ^ Binary operation expected result type not boolean (E031)
-  | EBinOpLeftTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the left (E032)
-  | EBinOpRightTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the right (E033)
-  | EBinOpExpectedTypeNotNum Op TypeSpecifier -- ^ Binary operation expected result type not numeric (E034)
-  | EBinOpLeftTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the left (E035)
-  | EBinOpRightTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the right (E036)
-  | EBinOpRightTypeNotPos Op TypeSpecifier -- ^ Binary operation expected positive type on the right (E037)
-  | EBinOpLeftTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the left (E038)
-  | EBinOpRightTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the right (E039)
-  | EAtomicAccessInvalidType TypeSpecifier -- ^ Atomic access invalid type (E040)
-  | EAtomicArrayAccessInvalidType TypeSpecifier -- ^ Atomic array access invalid type (E041)
-  | EAtomicInvalidType TypeSpecifier -- ^ Atomic invalid type (E042)
-  | EAtomicArrayInvalidType TypeSpecifier -- ^ Atomic array invalid type (E043)
-  | EAtomicAccessLoadObjectTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic access load object type mismatch (E044)
-  | EAtomicAccessLoadWrongNumArgs Integer -- ^ Atomic access load wrong number of arguments (E045)
-  | EAtomicAccessStoreValueTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic access store parameter type mismatch (E046)
-  | EAtomicAccessStoreWrongNumArgs Integer -- ^ Atomic access store wrong number of arguments (E047)
-  | EAtomicAccessWrongProcedure Identifier -- ^ Atomic access wrong procedure (E048)
-  | EAtomicArrayAccessLoadIndexTypeMismatch TypeSpecifier -- ^ Atomic array access load index type mismatch (E049)
-  | EAtomicArrayAccessLoadObjectTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic array access object type mismatch (E050)
-  | EAtomicArrayAccessLoadWrongNumArgs Integer -- ^ Atomic array access load wrong number of arguments (E051)
-  | EAtomicArrayAccessStoreIndexTypeMismatch TypeSpecifier -- ^ Atomic array access store index type mismatch (E052)
-  | EAtomicArrayAccessStoreValueTypeMismatch TypeSpecifier TypeSpecifier -- ^ Atomic array access store value type mismatch (E053)
-  | EAtomicArrayAccessStoreWrongNumArgs Integer -- ^ Atomic array access store wrong number of arguments (E054)
-  | EAtomicArrayAccessWrongProcedure Identifier -- ^ Atomic array access wrong procedure (E055)
-  | EConstantWithoutKnownType Const -- ^ Constant without known type (E056)
-  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (E057)
-  | EStructInitializerTypeMismatch TypeSpecifier TypeSpecifier -- ^ Struct initializer type mismatch (E058)
-  | EStructInitializerGlobalNotStruct (SemanTypeDef a) -- ^ Struct initializer expected global type not struct (E059)  
-  | EStructInitializerExpectedTypeNotStruct TypeSpecifier -- ^ Struct initializer expected type not struct (E060)
-  | EStructInitializerUnknownType Identifier -- ^ Struct initializer unknown type (E061)
-  | EMismatchIdNotEnum Identifier (SemanTypeDef a)
-  | EMismatchDyn TypeSpecifier TypeSpecifier
+  | EProcedureCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in procedure call (E011)
+  | EUnknownProcedure Identifier -- ^ Unknown procedure (E012)
+  | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (E013)
+  | EResourceClassAction (Identifier, a) Identifier -- ^ Resource class defines an action (E014)
+  | EResourceClassInPort (Identifier, a) Identifier -- ^ Resource class defines an in port (E015)
+  | EResourceClassOutPort (Identifier, a) Identifier -- ^ Resource class defines an out port (E016)
+  | EInterfaceNotFound Identifier -- ^ Interface not found (E017)
+  | EMismatchIdNotInterface Identifier -- ^ The type is not an interface (E018)
+  | EProcedureNotFromProvidedInterfaces (Identifier, a) Identifier -- ^ Procedure not from provided interfaces (E019)
+  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (E020)
+  | EProcedureExtraParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Extra parameters in procedure definition (E021)
+  | EProcedureMissingParams (Identifier, Identifier, [Parameter], a) Integer -- ^ Missing parameters in procedure definition (E022)
+  | EProcedureParamTypeMismatch (Identifier, Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in procedure definition (E023)
+  | EIfElseIfCondNotBool TypeSpecifier -- ^ If-else-if condition is not a boolean (E024)
+  | EFunctionCallExtraParams (Identifier, [Parameter], a) Integer -- ^ Extra parameters in function call (E025)
+  | EFunctionCallMissingParams (Identifier, [Parameter], a) Integer -- ^ Missing parameters in function call (E026)
+  | EFunctionCallParamTypeMismatch (Identifier, Parameter, a) TypeSpecifier -- ^ Parameter type mismatch in function call (E027)
+  | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (E028)
+  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (E029)
+  | EBinOpExpectedTypeLeft Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the left (E030)
+  | EBinOpExpectedTypeRight Op TypeSpecifier TypeSpecifier -- ^ Binary operation expected type on the right (E031)
+  | EBinOpTypeMismatch Op TypeSpecifier TypeSpecifier -- ^ Binary operation type mismatch (E032)
+  | EBinOpExpectedTypeNotBool Op TypeSpecifier -- ^ Binary operation expected result type not boolean (E033)
+  | EBinOpLeftTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the left (E034)
+  | EBinOpRightTypeNotBool Op TypeSpecifier -- ^ Binary operation expected boolean type on the right (E035)
+  | EBinOpExpectedTypeNotNum Op TypeSpecifier -- ^ Binary operation expected result type not numeric (E036)
+  | EBinOpLeftTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the left (E037)
+  | EBinOpRightTypeNotNum Op TypeSpecifier -- ^ Binary operation expected numeric type on the right (E038)
+  | EBinOpRightTypeNotPos Op TypeSpecifier -- ^ Binary operation expected positive type on the right (E039)
+  | EBinOpLeftTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the left (E040)
+  | EBinOpRightTypeNotEquatable Op TypeSpecifier -- ^ Binary operation expected equatable type on the right (E041)
+  | EAtomicAccessInvalidType TypeSpecifier -- ^ Atomic access invalid type (E042)
+  | EAtomicArrayAccessInvalidType TypeSpecifier -- ^ Atomic array access invalid type (E043)
+  | EAtomicInvalidType TypeSpecifier -- ^ Atomic invalid type (E044)
+  | EAtomicArrayInvalidType TypeSpecifier -- ^ Atomic array invalid type (E045)
+  | EConstantWithoutKnownType Const -- ^ Constant without known type (E046)
+  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (E047)
+  | EStructInitializerTypeMismatch TypeSpecifier TypeSpecifier -- ^ Struct initializer type mismatch (E048)
+  | EStructInitializerGlobalNotStruct (SemanTypeDef a) -- ^ Struct initializer expected global type not struct (E049)  
+  | EStructInitializerExpectedTypeNotStruct TypeSpecifier -- ^ Struct initializer expected type not struct (E050)
+  | EStructInitializerUnknownType Identifier -- ^ Struct initializer unknown type (E051)
+  | ESliceInvalidUse -- ^ Invalid use of a slice (E052)
+  | EArrayIntitalizerInvalidUse -- ^ Invalid use of an array initializer (E053)
+  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer (E054)
   | EReturnValueExpected TypeSpecifier
   | EReturnValueNotVoid 
-  | EExpectedType
-  -- | Expected Numeric Types
-  | ENumTs [TypeSpecifier]
-  | EUSizeTs TypeSpecifier
-  -- | Reference of a global type?
-  | EReferenceGlobal Identifier
-  -- | Not Variable found
-  | ENotVar
   -- | Invalid access to global object
   | EInvalidAccessToGlobal Identifier
   -- | Invalid writing access to read only object
@@ -121,7 +104,6 @@ data Errors a
   | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
-  | EUnknownProcedure Identifier
   | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
@@ -136,8 +118,6 @@ data Errors a
   | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
   -- | Global Object but not a type
   | EGlobalNoType Identifier
-  -- | Array with malformed size 
-  | EArrayConst Size
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -214,14 +194,6 @@ data Errors a
   | ETypeNotReference TypeSpecifier
   -- Error while forcing Undyn
   | EUndynForcingError
-  | EInvalidUseOfSlice
-  -- Error using a method different than alloc on a pool
-  | EPoolsAllocArgs
-  | EPoolsMethods Identifier
-  |   EPoolUnknownProcedure Identifier
-  | EPoolsWrongNumArgs
-  | EPoolsWrongArgType TypeSpecifier
-  | EPoolsWrongArgTypeW TypeSpecifier
   -- Error when constructing an option variant expression with a non-dynamic type
   | EOptionVariantNotDynamic TypeSpecifier
   -- Internal Undyn

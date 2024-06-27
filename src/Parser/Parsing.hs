@@ -33,6 +33,7 @@ the position in the source file where the element is located.
 
 data Annotation =
   Position SourcePos -- ^ Source code position
+  | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen
   deriving Show
