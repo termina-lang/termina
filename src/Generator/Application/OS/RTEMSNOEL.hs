@@ -64,14 +64,14 @@ data RTEMSGlobal =
     | RTEMSPool
       Identifier -- ^ pool identifier
       TypeSpecifier -- ^ type of the elements of the pool
-      TInteger -- ^ pool size
+      Size -- ^ pool size
     | RTEMSAtomic
       Identifier -- ^ atomic identifier
       TypeSpecifier -- ^ type of the atomic
     | RTEMSAtomicArray
       Identifier -- ^ atomic array identifier
       TypeSpecifier -- ^ type of the elements of the atomic array
-      TInteger -- ^ atomic array size
+      Size -- ^ atomic array size
     deriving Show
 
 data RTEMSEmitter =
@@ -234,9 +234,9 @@ buildRTEMSGlobal (Resource identifier (DefinedType ty) (Just (StructInitializer 
                             [RTEMSAccessPort portIdentifier resourceIdentifier]
                         _ -> error $ "Invalid port connection: " ++ show portIdentifier;
                 _ -> []) clsMembers
-buildRTEMSGlobal (Resource identifier (Pool ty (K size)) _ _ _) _ = RTEMSPool identifier ty size
+buildRTEMSGlobal (Resource identifier (Pool ty size) _ _ _) _ = RTEMSPool identifier ty size
 buildRTEMSGlobal (Resource identifier (Atomic ty) _ _ _) _ = RTEMSAtomic identifier ty
-buildRTEMSGlobal (Resource identifier (AtomicArray ty (K size)) _ _ _) _ = RTEMSAtomicArray identifier ty size
+buildRTEMSGlobal (Resource identifier (AtomicArray ty size) _ _ _) _ = RTEMSAtomicArray identifier ty size
 buildRTEMSGlobal obj _ = error $ "Invalid global object: " ++ show obj
 
 buildRTEMSEmitter :: Global SemanticAnns -> M.Map Identifier RTEMSGlobal -> Maybe RTEMSEmitter
@@ -293,7 +293,9 @@ genPoolMemoryArea :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
 genPoolMemoryArea before (RTEMSPool identifier ts size) = do
     let cAnn = CAnnotations Internal CGenericAnn
         declStmt = CAnnotations Internal (CDeclarationAnn before)
-        cSize = genInteger size
+        cSize = case size of
+            (K s) -> CConst (CIntConst (genInteger s)) cAnn
+            (V v) -> CVar v cAnn
     declSpec <- genDeclSpecifiers ts
     return $ CExtDecl $ CDeclExt $
         CDeclaration [CStorageSpec CStatic, CTypeSpec CUInt8Type]
@@ -301,7 +303,7 @@ genPoolMemoryArea before (RTEMSPool identifier ts size) = do
                 [
                     CArrDeclr [] (CArrSize False (CCall (CVar "__termina_pool__size" cAnn) [
                         CSizeofType (CDeclaration declSpec [] (CAnnotations Internal (CDeclarationAnn False))) cAnn,
-                        CConst (CIntConst cSize) cAnn
+                        cSize
                     ] cAnn)) cAnn
                 ] [] cAnn, Nothing, Nothing)]
             declStmt
@@ -337,12 +339,14 @@ genAtomicArrayDeclaration :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
 genAtomicArrayDeclaration before (RTEMSAtomicArray identifier ts size) = do
     let cAnn = CAnnotations Internal CGenericAnn
         declStmt = CAnnotations Internal (CDeclarationAnn before)
-        cSize = genInteger size
+        cSize = case size of
+            (K s) -> CConst (CIntConst (genInteger s)) cAnn
+            (V v) -> CVar v cAnn
     declSpec <- genDeclSpecifiers ts
     return $ CExtDecl $ CDeclExt $
         CDeclaration (CTypeQual CAtomicQual : declSpec)
             [(Just $ CDeclarator (Just identifier)
-                [CArrDeclr [] (CArrSize False (CConst (CIntConst cSize) cAnn)) cAnn] [] cAnn, Nothing, Nothing)]
+                [CArrDeclr [] (CArrSize False cSize) cAnn] [] cAnn, Nothing, Nothing)]
             declStmt
 genAtomicArrayDeclaration _ obj = error $ "Invalid global object (not an atomic array): " ++ show obj
 
@@ -1406,7 +1410,7 @@ genMainFile mName prjprogs = do
     cTaskClassesCode <- mapM genTaskClassCode (M.elems taskClss)
     cEmitters <- mapM genEmitter emitters
     enableProtection <- genEnableProtection resLockingMap
-    initGlobals <- genInitGlobals resources pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
+    initGlobals <- genInitGlobals (M.elems resources) pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
     installEmitters <- genInstallEmitters emitters
     createTasks <- genCreateTasks tasks
     initTask <- genInitTask emitters
@@ -1457,7 +1461,7 @@ genMainFile mName prjprogs = do
 
         tasks = [t | t@(RTEMSTask {}) <- rtemsGlbs]
         pools = [p | p@(RTEMSPool {}) <- rtemsGlbs]
-        resources = [r | r@(RTEMSResource {}) <- rtemsGlbs]
+        resources = M.fromList [(ident, r) | r@(RTEMSResource ident _ _) <- rtemsGlbs]
         atomics = [a | a@(RTEMSAtomic {}) <- rtemsGlbs]
         atomicArrays = [a | a@(RTEMSAtomicArray {}) <- rtemsGlbs]
 
@@ -1551,7 +1555,7 @@ genMainFile mName prjprogs = do
         timersToTasks = [e | e <- emitters, case e of { RTEMSPeriodicTimerEmitter _ (RTEMSTask{}) -> True; _ -> False }]
 
         -- | Map between the resources and the locking mechanism that must be used
-        resLockingMap = getResLocking . S.elems <$> dependenciesMap
+        resLockingMap = getResLocking . S.elems <$> M.filterWithKey (\k _ -> M.member k resources) dependenciesMap
         -- | Obtains the locking mechanism that must be used for a resource
         getResLocking :: [RTEMSGlobal] -> RTEMSResourceLock
         getResLocking [] = RTEMSResourceLockNone
