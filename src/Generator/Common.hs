@@ -251,7 +251,7 @@ genDeclSpecifiers (AtomicArray ts _)           = do
 genDeclSpecifiers (AtomicAccess ts)            = do
     tsDecl <- genDeclSpecifiers ts
     return $ CTypeQual CAtomicQual : tsDecl
-genDeclSpecifiers (AtomicArrayAccess ts)     = do
+genDeclSpecifiers (AtomicArrayAccess ts _)     = do
     tsDecl <- genDeclSpecifiers ts
     return $ CTypeQual CAtomicQual : tsDecl
 -- | Type of the ports

@@ -71,7 +71,7 @@ instance ShowText TypeSpecifier where
     showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (Allocator ts) = "Allocator<" <> showText ts <> ">"
     showText (AtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
-    showText (AtomicArrayAccess ts) = "AtomicArrayAccess<" <> showText ts <> ">"
+    showText (AtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
     showText (Atomic ts) = "Atomic<" <> showText ts <> ">"
     showText (AtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (Reference ak ts) = "&" <> showText ak <> showText ts
@@ -670,8 +670,32 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array."))
+    EAtomicConnectionTypeMismatch expectedTy actualTy ->
+        let title = "error[E046]: atomic connection type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EAtomicArrayConnectionTypeMismatch expectedTy actualTy ->
+        let title = "error[E047]: atomic array connection type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <> 
+                    "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
+        let title = "error[E048]: atomic array connection size mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <> 
+                    "\x1b[0m but the array has size \x1b[31m" <> showText actualSize <> "\x1b[0m."))
     EConstantWithoutKnownType c ->
-        let title = "error[E046]: constant without known type."
+        let title = "error[E049]: constant without known type."
         in
             printSimpleError
                 sourceLines title fileName
@@ -679,7 +703,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The type of the constant \x1b[31m" <> showText c <> 
                     "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
     EStructInitializerInvalidUse ->
-        let title = "error[E047]: invalid use of struct initializer."
+        let title = "error[E050]: invalid use of struct initializer."
         in
             printSimpleError
                 sourceLines title fileName
@@ -687,7 +711,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just $ "You are trying to use a struct initializer in an invalid context.\n" <>
                         "Struct initializers can only be used to initialize struct objects.")
     EStructInitializerTypeMismatch expectedTy actualTy ->
-        let title = "error[E048]: struct initializer type mismatch."
+        let title = "error[E051]: struct initializer type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -695,7 +719,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EStructInitializerGlobalNotStruct tydef ->
-        let title = "error[E049]: struct initializer expected global type not struct."
+        let title = "error[E052]: struct initializer expected global type not struct."
         in
             printSimpleError
                 sourceLines title fileName
@@ -704,7 +728,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "You are using a struct initializer but the expected type is \x1b[31m" <> 
                     showText tydef <> "\x1b[0m."))
     EStructInitializerExpectedTypeNotStruct ty ->
-        let title = "error[E050]: struct initializer expected type not struct."
+        let title = "error[E053]: struct initializer expected type not struct."
         in
             printSimpleError
                 sourceLines title fileName
@@ -713,14 +737,14 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "You are using a struct initializer but the expected type is \x1b[31m" <> 
                     showText ty <> "\x1b[0m."))
     EStructInitializerUnknownType ident ->
-        let title = "error[E051]: struct initializer unknown type."
+        let title = "error[E054]: struct initializer unknown type."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m of the struct initializer is unknown."))
     ESliceInvalidUse ->
-        let title = "error[E052]: invalid use of slice."
+        let title = "error[E055]: invalid use of slice."
         in
             printSimpleError
                 sourceLines title fileName
@@ -728,7 +752,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just $ "You are trying to use a slice in an invalid context.\n" <>
                         "Slices can only be used to create references to a part of an array.")
     EArrayIntitalizerInvalidUse ->
-        let title = "error[E053]: invalid use of an array initializer."
+        let title = "error[E056]: invalid use of an array initializer."
         in
             printSimpleError
                 sourceLines title fileName
@@ -736,7 +760,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just $ "You are trying to use an array initializer in an invalid context.\n" <>
                         "Array initializers can only be used to initialize array objects.")
     EArrayExprListIntitalizerInvalidUse -> 
-        let title = "error[E054]: invalid use of an expression list array initializer."
+        let title = "error[E057]: invalid use of an expression list array initializer."
         in
             printSimpleError
                 sourceLines title fileName
@@ -744,7 +768,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just $ "You are trying to use an array expression list initializer in an invalid context.\n" <>
                         "Array expression list initializers can only be used to initialize array objects.")
     EOptionVariantInitializerInvalidUse ->
-        let title = "error[E055]: invalid use of an option variant initializer."
+        let title = "error[E058]: invalid use of an option variant initializer."
         in
             printSimpleError
                 sourceLines title fileName
@@ -752,7 +776,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just $ "You are trying to use an option variant initializer in an invalid context.\n" <>
                         "Option variant initializers can only be used to initialize option objects.")
     EArrayInitializerSizeMismatch expectedSize initializerSize ->
-        let title = "error[E056]: array initializer size mismatch."
+        let title = "error[E059]: array initializer size mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -760,7 +784,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The size of the array initializer is \x1b[31m" <> showText initializerSize <> 
                     "\x1b[0m but the expected size is \x1b[31m" <> showText expectedSize <> "\x1b[0m."))
     EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
-        let title = "error[E057]: array expression list initializer size mismatch."
+        let title = "error[E060]: array expression list initializer size mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -768,7 +792,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The size of the array expression list initializer is \x1b[31m" <> T.pack (show initializerSize) <>
                     "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
     EArrayExprListInitializerExprTypeMismatch expectedTy actualTy ->
-        let title = "error[E058]: array expression list initializer expression type mismatch."
+        let title = "error[E061]: array expression list initializer expression type mismatch."
         in
             printSimpleError
                 sourceLines title fileName
@@ -776,12 +800,19 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EReturnValueExpected ty ->
-        let title = "error[E059]: expected return value."
+        let title = "error[E062]: expected return value."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The function is expected to return a value of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EReturnValueNotUnit ->
+        let title = "error[E063]: return value not expected."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just "The function is not expected to return a value.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e

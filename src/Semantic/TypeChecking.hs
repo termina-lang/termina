@@ -269,7 +269,7 @@ typeMemberFunctionCall ann obj_ty ident args =
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) 0)
             _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    AccessPort (AtomicArrayAccess ty_atomic) ->
+    AccessPort (AtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
@@ -810,10 +810,12 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
           -- TODO: Check that the types match
           SemAnn _ (GGlob (SResource (Atomic ty))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomic sid
-      AccessPort (AtomicArrayAccess {}) ->
+      AccessPort (AtomicArrayAccess ty s) ->
         case gentry of
-          -- TODO: Check that the types match
-          SemAnn _ (GGlob (SResource (AtomicArray ty s))) -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
+          SemAnn _ (GGlob (SResource (AtomicArray ty' s'))) -> do
+            catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (checkEqTypesOrError loc ty ty')
+            unless (s == s') (throwError $ annotateError loc $ EAtomicArrayConnectionSizeMismatch s s')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomicArray sid
       AccessPort (DefinedType iface) ->
         getGlobalTypeDef loc iface >>=

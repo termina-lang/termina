@@ -380,8 +380,10 @@ atomicArrayAccessParser = do
   reserved "AtomicArrayAccess"
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
+  _ <- semi
+  size <- sizeParser
   _ <- reserved ">"
-  return $ AtomicArrayAccess typeSpecifier
+  return $ AtomicArrayAccess typeSpecifier size
 
 vectorParser :: Parser TypeSpecifier
 vectorParser = do

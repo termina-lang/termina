@@ -67,7 +67,7 @@ data ConnectionSeman =
     [SemanProcedure]
   | APAtomicConnTy
     -- | Type specifier of the connected atomic
-    TypeSpecifier    
+    TypeSpecifier
   | APAtomicArrayConnTy
     -- | type specifier of the connected atomic array
     TypeSpecifier
@@ -377,7 +377,7 @@ getConst loc ident = do
                   case semError errorLocal of {
                     ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
                     _ -> throwError errorLocal;
-                  }) >> 
+                  }) >>
                     -- | Ooops! We found a local object with the name |ident| but it is not a constant.
                     throwError (annotateError loc (ENotConstant ident));
               err  -> error $ "Impossible error: " ++ show err;
@@ -421,17 +421,11 @@ getLHSVarTy loc ident =
               ENotConstant _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case semError errorGlobal of {
-                    ENotNamedGlobal errvar ->
-                    if errvar == ident then
+                    ENotNamedGlobal _ -> 
                       throwError $ annotateError loc (ENotNamedObject ident);
-                    else
-                      throwError errorGlobal;
                     _  -> throwError errorGlobal;
                   }
-                ) >>= (\case{
-                        SemAnn _ (GGlob _) -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
-                        _ -> throwError $ annotateError loc (ENotNamedObject ident);
-                      });
+                ) >> throwError (annotateError loc (EInvalidAccessToGlobal ident));
               _ -> throwError errorRO;
             }) >> throwError (annotateError loc (EObjectIsReadOnly ident))
           ;
@@ -597,7 +591,8 @@ checkTypeSpecifier loc (AccessPort ty) =
     (Allocator (Option _))  -> throwError $ annotateError loc EOptionNested
     (Allocator ty') -> simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
     (AtomicAccess ty') -> unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
-    (AtomicArrayAccess ty') -> unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty'))
+    (AtomicArrayAccess ty' s) -> 
+      unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty')) >> checkSize loc s
     (DefinedType identTy) ->
       getGlobalTypeDef loc identTy >>=
         \case
@@ -615,9 +610,10 @@ checkTypeSpecifier loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeSpecif
 checkTypeSpecifier loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
 checkTypeSpecifier loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (AtomicAccess ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
-checkTypeSpecifier loc (AtomicArrayAccess ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty'))
+checkTypeSpecifier loc (AtomicArrayAccess ty' s) = 
+  unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty')) >> checkSize loc s
 checkTypeSpecifier loc (Atomic ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicInvalidType ty'))
-checkTypeSpecifier loc (AtomicArray ty' s) = 
+checkTypeSpecifier loc (AtomicArray ty' s) =
   unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayInvalidType ty')) >> checkSize loc s
 -- This is explicit just in case
 checkTypeSpecifier _ UInt8                   = return ()
