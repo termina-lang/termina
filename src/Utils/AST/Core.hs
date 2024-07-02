@@ -44,7 +44,7 @@ findClassViewerOrMethod :: Identifier -> [ ClassMember' expr lho a ] -> Maybe ([
 findClassViewerOrMethod i
   = fmap
   (\case {
-    ClassViewer _ ps ty _ a -> (ps, Just ty, a);
+    ClassViewer _ ps mty _ a -> (ps, mty, a);
     ClassMethod _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })

@@ -59,7 +59,7 @@ mapStatementOption prevMap (IfElseStmt _ stmts elseIfs elseBlk _) =
   -- | Get the option types from the else if statements
   flip (foldM (\m (ElseIf _ stmts' _) -> foldM mapStatementOption m stmts')) elseIfs >>=
   -- | Get the option types from the else statements
-  (\acc -> maybe (return acc) (\elseStmts -> foldM mapStatementOption acc elseStmts) elseBlk)
+  (\acc -> maybe (return acc) (foldM mapStatementOption acc) elseBlk)
 mapStatementOption prevMap (ForLoopStmt _ _ _ _ _ stmts _) = foldM mapStatementOption prevMap stmts
 mapStatementOption prevMap (MatchStmt _ cases _) =
   foldM (\m (MatchCase _ _ stmts _) -> foldM mapStatementOption m stmts) prevMap cases
@@ -94,11 +94,11 @@ mapClassMemberOption prevMap (ClassProcedure _ params blk _) =
   foldM mapParameterOption prevMap params >>=
   -- | Get the option types from the block return type
   flip (foldM mapStatementOption) blk
-mapClassMemberOption prevMap (ClassViewer _ params ret blkRet _) =
-  -- | Get the option types from the parameters
-  foldM mapParameterOption prevMap params >>=
+mapClassMemberOption prevMap (ClassViewer _ params maybeRet blkRet _) =
   -- | Get the option types from the return type
-  flip insertOptionType ret >>=
+  mapMaybeOption prevMap maybeRet >>=
+  -- | Get the option types from the parameters
+  flip (foldM mapParameterOption) params >>=
   -- | Get the option types from the block return type
   flip (foldM mapStatementOption) (blockBody blkRet)
 mapClassMemberOption prevMap (ClassAction _ param ret blkRet _) =
@@ -146,7 +146,7 @@ mapOptions prevMap (Function _ params maybeRet blkRet _ _) =
 mapOptions prevMap (TypeDefinition typeDef _) =
   -- | Get the option types from the type definition
   mapTypeDefOption prevMap typeDef
-mapOptions prevMap (GlobalDeclaration (Resource _ (MsgQueue ts _) _ _ _)) = 
+mapOptions prevMap (GlobalDeclaration (Resource _ (MsgQueue ts _) _ _ _)) =
   -- | Get the option types from the message queue type
   insertOptionType prevMap (Option ts)
 mapOptions prevMap _ = return prevMap

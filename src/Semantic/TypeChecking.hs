@@ -1244,7 +1244,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             >> return (fs, prcs, mth : mths, vws, acts)
           -- Viewers
           view@(ClassViewer _fv_id fv_tys mty _body annCV)
-            -> checkReturnType annCV mty
+            -> maybe (return ()) (checkReturnType annCV) mty
             -- Parameters cannot have dyns inside.
             >> mapM_ (checkParameterType annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
@@ -1323,10 +1323,10 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
-            ClassViewer mIdent mps ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet (Just ty) mbody)
-              blockRetTy ty typed_bret
-              let newVw = SAST.ClassViewer mIdent mps ty typed_bret (buildExpAnn mann ty)
+            ClassViewer mIdent mps mty mbody mann -> do
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet mty mbody)
+              maybe (blockRetTy Unit) blockRetTy mty typed_bret
+              let newVw = SAST.ClassViewer mIdent mps mty typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
               typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)

@@ -284,7 +284,7 @@ data ClassMember' expr obj a
     | ClassViewer
       Identifier -- ^ name of the viewer
       [Parameter] -- ^ list of parameters (possibly empty)
-      TypeSpecifier -- ^ return type of the viewer
+      (Maybe TypeSpecifier) -- ^ return type of the viewer
       (BlockRet' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassAction 

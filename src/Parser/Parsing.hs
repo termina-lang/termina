@@ -1064,7 +1064,7 @@ classViewerParser = do
   p <- getPosition
   name <- identifierParser
   params <- parens viewerParamsParser
-  typeSpec <- reservedOp "->" >> typeSpecifierParser
+  typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
   return $ ClassViewer name params typeSpec blockRet (Position p)
   where

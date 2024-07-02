@@ -295,7 +295,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
         genClassFunctionDeclaration (ClassViewer viewer params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
-            retTypeDecl <- genDeclSpecifiers rts
+            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
             cParams <- mapM (genParameterDeclaration ann') params
             clsFuncName <- genClassFunctionName identifier viewer
@@ -340,7 +340,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
         genClassFunctionDefinition :: ClassMember SemanticAnns -> CSourceGenerator CExternalDeclaration
         genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
-            retTypeDecl <- genDeclSpecifiers rts
+            retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
             cSelfParam <- genConstSelfParam clsdef
             cParams <- mapM (genParameterDeclaration ann) parameters
             cReturn <- genReturnStatement ret
