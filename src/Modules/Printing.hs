@@ -11,4 +11,4 @@ import qualified Data.Map as M
 
 ppModError :: M.Map FilePath TL.Text -> Errors -> IO ()
 ppModError toLazyText (ELiftTypeCheckError e) = ppError toLazyText e
-ppModError _ _ = putStrLn "Other errors during module stuff"
+ppModError _ e = putStrLn $ "Other errors during module stuff " <> show e
