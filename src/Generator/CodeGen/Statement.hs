@@ -1,11 +1,11 @@
-module Generator.Statement where
+module Generator.CodeGen.Statement where
 
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
-import Generator.Common
-import Generator.Expression
+import Generator.CodeGen.Common
+import Generator.CodeGen.Expression
 import Annotations
 import Data.Map (fromList, union)
 import qualified Control.Monad.Reader

@@ -8,13 +8,12 @@ import Semantic.TypeChecking
 import qualified Data.Map as M
 import qualified Data.Set as S
 import AST.Core
-import Semantic.Option
+import Generator.Option
 import Control.Monad.Reader
-import Generator.Module
+import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import System.Path
 import Modules.Modules
-import Generator.Application.Option
+import Generator.CodeGen.Application.Option
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++
@@ -68,7 +67,7 @@ renderHeader input = case parse (contents topLevel) "" input of
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
       Right tast -> 
-        case runReaderT (genHeaderFile True (fragment "test") SrcFile [] tast) M.empty of
+        case runReaderT (genHeaderFile True "test" [] tast) M.empty of
           Left err -> pack $ show err
           Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 
@@ -79,7 +78,7 @@ renderSource input = case parse (contents topLevel) "" input of
     case typeCheckRun ast of
       Left err -> pack $ "Type error: " ++ show err
       Right tast -> 
-        case runReaderT (genSourceFile (fragment "test") tast) M.empty of
+        case runReaderT (genSourceFile "test" tast) M.empty of
           Left err -> pack $ show err
           Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
 

@@ -1,35 +1,28 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Module where
+module Generator.CodeGen.Module where
 
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
-import Generator.Common
-import Generator.TypeDefinition
-import Generator.Global
-import Generator.Function
+import Generator.CodeGen.Common
+import Generator.CodeGen.TypeDefinition
+import Generator.CodeGen.Global
+import Generator.CodeGen.Function
 import Modules.Modules
-import System.Path
 import Parser.Parsing
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
+import System.FilePath
 
 
-genModulePathName :: ModuleName -> ModuleMode -> FilePath
-genModulePathName mn DirMod = toUnrootedFilePath (mn </> fragment "header")
-genModulePathName mn SrcFile = toUnrootedFilePath mn
-
-genModuleDefineLabel :: ModuleName -> ModuleMode -> String
-genModuleDefineLabel mn mm =
-    let filePath = case mm of
-            DirMod -> map (pack . toUnrootedFilePath) (splitFragments (mn </> fragment "header" <.> FileExt "h"))
-            SrcFile -> map (pack . toUnrootedFilePath) (splitFragments (mn <.> FileExt "h"))
+genModuleDefineLabel :: ModuleName -> String
+genModuleDefineLabel mn =
+    let filePath = map pack (splitSearchPath (mn <.> "h"))
     in
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
-genInclude :: (ModuleName, ModuleMode) -> Bool -> CPreprocessorDirective
-genInclude (mName, DirMod) before = CPPInclude False (toUnrootedFilePath (mName </> fragment "header" <.> FileExt "h")) (CAnnotations Internal (CPPDirectiveAnn before))
-genInclude (mName, SrcFile) before = CPPInclude False (toUnrootedFilePath (mName <.> FileExt "h")) (CAnnotations Internal (CPPDirectiveAnn before))
+genInclude :: ModuleName -> Bool -> CPreprocessorDirective
+genInclude mName before = CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn before))
 
 genHeaderASTElement :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = do
@@ -57,17 +50,15 @@ genHeaderFile ::
     Bool
     -- | Module name
     -> ModuleName
-    -- | Module mode
-    -> ModuleMode
     -- | Import list
-    -> [(ModuleName, ModuleMode)]
+    -> [ModuleName]
     -> AnnotatedProgram SemanticAnns
     -> CHeaderGenerator CFile
-genHeaderFile includeOptionH mName mMode imports program = do
-    let defineLabel = genModuleDefineLabel mName mMode
+genHeaderFile includeOptionH mName imports program = do
+    let defineLabel = genModuleDefineLabel mName
         includeList = map (CPPDirective . flip genInclude False) imports
     items <- concat <$> mapM genHeaderASTElement program
-    return $ CHeaderFile (genModulePathName mName mMode) $
+    return $ CHeaderFile mName $
         [
             CPPDirective $ CPPIfNDef defineLabel (CAnnotations Internal (CPPDirectiveAnn False)),
             CPPDirective $ CPPDefine defineLabel Nothing (CAnnotations Internal (CPPDirectiveAnn False)),
@@ -85,6 +76,6 @@ genSourceFile ::
     -> CSourceGenerator CFile
 genSourceFile mName program = do
     items <- concat <$> mapM genSourceASTElement program
-    return $ CSourceFile (genModulePathName mName SrcFile) $
-        CPPDirective (CPPInclude False (toUnrootedFilePath (mName <.> FileExt "h")) (CAnnotations Internal (CPPDirectiveAnn True)))
+    return $ CSourceFile mName $
+        CPPDirective (CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn True)))
         : items

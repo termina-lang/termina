@@ -8,7 +8,7 @@ import Semantic.Monad
 import Prettyprinter
 import UT.PPrinter.Expression.Common
 import Control.Monad.Reader
-import Generator.Statement
+import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 
 

@@ -9,8 +9,8 @@ import qualified Data.Map as M
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.TypeDefinition
-import Generator.Common
+import Generator.CodeGen.TypeDefinition
+import Generator.CodeGen.Common
 
 
 classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnns

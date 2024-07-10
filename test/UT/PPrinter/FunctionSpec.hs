@@ -9,8 +9,8 @@ import UT.PPrinter.Expression.Common
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.Function
-import Generator.Common
+import Generator.CodeGen.Function
+import Generator.CodeGen.Common
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"

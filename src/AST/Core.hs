@@ -391,7 +391,7 @@ data Const = B Bool | I TInteger (Maybe TypeSpecifier) | C Char
 -- Blocks are just list of statements
 type Block' expr obj a = [Statement' expr obj a]
 
-data TerminaProgram' expr glb pf a b = Termina
+data TerminaModule' expr glb pf a b = Termina
   { modules :: [ Module' pf]
   , frags :: [ AnnASTElement' expr glb b ] }
   deriving Show

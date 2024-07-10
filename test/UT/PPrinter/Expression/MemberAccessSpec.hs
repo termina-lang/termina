@@ -5,7 +5,7 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Control.Monad.Reader
-import Generator.Expression
+import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Monad

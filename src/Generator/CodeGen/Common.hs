@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Common where
+module Generator.CodeGen.Common where
 
 import AST.Seman
 import Semantic.Monad

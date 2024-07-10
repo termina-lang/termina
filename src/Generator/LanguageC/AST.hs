@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
 module Generator.LanguageC.AST where
 import Prettyprinter
 import Semantic.Monad

@@ -1,13 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Application.Option where
+module Generator.CodeGen.Application.Option where
 
 import Generator.LanguageC.AST
-import Generator.Common
+import Generator.CodeGen.Common
 import Parser.Parsing
 import Control.Monad.Reader
 import System.Path
-import Generator.TypeDefinition
+import Generator.CodeGen.TypeDefinition
 import Semantic.Monad
 import qualified Data.Set as S
 import qualified Data.Map as M

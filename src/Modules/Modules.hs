@@ -5,7 +5,7 @@ module Modules.Modules where
 import AST.Core
 import qualified AST.Parser as PAST
 import Parser.Parsing (Annotation)
-import System.Path
+import System.FilePath
 import Extras.TopSort
 
 
@@ -14,18 +14,24 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text.Lazy as TL
 
 -- /Folder1/Folder2/../ModName
-type ModuleName = Path Unrooted
+type ModuleName = FilePath
 -- AbsProjectRoute/Folder1/Folder2/.../ModName/src.fin
-type ModuleSrc = Path Absolute
-type ProjectDir = Path Absolute
+type ModuleSrc = FilePath
+type ProjectDir = FilePath
 
+{--
 
 data ModuleData = MData
   { moduleName :: ModuleName
   , moduleSrc :: ModuleSrc
   }
 
-
+buildModuleName :: [String] -> FilePath
+buildModuleName [] = ""
+buildModuleName [x] = x
+buildModuleName (x:xs) = x </> buildModuleName xs
+--}
+{--
 -- Ways of modules
 data ModuleMode = DirMod | SrcFile
 
@@ -41,27 +47,29 @@ terminaExt :: FileExt
 terminaExt = FileExt "fin"
 
 buildModuleName :: [String] -> ModuleName
-buildModuleName = fragments
+buildModuleName [] = ""
+buildModuleName [x] = x
+buildModuleName (x:xs) = x </> buildModuleName xs
 
-terminaProgramImports :: PAST.TerminaProgram Annotation -> [ ModuleName ]
-terminaProgramImports = map ( fragments . moduleIdentifier) . modules
+terminaProgramImports :: PAST.TerminaModule Annotation -> [ ModuleName ]
+terminaProgramImports = map (buildModuleName . moduleIdentifier) . modules
 
 loadProject
   :: Monad m
   -- ModuleName
-  => (ModuleName -> m (ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
+  => (ModuleName -> m (ModuleMode, TL.Text, PAST.TerminaModule Annotation))
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaModule Annotation))
 loadProject = loadProject' M.empty
 
 loadProject' :: Monad m
   -- Map loading every file imported
-  => M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaProgram Annotation)
+  => M.Map ModuleName ([ModuleName], ModuleMode, TL.Text, PAST.TerminaModule Annotation)
   -- Loading function
-  -> (ModuleName -> m (ModuleMode, TL.Text,PAST.TerminaProgram Annotation))
+  -> (ModuleName -> m (ModuleMode, TL.Text,PAST.TerminaModule Annotation))
   -- Modules to load
   -> [ModuleName]
-  -> m (M.Map ModuleName ([ModuleName],ModuleMode, TL.Text, PAST.TerminaProgram Annotation))
+  -> m (M.Map ModuleName ([ModuleName],ModuleMode, TL.Text, PAST.TerminaModule Annotation))
 loadProject' fsLoaded _loadFile [] = return fsLoaded
 loadProject' fsLoaded loadFile (fs:fss) =
   if M.member fs fsLoaded
@@ -80,8 +88,8 @@ loadProject' fsLoaded loadFile (fs:fss) =
 -- | Return the list of module in ascending order...
 -- This may not be the correct order. We can detect a cycle before hand or just
 -- try and detect it on the fly.
-processProject :: M.Map (Path Absolute) (PAST.TerminaProgram Annotation)
-  -> [(Path Absolute, PAST.TerminaProgram Annotation)]
+processProject :: M.Map (Path Absolute) (PAST.TerminaModule Annotation)
+  -> [(Path Absolute, PAST.TerminaModule Annotation)]
 processProject = M.toAscList
 
 -- | Given a map, it returns each path with its dependencies.
@@ -105,3 +113,4 @@ sortOrLoop = topErrorInternal . processProjectDeps
                           ("Internal TopSort Error Node not found" ++ show a)})
                          Right
                           . topSortFromDepList
+--}

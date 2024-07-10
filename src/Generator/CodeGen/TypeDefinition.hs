@@ -1,13 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.TypeDefinition where
+module Generator.CodeGen.TypeDefinition where
 
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
-import Generator.Common
-import Generator.Statement
+import Generator.CodeGen.Common
+import Generator.CodeGen.Statement
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.Reader

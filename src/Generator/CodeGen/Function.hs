@@ -1,13 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Function where
+module Generator.CodeGen.Function where
 
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
-import Generator.Common
-import Generator.Statement
+import Generator.CodeGen.Common
+import Generator.CodeGen.Statement
 
 
 genFunctionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]

@@ -1411,6 +1411,7 @@ programAdd (TypeDefinition ty anns) =
         >> return (type_name , el)
       _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
 
+{--
 --- Exectuing Type Checking
 typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation
   -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
@@ -1454,3 +1455,4 @@ typeAndGetGlobals preLoad p =
         ) env )
       (Right preLoad)
       initGlb
+--}

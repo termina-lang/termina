@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Global where
+module Generator.CodeGen.Global where
 
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
 import Control.Monad.Except
-import Generator.Common
+import Generator.CodeGen.Common
 
 genGlobalDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts _ _ ann)) = do

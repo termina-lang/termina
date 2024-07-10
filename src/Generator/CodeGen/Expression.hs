@@ -1,4 +1,5 @@
-module Generator.Expression where
+module Generator.CodeGen.Expression where
+
 import AST.Seman
 import Generator.LanguageC.AST
 import Semantic.Monad
@@ -6,7 +7,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Maybe
 import Data.Map
-import Generator.Common
+import Generator.CodeGen.Common
 import Annotations
 
 

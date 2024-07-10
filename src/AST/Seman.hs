@@ -129,4 +129,4 @@ type AnnotatedProgram a = [AnnASTElement' Expression Object a]
 type Block a = Block' Expression Object a
 
 type Module = Module' ModuleName
-type TerminaProgram a = TerminaProgram' Expression Object ModuleName a a
+type TerminaModule a = TerminaModule' Expression Object ModuleName a a

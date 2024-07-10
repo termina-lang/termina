@@ -1146,8 +1146,8 @@ moduleInclusionParser = do
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
 
-terminaProgram :: Parser (TerminaProgram Annotation)
-terminaProgram = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
+terminaModuleParser :: Parser (TerminaModule Annotation)
+terminaModuleParser = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
 
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram Annotation)

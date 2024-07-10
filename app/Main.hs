@@ -1,12 +1,24 @@
 module Main (main) where
 
+
+import Options.Applicative
+import Command.New
+import Command.Build
+
+{--
+p
+-- FilePath and IO
+import System.Path
+import System.Path.IO
+
+
 -- import AST
 import Parser.Parsing
 import Options
 -- import Control.Applicative
 import Semantic.Monad
 
-import Semantic.Option (mapOptions, OptionMap)
+import Generator.Option (mapOptions, OptionMap)
 
 import Text.Parsec (runParser)
 
@@ -21,18 +33,15 @@ import qualified AST.Seman as SAST
 
 import DataFlow.DF
 
--- FilePath and IO
-import System.Path
-import System.Path.IO
-
 -- Containers
 import qualified Data.Map.Strict as M
 import Generator.LanguageC.Printer
 import Control.Monad.Reader
-import Generator.Module
-import Generator.Application.Option
-import Generator.Application.Initialization
-import Generator.Application.OS.RTEMSNOEL
+import qualified Control.Monad.State.Strict as ST
+import Generator.CodeGen.Module
+import Generator.CodeGen.Application.Option
+import Generator.CodeGen.Application.Initialization
+import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike
 import qualified Data.Text.Lazy as TL
 
 data MainOptions = MainOptions
@@ -55,7 +64,6 @@ instance Options MainOptions where
             "Output file"
         <*> simpleOption "chatty" False
             "Chatty compilation"
-
 getFileSrc :: Path Absolute -> IO ( ModuleMode, Path Absolute)
 getFileSrc path =
   doesDirectoryExist path >>= \isDir ->
@@ -76,14 +84,14 @@ getFileSrc path =
 
 -- We need to Module names and File Paths
 -- Load File takes an absolute path (could be something else but whatev)
-loadFile :: Path Absolute -> IO (ModuleMode , TL.Text, PAST.TerminaProgram Annotation) --(TerminaProgram Annotation)
+loadFile :: Path Absolute -> IO (ModuleMode , TL.Text, PAST.TerminaModule Annotation) --(TerminaModule Annotation)
 loadFile absPath = do
   -- Get file name
   (mMode, absPathFile) <- getFileSrc absPath
   -- read it
   src_code <- readLazyText absPathFile
   -- parse it
-  case runParser terminaProgram () (toFilePath absPathFile) (TL.unpack src_code) of
+  case runParser terminaModuleParser () (toFilePath absPathFile) (TL.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
     Right term -> return (mMode , src_code, term)
 
@@ -175,7 +183,36 @@ printOptionsHeaderFile chatty targetDir opts = do
     Right cHeaderFile -> writeStrictText optionsHeaderFile $ render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)  
   where
     optionsHeaderFile = targetDir </> fragment "include" </> fragment "option" <.> FileExt "h"
+--}
+data Command =
+    New NewCmdArgs
+    | Build BuildCmdArgs
+    deriving (Show,Eq)
 
+newCommandParser :: Parser Command
+newCommandParser = New
+    <$> newCmdArgsParser
+
+buildCommandParser :: Parser Command
+buildCommandParser = Build
+    <$> buildCmdArgsParser
+
+commandParser :: Parser Command
+commandParser = subparser
+  ( command "new" (info newCommandParser ( progDesc "Setup a new project" ))
+ <> command "build" (info buildCommandParser ( progDesc "Build current project" ))
+  )
+
+main :: IO ()
+main = do
+    cmd <- customExecParser (prefs showHelpOnEmpty) $ info (commandParser <**> helper)
+        (fullDesc
+            <> header "termina: a domain-specific language for real-time critical systems" )
+    case cmd of
+        New cmdargs -> newCommand cmdargs
+        Build cmdargs -> buildCommand cmdargs
+
+{--
 main :: IO ()
 main = runCommand $ \opts args ->
     if optREPL opts then
@@ -244,8 +281,11 @@ main = runCommand $ \opts args ->
               -- Printing Project
               whenChatty opts $ print "Printing Project"
               allModules <- mapM (\(mName, mTyped) -> maybe (fail "Internal error: something went missing in mapProject") (\(_, mm, _, _) -> return (mName, mm, mTyped)) (M.lookup mName mapProject)) $ M.toList typedProject
-              allOptions <- foldM (\opts (_, mTyped) -> 
-                foldM mapOptions opts (SAST.frags $ typedModule $ moduleData mTyped)) M.empty $ M.toList typedProject
+              let frags = concatMap (SAST.frags . typedModule . moduleData . (\(_, _, mTyped) -> mTyped)) allModules
+              let allOptions = 
+                    ST.execState (mapM_ mapOptions frags) M.empty
+              --allOptions <- foldM (\opts (_, mTyped) -> 
+              --  foldM mapOptions opts (SAST.frags $ typedModule $ moduleData mTyped)) M.empty $ M.toList typedProject
               (basicTypeOptions, definedTypeOptions) <- return $ M.partitionWithKey 
                 (\k _ -> case k of
                   SAST.DefinedType {} -> False
@@ -268,3 +308,4 @@ main = runCommand $ \opts args ->
             -- Wrong arguments Errors
             [] -> ioError $ userError "No file?"
             _ -> ioError $ userError "Arguments error"
+--}

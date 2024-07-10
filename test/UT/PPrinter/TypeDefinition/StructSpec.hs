@@ -10,8 +10,8 @@ import qualified Data.Set as S
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.LanguageC.Printer
-import Generator.TypeDefinition
-import Generator.Common
+import Generator.CodeGen.TypeDefinition
+import Generator.CodeGen.Common
 
 {- | Struct type with a single field.
 In Termina's concrete sytax:

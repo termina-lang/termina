@@ -1,15 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.Application.OS.RTEMSNOEL where
+module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike where
 
 import Generator.LanguageC.AST
-import Generator.Common
 import Parser.Parsing
-import System.Path
+import System.FilePath
 import Semantic.Monad
 import AST.Seman
 import Modules.Modules
-import Generator.Module
+import Generator.CodeGen.Common
 import qualified AST.Seman as SAST
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -1393,7 +1392,7 @@ genAppConfig tasks msgQueues timers mutexes = do
 
 
 
-genMainFile :: ModuleName ->  [(ModuleName, ModuleMode, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
+genMainFile :: ModuleName ->  [(ModuleName, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
     let cAnn = CAnnotations Internal CGenericAnn
         includeRTEMS = CPPDirective $ CPPInclude True "rtems.h" (CAnnotations Internal (CPPDirectiveAnn True))
@@ -1415,7 +1414,7 @@ genMainFile mName prjprogs = do
     createTasks <- genCreateTasks tasks
     initTask <- genInitTask emitters
     appConfig <- genAppConfig tasks msgQueues timers mutexes
-    return $ CSourceFile (genModulePathName mName SrcFile) $ [
+    return $ CSourceFile mName $ [
             -- #include <rtems.h>
             includeRTEMS,
             -- #include <termina.h>
@@ -1430,10 +1429,10 @@ genMainFile mName prjprogs = do
 
     where
         -- | Original program list filtered to only include the global declaration
-        globals = map (\(mn, mm, elems) -> (mn, mm, [g | (SAST.GlobalDeclaration g) <- elems])) prjprogs
+        globals = map (\(mn, elems) -> (mn, [g | (SAST.GlobalDeclaration g) <- elems])) prjprogs
         -- | Map between the class identifiers and the class definitions
         classMap = foldr
-                (\(_, _, objs) accMap ->
+                (\(_, objs) accMap ->
                     foldr (\obj currMap ->
                         case obj of
                             SAST.TypeDefinition cls@(Class _ classId _ _ _) _ -> M.insert classId cls currMap
@@ -1442,13 +1441,13 @@ genMainFile mName prjprogs = do
                 ) M.empty prjprogs
         -- | List of modules that actually contain the global declarations and are the only ones that must
         -- be included
-        glbs = filter (\(_, _, objs) -> not (null objs)) globals
+        glbs = filter (\(_, objs) -> not (null objs)) globals
         -- | List of modules that must be included
-        incs = map (\(nm, mm, _) -> (nm, mm)) glbs
+        incs = map fst glbs
         -- | List of include directives
-        includes = map (\(nm, _) -> CPPDirective $ CPPInclude False (toUnrootedFilePath (nm <.> FileExt "h")) (CAnnotations Internal (CPPDirectiveAnn True))) incs
+        includes = map (\nm -> CPPDirective $ CPPInclude False (nm <.> "h") (CAnnotations Internal (CPPDirectiveAnn True))) incs
         -- List of RTEMS global declarations (tasks, handlers, resources and channels)
-        rtemsGlbs = concatMap (\(_, _, objs) ->
+        rtemsGlbs = concatMap (\(_, objs) ->
             map (`buildRTEMSGlobal` classMap)
                 (filter (\case { Task {} -> True; Resource {} -> True; Handler {} -> True; _ -> False}) objs)
             ) glbs
@@ -1488,7 +1487,7 @@ genMainFile mName prjprogs = do
                     _ -> acc
             ) [] tasks
 
-        channelMessageQueues = concatMap (\(_, _, objs) ->
+        channelMessageQueues = concatMap (\(_, objs) ->
             map (\case {
                     (Channel identifier (MsgQueue ts (K size)) _ _ _) ->
                         case M.lookup identifier targetChannelConnections of
@@ -1540,7 +1539,7 @@ genMainFile mName prjprogs = do
                         _ -> accMap
                 ) M.empty rtemsGlbs
 
-        emitters = catMaybes $ concatMap (\(_, _, objs) ->
+        emitters = catMaybes $ concatMap (\(_, objs) ->
                 map (`buildRTEMSEmitter` emitterConnectionsMap) objs) glbs ++
                 map (`buildRTEMSEmitter` emitterConnectionsMap) [
                         Emitter "irq_1" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
