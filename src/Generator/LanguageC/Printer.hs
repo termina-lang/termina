@@ -577,3 +577,6 @@ braces' b = braces (line <> b <> line)
 
 indentTab :: DocStyle -> DocStyle
 indentTab = indent 4
+
+runCPrinter :: CFile -> Text
+runCPrinter cFile = render $ runReader (pprint cFile) (CPrinterConfig False False)

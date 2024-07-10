@@ -13,11 +13,13 @@ import Modules.Modules
 import Parser.Parsing
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
+import qualified Data.Map as M
+import Control.Monad.Reader (runReaderT)
 
 
 genModuleDefineLabel :: ModuleName -> String
 genModuleDefineLabel mn =
-    let filePath = map pack (splitSearchPath (mn <.> "h"))
+    let filePath = map (pack . dropTrailingPathSeparator) (splitPath (mn <.> "h"))
     in
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
@@ -79,3 +81,9 @@ genSourceFile mName program = do
     return $ CSourceFile mName $
         CPPDirective (CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn True)))
         : items
+
+runGenSourceFile :: ModuleName -> AnnotatedProgram SemanticAnns -> Either CGeneratorError CFile
+runGenSourceFile mName program = runReaderT (genSourceFile mName program) M.empty
+
+runGenHeaderFile :: Bool -> ModuleName -> [ModuleName] -> AnnotatedProgram SemanticAnns -> OptionTypes -> Either CGeneratorError CFile
+runGenHeaderFile includeOptionH mName imports program = runReaderT (genHeaderFile includeOptionH mName imports program)

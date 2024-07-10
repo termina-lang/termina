@@ -33,13 +33,15 @@ dependencies:
 # FilePath
 - filepath
 - text
-#
+- directory
 - containers
-- mtl >= 2.3.1
+- mtl
 # File Paths
 - paths
 # Error messages pretty printer
 - errata
+- optparse-applicative
+- yaml
 
 ghc-options:
 - -Wall

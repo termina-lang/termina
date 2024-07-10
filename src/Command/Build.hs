@@ -9,7 +9,8 @@ import Control.Monad
 import Data.Yaml
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as IOL
+import qualified Data.Text.IO as TIO
+import qualified Data.Text.Lazy.IO as TLIO
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
@@ -21,15 +22,18 @@ import Parser.Parsing (Annotation, terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
-import Semantic.Monad (SemanticAnns, SAnns, ExpressionState, runTypeChecking, SemanticMonad, initialExpressionSt)
-import Semantic.Types (GEntry)
+import Semantic.Monad (SemanticAnns, ExpressionState, runTypeChecking, SemanticMonad, initialExpressionSt)
 import Modules.Modules (ModuleName)
 import Semantic.TypeChecking (programSeman, programAdd)
-import AST.Core (Identifier)
 import Semantic.Errors (ppError)
 import DataFlow.DF (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
 import Data.List (foldl')
+import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
+import Generator.LanguageC.Printer (runCPrinter)
+import Generator.CodeGen.Application.Initialization (runGenInitFile)
+import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
+import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -95,7 +99,7 @@ data TerminaModuleData a = TerminaModuleData {
   -- | Module's qualified name
   qualifiedName :: !QualifiedName,
   -- | Root of the module
-  -- This is the root path where the module is
+  -- This is the root path where the module is located
   rootPath :: !FilePath,
   -- | List of imported modules
   importedModules :: ![QualifiedName],
@@ -109,9 +113,8 @@ newtype ParsingData = ParsingData {
   parsedAST :: PAST.AnnotatedProgram Annotation
 } deriving (Show)
 
-data SemanticData = SemanticData {
-  typedAST :: SAST.AnnotatedProgram SemanticAnns,
-  moduleDefs :: M.Map SAST.Identifier (SAnns (GEntry SemanticAnns))
+newtype SemanticData = SemanticData {
+  typedAST :: SAST.AnnotatedProgram SemanticAnns
 } deriving (Show)
 
 type ParsedModule = TerminaModuleData ParsingData
@@ -144,7 +147,7 @@ loadTerminaModule ::
   -> IO ParsedModule
 loadTerminaModule filePath root = do
   -- read it
-  src_code <- IOL.readFile $ root </> filePath <.> "fin"
+  src_code <- TLIO.readFile $ root </> filePath <.> "fin"
   -- parse it
   case runParser terminaModuleParser () filePath (TL.unpack src_code) of
     Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
@@ -200,11 +203,11 @@ sortProjectDepsOrLoop = topErrorInternal . M.toList
 
 typeTerminaModule :: 
   PAST.AnnotatedProgram Annotation 
-  -> SemanticMonad (SAST.AnnotatedProgram SemanticAnns, M.Map Identifier (SAnns (GEntry SemanticAnns)))
-typeTerminaModule = foldM (\(elems, glbs) t -> do
-  element <- programSeman t
-  (ident, ann) <- programAdd element
-  return (element : elems, M.insert ident ann glbs)) ([], M.empty)
+  -> SemanticMonad (SAST.AnnotatedProgram SemanticAnns)
+typeTerminaModule = mapM checkAndAdd
+
+  where
+    checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
 
 typeModules :: ParsedProject -> [ModuleName] -> IO TypedProject
 typeModules parsedProject =
@@ -221,14 +224,14 @@ typeModules parsedProject =
         (Left err, _) -> 
           let sourceFilesMap = sourcecode <$> parsedProject in
           ppError sourceFilesMap err >> exitFailure
-        (Right (typedProgram, globals), newState) -> do
+        (Right typedProgram, newState) -> do
           let typedModule = 
                 TerminaModuleData 
                   (qualifiedName parsedModule) 
                   (rootPath parsedModule) 
                   (importedModules parsedModule) 
                   (sourcecode parsedModule) 
-                  (SemanticData typedProgram globals)
+                  (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
 
 useDefCheckModules :: TypedProject -> IO ()
@@ -242,12 +245,63 @@ useDefCheckModules = mapM_ useDefCheckModule . M.elems
         Nothing -> return ()
         Just err -> die . errorMessage $ "Unsupported platform: \"" ++ show err
 
-optionMapModules :: TypedProject -> OptionMap
-optionMapModules = foldl' optionMapModule M.empty . M.elems
+optionMapModules :: TypedProject -> (OptionMap, OptionMap)
+optionMapModules = M.partitionWithKey 
+                (\k _ -> case k of
+                  SAST.DefinedType {} -> False
+                  _ -> True) . foldl' optionMapModule M.empty . M.elems
 
   where
     optionMapModule :: OptionMap -> TypedModule -> OptionMap
     optionMapModule prevMap typedModule = runMapOptionsAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
+
+printModules :: 
+  -- | Whether to include the option.h file or not
+  Bool 
+  -- | The map with the option types to generate from defined types 
+  -> OptionMap 
+  -- | The output folder 
+  -> FilePath 
+  -- | The project to generate the code from
+  -> TypedProject -> IO ()
+printModules includeOptionH definedTypesOptionMap destinationPath = 
+  mapM_ printModule . M.elems 
+
+  where
+
+    printModule :: TypedModule -> IO ()
+    printModule typedModule = do
+      let sourceFile = destinationPath </> "src" </> qualifiedName typedModule <.> "c"
+          tAST = typedAST . metadata $ typedModule
+      case runGenSourceFile (qualifiedName typedModule) tAST of
+        Left err -> die. errorMessage $ show err
+        Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter cSourceFile
+      case runGenHeaderFile includeOptionH (qualifiedName typedModule) (importedModules typedModule) tAST definedTypesOptionMap of
+        Left err -> die . errorMessage $ show err
+        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName typedModule <.> "h") $ runCPrinter cHeaderFile
+
+printInitFile :: FilePath -> TypedProject -> IO ()
+printInitFile destinationPath typedProject = do
+  let initFilePath = destinationPath </> "init" <.> "c"
+      projectModules = M.toList $ typedAST . metadata <$> typedProject
+  case runGenInitFile initFilePath projectModules of
+    Left err -> die . errorMessage $ show err
+    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter cInitFile
+
+printMainFile :: FilePath -> TypedProject -> IO ()
+printMainFile destinationPath typedProject = do
+  let mainFilePath = destinationPath </> "main" <.> "c"
+      projectModules = M.toList $ typedAST . metadata <$> typedProject
+  case runGenMainFile mainFilePath projectModules of
+    Left err -> die . errorMessage $ show err
+    Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter cMainFile
+
+printOptionHeaderFile :: FilePath -> OptionMap -> IO ()
+printOptionHeaderFile destinationPath basicTypesOptionMap = do
+  let optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
+  case runGenOptionHeaderFile basicTypesOptionMap of
+    Left err -> die . errorMessage $ show err
+    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
@@ -291,6 +345,11 @@ buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     useDefCheckModules typedProject
     when chatty (putStrLn . debugMessage $ "Searching for option types")
-    let optionMap = optionMapModules typedProject
+    let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
+    printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) typedProject
+    printInitFile (outputFolder config) typedProject
+    printMainFile (outputFolder config) typedProject
+    printOptionHeaderFile (outputFolder config) basicTypesOptionMap
+    when chatty (putStrLn . debugMessage $ "Build completed successfully")

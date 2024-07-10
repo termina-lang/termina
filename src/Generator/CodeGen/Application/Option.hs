@@ -35,3 +35,6 @@ genOptionHeaderFile = do
         ++ items ++ [
             CPPDirective $ CPPEndif (CAnnotations Internal (CPPDirectiveAnn True))
         ]
+
+runGenOptionHeaderFile :: OptionTypes -> Either CGeneratorError CFile
+runGenOptionHeaderFile = runReaderT genOptionHeaderFile

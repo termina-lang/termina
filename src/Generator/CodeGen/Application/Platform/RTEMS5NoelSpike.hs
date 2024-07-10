@@ -1573,3 +1573,6 @@ genMainFile mName prjprogs = do
         getResLocking _ = error "Internal error when obtaining the resource dependencies."
 
         mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
+
+runGenMainFile :: ModuleName -> [(ModuleName, SAST.AnnotatedProgram SemanticAnns)] -> Either CGeneratorError CFile
+runGenMainFile mainFilePath prjprogs = runReaderT (genMainFile mainFilePath prjprogs) M.empty
