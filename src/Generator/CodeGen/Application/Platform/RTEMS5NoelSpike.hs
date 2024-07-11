@@ -1389,10 +1389,7 @@ genAppConfig tasks msgQueues timers mutexes = do
                 ]
 
 
-
-
-
-genMainFile :: ModuleName ->  [(ModuleName, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
+genMainFile :: QualifiedName ->  [(QualifiedName, SAST.AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
     let cAnn = CAnnotations Internal CGenericAnn
         includeRTEMS = CPPDirective $ CPPInclude True "rtems.h" (CAnnotations Internal (CPPDirectiveAnn True))
@@ -1574,5 +1571,5 @@ genMainFile mName prjprogs = do
 
         mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
 
-runGenMainFile :: ModuleName -> [(ModuleName, SAST.AnnotatedProgram SemanticAnns)] -> Either CGeneratorError CFile
+runGenMainFile :: QualifiedName -> [(QualifiedName, SAST.AnnotatedProgram SemanticAnns)] -> Either CGeneratorError CFile
 runGenMainFile mainFilePath prjprogs = runReaderT (genMainFile mainFilePath prjprogs) M.empty

@@ -73,26 +73,6 @@ kClassMember (ClassAction idx ps ty _blk ann) =
 -- This fuction says what types can be casted into others.
 casteableTys :: TypeSpecifier -> TypeSpecifier-> Bool
 casteableTys a b = numTy a && numTy b
--- casteableTys UInt8 UInt16  = True
--- casteableTys UInt8 UInt32  = True
--- casteableTys UInt8 UInt64  = True
---
--- casteableTys UInt16 UInt32 = True
--- casteableTys UInt16 UInt64 = True
---
--- casteableTys UInt32 UInt64 = True
---
--- casteableTys Int8 Int16    = True
--- casteableTys Int8 Int32    = True
--- casteableTys Int8 Int64    = True
---
--- casteableTys Int16 Int32   = True
--- casteableTys Int16 Int64   = True
---
--- casteableTys Int32 Int64   = True
--- Last option being the same.
--- This is a trivial casting :muscle:
--- casteableTys a b           = checkEqTypes a b
 
 -- Relation between types
 -- we use to define (dyn A \subseteq A)

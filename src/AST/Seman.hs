@@ -9,7 +9,7 @@ module AST.Seman
 import           Annotations
 import           AST.Core
 
-import Modules.Modules (ModuleName)
+import Modules.Modules (QualifiedName)
 
   -- | First AST after parsing
 data Expression'
@@ -128,5 +128,5 @@ type Statement = Statement' Expression Object
 type AnnotatedProgram a = [AnnASTElement' Expression Object a]
 type Block a = Block' Expression Object a
 
-type Module = Module' ModuleName
-type TerminaModule a = TerminaModule' Expression Object ModuleName a a
+type Module = Module' QualifiedName
+type TerminaModule a = TerminaModule' Expression Object QualifiedName a a

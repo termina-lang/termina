@@ -22,9 +22,8 @@ import Parser.Parsing (Annotation, terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
-import Semantic.Monad (SemanticAnns, ExpressionState, runTypeChecking, SemanticMonad, initialExpressionSt)
-import Modules.Modules (ModuleName)
-import Semantic.TypeChecking (programSeman, programAdd)
+import Semantic.Monad (SemanticAnns, ExpressionState, initialExpressionSt)
+import Modules.Modules
 import Semantic.Errors (ppError)
 import DataFlow.DF (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
@@ -34,6 +33,7 @@ import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
+import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -89,25 +89,6 @@ loadConfig = do
         Left (InvalidYaml (Just (YamlException err))) -> die . errorMessage $ err
         Left err -> die . errorMessage $ show err
         Right c -> return c
-
-type QualifiedName = FilePath
-
--- | Data type used to represented a loaded module
--- | It contains the module's name, the list of imported modules, the source code
--- | and the module's metadata.
-data TerminaModuleData a = TerminaModuleData {
-  -- | Module's qualified name
-  qualifiedName :: !QualifiedName,
-  -- | Root of the module
-  -- This is the root path where the module is located
-  rootPath :: !FilePath,
-  -- | List of imported modules
-  importedModules :: ![QualifiedName],
-  -- | Source code
-  sourcecode :: TL.Text,
-  -- | Module meta-data (e.g. parsed AST)
-  metadata :: a
-} deriving (Show)
 
 newtype ParsingData = ParsingData {
   parsedAST :: PAST.AnnotatedProgram Annotation
@@ -201,30 +182,22 @@ sortProjectDepsOrLoop = topErrorInternal . M.toList
         )
         Right $ topSortFromDepList projectDependencies
 
-typeTerminaModule :: 
-  PAST.AnnotatedProgram Annotation 
-  -> SemanticMonad (SAST.AnnotatedProgram SemanticAnns)
-typeTerminaModule = mapM checkAndAdd
-
-  where
-    checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
-
-typeModules :: ParsedProject -> [ModuleName] -> IO TypedProject
+typeModules :: ParsedProject -> [QualifiedName] -> IO TypedProject
 typeModules parsedProject =
   typeModules' M.empty initialExpressionSt
 
   where
   
-    typeModules' :: TypedProject -> ExpressionState -> [ModuleName] -> IO TypedProject
+    typeModules' :: TypedProject -> ExpressionState -> [QualifiedName] -> IO TypedProject
     typeModules' typedProject _ [] = pure typedProject
     typeModules' typedProject prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
       let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
       case result of
-        (Left err, _) -> 
+        (Left err) -> 
           let sourceFilesMap = sourcecode <$> parsedProject in
           ppError sourceFilesMap err >> exitFailure
-        (Right typedProgram, newState) -> do
+        (Right (typedProgram, newState)) -> do
           let typedModule = 
                 TerminaModuleData 
                   (qualifiedName parsedModule) 
@@ -320,12 +293,12 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
-    when chatty (putStrLn . debugMessage $ "Creating output source folder: \"" ++ outputSrcFolder ++ "\"")
+    when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
     createDirectoryIfMissing True outputSrcFolder
-    when chatty (putStrLn . debugMessage $ "Creating output include folder: \"" ++ outputIncludeFolder ++ "\"")
+    when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application main module: \"" ++ appFolder config </> appFilename config ++ "\"")
+    when chatty (putStrLn . debugMessage $ "Loading application main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
     appModule <- loadTerminaModule (appFilename config) (appFolder config)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")

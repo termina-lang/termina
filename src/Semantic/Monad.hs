@@ -27,6 +27,7 @@ import           Utils.TypeSpecifier
 -- Monads
 import           Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
+import Data.Functor
 
 type Locations = Parser.Annotation
 
@@ -478,23 +479,17 @@ getGlobalVarTy loc ident =
                       });
 
 
--- | Lookups |idenfitier| in local scope first (I assuming this is the most
--- frequent case) and then the global scope.
--- Note that it looks for every identifier and returns whatever it is.
--- It is kinda weird, because we should know what to expect.
--- Returns the type of |identifier| in case it is defined.
-
+-- | Lookups |idenfitier| in a given scope.
+-- Returns true if the identifier is defined within the scope or false otherwise.
 isDefinedIn :: Identifier -> M.Map Identifier a -> Bool
 isDefinedIn = M.member
 
 glbWhereIsDefined :: Identifier -> SemanticMonad (Maybe Locations)
--- M.Map Identifier (SAnns a) -> Maybe Locations
 glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
 
 isDefined :: Identifier -> SemanticMonad Bool
 isDefined ident =
-  get >>= return . (\st -> isDefinedIn ident (global st)
-                            || isDefinedIn ident (local st))
+  get <&> (\st -> isDefinedIn ident (global st) || isDefinedIn ident (local st))
 
 -------------
 -- Type |Type| helpers!
@@ -542,17 +537,16 @@ simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann 
 classFieldTyorFail :: Locations -> TypeSpecifier -> SemanticMonad ()
 classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
 
+checkSize :: Locations -> Size -> SemanticMonad ()
+checkSize loc (CAST.K s) = checkIntConstant loc USize s
+checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> checkEqTypesOrError loc USize ty) >> return ()
+
 -- | Function checking that a TypeSpecifier is well-defined.
 -- This is not the same as defining a type, but it is similar.
 -- Some types can be found in the wild, but user defined types are just check
 -- they exist (they were defined preivously).
 -- Note that we do not change the |TypeSpecifier| in any way, that's why this
 -- function return |()|.
-
-checkSize :: Locations -> Size -> SemanticMonad ()
-checkSize loc (CAST.K s) = checkIntConstant loc USize s
-checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> checkEqTypesOrError loc USize ty) >> return ()
-
 checkTypeSpecifier :: Locations -> TypeSpecifier -> SemanticMonad ()
 checkTypeSpecifier loc (DefinedType identTy) =
   -- Check that the type was defined
@@ -629,41 +623,6 @@ checkTypeSpecifier _ Char                    = return ()
 checkTypeSpecifier _ Bool                    = return ()
 checkTypeSpecifier _ Unit                    = return ()
 
--- | Type does not have Dynamic Subtyping.
--- Note to self: I still do not have the complete type system in my head.
--- It is something that keeps changing... When we have the complete type system,
--- we should write this module from scratch.
--- Note this is not a function checking that the type itself is well-formed.
--- we are just lifting a similar check on types.
--- typeHasDyn :: Locations -> TypeSpecifier -> SemanticMonad Bool
--- typeHasDyn loc ty
---  = either
-      -- There is a user defined type.
---      (userDefHasDyn loc)
-      -- No user defined, either it has it or not.
---      return
---  $ hasDynOrDep ty
-
--- userDefHasDyn :: Locations -> Identifier -> SemanticMonad Bool
--- userDefHasDyn loc ident =
---  getGlobalTypeDef loc ident >>= stypedefHasDyn
---  where
-    --
---    stypedefHasDyn :: SemanTypeDef SemanticAnns -> SemanticMonad Bool
---    stypedefHasDyn (Struct _ident fsdef _mods) =
---      or <$> mapM (typeHasDyn loc . fieldTypeSpecifier) fsdef
---    stypedefHasDyn (Enum _ident enumVs _mods) =
---      or . concat <$> mapM ( mapM (typeHasDyn loc) . assocData) enumVs
---    stypedefHasDyn (Class _cKind _ident sMembers _mods) =
---      or <$> mapM clsMemberHasDyn sMembers
-    --
---    clsMemberHasDyn :: SemanClassMember SemanticAnns  -> SemanticMonad Bool
---    -- The only one struct carrying Dynamic Value are class fields.
---    clsMemberHasDyn (ClassField fldDef _anns) = typeHasDyn loc (fieldTypeSpecifier fldDef)
---    clsMemberHasDyn (ClassMethod _ident _retTy _blk _anns) = return False
---    clsMemberHasDyn (ClassProcedure _ident _params _blk _anns) = return False -- It is not a value, it takes one
---    clsMemberHasDyn (ClassViewer _ident _params _retTy _blk _ann) = return False
-
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
 getObjectType :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
@@ -674,15 +633,6 @@ getExpType
   = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
   . getResultingType . ty_ann . getAnnotation
 
-runTypeChecking
-  :: ExpressionState
-  -> SemanticMonad a
-  -> (Either SemanticErrors a , ExpressionState)
-runTypeChecking initSt = flip ST.runState initSt . runExceptT
-
--- | Function checking that constant expressions are correct.
--- When checking a constant we have an expected type and, optionally,
--- an explicit type attached to the constant definition.
 checkConstant :: Locations -> TypeSpecifier -> Const -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct

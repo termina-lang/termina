@@ -4,12 +4,11 @@ import Test.Hspec
 import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
+import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Control.Monad.Reader
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import Modules.Modules
 
 test0 :: String
 test0 = "function add_one(input : &mut [u32; 5]) {\n" ++ 
@@ -28,23 +27,23 @@ renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case typeCheckRun ast of
+    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> 
-        case runReaderT (genHeaderFile False "test" [] tast) M.empty of
+      Right (tast, _) -> 
+        case runGenHeaderFile False "test" [] tast M.empty of
           Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+          Right cHeaderFile -> runCPrinter cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case typeCheckRun ast of
+    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> 
-        case runReaderT (genSourceFile "test" tast) M.empty of
+      Right (tast, _) -> 
+        case runGenSourceFile "test" tast of
           Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+          Right cSourceFile -> runCPrinter cSourceFile
 
 spec :: Spec
 spec = do

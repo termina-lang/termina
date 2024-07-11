@@ -32,7 +32,7 @@ genInitializeObj before (Emitter identifier _ (Just expr) _ ann) = do
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
 genInitializeObj _ _ = return []
 
-genInitFile :: ModuleName -> [(ModuleName, AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
+genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnns)] -> CSourceGenerator CFile
 genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, objs) <- globals])
     let cAnn = CAnnotations Internal CGenericAnn
@@ -62,5 +62,5 @@ genInitFile mName prjprogs = do
             rest <- concat <$> mapM (genInitializeObj False) objs
             return $ items ++ rest
 
-runGenInitFile :: FilePath -> [(ModuleName, AnnotatedProgram SemanticAnns)] -> Either CGeneratorError CFile 
+runGenInitFile :: FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnns)] -> Either CGeneratorError CFile 
 runGenInitFile initFilePath prjprogs = runReaderT (genInitFile initFilePath prjprogs) M.empty

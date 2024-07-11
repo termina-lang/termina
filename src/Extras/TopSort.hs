@@ -1,4 +1,3 @@
-{-# Language LambdaCase #-}
 -- | Small toy implementation of top sort.
 -- Instead of using other implementations, we fail when a cycle is detected.
 -- There are several implementations, but we use a DFS.
@@ -43,15 +42,15 @@ addL a st = st{res=a : res st}
 rmTemp :: Ord a => a -> TopSt a -> TopSt a
 rmTemp a st = st{getTemp = S.delete a (getTemp st)}
 
-data TopE a
+data TopSortError a
   = ELoop [a] -- ^ Loop Error fund.
   | ENotFound a (Maybe a) -- ^ Internal error.
   | MaxBound
   deriving Show
 
 -- Monad to compute.
--- Error TopE and State TopSt
-type TopSort a = ExceptT (TopE a) (State (TopSt a))
+-- Error TopSortError and State TopSt
+type TopSort a = ExceptT (TopSortError a) (State (TopSt a))
 
 -- Adj map
 type Graph a = M.Map a [a]
@@ -77,14 +76,14 @@ topSort
   -- | Takes a dependency graph
   => Graph a
   -- Returns either a loop between elements [0] or an ordered list of them.
-  -> Either (TopE a) [a]
+  -> Either (TopSortError a) [a]
 topSort graph = evalState (runExceptT (computation >> gets (reverse . res))) emptyTopS
   where
     nodes = M.keys graph
     computation = topSortInternal graph nodes
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: (Ord a) => [(a, [a])] -> Either (TopE a) [a]
+topSortFromDepList :: (Ord a) => [(a, [a])] -> Either (TopSortError a) [a]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
@@ -106,7 +105,7 @@ topSortInternal graph =
         visit graph Nothing a
    )
 
-visit :: Ord a => Graph a -> Maybe a -> a ->TopSort a ()
+visit :: Ord a => Graph a -> Maybe a -> a -> TopSort a ()
 visit graph parent src
   = gets getPerm >>= \permSet ->
   if S.member src permSet
@@ -118,9 +117,9 @@ visit graph parent src
       -- temp mark |src|
       lmodifyE (addTemp src)
       --
-      accms <- case M.lookup src graph of
-                    Nothing -> throwError (ENotFound src parent)
-                    Just adj_src -> mapM (visit graph (Just src)) adj_src
+      case M.lookup src graph of
+          Nothing -> throwError (ENotFound src parent)
+          Just adj_src -> mapM_ (visit graph (Just src)) adj_src
       lmodify (rmTemp src)
       lmodifyE (addPerm src)
       lmodify (addL src)

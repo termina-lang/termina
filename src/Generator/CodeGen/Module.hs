@@ -17,13 +17,13 @@ import qualified Data.Map as M
 import Control.Monad.Reader (runReaderT)
 
 
-genModuleDefineLabel :: ModuleName -> String
+genModuleDefineLabel :: QualifiedName -> String
 genModuleDefineLabel mn =
     let filePath = map (pack . dropTrailingPathSeparator) (splitPath (mn <.> "h"))
     in
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
-genInclude :: ModuleName -> Bool -> CPreprocessorDirective
+genInclude :: QualifiedName -> Bool -> CPreprocessorDirective
 genInclude mName before = CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn before))
 
 genHeaderASTElement :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem]
@@ -51,9 +51,9 @@ genHeaderFile ::
     -- | Include option.h
     Bool
     -- | Module name
-    -> ModuleName
+    -> QualifiedName
     -- | Import list
-    -> [ModuleName]
+    -> [QualifiedName]
     -> AnnotatedProgram SemanticAnns
     -> CHeaderGenerator CFile
 genHeaderFile includeOptionH mName imports program = do
@@ -72,7 +72,7 @@ genHeaderFile includeOptionH mName imports program = do
 
 genSourceFile ::
     -- | Module name
-    ModuleName
+    QualifiedName
     -- | Typed Termina program
     -> AnnotatedProgram SemanticAnns
     -> CSourceGenerator CFile
@@ -82,8 +82,8 @@ genSourceFile mName program = do
         CPPDirective (CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn True)))
         : items
 
-runGenSourceFile :: ModuleName -> AnnotatedProgram SemanticAnns -> Either CGeneratorError CFile
+runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnns -> Either CGeneratorError CFile
 runGenSourceFile mName program = runReaderT (genSourceFile mName program) M.empty
 
-runGenHeaderFile :: Bool -> ModuleName -> [ModuleName] -> AnnotatedProgram SemanticAnns -> OptionTypes -> Either CGeneratorError CFile
+runGenHeaderFile :: Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnns -> OptionTypes -> Either CGeneratorError CFile
 runGenHeaderFile includeOptionH mName imports program = runReaderT (genHeaderFile includeOptionH mName imports program)

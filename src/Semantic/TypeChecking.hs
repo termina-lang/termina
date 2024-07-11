@@ -25,7 +25,7 @@ import qualified Parser.Parsing              as Parser (Annotation (..))
 -- Interpretation of types
 import           Semantic.Types
 -- Error module
-import           Control.Monad.Except (MonadError (..))
+import           Control.Monad.Except (MonadError (..), runExceptT)
 import           Semantic.Errors
 -- Semantic Monad
 import           Semantic.Monad
@@ -35,11 +35,12 @@ import           Extras.TopSort
 ----------------------------------------
 -- Libaries and stuff
 
-import    qualified       Data.List  (foldl',find, map, nub, sortOn, (\\))
+import    qualified       Data.List  (find, map, nub, sortOn, (\\))
 import           Data.Maybe
 
 -- import Control.Monad.State as ST
 import           Control.Monad
+import qualified Control.Monad.State.Strict as ST
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
 
@@ -1411,48 +1412,18 @@ programAdd (TypeDefinition ty anns) =
         >> return (type_name , el)
       _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
 
-{--
---- Exectuing Type Checking
-typeCheckRunE :: PAST.AnnotatedProgram Parser.Annotation
-  -> (Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
-     , ExpressionState)
-typeCheckRunE = runTypeChecking initialExpressionSt  . mapM checkAndAdd
-    where
-      checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
+typeTerminaModule :: 
+  PAST.AnnotatedProgram Parser.Annotation 
+  -> SemanticMonad (SAST.AnnotatedProgram SemanticAnns)
+typeTerminaModule = mapM checkAndAdd
 
-typeCheckRun :: PAST.AnnotatedProgram Parser.Annotation
-  -> Either SemanticErrors (SAST.AnnotatedProgram SemanticAnns)
-typeCheckRun = fst . typeCheckRunE
+  where
+    checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
 
--- Module TypeChecking function
-typeAndGetGlobals
-  -- GlobalEnv from imports
-  :: GlobalEnv
-  -- Current Termina Module
-  -> PAST.AnnotatedProgram Parser.Annotation
-  -> Either
-        SemanticErrors
-        (SAST.AnnotatedProgram SemanticAnns
-        , [(Identifier
-           , SAnns (GEntry SemanticAnns))])
-typeAndGetGlobals preLoad p =
-  case buildInit of
-    Left err -> Left (annotateError internalErrorSeman err)
-    Right intGlbs -> fst (runTypeChecking (makeInitial intGlbs) (foldM checkAddCompile ([],[]) p))
- where
-   checkAddCompile (ts, gs) t = do
-     tTyped <- programSeman t
-     glb <- programAdd tTyped
-     -- IMPORTANT: When the module is typed, the typed elements must be included at
-     -- the end of the list.
-     return (ts ++ [tTyped], gs ++ [glb])
-   buildInit =
-     Data.List.foldl'
-      (\env (k,v) -> either
-        Left
-        (\env -> if isJust (M.lookup k env)
-          then Left (EVarDefined k) else Right (M.insert k v env)
-        ) env )
-      (Right preLoad)
-      initGlb
---}
+runTypeChecking
+  :: ExpressionState
+  -> SemanticMonad a
+  -> Either SemanticErrors (a, ExpressionState)
+runTypeChecking initSt m = case flip ST.runState initSt . runExceptT $ m of
+  (Left err, _) -> Left err
+  (Right output, st) -> Right (output, st)

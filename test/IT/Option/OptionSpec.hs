@@ -5,14 +5,13 @@ import Parser.Parsing
 import Data.Text hiding (empty)
 import Text.Parsec
 import Semantic.TypeChecking
+import Semantic.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
 import AST.Core
 import Generator.Option
-import Control.Monad.Reader
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import Modules.Modules
 import Generator.CodeGen.Application.Option
 
 test0 :: String
@@ -64,28 +63,28 @@ renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case typeCheckRun ast of
+    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> 
-        case runReaderT (genHeaderFile True "test" [] tast) M.empty of
+      Right (tast, _) -> 
+        case runGenHeaderFile True "test" [] tast M.empty of
           Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+          Right cHeaderFile -> runCPrinter cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case typeCheckRun ast of
+    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
-      Right tast -> 
-        case runReaderT (genSourceFile "test" tast) M.empty of
+      Right (tast, _) -> 
+        case runGenSourceFile "test" tast of
           Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+          Right cSourceFile -> runCPrinter cSourceFile
 
 renderOption :: OptionMap -> Text
-renderOption optionMap = case runReaderT genOptionHeaderFile optionMap of
+renderOption optionMap =   case runGenOptionHeaderFile optionMap of
     Left err -> pack $ show err
-    Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+    Right cOptionsFile -> runCPrinter cOptionsFile
 
 spec :: Spec
 spec = do
