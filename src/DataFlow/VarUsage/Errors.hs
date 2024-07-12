@@ -1,12 +1,12 @@
 -- | Module With Errors
 
-module DataFlow.Errors where
+module DataFlow.VarUsage.Errors where
 
 import AST.Core (Identifier)
 
 import Parser.Parsing (Annotation)
 
-import DataFlow.Types
+import DataFlow.VarUsage.Types
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M

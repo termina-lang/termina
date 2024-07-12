@@ -1,12 +1,12 @@
 -- | DSL to compute Use/Defs of Termina expressions
 
-module DataFlow.Computation where
+module DataFlow.VarUsage.Computation where
 
 import AST.Core (Identifier,Parameter(..),TypeSpecifier(..))
 import Parser.Parsing (Annotation)
 
-import DataFlow.Errors
-import DataFlow.Types
+import DataFlow.VarUsage.Errors
+import DataFlow.VarUsage.Types
 
 import qualified Control.Monad.State as ST
 import Control.Monad.Except as E
@@ -88,7 +88,19 @@ runEncapsEOO ms =
   get >>= \st ->
   mapM (withState emptyButUsed) ms >>=
 -- mapM (withState (const emptyUDSt)) ms >>=
+
+-- mapM (withState (const emptyUDSt)) ms >>=
+
+-- mapM (withState (const emptyUDSt)) ms >>=
+
+-- mapM (withState (const emptyUDSt)) ms >>=
   
+-- mapM (withState (const emptyUDSt)) ms >>=
+
+-- mapM (withState (const emptyUDSt)) ms >>=
+
+-- mapM (withState (const emptyUDSt)) ms >>=
+
 -- mapM (withState (const emptyUDSt)) ms >>=
   (put st >>) . return
 
@@ -200,10 +212,7 @@ allocOO ident
         Allocated -> throwError (AllocTwice ident);
         -- Define in the future? This case shouldn't happen
         Defined -> throwError (AllocRedef ident);
-        })
-  =<<
-  M.lookup ident
-  <$> gets usedOption
+        }) . M.lookup ident =<< gets usedOption
 
 defVariableOO :: Identifier -> UDM Errors ()
 defVariableOO ident =
@@ -216,10 +225,7 @@ defVariableOO ident =
         Used -> throwError (DefinedNotAlloc ident);
         -- Defined;Defined not allowed,
         Defined -> throwError (DefinedTwice ident);
-        })
-  =<<
-  M.lookup ident
-  <$> gets usedOption
+        }) . M.lookup ident =<< gets usedOption
 
 -- If we define a variable that was not used, then error.
 defVariable :: Identifier -> UDM Errors ()

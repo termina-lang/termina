@@ -24,7 +24,7 @@ import qualified Data.Map.Strict as M
 import Extras.TopSort
 import Semantic.Monad (SemanticAnns, Environment, makeInitialGlobalEnv)
 import Modules.Modules
-import DataFlow.DF (runUDAnnotatedProgram)
+import DataFlow.VarUsage (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
 import Data.List (foldl')
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)

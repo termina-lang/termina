@@ -83,10 +83,14 @@ data ConnectionSeman =
   | SPConnTy
     -- | Type specifier of the connected event emitter
     TypeSpecifier
+    -- | Name of the action that will be triggered when the event emitter emits an event 
+    Identifier 
   -- | In port connection
   | InPConnTy
     -- | Type specifier of the connected channel
     TypeSpecifier
+    -- | Name of the action that will be triggered when the channel receives a message
+    Identifier
   | OutPConnTy
     -- | Type specifier of the connected channel
     TypeSpecifier
@@ -167,11 +171,11 @@ buildAtomicConnAnn loc ts = SemAnn loc (CTy (APAtomicConnTy ts))
 buildAtomicArrayConnAnn :: Locations -> TypeSpecifier -> Size -> SAnns SemanticElems
 buildAtomicArrayConnAnn loc ts s = SemAnn loc (CTy (APAtomicArrayConnTy ts s))
 
-buildSinkPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
-buildSinkPortConnAnn loc ts = SemAnn loc (CTy (SPConnTy ts))
+buildSinkPortConnAnn :: Locations -> TypeSpecifier -> Identifier -> SAnns SemanticElems
+buildSinkPortConnAnn loc ts action = SemAnn loc (CTy (SPConnTy ts action))
 
-buildInPortConnAnn :: Locations -> TypeSpecifier -> SAnns SemanticElems
-buildInPortConnAnn loc ts = SemAnn loc (CTy (InPConnTy ts))
+buildInPortConnAnn :: Locations -> TypeSpecifier -> Identifier -> SAnns SemanticElems
+buildInPortConnAnn loc ts action = SemAnn loc (CTy (InPConnTy ts action))
 
 -- | Expression Semantic Annotations
 type SemanticAnns = SAnns SemanticElems

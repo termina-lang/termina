@@ -770,15 +770,17 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPort
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      SinkPort _ _  ->
+      SinkPort _ action  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
-          SemAnn _ (GGlob (SEmitter ets)) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets)
+          SemAnn _ (GGlob (SEmitter ets)) -> 
+            return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
-      InPort _ _  ->
+      InPort _ action  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
-          SemAnn _ (GGlob (SChannel cts)) -> return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts)
+          SemAnn _ (GGlob (SChannel cts)) -> 
+            return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError loc $ EInboundPortNotChannel sid
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])

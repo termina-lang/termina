@@ -1,6 +1,8 @@
 -- | Simple POC of data flo analysis to compute flow of dynamic variables.
 
-module DataFlow.DF where
+module DataFlow.VarUsage (
+  runUDAnnotatedProgram
+) where
 
 {-
 At termina level, each block is a basic block.
@@ -13,8 +15,8 @@ statement and build our sets backwards.
 -}
 
 -- Monad and manipulations
-import           DataFlow.Computation
-import           DataFlow.Errors
+import           DataFlow.VarUsage.Computation
+import           DataFlow.VarUsage.Errors
 
 import Utils.Annotations
 
@@ -28,8 +30,7 @@ import qualified Data.Map.Strict      as M
 -- AST to work with.
 import           AST.Seman            as SAST
 -- We need to know the type of objects.
-import qualified Semantic.Monad       as SM (location)
-import           Semantic.Monad       (SemanticAnns (..), SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
+import Semantic.Monad as SM (location, SemanticAnns, SAnns(..), getResultingType, getTypeSAnns, getObjectSAnns)
 
 
 --import Debug.Termina
@@ -43,17 +44,17 @@ useConstE = const (return ())
 -- + Moving out variables of type dyn and Option<dyn T>
 -- + Copying expressions, everything.
 -- It is context dependent (AFAIK).
-useArguments :: Expression Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useArguments :: Expression SM.SemanticAnns -> UDM AnnotatedErrors ()
 -- If we are giving a variable of type Dyn, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
-  = case Semantic.Monad.getTypeSAnns ann of
+  = case SM.getTypeSAnns ann of
      Just (DynamicSubtype _) ->
        SM.location ann `annotateError` useDynVar ident
      _ -> useExpression e
 -- Dyn variables inside expressions are read as values.
 useArguments e = useExpression e
 
-useObject, defObject :: Object Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useObject, defObject :: Object SM.SemanticAnns -> UDM AnnotatedErrors ()
 useObject (Variable ident ann)
   =
   let loc = SM.location ann in
@@ -70,7 +71,7 @@ useObject (Variable ident ann)
             -- Mutable Options??
                 _ ->
                 loc `annotateError` safeAddUse ident
-        }) (Semantic.Monad.getTypeSAnns ann)
+        }) (SM.getTypeSAnns ann)
 useObject (ArrayIndexExpression obj e _ann)
   = useObject obj >> useExpression e
 useObject (MemberAccess obj _i _ann)
@@ -103,15 +104,15 @@ defObject (ArraySlice obj eB eT _ann)
 defObject (Undyn obj _ann)
   = useObject obj
 
-useFieldAssignment :: FieldAssignment Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useFieldAssignment :: FieldAssignment SM.SemanticAnns -> UDM AnnotatedErrors ()
 useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 -- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignemnt _ = return ()
 
-getObjectType :: Object Semantic.Monad.SemanticAnns -> UDM Errors (AccessKind, TypeSpecifier)
-getObjectType = maybe (throwError ImpossibleError) return . Semantic.Monad.getObjectSAnns . getAnnotation
+getObjectType :: Object SM.SemanticAnns -> UDM Errors (AccessKind, TypeSpecifier)
+getObjectType = maybe (throwError ImpossibleError) return . SM.getObjectSAnns . getAnnotation
 
-useExpression :: Expression Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useExpression :: Expression SM.SemanticAnns -> UDM AnnotatedErrors ()
 useExpression (AccessObject obj)
   = useObject obj
 useExpression (Constant _c _a)
@@ -175,16 +176,16 @@ useExpression (FunctionCall _ident args _ann)
       -- TODO Can Dyn be passed around as arguments?
   = mapM_ useArguments args
 
-useDefBlockRet :: BlockRet Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefBlockRet :: BlockRet SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefBlockRet bret =
   maybe (return ()) useExpression (returnExpression (blockRet bret))
   >> useDefBlock (blockBody bret)
 
 -- Not so sure about this.
-useDefBlock :: Block Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefBlock :: Block SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefBlock = mapM_ useDefStmt . reverse
 
-useDefStmt :: Statement Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefStmt :: Statement SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefStmt (Declaration ident _accK tyS initE ann)
   -- variable def is defined
   =
@@ -278,7 +279,7 @@ useDefStmt (MatchStmt e mcase ann)
         -- Otherwise, it is a simple use variable.
         _ -> runEncapsEOO (map ( (>> get) . useMCase) mcase);
     )
-    (Semantic.Monad.getResultingType $ ty_ann $ getAnnotation e)
+    (SM.getResultingType $ ty_ann $ getAnnotation e)
   >>= \sets ->
   -- Get all OO sets
   let
@@ -305,7 +306,7 @@ useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 
 destroyOptionDyn
-  :: (MatchCase Semantic.Monad.SemanticAnns, MatchCase Semantic.Monad.SemanticAnns)
+  :: (MatchCase SM.SemanticAnns, MatchCase SM.SemanticAnns)
   -> (UDM AnnotatedErrors UDSt , UDM AnnotatedErrors UDSt)
 destroyOptionDyn (ml, mr)
   =
@@ -318,7 +319,7 @@ destroyOptionDyn (ml, mr)
     , useDefBlock (matchBody mNone) >> get)
 
 -- General case, not when it is Option Dyn
-useMCase :: MatchCase Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useMCase :: MatchCase SM.SemanticAnns -> UDM AnnotatedErrors ()
 useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBlock blk
   >> SM.location ann `annotateError` mapM_ defVariable bvars
@@ -331,7 +332,7 @@ sameSets :: [VarSet] -> Bool
 sameSets [] = False
 sameSets (x:xs) = all (S.null . S.difference x) xs
 
-useDefCMemb :: ClassMember Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefCMemb :: ClassMember SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefCMemb (ClassField fdef ann)
   = SM.location ann `annotateError` defVariable (fieldIdentifier fdef)
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
@@ -347,7 +348,7 @@ useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (annotateError (SM.location ann) . defArgumentsProc) [p]
 
-useDefTypeDef :: TypeDef Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefTypeDef :: TypeDef SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefTypeDef (Class _k _id members _provides _mods)
   -- First we go through uses
   = mapM_ useDefCMemb muses
@@ -366,7 +367,7 @@ useDefTypeDef (Interface {}) = return ()
 useDefTypeDef (Enum {}) = return ()
 
 -- Globals
-useDefFrag :: AnnASTElement Semantic.Monad.SemanticAnns -> UDM AnnotatedErrors ()
+useDefFrag :: AnnASTElement SM.SemanticAnns -> UDM AnnotatedErrors ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
  >> mapM_ (annotateError (SM.location anns) . defArgumentsProc ) ps
@@ -376,14 +377,14 @@ useDefFrag (GlobalDeclaration {})
 useDefFrag (TypeDefinition tyDef _ann)
   = useDefTypeDef tyDef
 
-runUDFrag :: AnnASTElement Semantic.Monad.SemanticAnns -> Maybe AnnotatedErrors
+runUDFrag :: AnnASTElement SM.SemanticAnns -> Maybe AnnotatedErrors
 runUDFrag =
   either Just (const Nothing)
   . fst
   . runComputation
   . useDefFrag
 
-runUDAnnotatedProgram :: AnnotatedProgram  Semantic.Monad.SemanticAnns -> Maybe AnnotatedErrors
+runUDAnnotatedProgram :: AnnotatedProgram  SM.SemanticAnns -> Maybe AnnotatedErrors
 runUDAnnotatedProgram
   = safeHead
   . filter isJust
