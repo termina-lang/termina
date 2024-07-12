@@ -17,11 +17,12 @@ import qualified Text.Parsec.Expr     as Ex
 import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
-import           Data.Functor
+import Data.Functor
 import Text.Parsec.Expr
 import qualified Data.List as L
 import Control.Monad
 import Data.Char
+import Utils.Annotations
 
 {- | Type of the parsing annotations
 
@@ -32,7 +33,7 @@ the position in the source file where the element is located.
 -}
 
 data Annotation =
-  Position SourcePos -- ^ Source code position
+  Position SourcePos SourcePos -- ^ Source code start and end position
   | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen
@@ -255,52 +256,56 @@ parameterParser = do
 -- { field0 = 0 : u32, field1 = 0 : u16 } : StructIdentifier
 structInitializerParser :: Parser (Expression Annotation)
 structInitializerParser = do
-    p <- getPosition
+    startpos <- getPosition
     assignments <- braces (sepBy (wspcs *> fieldAssignmentParser <* wspcs) comma)
     identifier <- optionMaybe (reservedOp ":" >> identifierParser)
-    return $ StructInitializer assignments identifier (Position p)
+    StructInitializer assignments identifier . Position startpos <$> getPosition
     where
 
       fieldAssignmentParser :: Parser (FieldAssignment Annotation)
       fieldAssignmentParser = do
+        try fieldValueParser <|> try fieldAddressParser <|> try fieldAccessPortConnectionParser 
+            <|> try fieldInboundPortConnectionParser <|> fieldOutboundPortConnectionParser 
+
+      fieldValueParser :: Parser (FieldAssignment Annotation)
+      fieldValueParser = do
+        startPos <- getPosition
         identifier <- identifierParser
-        fieldValueParser identifier <|> fieldAddressParser identifier <|> fieldAccessPortConnectionParser identifier
-            <|> fieldInboundPortConnectionParser identifier <|> fieldOutboundPortConnectionParser identifier
-
-      fieldValueParser :: Identifier -> Parser (FieldAssignment Annotation)
-      fieldValueParser ident = do
         _ <- reservedOp "="
-        p' <- getPosition
         expr <- expressionParser
-        return $ FieldValueAssignment ident expr (Position p')
+        FieldValueAssignment identifier expr . Position startPos <$> getPosition
       
-      fieldAddressParser :: Identifier -> Parser (FieldAssignment Annotation)
-      fieldAddressParser ident = do
+      fieldAddressParser :: Parser (FieldAssignment Annotation)
+      fieldAddressParser = do
+        startPos <- getPosition
+        identifier <- identifierParser
         _ <- reservedOp "@"
-        p' <- getPosition
-        address <- integerParser
-        return $ FieldAddressAssignment ident address (Position p')
+        addr <- integerParser
+        FieldAddressAssignment identifier addr . Position startPos <$> getPosition
       
-      fieldAccessPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
-      fieldAccessPortConnectionParser ident = do
+      fieldAccessPortConnectionParser :: Parser (FieldAssignment Annotation)
+      fieldAccessPortConnectionParser = do
+        startPos <- getPosition
+        identifier <- identifierParser
         _ <- reservedOp "<->"
-        p' <- getPosition
         port <- identifierParser
-        return $ FieldPortConnection AccessPortConnection ident port (Position p')
+        FieldPortConnection AccessPortConnection identifier port . Position startPos <$> getPosition
       
-      fieldInboundPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
-      fieldInboundPortConnectionParser ident = do
+      fieldInboundPortConnectionParser :: Parser (FieldAssignment Annotation)
+      fieldInboundPortConnectionParser = do
+        startPos <- getPosition
+        identifier <- identifierParser
         _ <- reservedOp "<-"
-        p' <- getPosition
         port <- identifierParser
-        return $ FieldPortConnection InboundPortConnection ident port (Position p')
+        FieldPortConnection InboundPortConnection identifier port . Position startPos <$> getPosition
 
-      fieldOutboundPortConnectionParser :: Identifier -> Parser (FieldAssignment Annotation)
-      fieldOutboundPortConnectionParser ident = do
+      fieldOutboundPortConnectionParser :: Parser (FieldAssignment Annotation)
+      fieldOutboundPortConnectionParser = do
+        startPos <- getPosition
+        identifier <- identifierParser
         _ <- reservedOp "->"
-        p' <- getPosition
         port <- identifierParser
-        return $ FieldPortConnection OutboundPortConnection ident port (Position p')
+        FieldPortConnection OutboundPortConnection identifier port . Position startPos <$> getPosition
 
 -- | Parser for an element modifier
 -- A modifier is of the form:
@@ -460,68 +465,67 @@ expressionParser' = buildPrattParser -- New parser
     expressionTermParser
   where 
     binaryInfix s f = Ex.Infix (do
-          p <- getPosition
           _ <- reservedOp s
-          return $ \l r -> BinOp f l r (Position p))
+          return $ \l r -> BinOp f l r (Position (getStartPosition (getAnnotation l)) (getEndPosition (getAnnotation r))))
     castingPostfix = Ex.Postfix (do
-          p <- getPosition
           _ <- reserved "as"
           typeSpecificer <- typeSpecifierParser
-          return $ \parent -> Casting parent typeSpecificer (Position p))
+          endPos <- getPosition
+          return $ \parent -> Casting parent typeSpecificer (Position (getStartPosition (getAnnotation parent)) endPos))
 
 functionCallParser :: Parser (Expression Annotation)
 functionCallParser = do
-  p <- getPosition
+  startPos <- getPosition
   ident <- identifierParser
   params <- parens (sepBy (try expressionParser) comma)
-  return $ FunctionCall ident params (Position p)
+  FunctionCall ident params . Position startPos <$> getPosition
 
 optionVariantExprParser :: Parser (Expression Annotation)
 optionVariantExprParser =
   (do
-    p <- getPosition
+    startPos <- getPosition
     _ <- reserved "None"
-    return $ OptionVariantInitializer None (Position p)) <|>
+    OptionVariantInitializer None . Position startPos <$> getPosition) <|>
   (do
-    p <- getPosition
+    startPos <- getPosition
     _ <- reserved "Some"
     someExpr <- parens expressionParser
-    return $ OptionVariantInitializer (Some someExpr) (Position p))
+    OptionVariantInitializer (Some someExpr) . Position startPos <$> getPosition)
 
 enumVariantExprParser :: Parser (Expression Annotation)
 enumVariantExprParser = do
-  p <- getPosition
+  startPos <- getPosition
   enum <- identifierParser
   _ <- reservedOp "::"
   variant <- identifierParser
   parameterList <-
     option [] (parens (sepBy (try expressionParser) comma))
-  return $ EnumVariantInitializer enum variant parameterList (Position p)
+  EnumVariantInitializer enum variant parameterList . Position startPos <$> getPosition
 
 isEnumVariantExprParser :: Parser (Expression Annotation)
 isEnumVariantExprParser = do
-  p <- getPosition
+  startPos <- getPosition
   object <- objectParser
   _ <- reserved "is"
   enum <- identifierParser
   _ <- reservedOp "::"
   variant <- identifierParser
-  return $ IsEnumVariantExpression object enum variant (Position p)
+  IsEnumVariantExpression object enum variant . Position startPos <$> getPosition
 
 isOptionVariantExprParser :: Parser (Expression Annotation)
 isOptionVariantExprParser =
   (do
-    p <- getPosition
+    startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "None"
-    return $ IsOptionVariantExpression object NoneLabel (Position p)) <|>
+    IsOptionVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
   (do
-    p <- getPosition
+    startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Some"
-    return $ IsOptionVariantExpression object SomeLabel (Position p))
+    IsOptionVariantExpression object SomeLabel . Position startPos <$> getPosition)
 
 expressionParser :: Parser (Expression Annotation)
 expressionParser = try optionVariantExprParser
@@ -536,17 +540,17 @@ expressionParser = try optionVariantExprParser
 
 mutableReferenceExprParser :: Parser (Expression Annotation)
 mutableReferenceExprParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reservedOp "&mut"
   object <- objectParser
-  return $ ReferenceExpression Mutable object (Position p)
+  ReferenceExpression Mutable object . Position startPos <$> getPosition
 
 referenceExprParser :: Parser (Expression Annotation)
 referenceExprParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reservedOp "&"
   object <- objectParser
-  return $ ReferenceExpression Immutable object (Position p)
+  ReferenceExpression Immutable object . Position startPos <$> getPosition
 
 expressionTermParser :: Parser (Expression Annotation)
 expressionTermParser = try isEnumVariantExprParser
@@ -567,9 +571,9 @@ parensObjectParser = parens objectParser
 -- Object term parser.
 objectTermParser :: Parser (Object Annotation)
 objectTermParser = (do
-    p <- getPosition
+    startPos <- getPosition
     ident <- identifierParser
-    return $ Variable ident (Position p))
+    Variable ident . Position startPos <$> getPosition)
   <|> parensObjectParser
 
 -- Expression parser
@@ -616,35 +620,35 @@ objectParser = objectParser' objectTermParser
       ,[dereferencePrefix]]
     vectorOpPostfix
       = Ex.Postfix (try (do
-            p <- getPosition
             _ <- reservedOp "["
             low <- expressionParser 
             _ <- reservedOp ".."
             up <- expressionParser
             _ <- reservedOp "]"
-            return $ \parent ->  ArraySlice parent low up (Position p)
+            endPos <- getPosition
+            return $ \parent ->  ArraySlice parent low up (Position (getStartPosition (getAnnotation parent)) endPos)
           ) <|> (do
-            p <- getPosition
             index <- brackets expressionParser
-            return $ \parent ->  ArrayIndexExpression parent index (Position p)
+            endPos <- getPosition
+            return $ \parent ->  ArrayIndexExpression parent index (Position (getStartPosition (getAnnotation parent)) endPos)
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
-        p <- getPosition
         _ <- reservedOp "->"
         member <- identifierParser
-        return $ \parent ->   DereferenceMemberAccess parent member (Position p))
+        endPos <- getPosition
+        return $ \parent -> DereferenceMemberAccess parent member (Position (getStartPosition (getAnnotation parent)) endPos))
     memberAccessPostfix
       = Ex.Postfix (do
         _ <- reservedOp "."
-        p <- getPosition
         member <- identifierParser
-        return $ \parent ->  MemberAccess parent member (Position p))
+        endPos <- getPosition
+        return $ \parent ->  MemberAccess parent member (Position (getStartPosition (getAnnotation parent)) endPos))
     dereferencePrefix
       = Ex.Prefix (do
-        p <- getPosition
+        startPos <- getPosition
         _ <- reservedOp "*"
-        return $ flip Dereference (Position p))
+        return $ \child -> Dereference child (Position startPos (getEndPosition (getAnnotation child))))
 ----------------------------------------
 
 accessObjectParser :: Parser (Expression Annotation)
@@ -656,65 +660,69 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       ,[dereferencePrefix]]
     vectorOpPostfix
       = Ex.Postfix (try (do
-            p <- getPosition
             _ <- reservedOp "["
             low <- expressionParser
             _ <- reservedOp ".."
             up <- expressionParser
             _ <- reservedOp "]"
+            endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArraySlice obj low up (Position p))
+              AccessObject obj -> AccessObject (ArraySlice obj low up (Position (getStartPosition (getAnnotation parent)) endPos))  
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
-            p <- getPosition
             index <- brackets expressionParser
+            endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position p))
+              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position (getStartPosition (getAnnotation parent)) endPos))  
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "->"
-      p <- getPosition
       member <- identifierParser
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
+      endPos <- getPosition
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (DereferenceMemberAccess obj member (Position p))) (flip (DerefMemberFunctionCall obj member) (Position p)) params
+          let startPos = getStartPosition (getAnnotation parent) in
+          maybe (AccessObject (DereferenceMemberAccess obj member (Position startPos endPos))) (flip (DerefMemberFunctionCall obj member) (Position startPos endPos)) params
         _ -> error "Unexpected member access to a non object"))
     memberAccessPostfix
       = Ex.Postfix (do
       _ <- reservedOp "."
-      p <- getPosition
       member <- identifierParser
       params <- optionMaybe (parens (sepBy (try expressionParser) comma))
+      endPos <- getPosition
       return (\parent -> case parent of
         AccessObject obj ->
-          maybe (AccessObject (MemberAccess obj member (Position p))) (flip (MemberFunctionCall obj member) (Position p)) params
+          let startPos = getStartPosition (getAnnotation parent) in
+          maybe (AccessObject (MemberAccess obj member (Position startPos endPos))) (flip (MemberFunctionCall obj member) (Position startPos endPos)) params
         _ -> error "Unexpected member access to a non object"))
     dereferencePrefix
       = Ex.Prefix (do
-      p <- getPosition
+      startPos <- getPosition
       _ <- reservedOp "*"
-      return (\parent -> case parent of
-        AccessObject obj -> AccessObject (Dereference obj (Position p))
+      return (\child -> case child of
+        AccessObject obj -> 
+          let endPos = getStartPosition (getAnnotation child) in
+          AccessObject (Dereference obj (Position startPos endPos))
         _ -> error "Unexpected member access to a non object"))
 
 arrayInitializerParser :: Parser (Expression Annotation)
 arrayInitializerParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reservedOp "["
   value <- expressionParser
   _ <- semi
   size <- sizeParser
   _ <- reservedOp "]"
-  return $ ArrayInitializer value size (Position p)
+  ArrayInitializer value size . Position startPos <$> getPosition
 
 arrayExprListInitializerParser :: Parser (Expression Annotation)
 arrayExprListInitializerParser = do
-  p <- getPosition
+  startPos <- getPosition
   exprs <- braces (sepBy expressionParser comma)
-  return $ ArrayExprListInitializer exprs (Position p)
+  ArrayExprListInitializer exprs . Position startPos <$> getPosition
 
 -- -- Task Definition
 
@@ -723,11 +731,11 @@ blockParser = BlockRet  <$> many blockItemParser <*> returnStmtParser
 
 returnStmtParser :: Parser (ReturnStmt Annotation)
 returnStmtParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
   _ <- semi
-  return $ ReturnStmt ret (Position p)
+  ReturnStmt ret . Position startPos <$> getPosition
 
 emptyReturn :: Parser ()
 emptyReturn = returnStmtParser >>= maybe mempty (const (fail "Expected Empty return")) . returnExpression
@@ -736,14 +744,15 @@ functionParser :: Parser (AnnASTElement  Annotation)
 functionParser = do
   modifiers <- many modifierParser
   reserved "function"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
+  endPos <- getPosition
   blockRet <- braces blockParser
-  return $ Function name params typeSpec blockRet modifiers (Position p)
+  return $ Function name params typeSpec blockRet modifiers (Position startPos endPos)
 
 constLiteralParser :: Parser Const
 constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
@@ -757,15 +766,23 @@ constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
     parseLitChar = C <$> charLit
 
 constantParser :: Parser (Expression Annotation)
-constantParser = 
-  flip Constant . Position  <$> getPosition <*> constLiteralParser
+constantParser = do
+  startPos <- getPosition
+  literal <- constLiteralParser
+  Constant literal . Position startPos <$> getPosition
 
 constExprParser :: Parser (ConstExpression Annotation)
 constExprParser = 
   constSymbolParser <|> constExprLiteral
   where
-    constSymbolParser = flip KV . Position <$> getPosition <*> identifierParser
-    constExprLiteral = flip KC . Position <$> getPosition <*> constLiteralParser
+    constSymbolParser = do
+      startPos <- getPosition
+      ident <- identifierParser
+      KV ident . Position startPos <$> getPosition
+    constExprLiteral = do
+      startPos <- getPosition
+      literal <- constLiteralParser
+      KC literal . Position startPos <$> getPosition
 
 integerParser :: Parser TInteger
 integerParser = try hexParser <|> decParser
@@ -784,7 +801,7 @@ sizeParser = constValueSizeParser <|> constSizeParser
 
 mutableObjDeclarationParser :: Parser (Statement Annotation)
 mutableObjDeclarationParser = do
-  p <- getPosition
+  startPos <- getPosition
   reserved "var"
   name <- identifierParser
   reservedOp ":"
@@ -792,11 +809,11 @@ mutableObjDeclarationParser = do
   _ <- reservedOp "="
   initializer <-  expressionParser
   _ <- semi
-  return $ Declaration name Mutable ty initializer (Position p)
+  Declaration name Mutable ty initializer . Position startPos <$> getPosition
 
 immutableObjDeclarationParser :: Parser (Statement Annotation)
 immutableObjDeclarationParser = do
-  p <- getPosition
+  startPos <- getPosition
   reserved "let"
   name <- identifierParser
   reservedOp ":"
@@ -804,14 +821,14 @@ immutableObjDeclarationParser = do
   _ <- reservedOp "="
   initializer <-  expressionParser
   _ <- semi
-  return $ Declaration name Immutable ty initializer (Position p)
+  Declaration name Immutable ty initializer . Position startPos <$> getPosition
 
 singleExprStmtParser :: Parser (Statement Annotation)
 singleExprStmtParser = do
-  p <- getPosition
+  startPos <- getPosition
   expression <- expressionParser
   _ <- semi
-  return $ SingleExpStmt expression (Position p)
+  SingleExpStmt expression . Position startPos <$> getPosition
 
 blockItemParser :: Parser (Statement Annotation)
 blockItemParser
@@ -825,43 +842,43 @@ blockItemParser
 
 assignmentStmtPaser :: Parser (Statement Annotation)
 assignmentStmtPaser = do
-  p <- getPosition
+  startPos <- getPosition
   lval <- objectParser
   _ <- reservedOp "="
   rval <- expressionParser
   _ <- semi
-  return $ AssignmentStmt lval rval (Position p)
+  AssignmentStmt lval rval . Position startPos <$> getPosition
 
 matchCaseParser :: Parser (MatchCase Annotation)
 matchCaseParser = do
   reserved "case"
-  p <- getPosition
+  startPos <- getPosition
   caseId <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   compound <- braces $ many blockItemParser
-  return $ MatchCase caseId args compound (Position p)
+  MatchCase caseId args compound . Position startPos <$> getPosition
 
 matchStmtParser :: Parser (Statement Annotation)
 matchStmtParser = do
+  startPos <- getPosition
   reserved "match"
-  p <- getPosition
   matchExpression <- expressionParser
   cases <- braces (many1 $ try matchCaseParser)
-  return $ MatchStmt matchExpression cases (Position p)
+  MatchStmt matchExpression cases . Position startPos <$> getPosition
 
 elseIfParser :: Parser (ElseIf Annotation)
 elseIfParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reserved "else"
   _ <- reserved "if"
   expression <- expressionParser
   compound <- braces $ many blockItemParser
-  return $ ElseIf expression compound (Position p)
+  ElseIf expression compound . Position startPos <$> getPosition
 
 ifElseIfStmtParser :: Parser (Statement Annotation)
 ifElseIfStmtParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reserved "if"
   expression <- expressionParser
   ifCompound <- braces $ many blockItemParser
@@ -870,11 +887,11 @@ ifElseIfStmtParser = do
     _ <- reserved "else"
     stmts <- braces $ many $ try blockItemParser
     return $ Just stmts)
-  return $ IfElseStmt expression ifCompound elseIfs elseCompound (Position p)
+  IfElseStmt expression ifCompound elseIfs elseCompound . Position startPos <$> getPosition
 
 forLoopStmtParser :: Parser (Statement Annotation)
 forLoopStmtParser = do
-  p <- getPosition
+  startPos <- getPosition
   _ <- reserved "for"
   identifier <- identifierParser
   reservedOp ":"
@@ -887,13 +904,13 @@ forLoopStmtParser = do
     reserved "while"
     expressionParser)
   compound <- braces $ many blockItemParser
-  return $ ForLoopStmt identifier ty start end breakCondition compound (Position p)
+  ForLoopStmt identifier ty start end breakCondition compound . Position startPos <$> getPosition
 
 taskDeclParser :: Parser (Global Annotation)
 taskDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "task"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -901,13 +918,13 @@ taskDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Task identifier typeSpecifier initializer modifiers (Position p)
+  Task identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 emitterDeclParser :: Parser (Global Annotation)
 emitterDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "emitter"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -915,13 +932,13 @@ emitterDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Emitter identifier typeSpecifier initializer modifiers (Position p)
+  Emitter identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 channelDeclParser :: Parser (Global Annotation)
 channelDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "channel"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -929,13 +946,13 @@ channelDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Channel identifier typeSpecifier initializer modifiers (Position p)
+  Channel identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 resourceDeclParser :: Parser (Global Annotation)
 resourceDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "resource"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -943,13 +960,13 @@ resourceDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Resource identifier typeSpecifier initializer modifiers (Position p)
+  Resource identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 handlerDeclParser :: Parser (Global Annotation)
 handlerDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "handler"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -957,20 +974,20 @@ handlerDeclParser = do
     reservedOp "="
     expressionParser)
   _ <- semi
-  return $ Handler identifier typeSpecifier initializer modifiers (Position p)
+  Handler identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 constDeclParser :: Parser (Global Annotation)
 constDeclParser = do
   modifiers <- many modifierParser
-  p <- getPosition
   reserved "const"
+  startPos <- getPosition
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
   _ <- reservedOp "="
   initializer <- constExprParser
   _ <- semi
-  return $ Const identifier typeSpecifier initializer modifiers (Position p)
+  Const identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 
 globalDeclParser :: Parser (AnnASTElement  Annotation)
 globalDeclParser = do
@@ -997,49 +1014,49 @@ structDefinitionParser :: Parser (AnnASTElement Annotation)
 structDefinitionParser = do
   modifiers <- many modifierParser
   reserved "struct"
-  p <- getPosition
+  startPos <- getPosition
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   _ <- semi
-  return $ TypeDefinition (Struct identifier fields modifiers) (Position p)
+  TypeDefinition (Struct identifier fields modifiers) . Position startPos <$> getPosition
 
 classFieldDefinitionParser :: Parser (ClassMember Annotation)
 classFieldDefinitionParser = do
-  p <- getPosition
+  startPos <- getPosition
   field <- fieldDefinitionParser
-  return $ ClassField field (Position p)
+  ClassField field . Position startPos <$> getPosition
 
 classMethodParser :: Parser (ClassMember Annotation)
 classMethodParser = do
   reserved "method"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   parens (reserved "&mut" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
-  return $ ClassMethod name typeSpec blockRet (Position p)
+  ClassMethod name typeSpec blockRet . Position startPos <$> getPosition
 
 classActionParser :: Parser (ClassMember Annotation)
 classActionParser = do
   reserved "action"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   param <- parens (reserved "&mut" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
   blockRet <- braces blockParser
-  return $ ClassAction name param typeSpec blockRet (Position p)
+  ClassAction name param typeSpec blockRet . Position startPos <$> getPosition
 
 classProcedureParser :: Parser (ClassMember Annotation)
 classProcedureParser = do
   reserved "procedure"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   params <- parens procedureParamsParser
   reservedOp "{"
   block <- many blockItemParser
   emptyReturn
   reservedOp "}"
-  return $ ClassProcedure name params block (Position p)
+  ClassProcedure name params block . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -1048,11 +1065,11 @@ classProcedureParser = do
 interfaceProcedureParser :: Parser (InterfaceMember Annotation)
 interfaceProcedureParser = do
   reserved "procedure"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   params <- parens procedureParamsParser
   reservedOp ";"
-  return $ InterfaceProcedure name params (Position p)
+  InterfaceProcedure name params . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =
@@ -1061,12 +1078,12 @@ interfaceProcedureParser = do
 classViewerParser :: Parser (ClassMember Annotation)
 classViewerParser = do
   reserved "viewer"
-  p <- getPosition
+  startPos <- getPosition
   name <- identifierParser
   params <- parens viewerParamsParser
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
   blockRet <- braces blockParser
-  return $ ClassViewer name params typeSpec blockRet (Position p)
+  ClassViewer name params typeSpec blockRet . Position startPos <$> getPosition
   where
     viewerParamsParser :: Parser [Parameter]
     viewerParamsParser =
@@ -1076,18 +1093,18 @@ interfaceDefinitionParser :: Parser (AnnASTElement Annotation)
 interfaceDefinitionParser = do
   modifiers <- many modifierParser
   reserved "interface"
-  p <- getPosition
+  startPos <- getPosition
   identifier <- identifierParser
   procedures <- braces (many1 interfaceProcedureParser)
   _ <- semi
-  return $ TypeDefinition (Interface identifier procedures modifiers) (Position p)
+  TypeDefinition (Interface identifier procedures modifiers) . Position startPos <$> getPosition
 
 classDefinitionParser :: Parser (AnnASTElement Annotation)
 classDefinitionParser = do
   modifiers <- many modifierParser
   classKind <- classKindParser
   reserved "class"
-  p <- getPosition
+  startPos <- getPosition
   identifier <- identifierParser
   provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
   fields <-
@@ -1097,7 +1114,7 @@ classDefinitionParser = do
       <|> classActionParser
       <|> classFieldDefinitionParser)
   _ <- semi
-  return $ TypeDefinition (Class classKind identifier fields provides modifiers) (Position p)
+  TypeDefinition (Class classKind identifier fields provides modifiers) . Position startPos <$> getPosition
   where
     classKindParser :: Parser ClassKind
     classKindParser =
@@ -1114,11 +1131,11 @@ enumDefinitionParser :: Parser (AnnASTElement Annotation)
 enumDefinitionParser = do
   modifiers <- many modifierParser
   reserved "enum"
-  p <- getPosition
+  startPos <- getPosition
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
   _ <- semi
-  return $ TypeDefinition (Enum identifier variants modifiers) (Position p)
+  TypeDefinition (Enum identifier variants modifiers) . Position startPos <$> getPosition
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram Annotation)
@@ -1134,7 +1151,12 @@ moduleIdentifierParser = sepBy1 firstCapital dot
       <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
 
 singleModule :: Parser ([ Modifier ], [String], Annotation )
-singleModule = (,,) <$> many modifierParser <*> moduleIdentifierParser <*> (Position <$> getPosition)
+singleModule = do
+  modifiers <- many modifierParser
+  startPos <- getPosition
+  moduleIdent <- moduleIdentifierParser
+  endPos <- getPosition
+  return (modifiers, moduleIdent, Position startPos endPos)
 
 moduleInclusionParser :: Parser Module
 moduleInclusionParser = do
@@ -1152,3 +1174,11 @@ terminaModuleParser = wspcs *> (Termina <$> many moduleInclusionParser <*> conte
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram Annotation)
 strParse = parse topLevel ""
+
+getStartPosition :: Annotation -> SourcePos
+getStartPosition (Position startPos _) = startPos
+getStartPosition _ = error "Internal error: expected Position annotation (this should not happen)"
+
+getEndPosition :: Annotation -> SourcePos
+getEndPosition (Position _ endPos) = endPos
+getEndPosition _ = error "Internal error: expected Position annotation (this should not happen)"

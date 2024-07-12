@@ -14,7 +14,7 @@ import qualified Data.Text.Lazy.IO as TLIO
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
-import Generator.Platform ( checkPlatform )
+import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv )
 import System.FilePath
 import System.Exit
 import System.Directory
@@ -22,9 +22,8 @@ import Parser.Parsing (Annotation, terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
-import Semantic.Monad (SemanticAnns, ExpressionState, initialExpressionSt)
+import Semantic.Monad (SemanticAnns, Environment, makeInitialGlobalEnv)
 import Modules.Modules
-import Semantic.Errors (ppError)
 import DataFlow.DF (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
 import Data.List (foldl')
@@ -34,6 +33,7 @@ import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
+import Semantic.Errors.PPrinting (ppError)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -127,11 +127,12 @@ loadTerminaModule ::
   -> FilePath 
   -> IO ParsedModule
 loadTerminaModule filePath root = do
+  let fullPath = root </> filePath <.> "fin"
   -- read it
-  src_code <- TLIO.readFile $ root </> filePath <.> "fin"
+  src_code <- TLIO.readFile fullPath
   -- parse it
-  case runParser terminaModuleParser () filePath (TL.unpack src_code) of
-    Left err -> ioError $ userError $ "Parser Error ::\n" ++ show err
+  case runParser terminaModuleParser () fullPath (TL.unpack src_code) of
+    Left err -> die . errorMessage $ "Parsing error: " ++ show err
     Right term -> do
       imports <- getModuleImports term
       return $ TerminaModuleData filePath root imports src_code (ParsingData . PAST.frags $ term)
@@ -182,14 +183,14 @@ sortProjectDepsOrLoop = topErrorInternal . M.toList
         )
         Right $ topSortFromDepList projectDependencies
 
-typeModules :: ParsedProject -> [QualifiedName] -> IO TypedProject
+typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
 typeModules parsedProject =
-  typeModules' M.empty initialExpressionSt
+  typeModules' M.empty
 
   where
   
-    typeModules' :: TypedProject -> ExpressionState -> [QualifiedName] -> IO TypedProject
-    typeModules' typedProject _ [] = pure typedProject
+    typeModules' :: TypedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
+    typeModules' typedProject finalState [] = pure (typedProject, finalState)
     typeModules' typedProject prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
       let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
@@ -313,7 +314,9 @@ buildCommand (BuildCmdArgs chatty) = do
         return
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
-    typedProject <- typeModules parsedProject orderedDependencies
+    -- | Create the initial global environment
+    let initialGlobalEnv = makeInitialGlobalEnv (getPlatformInitialGlobalEnv plt)
+    (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     useDefCheckModules typedProject

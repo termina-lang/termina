@@ -33,7 +33,7 @@ renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenHeaderFile False "test" [] tast M.empty of
@@ -44,7 +44,7 @@ renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenSourceFile "test" tast of

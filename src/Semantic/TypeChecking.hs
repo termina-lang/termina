@@ -5,11 +5,11 @@
 module Semantic.TypeChecking where
 
 -- Termina Ast and Utils
-import           Annotations
-import           AST.Parser                  as PAST
-import           Utils.AST.Parser
-import           Utils.AST.Core
-import           Utils.TypeSpecifier
+import Utils.Annotations
+import AST.Parser as PAST
+import Utils.AST.Parser
+import Utils.AST.Core
+import Utils.TypeSpecifier
 
 -- Top Sort
 import qualified Data.Map.Strict as M
@@ -23,23 +23,23 @@ import qualified Parser.Parsing              as Parser (Annotation (..))
 ----------------------------------------
 -- Internal modules to the semantic phase.
 -- Interpretation of types
-import           Semantic.Types
+import Semantic.Types
 -- Error module
-import           Control.Monad.Except (MonadError (..), runExceptT)
-import           Semantic.Errors
+import Control.Monad.Except (MonadError (..), runExceptT)
+import Semantic.Errors.Errors
 -- Semantic Monad
-import           Semantic.Monad
+import Semantic.Monad
 
-import           Extras.TopSort
+import Extras.TopSort
 
 ----------------------------------------
 -- Libaries and stuff
 
-import    qualified       Data.List  (find, map, nub, sortOn, (\\))
-import           Data.Maybe
+import qualified Data.List  (find, map, nub, sortOn, (\\))
+import Data.Maybe
 
 -- import Control.Monad.State as ST
-import           Control.Monad
+import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
@@ -1421,9 +1421,9 @@ typeTerminaModule = mapM checkAndAdd
     checkAndAdd t = programSeman t >>= \t' -> programAdd t' >> return t'
 
 runTypeChecking
-  :: ExpressionState
+  :: Environment
   -> SemanticMonad a
-  -> Either SemanticErrors (a, ExpressionState)
+  -> Either SemanticErrors (a, Environment)
 runTypeChecking initSt m = case flip ST.runState initSt . runExceptT $ m of
   (Left err, _) -> Left err
   (Right output, st) -> Right (output, st)

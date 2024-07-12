@@ -6,7 +6,7 @@ import Semantic.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
-import Annotations
+import Utils.Annotations
 import Data.Map (fromList, union)
 import qualified Control.Monad.Reader
 

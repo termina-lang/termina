@@ -1,7 +1,7 @@
 {-# Language KindSignatures #-}
 -- | Module describing a family of types equipped with annotations
 
-module Annotations where
+module Utils.Annotations where
 
 import Data.Kind
 

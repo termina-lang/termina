@@ -7,13 +7,13 @@ import Parser.Parsing
 
 import Semantic.TypeChecking
 import Semantic.Monad
-import Semantic.Errors
+import Semantic.Errors.Errors
 
 runNegativeTest :: String -> Maybe (Errors Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    case runTypeChecking initialExpressionSt (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> Just $ semError err
       Right _ -> Nothing
 

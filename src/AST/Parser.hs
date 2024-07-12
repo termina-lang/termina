@@ -12,8 +12,8 @@ module AST.Parser
   ) where
 
 -- From |CoreAST| we get all basic blocks.
-import           Annotations
-import           AST.Core
+import Utils.Annotations
+import AST.Core
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.

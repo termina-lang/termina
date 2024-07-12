@@ -16,7 +16,7 @@ statement and build our sets backwards.
 import           DataFlow.Computation
 import           DataFlow.Errors
 
-import Annotations
+import Utils.Annotations
 
 import           Control.Monad
 import           Control.Monad.Except

@@ -6,26 +6,26 @@
 
 module Semantic.Monad where
 
-import           Data.Map                   as M
-import           Data.Maybe
+import Data.Map as M
+import Data.Maybe
 
 -- Debugging
 -- import Debugging
 
 -- AST Info
-import           Annotations
-import           AST.Parser
-import           AST.Seman                   as SAST
-import           AST.Core                    as CAST
-import           Utils.AST.Parser                  (checkEqTypes)
+import Utils.Annotations
+import AST.Parser
+import AST.Seman as SAST
+import AST.Core as CAST
+import Utils.AST.Parser (checkEqTypes)
 
-import qualified Parser.Parsing                    as Parser (Annotation (..))
-import           Semantic.Errors
-import           Semantic.Types
-import           Utils.TypeSpecifier
+import qualified Parser.Parsing as Parser (Annotation (..))
+import Semantic.Errors.Errors
+import Semantic.Types
+import Utils.TypeSpecifier
 
 -- Monads
-import           Control.Monad.Except
+import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import Data.Functor
 
@@ -207,58 +207,39 @@ type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
 -- of our work.
 
 -- | Environment required to type expression packed into just one type.
-data ExpressionState
+data Environment
  = ExprST
  { global :: GlobalEnv
  , local  :: LocalEnv
  }
 
- -- | This is the initial global environment.
- -- This is a temporary solution until we figure out how to manage the
- -- standard library. For the time being, initial type definitions such as
- -- "TaskRet" and "Result" are defined here.
-initialGlobalEnv :: GlobalEnv
-initialGlobalEnv = fromList initGlb
-
-initGlb :: [(Identifier, SAnns (GEntry SemanticAnns))]
-initGlb =
+stdlibGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))]
+stdlibGlobalEnv =
   [("Result", internalErrorSeman `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
    ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
    ("Interrupt", internalErrorSeman `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
-   ("irq_1", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-   ("irq_2", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-   ("irq_3", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-   ("irq_4", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
    ("SystemInit", internalErrorSeman `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
    ("system_init", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
    ("PeriodicTimer", internalErrorSeman `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn internalErrorSeman (DefinedType "TimeVal"))] [] [])),
    ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
    ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
-  -- [("TaskRet", GType (Enum "TaskRet" [EnumVariant "Continue" [], EnumVariant "Finish" [], EnumVariant "Abort" [UInt32]] [])),
-  --  ("Result", GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" [UInt32]] [])),
-  --  ("TimeVal", GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
-  --  ("clock_get_uptime", GFun [] (DefinedType "TimeVal")),
-  --  ("delay_in", GFun [Parameter "time_val" (DefinedType "TimeVal")] Unit)]
 
-makeInitial :: GlobalEnv -> ExpressionState
-makeInitial e = ExprST e empty
+makeInitialGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))] -> Environment
+makeInitialGlobalEnv pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
 
-initialExpressionSt :: ExpressionState
-initialExpressionSt = ExprST initialGlobalEnv empty
-
-type SemanticMonad = ExceptT SemanticErrors (ST.State ExpressionState)
+type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 
 ----------------------------------------
-gets :: (ExpressionState -> a) -> SemanticMonad a
+gets :: (Environment -> a) -> SemanticMonad a
 gets = lift . ST.gets
 
-get :: SemanticMonad ExpressionState
+get :: SemanticMonad Environment
 get = lift ST.get
 
-put :: ExpressionState -> SemanticMonad ()
+put :: Environment -> SemanticMonad ()
 put = lift . ST.put
 
-modify :: (ExpressionState -> ExpressionState) -> SemanticMonad ()
+modify :: (Environment -> Environment) -> SemanticMonad ()
 modify = lift . ST.modify
 
 ----------------------------------------
@@ -266,7 +247,7 @@ modify = lift . ST.modify
 
 -- | Execute computations in a temporal state wihtout
 -- modifying current state.
-withInState :: ExpressionState -> SemanticMonad a -> SemanticMonad a
+withInState :: Environment -> SemanticMonad a -> SemanticMonad a
 withInState tempState comp = localScope (put tempState >> comp)
 
 -- Execute comp but bracktracking the state

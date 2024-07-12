@@ -6,8 +6,8 @@ module AST.Seman
   , module AST.Core
   ) where
 
-import           Annotations
-import           AST.Core
+import Utils.Annotations
+import AST.Core
 
 import Modules.Modules (QualifiedName)
 

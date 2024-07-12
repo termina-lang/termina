@@ -131,7 +131,7 @@ printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
 ppError :: M.Map FilePath TL.Text -> 
     SemanticErrors -> IO ()
-ppError toModuleAST (AnnError e (Position pos)) =
+ppError toModuleAST (AnnError e (Position pos _endPos)) =
   let fileName = sourceName pos
       lineNumber = sourceLine pos
       lineColumn = sourceColumn pos
@@ -202,7 +202,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Invalid return type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EProcedureCallExtraParams (procId, params, Position procPos) paramNumber ->
+    EProcedureCallExtraParams (procId, params, Position procPos _procEndPos) paramNumber ->
         let title = "\x1b[31merror [E009]\x1b[0m: extra parameters in procedure call."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -219,7 +219,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureCallMissingParams (procId, params, Position procPos) paramNumber ->
+    EProcedureCallMissingParams (procId, params, Position procPos _procEndPos) paramNumber ->
         let title = "\x1b[31merror [E010]\x1b[0m: missing parameters in procedure call."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -246,7 +246,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             case ann of
-                Position procPos ->
+                Position procPos _procEndPos ->
                     let procFileName = sourceName procPos
                         procLineNumber = sourceLine procPos
                         procLineColumn = sourceColumn procPos
@@ -275,7 +275,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 lineNumber lineColumn (length ident)
                 (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
                     "A resource class must provide at least one interface."))
-    EResourceClassAction (classId, Position posClass) ident ->
+    EResourceClassAction (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E014]\x1b[0m: resource class defines an action."
         in
             TL.putStrLn $ prettyErrors 
@@ -301,7 +301,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define actions."))
                 ]
-    EResourceClassInPort (classId, Position posClass) ident ->
+    EResourceClassInPort (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E015]\x1b[0m: resource class defines an in port."
         in
             TL.putStrLn $ prettyErrors 
@@ -327,7 +327,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define in ports."))
                 ]
-    EResourceClassOutPort (classId, Position posClass) ident ->
+    EResourceClassOutPort (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E016]\x1b[0m: resource class defines an out port."
         in
             TL.putStrLn $ prettyErrors 
@@ -367,7 +367,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface."))
-    EProcedureNotFromProvidedInterfaces (classId, Position posClass) ident ->
+    EProcedureNotFromProvidedInterfaces (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E019]\x1b[0m: procedure not from provided interfaces."
         in
             TL.putStrLn $ prettyErrors 
@@ -401,7 +401,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
-    EProcedureExtraParams (ifaceId, procId, params, Position procPos) paramNumber ->
+    EProcedureExtraParams (ifaceId, procId, params, Position procPos _procEndPos) paramNumber ->
         let title = "\x1b[31merror [E021]\x1b[0m: extra parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -419,7 +419,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureMissingParams (ifaceId, procId, params, Position procPos) paramNumber ->
+    EProcedureMissingParams (ifaceId, procId, params, Position procPos _procEndPos) paramNumber ->
         let title = "\x1b[31merror [E022]\x1b[0m: missing parameters in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -437,7 +437,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos) actualTy ->
+    EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos _procEndPos) actualTy ->
         let title = "\x1b[31merror [E023]\x1b[0m: parameter type mismatch in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -465,7 +465,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EFunctionCallExtraParams (funcId, params, Position funcPos) paramNumber ->
+    EFunctionCallExtraParams (funcId, params, Position funcPos _funcEndPos) paramNumber ->
         let title = "\x1b[31merror [E025]\x1b[0m: extra parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
@@ -482,7 +482,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
-    EFunctionCallMissingParams (funcId, params, Position funcPos) paramNumber ->
+    EFunctionCallMissingParams (funcId, params, Position funcPos _funcEndPos) paramNumber ->
         let title = "\x1b[31merror [E026]\x1b[0m: missing parameters in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
@@ -499,7 +499,7 @@ ppError toModuleAST (AnnError e (Position pos)) =
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
-    EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos) actualTy ->
+    EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos _funcEndPos) actualTy ->
         let title = "\x1b[31merror [E027]\x1b[0m: parameter type mismatch in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos

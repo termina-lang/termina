@@ -8,7 +8,7 @@ import Control.Monad.Reader
 import Data.Maybe
 import Data.Map
 import Generator.CodeGen.Common
-import Annotations
+import Utils.Annotations
 
 
 cBinOp :: Op -> CBinaryOp

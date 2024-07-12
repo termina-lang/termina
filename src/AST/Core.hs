@@ -6,11 +6,7 @@
 
 module AST.Core where
 
-import           Annotations
-
--- Parametric Emtpy Type
-data Empty a
-  deriving (Show, Functor)
+import Utils.Annotations
 
 data ReturnStmt' expr a
   = ReturnStmt
