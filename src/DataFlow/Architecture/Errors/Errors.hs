@@ -1,4 +1,4 @@
-module DataFlow.Program.Errors.Errors (
+module DataFlow.Architecture.Errors.Errors (
     ProgramError, annnotateError, Error(..)
 ) where
 

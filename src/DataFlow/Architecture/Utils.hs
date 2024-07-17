@@ -1,7 +1,7 @@
-module DataFlow.Program.Utils where
+module DataFlow.Architecture.Utils where
 
 import AST.Seman
-import DataFlow.Program.Types
+import DataFlow.Architecture.Types
 
 getEmmiterIdentifier :: TPEmitter a -> Identifier
 getEmmiterIdentifier (TPInterruptEmittter ident _) = ident

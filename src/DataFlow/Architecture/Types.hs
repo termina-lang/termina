@@ -1,4 +1,4 @@
-module DataFlow.Program.Types where
+module DataFlow.Architecture.Types where
 
 import Data.Map
 import AST.Seman
@@ -126,7 +126,7 @@ data TPPool a = TPPool
     a -- ^ annontations
    deriving Show
 
-data TerminaProgram a = TerminaProgram {
+data TerminaProgArch a = TerminaProgArch {
 
     -- Map of all the event emitters in the program
     emitters :: Map Identifier (TPEmitter a),

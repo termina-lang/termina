@@ -34,9 +34,9 @@ import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Errors.PPrinting (ppError)
-import DataFlow.Program
-import DataFlow.Program.Types
-import DataFlow.Program.Utils
+import DataFlow.Architecture
+import DataFlow.Architecture.Types
+import DataFlow.Architecture.Checks
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -283,28 +283,26 @@ printOptionHeaderFile destinationPath basicTypesOptionMap = do
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
 
-architectureCheck :: TypedProject -> TerminaProgram SemanticAnns -> [QualifiedName] -> IO (TerminaProgram SemanticAnns)
-architectureCheck typedProject initialTerminaProgram orderedDependencies = do
-  finalProgram <- architectureCheck' initialTerminaProgram orderedDependencies
-  warnEmittersNotConnected finalProgram
-  return finalProgram
+genArchitecture :: TypedProject -> TerminaProgArch SemanticAnns -> [QualifiedName] -> IO (TerminaProgArch SemanticAnns)
+genArchitecture typedProject initialTerminaProgram orderedDependencies = do
+  genArchitecture' initialTerminaProgram orderedDependencies
 
   where
 
-    architectureCheck' :: TerminaProgram SemanticAnns -> [QualifiedName] -> IO (TerminaProgram SemanticAnns)
-    architectureCheck' tp [] = pure tp
-    architectureCheck' tp (m:ms) = do
+    genArchitecture' :: TerminaProgArch SemanticAnns -> [QualifiedName] -> IO (TerminaProgArch SemanticAnns)
+    genArchitecture' tp [] = pure tp
+    genArchitecture' tp (m:ms) = do
       let typedModule = typedAST . metadata $ typedProject M.! m
-      let result = runArchitectureCheck tp typedModule
+      let result = runGenArchitecture tp typedModule
       case result of
         Left err -> die . errorMessage $ show err
-        Right tp' -> architectureCheck' tp' ms
+        Right tp' -> genArchitecture' tp' ms
 
-    warnEmittersNotConnected :: TerminaProgram SemanticAnns -> IO ()
-    warnEmittersNotConnected tp =
-      let emittersNotConnected = M.keys . M.filter ((`M.notMember` emitterTargets tp) . getEmmiterIdentifier) . emitters $ tp in
-      unless (null emittersNotConnected) $
-        putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show emittersNotConnected
+warnDisconnectedEmitters :: TerminaProgArch SemanticAnns -> IO ()
+warnDisconnectedEmitters tp =
+    let disconnectedEmitters = getDisconnectedEmitters tp in
+    unless (null disconnectedEmitters) $
+      putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show disconnectedEmitters
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
@@ -352,7 +350,8 @@ buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    _programArchitecture <- architectureCheck typedProject (getPlatformInitialProgram plt) orderedDependencies 
+    programArchitecture <- genArchitecture typedProject (getPlatformInitialProgram plt) orderedDependencies 
+    warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) typedProject

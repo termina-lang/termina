@@ -6,9 +6,9 @@ import qualified Data.Text as T
 import AST.Core
 import Semantic.Monad
 import Semantic.Types
-import DataFlow.Program.Types
+import DataFlow.Architecture.Types
 import qualified Data.Map as M
-import DataFlow.Program (emptyTerminaProgram)
+import DataFlow.Architecture (emptyTerminaProgArch)
 import Parser.Parsing
 
 data SupportedPlatform = 
@@ -30,10 +30,10 @@ getPlatformInitialGlobalEnv RTEMS5NoelSpike =
        ("irq_4", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt")))
     ]
 
-getPlatformInitialProgram :: SupportedPlatform -> TerminaProgram SemanticAnns
+getPlatformInitialProgram :: SupportedPlatform -> TerminaProgArch SemanticAnns
 getPlatformInitialProgram RTEMS5NoelSpike = 
-    emptyTerminaProgram {
-        emitters = M.union (emitters emptyTerminaProgram) $ M.fromList [
+    emptyTerminaProgArch {
+        emitters = M.union (emitters emptyTerminaProgArch) $ M.fromList [
             ("irq_1", TPInterruptEmittter "irq_1" (SemAnn Internal (GTy (GGlob (SEmitter (DefinedType "Interrupt")))))),
             ("irq_2", TPInterruptEmittter "irq_2" (SemAnn Internal (GTy (GGlob (SEmitter (DefinedType "Interrupt")))))),
             ("irq_3", TPInterruptEmittter "irq_3" (SemAnn Internal (GTy (GGlob (SEmitter (DefinedType "Interrupt")))))),

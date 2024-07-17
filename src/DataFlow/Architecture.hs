@@ -1,52 +1,42 @@
-module DataFlow.Program where
+module DataFlow.Architecture (
+    runGenArchitecture, emptyTerminaProgArch
+) where
 
-import DataFlow.Program.Types
+import DataFlow.Architecture.Types
 import Control.Monad.Except
-import DataFlow.Program.Errors.Errors
+import DataFlow.Architecture.Errors.Errors
 import qualified Control.Monad.State.Strict as ST
 import AST.Seman
 import Semantic.Monad
 import qualified Data.Map as M
 import Data.Maybe
-import DataFlow.Program.Utils
+import DataFlow.Architecture.Utils
 import Parser.Parsing
 import Semantic.Types
 
-type ProgramMonad = ExceptT ProgramError (ST.State (TerminaProgram SemanticAnns))
+type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnns))
 
-getTaskClass :: Identifier -> ProgramMonad (TypeDef SemanticAnns)
-getTaskClass ident = do
-  fromJust . M.lookup ident . taskClasses <$> ST.get
-
-getResourceClass :: Identifier -> ProgramMonad (TypeDef SemanticAnns)
-getResourceClass ident = do
-  fromJust . M.lookup ident . resourceClasses <$> ST.get
-
-getHandlerClass :: Identifier -> ProgramMonad (TypeDef SemanticAnns)
-getHandlerClass ident = do
-  fromJust . M.lookup ident . handlerClasses <$> ST.get
-
-typeDefinitionCheck :: TypeDef SemanticAnns -> ProgramMonad ()
-typeDefinitionCheck tydef@(Class TaskClass ident _ _ _) = 
+genArchTypeDef :: TypeDef SemanticAnns -> ArchitectureMonad ()
+genArchTypeDef tydef@(Class TaskClass ident _ _ _) = 
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tydef (taskClasses tp)
     }
-typeDefinitionCheck tydef@(Class HandlerClass ident _ _ _) = 
+genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = 
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident tydef (handlerClasses tp)
     }
-typeDefinitionCheck tydef@(Class ResourceClass ident _ _ _) = 
+genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = 
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident tydef (resourceClasses tp)
     }
-typeDefinitionCheck _ = return ()
+genArchTypeDef _ = return ()
 
-globalCheck :: Global SemanticAnns -> ProgramMonad ()
-globalCheck (Const {}) = return ()
-globalCheck (Emitter ident emitterCls _ _ ann) = do
+genArchGlobal :: Global SemanticAnns -> ArchitectureMonad ()
+genArchGlobal (Const {}) = return ()
+genArchGlobal (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
     (DefinedType "Interrupt") -> ST.modify $ \tp ->
       tp {
@@ -61,7 +51,7 @@ globalCheck (Emitter ident emitterCls _ _ ann) = do
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
     _ -> throwError $ annnotateError (location ann) (UnsupportedEmitterClass ident)
-globalCheck (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) _ tann) = do
+genArchGlobal (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) _ tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
@@ -104,8 +94,8 @@ globalCheck (Task ident (DefinedType tcls) (Just (StructInitializer assignments 
     }
 -- | Task declaration without struct initializer or a proper type specifier
 -- This should not happen, since a task must define at least one inbound port
-globalCheck (Task {}) = error "Internal error: invalid task declaration"
-globalCheck (Resource ident (DefinedType rcls) initializer _ rann) = 
+genArchGlobal (Task {}) = error "Internal error: invalid task declaration"
+genArchGlobal (Resource ident (DefinedType rcls) initializer _ rann) = 
   case initializer of
     Nothing -> ST.modify $ \tp ->
       tp {
@@ -126,23 +116,23 @@ globalCheck (Resource ident (DefinedType rcls) initializer _ rann) =
     -- This should not happen, since the type checker must not allow initializing a
     -- resource with anything other than a struct initializer 
     Just _ -> error "Internal error: resource initializer is not a struct initializer"
-globalCheck (Resource ident (Atomic aty) _ _ rann) = 
+genArchGlobal (Resource ident (Atomic aty) _ _ rann) = 
   ST.modify $ \tp ->
     tp {
       atomics = M.insert ident (TPAtomic ident aty rann)  (atomics tp)
     }
-globalCheck (Resource ident (AtomicArray aty size) _ _ rann) = 
+genArchGlobal (Resource ident (AtomicArray aty size) _ _ rann) = 
   ST.modify $ \tp ->
     tp {
       atomicArrays = M.insert ident (TPAtomicArray ident aty size rann) (atomicArrays tp)
     }
-globalCheck (Resource ident (Pool aty size) _ _ rann) = 
+genArchGlobal (Resource ident (Pool aty size) _ _ rann) = 
   ST.modify $ \tp ->
     tp {
       pools = M.insert ident (TPPool ident aty size rann) (pools tp)
     }
-globalCheck (Resource {}) = error "Internal error: invalid resource declaration"
-globalCheck (Handler ident (DefinedType hcls) (Just (StructInitializer assignments _ _)) _ hann) = do
+genArchGlobal (Resource {}) = error "Internal error: invalid resource declaration"
+genArchGlobal (Handler ident (DefinedType hcls) (Just (StructInitializer assignments _ _)) _ hann) = do
   members <- ST.get >>= \tp -> 
     case M.lookup hcls (handlerClasses tp) of
       Nothing -> error $ "Handler class: " ++ hcls ++ " not found"
@@ -176,21 +166,21 @@ globalCheck (Handler ident (DefinedType hcls) (Just (StructInitializer assignmen
     }
 -- | Handler declaration without struct initializer or a proper type specifier
 -- This should not happen, since a handler must define one sink port
-globalCheck (Handler {}) = error "Internal error: invalid handler declaration"
-globalCheck (Channel ident (MsgQueue mty size) _ _ cann) = 
+genArchGlobal (Handler {}) = error "Internal error: invalid handler declaration"
+genArchGlobal (Channel ident (MsgQueue mty size) _ _ cann) = 
   ST.modify $ \tp ->
     tp {
       channels = M.insert ident (TPMsgQueue ident mty size cann) (channels tp)
     }
-globalCheck (Channel {}) = error "Internal error: invalid channel declaration"
+genArchGlobal (Channel {}) = error "Internal error: invalid channel declaration"
 
-elementCheck :: AnnASTElement SemanticAnns -> ProgramMonad ()
-elementCheck (Function {}) = return ()
-elementCheck (GlobalDeclaration glb) = globalCheck glb
-elementCheck (TypeDefinition typeDef _) = typeDefinitionCheck typeDef
+genArchElement :: AnnASTElement SemanticAnns -> ArchitectureMonad ()
+genArchElement (Function {}) = return ()
+genArchElement (GlobalDeclaration glb) = genArchGlobal glb
+genArchElement (TypeDefinition typeDef _) = genArchTypeDef typeDef
 
-emptyTerminaProgram :: TerminaProgram SemanticAnns
-emptyTerminaProgram = TerminaProgram {
+emptyTerminaProgArch :: TerminaProgArch SemanticAnns
+emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
     ("system_init", TPSystemInitEmitter "system_init" (SemAnn Internal (GTy (GGlob (SEmitter (DefinedType "SystemInit"))))))
   ],
@@ -208,12 +198,12 @@ emptyTerminaProgram = TerminaProgram {
   channelTargets = M.empty
 }
 
-runArchitectureCheck :: 
-  TerminaProgram SemanticAnns 
+runGenArchitecture :: 
+  TerminaProgArch SemanticAnns 
   -> AnnotatedProgram SemanticAnns 
-  -> Either ProgramError (TerminaProgram SemanticAnns)
-runArchitectureCheck tp elements =
-  case flip ST.runState tp . runExceptT $ mapM_ elementCheck elements of
+  -> Either ProgramError (TerminaProgArch SemanticAnns)
+runGenArchitecture tp elements =
+  case flip ST.runState tp . runExceptT $ mapM_ genArchElement elements of
     (Left err, _) -> Left err
     (Right _, st) -> Right st
 
