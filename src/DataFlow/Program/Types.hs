@@ -7,19 +7,7 @@ import Semantic.Monad
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
 
-data TPSinkPort = TPSinkPort 
-    Identifier -- ^ port identifier
-    TypeSpecifier -- ^ data type specifier
-    Identifier -- ^ action to be executed
-  deriving Show
-
-data TPInputPort = TPInputPort
-    Identifier -- ^ port identifier
-    TypeSpecifier -- ^ data type specifier
-    Identifier -- ^ action to be executed
-  deriving Show
-
-data TPTask = TPTask {
+data TPTask a = TPTask {
 
     -- | Name of the task
     taskName :: Identifier,
@@ -30,37 +18,40 @@ data TPTask = TPTask {
     -- | Map of the input ports of the task
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port.
-    taskInputPortConns :: Map Identifier (TPInputPort, SemanticAnns),
-
-    -- | Map of the output ports of the task
-    -- It maps the name of the port to the name of channel
-    -- that is connected to the port.
-    taskOutputPortConns :: Map Identifier (Identifier, SemanticAnns),
+    taskInputPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the sink ports of the task
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port.
-    taskSinkPortConns :: Map Identifier (TPSinkPort, SemanticAnns),
+    taskSinkPortConns :: Map Identifier (Identifier, a),
+
+    -- | Map of the output ports of the task
+    -- It maps the name of the port to the name of channel
+    -- that is connected to the port.
+    taskOutputPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the access ports of the task
     -- It maps the name of the port to the name of the resource
     -- that is connected to the port.
-    taskAPConnections :: Map Identifier (Identifier, SemanticAnns),
+    taskAPConnections :: Map Identifier (Identifier, a),
 
-    taskSemAnns :: SemanticAnns -- ^ semantic annontations
+    taskAnns :: a -- ^ semantic annontations
     
 } deriving Show
 
-data TPEmitter = 
+data TPEmitter a = 
   TPInterruptEmittter 
     Identifier -- ^ emitter identifier
+    a -- ^ annotations
   | TPPeriodicTimerEmitter 
     Identifier -- ^ emitter identifier
+    a -- ^ annotations
   | TPSystemInitEmitter
     Identifier -- ^ emitter identifier
+    a -- ^ annotations
   deriving Show
 
-data TPResource = TPResource {
+data TPResource a = TPResource {
 
     -- | Name of the resource
     resourceName :: Identifier,
@@ -71,119 +62,100 @@ data TPResource = TPResource {
     -- | Map of the access ports of the resource
     -- It maps the name of the port to the name of the resource
     -- that is connected to the port.
-    resAPConnections :: Map Identifier (Identifier, SemanticAnns),
+    resAPConnections :: Map Identifier (Identifier, a),
 
-    resourceSemAnns :: SemanticAnns -- ^ semantic annontations
+    resourceAnns :: a -- ^ annotations
 
 } deriving Show
 
-data TPHandler = TPHandler {
+data TPHandler a = TPHandler {
+    
+    -- | Name of the handler
     handlerName :: Identifier,
+
+    -- | Class of the handler
     handlerClass :: Identifier,
-    handlerSinkPortConn :: (TPSinkPort, SemanticAnns),
-    handlerOutputPortConns :: Map Identifier (Identifier, SemanticAnns),
-    handlerAPConnections :: Map Identifier (Identifier, SemanticAnns),
-    handlerSemAnns :: SemanticAnns
+    
+    -- | Map of the input ports of the handler
+    -- It maps the name of the port to the name of the channel
+    -- that is connected to the port. It also conntains the
+    -- annotations associated with the port connection assignment.
+    handlerSinkPortConn :: (Identifier, Identifier, a),
+
+    -- | Map of the output ports of the handler
+    -- It maps the name of the port to the name of the channel
+    -- that is connected to the port. It also conntains the
+    -- annotations associated with the port connection assignment.
+    handlerOutputPortConns :: Map Identifier (Identifier, a),
+
+    -- | Map of the access ports of the handler
+    -- It maps the name of the port to the name of the resource
+    -- that is connected to the port. It also conntains the
+    -- annotations associated with the port connection assignment.
+    handlerAPConnections :: Map Identifier (Identifier, a),
+
+    -- | Annotations associated with the handler
+    handlerAnns :: a
+
 } deriving Show
 
-data TPAtomic = TPAtomic 
+data TPAtomic a = TPAtomic 
     Identifier -- ^ atomic identifier
     TypeSpecifier -- ^ data type specifier
+    a -- ^ annontations
   deriving Show
 
-data TPAtomicArray = TPAtomicArray 
+data TPAtomicArray a = TPAtomicArray 
     Identifier -- ^ atomic array identifier
     TypeSpecifier -- ^ data type specifier
     Size -- ^ size of the array
-    SemanticAnns -- ^ semantic annontations
+    a -- ^ annontations
   deriving Show
 
-data TPChannel = TPMsgQueue
+data TPChannel a = TPMsgQueue
     Identifier -- ^ message queue identifier
     TypeSpecifier -- ^ data type specifier
     Size -- ^ size of the message queue
-    SemanticAnns -- ^ semantic annontations
+    a -- ^ annontations
    deriving Show
 
-data TPPool = TPPool 
+data TPPool a = TPPool 
     Identifier -- ^ pool identifier
     TypeSpecifier -- ^ data type specifier
     Size -- ^ size of the pool
-    SemanticAnns -- ^ semantic annontations
+    a -- ^ annontations
    deriving Show
 
-data TPTaskClass = TPTaskClass {
-
-    taskClassName :: Identifier,
-
-    -- | Map of the input ports of the task class
-    -- It maps the name of the port to the name of the action
-    -- that is triggered when it receives a message through the port.
-    taskInputPorts :: Map Identifier (TypeSpecifier, Identifier),
-
-    -- | Map of the event sink ports of the task class
-    -- It maps the name of the port to the name of the action
-    -- that is triggered when the event source connected to the port
-    -- emits an event.
-    taskSinkPorts :: Map Identifier (TypeSpecifier, Identifier),
-
-    taskOutputPorts :: Map Identifier TypeSpecifier,
-
-    taskAccessPorts :: Map Identifier TypeSpecifier
-
-    -- In the future, we may need to include the full type definition
-
-} deriving Show
-
-data TPResourceClass = TPResourceClass {
-
-    resClassName :: Identifier,
-
-    resAccessPorts :: Map Identifier TypeSpecifier
-
-} deriving Show
-
-data TPHandlerClass = TPHandlerClass {
-
-    handlerClassName :: Identifier,
-
-    handlerSinkPort :: (TypeSpecifier, Identifier),
-
-    handlerOutputPorts :: Map Identifier TypeSpecifier,
-
-    handlerAccessPorts :: Map Identifier TypeSpecifier
-  
-} deriving Show
-
-data TerminaProgram = TerminaProgram {
+data TerminaProgram a = TerminaProgram {
 
     -- Map of all the event emitters in the program
-    emitters :: Map Identifier TPEmitter,
+    emitters :: Map Identifier (TPEmitter a),
 
     -- | Map of all the connected event emitters
     -- It maps the name of the emitter to the name of the task or
     -- handler and the name of the port that is connected to the emitter.
-    emitterTargets :: Map Identifier (Identifier, Identifier),
+    emitterTargets :: Map Identifier (Identifier, Identifier, a),
 
-    taskClasses :: Map Identifier TPTaskClass,
-    tasks :: Map Identifier TPTask,
+    taskClasses :: Map Identifier (TypeDef a),
+    tasks :: Map Identifier (TPTask a),
 
-    handlerClasses :: Map Identifier TPHandlerClass,
-    handlers :: Map Identifier TPHandler,
+    handlerClasses :: Map Identifier (TypeDef a),
+    handlers :: Map Identifier (TPHandler a),
 
-    resourceClasses :: Map Identifier TPResourceClass,
-    resources :: Map Identifier TPResource,
+    resourceClasses :: Map Identifier (TypeDef SemanticAnns),
 
-    pools :: Map Identifier TPPool,
-    atomics :: Map Identifier TPAtomic,
-    atomicArrays :: Map Identifier TPAtomicArray,
+    resources :: Map Identifier (TPResource a),
+
+    pools :: Map Identifier (TPPool a),
+    atomics :: Map Identifier (TPAtomic a),
+    atomicArrays :: Map Identifier (TPAtomicArray a),
 
     -- | Map of all the task classes in the program
-    channnels :: Map Identifier TPChannel,
+    channels :: Map Identifier (TPChannel a),
 
     -- | Map of all the connected channels
     -- It maps the name of the channel to the name of the task and the
     -- name of the port that is connected to the channel.
-    channelTargets :: Map Identifier (Identifier, Identifier)
+    channelTargets :: Map Identifier (Identifier, Identifier, a)
 
 } deriving Show

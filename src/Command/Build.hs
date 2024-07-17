@@ -14,7 +14,7 @@ import qualified Data.Text.Lazy.IO as TLIO
 import qualified AST.Parser as PAST
 import qualified AST.Seman as SAST
 
-import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv )
+import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv, getPlatformInitialProgram )
 import System.FilePath
 import System.Exit
 import System.Directory
@@ -34,6 +34,9 @@ import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Errors.PPrinting (ppError)
+import DataFlow.Program
+import DataFlow.Program.Types
+import DataFlow.Program.Utils
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -81,6 +84,9 @@ errorMessage msg = "\x1b[31merror\x1b[0m: " ++ msg
 debugMessage :: String -> String
 debugMessage msg = "\x1b[32mdebug\x1b[0m: " ++ msg
 
+warnMessage :: String -> String
+warnMessage msg = "\x1b[33mwarning\x1b[0m: " ++ msg
+
 -- | Load "termina.yaml" configuration file
 loadConfig :: IO TerminaYaml
 loadConfig = do
@@ -108,8 +114,8 @@ buildModuleName :: [String] -> IO QualifiedName
 buildModuleName [] = error . errorMessage $ "Internal parsing error: empty module name"
 buildModuleName [x] = die . errorMessage $ "Inalid module name \"" ++ show x ++ "\": modules cannot be at the root of the source folder"
 buildModuleName fs = buildModuleName' fs
-  
-  where 
+
+  where
 
     buildModuleName' :: [String] -> IO QualifiedName
     buildModuleName' [] = error . errorMessage $ "Internal parsing error: empty module name"
@@ -120,11 +126,11 @@ getModuleImports :: PAST.TerminaModule Annotation -> IO [FilePath]
 getModuleImports = mapM (buildModuleName . PAST.moduleIdentifier) . PAST.modules
 
 -- | Load Termina file 
-loadTerminaModule :: 
+loadTerminaModule ::
   -- | Path of the file to load
-  FilePath 
+  FilePath
   -- | Path of the source folder that stores the imported modules
-  -> FilePath 
+  -> FilePath
   -> IO ParsedModule
 loadTerminaModule filePath root = do
   let fullPath = root </> filePath <.> "fin"
@@ -188,23 +194,23 @@ typeModules parsedProject =
   typeModules' M.empty
 
   where
-  
+
     typeModules' :: TypedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
     typeModules' typedProject finalState [] = pure (typedProject, finalState)
     typeModules' typedProject prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
       let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
       case result of
-        (Left err) -> 
+        (Left err) ->
           let sourceFilesMap = sourcecode <$> parsedProject in
           ppError sourceFilesMap err >> exitFailure
         (Right (typedProgram, newState)) -> do
-          let typedModule = 
-                TerminaModuleData 
-                  (qualifiedName parsedModule) 
-                  (rootPath parsedModule) 
-                  (importedModules parsedModule) 
-                  (sourcecode parsedModule) 
+          let typedModule =
+                TerminaModuleData
+                  (qualifiedName parsedModule)
+                  (rootPath parsedModule)
+                  (importedModules parsedModule)
+                  (sourcecode parsedModule)
                   (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
 
@@ -220,7 +226,7 @@ useDefCheckModules = mapM_ useDefCheckModule . M.elems
         Just err -> die . errorMessage $ "Unsupported platform: \"" ++ show err
 
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
-optionMapModules = M.partitionWithKey 
+optionMapModules = M.partitionWithKey
                 (\k _ -> case k of
                   SAST.DefinedType {} -> False
                   _ -> True) . foldl' optionMapModule M.empty . M.elems
@@ -229,17 +235,17 @@ optionMapModules = M.partitionWithKey
     optionMapModule :: OptionMap -> TypedModule -> OptionMap
     optionMapModule prevMap typedModule = runMapOptionsAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
 
-printModules :: 
+printModules ::
   -- | Whether to include the option.h file or not
-  Bool 
+  Bool
   -- | The map with the option types to generate from defined types 
-  -> OptionMap 
+  -> OptionMap
   -- | The output folder 
-  -> FilePath 
+  -> FilePath
   -- | The project to generate the code from
   -> TypedProject -> IO ()
-printModules includeOptionH definedTypesOptionMap destinationPath = 
-  mapM_ printModule . M.elems 
+printModules includeOptionH definedTypesOptionMap destinationPath =
+  mapM_ printModule . M.elems
 
   where
 
@@ -276,6 +282,29 @@ printOptionHeaderFile destinationPath basicTypesOptionMap = do
   case runGenOptionHeaderFile basicTypesOptionMap of
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
+
+architectureCheck :: TypedProject -> TerminaProgram SemanticAnns -> [QualifiedName] -> IO (TerminaProgram SemanticAnns)
+architectureCheck typedProject initialTerminaProgram orderedDependencies = do
+  finalProgram <- architectureCheck' initialTerminaProgram orderedDependencies
+  warnEmittersNotConnected finalProgram
+  return finalProgram
+
+  where
+
+    architectureCheck' :: TerminaProgram SemanticAnns -> [QualifiedName] -> IO (TerminaProgram SemanticAnns)
+    architectureCheck' tp [] = pure tp
+    architectureCheck' tp (m:ms) = do
+      let typedModule = typedAST . metadata $ typedProject M.! m
+      let result = runArchitectureCheck tp typedModule
+      case result of
+        Left err -> die . errorMessage $ show err
+        Right tp' -> architectureCheck' tp' ms
+
+    warnEmittersNotConnected :: TerminaProgram SemanticAnns -> IO ()
+    warnEmittersNotConnected tp =
+      let emittersNotConnected = M.keys . M.filter ((`M.notMember` emitterTargets tp) . getEmmiterIdentifier) . emitters $ tp in
+      unless (null emittersNotConnected) $
+        putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show emittersNotConnected
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
@@ -322,6 +351,8 @@ buildCommand (BuildCmdArgs chatty) = do
     useDefCheckModules typedProject
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
+    when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
+    _programArchitecture <- architectureCheck typedProject (getPlatformInitialProgram plt) orderedDependencies 
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) typedProject
