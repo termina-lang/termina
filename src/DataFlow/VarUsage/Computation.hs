@@ -17,6 +17,7 @@ import Control.Monad.Except as E
 import qualified Data.Set as S
 -- Maps
 import qualified Data.Map.Strict as M
+import Utils.Annotations
 
 type VarSet = S.Set Identifier
 
@@ -151,7 +152,7 @@ removeUsed s st = st{usedSet = S.delete s (usedSet st)}
 
 ----------------------------------------
 -- This function checks we have not reached the limit of the data structure.
-safeAddUse :: Identifier -> UDM Errors ()
+safeAddUse :: Identifier -> UDM Error ()
 -- Add Variable to use set
 safeAddUse ident
   = do
@@ -159,7 +160,7 @@ safeAddUse ident
     unless (S.size usedSet < maxBound) (throwError SetMaxBound)
     putUSet $ unsafeAdd ident usedSet
 
-safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Errors ()
+safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Error ()
 safeAddUseOnlyOnce ident mv
   = do
     ooMap <- gets usedOption
@@ -173,7 +174,7 @@ safeAddUseOnlyOnce ident mv
         _ -> M.insert ident mv ooMap
 
 -- DynVar manipulation
-defDynVar, useDynVar :: Identifier -> UDM Errors ()
+defDynVar, useDynVar :: Identifier -> UDM Error ()
 defDynVar ident
   = gets usedDyn
   >>= \dynSet ->
@@ -193,14 +194,14 @@ useDynVar ident
     >> putDynSet (unsafeAdd ident dynSet)
 ----------------------------------------
 
-addUseOnlyOnce :: Identifier -> UDM Errors ()
+addUseOnlyOnce :: Identifier -> UDM Error ()
 addUseOnlyOnce ident
   = do
     ooMap <- gets usedOption
     when (M.member ident ooMap) (throwError (UsingTwice ident))
     safeAddUseOnlyOnce ident Used
 
-allocOO :: Identifier -> UDM Errors ()
+allocOO :: Identifier -> UDM Error ()
 allocOO ident
   =
   maybe
@@ -214,7 +215,7 @@ allocOO ident
         Defined -> throwError (AllocRedef ident);
         }) . M.lookup ident =<< gets usedOption
 
-defVariableOO :: Identifier -> UDM Errors ()
+defVariableOO :: Identifier -> UDM Error ()
 defVariableOO ident =
   maybe
     (throwError (NotUsed ident))
@@ -228,7 +229,7 @@ defVariableOO ident =
         }) . M.lookup ident =<< gets usedOption
 
 -- If we define a variable that was not used, then error.
-defVariable :: Identifier -> UDM Errors ()
+defVariable :: Identifier -> UDM Error ()
 defVariable ident =
   gets usedSet >>=
   \i ->
@@ -249,17 +250,12 @@ defVariable ident =
 -- Dyn variables have a special Use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- dyn.
-defArgumentsProc :: Parameter -> UDM Errors ()
+defArgumentsProc :: Parameter -> UDM Error ()
 defArgumentsProc ps
   = (case paramTypeSpecifier ps of
         DynamicSubtype _ -> defDynVar
         _ -> defVariable)
     (paramIdentifier ps)
-
-----------------------------------------
--- Annotation and error helper.
-annotateError :: Annotation -> UDM Errors a -> UDM AnnotatedErrors a
-annotateError an = withExceptT (annError an)
 
 ----------------------------------------
 -- Run computation and get its result.

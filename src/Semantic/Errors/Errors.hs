@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 -- | Module Encapsulating Semantic Errors
 
 module Semantic.Errors.Errors where
@@ -7,11 +8,12 @@ import AST.Parser
 -- import SemanAST as SAST
 import Semantic.Types
 import Parser.Parsing (Annotation)
+import Utils.Annotations
 
 ----------------------------------------
 -- Type checker error handling
 ----------------------------------------
-data Errors a
+data Error a
   -- | Expected /similar/ types?
   = 
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
@@ -214,10 +216,7 @@ data Errors a
   | EMsgQueueRcvWrongArgTy TypeSpecifier
   deriving Show
 
-data AnnotatedErrors a = AnnError {semError :: Errors a , annError :: a }
-  deriving Show
+type SemanticErrors = AnnotatedError (Error Annotation) Annotation
 
-annotateError :: a -> Errors a -> AnnotatedErrors a
-annotateError = flip AnnError
-
-type SemanticErrors = AnnotatedErrors Annotation
+instance Annotated (AnnotatedError (Error Annotation)) where
+  getAnnotation (AnnotatedError _err ann) = ann

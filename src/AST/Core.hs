@@ -19,9 +19,6 @@ data ReturnStmt' expr a
 instance Annotated (ReturnStmt' expr) where
   getAnnotation = returnAnnotation
 
-instance HAnnotated ReturnStmt' where
-  getHAnnotation = returnAnnotation
-
 -- | Integer representation.  
 -- A value of this type is used to indicate the representation in which the
 -- value was introduced. It will be later used by the code generator to generate

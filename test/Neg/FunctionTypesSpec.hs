@@ -9,13 +9,15 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors.Errors
 import AST.Seman
+import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Errors Annotation)
+
+runNegativeTest :: String -> Maybe (Error Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> Just $ semError err
+      Left err -> Just $ getError err
       Right _ -> Nothing
 
 test0 :: String
@@ -64,10 +66,10 @@ spec = do
           isEInvalidReturnType (Array UInt8 (K (TInteger 10 DecRepr)))
   
   where
-    isEInvalidParameterType :: Identifier -> TypeSpecifier -> Maybe (Errors Annotation) -> Bool
+    isEInvalidParameterType :: Identifier -> TypeSpecifier -> Maybe (Error Annotation) -> Bool
     isEInvalidParameterType ident ts = 
       \case Just (EInvalidParameterType (Parameter ident' ts')) -> ident == ident' && ts == ts'; _ -> False
     
-    isEInvalidReturnType :: TypeSpecifier -> Maybe (Errors Annotation) -> Bool
+    isEInvalidReturnType :: TypeSpecifier -> Maybe (Error Annotation) -> Bool
     isEInvalidReturnType ts = 
       \case Just (EInvalidReturnType ts') -> ts == ts'; _ -> False

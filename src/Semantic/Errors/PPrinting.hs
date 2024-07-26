@@ -17,6 +17,7 @@ import AST.Seman
 import Numeric
 import qualified Data.Map as M
 import Semantic.Types (SemanTypeDef)
+import Utils.Annotations
 
 class ShowText a where
     showText :: a -> T.Text
@@ -131,7 +132,7 @@ printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
 ppError :: M.Map FilePath TL.Text -> 
     SemanticErrors -> IO ()
-ppError toModuleAST (AnnError e (Position pos _endPos)) =
+ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
   let fileName = sourceName pos
       lineNumber = sourceLine pos
       lineColumn = sourceColumn pos
@@ -815,4 +816,4 @@ ppError toModuleAST (AnnError e (Position pos _endPos)) =
                 (Just "The function is not expected to return a value.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
-ppError _ (AnnError e pos) = putStrLn $ show pos ++ ": " ++ show e
+ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

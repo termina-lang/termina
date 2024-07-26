@@ -87,12 +87,12 @@ catchMismatch ::
   -- | Location of the error
   Parser.Annotation 
   -- | Function to create the error
-  -> (TypeSpecifier -> Errors Parser.Annotation) 
+  -> (TypeSpecifier -> Error Parser.Annotation) 
   -- | Action to execute
   -> SemanticMonad a 
   -- | Action to execute
   -> SemanticMonad a
-catchMismatch ann ferror action = catchError action (\err -> case semError err of
+catchMismatch ann ferror action = catchError action (\err -> case getError err of
   EMismatch _ ty -> throwError $ annotateError ann (ferror ty)
   _ -> throwError err)
 
@@ -426,9 +426,9 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameTypeExpressions :: 
       (TypeSpecifier -> Bool)
       -- | Left hand side error constructor
-      -> (TypeSpecifier -> Errors Parser.Annotation)
+      -> (TypeSpecifier -> Error Parser.Annotation)
       -- | Right hand side error constructor
-      -> (TypeSpecifier -> Errors Parser.Annotation)
+      -> (TypeSpecifier -> Error Parser.Annotation)
       -- | Left hand side expression
       -> Expression Parser.Annotation 
       -- | Right hand side expression
@@ -438,7 +438,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameTypeExpressions isValid lerror rerror lnume rnume = do
       tyle <- catchError 
         (typeExpression Nothing typeObj lnume)
-        (\err -> case semError err of
+        (\err -> case getError err of
           -- | If the type of the left hand side is unknown, then we must
           -- check the right hand side. This could be implemented in a more
           -- efficient way, but for now, we will check the right hand side and
@@ -923,8 +923,8 @@ typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
   where
     typeCondExpr :: Expression Parser.Annotation -> SemanticMonad (SAST.Expression SemanticAnns)
     typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr)
-      (\err -> case semError err of
-        EMismatch Bool ty -> throwError $ annotateError (annError err) $ EIfElseIfCondNotBool ty
+      (\err -> case getError err of
+        EMismatch Bool ty -> throwError $ annotateError (getAnnotation err) $ EIfElseIfCondNotBool ty
         _ -> throwError err
       )
 -- Here we could implement some abstract interpretation analysis
@@ -1358,7 +1358,7 @@ enumDefinitionTy ann ev
   where
     ev_tys = assocData ev
 
-checkUniqueNames :: Locations -> ([Identifier] -> Errors Locations) -> [Identifier] -> SemanticMonad ()
+checkUniqueNames :: Locations -> ([Identifier] -> Error Locations) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))

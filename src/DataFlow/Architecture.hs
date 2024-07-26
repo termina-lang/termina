@@ -13,6 +13,7 @@ import Data.Maybe
 import DataFlow.Architecture.Utils
 import Parser.Parsing
 import Semantic.Types
+import Utils.Annotations
 
 type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnns))
 
@@ -50,7 +51,7 @@ genArchGlobal (Emitter ident emitterCls _ _ ann) = do
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
-    _ -> throwError $ annnotateError (location ann) (UnsupportedEmitterClass ident)
+    _ -> throwError $ annotateError (location ann) (UnsupportedEmitterClass ident)
 genArchGlobal (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) _ tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
@@ -68,7 +69,7 @@ genArchGlobal (Task ident (DefinedType tcls) (Just (StructInitializer assignment
                   }
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annnotateError (location cann) (DuplicatedChannelConnection target (location prevcann))
+                throwError $ annotateError (location cann) (DuplicatedChannelConnection target (location prevcann))
           SinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
@@ -80,7 +81,7 @@ genArchGlobal (Task ident (DefinedType tcls) (Just (StructInitializer assignment
                   }
                 return (inp, M.insert pname (target, cann) sink, outp, accp)
               Just (_, _, prevcann) -> 
-                throwError $ annnotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
+                throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann -> 
         return (inp, sink, M.insert pname (target, cann) outp, accp)
@@ -152,7 +153,7 @@ genArchGlobal (Handler ident (DefinedType hcls) (Just (StructInitializer assignm
                   }
                 return (Just (pname, target, cann), outp, accp)
               Just (_, _, prevcann) -> 
-                throwError $ annnotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
+                throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann -> 
         return (sink, M.insert pname (target, cann) outp, accp)

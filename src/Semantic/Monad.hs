@@ -323,14 +323,14 @@ insertGlobalFun :: Locations -> Identifier -> [Parameter] -> TypeSpecifier -> Se
 insertGlobalFun loc ident ps rettype =
   insertGlobal ident (loc `SemAnn` GFun ps rettype) (EUsedFunName ident)
 
-insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Locations -> Errors Locations) -> SemanticMonad ()
+insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Locations -> Error Locations) -> SemanticMonad ()
 insertGlobal ident entry err =
   glbWhereIsDefined ident >>=
   \case
     { Just l -> throwError (annotateError (location entry) (err l)) ;
       Nothing -> modify (\s -> s{global = M.insert ident entry (global s)}) ;
     }
-  -- if b then throwError (annotateError (location entry) err)
+  -- if b then throwError (annotateError (location entry) getError)
   -- else
 
 insertLocalVariables :: Locations -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
@@ -354,13 +354,13 @@ getConst loc ident = do
     catchError (getGlobalEntry loc ident)
         (\errorGlobal ->
             -- | We have not found a global object with the name |ident|
-            case semError errorGlobal of {
+            case getError errorGlobal of {
               ENotNamedGlobal _ ->
                 -- | If we have not found a global object with the name |ident|, then check the local objects.
                 -- Any path that goes through here is an error.
                 catchError (getLocalObjTy loc ident)
                 (\errorLocal ->
-                  case semError errorLocal of {
+                  case getError errorLocal of {
                     ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
                     _ -> throwError errorLocal;
                   }) >>
@@ -399,14 +399,14 @@ getLHSVarTy loc ident =
   catchError (getLocalObjTy loc ident >>= (\(ak, ts) -> return (ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
-      case semError errorLocal of {
+      case getError errorLocal of {
         ENotNamedObject _ ->
           catchError (getConst loc ident)
           (\errorRO ->
-            case semError errorRO of {
+            case getError errorRO of {
               ENotConstant _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
-                  case semError errorGlobal of {
+                  case getError errorGlobal of {
                     ENotNamedGlobal _ -> 
                       throwError $ annotateError loc (ENotNamedObject ident);
                     _  -> throwError errorGlobal;
@@ -423,14 +423,14 @@ getRHSVarTy loc ident =
     (getLocalObjTy loc ident >>= (\(ak, ts) -> return (ak, ts)))
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
-      case semError errorLocal of {
+      case getError errorLocal of {
         ENotNamedObject _ ->
           catchError (getConst loc ident >>= (\(ts, _) -> return (Immutable, ts)))
           (\errorRO ->
-            case semError errorRO of {
+            case getError errorRO of {
               ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
-                  case semError errorGlobal of {
+                  case getError errorGlobal of {
                     ENotNamedGlobal errvar ->
                     if errvar == ident then
                       throwError $ annotateError loc (ENotNamedObject ident);
@@ -450,7 +450,7 @@ getRHSVarTy loc ident =
 getGlobalVarTy loc ident =
   catchError (getGlobalEntry loc ident)
              (\errorGlobal ->
-                case semError errorGlobal of {
+                case getError errorGlobal of {
                   ENotNamedGlobal errvar ->
                     if errvar == ident then
                       throwError $ annotateError loc (ENotNamedObject ident);

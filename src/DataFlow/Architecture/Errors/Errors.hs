@@ -1,9 +1,10 @@
 module DataFlow.Architecture.Errors.Errors (
-    ProgramError, annnotateError, Error(..)
+    ProgramError, Error(..)
 ) where
 
 import AST.Seman
 import Parser.Parsing
+import Utils.Annotations
 
 data Error a = 
     -- | Error when the task is not defined
@@ -12,12 +13,4 @@ data Error a =
     | UnsupportedEmitterClass Identifier
     deriving Show
 
-data AnnotatedError a = 
-    AnnotatedError {
-        location :: a , error :: Error a }
-  deriving Show
-
-annnotateError :: a -> Error a -> AnnotatedError a
-annnotateError = AnnotatedError
-
-type ProgramError = AnnotatedError Annotation
+type ProgramError = AnnotatedError (Error Annotation) Annotation

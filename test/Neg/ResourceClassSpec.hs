@@ -9,13 +9,14 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors.Errors
 import AST.Seman
+import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Errors Annotation)
+runNegativeTest :: String -> Maybe (Error Annotation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> Just $ semError err
+      Left err -> Just $ getError err
       Right _ -> Nothing
 
 test0 :: String
@@ -231,32 +232,32 @@ spec = do
   
   where
 
-    isEResourceClassNoProvides :: Maybe (Errors Annotation) -> Bool
+    isEResourceClassNoProvides :: Maybe (Error Annotation) -> Bool
     isEResourceClassNoProvides = \case Just (EResourceClassNoProvides "id0") -> True; _ -> False
 
-    isEResourceClassAction :: Maybe (Errors Annotation) -> Bool
+    isEResourceClassAction :: Maybe (Error Annotation) -> Bool
     isEResourceClassAction = \case Just (EResourceClassAction ("TMChannel", Position {}) "send_packet") -> True; _ -> False
 
-    isEResourceClassInPort :: Maybe (Errors Annotation) -> Bool
+    isEResourceClassInPort :: Maybe (Error Annotation) -> Bool
     isEResourceClassInPort = \case Just (EResourceClassInPort ("TMChannel", Position {}) "input_msg") -> True; _ -> False
 
-    isEResourceClassOutPort :: Maybe (Errors Annotation) -> Bool
+    isEResourceClassOutPort :: Maybe (Error Annotation) -> Bool
     isEResourceClassOutPort = \case Just (EResourceClassOutPort ("TMChannel", Position {}) "output_msg") -> True; _ -> False
 
-    isEInterfaceNotFound :: Maybe (Errors Annotation) -> Bool
+    isEInterfaceNotFound :: Maybe (Error Annotation) -> Bool
     isEInterfaceNotFound = \case Just (EInterfaceNotFound "TMChannelInterface") -> True; _ -> False
 
-    isEProcedureNotFromProvidedInterfaces :: Maybe (Errors Annotation) -> Bool
+    isEProcedureNotFromProvidedInterfaces :: Maybe (Error Annotation) -> Bool
     isEProcedureNotFromProvidedInterfaces = \case Just (EProcedureNotFromProvidedInterfaces ("TMChannel", Position {}) "send_packet") -> True; _ -> False
   
-    isEMissingProcedure :: Maybe (Errors Annotation) -> Bool
+    isEMissingProcedure :: Maybe (Error Annotation) -> Bool
     isEMissingProcedure = \case Just (EMissingProcedure "TMChannelInterface" "send_packet") -> True; _ -> False
 
-    isEProcedureExtraParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureExtraParams :: Maybe (Error Annotation) -> Bool
     isEProcedureExtraParams = \case Just (EProcedureExtraParams ("TMChannelInterface", "send_packet", [], Position {}) 1) -> True; _ -> False
 
-    isEProcedureMissingParams :: Maybe (Errors Annotation) -> Bool
+    isEProcedureMissingParams :: Maybe (Error Annotation) -> Bool
     isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [Parameter "input" UInt32], Position {}) 0) -> True; _ -> False
 
-    isEProcedureParamMismatch :: Maybe (Errors Annotation) -> Bool
+    isEProcedureParamMismatch :: Maybe (Error Annotation) -> Bool
     isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position {}) (Reference Mutable UInt16)) -> True; _ -> False

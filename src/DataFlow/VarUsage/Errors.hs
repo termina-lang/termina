@@ -10,8 +10,9 @@ import DataFlow.VarUsage.Types
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
+import Utils.Annotations
 
-data Errors
+data Error
   = SetMaxBound
   | MapMaxBound
   | ImpossibleError
@@ -42,9 +43,4 @@ data Errors
   -- vv| NotUsedDyn Identifier
   deriving Show
 
-data AnnotatedErrors
-  = AnErrors {location :: Annotation , err :: Errors}
-  deriving Show
-
-annError :: Annotation -> Errors -> AnnotatedErrors
-annError = AnErrors
+type VarUsageError = AnnotatedError Error Annotation
