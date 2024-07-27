@@ -37,5 +37,5 @@ getError (AnnotatedError err _ann) = err
 annotateError :: b -> a -> AnnotatedError a b
 annotateError = flip AnnotatedError
 
-withAnnotation :: Functor m => b -> ExceptT e m a -> ExceptT (AnnotatedError e b) m a
-withAnnotation ann = withExceptT (annotateError ann)
+withLocation :: Functor m => b -> ExceptT e m a -> ExceptT (AnnotatedError e b) m a
+withLocation ann = withExceptT (annotateError ann)

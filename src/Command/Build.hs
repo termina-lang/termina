@@ -223,7 +223,7 @@ useDefCheckModules = mapM_ useDefCheckModule . M.elems
       let result = runUDAnnotatedProgram . typedAST . metadata $ typedModule in
       case result of
         Nothing -> return ()
-        Just err -> die . errorMessage $ "Unsupported platform: \"" ++ show err
+        Just err -> die . errorMessage $ show err
 
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
 optionMapModules = M.partitionWithKey

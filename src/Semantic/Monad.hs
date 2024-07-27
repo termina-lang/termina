@@ -170,8 +170,8 @@ getSemanticAnn = element
 forgetSemAnn :: SemanticAnn -> Location
 forgetSemAnn = location
 
-getTypeSAnns :: SemanticAnn -> Maybe TypeSpecifier
-getTypeSAnns  = getResultingType . getSemanticAnn
+getTypeSemAnn :: SemanticAnn -> Maybe TypeSpecifier
+getTypeSemAnn  = getResultingType . getSemanticAnn
 
 undynExpType :: ESeman -> ESeman
 undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty

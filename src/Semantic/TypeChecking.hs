@@ -40,8 +40,6 @@ import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Parsing as Parser
 
-type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnn)
-
 catchMismatch :: 
   -- | Location of the error
   Parser.Annotation 
@@ -167,7 +165,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
                   typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
-                  fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSAnns anns)
+                  fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
           ;

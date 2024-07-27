@@ -30,15 +30,8 @@ import qualified Data.Map.Strict      as M
 -- AST to work with.
 import           AST.Seman            as SAST
 -- We need to know the type of objects.
-import Semantic.Monad as SM (SemanticAnn, getResultingType, getTypeSAnns, getObjectSAnns, getSemanticAnn)
+import Semantic.Monad as SM (SemanticAnn, getResultingType, getTypeSemAnn, getObjectSAnns, getSemanticAnn)
 
-
---import Debug.Termina
-
--- Constant expression could be global variables, should we check they are used
--- too?
-useConstE :: ConstExpression a -> UDM VarUsageError ()
-useConstE = const (return ())
 
 -- There are two types of arguments :
 -- + Moving out variables of type dyn and Option<dyn T>
@@ -47,14 +40,14 @@ useConstE = const (return ())
 useArguments :: Expression SM.SemanticAnn -> UDM VarUsageError ()
 -- If we are giving a variable of type Dyn, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
-  = case SM.getTypeSAnns ann of
+  = case SM.getTypeSemAnn ann of
      Just (DynamicSubtype _) ->
-       withAnnotation (location ann) $ useDynVar ident
+       withLocation (location ann) $ useDynVar ident
      _ -> useExpression e
 -- Dyn variables inside expressions are read as values.
 useArguments e = useExpression e
 
-useObject, defObject :: Object SM.SemanticAnn -> UDM VarUsageError ()
+useObject :: Object SM.SemanticAnn -> UDM VarUsageError ()
 useObject (Variable ident ann)
   =
   let loc = location ann in
@@ -66,12 +59,12 @@ useObject (Variable ident ann)
                 ;
             -- We can use Options only once!
                 Option (DynamicSubtype _) ->
-                withAnnotation loc $ addUseOnlyOnce ident
+                withLocation loc $ addUseOnlyOnce ident
                 ;
             -- Mutable Options??
                 _ ->
-                withAnnotation loc $ safeAddUse ident
-        }) (SM.getTypeSAnns ann)
+                withLocation loc $ safeAddUse ident
+        }) (SM.getTypeSemAnn ann)
 useObject (ArrayIndexExpression obj e _ann)
   = useObject obj >> useExpression e
 useObject (MemberAccess obj _i _ann)
@@ -79,29 +72,12 @@ useObject (MemberAccess obj _i _ann)
 useObject (Dereference obj _ann)
   = useObject obj
 useObject (DereferenceMemberAccess obj i ann)
-  = withAnnotation (location ann) (safeAddUse i)
+  = withLocation (location ann) (safeAddUse i)
   >> useObject obj
 useObject (ArraySlice obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
 -- TODO Use Object undyn?
 useObject (Undyn obj _ann)
-  = useObject obj
-
-defObject (Variable ident ann)
-  = withAnnotation (location ann) $ defVariable ident
-defObject (ArrayIndexExpression obj e _ann)
-  = useExpression e
-  >> useObject obj
-defObject (MemberAccess obj _i _ann)
-  = useObject obj
-defObject (Dereference obj _ann)
-  = useObject obj
-defObject (DereferenceMemberAccess obj i ann)
-  = withAnnotation (location ann) (safeAddUse i)
-  >> useObject obj
-defObject (ArraySlice obj eB eT _ann)
-  = useObject obj >> useExpression eB >> useExpression eT
-defObject (Undyn obj _ann)
   = useObject obj
 
 useFieldAssignment :: FieldAssignment SM.SemanticAnn -> UDM VarUsageError ()
@@ -131,10 +107,10 @@ useExpression (ArraySliceExpression _aK obj _size _ann)
   = useObject obj
 useExpression (MemberFunctionCall obj ident args ann) = do
     useObject obj
-    obj_type <- withAnnotation (location ann) (getObjectType obj)
+    obj_type <- withLocation (location ann) (getObjectType obj)
     case obj_type  of
       (_, AccessPort (Allocator {})) ->
-        withAnnotation (location ann) (case ident of
+        withLocation (location ann) (case ident of
           "alloc" -> do
             case args of
               -- I don't think we can have expression computing variables here.
@@ -150,12 +126,12 @@ useExpression (MemberFunctionCall obj ident args ann) = do
           "send" -> do
             case args of
               [AccessObject input_obj@(Variable var _)] -> do
-                  input_obj_type <- withAnnotation (location ann) (getObjectType input_obj)
+                  input_obj_type <- withLocation (location ann) (getObjectType input_obj)
                   case input_obj_type of
-                    (_, DynamicSubtype _) -> withAnnotation (location ann) (useDynVar var)
+                    (_, DynamicSubtype _) -> withLocation (location ann) (useDynVar var)
                     _ -> useObject input_obj
-              _ -> withAnnotation (location ann) (throwError ImpossibleErrorBadSendArg)
-          _ -> withAnnotation (location ann) $ throwError ImpossibleError -- OutPorts only have send
+              _ -> withLocation (location ann) (throwError ImpossibleErrorBadSendArg)
+          _ -> withLocation (location ann) $ throwError ImpossibleError -- OutPorts only have send
       -- TODO Can Dyn be passed around as arguments?
       _ -> mapM_ useArguments args
 useExpression (DerefMemberFunctionCall obj _ident args _ann)
@@ -189,7 +165,7 @@ useDefStmt :: Statement SM.SemanticAnn -> UDM VarUsageError ()
 useDefStmt (Declaration ident _accK tyS initE ann)
   -- variable def is defined
   =
-  withAnnotation (location ann)
+  withLocation (location ann)
   (case tyS of
     -- Dynamic are only declared on match statements
     Option (DynamicSubtype _) -> defVariableOO ident
@@ -202,8 +178,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e _ann)
   -- DONE [UseDef.Report.Q1]
-  = defObject obj
-  >> useExpression e
+  = useExpression e
   >> useObject obj
 useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   = do
@@ -314,7 +289,7 @@ destroyOptionDyn (ml, mr)
   in
     (useDefBlock (matchBody mOpt)
       >>
-     withAnnotation (location (matchAnnotation mOpt)) (defDynVar (head (matchBVars mOpt)))
+     withLocation (location (matchAnnotation mOpt)) (defDynVar (head (matchBVars mOpt)))
      >> get
     , useDefBlock (matchBody mNone) >> get)
 
@@ -322,7 +297,7 @@ destroyOptionDyn (ml, mr)
 useMCase :: MatchCase SM.SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBlock blk
-  >> withAnnotation (location ann) (mapM_ defVariable bvars)
+  >> withLocation (location ann) (mapM_ defVariable bvars)
 
 sameMaps :: [OOVarSt] -> Bool
 sameMaps [] = False
@@ -334,19 +309,19 @@ sameSets (x:xs) = all (S.null . S.difference x) xs
 
 useDefCMemb :: ClassMember SM.SemanticAnn -> UDM VarUsageError ()
 useDefCMemb (ClassField fdef ann)
-  = withAnnotation (location ann) (defVariable (fieldIdentifier fdef))
+  = withLocation (location ann) (defVariable (fieldIdentifier fdef))
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
   = useDefBlock blk
-  >> mapM_ (withAnnotation (location ann) . defArgumentsProc) ps
+  >> mapM_ (withLocation (location ann) . defArgumentsProc) ps
   -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (withAnnotation (location ann) . defVariable . paramIdentifier) ps
+  >> mapM_ (withLocation (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (withAnnotation (location ann) . defArgumentsProc) [p]
+  >> mapM_ (withLocation (location ann) . defArgumentsProc) [p]
 
 useDefTypeDef :: TypeDef SM.SemanticAnn -> UDM VarUsageError ()
 useDefTypeDef (Class _k _id members _provides _mods)
@@ -370,7 +345,7 @@ useDefTypeDef (Enum {}) = return ()
 useDefFrag :: AnnASTElement SM.SemanticAnn -> UDM VarUsageError ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ (withAnnotation (location anns) . defArgumentsProc ) ps
+ >> mapM_ (withLocation (location anns) . defArgumentsProc ) ps
  -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()
