@@ -9,7 +9,7 @@ import Semantic.Types
 import DataFlow.Architecture.Types
 import qualified Data.Map as M
 import DataFlow.Architecture (emptyTerminaProgArch)
-import Parser.Parsing
+import Utils.Annotations
 
 data SupportedPlatform = 
     RTEMS5NoelSpike

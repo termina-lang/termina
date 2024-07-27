@@ -15,6 +15,7 @@ import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map as M
 import Control.Monad.Reader (runReaderT)
+import Utils.Annotations
 
 
 genModuleDefineLabel :: QualifiedName -> String

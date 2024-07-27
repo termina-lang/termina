@@ -4,7 +4,6 @@ module Generator.CodeGen.Application.Option where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
-import Parser.Parsing
 import Control.Monad.Reader
 import System.Path
 import Generator.CodeGen.TypeDefinition
@@ -12,6 +11,7 @@ import Semantic.Monad
 import qualified Data.Set as S
 import qualified Data.Map as M
 import AST.Seman
+import Utils.Annotations
 
 genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")

@@ -11,7 +11,7 @@ import Generator.CodeGen.Statement
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad.Reader
-import Parser.Parsing
+import Utils.Annotations
 
 filterStructModifiers :: [Modifier] -> [Modifier]
 filterStructModifiers = filter (\case

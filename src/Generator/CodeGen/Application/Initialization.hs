@@ -4,7 +4,6 @@ module Generator.CodeGen.Application.Initialization where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
-import Parser.Parsing
 import System.FilePath
 import Semantic.Monad
 import AST.Seman
@@ -12,6 +11,7 @@ import Generator.CodeGen.Statement
 import Modules.Modules
 import qualified Data.Map as M
 import Control.Monad.Reader (runReaderT)
+import Utils.Annotations
 
 genInitializeObj :: Bool -> Global SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ ann) = do

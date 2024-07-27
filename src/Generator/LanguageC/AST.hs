@@ -1,8 +1,8 @@
 module Generator.LanguageC.AST where
 import Prettyprinter
-import Semantic.Monad
 import Numeric
 import Data.Char
+import Utils.Annotations
 
 type Ident = String
 
@@ -358,7 +358,7 @@ data CItemAnn =
 
 data CAnns = CAnnotations
   {
-    location :: Locations,
+    location :: Location,
     itemAnnotation :: CItemAnn
   }
   deriving (Show)

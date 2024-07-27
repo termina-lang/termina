@@ -9,7 +9,6 @@ import Semantic.Errors.Errors
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TL
-import Parser.Parsing
 import Text.Parsec.Pos
 import Errata
 import Errata.Styles

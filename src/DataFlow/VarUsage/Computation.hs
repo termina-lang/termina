@@ -3,7 +3,6 @@
 module DataFlow.VarUsage.Computation where
 
 import AST.Core (Identifier,Parameter(..),TypeSpecifier(..))
-import Parser.Parsing (Annotation)
 
 import DataFlow.VarUsage.Errors
 import DataFlow.VarUsage.Types
@@ -17,7 +16,6 @@ import Control.Monad.Except as E
 import qualified Data.Set as S
 -- Maps
 import qualified Data.Map.Strict as M
-import Utils.Annotations
 
 type VarSet = S.Set Identifier
 

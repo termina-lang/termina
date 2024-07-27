@@ -17,9 +17,6 @@ import qualified Data.Map.Strict as M
 -- Termina Semantic AST
 import qualified AST.Seman as SAST
 
--- Just annotations from Parser
-import qualified Parser.Parsing              as Parser (Annotation (..))
-
 ----------------------------------------
 -- Internal modules to the semantic phase.
 -- Interpretation of types
@@ -41,47 +38,9 @@ import Data.Maybe
 -- import Control.Monad.State as ST
 import Control.Monad
 import qualified Control.Monad.State.Strict as ST
+import qualified Parser.Parsing as Parser
 
 type SemanticPass t = t Parser.Annotation -> SemanticMonad (t SemanticAnns)
-
-----------------------------------------
--- Function type-checking binary operations.
--- It returns resulting type of using an operation.
-
-
--- | Type assignment list of param expressions. 
--- This function performs the following operations:
--- - It types the expressions that make up the call argument list of a function.
--- - It checks that the type of each of the arguments matches the type set in the function definition.
-{--typeArguments ::
-  -- | Annotation of the function call
-  Parser.Annotation
-  -- | List of parameters
-  -> [Parameter]
-  -- | List of arguments of the function call
-  -> [Expression Parser.Annotation]
-  -> SemanticMonad [SAST.Expression SemanticAnns]
-typeArguments _ann [] [] = return []
-typeArguments ann (p : ps) (a : as) =
-  typeExpression (Just (paramTypeSpecifier p)) typeRHSObject a
-  >>= \tyed_exp -> (tyed_exp :) <$> typeArguments ann ps as
-typeArguments ann (_p : _) [] = throwError $ annotateError ann EFunParams
-typeArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams 
-
-typeConstArguments ::
-  -- | Annotation of the function call
-  Parser.Annotation
-  -- | List of parameters
-  -> [ConstParameter]
-  -- | List of arguments of the function call
-  -> [ConstExpression Parser.Annotation]
-  -> SemanticMonad [SAST.ConstExpression SemanticAnns]
-typeConstArguments _ann [] [] = return []
-typeConstArguments ann (p : ps) (a : as) =
-  typeConstExpression (paramTypeSpecifier $ unConstParam p) a
-  >>= \tyed_exp -> (tyed_exp :) <$> typeConstArguments ann ps as
-typeConstArguments ann (_p : _) [] = throwError $ annotateError ann EFunParams
-typeConstArguments ann [] (_a : _) = throwError $ annotateError ann EFunParams --}
 
 catchMismatch :: 
   -- | Location of the error
@@ -237,63 +196,63 @@ typeMemberFunctionCall ann obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool))), Parser.Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool))), Builtin))
                 (typeExpression (Just (Reference Mutable (Option (DynamicSubtype ty_pool)))) typeRHSObject opt)
               return (([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Parser.Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Parser.Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [element] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (DynamicSubtype ty_pool), Parser.Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (DynamicSubtype ty_pool), Builtin))
                 (typeExpression (Just (DynamicSubtype ty_pool)) typeRHSObject element)
               return (([Parameter "element" (DynamicSubtype ty_pool)], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Parser.Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Parser.Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicAccess ty_atomic) ->
       case ident of
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Parameter "retval" (Reference Mutable ty_atomic), Parser.Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Parameter "retval" (Reference Mutable ty_atomic), Builtin))
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
               return (([Parameter "retval" (Reference Mutable ty_atomic)], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
         "store" ->
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", Parameter "value" ty_atomic, Parser.Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", Parameter "value" ty_atomic, Builtin))
                 (typeExpression (Just ty_atomic) typeRHSObject value)
               return (([Parameter "value" ty_atomic], [typed_value]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [Parameter "value" ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "index" USize, Parser.Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "index" USize, Builtin))
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "retval" (Reference Mutable ty_atomic), Parser.Builtin))
+              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "retval" (Reference Mutable ty_atomic), Builtin))
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
               return (([Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], [typed_idx, typed_ref]), Unit)
             _ -> if length args < 2 then 
-              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Parser.Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
         "store_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "index" USize, Parser.Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "index" USize, Builtin))
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "value" ty_atomic, Parser.Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "value" ty_atomic, Builtin))
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
               return (([Parameter "index" USize, Parameter "value" ty_atomic], [typed_idx, typed_value]), Unit)
             _ -> if length args < 2 then 
-              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Parser.Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     OutPort ty ->
       case ident of
@@ -1062,7 +1021,7 @@ typeGlobal (Const ident ty expr mods anns) = do
       -- TODO: Check that the types match
       return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
 
-checkParameterType :: Locations -> Parameter -> SemanticMonad ()
+checkParameterType :: Location -> Parameter -> SemanticMonad ()
 checkParameterType anns p =
     let typeSpec = paramTypeSpecifier p in
      -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
@@ -1070,7 +1029,7 @@ checkParameterType anns p =
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
     checkTypeSpecifier anns typeSpec
 
-checkReturnType :: Locations -> TypeSpecifier -> SemanticMonad ()
+checkReturnType :: Location -> TypeSpecifier -> SemanticMonad ()
 checkReturnType anns ty =
   unless (returnValueTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
   checkTypeSpecifier anns ty
@@ -1119,10 +1078,10 @@ semanticTypeDef (Interface i cls m) = Interface i cls m
 
 
 -- | This function type checks the members of a class depending on its kind.
-checkClassKind :: Locations -> Identifier -> ClassKind
+checkClassKind :: Location -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnns],
-      [PAST.ClassMember Locations],
-      [PAST.ClassMember Locations])
+      [PAST.ClassMember Location],
+      [PAST.ClassMember Location])
   -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
 checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
@@ -1163,7 +1122,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
 
   where
 
-    checkSortedProcedures :: [(InterfaceMember SemanticAnns, Identifier)] -> [ClassMember Locations] -> SemanticMonad ()
+    checkSortedProcedures :: [(InterfaceMember SemanticAnns, Identifier)] -> [ClassMember Location] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
@@ -1183,7 +1142,7 @@ checkClassKind _anns _clsId _kind _members _provides = return ()
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeTypeDefinition :: Locations -> TypeDef Locations -> SemanticMonad (SAST.TypeDef SemanticAnns)
+typeTypeDefinition :: Location -> TypeDef Location -> SemanticMonad (SAST.TypeDef SemanticAnns)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeTypeDefinition ann (Struct ident fs mds) =
   -- Check every type is well-defined:
@@ -1217,7 +1176,7 @@ typeTypeDefinition ann (Interface ident cls mds) = do
 
   where
 
-    typeInterfaceProcedure :: InterfaceMember Locations -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
+    typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnns)
     typeInterfaceProcedure (InterfaceProcedure procId ps annIP) = do
       mapM_ (checkTypeSpecifier annIP . paramTypeSpecifier) ps
       return $ InterfaceProcedure procId ps (buildExpAnn annIP Unit)
@@ -1341,7 +1300,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
 
 ----------------------------------------
 -- Field definition helpers.
-fieldDefinitionTy :: Locations -> FieldDefinition -> SemanticMonad ()
+fieldDefinitionTy :: Location -> FieldDefinition -> SemanticMonad ()
 fieldDefinitionTy ann f
   -- First we check its type is well-defined
   = checkTypeSpecifier ann tyFD
@@ -1352,13 +1311,13 @@ fieldDefinitionTy ann f
     tyFD = fieldTypeSpecifier f
 
 -- Enum Variant definition helpers.
-enumDefinitionTy :: Locations -> EnumVariant -> SemanticMonad ()
+enumDefinitionTy :: Location -> EnumVariant -> SemanticMonad ()
 enumDefinitionTy ann ev
   = mapM_ (\ty -> checkTypeSpecifier ann ty >> simpleTyorFail ann ty) ev_tys
   where
     ev_tys = assocData ev
 
-checkUniqueNames :: Locations -> ([Identifier] -> Error Locations) -> [Identifier] -> SemanticMonad ()
+checkUniqueNames :: Location -> ([Identifier] -> Error Location) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))

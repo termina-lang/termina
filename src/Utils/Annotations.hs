@@ -5,6 +5,14 @@ module Utils.Annotations where
 
 import Data.Kind
 import Control.Monad.Except
+import Text.Parsec.Pos
+
+data Location =
+  Position SourcePos SourcePos -- ^ Source code start and end position
+  | Builtin -- ^ Builtin position for elements that are not in the source code
+  | Internal
+  -- ^ Internal error position. Used for debugging, internals shoulnd't happen
+  deriving Show
 
 class Annotated (d :: Type -> Type) where
   getAnnotation :: d a -> a
