@@ -86,21 +86,6 @@ runEncapsEOO :: [UDM e a] -> UDM e [a]
 runEncapsEOO ms =
   get >>= \st ->
   mapM (withState emptyButUsed) ms >>=
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
-  
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
-
--- mapM (withState (const emptyUDSt)) ms >>=
   (put st >>) . return
 
 -- Run computations encapusulates with same first state.
