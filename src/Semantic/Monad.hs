@@ -28,9 +28,6 @@ import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import Data.Functor
 
-internalErrorSeman :: Location
-internalErrorSeman = Internal
-
 data SAnns a = SemAnn
   { -- | Location on source code
     location :: Location
@@ -216,14 +213,14 @@ data Environment
 
 stdlibGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))]
 stdlibGlobalEnv =
-  [("Result", internalErrorSeman `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
-   ("TimeVal",internalErrorSeman `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
-   ("Interrupt", internalErrorSeman `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
-   ("SystemInit", internalErrorSeman `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
-   ("system_init", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
-   ("PeriodicTimer", internalErrorSeman `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn internalErrorSeman (DefinedType "TimeVal"))] [] [])),
-   ("clock_get_uptime",internalErrorSeman `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
-   ("delay_in",internalErrorSeman `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
+  [("Result", Internal `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
+   ("TimeVal",Internal `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
+   ("Interrupt", Internal `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
+   ("SystemInit", Internal `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
+   ("system_init", Internal `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
+   ("PeriodicTimer", Internal `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn Internal (DefinedType "TimeVal"))] [] [])),
+   ("clock_get_uptime",Internal `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
+   ("delay_in",Internal `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
 
 makeInitialGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))] -> Environment
 makeInitialGlobalEnv pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
@@ -490,7 +487,7 @@ unDyn t = Undyn t (undynTypeAnn (getAnnotation t))
 
 unDynExp :: SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
 unDynExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unDyn obj)
-unDynExp _ = throwError $ annotateError internalErrorSeman EUnDynExpression
+unDynExp _ = throwError $ annotateError Internal EUnDynExpression
 
 mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
 mustBeTy ty expression =
@@ -504,7 +501,7 @@ mustBeTy ty expression =
 blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
-  (throwError (annotateError internalErrorSeman EUnboxingBlockRet))
+  (throwError (annotateError Internal EUnboxingBlockRet))
   (void . checkEqTypesOrError (location ann) ty) (getResultingType (ty_ann ann))
 
 getIntConst :: Location -> Const -> SemanticMonad Integer
@@ -608,11 +605,11 @@ checkTypeSpecifier _ Unit                    = return ()
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
 getObjectType :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
-getObjectType = maybe (throwError $ annotateError internalErrorSeman EUnboxingObject) return . getObjectSAnns . getAnnotation
+getObjectType = maybe (throwError $ annotateError Internal EUnboxingObject) return . getObjectSAnns . getAnnotation
 
 getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
 getExpType
-  = maybe (throwError $ annotateError internalErrorSeman EUnboxingStmtExpr) return
+  = maybe (throwError $ annotateError Internal EUnboxingStmtExpr) return
   . getResultingType . ty_ann . getAnnotation
 
 checkConstant :: Location -> TypeSpecifier -> Const -> SemanticMonad ()
@@ -640,4 +637,4 @@ checkIntConstant loc tyI ti@(TInteger i _) =
 buildSize :: ConstExpression SemanticAnns -> SemanticMonad Size
 buildSize (KC (I ti _) _) = return (SAST.K ti)
 buildSize (KV ident _) = return (SAST.V ident)
-buildSize (KC c _) = throwError $ annotateError internalErrorSeman $ ENotIntConst c
+buildSize (KC c _) = throwError $ annotateError Internal $ ENotIntConst c

@@ -1540,11 +1540,11 @@ genMainFile mName prjprogs = do
         emitters = catMaybes $ concatMap (\(_, objs) ->
                 map (`buildRTEMSEmitter` emitterConnectionsMap) objs) glbs ++
                 map (`buildRTEMSEmitter` emitterConnectionsMap) [
-                        Emitter "irq_1" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
-                        Emitter "irq_2" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
-                        Emitter "irq_3" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
-                        Emitter "irq_4" (DefinedType "Interrupt") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
-                        Emitter "system_init" (DefinedType "SystemInit") Nothing [] (internalErrorSeman `SemAnn` GTy (GGlob (SEmitter (DefinedType "SystemInit"))))
+                        Emitter "irq_1" (DefinedType "Interrupt") Nothing [] (Internal `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
+                        Emitter "irq_2" (DefinedType "Interrupt") Nothing [] (Internal `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
+                        Emitter "irq_3" (DefinedType "Interrupt") Nothing [] (Internal `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
+                        Emitter "irq_4" (DefinedType "Interrupt") Nothing [] (Internal `SemAnn` GTy (GGlob (SEmitter (DefinedType "Interrupt")))),
+                        Emitter "system_init" (DefinedType "SystemInit") Nothing [] (Internal `SemAnn` GTy (GGlob (SEmitter (DefinedType "SystemInit"))))
                     ]
 
         timers = [t | t <- emitters, case t of { RTEMSPeriodicTimerEmitter {} -> True; _ -> False }]

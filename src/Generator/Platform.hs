@@ -24,10 +24,10 @@ checkPlatform _ = Nothing
 getPlatformInitialGlobalEnv :: SupportedPlatform -> [(Identifier, SAnns (GEntry SemanticAnns))]
 getPlatformInitialGlobalEnv RTEMS5NoelSpike = 
     [
-       ("irq_1", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-       ("irq_2", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-       ("irq_3", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
-       ("irq_4", internalErrorSeman `SemAnn` GGlob (SEmitter (DefinedType "Interrupt")))
+       ("irq_1", Internal `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
+       ("irq_2", Internal `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
+       ("irq_3", Internal `SemAnn` GGlob (SEmitter (DefinedType "Interrupt"))),
+       ("irq_4", Internal `SemAnn` GGlob (SEmitter (DefinedType "Interrupt")))
     ]
 
 getPlatformInitialProgram :: SupportedPlatform -> TerminaProgArch SemanticAnns

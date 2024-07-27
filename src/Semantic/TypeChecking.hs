@@ -59,7 +59,7 @@ getMemberFieldType :: Parser.Annotation -> TypeSpecifier -> Identifier -> Semant
 getMemberFieldType ann obj_ty ident =
   case obj_ty of
     Location obj_ty' -> getMemberFieldType ann obj_ty' ident
-    DefinedType dident -> getGlobalTypeDef internalErrorSeman dident >>=
+    DefinedType dident -> getGlobalTypeDef Internal dident >>=
       \case{
         -- Either a struct
         Struct _identTy fields _mods ->
@@ -167,7 +167,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
                   typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
-                  fty <- maybe (throwError $ annotateError internalErrorSeman EMemberMethodType) return (getTypeSAnns anns)
+                  fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSAnns anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
           ;
@@ -592,7 +592,7 @@ typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty p
         (getGlobalTypeDef pann id_ty)
         -- | Internal error. This should not happen, since we must have checked the
         -- expected type before calling this function. 
-        (\_ -> throwError $ annotateError internalErrorSeman (ENotStructFound id_ty))
+        (\_ -> throwError $ annotateError Internal (ENotStructFound id_ty))
   >>= \case{
     Struct _ ty_fs _mods  ->
       SAST.StructInitializer
@@ -953,8 +953,8 @@ typeStatement (MatchStmt matchE cases ann) = do
             | cIdent == supIdent =
               if length bVars == length tVars then
               flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock bd)
-              else throwError $ annotateError internalErrorSeman EMatchCaseInternalError
-            | otherwise = throwError $ annotateError internalErrorSeman $ EMatchCaseBadName cIdent supIdent
+              else throwError $ annotateError Internal EMatchCaseInternalError
+            | otherwise = throwError $ annotateError Internal $ EMatchCaseBadName cIdent supIdent
 
 
 ----------------------------------------
@@ -1001,7 +1001,7 @@ typeGlobal (Emitter ident ty mexpr mods anns) = do
         (DefinedType "Interrupt") -> return $ SEmitter ty
         (DefinedType "PeriodicTimer") -> return $  SEmitter ty
         (DefinedType "SystemInit") -> return $ SEmitter ty
-        _ -> throwError $ annotateError internalErrorSeman EInternalNoGTY
+        _ -> throwError $ annotateError Internal EInternalNoGTY
   return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns glb))
 typeGlobal (Channel ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
@@ -1092,7 +1092,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     [] -> return ()
     (ClassAction actionId _ _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
-    _ -> throwError (annotateError internalErrorSeman EClassTyping)
+    _ -> throwError (annotateError Internal EClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
     \case {
@@ -1135,7 +1135,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
         unless (checkEqTypes ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
-    checkSortedProcedures _ _ = throwError (annotateError internalErrorSeman EClassTyping)
+    checkSortedProcedures _ _ = throwError (annotateError Internal EClassTyping)
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
 
@@ -1255,7 +1255,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             Right order ->
               mapM
               (maybe
-                (throwError (annotateError internalErrorSeman EMissingIdentifier))
+                (throwError (annotateError Internal EMissingIdentifier))
                 return
                 . (`M.lookup` nameClassMap)) order
   ----------------------------------------
@@ -1274,7 +1274,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
           -- Now analyze new member.
           case newMember of
             -- Filtered Cases
-            ClassField {} -> throwError (annotateError internalErrorSeman EClassTyping)
+            ClassField {} -> throwError (annotateError Internal EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
               typed_blk <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlock blk)
@@ -1371,7 +1371,7 @@ programAdd (TypeDefinition ty anns) =
           type_name el
           (EUsedTypeName type_name)
         >> return (type_name , el)
-      _ -> throwError (annotateError internalErrorSeman EInternalNoGTY)
+      _ -> throwError (annotateError Internal EInternalNoGTY)
 
 typeTerminaModule :: 
   PAST.AnnotatedProgram Parser.Annotation 
