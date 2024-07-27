@@ -2,7 +2,7 @@ module UT.PPrinter.Expression.Common where
 
 import AST.Core
 import Semantic.Monad
-import Parser.Parsing
+import Utils.Annotations
 
 objSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnns
 objSemAnn ak ts = SemAnn Internal (ETy (ObjectType ak ts))
