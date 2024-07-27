@@ -15,16 +15,16 @@ import Generator.LanguageC.Printer
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
 
-optionDynUInt32SemAnn :: SemanticAnns
+optionDynUInt32SemAnn :: SemanticAnn
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
-vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnns
+vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
 twoDymArrayRowAnn = vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
 twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnns
+vector1, vector2, vector3, vector4, vector5, vector6 :: Object SemanticAnn
 vector1 = Variable "vector1" vectorAnn
 vector2 = Variable "vector2" twoDymArrayAnn
 vector3 = Variable "vector3" vectorAnn
@@ -32,7 +32,7 @@ vector4 = Variable "vector4" twoDymArrayAnn
 vector5 = Variable "vector5" twoDymArrayAnn
 vector6 = Variable "vector6" vectorTMDescriptorAnn
 
-vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnns
+vector1Assign, vector2Assign, vector3Assign, vector4Assign, vector5Assign, vector6Assign :: Statement SemanticAnn
 vector1Assign = AssignmentStmt vector1 (AccessObject (Variable "vector0" vectorAnn)) undefined
 vector2Assign = AssignmentStmt vector2 (AccessObject (Variable "vector1" twoDymArrayAnn)) undefined
 vector3Assign = AssignmentStmt vector3 (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined
@@ -40,74 +40,74 @@ vector4Assign = AssignmentStmt vector4 (ArrayInitializer (ArrayInitializer uint3
 vector5Assign = AssignmentStmt vector5 (ArrayInitializer (AccessObject (Variable "vector_row" twoDymArrayRowAnn)) (K (TInteger 10 DecRepr)) twoDymArrayAnn) undefined
 vector6Assign = AssignmentStmt vector6 (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorAnn) undefined
 
-foo1, foo2 :: Object SemanticAnns
+foo1, foo2 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
 foo2 = Variable "foo2" (objSemAnn Mutable UInt32)
 
-foo1Assign, foo2Assign :: Statement SemanticAnns
+foo1Assign, foo2Assign :: Statement SemanticAnn
 foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))) undefined
 foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
 
-structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnns
+structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnn
 structASemAnn = definedTypeSemAnn Mutable "StructA"
 tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
 messageSemAnn = definedTypeSemAnn Mutable "Message"
 
-uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
+uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
 uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
-structAFieldsInit0 :: Expression SemanticAnns
+structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 = 
     StructInitializer 
         [FieldValueAssignment "field_a" uint32Const0 undefined,
          FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] (Just "StructA") structASemAnn
 
-tmDescriptorFieldsInit0 :: Expression SemanticAnns
+tmDescriptorFieldsInit0 :: Expression SemanticAnn
 tmDescriptorFieldsInit0 = 
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 undefined,
          FieldValueAssignment "field1" structAFieldsInit0 undefined] (Just "TMDescriptor") tmDescriptorSemAnn
 
 
-struct0, struct1 :: Object SemanticAnns
+struct0, struct1 :: Object SemanticAnn
 struct0 = Variable "struct0" tmDescriptorSemAnn
 struct1 = Variable "struct1" tmDescriptorSemAnn
 
-struct0Assign, struct1Assign :: Statement SemanticAnns
+struct0Assign, struct1Assign :: Statement SemanticAnn
 struct0Assign = AssignmentStmt struct0 tmDescriptorFieldsInit0 undefined
 struct1Assign = AssignmentStmt struct1 (AccessObject (Variable "struct0" tmDescriptorSemAnn)) undefined
 
-enum0, enum1 :: Object SemanticAnns
+enum0, enum1 :: Object SemanticAnn
 enum0 = Variable "enum0" messageSemAnn
 enum1 = Variable "enum1" messageSemAnn
 
-enum0Assign, enum1Assign :: Statement SemanticAnns
+enum0Assign, enum1Assign :: Statement SemanticAnn
 enum0Assign = AssignmentStmt enum0 (EnumVariantInitializer "Message" "Reset" [] messageSemAnn) undefined
 enum1Assign = AssignmentStmt enum1 (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
-dynVar0 :: Object SemanticAnns
+dynVar0 :: Object SemanticAnn
 dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
 
-option0, option1 :: Object SemanticAnns
+option0, option1 :: Object SemanticAnn
 option0 =  Variable "option0" optionDynUInt32SemAnn
 option1 =  Variable "option1" optionDynUInt32SemAnn
 
-undynVar0 :: Object SemanticAnns
+undynVar0 :: Object SemanticAnn
 undynVar0 = Undyn dynVar0 (objSemAnn Mutable UInt32)
 
-undynVar0AssignFoo1, undynVar0AssignConst :: Statement SemanticAnns
+undynVar0AssignFoo1, undynVar0AssignConst :: Statement SemanticAnn
 undynVar0AssignFoo1 = AssignmentStmt undynVar0 (AccessObject foo1) undefined
 undynVar0AssignConst = AssignmentStmt undynVar0 (Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32SemAnn) undefined
 
-option0Assign, option1Assign :: Statement SemanticAnns
+option0Assign, option1Assign :: Statement SemanticAnn
 option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject dynVar0)) optionDynUInt32SemAnn) undefined
 option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionDynUInt32SemAnn) undefined
 
-renderStatement :: Statement SemanticAnns -> Text
+renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
   case runReaderT (genBlockItem stmt) empty of
     Left err -> pack $ show err

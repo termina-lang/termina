@@ -19,7 +19,7 @@ filterStructModifiers = filter (\case
       Modifier "aligned" _ -> True
       _ -> False)
 
-genFieldDeclaration :: SemanticAnns -> FieldDefinition -> CHeaderGenerator CDeclaration
+genFieldDeclaration :: SemanticAnn -> FieldDefinition -> CHeaderGenerator CDeclaration
 genFieldDeclaration ann (FieldDefinition identifier ts@(Location {})) = do
     let exprCAnn = buildGenericAnn ann
     decl <- genDeclSpecifiers ts
@@ -47,7 +47,7 @@ genFieldDeclaration ann (FieldDefinition identifier ts) = do
     return $ CDeclaration decl [(Just (CDeclarator (Just identifier) arrayDecl [] exprCAnn), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
 
-genOptionSomeParameterStruct :: SemanticAnns -> TypeSpecifier ->  CHeaderGenerator CExternalDeclaration
+genOptionSomeParameterStruct :: SemanticAnn -> TypeSpecifier ->  CHeaderGenerator CExternalDeclaration
 genOptionSomeParameterStruct ann ts = do
     decl <- genDeclSpecifiers ts
     arrayDecl <- genArraySizeDeclarator ts ann
@@ -64,7 +64,7 @@ genOptionSomeParameterStruct ann ts = do
                 ] cAnn
 
 
-genOptionStruct :: SemanticAnns -> TypeSpecifier -> CHeaderGenerator [CExternalDeclaration]
+genOptionStruct :: SemanticAnn -> TypeSpecifier -> CHeaderGenerator [CExternalDeclaration]
 genOptionStruct ann (Option ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
@@ -100,7 +100,7 @@ genAttribute (Modifier name (Just expr)) = do
 
         genConst :: (MonadError CGeneratorError m) => Const -> m CExpression
         genConst c = do
-            let cAnn = CAnnotations Internal CGenericAnn
+            let cAnn = Located CGenericAnn Internal
             case c of
                 (I i _) -> 
                     let cInteger = genInteger i in
@@ -109,7 +109,7 @@ genAttribute (Modifier name (Just expr)) = do
                 (B False) -> return $ CConst (CIntConst (CInteger 0 CDecRepr)) cAnn
                 (C char) -> return $ CConst (CCharConst (CChar char)) cAnn
 
-genEnumVariantParameterStruct :: SemanticAnns -> Identifier -> EnumVariant -> CHeaderGenerator CExternalDeclaration
+genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant -> CHeaderGenerator CExternalDeclaration
 genEnumVariantParameterStruct ann identifier (EnumVariant variant params) = do
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
@@ -127,7 +127,7 @@ genEnumVariantParameterStruct ann identifier (EnumVariant variant params) = do
             return $ CDeclaration decl [(Just (CDeclarator (Just (namefy $ show index)) arrayDecl [] exprCAnn), Nothing, Nothing)]
                 (buildDeclarationAnn ann False)
 
-classifyClassMembers :: (MonadError CGeneratorError m) => TypeDef SemanticAnns -> m ([ClassMember SemanticAnns], [ClassMember SemanticAnns])
+classifyClassMembers :: (MonadError CGeneratorError m) => TypeDef SemanticAnn -> m ([ClassMember SemanticAnn], [ClassMember SemanticAnn])
 classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
     return $ foldr (\m (fields, funcs) -> case m of
         field@(ClassField fieldDef _) -> case clsKind of
@@ -139,21 +139,21 @@ classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
         func -> (fields, func : funcs)) ([], []) members
 classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
-genThisParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genThisParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genThisParam (TypeDefinition (Class _clsKind _identifier _members _provides _modifiers) ann) =
     return $ CDeclaration [CTypeSpec CVoidType]
         [(Just (CDeclarator (Just thisParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
 genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
-genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) ann) =
     return $ CDeclaration [CTypeSpec $ CTypeDef identifier]
         [(Just (CDeclarator (Just selfParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
 genSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
-genConstSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnns -> m CDeclaration
+genConstSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genConstSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) ann) =
     return $ CDeclaration [CTypeQual CConstQual, CTypeSpec $ CTypeDef identifier]
         [(Just (CDeclarator (Just selfParam) [CPtrDeclr [CConstQual] (buildGenericAnn ann)] [] (buildGenericAnn ann)), Nothing, Nothing)]
@@ -161,7 +161,7 @@ genConstSelfParam (TypeDefinition (Class _clsKind identifier _members _provides 
 genConstSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
 -- | TypeDef pretty printer.
-genTypeDefinitionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]
+genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CExternalDeclaration]
 genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = do
     let cAnn = buildDeclarationAnn ann True
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
@@ -242,7 +242,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
 
     where
 
-        genInterfaceProcedureField :: InterfaceMember SemanticAnns -> CHeaderGenerator CDeclaration
+        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure params ann') = do
             cParams <- mapM (genParameterDeclaration ann') params
             let cAnn = buildDeclarationAnn ann' False
@@ -288,11 +288,11 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
 
     where
 
-        genClassField :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
+        genClassField :: ClassMember SemanticAnn -> CHeaderGenerator CDeclaration
         genClassField (ClassField fld ann') = genFieldDeclaration ann' fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
-        genClassFunctionDeclaration :: ClassMember SemanticAnns -> CHeaderGenerator CDeclaration
+        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CHeaderGenerator CDeclaration
         genClassFunctionDeclaration (ClassViewer viewer params rts _ ann') = do
             let cAnn = buildGenericAnn ann'
             retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
@@ -330,14 +330,14 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
-genClassDefinition :: AnnASTElement SemanticAnns -> CSourceGenerator [CExternalDeclaration]
+genClassDefinition :: AnnASTElement SemanticAnn -> CSourceGenerator [CExternalDeclaration]
 genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _members _provides _) _) = do
     (_fields, functions) <- classifyClassMembers cls
     mapM genClassFunctionDefinition functions
 
     where
 
-        genClassFunctionDefinition :: ClassMember SemanticAnns -> CSourceGenerator CExternalDeclaration
+        genClassFunctionDefinition :: ClassMember SemanticAnn -> CSourceGenerator CExternalDeclaration
         genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
             retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts

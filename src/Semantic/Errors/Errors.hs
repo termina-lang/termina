@@ -153,7 +153,7 @@ data Error a
   -- | Dynamic (type has a Dynamic inside) as Argument of a function
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
-  | EUsedFunName Identifier a
+  | EUsedFunName Identifier Location
   -- | Expected Simple Type
   | EExpectedSimple TypeSpecifier
   -- | Invalid class field type

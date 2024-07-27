@@ -10,7 +10,7 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-var0, var1, pVar :: Object SemanticAnns
+var0, var1, pVar :: Object SemanticAnn
 -- | var0 : u16
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
 -- | dynVar1 : 'dyn u16
@@ -18,51 +18,51 @@ var1 = Variable "var1" dynUInt16SemAnn
 -- | p_var : &u16
 pVar = Variable "p_var" refUInt16SemAnn
 
-undynVar1 :: Expression SemanticAnns
+undynVar1 :: Expression SemanticAnn
 undynVar1 = AccessObject (Undyn var1 (objSemAnn Mutable UInt16))
 
-referenceVar0, referenceVar1 :: Expression SemanticAnns
+referenceVar0, referenceVar1 :: Expression SemanticAnn
 -- | &mut var0 : &u16
 referenceVar0 = ReferenceExpression Mutable var0 refUInt16SemAnn
 -- | &mut var1 : &u16
 referenceVar1 = ReferenceExpression Mutable var1 refUInt16SemAnn
 
-dereferencepVar :: Object SemanticAnns
+dereferencepVar :: Object SemanticAnn
 -- | *p_var : u16
 dereferencepVar = Dereference pVar (objSemAnn Mutable UInt16)
 
-vector0, dynArray0 :: Object SemanticAnns
+vector0, dynArray0 :: Object SemanticAnn
 vector0 = Variable "vector0" (vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
 dynArray0 = Variable "dynArray0" (dynArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
-pArray1 :: Expression SemanticAnns
+pArray1 :: Expression SemanticAnn
 pArray1 = AccessObject (Variable "p_vector1" (refArraySemAnn UInt32 (K (TInteger 10 DecRepr))))
 
-referenceArray0 :: Expression SemanticAnns
+referenceArray0 :: Expression SemanticAnn
 referenceArray0 = ReferenceExpression Mutable vector0 (refArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
-uint16Const :: Expression SemanticAnns
+uint16Const :: Expression SemanticAnn
 uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
-var0PlusConstant, var1PlusConstant :: Expression SemanticAnns
+var0PlusConstant, var1PlusConstant :: Expression SemanticAnn
 var0PlusConstant = BinOp Addition (AccessObject var0) uint16Const uint16SemAnn
 var1PlusConstant = BinOp Addition undynVar1 uint16Const uint16SemAnn
 
-dereferencepVarPlusConstant :: Expression SemanticAnns
+dereferencepVarPlusConstant :: Expression SemanticAnn
 dereferencepVarPlusConstant = BinOp Addition (AccessObject dereferencepVar) uint16Const uint16SemAnn
 
-var0PlusVar1, dereferencepVar2PlusVar1 :: Expression SemanticAnns
+var0PlusVar1, dereferencepVar2PlusVar1 :: Expression SemanticAnn
 var0PlusVar1 = BinOp Addition (AccessObject var0) undynVar1 uint16SemAnn
 dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) undynVar1 (objSemAnn Mutable UInt16)
 
 functionCallSingleVar0, functionCallSingleDynVar1,
-  functionCallSinglepVar :: Expression SemanticAnns
+  functionCallSinglepVar :: Expression SemanticAnn
 functionCallSingleVar0 = FunctionCall "foo" [AccessObject var0] (funSemAnn [Parameter "param0" UInt16] UInt16)
 functionCallSingleDynVar1 = FunctionCall "foo" [AccessObject var1] (funSemAnn [Parameter "param0" (DynamicSubtype UInt16)] Unit)
 functionCallSinglepVar = FunctionCall "foo" [AccessObject pVar] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 
 functionCallSingleRefVar0, functionCallSingleRefDynVar1,
-  functionCallSingleDerefpVar :: Expression SemanticAnns
+  functionCallSingleDerefpVar :: Expression SemanticAnn
 functionCallSingleRefVar0 = FunctionCall "foo" [referenceVar0] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 functionCallSingleRefDynVar1 = FunctionCall "foo" [referenceVar1] (funSemAnn [Parameter "param0" (Reference Mutable UInt16)] Unit)
 functionCallSingleDerefpVar = FunctionCall "foo" [AccessObject dereferencepVar] (funSemAnn [Parameter "param0" UInt16] Unit)
@@ -70,21 +70,21 @@ functionCallSingleDerefpVar = FunctionCall "foo" [AccessObject dereferencepVar] 
 functionCallSingleVar0PlusConstant, functionCallSingleDynVar1PlusConstant,
   functionCallSingleVar0PlusVar1,
   functionCallSingleDerefpVarPlusConstant,
-  functionCallSingleDerefpVarPlusDerefRefVar1 :: Expression SemanticAnns
+  functionCallSingleDerefpVarPlusDerefRefVar1 :: Expression SemanticAnn
 functionCallSingleVar0PlusConstant = FunctionCall "foo" [var0PlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleDynVar1PlusConstant = FunctionCall "foo" [var1PlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleVar0PlusVar1 = FunctionCall "foo" [var0PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [dereferencepVarPlusConstant] (funSemAnn [Parameter "param0" UInt16] Unit)
 functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [dereferencepVar2PlusVar1] (funSemAnn [Parameter "param0" UInt16] Unit)
 
-functionCallSingleDynArray0, functionCallSinglepArray1 :: Expression SemanticAnns
+functionCallSingleDynArray0, functionCallSinglepArray1 :: Expression SemanticAnn
 functionCallSingleDynArray0 = FunctionCall "foo" [AccessObject dynArray0] (funSemAnn [Parameter "param0" (DynamicSubtype (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
-functionCallSingleRefArray0 :: Expression SemanticAnns
+functionCallSingleRefArray0 :: Expression SemanticAnn
 functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [Parameter "param0" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] Unit)
 
-call2Parameters, call3Parameters :: Expression SemanticAnns
+call2Parameters, call3Parameters :: Expression SemanticAnn
 call2Parameters = FunctionCall "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [Parameter "param0" UInt16, Parameter "param1" UInt16] UInt16)
 call3Parameters = FunctionCall "foo4"
   [
@@ -99,7 +99,7 @@ call3Parameters = FunctionCall "foo4"
     Parameter "param3" UInt16
     ] Unit)
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

@@ -17,7 +17,7 @@ genEnumInitialization ::
     -- | Enum
     CExpression ->
     -- |  The initialization expression
-    Expression SemanticAnns ->
+    Expression SemanticAnn ->
     CSourceGenerator [CStatement]
 genEnumInitialization before level cObj expr = do
     case expr of
@@ -33,7 +33,7 @@ genOptionInitialization ::
     Bool
     -> Integer
     -> CExpression
-    -> Expression SemanticAnns
+    -> Expression SemanticAnn
     -> CSourceGenerator [CStatement]
 genOptionInitialization before level cObj expr =
     case expr of
@@ -57,7 +57,7 @@ genArrayInitialization ::
     -- generate the name of the iterator variable.
     -> Integer
     -> CExpression
-    -> Expression SemanticAnns
+    -> Expression SemanticAnn
     -> CSourceGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
@@ -87,7 +87,7 @@ genArrayInitialization before level cObj expr = do
             genArrayInitializationFromExpression level cObj cExpr exprType ann
     where
 
-        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnns] -> CSourceGenerator [CStatement]
+        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CSourceGenerator [CStatement]
         genArrayItemsInitialization _before _level _idx [] = return []
         genArrayItemsInitialization before' level' idx (x:xs) = do
             let ann = getAnnotation x
@@ -99,7 +99,7 @@ genArrayInitialization before level cObj expr = do
             CExpression ->
             CExpression ->
             TypeSpecifier ->
-            SemanticAnns ->
+            SemanticAnn ->
             CSourceGenerator [CStatement]
         genArrayInitializationFromExpression lvl cObj' cExpr ts ann = do
             case ts of
@@ -127,7 +127,7 @@ genFieldInitialization ::
     -> Integer
     -> CExpression
     -> Identifier
-    -> Expression SemanticAnns
+    -> Expression SemanticAnn
     -> CSourceGenerator [CStatement]
 genFieldInitialization before level cObj field expr =
     case expr of
@@ -159,7 +159,7 @@ genStructInitialization ::
     -- generate the name of the iterator variable.
     -> Integer
     -> CExpression
-    -> Expression SemanticAnns
+    -> Expression SemanticAnn
     -> CSourceGenerator [CStatement]
 genStructInitialization before level cObj expr =
   case expr of
@@ -179,13 +179,13 @@ genStructInitialization before level cObj expr =
                             ) (CVar clsFunctionName exprCAnn) exprCAnn) declStmtAnn
             genProcedureAssignment _ _ _ = throwError $ InternalError "Unsupported procedure assignment"
 
-            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnns] -> CSourceGenerator [CStatement]
+            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CSourceGenerator [CStatement]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment field expr' _: xs) = do
                 fieldInit <- genFieldInitialization before' level cObj field expr'
                 rest <- genFieldAssignments False xs
                 return $ fieldInit ++ rest
-            genFieldAssignments before' (FieldAddressAssignment field addr (SemAnn _ (ETy (SimpleType ts))):xs) = do
+            genFieldAssignments before' (FieldAddressAssignment field addr (Located (ETy (SimpleType ts)) _):xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                     cAddress = genInteger addr
@@ -202,7 +202,7 @@ genStructInitialization before level cObj expr =
                 return $ CExpr (Just $ CAssignment (
                                 CMember cObj field False exprCAnn
                             ) channelExpr exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (SemAnn _ (CTy (APConnTy rts procedures))) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (Located (CTy (APConnTy rts procedures)) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                     portField = CMember cObj field False exprCAnn
@@ -212,7 +212,7 @@ genStructInitialization before level cObj expr =
                 return $ CExpr (Just $ CAssignment (
                                 CMember portField thatField False exprCAnn
                             ) resourceExpr exprCAnn) declStmtAnn : (cProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (SemAnn _ (CTy (APAtomicArrayConnTy {}))) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (CTy (APAtomicArrayConnTy {})) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 rest <- genFieldAssignments False xs
@@ -230,7 +230,7 @@ genStructInitialization before level cObj expr =
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
-genBlockItem :: Statement SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
+genBlockItem :: Statement SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
 genBlockItem (AssignmentStmt obj expr  _) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
@@ -302,7 +302,7 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
         [CIf cExpr (CCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
 
     where
-        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnns] -> CSourceGenerator (Maybe CStatement)
+        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnn] -> CSourceGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
             prev' <- genAlternatives prev xs
@@ -413,10 +413,10 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             -- | A function to generate a match case (inside the monad)
             -> ([CDeclarationSpecifier]
                 -> CExpression
-                -> MatchCase SemanticAnns
+                -> MatchCase SemanticAnn
                 -> CSourceGenerator [CCompoundBlockItem])
             -- | The list of remaining match cases
-            -> [MatchCase SemanticAnns]
+            -> [MatchCase SemanticAnn]
             -> CSourceGenerator (Maybe CStatement)
         -- | This should never happen
         genMatchCases _ _ _ _ [] = return Nothing
@@ -438,7 +438,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
         genAnonymousMatchCase ::
             [CDeclarationSpecifier]
             -> CExpression
-            -> MatchCase SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
+            -> MatchCase SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
         genAnonymousMatchCase _ cExpr (MatchCase variant params blk' _) = do
@@ -451,7 +451,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
         genMatchCase ::
             [CDeclarationSpecifier]
             -> CExpression
-            -> MatchCase SemanticAnns
+            -> MatchCase SemanticAnn
             -> CSourceGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
@@ -471,7 +471,7 @@ genBlockItem (SingleExpStmt expr ann) = do
     cExpr <- genExpression expr
     return [CBlockStmt $ CExpr (Just cExpr) (buildStatementAnn ann True)]
 
-genReturnStatement :: ReturnStmt SemanticAnns -> CSourceGenerator [CCompoundBlockItem]
+genReturnStatement :: ReturnStmt SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
 genReturnStatement (ReturnStmt (Just expr) ann) = do
     let cAnn = buildStatementAnn ann True
     cExpr <- genExpression expr

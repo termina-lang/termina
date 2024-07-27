@@ -142,7 +142,7 @@ data TerminaProgArch a = TerminaProgArch {
     handlerClasses :: Map Identifier (TypeDef a),
     handlers :: Map Identifier (TPHandler a),
 
-    resourceClasses :: Map Identifier (TypeDef SemanticAnns),
+    resourceClasses :: Map Identifier (TypeDef SemanticAnn),
 
     resources :: Map Identifier (TPResource a),
 

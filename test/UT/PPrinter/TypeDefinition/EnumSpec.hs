@@ -13,26 +13,26 @@ import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Common
 
 
-enumWithOneRegularField :: AnnASTElement SemanticAnns
+enumWithOneRegularField :: AnnASTElement SemanticAnn
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" []
   ] []) undefined
 
-enumWithTwoRegularFields :: AnnASTElement SemanticAnns
+enumWithTwoRegularFields :: AnnASTElement SemanticAnn
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [],
     EnumVariant "variant1" []
   ] []) undefined
 
-enumWithOneParameterizedField :: AnnASTElement SemanticAnns
+enumWithOneParameterizedField :: AnnASTElement SemanticAnn
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32]
   ] []) undefined
 
-enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnns
+enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnn
 enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [UInt32],
@@ -41,7 +41,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant3" [Int8, Array (Array Char (K (TInteger 20 DecRepr))) (K (TInteger 35 DecRepr))]
   ] []) undefined
 
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl opts decl = 
   case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err

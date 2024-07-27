@@ -17,61 +17,61 @@ optionDynUInt32TS = Option (DynamicSubtype UInt32)
 vectorTS :: TypeSpecifier
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 
-optionDynUInt32SemAnn :: SemanticAnns
+optionDynUInt32SemAnn :: SemanticAnn
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
-vectorAnn :: SemanticAnns
+vectorAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-vector0 :: Expression SemanticAnns
+vector0 :: Expression SemanticAnn
 vector0 = AccessObject (Variable "vector0" vectorAnn)
 
-vector1 :: Statement SemanticAnns
+vector1 :: Statement SemanticAnn
 vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
 
-foo0 :: Expression SemanticAnns
+foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
 
-uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnns
+uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
 uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
 
-constToFoo0 :: Statement SemanticAnns
+constToFoo0 :: Statement SemanticAnn
 constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn
 
-dynVar0 :: Expression SemanticAnns
+dynVar0 :: Expression SemanticAnn
 dynVar0 = AccessObject (Variable "dyn_var0" dynUInt32SemAnn)
 
-option0, option1 :: Statement SemanticAnns
+option0, option1 :: Statement SemanticAnn
 option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantInitializer (Some dynVar0) optionDynUInt32SemAnn) stmtSemAnn
 option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantInitializer None optionDynUInt32SemAnn) stmtSemAnn
 
-twoDeclarations :: [Statement SemanticAnns]
+twoDeclarations :: [Statement SemanticAnn]
 twoDeclarations = [vector1, option0]
 
-oneAssignment :: [Statement SemanticAnns]
+oneAssignment :: [Statement SemanticAnn]
 oneAssignment = [constToFoo0]
 
-oneDeclaration :: [Statement SemanticAnns]
+oneDeclaration :: [Statement SemanticAnn]
 oneDeclaration = [option1]
 
-cond0, cond1 :: Expression SemanticAnns
+cond0, cond1 :: Expression SemanticAnn
 cond0 = BinOp RelationalEqual foo0 uint32Const0 boolSemAnn
 cond1 = BinOp RelationalNotEqual foo0 uint32Const0xFFFF0000 boolSemAnn
 
-singleIf :: Statement SemanticAnns
+singleIf :: Statement SemanticAnn
 singleIf = IfElseStmt cond0 twoDeclarations [] Nothing stmtSemAnn
 
-ifElse :: Statement SemanticAnns
+ifElse :: Statement SemanticAnn
 ifElse = IfElseStmt cond1 twoDeclarations [] (Just oneDeclaration) stmtSemAnn
 
-elseIf :: ElseIf SemanticAnns
+elseIf :: ElseIf SemanticAnn
 elseIf = ElseIf cond0 oneAssignment stmtSemAnn
 
-ifElseIf :: Statement SemanticAnns
+ifElseIf :: Statement SemanticAnn
 ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] (Just oneDeclaration) stmtSemAnn
 
-renderStatement :: Statement SemanticAnns -> Text
+renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
   case runReaderT (genBlockItem stmt) empty of
     Left err -> pack $ show err

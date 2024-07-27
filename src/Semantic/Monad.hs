@@ -28,21 +28,11 @@ import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import Data.Functor
 
-data SAnns a = SemAnn
-  { -- | Location on source code
-    location :: Location
-    -- | Type after type checking
-  , ty_ann   :: a}
-  deriving Show
-
 data ObjectAnn = ObjectAnn
   {
     accessKind :: AccessKind
   , objTy      :: TypeSpecifier
   } deriving Show
-
-instance Annotated SAnns where
-  getAnnotation = ty_ann
 
 data ESeman
   = SimpleType TypeSpecifier
@@ -101,7 +91,7 @@ data SemanticElems
   -- | Port connections
   | CTy ConnectionSeman
   -- | Global elements
-  | GTy (GEntry SemanticAnns)
+  | GTy (GEntry SemanticAnn)
   deriving Show
 
 ----------------------------------------
@@ -113,9 +103,9 @@ getResultingType :: SemanticElems -> Maybe TypeSpecifier
 getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ t -> t})
 getResultingType _        = Nothing
 
-getObjectSAnns :: SemanticAnns -> Maybe (AccessKind, TypeSpecifier)
-getObjectSAnns (SemAnn _ (ETy (ObjectType ak ty))) = Just (ak, ty)
-getObjectSAnns _                                   = Nothing
+getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TypeSpecifier)
+getObjectSAnns (Located (ETy (ObjectType ak ty)) _) = Just (ak, ty)
+getObjectSAnns _                                    = Nothing
 
 getArgumentsType :: SemanticElems -> Maybe [Parameter]
 getArgumentsType (ETy (AppType ts _)) = Just ts
@@ -125,60 +115,63 @@ isResultFromApp :: SemanticElems -> Bool
 isResultFromApp = isJust . getArgumentsType
 ----------------------------------------
 
-getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnns)
+getGEntry :: SemanticElems -> Maybe (GEntry SemanticAnn)
 getGEntry (GTy a) = Just a
 getGEntry _       = Nothing
 
-buildExpAnn :: Location -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnn loc = SemAnn loc . ETy . SimpleType
+buildExpAnn :: Location -> TypeSpecifier -> SemanticAnn
+buildExpAnn loc = locate loc . ETy . SimpleType
 
-buildExpAnnObj :: Location -> AccessKind -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnnObj loc ak = SemAnn loc . ETy . ObjectType ak
+buildExpAnnObj :: Location -> AccessKind -> TypeSpecifier -> SemanticAnn
+buildExpAnnObj loc ak = locate loc . ETy . ObjectType ak
 
-buildExpAnnApp :: Location -> [Parameter] -> TypeSpecifier -> SAnns SemanticElems
-buildExpAnnApp loc tys = SemAnn loc . ETy . AppType tys
+buildExpAnnApp :: Location -> [Parameter] -> TypeSpecifier -> SemanticAnn
+buildExpAnnApp loc tys = locate loc . ETy . AppType tys
 
-buildGlobalAnn :: Location -> SemGlobal -> SAnns SemanticElems
-buildGlobalAnn loc = SemAnn loc . GTy . GGlob
+buildGlobalAnn :: Location -> SemGlobal -> SemanticAnn
+buildGlobalAnn loc = locate loc . GTy . GGlob
 
-buildGlobal :: Location -> GEntry SemanticAnns -> SAnns SemanticElems
-buildGlobal loc = SemAnn loc . GTy
+buildGlobal :: Location -> GEntry SemanticAnn -> SemanticAnn
+buildGlobal loc = locate loc . GTy
 
-buildGlobalTy :: Location -> SemanTypeDef SemanticAnns -> SAnns SemanticElems
-buildGlobalTy loc = SemAnn loc . GTy . GType
+buildGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticAnn
+buildGlobalTy loc = locate loc . GTy . GType
 
-buildStmtAnn :: Location -> SAnns SemanticElems
-buildStmtAnn = flip SemAnn STy
+buildStmtAnn :: Location -> SemanticAnn
+buildStmtAnn = Located STy
 
-buildOutPortConnAnn :: Location -> TypeSpecifier -> SAnns SemanticElems
-buildOutPortConnAnn loc ts = SemAnn loc (CTy (OutPConnTy ts))
+buildOutPortConnAnn :: Location -> TypeSpecifier -> SemanticAnn
+buildOutPortConnAnn loc ts = locate loc (CTy (OutPConnTy ts))
 
-buildAccessPortConnAnn :: Location -> TypeSpecifier -> [SemanProcedure] -> SAnns SemanticElems
-buildAccessPortConnAnn loc ts procs = SemAnn loc (CTy (APConnTy ts procs))
+buildAccessPortConnAnn :: Location -> TypeSpecifier -> [SemanProcedure] -> SemanticAnn
+buildAccessPortConnAnn loc ts procs = locate loc (CTy (APConnTy ts procs))
 
-buildPoolConnAnn :: Location -> TypeSpecifier -> Size -> SAnns SemanticElems
-buildPoolConnAnn loc ts s = SemAnn loc (CTy (APPoolConnTy ts s))
+buildPoolConnAnn :: Location -> TypeSpecifier -> Size -> SemanticAnn
+buildPoolConnAnn loc ts s = locate loc (CTy (APPoolConnTy ts s))
 
-buildAtomicConnAnn :: Location -> TypeSpecifier -> SAnns SemanticElems
-buildAtomicConnAnn loc ts = SemAnn loc (CTy (APAtomicConnTy ts))
+buildAtomicConnAnn :: Location -> TypeSpecifier -> SemanticAnn
+buildAtomicConnAnn loc ts = locate loc (CTy (APAtomicConnTy ts))
 
-buildAtomicArrayConnAnn :: Location -> TypeSpecifier -> Size -> SAnns SemanticElems
-buildAtomicArrayConnAnn loc ts s = SemAnn loc (CTy (APAtomicArrayConnTy ts s))
+buildAtomicArrayConnAnn :: Location -> TypeSpecifier -> Size -> SemanticAnn
+buildAtomicArrayConnAnn loc ts s = locate loc (CTy (APAtomicArrayConnTy ts s))
 
-buildSinkPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SAnns SemanticElems
-buildSinkPortConnAnn loc ts action = SemAnn loc (CTy (SPConnTy ts action))
+buildSinkPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SemanticAnn
+buildSinkPortConnAnn loc ts action = locate loc (CTy (SPConnTy ts action))
 
-buildInPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SAnns SemanticElems
-buildInPortConnAnn loc ts action = SemAnn loc (CTy (InPConnTy ts action))
+buildInPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SemanticAnn
+buildInPortConnAnn loc ts action = locate loc (CTy (InPConnTy ts action))
 
 -- | Expression Semantic Annotations
-type SemanticAnns = SAnns SemanticElems
+type SemanticAnn = Located SemanticElems
 
-forgetSemAnn :: SAnns a -> Location
+getSemanticAnn :: SemanticAnn -> SemanticElems
+getSemanticAnn = element
+
+forgetSemAnn :: SemanticAnn -> Location
 forgetSemAnn = location
 
-getTypeSAnns :: SemanticAnns -> Maybe TypeSpecifier
-getTypeSAnns  = getResultingType . ty_ann
+getTypeSAnns :: SemanticAnn -> Maybe TypeSpecifier
+getTypeSAnns  = getResultingType . getSemanticAnn
 
 undynExpType :: ESeman -> ESeman
 undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
@@ -186,14 +179,14 @@ undynExpType (ObjectType ak (DynamicSubtype ty)) = ObjectType ak ty
 undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
 undynExpType _ = error "impossible 888+1"
 
-undynTypeAnn :: SemanticAnns -> SemanticAnns
-undynTypeAnn (SemAnn p (ETy en)) = SemAnn p (ETy (undynExpType en))
-undynTypeAnn _                                    = error "impossible 888"
+undynTypeAnn :: SemanticAnn -> SemanticAnn
+undynTypeAnn (Located (ETy en) p) = Located (ETy (undynExpType en)) p
+undynTypeAnn _                    = error "impossible 888"
 
 ----------------------------------------
 -- | Global env
 -- It has global definitions
-type GlobalEnv = Map Identifier (SAnns (GEntry SemanticAnns))
+type GlobalEnv = Map Identifier (Located (GEntry SemanticAnn))
 
 -- | Local env
 -- variables to their type
@@ -211,18 +204,21 @@ data Environment
  , local  :: LocalEnv
  }
 
-stdlibGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))]
-stdlibGlobalEnv =
-  [("Result", Internal `SemAnn` GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])),
-   ("TimeVal",Internal `SemAnn` GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])),
-   ("Interrupt", Internal `SemAnn` GType (Class EmitterClass "Interrupt" [] [] [])),
-   ("SystemInit", Internal `SemAnn` GType (Class EmitterClass "SystemInit" [] [] [])),
-   ("system_init", Internal `SemAnn` GGlob (SEmitter (DefinedType "SystemInit"))),
-   ("PeriodicTimer", Internal `SemAnn` GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn Internal (DefinedType "TimeVal"))] [] [])),
-   ("clock_get_uptime",Internal `SemAnn` GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit),
-   ("delay_in",Internal `SemAnn` GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit)]
+getEntry :: Located (GEntry SemanticAnn) -> GEntry SemanticAnn
+getEntry = element
 
-makeInitialGlobalEnv :: [(Identifier, SAnns (GEntry SemanticAnns))] -> Environment
+stdlibGlobalEnv :: [(Identifier, Located (GEntry SemanticAnn))]
+stdlibGlobalEnv =
+  [("Result", Located (GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])) Internal),
+   ("TimeVal", Located (GType (Struct "TimeVal" [FieldDefinition "tv_sec" UInt32, FieldDefinition "tv_usec" UInt32] [])) Internal),
+   ("Interrupt", Located (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
+   ("SystemInit", Located (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
+   ("system_init", Located (GGlob (SEmitter (DefinedType "SystemInit"))) Internal),
+   ("PeriodicTimer", Located (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (DefinedType "TimeVal")) (buildExpAnn Internal (DefinedType "TimeVal"))] [] [])) Internal),
+   ("clock_get_uptime", Located (GFun [Parameter "uptime" (Reference Mutable (DefinedType "TimeVal"))] Unit) Internal),
+   ("delay_in", Located (GFun [Parameter "time_val" (Reference Immutable (DefinedType "TimeVal"))] Unit) Internal)]
+
+makeInitialGlobalEnv :: [(Identifier, Located (GEntry SemanticAnn))] -> Environment
 makeInitialGlobalEnv pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
@@ -261,7 +257,7 @@ localScope comp = do
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnns)
+getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnn)
 getGlobalTypeDef loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
@@ -270,14 +266,14 @@ getGlobalTypeDef loc tid  = gets global >>=
   (\case {
       GType tydef -> return tydef;
         _         -> throwError $ annotateError loc (EGlobalNoType tid)
-      } . ty_ann) . M.lookup tid
+      } . getEntry) . M.lookup tid
 
 getFunctionTy :: Location -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden ) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-  SemAnn entryLoc (GFun args retty) -> return (args, retty, entryLoc)
-  SemAnn {} -> throwError $ annotateError loc (EFunctionNotFound iden)
+  Located (GFun args retty) entryLoc -> return (args, retty, entryLoc)
+  Located {} -> throwError $ annotateError loc (EFunctionNotFound iden)
 
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
@@ -307,17 +303,17 @@ insertLocalImmutObj loc ident ty =
   else -- | If there is no variable named |ident|
   modify (\s -> s{local = M.insert ident (Immutable, ty) (local s)})
 
-insertGlobalTy :: Location -> SemanTypeDef SemanticAnns -> SemanticMonad ()
+insertGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticMonad ()
 insertGlobalTy loc tydef =
-  insertGlobal type_name (loc `SemAnn` GType tydef) (EUsedTypeName type_name)
+  insertGlobal type_name (Located (GType tydef) loc) (EUsedTypeName type_name)
  where
    type_name = identifierType tydef
 
 insertGlobalFun :: Location -> Identifier -> [Parameter] -> TypeSpecifier -> SemanticMonad ()
 insertGlobalFun loc ident ps rettype =
-  insertGlobal ident (loc `SemAnn` GFun ps rettype) (EUsedFunName ident)
+  insertGlobal ident (Located (GFun ps rettype) loc) (EUsedFunName ident)
 
-insertGlobal :: Identifier -> SAnns (GEntry SemanticAnns) -> (Location -> Error Location) -> SemanticMonad ()
+insertGlobal :: Identifier -> Located (GEntry SemanticAnn) -> (Location -> Error Location) -> SemanticMonad ()
 insertGlobal ident entry err =
   glbWhereIsDefined ident >>=
   \case
@@ -364,7 +360,7 @@ getConst loc ident = do
             }
           ) >>= (\case {
                     -- | It is a global constant!
-                    SemAnn _ (GGlob (SConst ts value))  -> return (ts, value);
+                    Located (GGlob (SConst ts value)) _ -> return (ts, value);
                     -- | It is a global object, but not a constant.
                     _ -> throwError $ annotateError loc (ENotConstant ident);
     });
@@ -377,7 +373,7 @@ getIntSize loc (CAST.V ident) = do
 getIntSize _loc (CAST.K (TInteger value _)) = return value
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
-getGlobalEntry :: Location -> Identifier -> SemanticMonad (SAnns (GEntry SemanticAnns))
+getGlobalEntry :: Location -> Identifier -> SemanticMonad (Located (GEntry SemanticAnn))
 getGlobalEntry loc ident =
   gets global
   -- | Get local variables map and check if |ident| is a member of that map
@@ -433,7 +429,7 @@ getRHSVarTy loc ident =
                     _  -> throwError errorGlobal;
                   }
                 ) >>= (\case{
-                        SemAnn _ (GGlob _) -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                        Located (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                         _ -> throwError $ annotateError loc (ENotNamedObject ident);
                       });
               _ -> throwError errorRO;
@@ -453,7 +449,7 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        SemAnn _ (GGlob (SResource ts))  -> return (Mutable, ts);
+                        Located (GGlob (SResource ts)) _  -> return (Mutable, ts);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 
@@ -482,14 +478,14 @@ checkEqTypesOrError :: Location -> TypeSpecifier -> TypeSpecifier -> SemanticMon
 checkEqTypesOrError loc t1 t2 =
   unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
-unDyn :: SAST.Object SemanticAnns -> SAST.Object SemanticAnns
+unDyn :: SAST.Object SemanticAnn -> SAST.Object SemanticAnn
 unDyn t = Undyn t (undynTypeAnn (getAnnotation t))
 
-unDynExp :: SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
+unDynExp :: SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
 unDynExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unDyn obj)
 unDynExp _ = throwError $ annotateError Internal EUnDynExpression
 
-mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnns -> SemanticMonad (SAST.Expression SemanticAnns)
+mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
 mustBeTy ty expression =
   getExpType expression >>=
   checkEqTypesOrError loc ty
@@ -498,11 +494,11 @@ mustBeTy ty expression =
     ann_exp = getAnnotation expression
     loc = location ann_exp
 
-blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnns -> SemanticMonad ()
+blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnn -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
   (throwError (annotateError Internal EUnboxingBlockRet))
-  (void . checkEqTypesOrError (location ann) ty) (getResultingType (ty_ann ann))
+  (void . checkEqTypesOrError (location ann) ty) (getResultingType (getSemanticAnn ann))
 
 getIntConst :: Location -> Const -> SemanticMonad Integer
 getIntConst _ (I (TInteger i _) _) = return i
@@ -604,13 +600,13 @@ checkTypeSpecifier _ Unit                    = return ()
 
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
-getObjectType :: SAST.Object SemanticAnns -> SemanticMonad (AccessKind, TypeSpecifier)
+getObjectType :: SAST.Object SemanticAnn -> SemanticMonad (AccessKind, TypeSpecifier)
 getObjectType = maybe (throwError $ annotateError Internal EUnboxingObject) return . getObjectSAnns . getAnnotation
 
-getExpType :: SAST.Expression SemanticAnns -> SemanticMonad TypeSpecifier
+getExpType :: SAST.Expression SemanticAnn -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError Internal EUnboxingStmtExpr) return
-  . getResultingType . ty_ann . getAnnotation
+  . getResultingType . getSemanticAnn . getAnnotation
 
 checkConstant :: Location -> TypeSpecifier -> Const -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
@@ -634,7 +630,7 @@ checkIntConstant loc tyI ti@(TInteger i _) =
   then return ()
   else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
 
-buildSize :: ConstExpression SemanticAnns -> SemanticMonad Size
+buildSize :: ConstExpression SemanticAnn -> SemanticMonad Size
 buildSize (KC (I ti _) _) = return (SAST.K ti)
 buildSize (KV ident _) = return (SAST.V ident)
 buildSize (KC c _) = throwError $ annotateError Internal $ ENotIntConst c

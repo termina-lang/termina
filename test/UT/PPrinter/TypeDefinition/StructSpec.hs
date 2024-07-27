@@ -19,7 +19,7 @@ struct id0 {
     field0 : u8;
 };
 -}
-structWithOneField :: AnnASTElement SemanticAnns
+structWithOneField :: AnnASTElement SemanticAnn
 structWithOneField = TypeDefinition (Struct "id0" [FieldDefinition "field0" UInt8] []) undefined
 
 {- | Struct type with two fields.
@@ -29,7 +29,7 @@ struct id0 {
     field1 : u16;
 };
 -}
-structWithTwoFields :: AnnASTElement SemanticAnns
+structWithTwoFields :: AnnASTElement SemanticAnn
 structWithTwoFields = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
@@ -45,7 +45,7 @@ struct id0 {
     field2 : [u16; 10 : u32];
 };
 -}
-packedStruct :: AnnASTElement SemanticAnns
+packedStruct :: AnnASTElement SemanticAnn
 packedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
@@ -62,7 +62,7 @@ struct id0 {
     field2 : [u16; 10 : u32];
 };
 -}
-alignedStruct :: AnnASTElement SemanticAnns
+alignedStruct :: AnnASTElement SemanticAnn
 alignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
@@ -80,7 +80,7 @@ struct id0 {
     field2 : [u16; 10 : u32];
 };
 -}
-packedAndAlignedStruct :: AnnASTElement SemanticAnns
+packedAndAlignedStruct :: AnnASTElement SemanticAnn
 packedAndAlignedStruct = TypeDefinition
   (Struct "id0" [
     FieldDefinition "field0" UInt8,
@@ -91,7 +91,7 @@ packedAndAlignedStruct = TypeDefinition
       Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))
     ]) undefined
 
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl opts decl = 
   case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err

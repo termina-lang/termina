@@ -10,24 +10,24 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
-self, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnns
+self, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnn
 self = Variable "self" (refDefinedTypeSemAnn "Resource")
 tmChannel = Variable "tm_channel" (msgQueueSemAnn (DefinedType "TMDescriptor"))
 tmPool = Variable "tm_pool" (poolSemAnn UInt32)
 bar0 = Variable "bar0" (objSemAnn Mutable UInt16)
 bar1 = Variable "bar1" dynUInt16SemAnn
 
-tmPoolAlloc :: Expression SemanticAnns
+tmPoolAlloc :: Expression SemanticAnn
 tmPoolAlloc = MemberFunctionCall tmPool "alloc" [] unitSemAnn
 
-selfDereference :: Object SemanticAnns
+selfDereference :: Object SemanticAnn
 selfDereference = Dereference self (definedTypeSemAnn Mutable "Resource")
 
-tmChannelsend, selfFoo0 :: Expression SemanticAnns
+tmChannelsend, selfFoo0 :: Expression SemanticAnn
 tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] unitSemAnn
 selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

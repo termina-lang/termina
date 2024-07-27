@@ -10,7 +10,6 @@ import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
 import Modules.Modules
-import Parser.Parsing
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map as M
@@ -25,9 +24,9 @@ genModuleDefineLabel mn =
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
 genInclude :: QualifiedName -> Bool -> CPreprocessorDirective
-genInclude mName before = CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn before))
+genInclude mName before = CPPInclude False (mName <.> "h") (Located (CPPDirectiveAnn before) Internal)
 
-genHeaderASTElement :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem]
+genHeaderASTElement :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = do
     cTypeDef <- genTypeDefinitionDecl typedef
     return $ CExtDecl <$> cTypeDef
@@ -36,7 +35,7 @@ genHeaderASTElement func@(Function {}) = do
     cFunc <- genFunctionDecl func
     return $ CExtDecl <$> cFunc
 
-genSourceASTElement :: AnnASTElement SemanticAnns -> CSourceGenerator [CFileItem]
+genSourceASTElement :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
 genSourceASTElement typedef@(TypeDefinition (Class {}) _) = do
     cTypeDef <- genClassDefinition typedef
     return $ CExtDecl <$> cTypeDef
@@ -55,7 +54,7 @@ genHeaderFile ::
     -> QualifiedName
     -- | Import list
     -> [QualifiedName]
-    -> AnnotatedProgram SemanticAnns
+    -> AnnotatedProgram SemanticAnn
     -> CHeaderGenerator CFile
 genHeaderFile includeOptionH mName imports program = do
     let defineLabel = genModuleDefineLabel mName
@@ -63,28 +62,28 @@ genHeaderFile includeOptionH mName imports program = do
     items <- concat <$> mapM genHeaderASTElement program
     return $ CHeaderFile mName $
         [
-            CPPDirective $ CPPIfNDef defineLabel (CAnnotations Internal (CPPDirectiveAnn False)),
-            CPPDirective $ CPPDefine defineLabel Nothing (CAnnotations Internal (CPPDirectiveAnn False)),
-            CPPDirective $ CPPInclude True "termina.h" (CAnnotations Internal (CPPDirectiveAnn True))
-        ] ++ ([CPPDirective $ CPPInclude False "option.h" (CAnnotations Internal (CPPDirectiveAnn True)) | includeOptionH]) 
+            CPPDirective $ CPPIfNDef defineLabel (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective $ CPPDefine defineLabel Nothing (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective $ CPPInclude True "termina.h" (Located (CPPDirectiveAnn True) Internal)
+        ] ++ ([CPPDirective $ CPPInclude False "option.h" (Located (CPPDirectiveAnn True) Internal) | includeOptionH]) 
         ++ includeList ++ items ++ [
-            CPPDirective $ CPPEndif (CAnnotations Internal (CPPDirectiveAnn True))
+            CPPDirective $ CPPEndif (Located (CPPDirectiveAnn True) Internal)
         ]
 
 genSourceFile ::
     -- | Module name
     QualifiedName
     -- | Typed Termina program
-    -> AnnotatedProgram SemanticAnns
+    -> AnnotatedProgram SemanticAnn
     -> CSourceGenerator CFile
 genSourceFile mName program = do
     items <- concat <$> mapM genSourceASTElement program
     return $ CSourceFile mName $
-        CPPDirective (CPPInclude False (mName <.> "h") (CAnnotations Internal (CPPDirectiveAnn True)))
+        CPPDirective (CPPInclude False (mName <.> "h") (Located (CPPDirectiveAnn True) Internal))
         : items
 
-runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnns -> Either CGeneratorError CFile
+runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
 runGenSourceFile mName program = runReaderT (genSourceFile mName program) M.empty
 
-runGenHeaderFile :: Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnns -> OptionTypes -> Either CGeneratorError CFile
+runGenHeaderFile :: Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
 runGenHeaderFile includeOptionH mName imports program = runReaderT (genHeaderFile includeOptionH mName imports program)

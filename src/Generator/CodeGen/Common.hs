@@ -11,6 +11,7 @@ import Data.Set
 import Generator.LanguageC.AST
 import Data.Char
 import Numeric
+import Utils.Annotations
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -135,34 +136,34 @@ optionSomeField = "__0"
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError CGeneratorError m) => Object SemanticAnns -> m TypeSpecifier
-getObjType (Variable _ (SemAnn _ (ETy (ObjectType _ ts))))                  = return ts
-getObjType (ArrayIndexExpression _ _ (SemAnn _ (ETy (ObjectType _ ts))))    = return ts
-getObjType (MemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
-getObjType (Dereference _ (SemAnn _ (ETy (ObjectType _ ts))))               = return ts
-getObjType (ArraySlice _ _ _ (SemAnn _ (ETy (ObjectType _ ts))))            = return ts
-getObjType (Undyn _ (SemAnn _ (ETy (ObjectType _ ts))))                     = return ts
-getObjType (DereferenceMemberAccess _ _ (SemAnn _ (ETy (ObjectType _ ts)))) = return ts
+getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TypeSpecifier
+getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                   = return ts
+getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (ArraySlice _ _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (Undyn _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m [Parameter]
-getParameters (FunctionCall _ _ (SemAnn _ (ETy (AppType params _)))) = return params
+getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [Parameter]
+getParameters (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
 getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
-getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnns -> m TypeSpecifier
+getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TypeSpecifier
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (OptionVariantInitializer _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (BinOp _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (ReferenceExpression _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (Casting _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (FunctionCall _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
-getExprType (MemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
-getExprType (DerefMemberFunctionCall _ _ _ (SemAnn _ (ETy (AppType _ ts)))) = return ts
-getExprType (StructInitializer _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (EnumVariantInitializer _ _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (ArrayInitializer _ _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
-getExprType (ArrayExprListInitializer _ (SemAnn _ (ETy (SimpleType ts)))) = return ts
+getExprType (Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (FunctionCall _ _ (Located (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
+getExprType (StructInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | Generates the name of the option struct type
@@ -269,11 +270,11 @@ genInteger (TInteger i DecRepr) = CInteger i CDecRepr
 genInteger (TInteger i HexRepr) = CInteger i CHexRepr
 genInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
-genArraySize :: (MonadError CGeneratorError m) => Size -> SemanticAnns -> m CExpression
+genArraySize :: (MonadError CGeneratorError m) => Size -> SemanticAnn -> m CExpression
 genArraySize (K s) ann = return $ CConst (CIntConst (genInteger s)) (buildGenericAnn ann)
 genArraySize (V v) ann = return $ CVar v (buildGenericAnn ann)
 
-genArraySizeDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m [CDerivedDeclarator]
+genArraySizeDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m [CDerivedDeclarator]
 genArraySizeDeclarator (Array ts arraySize) ann = do
     let cAnn = buildGenericAnn ann
     cSize <- genArraySize arraySize ann
@@ -286,7 +287,7 @@ genArraySizeDeclarator (Reference _ (Array ts arraySize)) ann = do
     return $ CArrDeclr [] (CArrSize False cSize) cAnn : rest
 genArraySizeDeclarator _ _ = return []
 
-genParameterDeclaration :: (MonadError CGeneratorError m) => SemanticAnns -> Parameter -> m CDeclaration
+genParameterDeclaration :: (MonadError CGeneratorError m) => SemanticAnn -> Parameter -> m CDeclaration
 genParameterDeclaration ann (Parameter identifier (Reference accKind ts)) = do
     declSpec <- genDeclSpecifiers ts
     arrayDecl <- genArraySizeDeclarator ts ann
@@ -306,7 +307,7 @@ genParameterDeclaration ann (Parameter identifier ts) = do
     return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)]
         (buildDeclarationAnn ann False)
 
-genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m CDeclaration
+genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m CDeclaration
 genCastDeclaration (DynamicSubtype ts@(Array _ _)) ann = do
     -- We must obtain the declaration specifier of the vector
     specs <- genDeclSpecifiers ts
@@ -319,7 +320,7 @@ genCastDeclaration (DynamicSubtype ts@(Array _ _)) ann = do
         cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
 
-        genPtrArrayDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnns -> m CDeclarator
+        genPtrArrayDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m CDeclarator
         genPtrArrayDeclarator (Array ts' _) ann' = do
             arrayDecl <- genArraySizeDeclarator ts' ann'
             return $ CDeclarator Nothing (CPtrDeclr [] cAnn : arrayDecl) [] cAnn
@@ -340,20 +341,23 @@ genCastDeclaration ts ann = do
     specs <- genDeclSpecifiers ts
     return $ CDeclaration specs [] declAnn
 
-buildGenericAnn :: SemanticAnns -> CAnns
-buildGenericAnn ann = CAnnotations (Semantic.Monad.location ann) CGenericAnn
+internalAnn :: CItemAnn -> CAnns
+internalAnn = flip Located Internal
 
-buildStatementAnn :: SemanticAnns -> Bool -> CAnns
-buildStatementAnn ann before = CAnnotations (Semantic.Monad.location ann) (CStatementAnn before False)
+buildGenericAnn :: SemanticAnn -> CAnns
+buildGenericAnn ann = Located CGenericAnn (location ann) 
 
-buildDeclarationAnn :: SemanticAnns -> Bool -> CAnns
-buildDeclarationAnn ann before = CAnnotations (Semantic.Monad.location ann) (CDeclarationAnn before)
+buildStatementAnn :: SemanticAnn -> Bool -> CAnns
+buildStatementAnn ann before = Located (CStatementAnn before False) (location ann) 
 
-buildCompoundAnn :: SemanticAnns -> Bool -> Bool -> CAnns
-buildCompoundAnn ann before trailing = CAnnotations (Semantic.Monad.location ann) (CCompoundAnn before trailing)
+buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
+buildDeclarationAnn ann before = Located (CDeclarationAnn before) (location ann) 
 
-buildCPPDirectiveAnn :: SemanticAnns -> Bool -> CAnns
-buildCPPDirectiveAnn ann before = CAnnotations (Semantic.Monad.location ann) (CPPDirectiveAnn before)
+buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
+buildCompoundAnn ann before trailing = Located (CCompoundAnn before trailing) (location ann) 
+
+buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
+buildCPPDirectiveAnn ann before = Located (CPPDirectiveAnn before) (location ann) 
 
 printIntegerLiteral :: TInteger -> String
 printIntegerLiteral (TInteger i DecRepr) = show i

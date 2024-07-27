@@ -12,7 +12,7 @@ import Generator.LanguageC.Printer
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Common
 
-interfaceWithOneProcedure :: AnnASTElement SemanticAnns
+interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
     InterfaceProcedure "procedure0" [
       Parameter "param0" UInt8,
@@ -26,7 +26,7 @@ interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
     ] undefined
   ] []) undefined
 
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl opts decl = 
   case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err

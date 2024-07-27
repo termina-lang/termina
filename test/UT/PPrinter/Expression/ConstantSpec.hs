@@ -13,7 +13,7 @@ import UT.PPrinter.Expression.Common
 uint8Const0x8, uint16Const1024, uint32Const0xFFFF0000,
   uint64Const1800000000, int8ConstMinux128, int16Const1024,
   int32ConstMinux1024, int64ConstMinux3000000000,
-  charConsta, trueBool, falseBool :: Expression SemanticAnns
+  charConsta, trueBool, falseBool :: Expression SemanticAnn
 uint8Const0x8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8SemAnn
 uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 uint32Const0xFFFF0000 = Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn
@@ -26,7 +26,7 @@ charConsta = Constant (C 'a') charSemAnn
 trueBool = Constant (B True) boolSemAnn
 falseBool = Constant (B False) boolSemAnn
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

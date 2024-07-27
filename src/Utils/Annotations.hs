@@ -14,6 +14,16 @@ data Location =
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen
   deriving Show
 
+data Located a = Located {
+    -- | Located element
+    element :: a,
+     -- | Location on source code
+    location :: Location
+} deriving Show
+
+locate :: Location -> a -> Located a
+locate = flip Located
+
 class Annotated (d :: Type -> Type) where
   getAnnotation :: d a -> a
 

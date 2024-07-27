@@ -11,13 +11,12 @@ import Semantic.Monad
 import qualified Data.Map as M
 import Data.Maybe
 import DataFlow.Architecture.Utils
-import Parser.Parsing
 import Semantic.Types
 import Utils.Annotations
 
-type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnns))
+type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnn))
 
-genArchTypeDef :: TypeDef SemanticAnns -> ArchitectureMonad ()
+genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
 genArchTypeDef tydef@(Class TaskClass ident _ _ _) = 
   ST.modify $ \tp ->
     tp {
@@ -35,7 +34,7 @@ genArchTypeDef tydef@(Class ResourceClass ident _ _ _) =
     }
 genArchTypeDef _ = return ()
 
-genArchGlobal :: Global SemanticAnns -> ArchitectureMonad ()
+genArchGlobal :: Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal (Const {}) = return ()
 genArchGlobal (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
@@ -175,15 +174,15 @@ genArchGlobal (Channel ident (MsgQueue mty size) _ _ cann) =
     }
 genArchGlobal (Channel {}) = error "Internal error: invalid channel declaration"
 
-genArchElement :: AnnASTElement SemanticAnns -> ArchitectureMonad ()
+genArchElement :: AnnASTElement SemanticAnn -> ArchitectureMonad ()
 genArchElement (Function {}) = return ()
 genArchElement (GlobalDeclaration glb) = genArchGlobal glb
 genArchElement (TypeDefinition typeDef _) = genArchTypeDef typeDef
 
-emptyTerminaProgArch :: TerminaProgArch SemanticAnns
+emptyTerminaProgArch :: TerminaProgArch SemanticAnn
 emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (SemAnn Internal (GTy (GGlob (SEmitter (DefinedType "SystemInit"))))))
+    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (GGlob (SEmitter (DefinedType "SystemInit")))) Internal))
   ],
   emitterTargets = M.empty,
   taskClasses = M.empty,
@@ -200,9 +199,9 @@ emptyTerminaProgArch = TerminaProgArch {
 }
 
 runGenArchitecture :: 
-  TerminaProgArch SemanticAnns 
-  -> AnnotatedProgram SemanticAnns 
-  -> Either ProgramError (TerminaProgArch SemanticAnns)
+  TerminaProgArch SemanticAnn 
+  -> AnnotatedProgram SemanticAnn 
+  -> Either ProgramError (TerminaProgArch SemanticAnn)
 runGenArchitecture tp elements =
   case flip ST.runState tp . runExceptT $ mapM_ genArchElement elements of
     (Left err, _) -> Left err

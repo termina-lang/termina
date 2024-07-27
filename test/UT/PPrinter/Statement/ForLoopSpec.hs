@@ -11,32 +11,32 @@ import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorAnn :: SemanticAnns
+vectorAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-vector0 :: Object SemanticAnns
+vector0 :: Object SemanticAnn
 vector0 = Variable "vector0" vectorAnn
 
-total, i :: Expression SemanticAnns
+total, i :: Expression SemanticAnn
 total = AccessObject (Variable "total" (objSemAnn Mutable UInt32))
 i = AccessObject (Variable "i" (objSemAnn Mutable USize))
 
-vector0IndexI:: Expression SemanticAnns
+vector0IndexI:: Expression SemanticAnn
 vector0IndexI = AccessObject (ArrayIndexExpression vector0 i (objSemAnn Mutable UInt32))
 
-forLoopBody :: [Statement SemanticAnns]
+forLoopBody :: [Statement SemanticAnn]
 forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32SemAnn) undefined]
 
-breakCond :: Expression SemanticAnns
+breakCond :: Expression SemanticAnn
 breakCond = BinOp RelationalNotEqual i (Constant (I (TInteger 5 DecRepr) (Just USize)) uint32SemAnn) boolSemAnn
 
-forLoop0 :: Statement SemanticAnns
+forLoop0 :: Statement SemanticAnn
 forLoop0 = ForLoopStmt "i" USize (KC (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (KC (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) Nothing forLoopBody undefined
 
-forLoop1 :: Statement SemanticAnns
+forLoop1 :: Statement SemanticAnn
 forLoop1 = ForLoopStmt "i" USize (KC (I (TInteger 0 DecRepr) (Just USize)) uint32SemAnn) (KC (I (TInteger 10 DecRepr) (Just USize)) uint32SemAnn) (Just breakCond) forLoopBody undefined
 
-renderStatement :: Statement SemanticAnns -> Text
+renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
   case runReaderT (genBlockItem stmt) empty of
     Left err -> pack $ show err

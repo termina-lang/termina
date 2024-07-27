@@ -10,23 +10,23 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorAnn, twoDymArrayAnn, dynTwoDymArrayAnn, dynThreeDymArrayAnn :: SemanticAnns
+vectorAnn, twoDymArrayAnn, dynTwoDymArrayAnn, dynThreeDymArrayAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 dynTwoDymArrayAnn = dynTwoDymArraySemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 dynThreeDymArrayAnn = dynThreeDymArraySemAnn Char (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-var0, vector0, vector1 :: Object SemanticAnns
+var0, vector0, vector1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymArrayAnn
 
-dynVar0, dynArray1, dynArray2 :: Object SemanticAnns
+dynVar0, dynArray1, dynArray2 :: Object SemanticAnn
 dynVar0 = Variable "dyn_var0" dynUInt16SemAnn
 dynArray1 = Variable "dyn_vector1" dynTwoDymArrayAnn
 dynArray2 = Variable "dyn_vector2" dynThreeDymArrayAnn
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

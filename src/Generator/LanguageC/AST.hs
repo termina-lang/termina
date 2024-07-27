@@ -356,12 +356,10 @@ data CItemAnn =
       Bool -- ^ Add new line before directive
   deriving (Show)
 
-data CAnns = CAnnotations
-  {
-    location :: Location,
-    itemAnnotation :: CItemAnn
-  }
-  deriving (Show)
+type CAnns = Located CItemAnn
+
+itemAnnotation :: CAnns -> CItemAnn
+itemAnnotation = element
 
 type CFile = CFile' CAnns
 type CPreprocessorDirective = CPreprocessorDirective' CAnns

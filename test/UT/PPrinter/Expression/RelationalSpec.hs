@@ -10,22 +10,22 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-uint16Const1024 :: Expression SemanticAnns
+uint16Const1024 :: Expression SemanticAnn
 uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
-var0, var1 :: Object SemanticAnns
+var0, var1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
 var1 = Variable "var1" dynUInt16SemAnn
 
-undynVar1 :: Object SemanticAnns
+undynVar1 :: Object SemanticAnn
 undynVar1 = Undyn var1 (objSemAnn Mutable UInt16)
 
-trueBool, falseBool :: Expression SemanticAnns
+trueBool, falseBool :: Expression SemanticAnn
 trueBool = Constant (B True) boolSemAnn
 falseBool = Constant (B False) boolSemAnn
 
 var0EqConstant, constantEqVar0, var1EqConstant, 
-  constantEqVar1, var0EqVar1 :: Expression SemanticAnns
+  constantEqVar1, var0EqVar1 :: Expression SemanticAnn
 var0EqConstant = BinOp RelationalEqual (AccessObject var0) uint16Const1024 boolSemAnn
 constantEqVar0 = BinOp RelationalEqual uint16Const1024 (AccessObject var0) boolSemAnn
 var1EqConstant = BinOp RelationalEqual (AccessObject undynVar1) uint16Const1024 boolSemAnn
@@ -33,7 +33,7 @@ constantEqVar1 = BinOp RelationalEqual uint16Const1024 (AccessObject undynVar1) 
 var0EqVar1 = BinOp RelationalEqual (AccessObject var0) (AccessObject undynVar1) boolSemAnn
 
 var0NeqConstant, constantNeqVar0, var1NeqConstant, 
-  constantNeqVar1, var0NeqVar1 :: Expression SemanticAnns
+  constantNeqVar1, var0NeqVar1 :: Expression SemanticAnn
 var0NeqConstant = BinOp RelationalNotEqual (AccessObject var0) uint16Const1024 boolSemAnn
 constantNeqVar0 = BinOp RelationalNotEqual uint16Const1024 (AccessObject var0) boolSemAnn
 var1NeqConstant = BinOp RelationalNotEqual (AccessObject undynVar1) uint16Const1024 boolSemAnn
@@ -41,7 +41,7 @@ constantNeqVar1 = BinOp RelationalNotEqual uint16Const1024 (AccessObject undynVa
 var0NeqVar1 = BinOp RelationalNotEqual (AccessObject var0) (AccessObject undynVar1) boolSemAnn
 
 var0GTConstant, constantGTVar0, var1GTConstant, 
-  constantGTVar1, var0GTVar1 :: Expression SemanticAnns
+  constantGTVar1, var0GTVar1 :: Expression SemanticAnn
 var0GTConstant = BinOp RelationalGT (AccessObject (var0)) uint16Const1024 boolSemAnn
 constantGTVar0 = BinOp RelationalGT uint16Const1024 (AccessObject (var0)) boolSemAnn
 var1GTConstant = BinOp RelationalGT (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
@@ -49,7 +49,7 @@ constantGTVar1 = BinOp RelationalGT uint16Const1024 (AccessObject (undynVar1)) b
 var0GTVar1 = BinOp RelationalGT (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
 
 var0GTEConstant, constantGTEVar0, var1GTEConstant, 
-  constantGTEVar1, var0GTEVar1 :: Expression SemanticAnns
+  constantGTEVar1, var0GTEVar1 :: Expression SemanticAnn
 var0GTEConstant = BinOp RelationalGTE (AccessObject (var0)) uint16Const1024 boolSemAnn
 constantGTEVar0 = BinOp RelationalGTE uint16Const1024 (AccessObject (var0)) boolSemAnn
 var1GTEConstant = BinOp RelationalGTE (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
@@ -57,7 +57,7 @@ constantGTEVar1 = BinOp RelationalGTE uint16Const1024 (AccessObject (undynVar1))
 var0GTEVar1 = BinOp RelationalGTE (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
 
 var0LTConstant, constantLTVar0, var1LTConstant, 
-  constantLTVar1, var0LTVar1 :: Expression SemanticAnns
+  constantLTVar1, var0LTVar1 :: Expression SemanticAnn
 var0LTConstant = BinOp RelationalLT (AccessObject (var0)) uint16Const1024 boolSemAnn
 constantLTVar0 = BinOp RelationalLT uint16Const1024 (AccessObject (var0)) boolSemAnn
 var1LTConstant = BinOp RelationalLT (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
@@ -65,22 +65,22 @@ constantLTVar1 = BinOp RelationalLT uint16Const1024 (AccessObject (undynVar1)) b
 var0LTVar1 = BinOp RelationalLT (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
 
 var0LTEConstant, constantLTEVar0, var1LTEConstant, 
-  constantLTEVar1, var0LTEVar1 :: Expression SemanticAnns
+  constantLTEVar1, var0LTEVar1 :: Expression SemanticAnn
 var0LTEConstant = BinOp RelationalLTE (AccessObject (var0)) uint16Const1024 boolSemAnn
 constantLTEVar0 = BinOp RelationalLTE uint16Const1024 (AccessObject (var0)) boolSemAnn
 var1LTEConstant = BinOp RelationalLTE (AccessObject (undynVar1)) uint16Const1024 boolSemAnn
 constantLTEVar1 = BinOp RelationalLTE uint16Const1024 (AccessObject (undynVar1)) boolSemAnn
 var0LTEVar1 = BinOp RelationalLTE (AccessObject (var0)) (AccessObject (undynVar1)) boolSemAnn
 
-logicalAndConst, logicalAndExpr :: Expression SemanticAnns
+logicalAndConst, logicalAndExpr :: Expression SemanticAnn
 logicalAndConst = BinOp LogicalAnd trueBool falseBool boolSemAnn
 logicalAndExpr = BinOp LogicalAnd var0EqVar1 var0LTEConstant boolSemAnn
 
-logicalOrConst, logicalOrExpr :: Expression SemanticAnns
+logicalOrConst, logicalOrExpr :: Expression SemanticAnn
 logicalOrConst = BinOp LogicalOr falseBool trueBool boolSemAnn
 logicalOrExpr = BinOp LogicalOr var1LTConstant var0LTEConstant boolSemAnn
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

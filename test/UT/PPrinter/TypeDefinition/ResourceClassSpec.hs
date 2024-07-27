@@ -13,7 +13,7 @@ import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Common
 
 
-classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnns
+classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure "procedure0" [
       Parameter "param0" UInt8,
@@ -27,7 +27,7 @@ classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0
     ] [] undefined
   ] ["Interface0"] []) undefined
 
-classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnns
+classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnn
 classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure "procedure0" [
       Parameter "param0" UInt8,
@@ -39,12 +39,12 @@ classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class
     ] [] undefined
   ] ["Interface0"] []) undefined
 
-noHandlerClassWithoutOneProcedureAndZeroFields :: AnnASTElement SemanticAnns
+noHandlerClassWithoutOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 noHandlerClassWithoutOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] []) undefined
 
-classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnns
+classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndTwoFields = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
@@ -52,7 +52,7 @@ classWithOneProcedureAndTwoFields = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] []) undefined
 
-noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnns
+noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnn
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt8) undefined,
@@ -60,7 +60,7 @@ noHandlerClassWithOneEmptyProcedure = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] [Modifier "no_handler" Nothing]) undefined
 
-packedClass :: AnnASTElement SemanticAnns
+packedClass :: AnnASTElement SemanticAnn
 packedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
@@ -72,7 +72,7 @@ packedClass = TypeDefinition
     ] [] undefined
   ] ["Interface0"] [Modifier "packed" Nothing]) undefined
 
-alignedClass :: AnnASTElement SemanticAnns
+alignedClass :: AnnASTElement SemanticAnn
 alignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
@@ -81,7 +81,7 @@ alignedClass = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))]) undefined
 
-packedAndAlignedClass :: AnnASTElement SemanticAnns
+packedAndAlignedClass :: AnnASTElement SemanticAnn
 packedAndAlignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt64) undefined,
@@ -93,7 +93,7 @@ packedAndAlignedClass = TypeDefinition
       Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))
     ]) undefined
 
-classWithFixedLocationField :: AnnASTElement SemanticAnns
+classWithFixedLocationField :: AnnASTElement SemanticAnn
 classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt32) undefined,
@@ -101,7 +101,7 @@ classWithFixedLocationField = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] []) undefined
 
-classWithAccessPortField :: AnnASTElement SemanticAnns
+classWithAccessPortField :: AnnASTElement SemanticAnn
 classWithAccessPortField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" UInt32) undefined,
@@ -109,7 +109,7 @@ classWithAccessPortField = TypeDefinition
     ClassProcedure "procedure0" [] [] undefined
   ] ["Interface0"] []) undefined
 
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnns -> Text
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl opts decl = 
   case runReaderT (genTypeDefinitionDecl decl) opts of
     Left err -> pack $ show err

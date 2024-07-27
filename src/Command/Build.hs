@@ -22,7 +22,7 @@ import Parser.Parsing (Annotation, terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
-import Semantic.Monad (SemanticAnns, Environment, makeInitialGlobalEnv)
+import Semantic.Monad (SemanticAnn, Environment, makeInitialGlobalEnv)
 import Modules.Modules
 import DataFlow.VarUsage (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
@@ -101,7 +101,7 @@ newtype ParsingData = ParsingData {
 } deriving (Show)
 
 newtype SemanticData = SemanticData {
-  typedAST :: SAST.AnnotatedProgram SemanticAnns
+  typedAST :: SAST.AnnotatedProgram SemanticAnn
 } deriving (Show)
 
 type ParsedModule = TerminaModuleData ParsingData
@@ -283,13 +283,13 @@ printOptionHeaderFile destinationPath basicTypesOptionMap = do
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
 
-genArchitecture :: TypedProject -> TerminaProgArch SemanticAnns -> [QualifiedName] -> IO (TerminaProgArch SemanticAnns)
+genArchitecture :: TypedProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture typedProject initialTerminaProgram orderedDependencies = do
   genArchitecture' initialTerminaProgram orderedDependencies
 
   where
 
-    genArchitecture' :: TerminaProgArch SemanticAnns -> [QualifiedName] -> IO (TerminaProgArch SemanticAnns)
+    genArchitecture' :: TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
     genArchitecture' tp [] = pure tp
     genArchitecture' tp (m:ms) = do
       let typedModule = typedAST . metadata $ typedProject M.! m
@@ -298,7 +298,7 @@ genArchitecture typedProject initialTerminaProgram orderedDependencies = do
         Left err -> die . errorMessage $ show err
         Right tp' -> genArchitecture' tp' ms
 
-warnDisconnectedEmitters :: TerminaProgArch SemanticAnns -> IO ()
+warnDisconnectedEmitters :: TerminaProgArch SemanticAnn -> IO ()
 warnDisconnectedEmitters tp =
     let disconnectedEmitters = getDisconnectedEmitters tp in
     unless (null disconnectedEmitters) $

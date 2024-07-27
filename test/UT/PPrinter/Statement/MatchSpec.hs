@@ -11,47 +11,48 @@ import Control.Monad.Reader
 import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
+import Utils.Annotations
 
-optionDynUInt32SemAnn :: SemanticAnns
+optionDynUInt32SemAnn :: SemanticAnn
 optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
 
-vectorAnn, dynArrayAnn :: SemanticAnns
+vectorAnn, dynArrayAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 
-param0, param1 :: Object SemanticAnns
+param0, param1 :: Object SemanticAnn
 param0 = Variable "param0" dynUInt32SemAnn
 param1 = Variable "param1" dynArrayAnn
 
-uint32Const0 :: Expression SemanticAnns
+uint32Const0 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
 
-usizeConst0x8 :: Expression SemanticAnns
+usizeConst0x8 :: Expression SemanticAnn
 usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
-optionVar :: Expression SemanticAnns
+optionVar :: Expression SemanticAnn
 optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
 
-vector0IndexConstant :: Expression SemanticAnns
+vector0IndexConstant :: Expression SemanticAnn
 vector0IndexConstant = AccessObject (ArrayIndexExpression (Undyn param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
-foo1 :: Object SemanticAnns
+foo1 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
 
-param0ToFoo1, constToFoo1 :: Statement SemanticAnns
+param0ToFoo1, constToFoo1 :: Statement SemanticAnn
 param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Undyn param0 (objSemAnn Mutable UInt32))) stmtSemAnn
 constToFoo1 = AssignmentStmt foo1 uint32Const0 stmtSemAnn
 
-matchCaseSome0 :: MatchCase SemanticAnns
+matchCaseSome0 :: MatchCase SemanticAnn
 matchCaseSome0 = MatchCase "Some" ["param0"] [param0ToFoo1] stmtSemAnn
 
-param1ToFoo1 :: Statement SemanticAnns
+param1ToFoo1 :: Statement SemanticAnn
 param1ToFoo1 = AssignmentStmt foo1 vector0IndexConstant stmtSemAnn
 
-matchCaseSome1 :: MatchCase SemanticAnns
+matchCaseSome1 :: MatchCase SemanticAnn
 matchCaseSome1 = MatchCase "Some" ["param1"] [param1ToFoo1] stmtSemAnn
 
-matchCaseNone :: MatchCase SemanticAnns
+matchCaseNone :: MatchCase SemanticAnn
 matchCaseNone = MatchCase "None" [] [constToFoo1] stmtSemAnn
 
 -- | A match statement with two cases. In Termina syntax:
@@ -63,19 +64,19 @@ matchCaseNone = MatchCase "None" [] [constToFoo1] stmtSemAnn
 --     foo1 = 0;
 --   }
 -- }
-matchOption0 :: Statement SemanticAnns 
+matchOption0 :: Statement SemanticAnn 
 matchOption0 = MatchStmt optionVar [matchCaseSome0, matchCaseNone] stmtSemAnn
 
-matchOption1 :: Statement SemanticAnns
+matchOption1 :: Statement SemanticAnn
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
-getInteger :: Expression SemanticAnns
-getInteger = FunctionCall "get_integer" [] (SemAnn undefined (ETy (AppType [] (Option (DynamicSubtype UInt32)))))
+getInteger :: Expression SemanticAnn
+getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (Option (DynamicSubtype UInt32)))) Internal)
 
-matchOption2 :: Statement SemanticAnns
+matchOption2 :: Statement SemanticAnn
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn
 
-renderStatement :: Statement SemanticAnns -> Text
+renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
   case runReaderT (genBlockItem stmt) empty of
     Left err -> pack $ show err

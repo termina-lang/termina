@@ -32,10 +32,10 @@ cBinOp LogicalAnd = CLndOp
 cBinOp LogicalOr = CLorOp
 
 genMemberFunctionAccess :: 
-    Object SemanticAnns 
+    Object SemanticAnn 
     -> Identifier 
-    -> [Expression SemanticAnns] 
-    -> SemanticAnns 
+    -> [Expression SemanticAnn] 
+    -> SemanticAnn 
     -> CSourceGenerator CExpression
 genMemberFunctionAccess obj ident args ann = do
     let cAnn = buildGenericAnn ann
@@ -105,8 +105,8 @@ genMemberFunctionAccess obj ident args ann = do
             -- | If it is a send, the first parameter is the object to be sent. The
             -- function is expecting to receive a reference to that object.
             case args of
-                [element] -> do
-                    paramTs <- getExprType element
+                [elemnt] -> do
+                    paramTs <- getExprType elemnt
                     case paramTs of
                         Array {} ->
                             return $
@@ -125,7 +125,7 @@ genMemberFunctionAccess obj ident args ann = do
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 
-genExpression :: Expression SemanticAnns -> CSourceGenerator CExpression
+genExpression :: Expression SemanticAnn -> CSourceGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
     cObjType <- getObjType obj
@@ -216,7 +216,7 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
 genExpression (ArraySliceExpression _ak obj _size _ann) = genObject obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
-genConstExpression :: ConstExpression SemanticAnns -> CSourceGenerator CExpression
+genConstExpression :: ConstExpression SemanticAnn -> CSourceGenerator CExpression
 genConstExpression (KC (I i _) ann) = do
     let cInteger = genInteger i
     return $ CConst (CIntConst cInteger) (buildGenericAnn ann)
@@ -225,7 +225,7 @@ genConstExpression (KC (B False) ann) = return $ CConst (CIntConst (CInteger 0 C
 genConstExpression (KC (C char) ann) = return $ CConst (CCharConst (CChar char)) (buildGenericAnn ann)
 genConstExpression (KV ident ann) = return $ CVar ident (buildGenericAnn ann)
 
-genObject :: Object SemanticAnns -> CSourceGenerator CExpression
+genObject :: Object SemanticAnn -> CSourceGenerator CExpression
 genObject (Variable identifier ann) = do
     let cAnn = buildGenericAnn ann
     -- Obtain the substitutions map

@@ -10,7 +10,7 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
 
 
-genFunctionDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CExternalDeclaration]
+genFunctionDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CExternalDeclaration]
 genFunctionDecl (Function identifier parameters rts _ _ ann) = do
     let cAnn = buildGenericAnn ann
     retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
@@ -20,7 +20,7 @@ genFunctionDecl (Function identifier parameters rts _ _ ann) = do
         (buildDeclarationAnn ann True)]
 genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show item
 
-genFunction :: AnnASTElement SemanticAnns -> CSourceGenerator [CExternalDeclaration]
+genFunction :: AnnASTElement SemanticAnn -> CSourceGenerator [CExternalDeclaration]
 genFunction (Function identifier parameters rts (BlockRet body ret) _ ann) = do
     retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
     cParams <- mapM (genParameterDeclaration ann) parameters

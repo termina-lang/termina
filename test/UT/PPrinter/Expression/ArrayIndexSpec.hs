@@ -10,52 +10,52 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorAnn, dynArrayAnn, twoDymArrayAnn :: SemanticAnns
+vectorAnn, dynArrayAnn, twoDymArrayAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-refArrayAnn :: SemanticAnns
+refArrayAnn :: SemanticAnn
 refArrayAnn = refSemAnn (Array UInt32 (K (TInteger 10 DecRepr)))
 
-var0, vector0, vector1 :: Object SemanticAnns
+var0, vector0, vector1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
 vector0 = Variable "vector0" vectorAnn
 vector1 = Variable "vector1" twoDymArrayAnn
 
-pArray0 :: Object SemanticAnns
+pArray0 :: Object SemanticAnn
 pArray0 = Variable "p_vector0" refArrayAnn
 
-usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnns
+usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnn
 usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just USize)) usizeSemAnn
 usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just USize)) usizeSemAnn
 usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
-dynArray0 :: Object SemanticAnns
+dynArray0 :: Object SemanticAnn
 dynArray0 = Variable "dyn_vector0" dynArrayAnn
 
-vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnns
+vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnn
 vector0IndexConstant = AccessObject (ArrayIndexExpression vector0 usizeConst0x8 (objSemAnn Mutable UInt32))
 vector0IndexVar0 = AccessObject (ArrayIndexExpression vector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
-dynArray0IndexConstant, dynArray0IndexVar0 :: Expression SemanticAnns
+dynArray0IndexConstant, dynArray0IndexVar0 :: Expression SemanticAnn
 dynArray0IndexConstant = AccessObject (ArrayIndexExpression (Undyn dynArray0 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 dynArray0IndexVar0 = AccessObject (ArrayIndexExpression (Undyn dynArray0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
-vector1IndexFirstDym :: Object SemanticAnns
+vector1IndexFirstDym :: Object SemanticAnn
 vector1IndexFirstDym = ArrayIndexExpression vector1 usizeIndex3 (vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)))
 
-vector1IndexExpression :: Expression SemanticAnns
+vector1IndexExpression :: Expression SemanticAnn
 vector1IndexExpression = AccessObject (ArrayIndexExpression vector1IndexFirstDym usizeIndex4 (objSemAnn Mutable Int64))
 
-derefpArray0 :: Object SemanticAnns
+derefpArray0 :: Object SemanticAnn
 derefpArray0 = Dereference pArray0 vectorAnn
 
-derefpArray0IndexConstant, derefpArray0IndexVar0 :: Expression SemanticAnns
+derefpArray0IndexConstant, derefpArray0IndexVar0 :: Expression SemanticAnn
 derefpArray0IndexConstant = AccessObject (ArrayIndexExpression derefpArray0 usizeIndex3 (objSemAnn Mutable UInt32))
 derefpArray0IndexVar0 = AccessObject (ArrayIndexExpression derefpArray0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err

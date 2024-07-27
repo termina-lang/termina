@@ -8,7 +8,7 @@ import Semantic.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 
-genGlobalDecl :: AnnASTElement SemanticAnns -> CHeaderGenerator [CFileItem]
+genGlobalDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     let cAnn = buildGenericAnn ann
     decl <- genDeclSpecifiers ts
@@ -47,7 +47,7 @@ genGlobalDecl (GlobalDeclaration (Const identifier ts contExpr _ ann)) = do
 genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl
 
 
-genGlobal :: AnnASTElement SemanticAnns -> CSourceGenerator [CExternalDeclaration]
+genGlobal :: AnnASTElement SemanticAnn -> CSourceGenerator [CExternalDeclaration]
 genGlobal (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     let cAnn = buildGenericAnn ann
     decl <- genDeclSpecifiers ts

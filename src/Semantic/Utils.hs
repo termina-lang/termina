@@ -6,5 +6,5 @@ import Semantic.Monad
 import AST.Parser
 import Utils.Annotations
 
-getExpType :: Expression SemanticAnns -> Maybe TypeSpecifier
-getExpType = getResultingType . ty_ann . getAnnotation
+getExpType :: Expression SemanticAnn -> Maybe TypeSpecifier
+getExpType = getResultingType . getSemanticAnn . getAnnotation

@@ -11,66 +11,66 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 
 
-var0 :: Expression SemanticAnns
+var0 :: Expression SemanticAnn
 -- | var0 : u16
 var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt16))
 
-undynVar1 :: Expression SemanticAnns
+undynVar1 :: Expression SemanticAnn
 undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) (objSemAnn Mutable UInt16))
 
-constUInt16 :: Expression SemanticAnns
+constUInt16 :: Expression SemanticAnn
 -- | 1024 : u16
 constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
 
-var0PlusConstant :: Expression SemanticAnns
+var0PlusConstant :: Expression SemanticAnn
 -- | var0 + 1024 : u16
 var0PlusConstant = BinOp Addition var0 constUInt16 uint16SemAnn
 
-constantPlusVar0 :: Expression SemanticAnns
+constantPlusVar0 :: Expression SemanticAnn
 -- | 1024 : u16 + var0
 constantPlusVar0 = BinOp Addition constUInt16 var0 uint16SemAnn
 
-var1PlusConstant :: Expression SemanticAnns
+var1PlusConstant :: Expression SemanticAnn
 -- | var1 + 1024 : u16
 var1PlusConstant = BinOp Addition undynVar1 constUInt16 uint16SemAnn
 
-constantPlusVar1 :: Expression SemanticAnns
+constantPlusVar1 :: Expression SemanticAnn
 constantPlusVar1 = BinOp Addition constUInt16 undynVar1 uint16SemAnn
 
-var0PlusVar1 :: Expression SemanticAnns
+var0PlusVar1 :: Expression SemanticAnn
 var0PlusVar1 = BinOp Addition var0 undynVar1 uint16SemAnn
 
-var0PlusVar1PlusConstant :: Expression SemanticAnns
+var0PlusVar1PlusConstant :: Expression SemanticAnn
 var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 constUInt16 uint16SemAnn
 
-var0MinusConstant :: Expression SemanticAnns
+var0MinusConstant :: Expression SemanticAnn
 var0MinusConstant = BinOp Subtraction var0 constUInt16 uint16SemAnn
 
-constantMinusVar0 :: Expression SemanticAnns
+constantMinusVar0 :: Expression SemanticAnn
 constantMinusVar0 = BinOp Subtraction constUInt16 var0 uint16SemAnn
 
-var0MultConstant :: Expression SemanticAnns
+var0MultConstant :: Expression SemanticAnn
 var0MultConstant = BinOp Multiplication var0 constUInt16 uint16SemAnn
 
-constantMultVar0 :: Expression SemanticAnns
+constantMultVar0 :: Expression SemanticAnn
 constantMultVar0 = BinOp Multiplication constUInt16 var0 uint16SemAnn
 
-var0MultVar1 :: Expression SemanticAnns
+var0MultVar1 :: Expression SemanticAnn
 var0MultVar1 = BinOp Multiplication var0 undynVar1 uint16SemAnn
 
-var1DivConstant :: Expression SemanticAnns
+var1DivConstant :: Expression SemanticAnn
 var1DivConstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
 
-var0DivVar1 :: Expression SemanticAnns
+var0DivVar1 :: Expression SemanticAnn
 var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
 
-var1ModConstant :: Expression SemanticAnns
+var1ModConstant :: Expression SemanticAnn
 var1ModConstant = BinOp Modulo undynVar1 constUInt16 uint16SemAnn
 
-var0ModVar1 :: Expression SemanticAnns
+var0ModVar1 :: Expression SemanticAnn
 var0ModVar1 = BinOp Modulo var0 undynVar1 uint16SemAnn
 
-renderExpression :: Expression SemanticAnns -> Text
+renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   case runReaderT (genExpression expr) empty of
     Left err -> pack $ show err
