@@ -1,10 +1,8 @@
-import { drivers.uart }
+import drivers.uart;
 
 task class CHouseKeepingTask {
 
-    uart : port UARTDriver;
-
-    pool_port : port Pool<u32; 10>;
+    pool_port : port Allocator<u32>;
     msg_queue_port : port MsgQueue<u32; 10>;
 
     count : u32;
@@ -13,14 +11,14 @@ task class CHouseKeepingTask {
         return self->count == 0 : u32;
     }
 
-    method run(&priv self) -> TaskRet {
+    method run(&mut self) -> TaskRet {
 
         var ret : TaskRet = TaskRet::Continue;
         var result : Result = Result::Ok;
 
         var next_time : TimeVal = { tv_sec = 10 : u32, tv_usec = 0 : u32 } : TimeVal;
 
-        var msg : Option<dyn u32> = None;
+        var msg : Option<box u32> = None;
 
         self->pool_port.alloc(&mut msg);
 

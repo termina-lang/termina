@@ -119,7 +119,7 @@ data TypeSpecifier
   | AtomicArrayAccess TypeSpecifier Size -- Interface to access atomic arrays
   -- Non-primitive types
   | Reference AccessKind TypeSpecifier
-  | DynamicSubtype TypeSpecifier
+  | BoxSubtype TypeSpecifier
   -- | Fixed-location types
   | Location TypeSpecifier
   -- | Port types

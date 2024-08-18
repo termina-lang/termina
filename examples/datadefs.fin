@@ -2,7 +2,7 @@ class TMChannel {
 
   tm_sent_packets : u32 = 0 : u32 ;
 
-  fn send_tm_list(list : 'dyn TMList) -> Result {
+  fn send_tm_list(list : 'box TMList) -> Result {
 
     var ret : Result = Ok;
 

@@ -1,4 +1,4 @@
-fn test0(t : 'dyn uint16){
+fn test0(t : 'box uint16){
   free(t);
   return;
 }

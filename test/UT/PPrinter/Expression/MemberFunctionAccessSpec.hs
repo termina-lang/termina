@@ -15,7 +15,7 @@ self = Variable "self" (refDefinedTypeSemAnn "Resource")
 tmChannel = Variable "tm_channel" (msgQueueSemAnn (DefinedType "TMDescriptor"))
 tmPool = Variable "tm_pool" (poolSemAnn UInt32)
 bar0 = Variable "bar0" (objSemAnn Mutable UInt16)
-bar1 = Variable "bar1" dynUInt16SemAnn
+bar1 = Variable "bar1" boxUInt16SemAnn
 
 tmPoolAlloc :: Expression SemanticAnn
 tmPoolAlloc = MemberFunctionCall tmPool "alloc" [] unitSemAnn

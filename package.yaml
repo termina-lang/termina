@@ -2,7 +2,7 @@ name:                termina
 version:             0.1.0.0
 github:              "termina-lang/transpiler"
 license:             BSD3
-author:              "Termina Group"
+author:              "Termina Language Group"
 maintainer:          "example@example.com"
 copyright:           "2022 Author name here"
 

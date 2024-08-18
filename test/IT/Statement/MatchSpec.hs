@@ -13,11 +13,11 @@ import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "interface test_iface {\n" ++
-        "    procedure match_test0(&mut self, option0 : Option<dyn u32>);\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<box u32>);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure match_test0(&mut self, option0 : Option<dyn u32>) {\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<box u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
         "            case Some(value) => {\n" ++
@@ -33,11 +33,11 @@ test0 = "interface test_iface {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure match_test1(&mut self, option0 : Option<dyn u32>);\n" ++
+        "    procedure match_test1(&mut self, option0 : Option<box u32>);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure match_test1(&mut self, option0 : Option<dyn u32>) {\n" ++
+        "    procedure match_test1(&mut self, option0 : Option<box u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        match option0 {\n" ++
         "            case None => {\n" ++
@@ -112,14 +112,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* match_test0)(void * __this, __option_dyn_t option0);\n" ++
+              "    void (* match_test0)(void * __this, __option_box_t option0);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(void * const __this, __option_dyn_t option0);\n" ++
+              "void id0__match_test0(void * const __this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of procedure match_test0" $ do
@@ -127,7 +127,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test0(void * const __this, __option_dyn_t option0) {\n" ++
+              "void id0__match_test0(void * const __this, __option_box_t option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
@@ -141,7 +141,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        __option_dyn_params_t __Some = option0.Some;\n" ++
+              "        __option_box_params_t __Some = option0.Some;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)__Some.__0.data;\n" ++
               "\n" ++
@@ -161,14 +161,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* match_test1)(void * __this, __option_dyn_t option0);\n" ++
+              "    void (* match_test1)(void * __this, __option_box_t option0);\n" ++
               "} test_iface;\n" ++
               "\n" ++              
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test1(void * const __this, __option_dyn_t option0);\n" ++
+              "void id0__match_test1(void * const __this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of procedure match_test1" $ do
@@ -176,7 +176,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test1(void * const __this, __option_dyn_t option0) {\n" ++
+              "void id0__match_test1(void * const __this, __option_box_t option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
@@ -189,7 +189,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        __option_dyn_params_t __Some = option0.Some;\n" ++
+              "        __option_box_params_t __Some = option0.Some;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)__Some.__0.data;\n" ++
               "\n" ++

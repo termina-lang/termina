@@ -10,9 +10,9 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorAnn, dynArrayAnn, twoDymArrayAnn :: SemanticAnn
+vectorAnn, boxArrayAnn, twoDymArrayAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+boxArrayAnn = boxArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 refArrayAnn :: SemanticAnn
@@ -31,16 +31,16 @@ usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just USize)) usizeSemAnn
 usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just USize)) usizeSemAnn
 usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
-dynArray0 :: Object SemanticAnn
-dynArray0 = Variable "dyn_vector0" dynArrayAnn
+boxArray0 :: Object SemanticAnn
+boxArray0 = Variable "box_vector0" boxArrayAnn
 
 vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnn
 vector0IndexConstant = AccessObject (ArrayIndexExpression vector0 usizeConst0x8 (objSemAnn Mutable UInt32))
 vector0IndexVar0 = AccessObject (ArrayIndexExpression vector0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
-dynArray0IndexConstant, dynArray0IndexVar0 :: Expression SemanticAnn
-dynArray0IndexConstant = AccessObject (ArrayIndexExpression (Undyn dynArray0 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
-dynArray0IndexVar0 = AccessObject (ArrayIndexExpression (Undyn dynArray0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
+boxArray0IndexConstant, boxArray0IndexVar0 :: Expression SemanticAnn
+boxArray0IndexConstant = AccessObject (ArrayIndexExpression (Unbox boxArray0 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+boxArray0IndexVar0 = AccessObject (ArrayIndexExpression (Unbox boxArray0 vectorAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
 vector1IndexFirstDym :: Object SemanticAnn
 vector1IndexFirstDym = ArrayIndexExpression vector1 usizeIndex3 (vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr)))
@@ -73,12 +73,12 @@ spec = do
     it "Prints the expression: vector1[3 : u32][4 : u32]" $ do
       renderExpression vector1IndexExpression `shouldBe`
         pack "vector1[3][4]"
-    it "Prints the expression: dyn_vector0[0x08 : u8]" $ do
-      renderExpression dynArray0IndexConstant `shouldBe`
-        pack "((uint32_t *)dyn_vector0.data)[8]"
-    it "Prints the expression: dyn_vector0[var0]" $ do
-      renderExpression dynArray0IndexVar0 `shouldBe`
-        pack "((uint32_t *)dyn_vector0.data)[var0]"
+    it "Prints the expression: box_vector0[0x08 : u8]" $ do
+      renderExpression boxArray0IndexConstant `shouldBe`
+        pack "((uint32_t *)box_vector0.data)[8]"
+    it "Prints the expression: box_vector0[var0]" $ do
+      renderExpression boxArray0IndexVar0 `shouldBe`
+        pack "((uint32_t *)box_vector0.data)[var0]"
     it "Prints the expression: *vector0[3 : u32]" $ do
       renderExpression derefpArray0IndexConstant `shouldBe`
         pack "p_vector0[3]"

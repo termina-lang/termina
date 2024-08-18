@@ -75,7 +75,7 @@ instance ShowText TypeSpecifier where
     showText (Atomic ts) = "Atomic<" <> showText ts <> ">"
     showText (AtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (Reference ak ts) = "&" <> showText ak <> showText ts
-    showText (DynamicSubtype ts) = "dyn " <> showText ts
+    showText (BoxSubtype ts) = "box " <> showText ts
     showText (Location ts) = "loc " <> showText ts
     showText (AccessPort ts) = "access " <> showText ts
     showText (SinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident

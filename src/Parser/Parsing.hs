@@ -50,8 +50,8 @@ lexer = Tok.makeTokenParser langDef
               "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
       ++ -- Struct and enum types
              ["struct", "enum"]
-      ++ -- Dynamic Subtyping
-             ["dyn"]
+      ++ -- Box Subtyping
+             ["box"]
       ++ -- Fixed Location Subtyping
              ["loc"]
       ++ -- Ports Subtyping
@@ -209,7 +209,7 @@ typeSpecifierParser =
   <|> vectorParser
   <|> mutableReferenceParser
   <|> referenceParser
-  <|> dynamicSubtypeParser
+  <|> boxSubtypeParser
   <|> locationSubtypeParser
   <|> allocatorParser
   <|> atomicParser
@@ -399,8 +399,8 @@ referenceParser = reservedOp "&" >> Reference Immutable <$> typeSpecifierParser
 mutableReferenceParser :: Parser TypeSpecifier
 mutableReferenceParser = reservedOp "&mut" >> Reference Mutable <$> typeSpecifierParser
 
-dynamicSubtypeParser :: Parser TypeSpecifier
-dynamicSubtypeParser = reservedOp "dyn" >> DynamicSubtype <$> typeSpecifierParser
+boxSubtypeParser :: Parser TypeSpecifier
+boxSubtypeParser = reserved "box" >> BoxSubtype <$> typeSpecifierParser
 
 locationSubtypeParser :: Parser TypeSpecifier
 locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser

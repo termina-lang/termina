@@ -8,8 +8,8 @@ enum Message {
 /* The following definition fails
 task class CHousekeeping {
   message_pool : port Pool<Message; 10>;
-  method run(&priv self) -> bool {
-    var alloc_msg : Option<dyn Message> = None;
+  method run(&mut self) -> bool {
+    var alloc_msg : Option<box Message> = None;
     self->message_pool.alloc(&mut alloc_msg);
 
     return true;
@@ -23,8 +23,8 @@ task class CHousekeeping {
   message_pool : port Pool<Message; 10>;
   ints : port Pool<u32; 10>;
 
-  method add(&priv self) -> bool {
-    var int : Option<dyn u32> = None;
+  method add(&mut self) -> bool {
+    var int : Option<box u32> = None;
     self->ints.alloc(&mut int);
     match int {
       case Some(i) => {
@@ -38,8 +38,8 @@ task class CHousekeeping {
     return true;
   }
 
-  method run(&priv self) -> bool {
-    var alloc_msg : Option<dyn Message> = None;
+  method run(&mut self) -> bool {
+    var alloc_msg : Option<box Message> = None;
     self->message_pool.alloc(&mut alloc_msg);
     match alloc_msg {
         case Some(msg) => {

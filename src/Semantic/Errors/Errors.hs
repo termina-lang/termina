@@ -150,7 +150,7 @@ data Error a
   | EAccessPortNotPool Identifier
   | EAccessPortNotAtomic Identifier
   | EAccessPortNotAtomicArray Identifier
-  -- | Dynamic (type has a Dynamic inside) as Argument of a function
+  -- | Box (type has a Box inside) as Argument of a function
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier Location
@@ -181,8 +181,8 @@ data Error a
   | EClassTyping
   -- Dereference Object
   | ETypeNotReference TypeSpecifier
-  -- Internal Undyn
-  | EUnDynExpression
+  -- Internal Unbox
+  | EUnBoxExpression
   -- Match
   | EMatchNotEnum Identifier
   | EMatchWrongType TypeSpecifier

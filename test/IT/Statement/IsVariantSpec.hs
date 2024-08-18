@@ -12,11 +12,11 @@ import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "interface test_iface {\n" ++
-        "    procedure match_test0(&mut self, option0 : Option<dyn u32>);\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<box u32>);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure match_test0(&mut self, option0 : Option<dyn u32>) {\n" ++
+        "    procedure match_test0(&mut self, option0 : Option<box u32>) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
         "        if option0 is None {\n" ++
         "            foo = 1 : u32;\n" ++
@@ -76,14 +76,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* match_test0)(void * __this, __option_dyn_t option0);\n" ++
+              "    void (* match_test0)(void * __this, __option_box_t option0);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__match_test0(void * const __this, __option_dyn_t option0);\n" ++
+              "void id0__match_test0(void * const __this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of procedure match_test0" $ do
@@ -91,7 +91,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__match_test0(void * const __this, __option_dyn_t option0) {\n" ++
+              "void id0__match_test0(void * const __this, __option_box_t option0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++

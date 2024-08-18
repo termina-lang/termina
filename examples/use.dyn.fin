@@ -4,7 +4,7 @@ struct TMDescriptorT {
 };
 
 resource class TMChannel{
-   procedure test (&priv self, testD : dyn TMDescriptorT){
+   procedure test (&mut self, testD : box TMDescriptorT){
              free(testD);
              return;
    }

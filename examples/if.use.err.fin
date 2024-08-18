@@ -10,12 +10,12 @@ function testIf(foo : u16) -> u32 {
   return out;
 }
 
-function gFree (t : dyn u16) {
+function gFree (t : box u16) {
          free(t);
          return;
 }
 
-function testIfS (foo : dyn u16) {
+function testIfS (foo : box u16) {
     // var btest : u16 = 0 : u16;
     gFree(foo);
     // if (btest > 1 : u16){

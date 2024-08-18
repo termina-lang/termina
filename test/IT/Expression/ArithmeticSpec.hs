@@ -29,11 +29,11 @@ test0 = "function test0() {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure test1(&mut self, foo : dyn u16);\n" ++
+        "    procedure test1(&mut self, foo : box u16);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure test1(&mut self, foo : dyn u16) {\n" ++
+        "    procedure test1(&mut self, foo : box u16) {\n" ++
         "        foo = foo + 1024 : u16;\n" ++
         "        foo = 1024 : u16 + foo;\n" ++
         "        foo = foo - 1024 : u16;\n" ++
@@ -124,14 +124,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* test1)(void * __this, __termina_dyn_t foo);\n" ++
+              "    void (* test1)(void * __this, __termina_box_t foo);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__test1(void * const __this, __termina_dyn_t foo);\n" ++
+              "void id0__test1(void * const __this, __termina_box_t foo);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function test1" $ do
@@ -139,7 +139,7 @@ spec = do
        pack ("\n" ++
              "#include \"test.h\"\n" ++
              "\n" ++ 
-             "void id0__test1(void * const __this, __termina_dyn_t foo) {\n" ++
+             "void id0__test1(void * const __this, __termina_box_t foo) {\n" ++
              "    \n" ++
              "    id0 * self = (id0 *)__this;\n" ++
              "\n" ++

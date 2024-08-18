@@ -2,7 +2,7 @@ resource class UARTDriver {
 
     initialized : bool;
 
-    method init(&priv self) -> bool {
+    method init(&mut self) -> bool {
 
         var result : bool = true;
 
@@ -12,7 +12,7 @@ resource class UARTDriver {
 
     }
 
-    procedure init_drv(&priv self) {
+    procedure init_drv(&mut self) {
 
         self->initialized = true;
 

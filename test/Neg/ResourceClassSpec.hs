@@ -21,9 +21,9 @@ runNegativeTest input = case parse (contents topLevel) "" input of
 
 test0 :: String
 test0 = "resource class id0 {\n" ++
-        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32) {\n" ++
-        "        var opt : Option<dyn u32> = None;\n" ++
-        "        opt = Some(dyn_var0);\n" ++
+        "    procedure assignment_test1(&mut self, box_var0 : box u32) {\n" ++
+        "        var opt : Option<box u32> = None;\n" ++
+        "        opt = Some(box_var0);\n" ++
         "        return;\n" ++
         "    }\n" ++
         "};"

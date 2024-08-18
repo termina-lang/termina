@@ -75,10 +75,10 @@ casteableTys :: TypeSpecifier -> TypeSpecifier-> Bool
 casteableTys a b = numTy a && numTy b
 
 -- Relation between types
--- we use to define (dyn A \subseteq A)
+-- we use to define (box A \subseteq A)
 subTypes :: TypeSpecifier -> TypeSpecifier -> Bool
-subTypes (DynamicSubtype a) (DynamicSubtype b) = checkEqTypes a b
-subTypes (DynamicSubtype a) b                  = checkEqTypes a b
-subTypes a (DynamicSubtype b)                  = checkEqTypes a b
+subTypes (BoxSubtype a) (BoxSubtype b) = checkEqTypes a b
+subTypes (BoxSubtype a) b                  = checkEqTypes a b
+subTypes a (BoxSubtype b)                  = checkEqTypes a b
 -- Id \subseteq Subtypes
 subTypes a b                                   = checkEqTypes a b

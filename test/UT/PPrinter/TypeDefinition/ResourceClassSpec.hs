@@ -31,7 +31,7 @@ classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnn
 classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure "procedure0" [
       Parameter "param0" UInt8,
-      Parameter "param1" (Option (DynamicSubtype (DefinedType "TMPacket")))
+      Parameter "param1" (Option (BoxSubtype (DefinedType "TMPacket")))
     ] [] undefined,
     ClassProcedure "procedure1" [
       Parameter "param0" UInt8,
@@ -136,7 +136,7 @@ spec = do
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(void * const __this, uint8_t param0,\n" ++
-          "                        __option_dyn_t param1);\n" ++
+          "                        __option_box_t param1);\n" ++
           "\n" ++
           "void Class0__procedure1(void * const __this, uint8_t param0,\n" ++
           "                        uint8_t param1[32]);")

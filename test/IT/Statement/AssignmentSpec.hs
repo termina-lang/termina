@@ -20,45 +20,45 @@ test0 = "function assignment_test0() {\n" ++
 
 test1 :: String
 test1 = "interface test_iface {\n" ++
-        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32);\n" ++
+        "    procedure assignment_test1(&mut self, box_var0 : box u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test1(&mut self, dyn_var0 : dyn u32) {\n" ++
-        "        var opt : Option<dyn u32> = None;\n" ++
-        "        opt = Some(dyn_var0);\n" ++
+        "    procedure assignment_test1(&mut self, box_var0 : box u32) {\n" ++
+        "        var opt : Option<box u32> = None;\n" ++
+        "        opt = Some(box_var0);\n" ++
         "        return;\n" ++
         "    }\n" ++
         "};"
 
 test2 :: String
 test2 = "interface test_iface {\n" ++
-        "    procedure assignment_test2(&mut self, dyn_var0 : dyn u32, dyn_var1 : dyn u32);\n" ++
+        "    procedure assignment_test2(&mut self, box_var0 : box u32, box_var1 : box u32);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test2(&mut self, dyn_var0 : dyn u32, dyn_var1 : dyn u32) {\n" ++
+        "    procedure assignment_test2(&mut self, box_var0 : box u32, box_var1 : box u32) {\n" ++
         "        var foo : u32 = 0 : u32;\n" ++
-        "        dyn_var0 = foo;\n" ++
-        "        foo = dyn_var1;\n" ++
-        "        dyn_var1 = dyn_var0;\n" ++
+        "        box_var0 = foo;\n" ++
+        "        foo = box_var1;\n" ++
+        "        box_var1 = box_var0;\n" ++
         "        return;\n" ++
         "    }\n" ++
         "};"
 
 test3 :: String
 test3 = "interface test_iface {\n" ++
-        "    procedure assignment_test3(&mut self, dyn_var0 : dyn [u32; 10],\n" ++
-        "                               dyn_var1 : dyn [u32; 10]);\n" ++
+        "    procedure assignment_test3(&mut self, box_var0 : box [u32; 10],\n" ++
+        "                               box_var1 : box [u32; 10]);\n" ++
         "};\n" ++
         "\n"++
         "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test3(&mut self, dyn_var0 : dyn [u32; 10],\n" ++
-        "                               dyn_var1 : dyn [u32; 10]) {\n" ++
+        "    procedure assignment_test3(&mut self, box_var0 : box [u32; 10],\n" ++
+        "                               box_var1 : box [u32; 10]) {\n" ++
         "        var foo : [u32; 10] = [0 : u32; 10];\n" ++
-        "        dyn_var0 = foo;\n" ++
-        "        foo = dyn_var1;\n" ++
-        "        dyn_var1 = dyn_var0;\n" ++
+        "        box_var0 = foo;\n" ++
+        "        foo = box_var1;\n" ++
+        "        box_var1 = box_var0;\n" ++
         "        return;\n" ++
         "    }\n" ++
         "};"
@@ -123,14 +123,14 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test1)(void * __this, __termina_dyn_t dyn_var0);\n" ++
+              "    void (* assignment_test1)(void * __this, __termina_box_t box_var0);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test1(void * const __this, __termina_dyn_t dyn_var0);\n" ++
+              "void id0__assignment_test1(void * const __this, __termina_box_t box_var0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test1" $ do
@@ -138,17 +138,17 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test1(void * const __this, __termina_dyn_t dyn_var0) {\n" ++
+              "void id0__assignment_test1(void * const __this, __termina_box_t box_var0) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
               "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    __option_dyn_t opt;\n" ++
+              "    __option_box_t opt;\n" ++
               "    opt.__variant = None;\n" ++
               "\n" ++
               "    opt.__variant = Some;\n" ++
-              "    opt.Some.__0 = dyn_var0;\n" ++
+              "    opt.Some.__0 = box_var0;\n" ++
               "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
@@ -164,16 +164,16 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test2)(void * __this, __termina_dyn_t dyn_var0,\n" ++
-              "                              __termina_dyn_t dyn_var1);\n" ++
+              "    void (* assignment_test2)(void * __this, __termina_box_t box_var0,\n" ++
+              "                              __termina_box_t box_var1);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test2(void * const __this, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test2(void * const __this, __termina_box_t box_var0,\n" ++
+              "                           __termina_box_t box_var1);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test2" $ do
@@ -181,8 +181,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test2(void * const __this, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "void id0__assignment_test2(void * const __this, __termina_box_t box_var0,\n" ++
+              "                           __termina_box_t box_var1) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
@@ -190,11 +190,11 @@ spec = do
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    *(uint32_t *)dyn_var0.data = foo;\n" ++
+              "    *(uint32_t *)box_var0.data = foo;\n" ++
               "\n" ++
-              "    foo = *(uint32_t *)dyn_var1.data;\n" ++
+              "    foo = *(uint32_t *)box_var1.data;\n" ++
               "\n" ++
-              "    *(uint32_t *)dyn_var1.data = *(uint32_t *)dyn_var0.data;\n" ++
+              "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
               "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
@@ -210,16 +210,16 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test3)(void * __this, __termina_dyn_t dyn_var0,\n" ++
-              "                              __termina_dyn_t dyn_var1);\n" ++
+              "    void (* assignment_test3)(void * __this, __termina_box_t box_var0,\n" ++
+              "                              __termina_box_t box_var1);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_t __resource;\n" ++
               "} id0;\n" ++
               "\n" ++
-              "void id0__assignment_test3(void * const __this, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1);\n" ++
+              "void id0__assignment_test3(void * const __this, __termina_box_t box_var0,\n" ++
+              "                           __termina_box_t box_var1);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test2" $ do
@@ -227,8 +227,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void id0__assignment_test3(void * const __this, __termina_dyn_t dyn_var0,\n" ++
-              "                           __termina_dyn_t dyn_var1) {\n" ++
+              "void id0__assignment_test3(void * const __this, __termina_box_t box_var0,\n" ++
+              "                           __termina_box_t box_var1) {\n" ++
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
@@ -240,15 +240,15 @@ spec = do
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)dyn_var0.data)[__i0] = foo[__i0];\n" ++
+              "        ((uint32_t *)box_var0.data)[__i0] = foo[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = ((uint32_t *)dyn_var1.data)[__i0];\n" ++
+              "        foo[__i0] = ((uint32_t *)box_var1.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)dyn_var1.data)[__i0] = ((uint32_t *)dyn_var0.data)[__i0];\n" ++
+              "        ((uint32_t *)box_var1.data)[__i0] = ((uint32_t *)box_var0.data)[__i0];\n" ++
               "    }\n" ++
               "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++

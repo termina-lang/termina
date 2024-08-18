@@ -115,7 +115,7 @@ typeObject _ (MemberAccess obj ident ann) = do
     return (ak, ts)) obj
   (obj_ak', obj_ty') <- getObjectType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
-        maybe (typed_obj', obj_ak', obj_ty') (unDyn typed_obj', Mutable, ) (isDyn obj_ty')
+        maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
   fts <- getMemberFieldType ann obj_ty ident
   return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fts
 typeObject getVarTy (Dereference obj ann) = do
@@ -194,19 +194,19 @@ typeMemberFunctionCall ann obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool))), Builtin))
-                (typeExpression (Just (Reference Mutable (Option (DynamicSubtype ty_pool)))) typeRHSObject opt)
-              return (([Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (DynamicSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool))), Builtin))
+                (typeExpression (Just (Reference Mutable (Option (BoxSubtype ty_pool)))) typeRHSObject opt)
+              return (([Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (DynamicSubtype ty_pool), Builtin))
-                (typeExpression (Just (DynamicSubtype ty_pool)) typeRHSObject elemnt)
-              return (([Parameter "element" (DynamicSubtype ty_pool)], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (DynamicSubtype ty_pool)], Builtin) (fromIntegral (length args)))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (BoxSubtype ty_pool), Builtin))
+                (typeExpression (Just (BoxSubtype ty_pool)) typeRHSObject elemnt)
+              return (([Parameter "element" (BoxSubtype ty_pool)], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (BoxSubtype ty_pool)], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (BoxSubtype ty_pool)], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicAccess ty_atomic) ->
       case ident of
@@ -291,7 +291,7 @@ typeConstExpression expected_ty (KV identifier ann) = do
 
 -- | Function |typeExpression| takes an expression from the parser, traverse it
 -- annotating each node with its type.
--- Since we are also creating new nodes (|Undyn| annotations), instead of just
+-- Since we are also creating new nodes (|Unbox| annotations), instead of just
 -- traversing, we are actually /creating/ a new tree with implicit
 -- constructions.
 typeExpression ::
@@ -309,23 +309,23 @@ typeExpression expectedType typeObj (AccessObject obj) = do
     -- | Get the type of the object
     (_, obj_type) <- getObjectType typed_obj
     case (expectedType, obj_type) of
-      (Just (DynamicSubtype ts), DynamicSubtype ts') -> do
+      (Just (BoxSubtype ts), BoxSubtype ts') -> do
         -- If the type must be an expected type, then check it.
         checkEqTypesOrError (getAnnotation obj) ts ts'
         return $ SAST.AccessObject typed_obj
-      (Just ts, DynamicSubtype ts') -> do
+      (Just ts, BoxSubtype ts') -> do
         -- If the type must be an expected type, then check it.
         checkEqTypesOrError (getAnnotation obj) ts ts'
-        -- If we have an dyn and expect an undyned type:
-        return $ SAST.AccessObject (unDyn typed_obj)
+        -- If we have an box and expect an unboxed type:
+        return $ SAST.AccessObject (unBox typed_obj)
       (Just ts, ts') -> do
         -- If the type must be an expected type, then check it.
         checkEqTypesOrError (getAnnotation obj) ts ts'
         return $ SAST.AccessObject typed_obj
       -- If we are requesting an object without an expected type, then we must
-      -- be casting the result. Thus, we must return an undyned object.
-      (Nothing, DynamicSubtype _)->
-        return $ SAST.AccessObject (unDyn typed_obj)
+      -- be casting the result. Thus, we must return an unboxed object.
+      (Nothing, BoxSubtype _)->
+        return $ SAST.AccessObject (unBox typed_obj)
       (Nothing, _) ->
         return $ SAST.AccessObject typed_obj
 -- | Constant literals with an expected type.
@@ -508,11 +508,11 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = d
   -- | Get the type of the object
   (obj_ak, obj_type) <- getObjectType typed_obj
   case obj_type of
-    -- | If the object is of a dynamic subtype, then the reference will be to an object of
-    -- the base type. Objects of a dynamic subtype are always immutable, BUT a reference
-    -- to an object of a dynamic subtype can be mutable. Thus, we do not need to check
+    -- | If the object is of a box subtype, then the reference will be to an object of
+    -- the base type. Objects of a box subtype are always immutable, BUT a reference
+    -- to an object of a box subtype can be mutable. Thus, we do not need to check
     -- the access kind of the object.
-    DynamicSubtype ty -> do
+    BoxSubtype ty -> do
       -- | Check that the expected type is the same as the base type.  
       maybe (return ()) (checkEqTypesOrError pann (Reference refKind ty)) expectedType
       return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
@@ -855,11 +855,11 @@ typeStatement (AssignmentStmt lhs_o rhs_expr anns) = do
   lhs_o_typed' <- typeLHSObject lhs_o
   (lhs_o_ak', lhs_o_type') <- getObjectType lhs_o_typed'
   let (lhs_o_typed, lhs_o_ak, lhs_o_type) =
-        maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unDyn lhs_o_typed', Mutable, ) (isDyn lhs_o_type')
+        maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unBox lhs_o_typed', Mutable, ) (isBox lhs_o_type')
   unless (lhs_o_ak /= Immutable) (throwError $ annotateError anns EAssignmentToImmutable)
   rhs_expr_typed' <- typeExpression (Just lhs_o_type) typeRHSObject rhs_expr
   type_rhs' <- getExpType rhs_expr_typed'
-  rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unDynExp rhs_expr_typed') (isDyn type_rhs')
+  rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unBoxExp rhs_expr_typed') (isBox type_rhs')
   ety <- mustBeTy lhs_o_type rhs_expr_typed
   return $ AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
 typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
@@ -1022,8 +1022,8 @@ typeGlobal (Const ident ty expr mods anns) = do
 checkParameterType :: Location -> Parameter -> SemanticMonad ()
 checkParameterType anns p =
     let typeSpec = paramTypeSpecifier p in
-     -- If the type specifier is a dyn, then we must throw an EArgHasDyn error
-     -- since we cannot have dynamic types as parameters.
+     -- If the type specifier is a box, then we must throw an EArgHasBox error
+     -- since we cannot have box types as parameters.
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
     checkTypeSpecifier anns typeSpec
 
@@ -1205,7 +1205,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
           -- Viewers
           view@(ClassViewer _fv_id fv_tys mty _body annCV)
             -> maybe (return ()) (checkReturnType annCV) mty
-            -- Parameters cannot have dyns inside.
+            -- Parameters cannot have boxes inside.
             >> mapM_ (checkParameterType annCV) fv_tys
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)

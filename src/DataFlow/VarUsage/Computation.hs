@@ -39,7 +39,7 @@ data UDSt
     { usedSet :: VarSet
   -- A map indicating the state of special variables.
     , usedOption :: OOVarSt
-    , usedDyn :: VarSet
+    , usedBox :: VarSet
     }
 
 emptyUDSt :: UDSt
@@ -47,7 +47,7 @@ emptyUDSt
   = UDSt S.empty M.empty S.empty
 
 emptyButUsed :: UDSt -> UDSt
-emptyButUsed st = st{usedOption = M.empty, usedDyn = S.empty}
+emptyButUsed st = st{usedOption = M.empty, usedBox = S.empty}
 
 type UDM e = ExceptT e (ST.State UDSt)
 
@@ -62,9 +62,9 @@ put = lift . ST.put
 putOOMap :: OOVarSt -> UDM e ()
 putOOMap = modify . (\s st -> st{usedOption = s})
 
-putUSet,putDynSet :: VarSet -> UDM e ()
+putUSet,putBoxSet :: VarSet -> UDM e ()
 putUSet = modify . (\s st -> st{usedSet = s})
-putDynSet = modify . (\s st -> st{usedDyn = s})
+putBoxSet = modify . (\s st -> st{usedBox = s})
 
 gets :: (UDSt -> b) ->  UDM e b
 gets = lift . ST.gets
@@ -101,9 +101,9 @@ emptyOO :: UDM e ()
 emptyOO = get >>= \st -> put (st{usedOption = M.empty})
 
 continueWith,unionS :: OOVarSt -> VarSet -> VarSet -> UDM e ()
-continueWith oo uses dyns
-  = put $ UDSt uses oo dyns
-unionS oo uses dyns
+continueWith oo uses boxes
+  = put $ UDSt uses oo boxes
+unionS oo uses boxes
   = get
   >>= \st
   -> put
@@ -111,7 +111,7 @@ unionS oo uses dyns
     -- when key collision. It is what we want tho.
      st{ usedOption = M.union oo (usedOption st)
        , usedSet = S.union uses (usedSet st)
-       , usedDyn = S.union dyns (usedDyn st)
+       , usedBox = S.union boxes (usedBox st)
        }
 
 getOnlyOnce :: UDM e OOVarSt
@@ -156,25 +156,25 @@ safeAddUseOnlyOnce ident mv
         -- Everything else just inserts.
         _ -> M.insert ident mv ooMap
 
--- DynVar manipulation
-defDynVar, useDynVar :: Identifier -> UDM Error ()
-defDynVar ident
-  = gets usedDyn
-  >>= \dynSet ->
-    if S.member ident dynSet
+-- BoxVar manipulation
+defBoxVar, useBoxVar :: Identifier -> UDM Error ()
+defBoxVar ident
+  = gets usedBox
+  >>= \boxSet ->
+    if S.member ident boxSet
     then do
-      putDynSet $ S.delete ident dynSet
+      putBoxSet $ S.delete ident boxSet
     else
       throwError (NotUsedOO ident)
-useDynVar ident
-  = gets usedDyn
-  >>= \dynSet ->
-  if S.member ident dynSet
+useBoxVar ident
+  = gets usedBox
+  >>= \boxSet ->
+  if S.member ident boxSet
   then
     throwError (UsingTwice ident)
   else
-    unless (S.size dynSet < maxBound) (throwError SetMaxBound)
-    >> putDynSet (unsafeAdd ident dynSet)
+    unless (S.size boxSet < maxBound) (throwError SetMaxBound)
+    >> putBoxSet (unsafeAdd ident boxSet)
 ----------------------------------------
 
 addUseOnlyOnce :: Identifier -> UDM Error ()
@@ -229,14 +229,14 @@ defVariable ident =
             -- Variable |ident| is not used in the rest of the code :(
             throwError (NotUsed ident)
 
--- Procedures can receive /dyn/ variables as arguments.
--- Dyn variables have a special Use, through free or stuff.
+-- Procedures can receive /box/ variables as arguments.
+-- Box variables have a special Use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
--- dyn.
+-- box.
 defArgumentsProc :: Parameter -> UDM Error ()
 defArgumentsProc ps
   = (case paramTypeSpecifier ps of
-        DynamicSubtype _ -> defDynVar
+        BoxSubtype _ -> defBoxVar
         _ -> defVariable)
     (paramIdentifier ps)
 

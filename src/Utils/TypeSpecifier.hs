@@ -49,10 +49,10 @@ parameterTy USize           = True
 parameterTy Bool            = True
 parameterTy Char            = True
 parameterTy (DefinedType _) = True
-parameterTy (Reference _ (DynamicSubtype _)) = False
-parameterTy (Reference _ (Option (DynamicSubtype _))) = False
+parameterTy (Reference _ (BoxSubtype _)) = False
+parameterTy (Reference _ (Option (BoxSubtype _))) = False
 parameterTy (Reference {})  = True
-parameterTy (Option (DynamicSubtype _)) = False
+parameterTy (Option (BoxSubtype _)) = False
 parameterTy (Option _)      = True
 parameterTy _               = False
 
@@ -75,12 +75,12 @@ procedureParamTy _               = False
 
 -- | The following function defines what we consider to be simple types.
 -- Simple types can be used at variable creation, inside arrays and user defined structures.
--- Also at dynamic object and function returned values.
+-- Also at box object and function returned values.
 -- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
 simpleType :: TypeSpecifier -> Bool
 simpleType Unit                = False
-simpleType (Option (DynamicSubtype {})) = False
-simpleType (DynamicSubtype {}) = False
+simpleType (Option (BoxSubtype {})) = False
+simpleType (BoxSubtype {}) = False
 simpleType (MsgQueue {})       = False
 simpleType (Pool {})           = False
 simpleType (Reference {})      = False
@@ -92,8 +92,8 @@ simpleType _                   = True
 
 classFieldType :: TypeSpecifier -> Bool
 classFieldType Unit                         = False
-classFieldType (DynamicSubtype {})          = False
-classFieldType (Option (DynamicSubtype {})) = False
+classFieldType (BoxSubtype {})          = False
+classFieldType (Option (BoxSubtype {})) = False
 classFieldType (MsgQueue {})                = False
 classFieldType (Pool {})                    = False
 classFieldType (Reference {})               = False
@@ -172,36 +172,36 @@ referenceType (AccessPort {}) = False
 referenceType _               = True
 
 ----------------------------------------
--- Dynamic Helpers
-isDyn :: TypeSpecifier -> Maybe TypeSpecifier
-isDyn (DynamicSubtype t) = Just t
-isDyn _ = Nothing
+-- Box Helpers
+isBox :: TypeSpecifier -> Maybe TypeSpecifier
+isBox (BoxSubtype t) = Just t
+isBox _ = Nothing
 
-isNonDynOption :: TypeSpecifier -> Bool
-isNonDynOption (Option (DynamicSubtype _)) = False
-isNonDynOption (Option _) = True
-isNonDynOption _ = False
+isNonBoxOption :: TypeSpecifier -> Bool
+isNonBoxOption (Option (BoxSubtype _)) = False
+isNonBoxOption (Option _) = True
+isNonBoxOption _ = False
 
-hasDynOrDep :: TypeSpecifier -> Either Identifier Bool
-hasDynOrDep (DefinedType ident) = Left ident
-hasDynOrDep UInt8 = Right False
-hasDynOrDep UInt16 = Right False
-hasDynOrDep UInt32 = Right False
-hasDynOrDep UInt64 = Right False
-hasDynOrDep Int8 = Right False
-hasDynOrDep Int16 = Right False
-hasDynOrDep Int32 = Right False
-hasDynOrDep Int64 = Right False
-hasDynOrDep USize = Right False
-hasDynOrDep Bool = Right False
-hasDynOrDep Char = Right False
+hasBoxOrDep :: TypeSpecifier -> Either Identifier Bool
+hasBoxOrDep (DefinedType ident) = Left ident
+hasBoxOrDep UInt8 = Right False
+hasBoxOrDep UInt16 = Right False
+hasBoxOrDep UInt32 = Right False
+hasBoxOrDep UInt64 = Right False
+hasBoxOrDep Int8 = Right False
+hasBoxOrDep Int16 = Right False
+hasBoxOrDep Int32 = Right False
+hasBoxOrDep Int64 = Right False
+hasBoxOrDep USize = Right False
+hasBoxOrDep Bool = Right False
+hasBoxOrDep Char = Right False
 --
-hasDynOrDep (Array ty _s) = hasDynOrDep ty
-hasDynOrDep (Option ty) = hasDynOrDep ty
-hasDynOrDep (Reference _accK ty) = hasDynOrDep ty
-hasDynOrDep (DynamicSubtype _) = Right True
-hasDynOrDep (Slice ty) = hasDynOrDep ty
-hasDynOrDep _ = Right False
+hasBoxOrDep (Array ty _s) = hasBoxOrDep ty
+hasBoxOrDep (Option ty) = hasBoxOrDep ty
+hasBoxOrDep (Reference _accK ty) = hasBoxOrDep ty
+hasBoxOrDep (BoxSubtype _) = Right True
+hasBoxOrDep (Slice ty) = hasBoxOrDep ty
+hasBoxOrDep _ = Right False
 ----------------------------------------
 
 rootType :: TypeSpecifier -> TypeSpecifier
@@ -210,7 +210,7 @@ rootType (Array ts _) = rootType ts
 rootType (MsgQueue ts _) = rootType ts
 rootType (Pool ts _) = rootType ts
 rootType (Reference _ ts) = rootType ts
-rootType (DynamicSubtype ts) = rootType ts
+rootType (BoxSubtype ts) = rootType ts
 rootType (Location ts) = rootType ts
 rootType (Slice ts) = rootType ts
 rootType t = t

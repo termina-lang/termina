@@ -179,12 +179,12 @@ genExpression (ReferenceExpression _ obj ann) = do
     cObj <- genObject obj
     case typeObj of
         -- | If it is a vector, we need to generate the address of the data
-        (DynamicSubtype (Array _ _)) -> do
+        (BoxSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
             decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
             -- | Else, we print the address to the data
-        (DynamicSubtype _) -> do
+        (BoxSubtype _) -> do
             decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
         (Array {}) -> return cObj
@@ -269,23 +269,23 @@ genObject (Dereference obj ann) = do
         _ -> do
             cObj <- genObject obj
             return $ CUnary CIndOp cObj cAnn
--- | If the expression is a dynamic subtype treated as its base type, we need to
+-- | If the expression is a box subtype treated as its base type, we need to
 -- check if it is a vector
-genObject o@(Undyn obj ann) = do
+genObject o@(Unbox obj ann) = do
     let cAnn = buildGenericAnn ann
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
         -- | If it is a vector, we need to generate the address of the data
-        (DynamicSubtype (Array _ _)) -> do
+        (BoxSubtype (Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
             decl <- genCastDeclaration typeObj ann
             return $ CCast decl (CMember cObj "data" False cAnn) cAnn
             -- | Else, we print the derefence to the data
-        (DynamicSubtype _) -> do
+        (BoxSubtype _) -> do
             decl <- genCastDeclaration typeObj ann
             return $ CUnary CIndOp (CCast decl (CMember cObj "data" False cAnn) cAnn) cAnn
-        -- | An undyn can only be applied to a dynamic subtype. We are not
+        -- | An unbox can only be applied to a box subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
         _ -> throwError $ InternalError $ "Unsupported object: " ++ show o

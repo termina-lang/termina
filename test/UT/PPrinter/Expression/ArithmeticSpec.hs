@@ -15,8 +15,8 @@ var0 :: Expression SemanticAnn
 -- | var0 : u16
 var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt16))
 
-undynVar1 :: Expression SemanticAnn
-undynVar1 = AccessObject (Undyn (Variable "var1" dynUInt16SemAnn) (objSemAnn Mutable UInt16))
+unboxVar1 :: Expression SemanticAnn
+unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable UInt16))
 
 constUInt16 :: Expression SemanticAnn
 -- | 1024 : u16
@@ -32,13 +32,13 @@ constantPlusVar0 = BinOp Addition constUInt16 var0 uint16SemAnn
 
 var1PlusConstant :: Expression SemanticAnn
 -- | var1 + 1024 : u16
-var1PlusConstant = BinOp Addition undynVar1 constUInt16 uint16SemAnn
+var1PlusConstant = BinOp Addition unboxVar1 constUInt16 uint16SemAnn
 
 constantPlusVar1 :: Expression SemanticAnn
-constantPlusVar1 = BinOp Addition constUInt16 undynVar1 uint16SemAnn
+constantPlusVar1 = BinOp Addition constUInt16 unboxVar1 uint16SemAnn
 
 var0PlusVar1 :: Expression SemanticAnn
-var0PlusVar1 = BinOp Addition var0 undynVar1 uint16SemAnn
+var0PlusVar1 = BinOp Addition var0 unboxVar1 uint16SemAnn
 
 var0PlusVar1PlusConstant :: Expression SemanticAnn
 var0PlusVar1PlusConstant = BinOp Addition var0PlusVar1 constUInt16 uint16SemAnn
@@ -56,19 +56,19 @@ constantMultVar0 :: Expression SemanticAnn
 constantMultVar0 = BinOp Multiplication constUInt16 var0 uint16SemAnn
 
 var0MultVar1 :: Expression SemanticAnn
-var0MultVar1 = BinOp Multiplication var0 undynVar1 uint16SemAnn
+var0MultVar1 = BinOp Multiplication var0 unboxVar1 uint16SemAnn
 
 var1DivConstant :: Expression SemanticAnn
-var1DivConstant = BinOp Division undynVar1 constUInt16 uint16SemAnn
+var1DivConstant = BinOp Division unboxVar1 constUInt16 uint16SemAnn
 
 var0DivVar1 :: Expression SemanticAnn
-var0DivVar1 = BinOp Division var0 undynVar1 uint16SemAnn
+var0DivVar1 = BinOp Division var0 unboxVar1 uint16SemAnn
 
 var1ModConstant :: Expression SemanticAnn
-var1ModConstant = BinOp Modulo undynVar1 constUInt16 uint16SemAnn
+var1ModConstant = BinOp Modulo unboxVar1 constUInt16 uint16SemAnn
 
 var0ModVar1 :: Expression SemanticAnn
-var0ModVar1 = BinOp Modulo var0 undynVar1 uint16SemAnn
+var0ModVar1 = BinOp Modulo var0 unboxVar1 uint16SemAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

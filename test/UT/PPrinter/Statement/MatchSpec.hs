@@ -13,16 +13,16 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Utils.Annotations
 
-optionDynUInt32SemAnn :: SemanticAnn
-optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
+optionBoxUInt32SemAnn :: SemanticAnn
+optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
 
-vectorAnn, dynArrayAnn :: SemanticAnn
+vectorAnn, boxArrayAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-dynArrayAnn = dynArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+boxArrayAnn = boxArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnn
-param0 = Variable "param0" dynUInt32SemAnn
-param1 = Variable "param1" dynArrayAnn
+param0 = Variable "param0" boxUInt32SemAnn
+param1 = Variable "param1" boxArrayAnn
 
 uint32Const0 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
@@ -31,16 +31,16 @@ usizeConst0x8 :: Expression SemanticAnn
 usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
 
 optionVar :: Expression SemanticAnn
-optionVar = AccessObject (Variable "option_var" optionDynUInt32SemAnn)
+optionVar = AccessObject (Variable "option_var" optionBoxUInt32SemAnn)
 
 vector0IndexConstant :: Expression SemanticAnn
-vector0IndexConstant = AccessObject (ArrayIndexExpression (Undyn param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+vector0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
 foo1 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
 
 param0ToFoo1, constToFoo1 :: Statement SemanticAnn
-param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Undyn param0 (objSemAnn Mutable UInt32))) stmtSemAnn
+param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Unbox param0 (objSemAnn Mutable UInt32))) stmtSemAnn
 constToFoo1 = AssignmentStmt foo1 uint32Const0 stmtSemAnn
 
 matchCaseSome0 :: MatchCase SemanticAnn
@@ -71,7 +71,7 @@ matchOption1 :: Statement SemanticAnn
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnn
-getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (Option (DynamicSubtype UInt32)))) Internal)
+getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (Option (BoxSubtype UInt32)))) Internal)
 
 matchOption2 :: Statement SemanticAnn
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn
@@ -90,7 +90,7 @@ spec = do
         pack (
           "\nif (option_var.__variant == Some) {\n" ++
           "    \n" ++
-          "    __option_dyn_params_t __Some = option_var.Some;\n" ++
+          "    __option_box_params_t __Some = option_var.Some;\n" ++
           "\n" ++
           "    foo1 = *(uint32_t *)__Some.__0.data;\n" ++
           "\n" ++
@@ -108,7 +108,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option_dyn_params_t __Some = option_var.Some;\n" ++
+          "    __option_box_params_t __Some = option_var.Some;\n" ++
           "\n" ++
           "    foo1 = ((uint32_t *)__Some.__0.data)[8];\n" ++
           "\n" ++
@@ -118,7 +118,7 @@ spec = do
         pack (
           "\n{\n" ++
           "    \n" ++
-          "    __option_dyn_t __match = get_integer();\n" ++
+          "    __option_box_t __match = get_integer();\n" ++
           "\n" ++
           "    if (__match.__variant == Some) {\n" ++
           "        \n" ++

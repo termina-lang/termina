@@ -21,7 +21,7 @@ runNegativeTest input = case parse (contents topLevel) "" input of
       Right _ -> Nothing
 
 test0 :: String
-test0 = "function foo(param0 : dyn u8) -> u8 {\n" ++
+test0 = "function foo(param0 : box u8) -> u8 {\n" ++
         "\n" ++
         "    let x : u8 = param0 + 1;\n" ++
         "\n" ++
@@ -52,10 +52,10 @@ test2 = "function foo(param0 : u8) -> [u8; 10] {\n" ++
 spec :: Spec
 spec = do
   describe "Function definition" $ do
-    it "Defining a dynamic parameter" $ do
+    it "Defining a box parameter" $ do
      runNegativeTest test0
        `shouldSatisfy`
-        isEInvalidParameterType "param0" (DynamicSubtype UInt8)
+        isEInvalidParameterType "param0" (BoxSubtype UInt8)
     it "Defining a fixed size array parameter" $ do
       runNegativeTest test1
         `shouldSatisfy`

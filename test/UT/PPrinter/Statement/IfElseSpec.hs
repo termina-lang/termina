@@ -11,14 +11,14 @@ import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-optionDynUInt32TS :: TypeSpecifier
-optionDynUInt32TS = Option (DynamicSubtype UInt32)
+optionBoxUInt32TS :: TypeSpecifier
+optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
 vectorTS :: TypeSpecifier
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 
-optionDynUInt32SemAnn :: SemanticAnn
-optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
+optionBoxUInt32SemAnn :: SemanticAnn
+optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
 
 vectorAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
@@ -39,12 +39,12 @@ uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32))
 constToFoo0 :: Statement SemanticAnn
 constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn
 
-dynVar0 :: Expression SemanticAnn
-dynVar0 = AccessObject (Variable "dyn_var0" dynUInt32SemAnn)
+boxVar0 :: Expression SemanticAnn
+boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantInitializer (Some dynVar0) optionDynUInt32SemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantInitializer None optionDynUInt32SemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32SemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32SemAnn) stmtSemAnn
 
 twoDeclarations :: [Statement SemanticAnn]
 twoDeclarations = [vector1, option0]
@@ -90,9 +90,9 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_dyn_t option0;\n" ++
+          "    __option_box_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = dyn_var0;\n" ++
+          "    option0.Some.__0 = box_var0;\n" ++
           "\n" ++
           "}")
     it "Prints an if-else statement" $ do
@@ -105,13 +105,13 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_dyn_t option0;\n" ++
+          "    __option_box_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = dyn_var0;\n" ++
+          "    option0.Some.__0 = box_var0;\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option_dyn_t option1;\n" ++
+          "    __option_box_t option1;\n" ++
           "    option1.__variant = None;\n" ++
           "\n" ++
           "}")
@@ -125,9 +125,9 @@ spec = do
           "        vector1[__i0] = vector0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_dyn_t option0;\n" ++
+          "    __option_box_t option0;\n" ++
           "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = dyn_var0;\n" ++
+          "    option0.Some.__0 = box_var0;\n" ++
           "\n" ++
           "} else if (foo0 == 0) {\n" ++
           "    \n" ++
@@ -135,7 +135,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option_dyn_t option1;\n" ++
+          "    __option_box_t option1;\n" ++
           "    option1.__variant = None;\n" ++
           "\n" ++
           "}")

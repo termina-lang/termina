@@ -77,7 +77,7 @@ data Object a
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound
   -- |cEx| is an expression for the upper bound
-  | Undyn (Object a) a
+  | Unbox (Object a) a
   deriving (Show, Functor)
 
 instance Annotated Object where
@@ -87,7 +87,7 @@ instance Annotated Object where
   getAnnotation (Dereference _ a)             = a
   getAnnotation (DereferenceMemberAccess _ _ a) = a
   getAnnotation (ArraySlice _ _ _ a) = a
-  getAnnotation (Undyn _ a)                   = a
+  getAnnotation (Unbox _ a)                   = a
 
 instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (AccessObject obj)                = getAnnotation obj

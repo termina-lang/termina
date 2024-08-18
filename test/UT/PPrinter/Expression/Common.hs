@@ -30,24 +30,24 @@ usizeSemAnn = simpleTySemAnn USize
 charSemAnn = simpleTySemAnn Char
 boolSemAnn = simpleTySemAnn Bool
 
-dynTySemAnn :: TypeSpecifier -> SemanticAnn
-dynTySemAnn ts = objSemAnn Mutable (DynamicSubtype ts)
+boxTySemAnn :: TypeSpecifier -> SemanticAnn
+boxTySemAnn ts = objSemAnn Mutable (BoxSubtype ts)
 
-dynUInt8SemAnn, dynUInt16SemAnn, dynUInt32SemAnn, dynUInt64SemAnn, dynInt8SemAnn,
-    dynInt16SemAnn, dynInt32SemAnn, dynInt64SemAnn, dynCharSemAnn, dynBoolSemAnn :: SemanticAnn
-dynUInt8SemAnn = dynTySemAnn UInt8
-dynUInt16SemAnn = dynTySemAnn UInt16
-dynUInt32SemAnn = dynTySemAnn UInt32
-dynUInt64SemAnn = dynTySemAnn UInt64
-dynInt8SemAnn = dynTySemAnn Int8
-dynInt16SemAnn = dynTySemAnn Int16
-dynInt32SemAnn = dynTySemAnn Int32
-dynInt64SemAnn = dynTySemAnn Int64
-dynCharSemAnn = dynTySemAnn Char
-dynBoolSemAnn = dynTySemAnn Bool
+boxUInt8SemAnn, boxUInt16SemAnn, boxUInt32SemAnn, boxUInt64SemAnn, boxInt8SemAnn,
+    boxInt16SemAnn, boxInt32SemAnn, boxInt64SemAnn, boxCharSemAnn, boxBoolSemAnn :: SemanticAnn
+boxUInt8SemAnn = boxTySemAnn UInt8
+boxUInt16SemAnn = boxTySemAnn UInt16
+boxUInt32SemAnn = boxTySemAnn UInt32
+boxUInt64SemAnn = boxTySemAnn UInt64
+boxInt8SemAnn = boxTySemAnn Int8
+boxInt16SemAnn = boxTySemAnn Int16
+boxInt32SemAnn = boxTySemAnn Int32
+boxInt64SemAnn = boxTySemAnn Int64
+boxCharSemAnn = boxTySemAnn Char
+boxBoolSemAnn = boxTySemAnn Bool
 
-optionDynSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnn
-optionDynSemAnn ak ts = objSemAnn ak (Option (DynamicSubtype ts))
+optionBoxSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnn
+optionBoxSemAnn ak ts = objSemAnn ak (Option (BoxSubtype ts))
 
 refSemAnn :: TypeSpecifier -> SemanticAnn
 refSemAnn ts = objSemAnn Immutable (Reference Mutable ts)
@@ -68,8 +68,8 @@ refBoolSemAnn = refSemAnn Bool
 vectorSemAnn :: AccessKind -> TypeSpecifier -> Size -> SemanticAnn
 vectorSemAnn ak ts size = objSemAnn ak (Array ts size)
 
-dynArraySemAnn :: TypeSpecifier -> Size -> SemanticAnn
-dynArraySemAnn ts size = objSemAnn Mutable (DynamicSubtype (Array ts size))
+boxArraySemAnn :: TypeSpecifier -> Size -> SemanticAnn
+boxArraySemAnn ts size = objSemAnn Mutable (BoxSubtype (Array ts size))
 
 refArraySemAnn :: TypeSpecifier -> Size -> SemanticAnn
 refArraySemAnn ts size = objSemAnn Immutable (Reference Mutable (Array ts size))
@@ -88,15 +88,15 @@ uint16TwoDymVecSemAnn, uint32TwoDymVecSemAnn :: AccessKind -> Size -> Size -> Se
 uint16TwoDymVecSemAnn ak = twoDymArraySemAnn ak UInt16
 uint32TwoDymVecSemAnn ak = twoDymArraySemAnn ak UInt32
 
-dynTwoDymArraySemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnn
-dynTwoDymArraySemAnn ts size1 size2 = objSemAnn Mutable (DynamicSubtype (Array (Array ts size1) size2))
+boxTwoDymArraySemAnn :: TypeSpecifier -> Size -> Size -> SemanticAnn
+boxTwoDymArraySemAnn ts size1 size2 = objSemAnn Mutable (BoxSubtype (Array (Array ts size1) size2))
 
-dynThreeDymArraySemAnn :: TypeSpecifier -> Size -> Size -> Size -> SemanticAnn
-dynThreeDymArraySemAnn ts size1 size2 size3 = objSemAnn Mutable (DynamicSubtype (Array (Array (Array ts size1) size2) size3))
+boxThreeDymArraySemAnn :: TypeSpecifier -> Size -> Size -> Size -> SemanticAnn
+boxThreeDymArraySemAnn ts size1 size2 size3 = objSemAnn Mutable (BoxSubtype (Array (Array (Array ts size1) size2) size3))
 
-uint16DynTwoDymVecSemAnn, uint32DynTwoDymVecSemAnn :: Size -> Size -> SemanticAnn
-uint16DynTwoDymVecSemAnn = dynTwoDymArraySemAnn UInt16
-uint32DynTwoDymVecSemAnn = dynTwoDymArraySemAnn UInt32
+uint16BoxTwoDymVecSemAnn, uint32BoxTwoDymVecSemAnn :: Size -> Size -> SemanticAnn
+uint16BoxTwoDymVecSemAnn = boxTwoDymArraySemAnn UInt16
+uint32BoxTwoDymVecSemAnn = boxTwoDymArraySemAnn UInt32
 
 threeDymArraySemAnn :: AccessKind -> TypeSpecifier -> Size -> Size -> Size -> SemanticAnn
 threeDymArraySemAnn ak ts size1 size2 size3 = objSemAnn ak (Array (Array (Array ts size1) size2) size3)
@@ -108,8 +108,8 @@ uint32ThreeDymVecSemAnn ak = threeDymArraySemAnn ak UInt32
 definedTypeSemAnn :: AccessKind -> Identifier -> SemanticAnn
 definedTypeSemAnn ak name = objSemAnn ak (DefinedType name)
 
-dynDefinedTypeSemAnn :: Identifier -> SemanticAnn
-dynDefinedTypeSemAnn name = dynTySemAnn (DefinedType name)
+boxDefinedTypeSemAnn :: Identifier -> SemanticAnn
+boxDefinedTypeSemAnn name = boxTySemAnn (DefinedType name)
 
 refDefinedTypeSemAnn :: Identifier -> SemanticAnn
 refDefinedTypeSemAnn name = refSemAnn (DefinedType name)

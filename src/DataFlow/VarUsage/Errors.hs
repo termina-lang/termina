@@ -22,11 +22,11 @@ data Error
   | NotUsedOO Identifier
   | UsingTwice Identifier
   | DifferentOnlyOnce [M.Map Identifier MVars]
-  | DifferentDynsSets [S.Set Identifier]
+  | DifferentBoxesSets [S.Set Identifier]
   | DifferentOnlyOnceMatch
-  | DifferentDynsSetsMatch
+  | DifferentBoxesSetsMatch
   | ForMoreOOpt
-  | ForMoreODyn [Identifier]
+  | ForMoreOBox [Identifier]
   | InternalOptionMissMatch
   | ImpossibleErrorBadAllocArg
   | ImpossibleErrorBadFreeArg
@@ -38,9 +38,9 @@ data Error
   | AllocRedef Identifier -- This is impossible
   | DefinedNotAlloc Identifier
   | DefinedTwice Identifier
-  -- Dyn
-  | DefiningDyn Identifier
-  -- vv| NotUsedDyn Identifier
+  -- Box
+  | DefiningBox Identifier
+  -- vv| NotUsedBox Identifier
   deriving Show
 
 type VarUsageError = AnnotatedError Error Annotation

@@ -31,11 +31,11 @@ namefy = ("__" <>)
 (<::>) id0 id1 = id0 <> "__" <> id1
 
 -- | Termina's pretty builtin types
-pool, msgQueue, optionDyn, dynamicStruct, taskID, resourceID, sinkPort, inPort, outPort :: Identifier
+pool, msgQueue, optionBox, boxStruct, taskID, resourceID, sinkPort, inPort, outPort :: Identifier
 pool = namefy "termina_pool_t"
 msgQueue = namefy "termina_msg_queue_t"
-optionDyn = namefy "option_dyn_t"
-dynamicStruct = namefy "termina_dyn_t"
+optionBox = namefy "option_box_t"
+boxStruct = namefy "termina_box_t"
 taskID = namefy "termina_task_t"
 resourceID = namefy "termina_resource_t"
 sinkPort = namefy "termina_sink_port_t"
@@ -93,7 +93,7 @@ genOptionParameterStructName Int16 = return $ namefy "option_int16_params_t"
 genOptionParameterStructName Int32 = return $ namefy "option_int32_params_t"
 genOptionParameterStructName Int64 = return $ namefy "option_int64_params_t"
 genOptionParameterStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionParameterStructName (DynamicSubtype _) = return $ namefy "option_dyn_params_t"
+genOptionParameterStructName (BoxSubtype _) = return $ namefy "option_box_params_t"
 genOptionParameterStructName ts = 
     case ts of
         Array {} -> do
@@ -142,7 +142,7 @@ getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = r
 getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (ArraySlice _ _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (Undyn _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
@@ -179,7 +179,7 @@ genOptionStructName Int16 = return $ namefy "option_int16_t"
 genOptionStructName Int32 = return $ namefy "option_int32_t"
 genOptionStructName Int64 = return $ namefy "option_int64_t"
 genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionStructName (DynamicSubtype _) = return optionDyn
+genOptionStructName (BoxSubtype _) = return optionBox
 genOptionStructName ts =
     case ts of
         Array {} -> do
@@ -230,13 +230,13 @@ genDeclSpecifiers (DefinedType typeIdentifier) = return [CTypeSpec $ CTypeDef ty
 -- The type of the vector is the type of the elements
 genDeclSpecifiers (Array ts _) = genDeclSpecifiers ts
 -- | Option type
-genDeclSpecifiers (Option (DynamicSubtype _))  = return [CTypeSpec $ CTypeDef optionDyn]
+genDeclSpecifiers (Option (BoxSubtype _))  = return [CTypeSpec $ CTypeDef optionBox]
 genDeclSpecifiers (Option ts)                  = do
     optName <- genOptionStructName ts
     return [CTypeSpec $ CTypeDef optName]
 -- Non-primitive types:
--- | Dynamic subtype
-genDeclSpecifiers (DynamicSubtype _)           = return [CTypeSpec $ CTypeDef dynamicStruct]
+-- | Box subtype
+genDeclSpecifiers (BoxSubtype _)           = return [CTypeSpec $ CTypeDef boxStruct]
 -- | Pool type
 genDeclSpecifiers (Pool _ _)                   = return [CTypeSpec $ CTypeDef pool]
 genDeclSpecifiers (MsgQueue _ _)               = return [CTypeSpec $ CTypeDef msgQueue]
@@ -308,7 +308,7 @@ genParameterDeclaration ann (Parameter identifier ts) = do
         (buildDeclarationAnn ann False)
 
 genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m CDeclaration
-genCastDeclaration (DynamicSubtype ts@(Array _ _)) ann = do
+genCastDeclaration (BoxSubtype ts@(Array _ _)) ann = do
     -- We must obtain the declaration specifier of the vector
     specs <- genDeclSpecifiers ts
     decls <- genPtrArrayDeclarator ts ann
@@ -326,7 +326,7 @@ genCastDeclaration (DynamicSubtype ts@(Array _ _)) ann = do
             return $ CDeclarator Nothing (CPtrDeclr [] cAnn : arrayDecl) [] cAnn
         genPtrArrayDeclarator ts' _ = throwError $ InternalError $ "Invalid type specifier, not an array: " ++ show ts'
 
-genCastDeclaration (DynamicSubtype ts) ann = do
+genCastDeclaration (BoxSubtype ts) ann = do
     let cAnn = buildGenericAnn ann
         declAnn = buildDeclarationAnn ann False
     specs <- genDeclSpecifiers ts

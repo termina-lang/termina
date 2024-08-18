@@ -4,7 +4,7 @@ resource class UARTDriver {
     initialized : bool;
     status_register : loc u32;
 
-    method init(&priv self) -> Result {
+    method init(&mut self) -> Result {
 
         var result : Result = Result::Ok;
 
@@ -15,13 +15,13 @@ resource class UARTDriver {
 
     }
 
-    procedure init_drv(&priv self) {
+    procedure init_drv(&mut self) {
 
         return;
 
     }
 
-    procedure use(&priv self) {
+    procedure use(&mut self) {
 
         return;
 
@@ -33,7 +33,7 @@ handler class UARTIrqHandler {
 
     driver : port UARTDriver;
 
-    method init(&priv self) -> Result {
+    method init(&mut self) -> Result {
 
         var result : Result = Result::Ok;
 
@@ -41,7 +41,7 @@ handler class UARTIrqHandler {
 
     }
 
-    method handle(&priv self) -> Result {
+    method handle(&mut self) -> Result {
 
         var result : Result = Result::Ok;
 

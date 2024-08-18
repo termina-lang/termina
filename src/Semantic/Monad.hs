@@ -173,15 +173,15 @@ forgetSemAnn = location
 getTypeSemAnn :: SemanticAnn -> Maybe TypeSpecifier
 getTypeSemAnn  = getResultingType . getSemanticAnn
 
-undynExpType :: ESeman -> ESeman
-undynExpType (SimpleType (DynamicSubtype ty)) = SimpleType ty
-undynExpType (ObjectType ak (DynamicSubtype ty)) = ObjectType ak ty
-undynExpType (AppType ts (DynamicSubtype ty)) = AppType ts ty
-undynExpType _ = error "impossible 888+1"
+unboxExpType :: ESeman -> ESeman
+unboxExpType (SimpleType (BoxSubtype ty)) = SimpleType ty
+unboxExpType (ObjectType ak (BoxSubtype ty)) = ObjectType ak ty
+unboxExpType (AppType ts (BoxSubtype ty)) = AppType ts ty
+unboxExpType _ = error "impossible 888+1"
 
-undynTypeAnn :: SemanticAnn -> SemanticAnn
-undynTypeAnn (Located (ETy en) p) = Located (ETy (undynExpType en)) p
-undynTypeAnn _                    = error "impossible 888"
+unboxTypeAnn :: SemanticAnn -> SemanticAnn
+unboxTypeAnn (Located (ETy en) p) = Located (ETy (unboxExpType en)) p
+unboxTypeAnn _                    = error "impossible 888"
 
 ----------------------------------------
 -- | Global env
@@ -325,7 +325,7 @@ insertGlobal ident entry err =
 
 insertLocalVariables :: Location -> [(Identifier , TypeSpecifier)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (\case
-  (ident, ty@(DynamicSubtype _)) -> insertLocalMutObj loc ident ty;
+  (ident, ty@(BoxSubtype _)) -> insertLocalMutObj loc ident ty;
   (ident, ty) -> insertLocalImmutObj loc ident ty)
 
 -- | Get the type of a local (already) defined object. If it is not defined throw an error.
@@ -478,12 +478,12 @@ checkEqTypesOrError :: Location -> TypeSpecifier -> TypeSpecifier -> SemanticMon
 checkEqTypesOrError loc t1 t2 =
   unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
-unDyn :: SAST.Object SemanticAnn -> SAST.Object SemanticAnn
-unDyn t = Undyn t (undynTypeAnn (getAnnotation t))
+unBox :: SAST.Object SemanticAnn -> SAST.Object SemanticAnn
+unBox t = Unbox t (unboxTypeAnn (getAnnotation t))
 
-unDynExp :: SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
-unDynExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unDyn obj)
-unDynExp _ = throwError $ annotateError Internal EUnDynExpression
+unBoxExp :: SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
+unBoxExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unBox obj)
+unBoxExp _ = throwError $ annotateError Internal EUnBoxExpression
 
 mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
 mustBeTy ty expression =
@@ -539,8 +539,8 @@ checkTypeSpecifier loc (Slice ty) =
   checkTypeSpecifier loc ty
 checkTypeSpecifier loc (MsgQueue ty s) = checkTypeSpecifier loc ty >> checkSize loc s
 checkTypeSpecifier loc (Pool ty s) = checkTypeSpecifier loc ty >> checkSize loc s
--- Dynamic Subtyping
-checkTypeSpecifier loc (Option tyd@(DynamicSubtype _ty)) = checkTypeSpecifier loc tyd
+-- Box Subtyping
+checkTypeSpecifier loc (Option tyd@(BoxSubtype _ty)) = checkTypeSpecifier loc tyd
 -- Regular option subtyping
 checkTypeSpecifier loc (Option (Option _))     = throwError $ annotateError loc EOptionNested
 checkTypeSpecifier loc (Option ty) = simpleTyorFail loc ty >> checkTypeSpecifier loc ty
@@ -548,8 +548,8 @@ checkTypeSpecifier loc (Reference _ ty)        =
   -- Unless we are referencing a reference we are good
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
   checkTypeSpecifier loc ty
-checkTypeSpecifier loc (DynamicSubtype (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeSpecifier loc (DynamicSubtype ty) =
+checkTypeSpecifier loc (BoxSubtype (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (BoxSubtype ty) =
   simpleTyorFail loc ty >>
   checkTypeSpecifier loc ty
 checkTypeSpecifier loc (Location ty) =
@@ -571,10 +571,10 @@ checkTypeSpecifier loc (AccessPort ty) =
 checkTypeSpecifier loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
 checkTypeSpecifier loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
-checkTypeSpecifier loc (InPort (DynamicSubtype ty') _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (InPort (BoxSubtype ty') _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
-checkTypeSpecifier loc (OutPort (DynamicSubtype ty')) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
+checkTypeSpecifier loc (OutPort (BoxSubtype ty')) = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (OutPort ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'
 checkTypeSpecifier loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
 checkTypeSpecifier loc (Allocator ty') = simpleTyorFail loc ty' >> checkTypeSpecifier loc ty'

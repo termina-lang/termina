@@ -15,16 +15,16 @@ tmDescriptorTS, messageTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
 messageTS = DefinedType "Message"
 
-optionDynUInt32TS :: TypeSpecifier
-optionDynUInt32TS = Option (DynamicSubtype UInt32)
+optionBoxUInt32TS :: TypeSpecifier
+optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
 vectorTS, vectorTMDescriptorTS, twoDimArrayTS :: TypeSpecifier
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 vectorTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
 twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
 
-optionDynUInt32SemAnn :: SemanticAnn
-optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
+optionBoxUInt32SemAnn :: SemanticAnn
+optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
@@ -82,12 +82,12 @@ enum0, enum1 :: Statement SemanticAnn
 enum0 = Declaration "enum0" Mutable messageTS (EnumVariantInitializer "Message" "Reset" [] messageSemAnn) stmtSemAnn
 enum1 = Declaration "enum1" Mutable messageTS (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) stmtSemAnn
 
-dynVar0 :: Expression SemanticAnn
-dynVar0 = AccessObject (Variable "dyn_var0" dynUInt32SemAnn)
+boxVar0 :: Expression SemanticAnn
+boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionDynUInt32TS (OptionVariantInitializer (Some dynVar0) optionDynUInt32SemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionDynUInt32TS (OptionVariantInitializer None optionDynUInt32SemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32SemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32SemAnn) stmtSemAnn
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
@@ -105,16 +105,16 @@ spec = do
       renderStatement foo2 `shouldBe`
         pack "\nuint32_t foo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement var option0 : Option <'dyn u32> = Some(dyn_var0);" $ do
+    it "Prints the statement var option0 : Option <'box u32> = Some(box_var0);" $ do
       renderStatement option0 `shouldBe`
         pack (
-          "\n__option_dyn_t option0;\n" ++
+          "\n__option_box_t option0;\n" ++
           "option0.__variant = Some;\n" ++
-          "option0.Some.__0 = dyn_var0;")
-    it "Prints the statement var option1 : Option <'dyn u32> = None;" $ do
+          "option0.Some.__0 = box_var0;")
+    it "Prints the statement var option1 : Option <'box u32> = None;" $ do
       renderStatement option1 `shouldBe`
         pack (
-          "\n__option_dyn_t option1;\n" ++
+          "\n__option_box_t option1;\n" ++
           "option1.__variant = None;")
   describe "Pretty printing enum variable declarations" $ do
     it "Prints the statement var enum0 : Message = Message::Reset;" $ do

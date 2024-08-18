@@ -19,7 +19,7 @@ insertOptionType ::
   TypeSpecifier
   -> OptionTypesMonad ()
 insertOptionType ts = do
-  when (isNonDynOption ts) $ ST.gets (M.lookup (rootType ts)) >>=
+  when (isNonBoxOption ts) $ ST.gets (M.lookup (rootType ts)) >>=
     maybe
       -- | if the root type is not in the map, insert it
       (ST.modify $ M.insert (rootType ts) (S.singleton ts))

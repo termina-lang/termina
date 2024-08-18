@@ -23,7 +23,7 @@ checkEqTypes  (Option Unit) (Option _) = True
 checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (DynamicSubtype tyspecl) (DynamicSubtype tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (BoxSubtype tyspecl) (BoxSubtype tyspecr) = checkEqTypes tyspecl tyspecr
 checkEqTypes  (Array typespecl sizel) (Array typespecr sizer) = checkEqTypes typespecl typespecr && (sizel == sizer)
 checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes

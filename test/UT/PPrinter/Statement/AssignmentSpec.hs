@@ -15,8 +15,8 @@ import Generator.LanguageC.Printer
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
 
-optionDynUInt32SemAnn :: SemanticAnn
-optionDynUInt32SemAnn = optionDynSemAnn Mutable UInt32
+optionBoxUInt32SemAnn :: SemanticAnn
+optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
 
 vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnn
 vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
@@ -89,23 +89,23 @@ enum0Assign, enum1Assign :: Statement SemanticAnn
 enum0Assign = AssignmentStmt enum0 (EnumVariantInitializer "Message" "Reset" [] messageSemAnn) undefined
 enum1Assign = AssignmentStmt enum1 (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) undefined
 
-dynVar0 :: Object SemanticAnn
-dynVar0 = Variable "dyn_var0" dynUInt32SemAnn
+boxVar0 :: Object SemanticAnn
+boxVar0 = Variable "box_var0" boxUInt32SemAnn
 
 option0, option1 :: Object SemanticAnn
-option0 =  Variable "option0" optionDynUInt32SemAnn
-option1 =  Variable "option1" optionDynUInt32SemAnn
+option0 =  Variable "option0" optionBoxUInt32SemAnn
+option1 =  Variable "option1" optionBoxUInt32SemAnn
 
-undynVar0 :: Object SemanticAnn
-undynVar0 = Undyn dynVar0 (objSemAnn Mutable UInt32)
+unboxVar0 :: Object SemanticAnn
+unboxVar0 = Unbox boxVar0 (objSemAnn Mutable UInt32)
 
-undynVar0AssignFoo1, undynVar0AssignConst :: Statement SemanticAnn
-undynVar0AssignFoo1 = AssignmentStmt undynVar0 (AccessObject foo1) undefined
-undynVar0AssignConst = AssignmentStmt undynVar0 (Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32SemAnn) undefined
+unboxVar0AssignFoo1, unboxVar0AssignConst :: Statement SemanticAnn
+unboxVar0AssignFoo1 = AssignmentStmt unboxVar0 (AccessObject foo1) undefined
+unboxVar0AssignConst = AssignmentStmt unboxVar0 (Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32SemAnn) undefined
 
 option0Assign, option1Assign :: Statement SemanticAnn
-option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject dynVar0)) optionDynUInt32SemAnn) undefined
-option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionDynUInt32SemAnn) undefined
+option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32SemAnn) undefined
+option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionBoxUInt32SemAnn) undefined
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
@@ -123,12 +123,12 @@ spec = do
       renderStatement foo2Assign `shouldBe`
         pack "\nfoo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement option0 = Some(dyn_var0); where option0 : Option <'dyn u32>" $ do
+    it "Prints the statement option0 = Some(box_var0); where option0 : Option <'box u32>" $ do
       renderStatement option0Assign `shouldBe`
         pack (
           "\noption0.__variant = Some;\n" ++
-          "option0.Some.__0 = dyn_var0;")
-    it "Prints the statement option1 = None; where option1 : Option <'dyn u32>" $ do
+          "option0.Some.__0 = box_var0;")
+    it "Prints the statement option1 = None; where option1 : Option <'box u32>" $ do
       renderStatement option1Assign `shouldBe`
         pack "\noption1.__variant = None;"
   describe "Pretty printing enum variable declarations" $ do
@@ -203,10 +203,10 @@ spec = do
           "    }\n" ++
           "    vector6[__i0].field1.field_c = 4294901760;\n" ++
           "}")
-  describe "Pretty printing undyn assignments" $ do
-    it "Prints the statement dyn_var0 = foo1" $ do
-      renderStatement undynVar0AssignFoo1 `shouldBe`
-        pack "\n*(uint32_t *)dyn_var0.data = foo1;"
-    it "Prints the statement dyn_var0 = 1024 : u32" $ do
-      renderStatement undynVar0AssignConst `shouldBe`
-        pack "\n*(uint32_t *)dyn_var0.data = 1024;"
+  describe "Pretty printing unbox assignments" $ do
+    it "Prints the statement box_var0 = foo1" $ do
+      renderStatement unboxVar0AssignFoo1 `shouldBe`
+        pack "\n*(uint32_t *)box_var0.data = foo1;"
+    it "Prints the statement box_var0 = 1024 : u32" $ do
+      renderStatement unboxVar0AssignConst `shouldBe`
+        pack "\n*(uint32_t *)box_var0.data = 1024;"

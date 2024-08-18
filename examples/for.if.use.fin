@@ -22,7 +22,7 @@ resource class UARTDriver{
 
     }
 
-    procedure riscv_putchar(&priv self, c : u8, result : &mut Result) {
+    procedure riscv_putchar(&mut self, c : u8, result : &mut Result) {
 
         var write_timeout : u32 = 0 : u32;
         let timeout : u32 = 0xAAAAA : u32;

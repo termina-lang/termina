@@ -1,4 +1,4 @@
--- | Simple POC of data flo analysis to compute flow of dynamic variables.
+-- | Simple POC of data flo analysis to compute flow of box variables.
 
 module DataFlow.VarUsage (
   runUDAnnotatedProgram
@@ -34,17 +34,17 @@ import Semantic.Monad as SM (SemanticAnn, getResultingType, getTypeSemAnn, getOb
 
 
 -- There are two types of arguments :
--- + Moving out variables of type dyn and Option<dyn T>
+-- + Moving out variables of type box and Option<box T>
 -- + Copying expressions, everything.
 -- It is context dependent (AFAIK).
 useArguments :: Expression SM.SemanticAnn -> UDM VarUsageError ()
--- If we are giving a variable of type Dyn, we moving it out.
+-- If we are giving a variable of type Box, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
   = case SM.getTypeSemAnn ann of
-     Just (DynamicSubtype _) ->
-       withLocation (location ann) $ useDynVar ident
+     Just (BoxSubtype _) ->
+       withLocation (location ann) $ useBoxVar ident
      _ -> useExpression e
--- Dyn variables inside expressions are read as values.
+-- Box variables inside expressions are read as values.
 useArguments e = useExpression e
 
 useObject :: Object SM.SemanticAnn -> UDM VarUsageError ()
@@ -55,10 +55,10 @@ useObject (Variable ident ann)
         (throwError $ annotateError loc ImpossibleError)
         (\case {
                 -- Nothing, we can use it freely, in the normal sense of using it.
-                DynamicSubtype _ -> return ()
+                BoxSubtype _ -> return ()
                 ;
             -- We can use Options only once!
-                Option (DynamicSubtype _) ->
+                Option (BoxSubtype _) ->
                 withLocation loc $ addUseOnlyOnce ident
                 ;
             -- Mutable Options??
@@ -76,8 +76,8 @@ useObject (DereferenceMemberAccess obj i ann)
   >> useObject obj
 useObject (ArraySlice obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
--- TODO Use Object undyn?
-useObject (Undyn obj _ann)
+-- TODO Use Object unbox?
+useObject (Unbox obj _ann)
   = useObject obj
 
 useFieldAssignment :: FieldAssignment SM.SemanticAnn -> UDM VarUsageError ()
@@ -118,7 +118,7 @@ useExpression (MemberFunctionCall obj ident args ann) = do
               _ -> throwError ImpossibleErrorBadAllocArg
           "free" -> do
             case args of
-              [AccessObject (Variable var _anni)] -> useDynVar var
+              [AccessObject (Variable var _anni)] -> useBoxVar var
               _ -> throwError ImpossibleErrorBadFreeArg
           _ -> throwError ImpossibleError) -- Pools only have alloc
       (_, OutPort {}) ->
@@ -128,14 +128,14 @@ useExpression (MemberFunctionCall obj ident args ann) = do
               [AccessObject input_obj@(Variable var _)] -> do
                   input_obj_type <- withLocation (location ann) (getObjectType input_obj)
                   case input_obj_type of
-                    (_, DynamicSubtype _) -> withLocation (location ann) (useDynVar var)
+                    (_, BoxSubtype _) -> withLocation (location ann) (useBoxVar var)
                     _ -> useObject input_obj
               _ -> withLocation (location ann) (throwError ImpossibleErrorBadSendArg)
           _ -> withLocation (location ann) $ throwError ImpossibleError -- OutPorts only have send
-      -- TODO Can Dyn be passed around as arguments?
+      -- TODO Can Box be passed around as arguments?
       _ -> mapM_ useArguments args
 useExpression (DerefMemberFunctionCall obj _ident args _ann)
-      -- TODO Can Dyn be passed around as arguments?
+      -- TODO Can Box be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitializer e _size _ann)
   = useExpression e
@@ -149,7 +149,7 @@ useExpression (OptionVariantInitializer opt _ann)
         None   -> return ()
         Some e -> useExpression e
 useExpression (FunctionCall _ident args _ann)
-      -- TODO Can Dyn be passed around as arguments?
+      -- TODO Can Box be passed around as arguments?
   = mapM_ useArguments args
 
 useDefBlockRet :: BlockRet SM.SemanticAnn -> UDM VarUsageError ()
@@ -167,10 +167,10 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   =
   withLocation (location ann)
   (case tyS of
-    -- Dynamic are only declared on match statements
-    Option (DynamicSubtype _) -> defVariableOO ident
-    -- Dynamic are not possible, they come from somewhere else.
-    DynamicSubtype _ -> throwError (DefiningDyn ident)
+    -- Box are only declared on match statements
+    Option (BoxSubtype _) -> defVariableOO ident
+    -- Box are not possible, they come from somewhere else.
+    BoxSubtype _ -> throwError (DefiningBox ident)
     --Everything else
     _        -> defVariable ident)
   -- Use everithing in the |initE|
@@ -191,16 +191,16 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
                  map ((\l -> mapM_ useDefStmt l >> get) . reverse . elseIfBody) elseIfs
                 )
   -- Rule here is, all branches should have the same onlyonce behaviour.
-  let (usedOO, usedDyns)
-        = foldr (\s (oo,dd) -> (usedOption s : oo, usedDyn s : dd)) ([],[]) sets -- (map usedOption sets)
+  let (usedOO, usedBoxes)
+        = foldr (\s (oo,dd) -> (usedOption s : oo, usedBox s : dd)) ([],[]) sets -- (map usedOption sets)
   unless (sameMaps usedOO)
     (throwError $ annotateError (location ann) (DifferentOnlyOnce usedOO))
-  unless (sameSets usedDyns)
-    (throwError $ annotateError (location ann) (DifferentDynsSets usedDyns))
+  unless (sameSets usedBoxes)
+    (throwError $ annotateError (location ann) (DifferentBoxesSets usedBoxes))
   -- We get all uses
   let normalUses = S.unions (map usedSet sets)
   --
-  continueWith (head usedOO) normalUses (head usedDyns)
+  continueWith (head usedOO) normalUses (head usedBoxes)
   -- Issue #40, forgot to use condition expression.
   useExpression eCond
   mapM_ (useExpression . elseIfCond) elseIfs
@@ -222,9 +222,9 @@ useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
         >> useDefBlock block
         >> get >>= \st -> -- No Option should be in the state
         unless (M.null (usedOption st)) (throwError $ annotateError (location ann) ForMoreOOpt)
-        >> -- No Dyn should be in the state
-        let usedDynSet = usedDyn st in
-        unless (S.null usedDynSet) (throwError $ annotateError (location ann) (ForMoreODyn (getVars usedDynSet)))
+        >> -- No Box should be in the state
+        let usedBoxSet = usedBox st in
+        unless (S.null usedBoxSet) (throwError $ annotateError (location ann) (ForMoreOBox (getVars usedBoxSet)))
         >> -- If everything goes okay, return used variables
         return (usedSet st)
       )
@@ -242,13 +242,13 @@ useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
 useDefStmt (MatchStmt e mcase ann)
   =
   -- Depending on expression |e| type
-  -- we handle OptionDyn special case properly.
+  -- we handle OptionBox special case properly.
   maybe (throwError $ annotateError (location ann) ImpossibleErrorMatchGetType)
     (\case
-        Option (DynamicSubtype _) ->
+        Option (BoxSubtype _) ->
           case mcase of
             [x,y] ->
-              let (mo,mn) = destroyOptionDyn (x,y)
+              let (mo,mn) = destroyOptionBox (x,y)
               in runEncapsEOO [mo,mn]
             _ -> throwError $ annotateError (location ann) InternalOptionMissMatch;
         -- Otherwise, it is a simple use variable.
@@ -258,42 +258,42 @@ useDefStmt (MatchStmt e mcase ann)
   >>= \sets ->
   -- Get all OO sets
   let
-    (usedOOpt, usedDyns, usedN)
-     = foldr (\s (opts,dyns,norms) ->
+    (usedOOpt, usedBoxes, usedN)
+     = foldr (\s (opts,boxes,norms) ->
                ( usedOption s : opts
-               , usedDyn s : dyns
+               , usedBox s : boxes
                , usedSet s : norms)) ([],[],[]) sets
   in
   -- Should all be the same
   unless (sameMaps usedOOpt)
         (throwError $ annotateError (location ann) DifferentOnlyOnceMatch)
   >>
-  unless (sameSets usedDyns)
-        (throwError $ annotateError (location ann) DifferentDynsSetsMatch)
+  unless (sameSets usedBoxes)
+        (throwError $ annotateError (location ann) DifferentBoxesSetsMatch)
   -- Then continue addin uses
   >> unionS
         (head usedOOpt)
         (S.unions usedN)
-        (head usedDyns)
+        (head usedBoxes)
   >> -- Use of expression matching
   useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 
-destroyOptionDyn
+destroyOptionBox
   :: (MatchCase SM.SemanticAnn, MatchCase SM.SemanticAnn)
   -> (UDM VarUsageError UDSt , UDM VarUsageError UDSt)
-destroyOptionDyn (ml, mr)
+destroyOptionBox (ml, mr)
   =
   let (mOpt, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
   in
     (useDefBlock (matchBody mOpt)
       >>
-     withLocation (location (matchAnnotation mOpt)) (defDynVar (head (matchBVars mOpt)))
+     withLocation (location (matchAnnotation mOpt)) (defBoxVar (head (matchBVars mOpt)))
      >> get
     , useDefBlock (matchBody mNone) >> get)
 
--- General case, not when it is Option Dyn
+-- General case, not when it is Option Box
 useMCase :: MatchCase SM.SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBlock blk

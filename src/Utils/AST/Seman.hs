@@ -6,14 +6,14 @@ import Utils.AST.Parser
 import           AST.Seman
 
 -- A relation of type specifier.
-dynPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
-dynPromotion (DynamicSubtype t) (DynamicSubtype t') = checkEqTypes t t'
-dynPromotion (DynamicSubtype t) q = checkEqTypes t q
-dynPromotion t (DynamicSubtype q) = checkEqTypes t q
-dynPromotion _ _ = False
+boxPromotion :: TypeSpecifier -> TypeSpecifier -> Bool
+boxPromotion (BoxSubtype t) (BoxSubtype t') = checkEqTypes t t'
+boxPromotion (BoxSubtype t) q = checkEqTypes t q
+boxPromotion t (BoxSubtype q) = checkEqTypes t q
+boxPromotion _ _ = False
 -- TODO Q23
 
-cleanDyn :: TypeSpecifier -> TypeSpecifier
-cleanDyn (DynamicSubtype t) = cleanDyn t
-cleanDyn t = t
+cleanBox :: TypeSpecifier -> TypeSpecifier
+cleanBox (BoxSubtype t) = cleanBox t
+cleanBox t = t
 

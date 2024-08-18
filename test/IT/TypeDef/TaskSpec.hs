@@ -36,7 +36,7 @@ test0 = "struct Message {\n" ++
         "\n" ++
         "    self->interval = self->interval + 1;\n" ++
         "\n" ++
-        "    var alloc_msg : Option<dyn Message> = None;\n" ++
+        "    var alloc_msg : Option<box Message> = None;\n" ++
         "    self->message_pool.alloc(&mut alloc_msg);\n" ++
         "    match alloc_msg {\n" ++
         "        case Some (msg) => {\n" ++
@@ -122,7 +122,7 @@ spec = do
               "\n" ++
               "    self->interval = self->interval + 1;\n" ++
               "\n" ++
-              "    __option_dyn_t alloc_msg;\n" ++
+              "    __option_box_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
               "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
@@ -132,7 +132,7 @@ spec = do
               "\n"  ++
               "    } else {\n" ++
               "        \n" ++
-              "        __option_dyn_params_t __Some = alloc_msg.Some;\n" ++
+              "        __option_box_params_t __Some = alloc_msg.Some;\n" ++
               "\n" ++
               "        __termina_pool__free(self->message_pool, __Some.__0);\n" ++
               "\n" ++
