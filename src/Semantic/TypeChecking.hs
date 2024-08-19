@@ -40,18 +40,6 @@ import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Parsing as Parser
 
-catchMismatch :: 
-  -- | Location of the error
-  Parser.Annotation 
-  -- | Function to create the error
-  -> (TypeSpecifier -> Error Parser.Annotation) 
-  -- | Action to execute
-  -> SemanticMonad a 
-  -- | Action to execute
-  -> SemanticMonad a
-catchMismatch ann ferror action = catchError action (\err -> case getError err of
-  EMismatch _ ty -> throwError $ annotateError ann (ferror ty)
-  _ -> throwError err)
 
 getMemberFieldType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
 getMemberFieldType ann obj_ty ident =

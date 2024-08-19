@@ -129,7 +129,7 @@ printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg
 
 -- useful prettyprinter doc
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
-ppError :: M.Map FilePath TL.Text -> 
+ppError :: M.Map FilePath TL.Text ->
     SemanticErrors -> IO ()
 ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
   let fileName = sourceName pos
@@ -151,22 +151,22 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just "You are trying to index an object that is not an array.")
-    (ENotNamedObject ident) -> 
+    (ENotNamedObject ident) ->
         let title = "\x1b[31merror [E002]\x1b[0m: Object not found."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared"))
-    (ENotConstant ident) -> 
-        let 
+    (ENotConstant ident) ->
+        let
             title = "\x1b[31merror [E003]\x1b[0m: invalid use of a non-constant object."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length ident)
                 (Just ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant."))
-    EAssignmentToImmutable -> 
+    EAssignmentToImmutable ->
         let title = "\x1b[31merror [E004]\x1b[0m: assignment to immutable variable."
         in
             printSimpleError
@@ -181,7 +181,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 lineNumber lineColumn 2
                 (Just ("You are missing the else clause in an if-else-if statement.\n" <>
                     "You must provide an else clause if you are defining an else-if clause."))
-    ENotCasteable ts1 ts2 -> 
+    ENotCasteable ts1 ts2 ->
         let title = "\x1b[31merror [E006]\x1b[0m: invalid cast."
         in
             printSimpleError
@@ -195,7 +195,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Parameter \x1b[31m" <> T.pack ident <> "\x1b[0m has an invalid type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EInvalidReturnType ts -> 
+    EInvalidReturnType ts ->
         let title = "\x1b[31merror [E008]\x1b[0m: invalid return type."
         in
             printSimpleError
@@ -212,10 +212,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length procId)
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Procedure \x1b[31m" <> T.pack procId <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -229,10 +229,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length procId)
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Procedure \x1b[31m" <> T.pack procId <>
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -242,8 +242,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Parameter \x1b[31m" <> T.pack param <> 
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                (Just ("Parameter \x1b[31m" <> T.pack param <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             case ann of
                 Position procPos _procEndPos ->
@@ -252,10 +252,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                         procLineColumn = sourceColumn procPos
                         procSourceLines = toModuleAST M.! procFileName
                     in
-                    printSimpleError 
-                        procSourceLines 
-                            ("The procedure \x1b[31m" <> T.pack ident <> 
-                            "\x1b[0m is defined here:") 
+                    printSimpleError
+                        procSourceLines
+                            ("The procedure \x1b[31m" <> T.pack ident <>
+                            "\x1b[0m is defined here:")
                             procFileName
                         procLineNumber procLineColumn 1
                         Nothing
@@ -278,7 +278,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
     EResourceClassAction (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E014]\x1b[0m: resource class defines an action."
         in
-            TL.putStrLn $ prettyErrors 
+            TL.putStrLn $ prettyErrors
                 sourceLines
                 [
                     Errata
@@ -289,22 +289,22 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
-                                            (sourceColumn posClass + length classId) 
+                                    Pointer (sourceLine posClass) (sourceColumn posClass)
+                                            (sourceColumn posClass + length classId)
                                             True Nothing fancyRedPointer,
-                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                    Pointer lineNumber lineColumn (lineColumn + length ident)
                                             True (Just " \x1b[31minvalid action definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
                         ]
-                        (Just 
+                        (Just
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define actions."))
                 ]
     EResourceClassInPort (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E015]\x1b[0m: resource class defines an in port."
         in
-            TL.putStrLn $ prettyErrors 
+            TL.putStrLn $ prettyErrors
                 sourceLines
                 [
                     Errata
@@ -315,22 +315,22 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
-                                            (sourceColumn posClass + length classId) 
+                                    Pointer (sourceLine posClass) (sourceColumn posClass)
+                                            (sourceColumn posClass + length classId)
                                             True Nothing fancyRedPointer,
-                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                    Pointer lineNumber lineColumn (lineColumn + length ident)
                                             True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
                         ]
-                        (Just 
+                        (Just
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define in ports."))
                 ]
     EResourceClassOutPort (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E016]\x1b[0m: resource class defines an out port."
         in
-            TL.putStrLn $ prettyErrors 
+            TL.putStrLn $ prettyErrors
                 sourceLines
                 [
                     Errata
@@ -341,15 +341,15 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
-                                            (sourceColumn posClass + length classId) 
+                                    Pointer (sourceLine posClass) (sourceColumn posClass)
+                                            (sourceColumn posClass + length classId)
                                             True Nothing fancyRedPointer,
-                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                    Pointer lineNumber lineColumn (lineColumn + length ident)
                                             True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
                         ]
-                        (Just 
+                        (Just
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the out port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define out ports."))
                 ]
@@ -360,7 +360,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("Interface \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
-    EMismatchIdNotInterface ident -> 
+    EMismatchIdNotInterface ident ->
         let title = "\x1b[31merror [E018]\x1b[0m: identifier not an interface."
         in
             printSimpleError
@@ -370,7 +370,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
     EProcedureNotFromProvidedInterfaces (classId, Position posClass _endPosClass) ident ->
         let title = "\x1b[31merror [E019]\x1b[0m: procedure not from provided interfaces."
         in
-            TL.putStrLn $ prettyErrors 
+            TL.putStrLn $ prettyErrors
                 sourceLines
                 [
                     Errata
@@ -381,17 +381,17 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass) 
-                                            (sourceColumn posClass + length classId) 
+                                    Pointer (sourceLine posClass) (sourceColumn posClass)
+                                            (sourceColumn posClass + length classId)
                                             True Nothing fancyRedPointer,
-                                    Pointer lineNumber lineColumn (lineColumn + length ident) 
+                                    Pointer lineNumber lineColumn (lineColumn + length ident)
                                             True (Just " \x1b[31munknown procedure\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
                         ]
-                        (Just 
-                            ("The procedure \x1b[31m" <> T.pack ident 
-                                <> "\x1b[0m does not belong to any of the provided interfaces of resource class \x1b[31m" 
+                        (Just
+                            ("The procedure \x1b[31m" <> T.pack ident
+                                <> "\x1b[0m does not belong to any of the provided interfaces of resource class \x1b[31m"
                                 <> T.pack classId <> "\x1b[0m.\n"))
                 ]
     EMissingProcedure ifaceId procId ->
@@ -411,11 +411,11 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Procedure \x1b[31m" <> T.pack procId <>
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -429,11 +429,11 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Procedure \x1b[31m" <> T.pack procId <> 
-                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> 
-                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Procedure \x1b[31m" <> T.pack procId <>
+                    "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -447,14 +447,14 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                (Just ("Parameter \x1b[31m" <> T.pack paramId <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
-            printSimpleError 
-                procSourceLines 
-                    ("The procedure \x1b[31m" <> T.pack procId <> 
-                     "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <> 
-                     "\x1b[0m is defined here:") 
+            printSimpleError
+                procSourceLines
+                    ("The procedure \x1b[31m" <> T.pack procId <>
+                     "\x1b[0m of the interface \x1b[31m" <> T.pack ifaceId <>
+                     "\x1b[0m is defined here:")
                     procFileName
                 procLineNumber procLineColumn 1
                 Nothing
@@ -475,10 +475,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length funcId)
-                (Just ("Function \x1b[31m" <> T.pack funcId <> 
-                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
@@ -492,10 +492,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length funcId)
-                (Just ("Function \x1b[31m" <> T.pack funcId <> 
-                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <> 
+                (Just ("Function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
-            printSimpleError 
+            printSimpleError
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
@@ -509,13 +509,13 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length funcId)
-                (Just ("Parameter \x1b[31m" <> T.pack paramId <> 
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                (Just ("Parameter \x1b[31m" <> T.pack paramId <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
-            printSimpleError 
-                funcSourceLines 
-                    ("The function \x1b[31m" <> T.pack funcId <> 
-                     "\x1b[0m is defined here:") 
+            printSimpleError
+                funcSourceLines
+                    ("The function \x1b[31m" <> T.pack funcId <>
+                     "\x1b[0m is defined here:")
                     funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
@@ -539,9 +539,9 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The result of the binary operation \x1b[31m" <> showText op <> 
+                (Just ("The result of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                    "\x1b[0m but the left operand you are providing is of type \x1b[31m" <> 
+                    "\x1b[0m but the left operand you are providing is of type \x1b[31m" <>
                     showText actualTy <> "\x1b[0m."))
     EBinOpExpectedTypeRight op expectedTy actualTy ->
         let title = "\x1b[31merror [E031]\x1b[0m: Binary operation expected type on the right."
@@ -549,9 +549,9 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The result of the binary operation \x1b[31m" <> showText op <> 
+                (Just ("The result of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                    "\x1b[0m but the right operand you are providing is of type \x1b[31m" <> 
+                    "\x1b[0m but the right operand you are providing is of type \x1b[31m" <>
                     showText actualTy <> "\x1b[0m."))
     EBinOpTypeMismatch op ty_le ty_re ->
         let title = "\x1b[31merror [E032]\x1b[0m: binary operation type mismatch."
@@ -559,7 +559,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (T.length (showText op))
-                (Just ("Binary operation \x1b[31m" <> showText op <> 
+                (Just ("Binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
                     showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
     EBinOpExpectedTypeNotBool op ty ->
@@ -568,8 +568,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (T.length (showText op))
-                (Just ("The binary operation \x1b[31m" <> showText op <> 
-                    "will result in a value of type \x1b[31m" <> showText Bool <> 
+                (Just ("The binary operation \x1b[31m" <> showText op <>
+                    "will result in a value of type \x1b[31m" <> showText Bool <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotBool op ty ->
         let title = "\x1b[31merror [E034]\x1b[0m: binary operation expected boolean type on the left."
@@ -577,8 +577,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
     EBinOpRightTypeNotBool op ty ->
         let title = "\x1b[31merror [E035]\x1b[0m: binary operation expected boolean type on the right."
@@ -586,8 +586,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
     EBinOpExpectedTypeNotNum op ty ->
         let title = "\x1b[31merror [E036]\x1b[0m: binary operation expected result type not numeric."
@@ -595,7 +595,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (T.length (showText op))
-                (Just ("The binary operation \x1b[31m" <> showText op <> 
+                (Just ("The binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m will result in a numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotNum op ty ->
         let title = "\x1b[31merror [E037]\x1b[0m: binary operation expected numeric type on the left."
@@ -603,8 +603,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of numeric type."))
     EBinOpRightTypeNotNum op ty ->
         let title = "\x1b[31merror [E038]\x1b[0m: binary operation expected numeric type on the right."
@@ -612,8 +612,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of numeric type."))
     EBinOpRightTypeNotPos op ty ->
         let title = "\x1b[31merror [E039]\x1b[0m: binary operation expected positive numeric type on the right."
@@ -621,8 +621,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of positive numeric type."))
     EBinOpLeftTypeNotEquatable op ty ->
         let title = "\x1b[31merror [E040]\x1b[0m: binary operation expected equatable type on the left."
@@ -630,8 +630,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of equatable type."))
     EBinOpRightTypeNotEquatable op ty ->
         let title = "\x1b[31merror [E041]\x1b[0m: binary operation expected equatable type on the right."
@@ -639,8 +639,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <> 
-                    "\x1b[0m is of type \x1b[31m" <> showText ty <> 
+                (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
+                    "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of equatable type."))
     EAtomicAccessInvalidType ty ->
         let title = "\x1b[31merror [E042]\x1b[0m: invalid type for the atomic access interface."
@@ -676,7 +676,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <> 
+                (Just ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EAtomicArrayConnectionTypeMismatch expectedTy actualTy ->
         let title = "\x1b[31merror [E047]\x1b[0m: atomic array connection type mismatch."
@@ -684,7 +684,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <> 
+                (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
         let title = "\x1b[31merror [E048]\x1b[0m: atomic array connection size mismatch."
@@ -692,7 +692,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <> 
+                (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <>
                     "\x1b[0m but the array has size \x1b[31m" <> showText actualSize <> "\x1b[0m."))
     EConstantWithoutKnownType c ->
         let title = "\x1b[31merror [E049]\x1b[0m: constant without known type."
@@ -700,7 +700,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The type of the constant \x1b[31m" <> showText c <> 
+                (Just ("The type of the constant \x1b[31m" <> showText c <>
                     "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
     EStructInitializerInvalidUse ->
         let title = "\x1b[31merror [E050]\x1b[0m: invalid use of struct initializer."
@@ -716,7 +716,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EStructInitializerGlobalNotStruct tydef ->
         let title = "\x1b[31merror [E052]\x1b[0m: struct initializer expected global type not struct."
@@ -724,8 +724,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Invalid use of a struct initializer.\n" <> 
-                    "You are using a struct initializer but the expected type is \x1b[31m" <> 
+                (Just ("Invalid use of a struct initializer.\n" <>
+                    "You are using a struct initializer but the expected type is \x1b[31m" <>
                     showText tydef <> "\x1b[0m."))
     EStructInitializerExpectedTypeNotStruct ty ->
         let title = "\x1b[31merror [E053]\x1b[0m: struct initializer expected type not struct."
@@ -733,8 +733,8 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Invalid use of a struct initializer.\n" <> 
-                    "You are using a struct initializer but the expected type is \x1b[31m" <> 
+                (Just ("Invalid use of a struct initializer.\n" <>
+                    "You are using a struct initializer but the expected type is \x1b[31m" <>
                     showText ty <> "\x1b[0m."))
     EStructInitializerUnknownType ident ->
         let title = "\x1b[31merror [E054]\x1b[0m: struct initializer unknown type."
@@ -759,7 +759,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 lineNumber lineColumn 1
                 (Just $ "You are trying to use an array initializer in an invalid context.\n" <>
                         "Array initializers can only be used to initialize array objects.")
-    EArrayExprListIntitalizerInvalidUse -> 
+    EArrayExprListIntitalizerInvalidUse ->
         let title = "\x1b[31merror [E057]\x1b[0m: invalid use of an expression list array initializer."
         in
             printSimpleError
@@ -781,7 +781,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The size of the array initializer is \x1b[31m" <> showText initializerSize <> 
+                (Just ("The size of the array initializer is \x1b[31m" <> showText initializerSize <>
                     "\x1b[0m but the expected size is \x1b[31m" <> showText expectedSize <> "\x1b[0m."))
     EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
         let title = "\x1b[31merror [E060]\x1b[0m: array expression list initializer size mismatch."
@@ -797,7 +797,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <> 
+                (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EReturnValueExpected ty ->
         let title = "\x1b[31merror [E062]\x1b[0m: expected return value."
@@ -813,6 +813,20 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just "The function is not expected to return a value.")
+    EInvalidArrayType ty ->
+        let title = "\x1b[31merror [E064]\x1b[0m: invalid array type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid array type."))
+    EInvalidBoxType ty ->
+        let title = "\x1b[31merror [E065]\x1b[0m: invalid box type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid box type."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

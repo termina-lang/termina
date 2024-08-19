@@ -133,15 +133,15 @@ loadTerminaModule ::
   -> FilePath
   -> IO ParsedModule
 loadTerminaModule filePath root = do
-  let fullPath = root </> filePath <.> "fin"
+  let fullP = root </> filePath <.> "fin"
   -- read it
-  src_code <- TLIO.readFile fullPath
+  src_code <- TLIO.readFile fullP
   -- parse it
-  case runParser terminaModuleParser () fullPath (TL.unpack src_code) of
+  case runParser terminaModuleParser () fullP (TL.unpack src_code) of
     Left err -> die . errorMessage $ "Parsing error: " ++ show err
     Right term -> do
       imports <- getModuleImports term
-      return $ TerminaModuleData filePath root imports src_code (ParsingData . PAST.frags $ term)
+      return $ TerminaModuleData filePath fullP imports src_code (ParsingData . PAST.frags $ term)
 
 -- | Load the modules of the project
 loadModules
@@ -202,13 +202,18 @@ typeModules parsedProject =
       let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
-          let sourceFilesMap = sourcecode <$> parsedProject in
+          -- | Create the source files map. This map will be used to obtainn the source files that
+          -- will be feed to the error pretty printer. The source files map must use as key the
+          -- path of the source file and as element the text of the source file.
+          let sourceFilesMap = 
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                    M.empty parsedProject in
           ppError sourceFilesMap err >> exitFailure
         (Right (typedProgram, newState)) -> do
           let typedModule =
                 TerminaModuleData
                   (qualifiedName parsedModule)
-                  (rootPath parsedModule)
+                  (fullPath parsedModule)
                   (importedModules parsedModule)
                   (sourcecode parsedModule)
                   (SemanticData typedProgram)

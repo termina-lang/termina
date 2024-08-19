@@ -27,6 +27,7 @@ import Utils.TypeSpecifier
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import Data.Functor
+import qualified Parser.Parsing as Parser
 
 data ObjectAnn = ObjectAnn
   {
@@ -504,6 +505,32 @@ getIntConst :: Location -> Const -> SemanticMonad Integer
 getIntConst _ (I (TInteger i _) _) = return i
 getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
+catchMismatch :: 
+  -- | Location of the error
+  Parser.Annotation 
+  -- | Function to create the error
+  -> (TypeSpecifier -> Error Parser.Annotation) 
+  -- | Action to execute
+  -> SemanticMonad a 
+  -- | Action to execute
+  -> SemanticMonad a
+catchMismatch ann ferror action = catchError action (\err -> case getError err of
+  EMismatch _ ty -> throwError $ annotateError ann (ferror ty)
+  _ -> throwError err)
+
+catchExpectedSimple ::
+  -- | Location of the error
+  Parser.Annotation
+  -- | Function to create the error
+  -> (TypeSpecifier -> Error Parser.Annotation)
+  -- | Action to execute
+  -> SemanticMonad a
+  -- | Action to execute
+  -> SemanticMonad a
+catchExpectedSimple ann ferror action = catchError action (\err -> case getError err of
+  EExpectedSimple ty -> throwError $ annotateError ann (ferror ty)
+  _ -> throwError err)
+
 -- Helper function failing if a given |TypeSpecifier| is not *simple* |simpleType|.
 simpleTyorFail :: Location -> TypeSpecifier -> SemanticMonad ()
 simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
@@ -530,7 +557,7 @@ checkTypeSpecifier loc (DefinedType identTy) =
 checkTypeSpecifier loc (Array ty s) =
   -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
   -- Only arrays of simple types.
-  simpleTyorFail loc ty >>
+  catchExpectedSimple loc EInvalidArrayType (simpleTyorFail loc ty) >>
   checkTypeSpecifier loc ty >>
   checkSize loc s
 checkTypeSpecifier loc (Slice ty) =
@@ -548,9 +575,9 @@ checkTypeSpecifier loc (Reference _ ty)        =
   -- Unless we are referencing a reference we are good
   unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
   checkTypeSpecifier loc ty
-checkTypeSpecifier loc (BoxSubtype (Option _)) = throwError $ annotateError loc EOptionNested
+checkTypeSpecifier loc (BoxSubtype ty@(Option _)) = throwError $ annotateError loc (EInvalidBoxType ty)
 checkTypeSpecifier loc (BoxSubtype ty) =
-  simpleTyorFail loc ty >>
+  catchExpectedSimple loc EInvalidBoxType (simpleTyorFail loc ty) >>
   checkTypeSpecifier loc ty
 checkTypeSpecifier loc (Location ty) =
   simpleTyorFail loc ty >>

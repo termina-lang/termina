@@ -13,9 +13,9 @@ type QualifiedName = FilePath
 data TerminaModuleData a = TerminaModuleData {
   -- | Module's qualified name
   qualifiedName :: !QualifiedName,
-  -- | Root of the module
-  -- This is the root path where the module is located
-  rootPath :: !FilePath,
+  -- | File path to the module
+  -- This is the full path where the module's source file is located
+  fullPath :: !FilePath,
   -- | List of imported modules
   importedModules :: ![QualifiedName],
   -- | Source code

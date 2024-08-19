@@ -20,6 +20,7 @@ data Error a
   | ENoTyFound Identifier -- ^ Type not found (Internal)
   | ENotStructFound Identifier -- ^ Struct not found (Internal)
   | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
+  | EExpectedSimple TypeSpecifier -- ^ Expected a simple type (Internal)
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -83,6 +84,8 @@ data Error a
   | EArrayExprListInitializerExprTypeMismatch TypeSpecifier TypeSpecifier -- ^ Array initializing expression type mismatch (E061)
   | EReturnValueExpected TypeSpecifier -- ^ Expected return value (E062)
   | EReturnValueNotUnit -- ^ Return value not expected (E063)
+  | EInvalidArrayType TypeSpecifier -- ^ Invalid array type (E064)
+  | EInvalidBoxType TypeSpecifier -- ^ Invalid box type (E065)
   -- | Invalid access to global object
   | EInvalidAccessToGlobal Identifier
   -- | Invalid writing access to read only object
@@ -154,8 +157,6 @@ data Error a
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier Location
-  -- | Expected Simple Type
-  | EExpectedSimple TypeSpecifier
   -- | Invalid class field type
   | EInvalidClassFieldType TypeSpecifier
   -- | Forbidden Reference Type
