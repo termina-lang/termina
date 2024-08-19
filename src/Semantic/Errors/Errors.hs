@@ -93,8 +93,6 @@ data Error a
   | ESymbolDefined Identifier a -- ^ Symbol already defined (E070)
   -- | Not Function found
   | EFunctionNotFound Identifier
-  -- Something was found but it is not an identifier
-  | ETyNotStruct Identifier (SemanTypeDef a)
   -- | Record missing field^
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -112,21 +110,13 @@ data Error a
   | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
-  | EMemberMethodExtraConstParams
-  | EMemberMethodMissingConstParams
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
-  -- | Pattern Matching Missing cases
-  | EPMMissingOption0 -- Missing None
-  | EPMMissingOption1 -- Missing Some
-  | EPMMoreOptions -- More cases??
-  | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
   -- | ForLoop
   | EForIteratorWrongType TypeSpecifier
-  | EForWhileTy TypeSpecifier -- ^ Type of while is not Bool
   -- | Defined GEntry
   | EDefinedGEntry (GEntry a)
   -- | Impossible Cases. Internal Transpiler errors
@@ -155,8 +145,6 @@ data Error a
   | EReferenceTy TypeSpecifier
   -- | Nested Option
   | EOptionNested 
-  -- | Complex expression on LHS
-  | ELHSComplex
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
