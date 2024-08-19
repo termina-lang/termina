@@ -578,7 +578,7 @@ typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty p
         (getGlobalTypeDef pann id_ty)
         -- | Internal error. This should not happen, since we must have checked the
         -- expected type before calling this function. 
-        (\_ -> throwError $ annotateError Internal (ENotStructFound id_ty))
+        (\_ -> throwError $ annotateError Internal (ENoStructFound id_ty))
   >>= \case{
     Struct _ ty_fs _mods  ->
       SAST.StructInitializer

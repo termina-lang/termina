@@ -331,7 +331,7 @@ buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
+    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
     appModule <- loadTerminaModule (appFilename config) (appFolder config)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")

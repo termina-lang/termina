@@ -17,10 +17,10 @@ data Error a
   -- | Expected /similar/ types?
   = 
     EMismatch TypeSpecifier TypeSpecifier -- ^ Type mismatch (Internal)
-  | ENoTyFound Identifier -- ^ Type not found (Internal)
-  | ENotStructFound Identifier -- ^ Struct not found (Internal)
+  | ENoStructFound Identifier -- ^ Struct not found (Internal)
   | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
   | EExpectedSimple TypeSpecifier -- ^ Expected a simple type (Internal)
+  | ENotNamedGlobal Identifier -- ^ Global object not found (Internal)
   | EArray TypeSpecifier -- ^ Invalid array indexing (E001)
   | ENotNamedObject Identifier -- ^ Object not found (E002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (E003)
@@ -86,17 +86,11 @@ data Error a
   | EReturnValueNotUnit -- ^ Return value not expected (E063)
   | EInvalidArrayType TypeSpecifier -- ^ Invalid array type (E064)
   | EInvalidBoxType TypeSpecifier -- ^ Invalid box type (E065)
-  -- | Invalid access to global object
-  | EInvalidAccessToGlobal Identifier
-  -- | Invalid writing access to read only object
-  | EObjectIsReadOnly Identifier
-  -- | Not Global Variable found
-  | ENotNamedGlobal Identifier
-  | EGlobalOtherType Identifier
-  -- | Some globals cannot be assigned?
-  | EGlobalNotLHS Identifier
-  -- | No shadow binding
-  | EVarDefined Identifier
+  | ENoTypeFound Identifier -- ^ Type not found (E066 & Internal)
+  | EGlobalNoType Identifier -- ^ Global object but not a type (E067)
+  | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (E068)
+  | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (E069)
+  | ESymbolDefined Identifier a -- ^ Symbol already defined (E070)
   -- | Not Function found
   | EFunctionNotFound Identifier
   -- Something was found but it is not an identifier
@@ -127,8 +121,6 @@ data Error a
   | EPMMissingOption1 -- Missing Some
   | EPMMoreOptions -- More cases??
   | EPMMoreOptionsVariables -- More Variable in enum Some(a,b,c,d..)
-  -- | Global Object but not a type
-  | EGlobalNoType Identifier
   -- | Not an integer const
   | ENotIntConst Const
   | EConstantOutRange Const
@@ -196,7 +188,6 @@ data Error a
   -- Enum variant expressions
   | ETyNotEnumFound Identifier
   | EEnumVariantNotFound Identifier
-  | EEnumVariantType
   | EEnumVariantExtraParams
   | EEnumVariantMissingParams
   | ETyNotEnum Identifier (SemanTypeDef a)

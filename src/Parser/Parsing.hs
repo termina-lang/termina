@@ -795,8 +795,8 @@ sizeParser = constValueSizeParser <|> constSizeParser
 
 mutableObjDeclarationParser :: Parser (Statement Annotation)
 mutableObjDeclarationParser = do
-  startPos <- getPosition
   reserved "var"
+  startPos <- getPosition
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser
@@ -807,8 +807,8 @@ mutableObjDeclarationParser = do
 
 immutableObjDeclarationParser :: Parser (Statement Annotation)
 immutableObjDeclarationParser = do
-  startPos <- getPosition
   reserved "let"
+  startPos <- getPosition
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser

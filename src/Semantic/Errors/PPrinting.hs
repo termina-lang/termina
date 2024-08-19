@@ -827,6 +827,45 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid box type."))
+    ENoTypeFound ident ->
+        let title = "\x1b[31merror [E066]\x1b[0m: no type found."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not found."))
+    EGlobalNoType ident -> 
+        let title = "\x1b[31merror [E067]\x1b[0m: global object but not a type."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type."))
+    EInvalidAccessToGlobal ident ->
+        let title = "\x1b[31merror [E068]\x1b[0m: invalid access to global object."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed from within this context."))
+    EConstantIsReadOnly ident ->
+        let title = "\x1b[31merror [E069]\x1b[0m: invalid write to a constant."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified."))
+    ESymbolDefined ident (Position prevPos _prevEndPos) ->
+        let title = "\x1b[31merror [E070]\x1b[0m: symbol already defined."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.")) >>
+            printSimpleError
+                sourceLines "The symbol was previoulsy defined here:" fileName
+                (sourceLine prevPos) (sourceColumn prevPos) (length ident)
+                Nothing
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

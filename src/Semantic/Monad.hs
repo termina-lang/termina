@@ -191,7 +191,7 @@ type GlobalEnv = Map Identifier (Located (GEntry SemanticAnn))
 
 -- | Local env
 -- variables to their type
-type LocalEnv = Map Identifier (AccessKind, TypeSpecifier)
+type LocalEnv = Map Identifier (Located (AccessKind, TypeSpecifier))
 
 -- This may seem a bad decision, but each envornment represent something
 -- different.
@@ -262,7 +262,7 @@ getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (SemanTypeDef Semant
 getGlobalTypeDef loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
-  (throwError $ annotateError loc (ENoTyFound tid))
+  (throwError $ annotateError loc (ENoTypeFound tid))
   -- if so, return its type
   (\case {
       GType tydef -> return tydef;
@@ -271,7 +271,7 @@ getGlobalTypeDef loc tid  = gets global >>=
 
 getFunctionTy :: Location -> Identifier -> SemanticMonad ([Parameter],TypeSpecifier, Location)
 getFunctionTy loc iden =
-  catchError (getGlobalEntry loc iden ) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
+  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
   Located (GFun args retty) entryLoc -> return (args, retty, entryLoc)
   Located {} -> throwError $ annotateError loc (EFunctionNotFound iden)
@@ -286,24 +286,20 @@ addLocalImmutObjs loc newVars ma  =
 
 -- | Insert mutable object (variable) in local scope.
 insertLocalMutObj :: Location -> Identifier -> TypeSpecifier -> SemanticMonad ()
-insertLocalMutObj loc ident ty =
-  isDefined ident
-  >>= \b -> if b
-  then -- | if there is throw error
-  throwError $ annotateError loc $ EVarDefined ident
-  else -- | If there is no variable named |ident|
-  modify (\s -> s{local = M.insert ident (Mutable, ty) (local s)})
+insertLocalMutObj loc ident ty = do
+  prev <- whereIsDefined ident
+  case prev of
+    Nothing -> modify (\s -> s{local = M.insert ident (Located (Mutable, ty) loc) (local s)})
+    Just prevloc -> throwError $ annotateError loc $ ESymbolDefined ident prevloc
 
 -- | Insert immutable object (variable) in local scope.
 insertLocalImmutObj :: Location -> Identifier -> TypeSpecifier -> SemanticMonad ()
-insertLocalImmutObj loc ident ty =
-  isDefined ident
-  >>= \b -> if b
-  then -- | if there is throw error
-  throwError $ annotateError loc $ EVarDefined ident
-  else -- | If there is no variable named |ident|
-  modify (\s -> s{local = M.insert ident (Immutable, ty) (local s)})
-
+insertLocalImmutObj loc ident ty = do
+  prev <- whereIsDefined ident
+  case prev of
+    Nothing -> modify (\s -> s{local = M.insert ident (Located (Immutable, ty) loc) (local s)})
+    Just prevloc -> throwError $ annotateError loc $ ESymbolDefined ident prevloc
+  
 insertGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticMonad ()
 insertGlobalTy loc tydef =
   insertGlobal type_name (Located (GType tydef) loc) (EUsedTypeName type_name)
@@ -332,12 +328,12 @@ insertLocalVariables loc = mapM_ (\case
 -- | Get the type of a local (already) defined object. If it is not defined throw an error.
 getLocalObjTy :: Location -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier)
 getLocalObjTy loc ident =
+  gets local >>=
   -- | Get local objects map and check if |ident| is a member of that map
-  maybe
-    -- | if |ident| is not a member throw error |ENotNamedObject|
-    (throwError $ annotateError loc (ENotNamedObject ident))
-    -- | if |ident| is a member return its type and access kind
-    return . M.lookup ident =<< gets local
+  (\case {
+      Just ob -> return . element $ ob;
+      Nothing -> throwError $ annotateError loc (ENotNamedObject ident)
+  }) . M.lookup ident
 
 -- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
 getConst :: Location -> Identifier -> SemanticMonad (TypeSpecifier, Const)
@@ -404,7 +400,7 @@ getLHSVarTy loc ident =
                   }
                 ) >> throwError (annotateError loc (EInvalidAccessToGlobal ident));
               _ -> throwError errorRO;
-            }) >> throwError (annotateError loc (EObjectIsReadOnly ident))
+            }) >> throwError (annotateError loc (EConstantIsReadOnly ident))
           ;
         _  -> throwError errorLocal;
       })
@@ -422,11 +418,7 @@ getRHSVarTy loc ident =
               ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case getError errorGlobal of {
-                    ENotNamedGlobal errvar ->
-                    if errvar == ident then
-                      throwError $ annotateError loc (ENotNamedObject ident);
-                    else
-                      throwError errorGlobal;
+                    ENotNamedGlobal _ -> throwError $ annotateError loc (ENotNamedObject ident);
                     _  -> throwError errorGlobal;
                   }
                 ) >>= (\case{
@@ -455,17 +447,17 @@ getGlobalVarTy loc ident =
                       });
 
 
--- | Lookups |idenfitier| in a given scope.
--- Returns true if the identifier is defined within the scope or false otherwise.
-isDefinedIn :: Identifier -> M.Map Identifier a -> Bool
-isDefinedIn = M.member
-
 glbWhereIsDefined :: Identifier -> SemanticMonad (Maybe Location)
 glbWhereIsDefined i = fmap location . M.lookup i <$> gets global
 
-isDefined :: Identifier -> SemanticMonad Bool
-isDefined ident =
-  get <&> (\st -> isDefinedIn ident (global st) || isDefinedIn ident (local st))
+whereIsDefined :: Identifier -> SemanticMonad (Maybe Location)
+whereIsDefined ident = do
+  st <- get
+  case M.lookup ident (global st) of
+    Nothing -> case M.lookup ident (local st) of
+      Nothing -> return Nothing
+      Just ob -> return . Just . location $ ob
+    Just ob -> return . Just . location $ ob
 
 -------------
 -- Type |Type| helpers!
