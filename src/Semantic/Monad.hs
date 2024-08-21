@@ -26,7 +26,6 @@ import Utils.TypeSpecifier
 -- Monads
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import Data.Functor
 import qualified Parser.Parsing as Parser
 
 data ObjectAnn = ObjectAnn
