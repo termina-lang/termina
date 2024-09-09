@@ -51,7 +51,7 @@ data Expression'
     (obj a) -- ^ Opion object
     OptionVariantLabel -- ^ Variant label
     a
-  | ArraySliceExpression AccessKind (Object a) Size a
+  | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
   -- ^ Array slice. This is a reference to an slice of an array.
   deriving (Show, Functor)
 
@@ -72,11 +72,6 @@ data Object a
   -- ^ Dereference | *eI |, |eI| is an ~identifier~ expression.
   | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
-  | ArraySlice (Object a) (Expression a) (Expression a) a
-  -- ^ Array slicing | eI [ cEx .. cEy ]|,
-  -- value |eI :: exprI a| is an identifier expression
-  -- |cEx| is an expression for the lower bound
-  -- |cEx| is an expression for the upper bound
   | Unbox (Object a) a
   deriving (Show, Functor)
 
@@ -86,7 +81,6 @@ instance Annotated Object where
   getAnnotation (MemberAccess _ _ a)          = a
   getAnnotation (Dereference _ a)             = a
   getAnnotation (DereferenceMemberAccess _ _ a) = a
-  getAnnotation (ArraySlice _ _ _ a) = a
   getAnnotation (Unbox _ a)                   = a
 
 instance (Annotated obj) => Annotated (Expression' obj) where
@@ -105,7 +99,7 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
   getAnnotation (IsOptionVariantExpression _ _ a) = a
-  getAnnotation (ArraySliceExpression _ _ _ a)    = a
+  getAnnotation (ArraySliceExpression _ _ _ _ a)    = a
 ----------------------------------------
 
 -- type OptionVariant a = OptionVariant' (Expression a)

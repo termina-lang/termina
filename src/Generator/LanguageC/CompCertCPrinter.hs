@@ -138,12 +138,13 @@ instance PPrint CType where
     pprint (CTTypeDef ident qual) = do
         pqual <- pprint qual
         return $ pretty ident <+> pqual
+    pprint (CTFunction {}) = error "Priting function types are not supported"
 
 instance PPrint CObject where
     pprintPrec _ (CVar ident _) = return $ pretty ident
     pprintPrec p (CField expr ident _) = do
         pexpr <- pprintPrec 26 expr
-        case getType expr of
+        case getCExprType expr of
             CTPointer _ _ -> return $ parenPrec p 26 $ pexpr <> pretty "->" <> pretty ident
             _ -> return $ parenPrec p 26 $ pexpr <> pretty "." <> pretty ident
     pprintPrec p (CDeref expr _) = do
@@ -303,13 +304,18 @@ instance PPrint CEnum where
 
 
 instance PPrint CDeclaration where
-    pprint (CDecl (CTypeSpec ty) ident) = pprintCTypeDecl ident ty
-    pprint (CDecl (CTSStructUnion stu) ident) = do
+    pprint (CDecl (CTypeSpec ty) ident Nothing _) = pprintCTypeDecl ident ty
+    pprint (CDecl (CTypeSpec ty) ident (Just expr) _) = do
+        pty <- pprint ty
+        pexpr <- pprint expr
+        return $ pty <+> pretty ident <+> pretty "=" <+> pexpr
+    pprint (CDecl (CTSStructUnion stu) ident Nothing _) = do
         pstruct <- pprint stu
         return $ pstruct <+> pretty ident
-    pprint (CDecl (CTSEnum enum) ident) = do
+    pprint (CDecl (CTSEnum enum) ident Nothing _) = do
         penum <- pprint enum
         return $ penum <+> pretty ident
+    pprint _ = error "Invalid declaration"
 
 instance PPrint CStatement where
     pprint CSSkip = return emptyDoc
@@ -359,11 +365,24 @@ instance PPrint CStatement where
     pprint s@(CSFor for_init cond step stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                pfor_init <- pprint for_init
+                pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
                 pstat <- pprint stat
-                pcond <- pprint cond
-                pstep <- pprint step
-                return $ prependLine before $ indentStmt expand $
+                case (cond, step) of
+                    (Nothing, Nothing) ->
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <> semi) <+> pstat
+                    (Just cond', Nothing) -> do
+                        pcond <- pprint cond'
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi) <+> pstat
+                    (Nothing, Just step') -> do
+                        pstep <- pprint step'
+                        return $ prependLine before $ indentStmt expand $
+                            pretty "for" <+> parens (pfor_init <> semi <> semi <+> pstep) <+> pstat
+                    (Just cond', Just step') -> do
+                        pcond <- pprint cond'
+                        pstep <- pprint step'
+                        return $ prependLine before $ indentStmt expand $
                             pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSReturn Nothing ann) =

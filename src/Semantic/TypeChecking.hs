@@ -112,15 +112,10 @@ typeObject getVarTy (Dereference obj ann) = do
   case obj_ty of
     Reference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
     ty              -> throwError $ annotateError ann $ ETypeNotReference ty
-typeObject getVarTy (ArraySlice obj lower upper anns) = do
-  typed_obj <- typeObject getVarTy obj
-  (obj_ak, obj_ty) <- getObjectType typed_obj
-  typed_lower <- typeExpression (Just USize) typeRHSObject lower
-  typed_upper <- typeExpression (Just USize) typeRHSObject upper
-  case obj_ty of
-    Array ty_elems _ -> do
-      return $ SAST.ArraySlice typed_obj typed_lower typed_upper $ buildExpAnnObj anns obj_ak (Slice ty_elems)
-    ty -> throwError $ annotateError anns (EArray ty)
+typeObject _getVarTy (ArraySlice _obj _lower _upper anns) = do
+  -- | Array slices can only be used as part of a reference expression. If we are here,
+  -- then the array slice is being used in an invalid context.
+  throwError $ annotateError anns ESliceInvalidUse
 typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjectType typed_obj
@@ -489,35 +484,42 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just Bool) typeObj le)
           tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just Bool) typeObj re)
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
-
-typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = do
-  -- | Type object
-  typed_obj <- typeObj rhs_e
-  -- | Get the type of the object
-  (obj_ak, obj_type) <- getObjectType typed_obj
-  case obj_type of
-    -- | If the object is of a box subtype, then the reference will be to an object of
-    -- the base type. Objects of a box subtype are always immutable, BUT a reference
-    -- to an object of a box subtype can be mutable. Thus, we do not need to check
-    -- the access kind of the object.
-    BoxSubtype ty -> do
-      -- | Check that the expected type is the same as the base type.  
-      maybe (return ()) (checkEqTypesOrError pann (Reference refKind ty)) expectedType
-      return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
-    Slice ty -> do
-      -- | Check if the we are allowed to create that kind of reference from the object
-      checkReferenceAccessKind obj_ak
-      case expectedType of
-        Just rtype@(Reference _ak (Array ts size)) -> do
-          unless (checkEqTypes ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
-          return (SAST.ArraySliceExpression refKind typed_obj size (buildExpAnn pann rtype))
-        Just ety -> throwError $ annotateError pann $ EMismatch (Reference refKind ty) ety
-        _ -> throwError $ annotateError pann ESliceInvalidUse
+typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) = 
+  case rhs_e of
+    ArraySlice obj lower upper anns -> do
+      typed_obj <- typeObj obj
+      (obj_ak, obj_ty) <- getObjectType typed_obj
+      typed_lower <- typeExpression (Just USize) typeRHSObject lower
+      typed_upper <- typeExpression (Just USize) typeRHSObject upper
+      case obj_ty of
+        Array ty _ -> do
+          checkReferenceAccessKind obj_ak
+          case expectedType of
+            Just rtype@(Reference _ak (Array ts _size)) -> do
+              unless (checkEqTypes ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
+              return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann rtype))
+            Just ety -> throwError $ annotateError pann $ EMismatch (Reference refKind ty) ety
+            _ -> throwError $ annotateError pann ESliceInvalidUse
+        ty -> throwError $ annotateError anns (EArray ty) --}
     _ -> do
-      -- | Check if the we are allowed to create that kind of reference from the object
-      checkReferenceAccessKind obj_ak
-      maybe (return ()) (flip (checkEqTypesOrError pann) (Reference refKind obj_type)) expectedType
-      return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
+      -- | Type object
+      typed_obj <- typeObj rhs_e
+      -- | Get the type of the object
+      (obj_ak, obj_type) <- getObjectType typed_obj
+      case obj_type of
+        -- | If the object is of a box subtype, then the reference will be to an object of
+        -- the base type. Objects of a box subtype are always immutable, BUT a reference
+        -- to an object of a box subtype can be mutable. Thus, we do not need to check
+        -- the access kind of the object.
+        BoxSubtype ty -> do
+          -- | Check that the expected type is the same as the base type.  
+          maybe (return ()) (checkEqTypesOrError pann (Reference refKind ty)) expectedType
+          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
+        _ -> do
+          -- | Check if the we are allowed to create that kind of reference from the object
+          checkReferenceAccessKind obj_ak
+          maybe (return ()) (flip (checkEqTypesOrError pann) (Reference refKind obj_type)) expectedType
+          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
 
   where
 
@@ -772,7 +774,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
               -- Check that the resource provides the interface
               case gentry of
                 Located (GGlob (SResource rts@(DefinedType {}))) _ ->
-                  let procs = [SemanProcedure procid | (InterfaceProcedure procid _ _) <- members] in
+                  let procs = [SemanProcedure procid params | (InterfaceProcedure procid params _) <- members] in
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
               ;

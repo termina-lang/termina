@@ -58,7 +58,7 @@ data CTypeSpecifier' a =
     deriving Show
 
 data CDeclaration' a =
-    CDecl (CTypeSpecifier' a) Ident
+    CDecl (CTypeSpecifier' a) Ident (Maybe (CExpression' a)) a
     deriving Show
 
 data CExternalDeclaration' a
@@ -114,6 +114,8 @@ data CType =
     | CTArray CType CArraySize
     -- | Struct types
     | CTStruct CStructTag Ident CQualifier
+    -- | Function type
+    | CTFunction CType [CType]
     -- | Enumeration types
     | CTEnum Ident CQualifier
     -- | size_t type 
@@ -222,20 +224,26 @@ data CExpression' a =
     | CExprCall (CExpression' a) [CExpression' a] CType a
     deriving Show
 
-getType :: CExpression' a -> CType
-getType (CExprConstant _ t _) = t
-getType (CExprValOf _ t _) = t
-getType (CExprAddrOf _ t _) = t
-getType (CExprUnaryOp _ _ t _) = t
-getType (CExprBinaryOp _ _ _ t _) = t
-getType (CExprCast _ t _) = t
-getType (CExprSeqAnd _ _ t _) = t
-getType (CExprSeqOr _ _ t _) = t
-getType (CExprSizeOfType _ t _) = t
-getType (CExprAlignOfType _ t _) = t
-getType (CExprAssign _ _ t _) = t
-getType (CExprComma _ _ t _) = t
-getType (CExprCall _ _ t _) = t
+getCExprType :: CExpression' a -> CType
+getCExprType (CExprConstant _ t _) = t
+getCExprType (CExprValOf _ t _) = t
+getCExprType (CExprAddrOf _ t _) = t
+getCExprType (CExprUnaryOp _ _ t _) = t
+getCExprType (CExprBinaryOp _ _ _ t _) = t
+getCExprType (CExprCast _ t _) = t
+getCExprType (CExprSeqAnd _ _ t _) = t
+getCExprType (CExprSeqOr _ _ t _) = t
+getCExprType (CExprSizeOfType _ t _) = t
+getCExprType (CExprAlignOfType _ t _) = t
+getCExprType (CExprAssign _ _ t _) = t
+getCExprType (CExprComma _ _ t _) = t
+getCExprType (CExprCall _ _ t _) = t
+
+getCObjType :: CObject' a -> CType
+getCObjType (CVar _ t) = t
+getCObjType (CField _ _ t) = t
+getCObjType (CDeref _ t) = t
+getCObjType (CIndexOf _ _ t) = t
 
 data CCompoundBlockItem' a
   = CBlockStmt    (CStatement' a)    -- ^ A statement
@@ -249,7 +257,10 @@ data CStatement' a =
    | CSDo (CExpression' a) a -- ^ evaluate expression for side effects
    | CSCompound [CCompoundBlockItem' a] a -- ^ compound statement 
    | CSIfThenElse (CExpression' a) (CStatement' a) (CStatement' a) a -- ^ conditional
-   | CSFor (CStatement' a) (CExpression' a) (CStatement' a) (CStatement' a) a -- ^ for loop
+   | CSFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
+      (Maybe (CExpression' a))
+      (Maybe (CExpression' a))
+      (CStatement' a) a -- ^ for loop
    | CSReturn (Maybe (CExpression' a)) a -- ^ return statement
    | CSSwitch (CExpression' a) (CStatement' a) a -- ^ switch statement
     deriving Show

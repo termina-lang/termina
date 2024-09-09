@@ -213,7 +213,11 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
     return $ CBinary CEqOp (CMember cObj enumVariantsField False cAnn) (CVar optionSomeVariant cAnn) cAnn
-genExpression (ArraySliceExpression _ak obj _size _ann) = genObject obj
+genExpression (ArraySliceExpression _ak obj lower _ ann) = do
+    let cAnn = buildGenericAnn ann
+    cLower <- genExpression lower
+    cObj <- genObject obj
+    return $ CUnary CAdrOp (CIndex cObj cLower cAnn) cAnn
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
 
 genConstExpression :: ConstExpression SemanticAnn -> CSourceGenerator CExpression
@@ -242,13 +246,6 @@ genObject (ArrayIndexExpression obj index ann) = do
     cIndex <- genExpression index
     -- Return the C code for the vector index expression
     return $ CIndex cObj cIndex cAnn
--- | TODO This is a temporary solution. We need to call a function that validates
--- the bounds of the array slice.
-genObject (ArraySlice obj lower _ ann) = do
-    let cAnn = buildGenericAnn ann
-    cLower <- genExpression lower
-    cObj <- genObject obj
-    return $ CUnary CAdrOp (CIndex cObj cLower cAnn) cAnn
 genObject (MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj

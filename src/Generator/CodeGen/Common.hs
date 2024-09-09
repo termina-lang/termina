@@ -141,7 +141,6 @@ getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                   = 
 getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (ArraySlice _ _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann

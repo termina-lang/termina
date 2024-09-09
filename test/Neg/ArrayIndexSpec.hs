@@ -8,7 +8,6 @@ import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors.Errors
-import AST.Seman
 import Utils.Annotations
 
 runNegativeTest :: String -> Maybe (Error Annotation)
@@ -39,4 +38,4 @@ spec = do
   
   where
     isEIfElseNoOtherwise :: Maybe (Error Annotation) -> Bool
-    isEIfElseNoOtherwise = \case Just (EArray (Slice UInt8)) -> True; _ -> False
+    isEIfElseNoOtherwise = \case Just ESliceInvalidUse -> True; _ -> False

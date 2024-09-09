@@ -87,7 +87,6 @@ simpleType (Reference {})      = False
 simpleType (Location {})       = False
 simpleType (SinkPort {})       = False
 simpleType (AccessPort {})     = False
-simpleType (Slice {})          = False
 simpleType _                   = True
 
 classFieldType :: TypeSpecifier -> Bool
@@ -97,7 +96,6 @@ classFieldType (Option (BoxSubtype {})) = False
 classFieldType (MsgQueue {})                = False
 classFieldType (Pool {})                    = False
 classFieldType (Reference {})               = False
-classFieldType (Slice {})                   = False
 classFieldType _                            = True
 
 boolTy :: TypeSpecifier -> Bool
@@ -200,7 +198,6 @@ hasBoxOrDep (Array ty _s) = hasBoxOrDep ty
 hasBoxOrDep (Option ty) = hasBoxOrDep ty
 hasBoxOrDep (Reference _accK ty) = hasBoxOrDep ty
 hasBoxOrDep (BoxSubtype _) = Right True
-hasBoxOrDep (Slice ty) = hasBoxOrDep ty
 hasBoxOrDep _ = Right False
 ----------------------------------------
 
@@ -212,5 +209,4 @@ rootType (Pool ts _) = rootType ts
 rootType (Reference _ ts) = rootType ts
 rootType (BoxSubtype ts) = rootType ts
 rootType (Location ts) = rootType ts
-rootType (Slice ts) = rootType ts
 rootType t = t

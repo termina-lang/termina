@@ -40,7 +40,7 @@ data ESeman
   | AppType [Parameter] TypeSpecifier
   deriving Show
 
-newtype SemanProcedure = SemanProcedure Identifier
+data SemanProcedure = SemanProcedure Identifier [Parameter]
   deriving (Show)
 
 data ConnectionSeman =
@@ -551,10 +551,6 @@ checkTypeSpecifier loc (Array ty s) =
   catchExpectedSimple loc EInvalidArrayType (simpleTyorFail loc ty) >>
   checkTypeSpecifier loc ty >>
   checkSize loc s
-checkTypeSpecifier loc (Slice ty) =
-  -- Only slices of simple types.
-  simpleTyorFail loc ty >>
-  checkTypeSpecifier loc ty
 checkTypeSpecifier loc (MsgQueue ty s) = checkTypeSpecifier loc ty >> checkSize loc s
 checkTypeSpecifier loc (Pool ty s) = checkTypeSpecifier loc ty >> checkSize loc s
 -- Box Subtyping

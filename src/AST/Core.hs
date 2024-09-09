@@ -107,7 +107,6 @@ data TypeSpecifier
   | Int8 | Int16 | Int32 | Int64 | USize
   | Bool | Char | DefinedType Identifier
   | Array TypeSpecifier Size
-  | Slice TypeSpecifier
   | Option TypeSpecifier
   -- Built-in polymorphic types
   | MsgQueue TypeSpecifier Size -- Message queues

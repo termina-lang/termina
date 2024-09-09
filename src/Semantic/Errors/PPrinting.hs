@@ -65,7 +65,6 @@ instance ShowText TypeSpecifier where
     showText Char = "char"
     showText (DefinedType ident) = T.pack ident
     showText (Array ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
-    showText (Slice ts) = "[" <> showText ts <> "]"
     showText (Option ts) = "Option<" <> showText ts <> ">"
     showText (MsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
     showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
@@ -141,16 +140,10 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
     (EArray ts) -> 
         let title = "\x1b[31merror [E001]\x1b[0m: invalid array indexing."
         in
-        case ts of
-            (Slice _) -> printSimpleError 
-                sourceLines title fileName 
-                lineNumber lineColumn 1 
-                (Just ("You cannot index a slice. It is not an array. \n" <>
-                "A slice can only be used to create references  to a part of an array."))
-            _ -> printSimpleError
+            printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just "You are trying to index an object that is not an array.")
+                (Just ("Invalid array indexing of type \x1b[31m" <> showText ts <> "\x1b[0m.")) 
     (ENotNamedObject ident) ->
         let title = "\x1b[31merror [E002]\x1b[0m: Object not found."
         in

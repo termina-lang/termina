@@ -74,8 +74,6 @@ useObject (Dereference obj _ann)
 useObject (DereferenceMemberAccess obj i ann)
   = withLocation (location ann) (safeAddUse i)
   >> useObject obj
-useObject (ArraySlice obj eB eT _ann)
-  = useObject obj >> useExpression eB >> useExpression eT
 -- TODO Use Object unbox?
 useObject (Unbox obj _ann)
   = useObject obj
@@ -103,8 +101,8 @@ useExpression (IsEnumVariantExpression obj _ _ _)
   = useObject obj
 useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
-useExpression (ArraySliceExpression _aK obj _size _ann)
-  = useObject obj
+useExpression (ArraySliceExpression _aK obj eB eT _ann)
+  = useObject obj >> useExpression eB >> useExpression eT
 useExpression (MemberFunctionCall obj ident args ann) = do
     useObject obj
     obj_type <- withLocation (location ann) (getObjectType obj)
