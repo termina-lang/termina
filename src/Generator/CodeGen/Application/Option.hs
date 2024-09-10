@@ -18,7 +18,7 @@ genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
 
 genSimpleOptionDefinition :: TypeSpecifier -> CHeaderGenerator [CFileItem]
 genSimpleOptionDefinition ts = do
-    optionStruct <- genOptionStruct (Located STy Internal) ts
+    optionStruct <- genOptionStruct (Located (STy SimpleStmtType) Internal) ts
     return $ CExtDecl <$> optionStruct
 
 genOptionHeaderFile :: CHeaderGenerator CFile

@@ -6,8 +6,8 @@ import Data.Text hiding (empty)
 import Data.Map
 import Semantic.Monad
 import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Expression
+import Generator.LanguageC.CompCertCPrinter
 import UT.PPrinter.Expression.Common
 
 var0, var1, pVar :: Object SemanticAnn

@@ -22,7 +22,7 @@ cBinOp BitwiseRightShift = COpShr
 cBinOp RelationalLT = COpLt
 cBinOp RelationalLTE = COpLe
 cBinOp RelationalGT = COpGt
-cBinOp RelationalGTE = COpGt
+cBinOp RelationalGTE = COpGe
 cBinOp RelationalEqual = COpEq
 cBinOp RelationalNotEqual = COpNe
 cBinOp BitwiseAnd = COpAnd
@@ -59,16 +59,13 @@ genObject o@(Variable identifier ann) = do
 genObject o@(ArrayIndexExpression obj index ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
-    cObjExpr <- genObject obj
+    cExpr <- genObject obj
     -- Extract the C object from the expression
-    let cObj = case cObjExpr of
-            (CExprValOf c _ _) -> c
-            _ -> error $ "The generated expression is not an object: " ++ show cObjExpr -- ^ This should not happen
     ctype <- getObjType o >>= genType noqual
     -- Generate the C code for the index
     cIndex <- genExpression index
     -- Return the C code for the vector index expression
-    return $ CExprValOf (CIndexOf cObj cIndex ctype) ctype cAnn
+    return $ CExprValOf (CIndexOf cExpr cIndex ctype) ctype cAnn
 genObject o@(MemberAccess obj identifier ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
@@ -174,8 +171,7 @@ genMemberFunctionAccess obj ident args ann = do
                 "load_index" -> 
                     case args of 
                         [_, ReferenceExpression _ refObj _] -> do
-                            cObj <- unboxObject cObjExpr
-                            cIndexedObj <- genIndexOf cObj (head cArgs)
+                            cIndexedObj <- genIndexOf cObjExpr (head cArgs)
                             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
                             cRefObj <- genObject refObj >>= unboxObject
                             let cRefObjType = getCObjType cRefObj
@@ -185,8 +181,7 @@ genMemberFunctionAccess obj ident args ann = do
                 "store_index" -> 
                     case cArgs of
                         [idx, value] -> do
-                            cObj <- unboxObject cObjExpr
-                            cIndexedObj <- genIndexOf cObj idx
+                            cIndexedObj <- genIndexOf cObjExpr idx
                             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
                             genAtomicMethodCall "store" cRefIndexedObj [value] cAnn
                         _ -> throwError $ InternalError $ "invalid params for atomic store_index: " ++ show args
@@ -205,41 +200,43 @@ genExpression (AccessObject obj) = do
     case cObjType of
         (Location _) -> do
             cObj <- unboxObject cObjExpr
-            let cObjType = getCObjType cObj
-            return $ CExprAddrOf cObj cObjType (buildGenericAnn (getAnnotation obj))
+            return $ CExprAddrOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
         _ -> return cObjExpr
-genExpression (BinOp op left right ann) = do
-    let cAnn = buildGenericAnn ann
-    -- | We need to check if the left and right expressions are binary operations
-    -- If they are, we need to cast them to ensure that the resulting value
-    -- is truncated to the correct type
-    cLeft <- (do
-        leftExpr <- genExpression left
-        case left of
-            (BinOp {}) -> do
-                let leftExprType = getCExprType leftExpr
-                case leftExprType of
-                    CTBool _ -> return leftExpr
-                    _ -> return $ CExprCast leftExpr leftExprType cAnn
-            _ -> return leftExpr)
-    cRight <- (do
-        rightExpr <- genExpression right
-        case right of
-            (BinOp {}) -> do
-                let rightExprType = getCExprType rightExpr
-                case rightExprType of
-                    CTBool _ -> return rightExpr
-                    _ -> return $ CExprCast rightExpr rightExprType cAnn
-            _ -> genExpression right)
-    return $ CExprBinaryOp (cBinOp op) cLeft cRight (cBinOpType cLeft) cAnn
+genExpression (BinOp op left right ann) = 
+    let cAnn = buildGenericAnn ann in
+    case op of
+        LogicalAnd -> do
+            cLeft <- genExpression left
+            cRight <- genExpression right
+            return $ CExprSeqAnd cLeft cRight (CTBool noqual) cAnn
+        LogicalOr -> do
+            cLeft <- genExpression left
+            cRight <- genExpression right
+            return $ CExprSeqOr cLeft cRight (CTBool noqual) cAnn
+        _ -> do
+            -- | We need to check if the left and right expressions are binary operations
+            -- If they are, we need to cast them to ensure that the resulting value
+            -- is truncated to the correct type
+            cLeft <- (do
+                leftExpr <- genExpression left
+                case left of
+                    (BinOp {}) -> do
+                        let leftExprType = getCExprType leftExpr
+                        case leftExprType of
+                            CTBool _ -> return leftExpr
+                            _ -> return $ CExprCast leftExpr leftExprType cAnn
+                    _ -> return leftExpr)
+            cRight <- (do
+                rightExpr <- genExpression right
+                case right of
+                    (BinOp {}) -> do
+                        let rightExprType = getCExprType rightExpr
+                        case rightExprType of
+                            CTBool _ -> return rightExpr
+                            _ -> return $ CExprCast rightExpr rightExprType cAnn
+                    _ -> genExpression right)
+            return $ CExprBinaryOp (cBinOp op) cLeft cRight (getCExprType cLeft) cAnn
 
-    where
-
-        cBinOpType :: CExpression -> CType
-        cBinOpType leftExpr = case op of
-            LogicalAnd -> CTBool noqual
-            LogicalOr -> CTBool noqual
-            _ -> getCExprType leftExpr
 genExpression e@(Constant c ann) = do
     let cAnn = buildGenericAnn ann 
     cType <- getExprType e >>= genType noqual
@@ -262,12 +259,17 @@ genExpression (ReferenceExpression _ obj ann) = do
     cObj <- unboxObject cObjExpr
     case typeObj of
         -- | If it is a vector, we need to generate the address of the data
-        (BoxSubtype ty) -> do
+        (BoxSubtype ty@(Array {})) -> do
             -- We must obtain the declaration specifier of the vector
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer CTVoid noqual
             return $ CExprCast (CExprValOf (CField cObjExpr "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
             -- | Else, we print the address to the data
+        (BoxSubtype ty) -> do
+            cType <- genType noqual ty
+            let ptrToVoidCType = CTPointer CTVoid noqual
+                ptrTy = CTPointer cType noqual
+            return $ CExprCast (CExprValOf (CField cObjExpr "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
         (Array {}) -> return cObjExpr
         ty -> do
             cType <- genType noqual ty

@@ -40,6 +40,11 @@ data ESeman
   | AppType [Parameter] TypeSpecifier
   deriving Show
 
+data SSeman
+  = SimpleStmtType -- ^ Statement with no type
+    | MatchCaseStmtType [TypeSpecifier] -- ^ Match case with types
+  deriving Show
+
 data SemanProcedure = SemanProcedure Identifier [Parameter]
   deriving (Show)
 
@@ -86,8 +91,8 @@ data SemanticElems
   =
   -- | Expressions with their types
   ETy ESeman
-  -- | Statements with no types
-  | STy
+  -- | Statements 
+  | STy SSeman
   -- | Port connections
   | CTy ConnectionSeman
   -- | Global elements
@@ -110,6 +115,10 @@ getObjectSAnns _                                    = Nothing
 getArgumentsType :: SemanticElems -> Maybe [Parameter]
 getArgumentsType (ETy (AppType ts _)) = Just ts
 getArgumentsType _                    = Nothing
+
+getMatchCaseTypes :: SemanticElems -> Maybe [TypeSpecifier]
+getMatchCaseTypes (STy (MatchCaseStmtType ts)) = Just ts
+getMatchCaseTypes _                           = Nothing
 
 isResultFromApp :: SemanticElems -> Bool
 isResultFromApp = isJust . getArgumentsType
@@ -138,7 +147,10 @@ buildGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticAnn
 buildGlobalTy loc = locate loc . GTy . GType
 
 buildStmtAnn :: Location -> SemanticAnn
-buildStmtAnn = Located STy
+buildStmtAnn = Located (STy SimpleStmtType)
+
+buildStmtMatchCaseAnn :: Location -> [TypeSpecifier] -> SemanticAnn
+buildStmtMatchCaseAnn loc ts = locate loc (STy (MatchCaseStmtType ts))
 
 buildOutPortConnAnn :: Location -> TypeSpecifier -> SemanticAnn
 buildOutPortConnAnn loc ts = locate loc (CTy (OutPConnTy ts))

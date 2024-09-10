@@ -20,6 +20,7 @@ data CPreprocessorDirective' a
 
 data CFileItem' a
     = CExtDecl (CExternalDeclaration' a)
+    | CFunctionDef (CFunction' a)
     | CPPDirective (CPreprocessorDirective' a)
 
 data CAttribute' a = CAttr Ident [CExpression' a]
@@ -58,18 +59,18 @@ data CTypeSpecifier' a =
     deriving Show
 
 data CDeclaration' a =
-    CDecl (CTypeSpecifier' a) Ident (Maybe (CExpression' a)) a
+    CDecl (CTypeSpecifier' a) (Maybe Ident) (Maybe (CExpression' a))
     deriving Show
 
 data CExternalDeclaration' a
-    = CEDVariable CStorageSpecifier (CDeclaration' a) a
-    | CEDFunction (CFunction' a) a
-    | CEDEnum (CEnum' a) a
-    | CEDStructUnion (CStructureUnion' a) a
+    = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a) a
+    | CEDFunction CType Ident [CDeclaration' a] a
+    | CEDEnum (Maybe Ident) (CEnum' a) a
+    | CEDStructUnion (Maybe Ident) (CStructureUnion' a) a
     | CEDTypeDef Ident CType a
 
 data CFunction' a =
-    CFunction CType Ident [CDeclaration' a] (CStatement' a)
+    CFunction CType Ident [CDeclaration' a] (CStatement' a) a
 
 data CQualifier = CQualifier {
     qual_volatile :: Bool,
@@ -205,7 +206,7 @@ data CObject' a =
     CVar Ident CType
     | CField (CExpression' a) Ident CType
     | CDeref (CExpression' a) CType -- ^ pointer dereference (unary *)
-    | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
+    | CIndexOf (CExpression' a) (CExpression' a) CType -- ^ array indexing
     deriving Show
 
 data CExpression' a =
@@ -246,8 +247,8 @@ getCObjType (CDeref _ t) = t
 getCObjType (CIndexOf _ _ t) = t
 
 data CCompoundBlockItem' a
-  = CBlockStmt    (CStatement' a)    -- ^ A statement
-  | CBlockDecl    (CDeclaration' a)  -- ^ A local declaration
+  = CBlockStmt (CStatement' a)     -- ^ A statement
+  | CBlockDecl (CDeclaration' a) a -- ^ A local declaration
     deriving Show
 
 data CStatement' a =
@@ -256,7 +257,7 @@ data CStatement' a =
    | CSDefault (CStatement' a) a -- ^ Default (labeled statement)
    | CSDo (CExpression' a) a -- ^ evaluate expression for side effects
    | CSCompound [CCompoundBlockItem' a] a -- ^ compound statement 
-   | CSIfThenElse (CExpression' a) (CStatement' a) (CStatement' a) a -- ^ conditional
+   | CSIfThenElse (CExpression' a) (CStatement' a) (Maybe (CStatement' a)) a -- ^ conditional
    | CSFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
       (Maybe (CExpression' a))
       (Maybe (CExpression' a))

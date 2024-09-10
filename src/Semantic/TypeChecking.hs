@@ -940,7 +940,7 @@ typeStatement (MatchStmt matchE cases ann) = do
           typeMatchCase' (MatchCase cIdent bVars bd mcann) supIdent tVars
             | cIdent == supIdent =
               if length bVars == length tVars then
-              flip (SAST.MatchCase cIdent bVars) (buildStmtAnn ann) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock bd)
+              flip (SAST.MatchCase cIdent bVars) (buildStmtMatchCaseAnn ann tVars) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock bd)
               else throwError $ annotateError Internal EMatchCaseInternalError
             | otherwise = throwError $ annotateError Internal $ EMatchCaseBadName cIdent supIdent
 

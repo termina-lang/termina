@@ -8,7 +8,7 @@ objSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnn
 objSemAnn ak ts = Located (ETy (ObjectType ak ts)) Internal
 
 stmtSemAnn :: SemanticAnn
-stmtSemAnn = Located STy Internal
+stmtSemAnn = Located (STy SimpleStmtType) Internal
 
 simpleTySemAnn :: TypeSpecifier -> SemanticAnn
 simpleTySemAnn ts = Located (ETy (SimpleType ts)) Internal

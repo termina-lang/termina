@@ -59,6 +59,12 @@ resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"
 resourceUnlock = namefy "termina_resource" <::> "unlock"
 
+cResourceIDType, cResourceLockFuncType, cResourceUnlockFuncType :: CType
+cResourceIDType = CTTypeDef resourceID noqual
+cResourceLockFuncType = CTFunction CTVoid [CTPointer (CTTypeDef resourceID noqual) noqual]
+cResourceUnlockFuncType = CTFunction CTVoid [CTPointer (CTTypeDef resourceID noqual) noqual]
+
+
 thatField, thisParam, selfParam :: Identifier
 thatField = "__that"
 thisParam = "__this"
@@ -293,11 +299,11 @@ genFunctionType ts tsParams = do
     tsParams' <- traverse (genType noqual) tsParams
     return (CTFunction ts' tsParams')
 
-genIndexOf :: (MonadError CGeneratorError m) => CObject -> CExpression -> m CObject
-genIndexOf obj index = 
-    let cObjType = getCObjType obj in
+genIndexOf :: (MonadError CGeneratorError m) => CExpression -> CExpression -> m CObject
+genIndexOf expr index = 
+    let cObjType = getCExprType expr in
     case cObjType of
-        CTArray ty _ -> return $ CIndexOf obj index ty
+        CTArray ty _ -> return $ CIndexOf expr index ty
         _ -> throwError $ InternalError $ "invalid object type. Not an array: " ++ show cObjType
 
 genAddrOf :: (MonadError CGeneratorError m) => CObject -> CQualifier -> CAnns -> m CExpression
@@ -333,7 +339,8 @@ genMsgQueueMethodCall mName cObj cArgs cAnn =
                     return $
                         CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] CTVoid cAnn
                 _ -> do
-                    let cDataArg = CExprCast (CExprAddrOf cObj (CTPointer cArgType noqual) cAnn) (CTPointer CTVoid noqual) cAnn
+                    cArgObj <- unboxObject cArg
+                    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer CTVoid noqual) cAnn
                     return $
                         CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] CTVoid cAnn
         _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show cArgs
@@ -348,6 +355,17 @@ genAtomicMethodCall mName cObj cArgs cAnn =
             let cFuncType = CTFunction CTVoid (getCExprType cObj : fmap getCExprType cArgs)
             return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) CTVoid cAnn
         _ -> throwError $ InternalError $ "invalid atomic method name: " ++ mName
+
+genParameterDeclaration :: (MonadError CGeneratorError m) => Parameter -> m CDeclaration
+genParameterDeclaration (Parameter identifier (Reference _ak ts)) = do
+    cParamType <- genType noqual ts
+    case ts of
+        Array {} -> do
+            return $ CDecl (CTypeSpec cParamType) (Just identifier) Nothing
+        _ -> return $ CDecl (CTypeSpec (CTPointer cParamType noqual)) (Just identifier) Nothing 
+genParameterDeclaration (Parameter identifier ts) = do
+    cParamType <- genType noqual ts
+    return $ CDecl (CTypeSpec cParamType) (Just identifier) Nothing
 
 genInteger :: TInteger -> CInteger
 genInteger (TInteger i DecRepr) = CInteger i CDecRepr

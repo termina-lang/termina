@@ -5,8 +5,8 @@ import AST.Seman
 import Data.Text hiding (empty)
 import Data.Map
 import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Expression
+import Generator.LanguageC.CompCertCPrinter
 import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
@@ -18,14 +18,14 @@ bar0 = Variable "bar0" (objSemAnn Mutable UInt16)
 bar1 = Variable "bar1" boxUInt16SemAnn
 
 tmPoolAlloc :: Expression SemanticAnn
-tmPoolAlloc = MemberFunctionCall tmPool "alloc" [] unitSemAnn
+tmPoolAlloc = MemberFunctionCall tmPool "alloc" [] (funSemAnn [] Unit)
 
 selfDereference :: Object SemanticAnn
 selfDereference = Dereference self (definedTypeSemAnn Mutable "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnn
-tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] unitSemAnn
-selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] unitSemAnn
+tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [Parameter "data" UInt16] Unit)
+selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] (funSemAnn [Parameter "p0" UInt16, Parameter "p1" UInt16] Unit)
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

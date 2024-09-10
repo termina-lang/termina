@@ -80,17 +80,20 @@ instance PPrint CConstant where
     pprint (CCharConst c) = return $ pretty c
     pprint (CStrConst s) = return $ pretty s
 
+rootCType :: CType -> CType
+rootCType ty =
+    case ty of
+        CTArray ty' _ -> rootCType ty'
+        _ -> ty
+
 pprintCTArray :: CType -> CPrinter
 pprintCTArray arrayTy  =
     case arrayTy of
         CTArray ty size -> do
             pty <- pprintCTArray ty
             psize <- pprint size
-            return $ pty <> brackets psize
-        _ -> do
-            pty <- pprint arrayTy
-            return $ pty <+> parens (pretty "*")
-
+            return $ brackets psize <> pty
+        _ -> return emptyDoc
 
 instance PPrint CType where
     pprint CTVoid = return $ pretty "void"
@@ -113,7 +116,9 @@ instance PPrint CType where
     pprint (CTArray ty _size) = 
         case ty of
             CTArray {} -> do
-                pprintCTArray ty
+                pRootTy <- pprint (rootCType ty)
+                pArraySizes <- pprintCTArray ty
+                return $ pRootTy <+> parens (pretty "*") <> pArraySizes
             _ -> do
                 pty <- pprint ty
                 return $ pty <+> pretty "*"
@@ -157,7 +162,7 @@ instance PPrint CObject where
 
 instance PPrint CExpression where
     pprintPrec _ (CExprConstant c _ _) = pprint c
-    pprintPrec _ (CExprValOf obj _ _) = pprint obj
+    pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj
     pprintPrec p (CExprAddrOf obj _ _) = do
         pobj <- pprintPrec 25 obj
         return $ parenPrec p 25 $ pretty "&" <> pobj
@@ -169,10 +174,10 @@ instance PPrint CExpression where
         pexpr1 <- pprintPrec prec expr1
         pexpr2 <- pprintPrec (prec + 1) expr2
         return $ parenPrec p prec $ pexpr1 <+> pretty op <+> pexpr2
-    pprintPrec p (CExprCast decl expr _) = do
-        pdecl <- pprint decl
+    pprintPrec p (CExprCast expr ty _) = do
         pexpr <- pprintPrec 25 expr
-        return $ parenPrec p 25 $ parens pdecl <> pexpr
+        ptype <- pprint ty
+        return $ parenPrec p 25 $ parens ptype <> pexpr
     pprintPrec p (CExprSeqAnd expr1 expr2 _ _) = do
         pexpr1 <- pprintPrec 12 expr1
         pexpr2 <- pprintPrec 13 expr2
@@ -221,6 +226,10 @@ pprintCTypeDecl ident ty =
             pty <- pprintCTypeDecl ident ty'
             psize <- pprint size
             return $ pty <+> pretty ident <> brackets psize
+        CTFunction rTy params -> do
+            prTy <- pprint rTy
+            pparams <- mapM pprint params
+            return $ prTy <+> pretty ident <> parens (align (fillSep (punctuate comma pparams)))
         _ -> do
             pty <- pprint ty
             return $ pty <+> pretty ident
@@ -304,15 +313,17 @@ instance PPrint CEnum where
 
 
 instance PPrint CDeclaration where
-    pprint (CDecl (CTypeSpec ty) ident Nothing _) = pprintCTypeDecl ident ty
-    pprint (CDecl (CTypeSpec ty) ident (Just expr) _) = do
+    pprint (CDecl (CTypeSpec ty) (Just ident) Nothing)  = pprintCTypeDecl ident ty
+    pprint (CDecl (CTypeSpec ty) (Just ident) (Just expr)) = do
         pty <- pprint ty
         pexpr <- pprint expr
         return $ pty <+> pretty ident <+> pretty "=" <+> pexpr
-    pprint (CDecl (CTSStructUnion stu) ident Nothing _) = do
+    pprint (CDecl (CTSStructUnion stu) Nothing Nothing) = pprint stu
+    pprint (CDecl (CTSStructUnion stu) (Just ident) Nothing) = do
         pstruct <- pprint stu
         return $ pstruct <+> pretty ident
-    pprint (CDecl (CTSEnum enum) ident Nothing _) = do
+    pprint (CDecl (CTSEnum enum) Nothing Nothing) = pprint enum
+    pprint (CDecl (CTSEnum enum) (Just ident) Nothing) = do
         penum <- pprint enum
         return $ penum <+> pretty ident
     pprint _ = error "Invalid declaration"
@@ -338,14 +349,14 @@ instance PPrint CStatement where
                 pexpr <- pprint expr
                 return $ prependLine before $ indentStmt expand $ pexpr <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSIfThenElse expr stat estat ann) = do
+    pprint s@(CSIfThenElse expr stat mestat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                pestat <- case estat of
-                    CSSkip -> return emptyDoc
-                    _ -> do
+                pestat <- case mestat of
+                    Nothing -> return emptyDoc
+                    Just estat -> do
                         palt <- pprint estat
                         return $ pretty " else" <+> palt
                 return $ prependLine before $ indentStmt expand $
@@ -411,10 +422,12 @@ instance PPrint CStatement where
 
 instance PPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
-    pprint (CBlockDecl decl) = do
-        pdecl <- pprint decl
-        return $ pdecl <> semi
-
+    pprint (CBlockDecl decl ann) = do
+        case itemAnnotation ann of 
+            CDeclarationAnn before -> do
+                pdecl <- pprint decl
+                return $ prependLine before $ pdecl <> semi
+            _ -> error $ "Invalid annotation: " ++ show ann
 
 instance PPrint CPreprocessorDirective where
     pprint (CPPDefine ident Nothing ann) =
@@ -466,11 +479,14 @@ instance PPrint CPreprocessorDirective where
             _ -> error $ "Invalid annotation: " ++ show ann
 
 instance PPrint CFunction where
-    pprint (CFunction ty ident params body) = do
-        pty <- pprint ty
-        pparams <- mapM pprint params
-        pbody <- pprint body
-        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
+    pprint (CFunction ty ident params body ann) = do
+        case itemAnnotation ann of 
+            CDeclarationAnn before -> do
+                pty <- pprint ty
+                pparams <- mapM pprint params
+                pbody <- pprint body
+                return $ prependLine before $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
+            _ -> error $ "Invalid annotation: " ++ show ann
 
 instance PPrint CExternalDeclaration where
     pprint (CEDVariable stspec decl ann) = do
@@ -479,23 +495,36 @@ instance PPrint CExternalDeclaration where
                 pdecl <- pprint decl
                 return $ prependLine before $ pretty stspec <+> pdecl <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDFunction cfunc ann) = do
+    pprint (CEDFunction ty ident params ann) = do
         case itemAnnotation ann of
             CDeclarationAnn before -> do
-                pcfunc <- pprint cfunc
-                return $ prependLine before $ pcfunc
+                pty <- pprint ty
+                pparams <- mapM pprint params
+                return $ prependLine before $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDEnum enum ann) = do
+    pprint (CEDEnum Nothing enum ann) = do
         case itemAnnotation ann of
             CDeclarationAnn before -> do
                 penum <- pprint enum
                 return $ prependLine before $ penum <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDStructUnion stu ann) = do
+    pprint (CEDEnum (Just typeDefName) enum ann) =
+        case itemAnnotation ann of
+            CDeclarationAnn before -> do
+                penum <- pprint enum
+                return $ prependLine before $ pretty "typedef" <+> penum <+> pretty typeDefName <> semi
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CEDStructUnion Nothing stu ann) = do
         case itemAnnotation ann of
             CDeclarationAnn before -> do
                 pstruct <- pprint stu
                 return $ prependLine before $ pstruct <> semi
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CEDStructUnion (Just typeDefName) stu ann) = do
+        case itemAnnotation ann of
+            CDeclarationAnn before -> do
+                pstruct <- pprint stu
+                return $ prependLine before $ pretty "typedef" <+> pstruct <+> pretty typeDefName <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
     pprint (CEDTypeDef ident ty ann) = do
         case itemAnnotation ann of
@@ -507,6 +536,7 @@ instance PPrint CExternalDeclaration where
 instance PPrint CFileItem where
     pprint (CExtDecl decl) = pprint decl
     pprint (CPPDirective directive) = pprint directive
+    pprint (CFunctionDef func) = pprint func
 
 instance PPrint CFile where
     pprint (CHeaderFile _path items) = do
