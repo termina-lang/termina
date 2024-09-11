@@ -131,30 +131,30 @@ instance PPrint CType where
         return $ pretty tag <+> pretty ident
     pprint (CTStruct tag ident qual) = do
         pqual <- pprint qual
-        return $ pretty tag <+> pretty ident <+> pqual
+        return $ pqual <+> pretty tag <+> pretty ident
     pprint (CTEnum ident (CQualifier False False False)) = return $ pretty "enum" <+> pretty ident
     pprint (CTEnum ident qual) = do
         pqual <- pprint qual
-        return $ pretty "enum" <+> pretty ident <+> pqual
+        return $ pqual <+> pretty "enum" <+> pretty ident
     pprint (CTSizeT (CQualifier False False False)) = return $ pretty "size_t"
     pprint (CTSizeT qual) = do
         pqual <- pprint qual
-        return $ pretty "size_t" <+> pqual
+        return $ pqual <+> pretty "size_t"
     pprint (CTBool (CQualifier False False False)) = return $ pretty "_Bool"
     pprint (CTBool qual) = do
         pqual <- pprint qual
-        return $ pretty "_Bool" <+> pqual
+        return $ pqual <+> pretty "_Bool"
     pprint (CTTypeDef ident (CQualifier False False False)) = return $ pretty ident
     pprint (CTTypeDef ident qual) = do
         pqual <- pprint qual
-        return $ pretty ident <+> pqual
-    pprint (CTFunction {}) = error "Printing function types is not supported"
+        return $ pqual <+> pretty ident
+    pprint ty@(CTFunction {}) = error $ "Printing function types is not supported: " ++ show ty
 
 instance PPrint CObject where
     pprintPrec _ (CVar ident _) = return $ pretty ident
     pprintPrec p (CField expr ident _) = do
         pexpr <- pprintPrec 26 expr
-        case getCExprType expr of
+        case getCObjType expr of
             CTPointer _ _ -> return $ parenPrec p 26 $ pexpr <> pretty "->" <> pretty ident
             _ -> return $ parenPrec p 26 $ pexpr <> pretty "." <> pretty ident
     pprintPrec p (CDeref expr _) = do
@@ -162,8 +162,12 @@ instance PPrint CObject where
         return $ parenPrec p 25 $ pretty "*" <> pexpr
     pprintPrec p (CIndexOf obj index _) = do
         pobj <- pprintPrec 26 obj
-        pindex <- pprintPrec 26 index
+        pindex <- pprint index
         return $ parenPrec p 26 $ pobj <> brackets pindex
+    pprintPrec p (CObjCast obj ty _) = do
+        pexpr <- pprintPrec 25 obj
+        ptype <- pprint ty
+        return $ parenPrec p 25 $ parens ptype <> pexpr
 
 instance PPrint CExpression where
     pprintPrec _ (CExprConstant c _ _) = pprint c
@@ -546,7 +550,11 @@ instance PPrint CExternalDeclaration where
 instance PPrint CFileItem where
     pprint (CExtDecl decl) = pprint decl
     pprint (CPPDirective directive) = pprint directive
-    pprint (CFunctionDef func) = pprint func
+    pprint (CFunctionDef Nothing func) = pprint func
+    pprint (CFunctionDef (Just CStatic) func) = do
+        pfunc <- pprint func
+        return $ pretty "static" <+> pfunc
+    pprint (CFunctionDef {}) = error $ "Invalid function definition"
 
 instance PPrint CFile where
     pprint (CHeaderFile _path items) = do

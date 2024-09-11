@@ -111,7 +111,7 @@ genThisParam = return $ CDecl (CTypeSpec (CTPointer CTVoid constqual)) (Just thi
 
 genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) _) =
-    return $ CDecl (CTypeSpec (CTTypeDef identifier noqual)) (Just selfParam) Nothing
+    return $ CDecl (CTypeSpec (CTPointer (CTTypeDef identifier noqual) constqual)) (Just selfParam) Nothing
 genSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
 genConstSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
@@ -177,11 +177,11 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
             cParamTypes <- mapM (genType noqual . paramTypeSpecifier) params
-            let cThisParamType = CTPointer CTVoid noqual
+            let cThisParamType = CTPointer CTVoid constqual
                 cFuncPointerType = CTPointer (CTFunction CTVoid (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 
-genTypeDefinitionDecl (TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
+genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
     (fields, functions) <- classifyClassMembers cls
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
     fields' <- case clsKind of
@@ -214,8 +214,9 @@ genTypeDefinitionDecl (TypeDefinition cls@(Class clsKind identifier _members _pr
         genClassFunctionDeclaration (ClassViewer viewer params rts _ _) = do
             retType <- maybe (return CTVoid) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
+            cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
-            return $ CEDFunction retType clsFuncName cParamDecls (buildDeclarationAnn ann True)
+            return $ CEDFunction retType clsFuncName (cSelfParam : cParamDecls) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassProcedure procedure params _ _) = do
             cParamDecls <- mapM genParameterDeclaration params
             cThisParam <- genThisParam
@@ -224,12 +225,14 @@ genTypeDefinitionDecl (TypeDefinition cls@(Class clsKind identifier _members _pr
         genClassFunctionDeclaration (ClassMethod method rts _ _) = do
             retType <- maybe (return CTVoid) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
-            return $ CEDFunction retType clsFuncName [] (buildDeclarationAnn ann True)
+            cSelfParam <- genSelfParam clsdef
+            return $ CEDFunction retType clsFuncName [cSelfParam] (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction action param rts _ _) = do
             retType <- genType noqual rts
             cParamDecl <- genParameterDeclaration param
+            cSelfParam <- genSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier action
-            return $ CEDFunction retType clsFuncName [cParamDecl] (buildDeclarationAnn ann True)
+            return $ CEDFunction retType clsFuncName [cSelfParam, cParamDecl] (buildDeclarationAnn ann True)
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
@@ -245,27 +248,24 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             clsFuncName <- genClassFunctionName identifier viewer
             cRetType <- maybe (return CTVoid) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration parameters
-            cParamTypes <- mapM (genType noqual . paramTypeSpecifier) parameters
+            cSelfParam <- genConstSelfParam clsdef
             cReturn <- genReturnStatement ret
-            let cFunctionType = CTFunction cRetType (CTPointer CTVoid constqual : cParamTypes)
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
-            return $ CFunctionDef (CFunction cFunctionType clsFuncName cParamDecls
+            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True))
         genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            cParamTypes <- mapM (genType noqual . paramTypeSpecifier) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
-            let cFunctionType = CTFunction CTVoid (CTPointer CTVoid constqual : cParamTypes)
             selfCastStmt <- genSelfCastStmt
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
-            return $ CFunctionDef (CFunction cFunctionType clsFuncName (cThisParam : cParamDecls)
+            return $ CFunctionDef Nothing (CFunction CTVoid clsFuncName (cThisParam : cParamDecls)
                 (CSCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True))
 
@@ -284,12 +284,12 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 genProcedureOnEntry, genProcedureOnExit :: CCompoundBlockItem
                 genProcedureOnEntry =
                     let cAnn = buildGenericAnn ann
-                        selfResourceExpr = CExprAddrOf (CField (CExprValOf (CVar selfVariable (CTTypeDef identifier noqual)) (CTTypeDef identifier noqual) cAnn) resourceClassIDField cResourceIDType) (CTPointer cResourceIDType noqual) cAnn
+                        selfResourceExpr = CExprAddrOf (CField (CVar selfVariable (CTPointer (CTTypeDef identifier noqual) noqual)) resourceClassIDField cResourceIDType) (CTPointer cResourceIDType noqual) cAnn
                     in
                     CBlockStmt $ CSDo (CExprCall (CExprValOf (CVar resourceLock cResourceLockFuncType) cResourceLockFuncType cAnn) [selfResourceExpr] CTVoid cAnn) (buildStatementAnn ann True)
                 genProcedureOnExit =
                     let cAnn = buildGenericAnn ann
-                        selfResourceExpr = CExprAddrOf (CField (CExprValOf (CVar selfVariable (CTTypeDef identifier noqual)) (CTTypeDef identifier noqual) cAnn) resourceClassIDField cResourceIDType) (CTPointer cResourceIDType noqual) cAnn
+                        selfResourceExpr = CExprAddrOf (CField (CVar selfVariable (CTPointer (CTTypeDef identifier noqual) noqual)) resourceClassIDField cResourceIDType) (CTPointer cResourceIDType noqual) cAnn
                     in
                     CBlockStmt $ CSDo (CExprCall (CExprValOf (CVar resourceUnlock cResourceLockFuncType) cResourceUnlockFuncType cAnn) [selfResourceExpr] CTVoid cAnn) (buildStatementAnn ann True)
 
@@ -298,11 +298,10 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cRetType <- maybe (return CTVoid) (genType noqual) rts
             cSelfParam <- genSelfParam clsdef
             cReturn <- genReturnStatement ret
-            let cFunctionType = CTFunction cRetType [CTPointer CTVoid constqual]
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
-            return $ CFunctionDef (CFunction cFunctionType clsFuncName [cSelfParam]
+            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam]
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True))
         genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
@@ -310,13 +309,11 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cRetType <- genType noqual rts
             cSelfParam <- genSelfParam clsdef
             cParam <- genParameterDeclaration param
-            cParamType <- genType noqual . paramTypeSpecifier $ param
             cReturn <- genReturnStatement ret
-            let cFunctionType = CTFunction cRetType [cParamType]
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
-            return $ CFunctionDef (CFunction cFunctionType clsFuncName [cSelfParam, cParam]
+            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam, cParam]
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
                 (buildDeclarationAnn ann True))
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member

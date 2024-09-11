@@ -7,8 +7,8 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Module
+import Generator.LanguageC.CompCertCPrinter
 
 test0 :: String
 test0 = "interface test_iface {\n" ++
@@ -76,7 +76,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* match_test0)(void * __this, __option_box_t option0);\n" ++
+              "    void (* match_test0)(void * const, __option_box_t);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++

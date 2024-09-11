@@ -25,7 +25,7 @@ genFunction (Function identifier parameters rts (BlockRet body ret) _ ann) = do
     cBody <- foldM (\acc x -> do
         cStmt <- genBlockItem x
         return $ acc ++ cStmt) [] body
-    return [ CFunctionDef (CFunction cRetType identifier cParamDecls
+    return [ CFunctionDef Nothing (CFunction cRetType identifier cParamDecls
         (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
         (buildDeclarationAnn ann True))]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item

@@ -40,6 +40,6 @@ spec = do
         pack (
           "\ntypedef struct {\n" ++
           "    void * __that;\n" ++
-          "    void (* procedure0)(void *, uint8_t, uint16_t, uint32_t, uint64_t, int8_t,\n" ++
-          "                        int16_t, int32_t, int64_t);\n" ++
+          "    void (* procedure0)(void * const, uint8_t, uint16_t, uint32_t, uint64_t,\n" ++
+          "                        int8_t, int16_t, int32_t, int64_t);\n" ++
           "} iface0;")

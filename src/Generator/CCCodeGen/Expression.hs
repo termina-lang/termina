@@ -46,18 +46,16 @@ genConstExpression c@(KV ident ann) = do
     ctype <- getConstExprType c >>= genType noqual
     return $ CExprValOf (CVar ident ctype) ctype (buildGenericAnn ann)
 
-genObject :: Object SemanticAnn -> CSourceGenerator CExpression
-genObject o@(Variable identifier ann) = do
-    let cAnn = buildGenericAnn ann
+genObject :: Object SemanticAnn -> CSourceGenerator CObject
+genObject o@(Variable identifier _ann) = do
     cType <- getObjType o >>= genType noqual
     -- Obtain the substitutions map
     subs <- ask
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (CExprValOf (CVar identifier cType) cType cAnn) (Data.Map.lookup identifier subs)
+    let ident = fromMaybe (CVar identifier cType) (Data.Map.lookup identifier subs)
     -- Return the C identifier
     return ident
-genObject o@(ArrayIndexExpression obj index ann) = do
-    let cAnn = buildGenericAnn ann
+genObject o@(ArrayIndexExpression obj index _ann) = do
     -- Generate the C code for the object
     cExpr <- genObject obj
     -- Extract the C object from the expression
@@ -65,19 +63,16 @@ genObject o@(ArrayIndexExpression obj index ann) = do
     -- Generate the C code for the index
     cIndex <- genExpression index
     -- Return the C code for the vector index expression
-    return $ CExprValOf (CIndexOf cExpr cIndex ctype) ctype cAnn
-genObject o@(MemberAccess obj identifier ann) = do
-    let cAnn = buildGenericAnn ann
+    return $ CIndexOf cExpr cIndex ctype
+genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
     ctype <- getObjType o >>= genType noqual
-    return $ CExprValOf (CField cObj identifier ctype) ctype cAnn
-genObject o@(DereferenceMemberAccess obj identifier ann) = do
-    let cAnn = buildGenericAnn ann
+    return $ CField cObj identifier ctype
+genObject o@(DereferenceMemberAccess obj identifier _ann) = do
     cObj <- genObject obj
     ctype <- getObjType o >>= genType noqual
-    return $ CExprValOf (CField cObj identifier ctype) ctype cAnn
-genObject o@(Dereference obj ann) = do
-    let cAnn = buildGenericAnn ann
+    return $ CField cObj identifier ctype
+genObject o@(Dereference obj _ann) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
@@ -85,7 +80,7 @@ genObject o@(Dereference obj ann) = do
         (Reference _ (Array _ _)) -> return cObj
         _ -> do
             ctype <- getObjType o >>= genType noqual
-            return $ CExprValOf (CDeref cObj ctype) ctype cAnn
+            return $ CDeref cObj ctype
 -- | If the expression is a box subtype treated as its base type, we need to
 -- check if it is a vector
 genObject o@(Unbox obj ann) = do
@@ -98,12 +93,12 @@ genObject o@(Unbox obj ann) = do
         (BoxSubtype ty@(Array _ _)) -> do
             -- We must obtain the declaration specifier of the vector
             ctype <- genType noqual ty
-            return $ CExprCast (CExprValOf (CField cObj "data" dataFieldCType) dataFieldCType cAnn) ctype cAnn
+            return $ CObjCast (CField cObj "data" dataFieldCType) ctype cAnn
             -- | Else, we print the derefence to the data
         (BoxSubtype ty) -> do
             ctype <- genType noqual ty
             let cptrtype = CTPointer ctype noqual
-            return $ CExprValOf (CDeref (CExprCast (CExprValOf (CField cObj "data" dataFieldCType) dataFieldCType cAnn) cptrtype cAnn) ctype) ctype cAnn
+            return $ CDeref (CObjCast (CField cObj "data" dataFieldCType) cptrtype cAnn) ctype
         -- | An unbox can only be applied to a box subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
@@ -125,7 +120,8 @@ genMemberFunctionAccess obj ident args ann = do
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
     -- Generate the C code for the object
-    cObjExpr <- genObject obj
+    cObj <- genObject obj
+    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
@@ -145,12 +141,13 @@ genMemberFunctionAccess obj ident args ann = do
                     -- | If we are here, it means that we are dereferencing the self object
                     return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (CExprValOf (CVar "self" selfCType) selfCType cAnn : cArgs) cRetType cAnn
                     -- | If the left hand size is a class:
-                _ -> return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
+                _ -> 
+                    return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
         AccessPort (DefinedType iface) ->
             let thatFieldCType = CTPointer (CTStruct CStructTag iface noqual) noqual in
             return $
-                CExprCall (CExprValOf (CField cObjExpr ident cFuncType) cFuncType cAnn)
-                      (CExprValOf (CField cObjExpr thatField thatFieldCType) thatFieldCType cAnn : cArgs) cRetType cAnn
+                CExprCall (CExprValOf (CField cObj ident cFuncType) cFuncType cAnn)
+                      (CExprValOf (CField cObj thatField thatFieldCType) thatFieldCType cAnn : cArgs) cRetType cAnn
         -- | If the left hand side is a pool:
         AccessPort (Allocator {}) ->
             genPoolMethodCallExpr ident cObjExpr cArgs cAnn
@@ -159,7 +156,7 @@ genMemberFunctionAccess obj ident args ann = do
                 "load" -> 
                     case args of 
                         [ReferenceExpression _ refObj _] -> do
-                            cRefObj <- genObject refObj >>= unboxObject
+                            cRefObj <- genObject refObj
                             let cRefObjType = getCObjType cRefObj
                             mCall <- genAtomicMethodCall ident cObjExpr cArgs cAnn
                             return $ CExprAssign cRefObj mCall cRefObjType cAnn
@@ -171,9 +168,9 @@ genMemberFunctionAccess obj ident args ann = do
                 "load_index" -> 
                     case args of 
                         [_, ReferenceExpression _ refObj _] -> do
-                            cIndexedObj <- genIndexOf cObjExpr (head cArgs)
+                            cIndexedObj <- genIndexOf cObj (head cArgs)
                             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
-                            cRefObj <- genObject refObj >>= unboxObject
+                            cRefObj <- genObject refObj
                             let cRefObjType = getCObjType cRefObj
                             mCall <- genAtomicMethodCall "load" cRefIndexedObj cArgs cAnn
                             return $ CExprAssign cRefObj mCall cRefObjType cAnn
@@ -181,27 +178,26 @@ genMemberFunctionAccess obj ident args ann = do
                 "store_index" -> 
                     case cArgs of
                         [idx, value] -> do
-                            cIndexedObj <- genIndexOf cObjExpr idx
+                            cIndexedObj <- genIndexOf cObj idx
                             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
                             genAtomicMethodCall "store" cRefIndexedObj [value] cAnn
                         _ -> throwError $ InternalError $ "invalid params for atomic store_index: " ++ show args
                 _ -> throwError $ InternalError $ "This should not happen. Unsupported atomic access method: " ++ ident
         -- | If the left hand side is a message queue:
         OutPort {} -> do
-            cObj <- unboxObject cObjExpr
             genMsgQueueMethodCall ident cObj cArgs cAnn
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 
 genExpression :: Expression SemanticAnn -> CSourceGenerator CExpression
 genExpression (AccessObject obj) = do
-    cObjExpr <- genObject obj
+    cObj <- genObject obj
     cObjType <- getObjType obj
     case cObjType of
         (Location _) -> do
-            cObj <- unboxObject cObjExpr
-            return $ CExprAddrOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
-        _ -> return cObjExpr
+            return $ CExprValOf (CDeref cObj (getCObjType cObj)) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
+        _ -> 
+            return $ CExprValOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
 genExpression (BinOp op left right ann) = 
     let cAnn = buildGenericAnn ann in
     case op of
@@ -255,22 +251,21 @@ genExpression (Casting expr ts ann) = do
 genExpression (ReferenceExpression _ obj ann) = do
     let cAnn = buildGenericAnn ann 
     typeObj <- getObjType obj
-    cObjExpr <- genObject obj
-    cObj <- unboxObject cObjExpr
+    cObj <- genObject obj
     case typeObj of
         -- | If it is a vector, we need to generate the address of the data
         (BoxSubtype ty@(Array {})) -> do
             -- We must obtain the declaration specifier of the vector
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer CTVoid noqual
-            return $ CExprCast (CExprValOf (CField cObjExpr "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
+            return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
             -- | Else, we print the address to the data
         (BoxSubtype ty) -> do
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer CTVoid noqual
                 ptrTy = CTPointer cType noqual
-            return $ CExprCast (CExprValOf (CField cObjExpr "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
-        (Array {}) -> return cObjExpr
+            return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
+        (Array {}) -> return $ CExprValOf cObj (getCObjType cObj) cAnn
         ty -> do
             cType <- genType noqual ty
             return $ CExprAddrOf cObj (CTPointer cType noqual) cAnn
@@ -282,8 +277,8 @@ genExpression e@(FunctionCall name args ann) = do
     -- Obtain the substitutions map
     subs <- ask
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (CExprValOf (CVar name cFunctionType) cFunctionType cAnn) (Data.Map.lookup name subs)
-    return $ CExprCall ident cArgs cFunctionType cAnn
+    let ident = fromMaybe (CVar name cFunctionType) (Data.Map.lookup name subs)
+    return $ CExprCall (CExprValOf ident (getCObjType ident) cAnn) cArgs cFunctionType cAnn
 genExpression (MemberFunctionCall obj ident args ann) = do
     genMemberFunctionAccess obj ident args ann
 genExpression (DerefMemberFunctionCall obj ident args ann) =
@@ -311,5 +306,13 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
-genExpression (ArraySliceExpression _ak obj _lb _rb _ann) = genObject obj
+genExpression (ArraySliceExpression _ak obj lower _rb _ann) = do
+    cObjType <- getObjType obj
+    case cObjType of
+        (Array ty _) -> do
+            cObj <- genObject obj
+            cLower <- genExpression lower
+            cType <- genType noqual ty
+            return $ CExprAddrOf (CIndexOf cObj cLower cType) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
+        _ -> throwError $ InternalError $ "Unsupported object. Not an array: " ++ show obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o

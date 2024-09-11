@@ -7,8 +7,8 @@ import Text.Parsec
 import Semantic.TypeChecking
 import Semantic.Monad
 import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Module
+import Generator.LanguageC.CompCertCPrinter
 
 test0 :: String
 test0 = "interface TMChannelInterface {\n" ++
@@ -74,7 +74,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* get_tm_sent_packets)(void * __this, uint32_t * packets);\n" ++
+              "    void (* get_tm_sent_packets)(void * const, uint32_t * const);\n" ++
               "} TMChannelInterface;\n" ++
               "\n" ++              
               "typedef struct {\n" ++
@@ -82,7 +82,8 @@ spec = do
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
-              "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets);\n" ++
+              "void TMChannel__get_tm_sent_packets(void * const __this,\n" ++
+              "                                    uint32_t * const packets);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -90,7 +91,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void TMChannel__get_tm_sent_packets(void * const __this, uint32_t * packets) {\n" ++
+              "void TMChannel__get_tm_sent_packets(void * const __this,\n" ++
+              "                                    uint32_t * const packets) {\n" ++
               "    \n" ++
               "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
@@ -112,7 +114,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* get_status)(void * __this, uint32_t * ret);\n" ++
+              "    void (* get_status)(void * const, uint32_t * const);\n" ++
               "} UARTDriverInterface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
@@ -120,7 +122,7 @@ spec = do
               "    volatile uint32_t * status;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
-              "void UARTDriver__get_status(void * const __this, uint32_t * ret);\n" ++
+              "void UARTDriver__get_status(void * const __this, uint32_t * const ret);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class UARTDriver" $ do
@@ -128,7 +130,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void UARTDriver__get_status(void * const __this, uint32_t * ret) {\n" ++
+              "void UARTDriver__get_status(void * const __this, uint32_t * const ret) {\n" ++
               "    \n" ++
               "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++

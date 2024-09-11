@@ -20,7 +20,7 @@ data CPreprocessorDirective' a
 
 data CFileItem' a
     = CExtDecl (CExternalDeclaration' a)
-    | CFunctionDef (CFunction' a)
+    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a)
     | CPPDirective (CPreprocessorDirective' a)
 
 data CAttribute' a = CAttr Ident [CExpression' a]
@@ -204,9 +204,10 @@ data CArraySize =
 
 data CObject' a = 
     CVar Ident CType
-    | CField (CExpression' a) Ident CType
-    | CDeref (CExpression' a) CType -- ^ pointer dereference (unary *)
-    | CIndexOf (CExpression' a) (CExpression' a) CType -- ^ array indexing
+    | CField (CObject' a) Ident CType
+    | CDeref (CObject' a) CType -- ^ pointer dereference (unary *)
+    | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
+    | CObjCast (CObject' a) CType a
     deriving Show
 
 data CExpression' a =
@@ -245,6 +246,7 @@ getCObjType (CVar _ t) = t
 getCObjType (CField _ _ t) = t
 getCObjType (CDeref _ t) = t
 getCObjType (CIndexOf _ _ t) = t
+getCObjType (CObjCast _ t _) = t
 
 data CCompoundBlockItem' a
   = CBlockStmt (CStatement' a)     -- ^ A statement

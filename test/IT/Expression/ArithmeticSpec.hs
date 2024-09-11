@@ -8,8 +8,8 @@ import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
 import Control.Monad.Reader
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Module
+import Generator.LanguageC.CompCertCPrinter
 
 test0 :: String
 test0 = "function test0() {\n" ++
@@ -124,7 +124,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* test1)(void * __this, __termina_box_t foo);\n" ++
+              "    void (* test1)(void * const, __termina_box_t);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++

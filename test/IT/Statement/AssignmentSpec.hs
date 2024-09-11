@@ -7,8 +7,8 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Module
+import Generator.LanguageC.CompCertCPrinter
 
 test0 :: String
 test0 = "function assignment_test0() {\n" ++
@@ -123,7 +123,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test1)(void * __this, __termina_box_t box_var0);\n" ++
+              "    void (* assignment_test1)(void * const, __termina_box_t);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
@@ -164,8 +164,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test2)(void * __this, __termina_box_t box_var0,\n" ++
-              "                              __termina_box_t box_var1);\n" ++
+              "    void (* assignment_test2)(void * const, __termina_box_t, __termina_box_t);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
@@ -210,8 +209,7 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    void * __that;\n" ++
-              "    void (* assignment_test3)(void * __this, __termina_box_t box_var0,\n" ++
-              "                              __termina_box_t box_var1);\n" ++
+              "    void (* assignment_test3)(void * const, __termina_box_t, __termina_box_t);\n" ++
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
