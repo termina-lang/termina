@@ -8,9 +8,9 @@ import qualified Data.Map as M
 
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.TypeDefinition
-import Generator.CodeGen.Common
+import Generator.LanguageC.CompCertCPrinter
+import Generator.CCCodeGen.TypeDefinition
+import Generator.CCCodeGen.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
@@ -40,7 +40,6 @@ spec = do
         pack (
           "\ntypedef struct {\n" ++
           "    void * __that;\n" ++
-          "    void (* procedure0)(void * __this, uint8_t param0, uint16_t param1,\n" ++
-          "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                        int16_t param5, int32_t param6, int64_t param7);\n" ++
+          "    void (* procedure0)(void *, uint8_t, uint16_t, uint32_t, uint64_t, int8_t,\n" ++
+          "                        int16_t, int32_t, int64_t);\n" ++
           "} iface0;")

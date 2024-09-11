@@ -154,7 +154,7 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 
 getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [Parameter]
 getParameters (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
-getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
+getParameters ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TypeSpecifier
 getExprType (AccessObject obj) = getObjType obj
@@ -269,9 +269,7 @@ genType _qual (MsgQueue _ _) = return (CTTypeDef msgQueue noqual)
 genType qual (Location ts) = do
     ts' <- genType volatile ts
     return (CTPointer ts' qual)
-genType _qual (AccessPort ts) = do
-    ts' <- genType noqual ts
-    return (CTPointer ts' noqual)
+genType _qual (AccessPort ts) =  genType noqual ts
 genType _qual (Allocator _) = return (CTTypeDef pool noqual)
 genType _qual (Atomic ts) = genType atomic ts
 genType _qual (AtomicArray ts _) = genType atomic ts

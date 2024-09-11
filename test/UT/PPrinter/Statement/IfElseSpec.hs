@@ -7,8 +7,8 @@ import Data.Map
 import Semantic.Monad
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Statement
+import Generator.LanguageC.CompCertCPrinter
 import UT.PPrinter.Expression.Common
 
 optionBoxUInt32TS :: TypeSpecifier
@@ -17,14 +17,14 @@ optionBoxUInt32TS = Option (BoxSubtype UInt32)
 vectorTS :: TypeSpecifier
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 
-optionBoxUInt32SemAnn :: SemanticAnn
-optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
+optionBoxUInt32ExprSemAnn :: SemanticAnn
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
 
-vectorAnn :: SemanticAnn
-vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+vectorObjAnn :: SemanticAnn
+vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
 vector0 :: Expression SemanticAnn
-vector0 = AccessObject (Variable "vector0" vectorAnn)
+vector0 = AccessObject (Variable "vector0" vectorObjAnn)
 
 vector1 :: Statement SemanticAnn
 vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
@@ -33,8 +33,8 @@ foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
 constToFoo0 :: Statement SemanticAnn
 constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn
@@ -43,8 +43,8 @@ boxVar0 :: Expression SemanticAnn
 boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32SemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32SemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
 twoDeclarations :: [Statement SemanticAnn]
 twoDeclarations = [vector1, option0]
@@ -56,8 +56,8 @@ oneDeclaration :: [Statement SemanticAnn]
 oneDeclaration = [option1]
 
 cond0, cond1 :: Expression SemanticAnn
-cond0 = BinOp RelationalEqual foo0 uint32Const0 boolSemAnn
-cond1 = BinOp RelationalNotEqual foo0 uint32Const0xFFFF0000 boolSemAnn
+cond0 = BinOp RelationalEqual foo0 uint32Const0 boolExprSemAnn
+cond1 = BinOp RelationalNotEqual foo0 uint32Const0xFFFF0000 boolExprSemAnn
 
 singleIf :: Statement SemanticAnn
 singleIf = IfElseStmt cond0 twoDeclarations [] Nothing stmtSemAnn

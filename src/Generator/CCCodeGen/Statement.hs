@@ -84,7 +84,7 @@ genArrayInitialization before level cObjExpr expr = do
                 initExpr = Right $ CDecl
                             (CTypeSpec (CTSizeT noqual)) (Just iterator)
                             (Just (CExprConstant  (CIntConst (CInteger 0 CDecRepr)) (CTSizeT noqual) exprCAnn))
-                condExpr = Just $ CExprBinaryOp COpLe cIteratorExpr cSize (CTBool noqual) exprCAnn
+                condExpr = Just $ CExprBinaryOp COpLt cIteratorExpr cSize (CTBool noqual) exprCAnn
                 incrExpr = Just $ CExprAssign (CVar iterator (CTSizeT noqual)) (CExprBinaryOp COpAdd cIteratorExpr (CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn
                 cObjType = getCExprType cObjExpr
             cObjArrayItemType <- getCArrayItemType cObjType
@@ -130,7 +130,7 @@ genArrayInitialization before level cObjExpr expr = do
                             (CTypeSpec (CTSizeT noqual)) (Just iterator)
                             (Just (CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTSizeT noqual) exprCAnn))
                         cSize = genInteger s
-                        condExpr = Just $ CExprBinaryOp COpLe cIteratorExpr (CExprConstant (CIntConst cSize) (CTSizeT noqual) exprCAnn) (CTBool noqual) exprCAnn
+                        condExpr = Just $ CExprBinaryOp COpLt cIteratorExpr (CExprConstant (CIntConst cSize) (CTSizeT noqual) exprCAnn) (CTBool noqual) exprCAnn
                         incrExpr = Just $ CExprAssign (CVar iterator (CTSizeT noqual)) (CExprBinaryOp COpAdd cIteratorExpr (CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn
                     cTs' <- genType noqual ts'
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CExprValOf (CIndexOf cObjExpr' cIteratorExpr cTs') cTs' exprCAnn) (CExprValOf (CIndexOf cExpr cIteratorExpr cTs') cTs' exprCAnn) ts' ann
@@ -340,7 +340,7 @@ genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body 
         cIteratorExpr = CExprValOf cIteratorObj cIteratorType exprCAnn
     condExpr <-
         case breakCond of
-            Nothing -> return $ CExprBinaryOp COpLe cIteratorExpr endExpr (CTBool noqual) exprCAnn
+            Nothing -> return $ CExprBinaryOp COpLt cIteratorExpr endExpr (CTBool noqual) exprCAnn
             Just break' -> do
                     cBreak <- genExpression break'
                     return $ CExprSeqAnd
@@ -403,7 +403,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
         _ -> do
             cExpr <- genExpression expr
             cType <- genType noqual (DefinedType structName)
-            let decl = CDecl (CTypeSpec cType) (Just "match") (Just cExpr)
+            let decl = CDecl (CTypeSpec cType) (Just (namefy "match")) (Just cExpr)
                 cExpr' = CExprValOf (CVar (namefy "match") cType) cType exprCAnn
             case matchCases of
                 [m@(MatchCase identifier _ _ _)] -> do
@@ -492,7 +492,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             let newKeyVals = fromList $ zipWith3
                     (\sym index cParamType -> (sym, CExprValOf (CField cExpr' (namefy (show (index :: Integer))) cParamType) cParamType cAnn)) params [0..] cParamTypes
                 decl = CDecl cTs (Just (namefy variant))
-                    (Just $ CExprValOf (CField cExpr (namefy variant) cParamsStructType) cParamsStructType cAnn)
+                    (Just $ CExprValOf (CField cExpr variant cParamsStructType) cParamsStructType cAnn)
             cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlockItem blk'
             return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"

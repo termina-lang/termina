@@ -8,33 +8,33 @@ import Semantic.Monad
 
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Statement
+import Generator.LanguageC.CompCertCPrinter
 import UT.PPrinter.Expression.Common
 import Utils.Annotations
 
-optionBoxUInt32SemAnn :: SemanticAnn
-optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
+optionBoxUInt32ObjSemAnn :: SemanticAnn
+optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable UInt32
 
-vectorAnn, boxArrayAnn :: SemanticAnn
-vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-boxArrayAnn = boxArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+vectorObjAnn, boxArrayObjAnn :: SemanticAnn
+vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+boxArrayObjAnn = boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnn
 param0 = Variable "param0" boxUInt32SemAnn
-param1 = Variable "param1" boxArrayAnn
+param1 = Variable "param1" boxArrayObjAnn
 
 uint32Const0 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
 usizeConst0x8 :: Expression SemanticAnn
-usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeSemAnn
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeExprSemAnn
 
 optionVar :: Expression SemanticAnn
-optionVar = AccessObject (Variable "option_var" optionBoxUInt32SemAnn)
+optionVar = AccessObject (Variable "option_var" optionBoxUInt32ObjSemAnn)
 
 vector0IndexConstant :: Expression SemanticAnn
-vector0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 vectorAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+vector0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 vectorObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
 foo1 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
@@ -44,16 +44,16 @@ param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Unbox param0 (objSemAnn Mutabl
 constToFoo1 = AssignmentStmt foo1 uint32Const0 stmtSemAnn
 
 matchCaseSome0 :: MatchCase SemanticAnn
-matchCaseSome0 = MatchCase "Some" ["param0"] [param0ToFoo1] stmtSemAnn
+matchCaseSome0 = MatchCase "Some" ["param0"] [param0ToFoo1] (matchCaseSemAnn [BoxSubtype UInt32])
 
 param1ToFoo1 :: Statement SemanticAnn
 param1ToFoo1 = AssignmentStmt foo1 vector0IndexConstant stmtSemAnn
 
 matchCaseSome1 :: MatchCase SemanticAnn
-matchCaseSome1 = MatchCase "Some" ["param1"] [param1ToFoo1] stmtSemAnn
+matchCaseSome1 = MatchCase "Some" ["param1"] [param1ToFoo1] (matchCaseSemAnn [BoxSubtype (Array UInt32 (K (TInteger 10 DecRepr)))])
 
 matchCaseNone :: MatchCase SemanticAnn
-matchCaseNone = MatchCase "None" [] [constToFoo1] stmtSemAnn
+matchCaseNone = MatchCase "None" [] [constToFoo1] (matchCaseSemAnn [])
 
 -- | A match statement with two cases. In Termina syntax:
 -- match option_var {

@@ -7,8 +7,8 @@ import Data.Map
 import Semantic.Monad
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
+import Generator.CCCodeGen.Statement
+import Generator.LanguageC.CompCertCPrinter
 import UT.PPrinter.Expression.Common
 
 tmDescriptorTS, messageTS :: TypeSpecifier
@@ -23,25 +23,30 @@ vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 vectorTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
 twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
 
-optionBoxUInt32SemAnn :: SemanticAnn
-optionBoxUInt32SemAnn = optionBoxSemAnn Mutable UInt32
+optionBoxUInt32ExprSemAnn :: SemanticAnn
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
 
-vectorAnn, vectorTMDescriptorAnn, twoDymArrayAnn, twoDymArrayRowAnn :: SemanticAnn
-vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-vectorTMDescriptorAnn = vectorSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowAnn = vectorSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
-twoDymArrayAnn = twoDymArraySemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+vectorObjAnn, twoDymArrayObjAnn, twoDymArrayRowObjAnn :: SemanticAnn
+vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+twoDymArrayRowObjAnn = vectorObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+
+vectorExprAnn, vectorTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
+vectorExprAnn = vectorExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+vectorTMDescriptorExprAnn = vectorExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
+twoDymArrayRowExprAnn = vectorExprSemAnn Int64 (K (TInteger 5 DecRepr))
+twoDymArrayExprAnn = twoDymArrayExprSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 vector0 :: Expression SemanticAnn
-vector0 = AccessObject (Variable "vector0" vectorAnn)
+vector0 = AccessObject (Variable "vector0" vectorObjAnn)
 
 vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnn
 vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
-vector2 = Declaration "vector2" Mutable twoDimArrayTS (AccessObject (Variable "vector1" twoDymArrayAnn)) stmtSemAnn
-vector3 = Declaration "vector3" Mutable vectorTS (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) stmtSemAnn
-vector4 = Declaration "vector4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowAnn) (K (TInteger 10 DecRepr)) twoDymArrayAnn) stmtSemAnn
-vector5 = Declaration "vector5" Mutable twoDimArrayTS (ArrayInitializer (AccessObject (Variable "vector_row" twoDymArrayRowAnn)) (K (TInteger 10 DecRepr)) twoDymArrayAnn) stmtSemAnn
-vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorAnn) stmtSemAnn
+vector2 = Declaration "vector2" Mutable twoDimArrayTS (AccessObject (Variable "vector1" twoDymArrayObjAnn)) stmtSemAnn
+vector3 = Declaration "vector3" Mutable vectorTS (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn
+vector4 = Declaration "vector4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowExprAnn) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
+vector5 = Declaration "vector5" Mutable twoDimArrayTS (ArrayInitializer (AccessObject (Variable "vector_row" twoDymArrayRowObjAnn)) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
+vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorExprAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -50,14 +55,17 @@ foo1, foo2 :: Statement SemanticAnn
 foo1 = Declaration "foo1" Mutable UInt32 foo0 stmtSemAnn
 foo2 = Declaration "foo2" Mutable UInt32 uint32Const0 stmtSemAnn
 
-structASemAnn, tmDescriptorSemAnn, messageSemAnn :: SemanticAnn
-structASemAnn = definedTypeSemAnn Mutable "StructA"
-tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
-messageSemAnn = definedTypeSemAnn Mutable "Message"
+tmDescriptorObjSemAnn :: SemanticAnn
+tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
+
+structAExprSemAnn, tmDescriptorExprSemAnn, messageExprSemAnn :: SemanticAnn
+structAExprSemAnn = definedTypeExprSemAnn "StructA"
+tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
+messageExprSemAnn = definedTypeExprSemAnn "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -65,29 +73,29 @@ structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 =
     StructInitializer 
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] (Just "StructA") structASemAnn
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
 tmDescriptorFieldsInit0 =
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 undefined,
-         FieldValueAssignment "field1" structAFieldsInit0 undefined] (Just "TMDescriptor") tmDescriptorSemAnn
+         FieldValueAssignment "field1" structAFieldsInit0 undefined] (Just "TMDescriptor") tmDescriptorExprSemAnn
 
 struct0, struct1 :: Statement SemanticAnn
 struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
-struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorSemAnn)) stmtSemAnn
+struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorObjSemAnn)) stmtSemAnn
 
 enum0, enum1 :: Statement SemanticAnn
-enum0 = Declaration "enum0" Mutable messageTS (EnumVariantInitializer "Message" "Reset" [] messageSemAnn) stmtSemAnn
-enum1 = Declaration "enum1" Mutable messageTS (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageSemAnn) stmtSemAnn
+enum0 = Declaration "enum0" Mutable messageTS (EnumVariantInitializer "Message" "Reset" [] messageExprSemAnn) stmtSemAnn
+enum1 = Declaration "enum1" Mutable messageTS (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageExprSemAnn) stmtSemAnn
 
 boxVar0 :: Expression SemanticAnn
 boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32SemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32SemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 

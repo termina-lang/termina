@@ -49,11 +49,16 @@ class PPrint a where
     pprintPrec _ = pprint
 
 instance PPrint CQualifier where
-    pprint (CQualifier c v a) = 
-        let cv = if c then (pretty "const" <+>) else (emptyDoc <>)
-            va = if v then (pretty "volatile" <+>) else (emptyDoc <>)
-            at = if a then (pretty "_Atomic" <+>) else (emptyDoc <>) in
-        return (cv . va . at $ emptyDoc)
+    pprint (CQualifier True False False) = 
+        return $ pretty "volatile"
+    pprint (CQualifier False True False) =
+        return $ pretty "const"
+    pprint (CQualifier False False True) =
+        return $ pretty "_Atomic"
+    pprint (CQualifier True True False) =
+        return $ pretty "const" <+> pretty "volatile"
+    pprint qual =
+        error $ "Invalid qualifier: " ++ show qual
 
 parenPrec :: Integer -> Integer -> DocStyle -> DocStyle
 parenPrec prec prec2 t = if prec <= prec2 then t else parens t
@@ -143,7 +148,7 @@ instance PPrint CType where
     pprint (CTTypeDef ident qual) = do
         pqual <- pprint qual
         return $ pretty ident <+> pqual
-    pprint (CTFunction {}) = error "Priting function types are not supported"
+    pprint (CTFunction {}) = error "Printing function types is not supported"
 
 instance PPrint CObject where
     pprintPrec _ (CVar ident _) = return $ pretty ident
@@ -222,14 +227,19 @@ indentTab = indent 4
 pprintCTypeDecl :: Ident -> CType -> CPrinter
 pprintCTypeDecl ident ty = 
     case ty of
-        CTArray ty' size -> do
-            pty <- pprintCTypeDecl ident ty'
-            psize <- pprint size
-            return $ pty <+> pretty ident <> brackets psize
-        CTFunction rTy params -> do
+        CTArray {} -> do
+            pRootTy <- pprint (rootCType ty)
+            pArraySizes <- pprintCTArray ty
+            return $ pRootTy <+> pretty ident <> pArraySizes
+        CTPointer (CTFunction rTy params) (CQualifier False False False) -> do
             prTy <- pprint rTy
             pparams <- mapM pprint params
-            return $ prTy <+> pretty ident <> parens (align (fillSep (punctuate comma pparams)))
+            return $ prTy <+> parens (pretty "*" <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
+        CTPointer (CTFunction rTy params) qual -> do
+            prTy <- pprint rTy
+            pqual <- pprint qual
+            pparams <- mapM pprint params
+            return $ prTy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
         _ -> do
             pty <- pprint ty
             return $ pty <+> pretty ident

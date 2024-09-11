@@ -32,8 +32,8 @@ dereferencepVar :: Object SemanticAnn
 dereferencepVar = Dereference pVar (objSemAnn Mutable UInt16)
 
 vector0, boxArray0 :: Object SemanticAnn
-vector0 = Variable "vector0" (vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
-boxArray0 = Variable "boxArray0" (boxArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
+vector0 = Variable "vector0" (vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
+boxArray0 = Variable "boxArray0" (boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 pArray1 :: Expression SemanticAnn
 pArray1 = AccessObject (Variable "p_vector1" (refArraySemAnn UInt32 (K (TInteger 10 DecRepr))))
@@ -42,18 +42,18 @@ referenceArray0 :: Expression SemanticAnn
 referenceArray0 = ReferenceExpression Mutable vector0 (refArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 uint16Const :: Expression SemanticAnn
-uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
+uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
 
 var0PlusConstant, var1PlusConstant :: Expression SemanticAnn
-var0PlusConstant = BinOp Addition (AccessObject var0) uint16Const uint16SemAnn
-var1PlusConstant = BinOp Addition unboxVar1 uint16Const uint16SemAnn
+var0PlusConstant = BinOp Addition (AccessObject var0) uint16Const uint16ExprSemAnn
+var1PlusConstant = BinOp Addition unboxVar1 uint16Const uint16ExprSemAnn
 
 dereferencepVarPlusConstant :: Expression SemanticAnn
-dereferencepVarPlusConstant = BinOp Addition (AccessObject dereferencepVar) uint16Const uint16SemAnn
+dereferencepVarPlusConstant = BinOp Addition (AccessObject dereferencepVar) uint16Const uint16ExprSemAnn
 
 var0PlusVar1, dereferencepVar2PlusVar1 :: Expression SemanticAnn
-var0PlusVar1 = BinOp Addition (AccessObject var0) unboxVar1 uint16SemAnn
-dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) unboxVar1 (objSemAnn Mutable UInt16)
+var0PlusVar1 = BinOp Addition (AccessObject var0) unboxVar1 uint16ExprSemAnn
+dereferencepVar2PlusVar1 = BinOp Addition (AccessObject dereferencepVar) unboxVar1 uint16ExprSemAnn
 
 functionCallSingleVar0, functionCallSingleBoxVar1,
   functionCallSinglepVar :: Expression SemanticAnn

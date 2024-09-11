@@ -8,92 +8,98 @@ import Semantic.Monad
 import UT.PPrinter.Expression.Common
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.Function
-import Generator.CodeGen.Common
+import Generator.LanguageC.CompCertCPrinter
+import Generator.CCCodeGen.Function
+import Generator.CCCodeGen.Common
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnn
 -- | 1024 : u32
-constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32SemAnn
+constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
-vectorAnn :: SemanticAnn
-vectorAnn = vectorSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+vectorObjAnn :: SemanticAnn
+vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+
+vectorExprAnn :: SemanticAnn
+vectorExprAnn = vectorExprSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 refArrayAnn :: SemanticAnn
 refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
 
-structASemAnn, tmDescriptorSemAnn :: SemanticAnn
-structASemAnn = definedTypeSemAnn Mutable "StructA"
-tmDescriptorSemAnn = definedTypeSemAnn Mutable "TMDescriptor"
+tmDescriptorObjSemAnn :: SemanticAnn
+tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
+
+structAExprSemAnn, tmDescriptorExprSemAnn :: SemanticAnn
+structAExprSemAnn = definedTypeExprSemAnn "StructA"
+tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32SemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32SemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
 structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 = 
     StructInitializer
-        [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] (Just "StructA") structASemAnn
+        [FieldValueAssignment "field_a" uint32Const0 stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 structAFieldsInit1 :: Expression SemanticAnn
 structAFieldsInit1 = 
     StructInitializer
-        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorAnn) undefined,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] (Just "StructA") structASemAnn
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 structAFieldsInit3 :: Expression SemanticAnn
 structAFieldsInit3 = 
     StructInitializer
-        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) undefined,
-         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) vectorAnn)) undefined,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 undefined] (Just "StructA") structASemAnn
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
+         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) vectorObjAnn)) stmtSemAnn,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
 tmDescriptorFieldsInit0 = 
     StructInitializer
-        [FieldValueAssignment "field0" uint32Const0 undefined,
-         FieldValueAssignment "field1" structAFieldsInit0 undefined] (Just "TMDescriptor") tmDescriptorSemAnn
+        [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
+         FieldValueAssignment "field1" structAFieldsInit0 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
 
 tmDescriptorFieldsInit1 :: Expression SemanticAnn
 tmDescriptorFieldsInit1 = 
     StructInitializer
-        [FieldValueAssignment "field0" uint32Const0 undefined,
-         FieldValueAssignment "field1" structAFieldsInit1 undefined] (Just "TMDescriptor") tmDescriptorSemAnn
+        [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
+         FieldValueAssignment "field1" structAFieldsInit1 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
 
 tmDescriptorFieldsInit3 :: Expression SemanticAnn
 tmDescriptorFieldsInit3 = 
     StructInitializer
-        [FieldValueAssignment "field0" uint32Const0 undefined,
-         FieldValueAssignment "field1" structAFieldsInit3 undefined] (Just "TMDescriptor") tmDescriptorSemAnn
+        [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
+         FieldValueAssignment "field1" structAFieldsInit3 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
 
 struct0Declaration0, struct0Declaration1, struct0Declaration2, struct1Declaration :: Statement SemanticAnn
-struct0Declaration0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 undefined
-struct0Declaration1 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit1 undefined
-struct0Declaration2 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit3 undefined
-struct1Declaration = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorSemAnn)) undefined
+struct0Declaration0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
+struct0Declaration1 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit1 stmtSemAnn
+struct0Declaration2 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit3 stmtSemAnn
+struct1Declaration = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorObjSemAnn)) stmtSemAnn
 
 struct0 :: Object SemanticAnn
-struct0 = Variable "struct0" tmDescriptorSemAnn
+struct0 = Variable "struct0" tmDescriptorObjSemAnn
 
 struct0field0 :: Expression SemanticAnn
 struct0field0 = AccessObject (MemberAccess struct0 "field0" (objSemAnn Mutable UInt32))
 
 struct0Assignment0 :: Statement SemanticAnn
-struct0Assignment0 = AssignmentStmt (MemberAccess (Variable "struct0" tmDescriptorSemAnn) "field0" (objSemAnn Mutable UInt32)) (BinOp Addition struct0field0 constUInt32 uint32SemAnn) unitSemAnn
+struct0Assignment0 = AssignmentStmt (MemberAccess struct0 "field0" (objSemAnn Mutable UInt32)) (BinOp Addition struct0field0 constUInt32 uint32ExprSemAnn) unitSemAnn
 
 returnVoid :: ReturnStmt SemanticAnn
 returnVoid = ReturnStmt Nothing unitSemAnn
 
 returnStructField0 :: ReturnStmt SemanticAnn
-returnStructField0 = ReturnStmt (Just struct0field0) uint32SemAnn
+returnStructField0 = ReturnStmt (Just struct0field0) uint32ExprSemAnn
 
 function0 :: AnnASTElement SemanticAnn
 function0 = Function "function0" [] Nothing (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnVoid) [] unitSemAnn

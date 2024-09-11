@@ -11,14 +11,14 @@ import UT.PPrinter.Expression.Common
 import Semantic.Monad
 
 tmDescriptor0, tmDescriptor1 :: Object SemanticAnn
-tmDescriptor0 = Variable "tm_descriptor0" (definedTypeSemAnn Mutable "TMDescriptor")
+tmDescriptor0 = Variable "tm_descriptor0" (definedTypeObjSemAnn Mutable "TMDescriptor")
 tmDescriptor1 = Variable "tm_descriptor1" (boxDefinedTypeSemAnn "TMDescriptor")
 
 pTMDescriptor0 :: Object SemanticAnn
 pTMDescriptor0 = Variable "p_tm_descriptor0" (refDefinedTypeSemAnn "TMDescriptor")
 
 unboxTMDescriptor1 :: Object SemanticAnn
-unboxTMDescriptor1 = Unbox tmDescriptor1 (definedTypeSemAnn Mutable "TMDescriptor")
+unboxTMDescriptor1 = Unbox tmDescriptor1 (definedTypeObjSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnn
 tmDescriptor0field0 = AccessObject (MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable UInt32))

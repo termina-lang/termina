@@ -9,9 +9,9 @@ import qualified Data.Set as S
 
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.TypeDefinition
-import Generator.CodeGen.Common
+import Generator.LanguageC.CompCertCPrinter
+import Generator.CCCodeGen.TypeDefinition
+import Generator.CCCodeGen.Common
 
 {- | Struct type with a single field.
 In Termina's concrete sytax:

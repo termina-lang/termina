@@ -14,17 +14,17 @@ uint8Const0x8, uint16Const1024, uint32Const0xFFFF0000,
   uint64Const1800000000, int8ConstMinux128, int16Const1024,
   int32ConstMinux1024, int64ConstMinux3000000000,
   charConsta, trueBool, falseBool :: Expression SemanticAnn
-uint8Const0x8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8SemAnn
-uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn
-uint64Const1800000000 = Constant (I (TInteger 1800000000 DecRepr) (Just UInt64)) uint64SemAnn
-int8ConstMinux128 = Constant (I (TInteger (-128) DecRepr) (Just Int8)) int8SemAnn
-int16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just Int16)) int16SemAnn
-int32ConstMinux1024 = Constant (I (TInteger (-1024) DecRepr) (Just Int32)) int32SemAnn
-int64ConstMinux3000000000 = Constant (I (TInteger (-3000000000) DecRepr) (Just Int64)) int64SemAnn
-charConsta = Constant (C 'a') charSemAnn
-trueBool = Constant (B True) boolSemAnn
-falseBool = Constant (B False) boolSemAnn
+uint8Const0x8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8ExprSemAnn
+uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32ExprSemAnn
+uint64Const1800000000 = Constant (I (TInteger 1800000000 DecRepr) (Just UInt64)) uint64ExprSemAnn
+int8ConstMinux128 = Constant (I (TInteger (-128) DecRepr) (Just Int8)) int8ExprSemAnn
+int16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just Int16)) int16ExprSemAnn
+int32ConstMinux1024 = Constant (I (TInteger (-1024) DecRepr) (Just Int32)) int32ExprSemAnn
+int64ConstMinux3000000000 = Constant (I (TInteger (-3000000000) DecRepr) (Just Int64)) int64ExprSemAnn
+charConsta = Constant (C 'a') charExprSemAnn
+trueBool = Constant (B True) boolExprSemAnn
+falseBool = Constant (B False) boolExprSemAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

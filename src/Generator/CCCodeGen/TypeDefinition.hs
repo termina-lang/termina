@@ -106,11 +106,8 @@ classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
         func -> (fields, func : funcs)) ([], []) members
 classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
-genThisParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
-genThisParam (TypeDefinition (Class _clsKind _identifier _members _provides _modifiers) _) =
-    return $ CDecl (CTypeSpec (CTPointer CTVoid constqual)) (Just thisParam) Nothing
-genThisParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
-
+genThisParam :: (MonadError CGeneratorError m) => m CDeclaration
+genThisParam = return $ CDecl (CTypeSpec (CTPointer CTVoid constqual)) (Just thisParam) Nothing
 
 genSelfParam :: (MonadError CGeneratorError m) => AnnASTElement SemanticAnn -> m CDeclaration
 genSelfParam (TypeDefinition (Class _clsKind identifier _members _provides _modifiers) _) =
@@ -221,8 +218,9 @@ genTypeDefinitionDecl (TypeDefinition cls@(Class clsKind identifier _members _pr
             return $ CEDFunction retType clsFuncName cParamDecls (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassProcedure procedure params _ _) = do
             cParamDecls <- mapM genParameterDeclaration params
+            cThisParam <- genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
-            return $ CEDFunction CTVoid clsFuncName cParamDecls (buildDeclarationAnn ann True)
+            return $ CEDFunction CTVoid clsFuncName (cThisParam : cParamDecls) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassMethod method rts _ _) = do
             retType <- maybe (return CTVoid) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
@@ -258,7 +256,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 (buildDeclarationAnn ann True))
         genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
-            cThisParam <- genThisParam clsdef
+            cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
             cParamTypes <- mapM (genType noqual . paramTypeSpecifier) parameters
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)

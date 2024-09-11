@@ -12,24 +12,24 @@ import UT.PPrinter.Expression.Common
 
 
 castUInt32toUInt8, castUInt32toUInt16 :: Expression SemanticAnn
-castUInt32toUInt8 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn) UInt8 uint8SemAnn
-castUInt32toUInt16 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32SemAnn) UInt16 uint16SemAnn
+castUInt32toUInt8 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32ExprSemAnn) UInt8 uint8ExprSemAnn
+castUInt32toUInt16 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just UInt32)) uint32ExprSemAnn) UInt16 uint16ExprSemAnn
 
 var0 :: Expression SemanticAnn
 var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt32))
 
 castVar0toUInt8, castVar0toUInt32 :: Expression SemanticAnn
-castVar0toUInt8 = Casting var0 UInt8 uint8SemAnn
-castVar0toUInt32 = Casting var0 UInt32 uint32SemAnn
+castVar0toUInt8 = Casting var0 UInt8 uint8ExprSemAnn
+castVar0toUInt32 = Casting var0 UInt32 uint32ExprSemAnn
 
 tmDescriptor0 :: Object SemanticAnn
-tmDescriptor0 = Variable "tm_descriptor0" (definedTypeSemAnn Mutable "TMDescriptor")
+tmDescriptor0 = Variable "tm_descriptor0" (definedTypeObjSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0 :: Object SemanticAnn
 tmDescriptor0field0 = MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable UInt32)
 
 castTMDescriptor0field0toUInt8 :: Expression SemanticAnn
-castTMDescriptor0field0toUInt8 = Casting (AccessObject tmDescriptor0field0) UInt8 uint8SemAnn
+castTMDescriptor0field0toUInt8 = Casting (AccessObject tmDescriptor0field0) UInt8 uint8ExprSemAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

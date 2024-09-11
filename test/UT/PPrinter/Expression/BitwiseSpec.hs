@@ -18,53 +18,53 @@ unboxVar1 :: Expression SemanticAnn
 unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable UInt16))
 
 constUInt8, constUInt16 :: Expression SemanticAnn
-constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8SemAnn
-constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16SemAnn
+constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8ExprSemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
 
 var0LeftShiftConstant :: Expression SemanticAnn
-var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16SemAnn
+var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16ExprSemAnn
 
 constantLeftShiftVar0 :: Expression SemanticAnn
-constantLeftShiftVar0 = BinOp BitwiseLeftShift constUInt8 var0 uint16SemAnn
+constantLeftShiftVar0 = BinOp BitwiseLeftShift constUInt8 var0 uint16ExprSemAnn
 
 var1LeftShiftConstant :: Expression SemanticAnn
-var1LeftShiftConstant = BinOp BitwiseLeftShift unboxVar1 constUInt8 uint16SemAnn
+var1LeftShiftConstant = BinOp BitwiseLeftShift unboxVar1 constUInt8 uint16ExprSemAnn
 
 constantLeftShiftVar1 :: Expression SemanticAnn
-constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 unboxVar1 uint16SemAnn
+constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 unboxVar1 uint16ExprSemAnn
 
 var0LeftShiftVar1 :: Expression SemanticAnn
-var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 unboxVar1 uint16SemAnn
+var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 unboxVar1 uint16ExprSemAnn
 
 var0LeftShiftVar1LeftShiftConstant :: Expression SemanticAnn
-var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 constUInt8 uint16SemAnn
+var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 constUInt8 uint16ExprSemAnn
 
 var0RightShiftConstant :: Expression SemanticAnn
-var0RightShiftConstant = BinOp BitwiseRightShift var0 constUInt8 uint16SemAnn
+var0RightShiftConstant = BinOp BitwiseRightShift var0 constUInt8 uint16ExprSemAnn
 
 constantRightShiftVar0 :: Expression SemanticAnn
-constantRightShiftVar0 = BinOp BitwiseRightShift constUInt8 var0 uint16SemAnn
+constantRightShiftVar0 = BinOp BitwiseRightShift constUInt8 var0 uint16ExprSemAnn
 
 var0BitwiseAndConstant :: Expression SemanticAnn
-var0BitwiseAndConstant = BinOp BitwiseAnd var0 constUInt16 uint16SemAnn
+var0BitwiseAndConstant = BinOp BitwiseAnd var0 constUInt16 uint16ExprSemAnn
 
 constantBitwiseAndVar0 :: Expression SemanticAnn
-constantBitwiseAndVar0 = BinOp BitwiseAnd constUInt16 var0 uint16SemAnn
+constantBitwiseAndVar0 = BinOp BitwiseAnd constUInt16 var0 uint16ExprSemAnn
 
 var0BitwiseAndVar1 :: Expression SemanticAnn
-var0BitwiseAndVar1 = BinOp BitwiseAnd var0 unboxVar1 uint16SemAnn
+var0BitwiseAndVar1 = BinOp BitwiseAnd var0 unboxVar1 uint16ExprSemAnn
 
 var1BitwiseOrconstant :: Expression SemanticAnn
-var1BitwiseOrconstant = BinOp BitwiseOr unboxVar1 constUInt16 uint16SemAnn
+var1BitwiseOrconstant = BinOp BitwiseOr unboxVar1 constUInt16 uint16ExprSemAnn
 
 var0BitwiseOrVar1 :: Expression SemanticAnn
-var0BitwiseOrVar1 = BinOp BitwiseOr var0 unboxVar1 uint16SemAnn
+var0BitwiseOrVar1 = BinOp BitwiseOr var0 unboxVar1 uint16ExprSemAnn
 
 var1BitwiseXorconstant :: Expression SemanticAnn
-var1BitwiseXorconstant = BinOp BitwiseXor unboxVar1 constUInt16 uint16SemAnn
+var1BitwiseXorconstant = BinOp BitwiseXor unboxVar1 constUInt16 uint16ExprSemAnn
 
 var0BitwiseXorVar1 :: Expression SemanticAnn
-var0BitwiseXorVar1 = BinOp BitwiseXor var0 unboxVar1 uint16SemAnn
+var0BitwiseXorVar1 = BinOp BitwiseXor var0 unboxVar1 uint16ExprSemAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
