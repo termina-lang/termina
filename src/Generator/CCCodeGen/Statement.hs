@@ -29,9 +29,6 @@ genEnumInitialization before level cObj expr = do
                 cType <- getExprType e >>= genType noqual
                 let cFieldObj = CField cObj variant cType
                 genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
-            -- | TODO: The size of the enum field has been hardcoded, it should be
-            -- platform dependent
-            let enumFieldType = CTInt IntSize32 Unsigned noqual
             let variantsFieldsObj = CField cObj enumVariantsField enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> variant) enumFieldType) enumFieldType exprCAnn
             return $ CSDo (CExprAssign variantsFieldsObj variantExpr enumFieldType exprCAnn) declStmtAnn : concat cParams
@@ -44,7 +41,6 @@ genOptionInitialization ::
     -> Expression SemanticAnn
     -> CSourceGenerator [CStatement]
 genOptionInitialization before level cObj expr =
-    let enumFieldType = CTInt IntSize32 Unsigned noqual in
     case expr of
         (OptionVariantInitializer (Some e) ann) -> do
             let exprCAnn = buildGenericAnn ann
@@ -228,7 +224,7 @@ genStructInitialization before level cObj expr = do
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (Located (CTy (APConnTy rts procedures)) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
-                let thatFieldObj = CField cObj thatField (CTPointer CTVoid noqual)
+                let thatFieldObj = CField cObj thatField (CTPointer (CTVoid noqual) noqual)
                     cResourceType = CTTypeDef resource noqual
                     resourceExpr = CExprAddrOf (CVar resource cResourceType) (CTPointer cResourceType noqual) exprCAnn
                 rest <- genFieldAssignments False xs

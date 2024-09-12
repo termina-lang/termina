@@ -32,7 +32,7 @@ genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, objs) <- globals])
     let cStmtAnn = internalAnn (CStatementAnn True False)
         cReturn = [CBlockStmt $ CSReturn Nothing cStmtAnn]
-        initFunction = [CFunctionDef Nothing (CFunction CTVoid initFunctionName []
+        initFunction = [CFunctionDef Nothing (CFunction (CTVoid noqual) initFunctionName []
             (CSCompound (items ++ cReturn) (internalAnn (CCompoundAnn False True)))
             (internalAnn (CDeclarationAnn True)))]
     return $ CSourceFile mName (includeTermina : includes ++ initFunction)

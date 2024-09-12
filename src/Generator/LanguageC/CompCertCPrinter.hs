@@ -101,7 +101,10 @@ pprintCTArray arrayTy  =
         _ -> return emptyDoc
 
 instance PPrint CType where
-    pprint CTVoid = return $ pretty "void"
+    pprint (CTVoid (CQualifier False False False)) = return $ pretty "void"
+    pprint (CTVoid qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "void"
     pprint (CTChar (CQualifier False False False)) = return $ pretty "char"
     pprint (CTChar qual) = do
         pqual <- pprint qual
@@ -432,6 +435,11 @@ instance PPrint CStatement where
                         braces' ((indentTab . align) (vsep pItems <> line))
                     else
                         braces' ((indentTab . align) (vsep pItems))
+            _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CSBreak ann) =
+        case itemAnnotation ann of
+            CStatementAnn before expand -> do
+                return $ prependLine before $ indentStmt expand $ pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where

@@ -257,12 +257,12 @@ genExpression (ReferenceExpression _ obj ann) = do
         (BoxSubtype ty@(Array {})) -> do
             -- We must obtain the declaration specifier of the vector
             cType <- genType noqual ty
-            let ptrToVoidCType = CTPointer CTVoid noqual
+            let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
             return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
             -- | Else, we print the address to the data
         (BoxSubtype ty) -> do
             cType <- genType noqual ty
-            let ptrToVoidCType = CTPointer CTVoid noqual
+            let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
                 ptrTy = CTPointer cType noqual
             return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
         (Array {}) -> return $ CExprValOf cObj (getCObjType cObj) cAnn
@@ -286,23 +286,19 @@ genExpression (DerefMemberFunctionCall obj ident args ann) =
 genExpression (IsEnumVariantExpression obj enum variant ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    -- | TODO: The size of the enum field has been hardcoded, it should be
-    -- platform dependent
-    let enumFieldType = CTInt IntSize32 Unsigned noqual
+
     let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar (enum <::> variant) enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
 genExpression (IsOptionVariantExpression obj NoneLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let enumFieldType = CTInt IntSize32 Unsigned noqual
     let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar optionNoneVariant enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
 genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let enumFieldType = CTInt IntSize32 Unsigned noqual
     let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn

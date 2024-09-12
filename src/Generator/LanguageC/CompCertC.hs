@@ -105,7 +105,7 @@ data CIntSize =
 
 data CType = 
     -- | The void type
-    CTVoid
+    CTVoid CQualifier
     | CTChar CQualifier
     -- | Integer types
     | CTInt CIntSize CSignedness CQualifier
@@ -266,6 +266,7 @@ data CStatement' a =
       (CStatement' a) a -- ^ for loop
    | CSReturn (Maybe (CExpression' a)) a -- ^ return statement
    | CSSwitch (CExpression' a) (CStatement' a) a -- ^ switch statement
+   | CSBreak a -- ^ break statement
     deriving Show
 
 instance Pretty CConstant where
