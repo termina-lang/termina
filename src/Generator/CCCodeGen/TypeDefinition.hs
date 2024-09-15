@@ -53,12 +53,12 @@ genOptionStruct ann (Option ts) = do
     enumStructType <- genType noqual (DefinedType enumStructName)
     let cAnn = buildDeclarationAnn ann True
         some = CDecl (CTypeSpec paramsStructType) (Just optionSomeVariant) Nothing
-        variant = CDecl (CTypeSpec enumStructType) (Just enumVariantsField) Nothing
+        this_variant = CDecl (CTypeSpec enumStructType) (Just variant) Nothing
     identifier <- genOptionStructName ts
     paramStruct <- genOptionSomeParameterStruct ann ts
     return [
             paramStruct,
-            CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [some, variant] []) cAnn
+            CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [some, this_variant] []) cAnn
         ]
 genOptionStruct ts _ = throwError $ InternalError $ "Type not an option: " ++ show ts
 
@@ -157,7 +157,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
             genEnumStruct enumName variantsWithParams = do
                 enumType <- genType noqual (DefinedType enumName)
                 let cAnn = buildDeclarationAnn ann True
-                    enumField = CDecl (CTypeSpec enumType) (Just enumVariantsField) Nothing
+                    enumField = CDecl (CTypeSpec enumType) (Just variant) Nothing
                 case variantsWithParams of
                     [] -> return $ CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField] []) cAnn
                     [var] -> do

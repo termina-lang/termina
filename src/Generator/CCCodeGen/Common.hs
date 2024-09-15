@@ -129,8 +129,8 @@ genOptionParameterStructName ts =
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
-enumVariantsField :: Identifier
-enumVariantsField = namefy "variant"
+variant :: Identifier
+variant = namefy "variant"
 
 optionSomeVariant, optionNoneVariant :: Identifier
 optionSomeVariant = "Some"

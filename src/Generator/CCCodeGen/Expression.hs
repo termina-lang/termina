@@ -283,23 +283,23 @@ genExpression (MemberFunctionCall obj ident args ann) = do
     genMemberFunctionAccess obj ident args ann
 genExpression (DerefMemberFunctionCall obj ident args ann) =
     genMemberFunctionAccess obj ident args ann
-genExpression (IsEnumVariantExpression obj enum variant ann) = do
+genExpression (IsEnumVariantExpression obj enum this_variant ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
 
-    let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
-    let rightExpr = CExprValOf (CVar (enum <::> variant) enumFieldType) enumFieldType cAnn
+    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
+    let rightExpr = CExprValOf (CVar (enum <::> this_variant) enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
 genExpression (IsOptionVariantExpression obj NoneLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
+    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar optionNoneVariant enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
 genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let leftExpr = CExprValOf (CField cObj enumVariantsField enumFieldType) enumFieldType cAnn
+    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
     let rightExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType cAnn
     return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
 genExpression (ArraySliceExpression _ak obj lower _rb _ann) = do

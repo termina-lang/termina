@@ -201,6 +201,9 @@ instance PPrint CExpression where
     pprintPrec p (CExprSizeOfType decl _ _) = do
         pdecl <- pprint decl
         return $ parenPrec p 25 $ pretty "sizeof" <> parens pdecl
+    pprintPrec p (CExprSizeOfExpr expr _ _) = do
+        pexpr <- pprintPrec 25 expr
+        return $ parenPrec p 25 $ pretty "sizeof" <> parens pexpr
     pprintPrec p (CExprAlignOfType decl _ _) = do
         pdecl <- pprint decl
         return $ parenPrec p 25 $ pretty "_Alignof" <> parens pdecl

@@ -220,6 +220,7 @@ data CExpression' a =
     | CExprSeqAnd (CExpression' a) (CExpression' a) CType a -- ^ sequential "and" r1 && r2
     | CExprSeqOr (CExpression' a) (CExpression' a) CType a -- ^ sequential "or" r1 || r2 
     | CExprSizeOfType CType CType a
+    | CExprSizeOfExpr (CExpression' a) CType a
     | CExprAlignOfType CType CType a
     | CExprAssign (CObject' a) (CExpression' a) CType a
     | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
@@ -236,6 +237,7 @@ getCExprType (CExprCast _ t _) = t
 getCExprType (CExprSeqAnd _ _ t _) = t
 getCExprType (CExprSeqOr _ _ t _) = t
 getCExprType (CExprSizeOfType _ t _) = t
+getCExprType (CExprSizeOfExpr _ t _) = t
 getCExprType (CExprAlignOfType _ t _) = t
 getCExprType (CExprAssign _ _ t _) = t
 getCExprType (CExprComma _ _ t _) = t

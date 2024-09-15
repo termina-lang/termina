@@ -22,14 +22,14 @@ genEnumInitialization ::
 genEnumInitialization before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
-        (EnumVariantInitializer ts variant params ann) -> do
+        (EnumVariantInitializer ts this_variant params ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
                 let cFieldObj = CField cObj variant cType
                 genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
-            let variantsFieldsObj = CField cObj enumVariantsField enumFieldType
+            let variantsFieldsObj = CField cObj variant enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> variant) enumFieldType) enumFieldType exprCAnn
             return $ CSDo (CExprAssign variantsFieldsObj variantExpr enumFieldType exprCAnn) declStmtAnn : concat cParams
         _ -> error "Incorrect expression"
@@ -48,7 +48,7 @@ genOptionInitialization before level cObj expr =
             
             let cSomeVariantFieldObj = CField cObj optionSomeVariant enumFieldType
             fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj optionSomeField e
-            let variantsFieldsObj = CField cObj enumVariantsField enumFieldType
+            let variantsFieldsObj = CField cObj variant enumFieldType
             let someVariantExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType exprCAnn
             return $
                 CSDo (CExprAssign variantsFieldsObj someVariantExpr enumFieldType exprCAnn) declStmtAnn :
@@ -56,7 +56,7 @@ genOptionInitialization before level cObj expr =
         (OptionVariantInitializer None ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
-            let variantsFieldsObj = CField cObj enumVariantsField enumFieldType
+            let variantsFieldsObj = CField cObj variant enumFieldType
             let noneVariantExpr = CExprValOf (CVar optionNoneVariant enumFieldType) enumFieldType exprCAnn
             return [CSDo (CExprAssign variantsFieldsObj noneVariantExpr enumFieldType exprCAnn) declStmtAnn]
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
@@ -385,7 +385,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
                     cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cObj m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
                     -- platform dependent
-                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj enumVariantsField (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) exprCAnn
+                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) exprCAnn
                         cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) exprCAnn
                     return [CBlockStmt $ CSIfThenElse
                         (CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) (buildGenericAnn ann'))
@@ -407,7 +407,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
                     paramsStructTypeSpec <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
                     rest <- genMatchCases cObj' casePrefix genParamsStructName genAnonymousMatchCase xs
                     cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genAnonymousMatchCase paramsStructTypeSpec cObj' m
-                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj' enumVariantsField (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
+                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj' variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
                         cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
                     return [CBlockStmt $ CSCompound (CBlockDecl decl  (buildDeclarationAnn ann True) : [CBlockStmt $ CSIfThenElse
                         (CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) (buildGenericAnn ann'))
@@ -441,7 +441,7 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             return $ Just (CSCompound cBlk (buildCompoundAnn ann' False True))
         genMatchCases cObj casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
             let cAnn = buildGenericAnn ann'
-                cEnumVariantsFieldExpr = CExprValOf (CField cObj enumVariantsField (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
+                cEnumVariantsFieldExpr = CExprValOf (CField cObj variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
                 cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
                 cExpr' = CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) cAnn
             paramsStructName <- genParamsStructName identifier
