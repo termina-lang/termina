@@ -12,7 +12,7 @@ import Utils.Annotations
 class TypeElement a b where
           (@:) :: a -> CType -> b
 
-instance (TypeElement Ident CObject) where
+instance TypeElement Ident CObject where
     (@:) = CVar
 
 instance TypeElement Ident CExpression where
@@ -20,18 +20,25 @@ instance TypeElement Ident CExpression where
         let cAnn = internalAnn CGenericAnn in
         CExprValOf (CVar ident cType) cType cAnn
 
-class AccessField a b where
-    (@.) :: a -> Ident -> b
-
 data ObjField =
     ObjField CObject Ident
     deriving Show
 
-instance AccessField CObject ObjField where
-    (@.) = ObjField
+(@.) :: CObject -> Ident -> ObjField
+(@.) = ObjField
 
 instance TypeElement ObjField CObject where
     (@:) (ObjField obj field) = CField obj field
+
+instance TypeElement ObjField CExpression where
+    (@:) (ObjField obj field) cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprValOf (CField obj field cType) cType cAnn
+
+instance TypeElement CInteger CExpression where
+    (@:) cInteger cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprConstant (CIntConst cInteger) cType cAnn
 
 addrOf :: CObject -> CExpression
 addrOf obj =
@@ -39,6 +46,22 @@ addrOf obj =
         cPtrType = CTPointer (getCObjType obj) noqual
     in
     CExprAddrOf obj cPtrType cAnn
+
+class Dereference a where
+    deref :: CObject -> a
+
+instance Dereference CObject where
+    deref cObj =
+        case getCObjType cObj of
+            CTPointer cType _ -> CDeref cObj cType
+            _ -> error "Pointer type expected"
+
+instance Dereference CExpression where
+    deref cObj =
+        let cAnn = internalAnn CGenericAnn in
+        case getCObjType cObj of
+            CTPointer cType _ -> CExprValOf (CDeref cObj cType) cType cAnn
+            _ -> error "Pointer type expected"
 
 class Cast a where
     cast :: CType -> a -> a
@@ -62,6 +85,16 @@ size_t = CTSizeT noqual
 
 typeDef :: Ident -> CType
 typeDef ident = CTTypeDef ident noqual
+
+_sizeOfType :: CType -> CExpression
+_sizeOfType cType =
+    let cAnn = internalAnn CGenericAnn in
+    CExprSizeOfType cType size_t cAnn
+
+_sizeOfExpr :: CExpression -> CExpression
+_sizeOfExpr expr =
+        let cAnn = internalAnn CGenericAnn in
+        CExprSizeOfExpr expr size_t cAnn
 
 class Pointer a where
     ptr :: a -> CType
@@ -103,14 +136,11 @@ int16_t = CTInt IntSize16 Signed noqual
 int32_t = CTInt IntSize32 Signed noqual
 int64_t = CTInt IntSize64 Signed noqual
 
-class Assignment a b where
-    (@=) :: a -> CExpression -> b
-
-instance Assignment CObject CExpression where
-    (@=) obj expr =
-        let cAnn = internalAnn CGenericAnn
-            cObjType = getCObjType obj in
-        CExprAssign obj expr cObjType cAnn
+(@=) :: CObject -> CExpression -> CExpression
+(@=) obj expr =
+    let cAnn = internalAnn CGenericAnn
+        cObjType = getCObjType obj in
+    CExprAssign obj expr cObjType cAnn
 
 (@@) :: CExpression -> [CExpression] -> CExpression
 (@@) func params =
@@ -136,12 +166,19 @@ instance TypeElement Decimal CExpression where
 (@!=) l r =
     CExprBinaryOp COpNe l r (CTBool noqual) (internalAnn CGenericAnn)
 
+(@==) :: CExpression -> CExpression -> CExpression
+(@==) l r =
+    CExprBinaryOp COpEq l r (CTBool noqual) (internalAnn CGenericAnn)
+
 infix 1 @=
+infix 1 @:=
 infix 7 @!=
+infix 7 @==
 
 class Alignment a b where
     pre_cr :: a -> b
     post_cr :: a -> b
+    pre_post_cr :: a -> b
     no_cr :: a -> b
 
 instance Alignment CStatement CCompoundBlockItem where
@@ -187,6 +224,26 @@ instance Alignment CStatement CCompoundBlockItem where
         CBlockStmt $ CSBreak (Located (CStatementAnn pre True) loc)
     post_cr stmt = error $ "pre_cr: invalid annotation: " ++ show stmt
 
+    pre_post_cr CSSkip = CBlockStmt CSSkip
+    pre_post_cr (CSCase expr stmt (Located _ loc)) =
+        CBlockStmt $ CSCase expr stmt (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSDefault stmt (Located _ loc)) =
+        CBlockStmt $ CSDefault stmt (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSDo expr (Located _ loc)) =
+        CBlockStmt $ CSDo expr (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSCompound stmts (Located _ loc)) =
+        CBlockStmt $ CSCompound stmts (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSIfThenElse expr stmt maybeStmt (Located _ loc)) =
+        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSFor expr1 expr2 expr3 stmt (Located _ loc)) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSReturn maybeExpr (Located _ loc)) =
+        CBlockStmt $ CSReturn maybeExpr (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSSwitch expr stmt (Located _ loc)) =
+        CBlockStmt $ CSSwitch expr stmt (Located (CStatementAnn True True) loc)
+    pre_post_cr (CSBreak (Located _ loc)) =
+        CBlockStmt $ CSBreak (Located (CStatementAnn True True) loc)
+
     no_cr CSSkip = CBlockStmt CSSkip
     no_cr (CSCase expr stmt (Located _ loc)) =
         CBlockStmt $ CSCase expr stmt (Located (CStatementAnn False False) loc)
@@ -210,11 +267,13 @@ instance Alignment CStatement CCompoundBlockItem where
 instance Alignment CExpression CCompoundBlockItem where
     pre_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn True False))
     post_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn False True))
+    pre_post_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn True True))
     no_cr expr = CBlockStmt $ CSDo expr (internalAnn (CStatementAnn False False))
 
 instance Alignment CExpression CStatement where
     pre_cr expr = CSDo expr (internalAnn (CStatementAnn True False))
     post_cr expr = CSDo expr (internalAnn (CStatementAnn False True))
+    pre_post_cr expr = CSDo expr (internalAnn (CStatementAnn True True))
     no_cr expr = CSDo expr (internalAnn (CStatementAnn False False))
 
 _if :: CExpression -> CStatement -> CStatement
@@ -239,28 +298,38 @@ _switch expr stmt =
     let cAnn = internalAnn (CStatementAnn False False) in
     CSSwitch expr stmt cAnn
 
+_case :: CExpression -> CStatement -> CStatement
+_case expr stmt =
+    let cAnn = internalAnn (CStatementAnn False False) in
+    CSCase expr stmt cAnn
+
 _default :: CStatement -> CStatement
 _default stmt =
     let cAnn = internalAnn (CStatementAnn False False) in
     CSDefault stmt cAnn
 
-class For a where
-    _for :: a -> Maybe CExpression -> Maybe CExpression -> CStatement -> CStatement
+_return :: Maybe CExpression -> CStatement
+_return expr =
+    let cAnn = internalAnn (CStatementAnn False False) in
+    CSReturn expr cAnn
 
-instance For (Maybe CExpression) where
-    _for expr1 expr2 expr3 stmt =
-        let cAnn = internalAnn (CStatementAnn False False) in
-        CSFor (Left expr1) expr2 expr3 stmt cAnn
+_for :: Maybe CExpression -> Maybe CExpression -> Maybe CExpression -> CStatement -> CStatement
+_for expr1 expr2 expr3 stmt =
+    let cAnn = internalAnn (CStatementAnn False False) in
+    CSFor (Left expr1) expr2 expr3 stmt cAnn
 
-instance For Declaration where
-    _for (Declaration ident ts) expr2 expr3 stmt =
-        let cAnn = internalAnn (CStatementAnn False False) in
-        CSFor (Right (CDecl ts (Just ident) Nothing)) expr2 expr3 stmt cAnn
+class ForDeclaration a where
+    _for_let :: a -> CExpression -> CExpression -> CStatement -> CStatement
 
-instance For CDeclaration where
-    _for decl expr2 expr3 stmt =
+instance ForDeclaration Declaration where
+    _for_let (Declaration ident ts) expr2 expr3 stmt =
         let cAnn = internalAnn (CStatementAnn False False) in
-        CSFor (Right decl) expr2 expr3 stmt cAnn
+        CSFor (Right (CDecl ts (Just ident) Nothing)) (Just expr2) (Just expr3) stmt cAnn
+
+instance ForDeclaration CDeclaration where
+    _for_let decl expr2 expr3 stmt =
+        let cAnn = internalAnn (CStatementAnn False False) in
+        CSFor (Right decl) (Just expr2) (Just expr3) stmt cAnn
 
 data Declaration =
     Declaration Ident CTypeSpecifier
@@ -279,19 +348,104 @@ instance Alignment Declaration CCompoundBlockItem where
     post_cr (Declaration ident ts) =
         let stmtAnn = internalAnn (CStatementAnn False True) in
         CBlockDecl (CDecl ts (Just ident) Nothing) stmtAnn
-    no_cr :: Declaration -> CCompoundBlockItem
+    pre_post_cr (Declaration ident ts) =
+        let stmtAnn = internalAnn (CStatementAnn True True) in
+        CBlockDecl (CDecl ts (Just ident) Nothing) stmtAnn
     no_cr (Declaration ident ts) =
         let stmtAnn = internalAnn (CStatementAnn False False) in
         CBlockDecl (CDecl ts (Just ident) Nothing) stmtAnn
     
-instance Assignment Declaration CDeclaration where
-    (@=) (Declaration ident ts) expr =
-        CDecl ts (Just ident) (Just expr)
+(@:=) :: Declaration -> CExpression -> CDeclaration
+(@:=) (Declaration ident ts) expr =
+    CDecl ts (Just ident) (Just expr)
 
 instance Alignment CDeclaration CCompoundBlockItem where
     pre_cr decl = CBlockDecl decl (internalAnn (CStatementAnn True False))
     post_cr decl = CBlockDecl decl (internalAnn (CStatementAnn False True))
+    pre_post_cr decl = CBlockDecl decl (internalAnn (CStatementAnn True True))
     no_cr decl = CBlockDecl decl (internalAnn (CStatementAnn False False))
+
+data FunctionPrototype = 
+    FunctionPrototype Ident [Declaration]
+    | StaticFunctionPrototype Ident [Declaration]
+    deriving Show
+
+data FunctionDeclaration = 
+    FunctionDeclaration FunctionPrototype CType
+    deriving Show
+
+function, static_function :: Ident -> [Declaration] -> FunctionPrototype
+function = FunctionPrototype
+static_function = StaticFunctionPrototype
+
+data Function = Function FunctionDeclaration CStatement
+    deriving Show
+
+instance TypeElement Ident Declaration where
+    (@:) ident cType = Declaration ident (CTypeSpec cType)
+
+
+(@->) :: FunctionPrototype -> CType -> CStatement -> CFileItem
+(@->) (FunctionPrototype ident decls) cType stmt =
+    let declStmt = internalAnn (CDeclarationAnn False) in
+    CFunctionDef Nothing $ 
+        CFunction cType ident (map (\(Declaration paramId ts) -> CDecl ts (Just paramId) Nothing) decls) stmt declStmt
+(@->) (StaticFunctionPrototype ident decls) cType stmt =
+    let declStmt = internalAnn (CDeclarationAnn False) in
+    CFunctionDef (Just CStatic) $ 
+        CFunction cType ident (map (\(Declaration paramId ts) -> CDecl ts (Just paramId) Nothing) decls) stmt declStmt
+
+
+instance Alignment CFileItem CFileItem where
+    pre_cr (CFunctionDef storage (CFunction cType ident decls stmt (Located _ loc))) = 
+        CFunctionDef storage $ CFunction cType ident decls stmt (Located (CDeclarationAnn True) loc)
+    pre_cr (CPPDirective (CPPInclude system path (Located _ loc))) =
+        CPPDirective $ CPPInclude system path (Located (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPDefine ident maybeValues (Located _ loc))) =
+        CPPDirective $ CPPDefine ident maybeValues (Located (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPIfDef ident (Located _ loc))) =
+        CPPDirective $ CPPIfDef ident (Located (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPIfNDef ident (Located _ loc))) =
+        CPPDirective $ CPPIfNDef ident (Located (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPEndif (Located _ loc))) =
+        CPPDirective $ CPPEndif (Located (CPPDirectiveAnn True) loc)
+    pre_cr (CExtDecl (CEDVariable storage decl (Located _ loc))) =
+        CExtDecl $ CEDVariable storage decl (Located (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDFunction cType ident decls (Located _ loc))) =
+        CExtDecl $ CEDFunction cType ident decls (Located (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDEnum maybeIdent enum (Located _ loc))) =
+        CExtDecl $ CEDEnum maybeIdent enum (Located (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDStructUnion maybeIdent structUnion (Located _ loc))) =
+        CExtDecl $ CEDStructUnion maybeIdent structUnion (Located (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDTypeDef ident cType (Located _ loc))) =
+        CExtDecl $ CEDTypeDef ident cType (Located (CDeclarationAnn True) loc)
+
+    post_cr item = item
+
+    pre_post_cr = pre_cr
+    
+    no_cr (CFunctionDef storage (CFunction cType ident decls stmt (Located _ loc))) = 
+        CFunctionDef storage $ CFunction cType ident decls stmt (Located (CDeclarationAnn False) loc)
+    no_cr (CPPDirective (CPPInclude system path (Located _ loc))) =
+        CPPDirective $ CPPInclude system path (Located (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPDefine ident maybeValues (Located _ loc))) =
+        CPPDirective $ CPPDefine ident maybeValues (Located (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPIfDef ident (Located _ loc))) =
+        CPPDirective $ CPPIfDef ident (Located (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPIfNDef ident (Located _ loc))) =
+        CPPDirective $ CPPIfNDef ident (Located (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPEndif (Located _ loc))) =
+        CPPDirective $ CPPEndif (Located (CPPDirectiveAnn False) loc)
+    no_cr (CExtDecl (CEDVariable storage decl (Located _ loc))) =
+        CExtDecl $ CEDVariable storage decl (Located (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDFunction cType ident decls (Located _ loc))) =
+        CExtDecl $ CEDFunction cType ident decls (Located (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDEnum maybeIdent enum (Located _ loc))) =
+        CExtDecl $ CEDEnum maybeIdent enum (Located (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDStructUnion maybeIdent structUnion (Located _ loc))) =
+        CExtDecl $ CEDStructUnion maybeIdent structUnion (Located (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDTypeDef ident cType (Located _ loc))) =
+        CExtDecl $ CEDTypeDef ident cType (Located (CDeclarationAnn False) loc)
 {--
 
 

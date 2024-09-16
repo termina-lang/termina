@@ -27,10 +27,10 @@ genEnumInitialization before level cObj expr = do
             let declStmtAnn = buildStatementAnn ann before
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
-                let cFieldObj = CField cObj variant cType
+                let cFieldObj = CField cObj this_variant cType
                 genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
             let variantsFieldsObj = CField cObj variant enumFieldType
-            let variantExpr = CExprValOf (CVar (ts <::> variant) enumFieldType) enumFieldType exprCAnn
+            let variantExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType exprCAnn
             return $ CSDo (CExprAssign variantsFieldsObj variantExpr enumFieldType exprCAnn) declStmtAnn : concat cParams
         _ -> error "Incorrect expression"
 
@@ -456,8 +456,8 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             -> MatchCase SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
-        genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase variant params blk' ann') = do
-            let cObj' = CField cObj variant cParamsStructType
+        genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase this_variant params blk' ann') = do
+            let cObj' = CField cObj this_variant cParamsStructType
             cParamTypes <- case getMatchCaseTypes (element ann') of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
@@ -473,16 +473,16 @@ genBlockItem match@(MatchStmt expr matchCases ann) = do
             -> CSourceGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlockItem blk'
-        genMatchCase cTs@(CTypeSpec cParamsStructType) cExpr (MatchCase variant params blk' ann') = do
+        genMatchCase cTs@(CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
             let cAnn = buildGenericAnn ann'
-                cObj' = CVar (namefy variant) cParamsStructType
+                cObj' = CVar (namefy this_variant) cParamsStructType
             cParamTypes <- case getMatchCaseTypes (element ann') of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
-                decl = CDecl cTs (Just (namefy variant))
-                    (Just $ CExprValOf (CField cExpr variant cParamsStructType) cParamsStructType cAnn)
+                decl = CDecl cTs (Just (namefy this_variant))
+                    (Just $ CExprValOf (CField cExpr this_variant cParamsStructType) cParamsStructType cAnn)
             cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlockItem blk'
             return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"

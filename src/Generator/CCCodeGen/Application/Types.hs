@@ -7,9 +7,10 @@ import Generator.CCCodeGen.Utils
 import Generator.CCCodeGen.Common
 
 -- | Generic types
-_TimeVal,
+_TimeVal, _Result,
     _Interrupt, _PeriodicTimer :: CType
 _TimeVal = typeDef "TimeVal"
+_Result = typeDef "Result"
 _Interrupt = typeDef "Interrupt"
 _PeriodicTimer = typeDef "PeriodicTimer"
 
@@ -45,14 +46,24 @@ irq_handler classId handler = (classId <::> handler) @:
             uint32_t
         ]
 
+timer_handler :: Ident -> Ident -> CExpression
+timer_handler classId handler = (classId <::> handler) @:
+    CTFunction void
+        [
+            -- | CRISCVUARTHandler * const self
+            _const . ptr $ classId,
+            -- | TimeVal current
+            _TimeVal
+        ]
+
 system_init_handler :: Ident -> Ident -> CExpression
 system_init_handler classId handler = (classId <::> handler) @:
     CTFunction (typeDef "Result")
         [
             -- | CRISCVUARTHandler * const self
             _const . ptr $ classId,
-            -- | TimeVal * current
-            ptr _TimeVal
+            -- | TimeVal current
+            _TimeVal
         ]
 
 -- Result __termina_resource__init(__termina_resource_t * const resource);
