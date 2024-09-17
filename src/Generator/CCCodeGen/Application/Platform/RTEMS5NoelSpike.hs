@@ -16,6 +16,14 @@ import Generator.CCCodeGen.Application.OS.RTEMS.Types
 import Generator.CCCodeGen.Application.Types
 import Generator.CCCodeGen.Common
 import Control.Monad.Except (MonadError(throwError))
+import Control.Monad.Reader (runReader, ReaderT (runReaderT))
+import Data.Text (unpack)
+import Generator.LanguageC.CompCertCPrinter
+import Modules.Modules (QualifiedName)
+import qualified AST.Seman as SAST
+import Utils.Annotations
+import Semantic.Types
+import System.FilePath
 
 data RTEMSPort =
     RTEMSEventPort
@@ -277,23 +285,26 @@ genVariantsForTaskPorts (Class _ classId members _ _) =
         genDefineVariantsForPorts (port : xs) = do
             this_variant <- genVariantForPort classId port
             rest <- genDefineVariantsForPorts' xs 1
-            return $ CPPDirective (CPPDefine this_variant (Just [show (0 :: Integer)]) (internalAnn (CPPDirectiveAnn True))) : rest
+            return $ pre_cr (_define this_variant (Just [show (0 :: Integer)])) : rest
 
         genDefineVariantsForPorts' :: [Identifier] -> Integer -> CSourceGenerator [CFileItem]
         genDefineVariantsForPorts' [] _ = return []
         genDefineVariantsForPorts' (port : xs) value = do
             rest <- genDefineVariantsForPorts' xs (value + 1)
             this_variant <- genVariantForPort classId port
-            return $ CPPDirective (CPPDefine this_variant (Just [show value]) (internalAnn (CPPDirectiveAnn False))) : rest
+            return $ _define this_variant (Just [show value]) : rest
 
 genVariantsForTaskPorts def = throwError $ InternalError $ "Definition not a class: " ++ show def
 
 genPoolMemoryArea :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
 genPoolMemoryArea before (RTEMSPool identifier ts size) = do
-    let declStmt = internalAnn (CDeclarationAnn before)
     cSize <- genArraySize size
     cType <- genType noqual ts
-    return $ CExtDecl $ CEDVariable (Just CStatic) (CDecl (CTypeSpec (CTArray cType cSize)) (Just $ poolMemoryArea identifier) Nothing) declStmt
+    let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
+    if before then 
+        return $ pre_cr $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
+    else
+        return $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
 genPoolMemoryArea _ obj = error $ "Invalid global object (not a pool): " ++ show obj
 
 genPoolMemoryAreas :: [RTEMSGlobal] -> CSourceGenerator [CFileItem]
@@ -307,7 +318,7 @@ genAtomicDeclaration :: Bool -> RTEMSGlobal -> CSourceGenerator CFileItem
 genAtomicDeclaration before (RTEMSAtomic identifier ts) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType atomic ts
-    return $ CExtDecl $ CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+    return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 genAtomicDeclaration _ obj = error $ "Invalid global object (not an atomic): " ++ show obj
 
 genAtomicDeclarations :: [RTEMSGlobal] -> CSourceGenerator [CFileItem]
@@ -322,7 +333,7 @@ genAtomicArrayDeclaration before (RTEMSAtomicArray identifier ts size) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cSize <- genArraySize size
     cType <- genType atomic ts
-    return $ CExtDecl $ CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing) declStmt
+    return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt
 genAtomicArrayDeclaration _ obj = error $ "Invalid global object (not an atomic array): " ++ show obj
 
 genAtomicArrayDeclarations :: [RTEMSGlobal] -> CSourceGenerator [CFileItem]
@@ -336,7 +347,7 @@ genInterruptEmitterDeclaration :: Bool -> RTEMSEmitter -> CSourceGenerator CFile
 genInterruptEmitterDeclaration before (RTEMSInterruptEmitter identifier _ (RTEMSTask {})) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType noqual (DefinedType (namefy ("rtems" <::> "interrupt_emitter_t")))
-    return $ CExtDecl $ CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+    return $ CExtDecl (CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 genInterruptEmitterDeclaration _ obj = error $ "Invalid global object (not an interrupt emitter): " ++ show obj
 
 genInterruptEmitterDeclarations :: [RTEMSEmitter] -> CSourceGenerator [CFileItem]
@@ -348,15 +359,11 @@ genInterruptEmitterDeclarations (obj : objs) = do
 
 genTaskClassCode :: TypeDef SemanticAnn -> CSourceGenerator CFileItem
 genTaskClassCode (Class TaskClass classId members _ _) = do
-    let cRetType = CTTypeDef "rtems_task" noqual
-        declStmt = internalAnn (CDeclarationAnn True)
-        cReturn = [CBlockStmt $ CSReturn Nothing (internalAnn (CStatementAnn True False))]
-        cParamDecls = [CDecl (CTypeSpec $ CTTypeDef "rtems_task_argument" noqual) (Just "arg") Nothing]
     cBody <- genBody
-    return $ CFunctionDef (Just CStatic) (CFunction cRetType
-        (namefy "rtems_task" <::> classId) cParamDecls
-        (CSCompound (cBody ++ cReturn) (internalAnn (CCompoundAnn False True)))
-        declStmt)
+    return $ pre_cr $ static_function (namefy "rtems_task" <::> classId) [
+            "arg" @: rtems_task_argument
+        ] @-> rtems_task $ trail_cr . block $
+            cBody ++ [pre_cr (_return Nothing)]
 
     where
 
@@ -371,9 +378,11 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
         -- TOOD: The current implementation does not work with vectors
         getMsgDataVariable :: Bool -> Identifier -> TypeSpecifier -> CSourceGenerator CCompoundBlockItem
         getMsgDataVariable before action dts = do
-            let declStmt = internalAnn (CDeclarationAnn before)
             cDataType <- genType noqual dts
-            return $ CBlockDecl (CDecl (CTypeSpec cDataType) (Just $ action <::> "msg_data") Nothing) declStmt
+            if before then
+                return $ pre_cr $ var (action <::> "msg_data") cDataType
+            else
+                return $ no_cr $ var (action <::> "msg_data") cDataType
 
         getMsgDataVariables :: [(Identifier, TypeSpecifier, Identifier)] -> CSourceGenerator [CCompoundBlockItem]
         getMsgDataVariables [] = return []
@@ -393,71 +402,68 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
             return
                 [
                     -- case variant:
-                    pre_cr $ _case (this_variant @: enumFieldType) $ block [
+                    pre_cr $ _case (this_variant @: enumFieldType) $
                     -- status = rtems_message_queue_receive(self->port, &action_msg_data, 
                     --                                      &size, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-                        pre_cr $ "status" @: rtems_status_code @= rtems_message_queue_receive @@
-                                [
-                                    ("self" @: ptr classStructType) @. port @: rtems_id,
-                                    cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
-                                    addrOf ("size" @: size_t),
-                                    "RTEMS_NO_WAIT" @: rtems_option,
-                                    "RTEMS_NO_TIMEOUT" @: rtems_interval
-                                ],
-                        -- if (RTEMS_SUCCESSFUL != status)
-                        pre_cr $ _if (
-                                "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
-                            $ block [
-                                -- rtems_shutdown_executive(1);
-                                no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
+                    indent . pre_cr $ "status" @: rtems_status_code @= rtems_message_queue_receive @@
+                            [
+                                ("self" @: ptr classStructType) @. port @: rtems_id,
+                                cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
+                                addrOf ("size" @: size_t),
+                                "RTEMS_NO_WAIT" @: rtems_option,
+                                "RTEMS_NO_TIMEOUT" @: rtems_interval
                             ],
-                        -- result = classFunctionName(self, action_msg_data);
-                        pre_post_cr $ "result" @: CTTypeDef "Result" noqual @=
-                            (classFunctionName @: classFunctionType) @@ ["self" @: classStructType, (action <::> "msg_data") @: cDataType],
-                        -- if (result.__variant != Result__Ok)
-                        pre_post_cr $ _if (
-                                (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
-                            $ block [
-                                -- rtems_shutdown_executive(1);
-                                no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
-                            ],
-                        pre_post_cr _break
-                    ]
+                    -- if (RTEMS_SUCCESSFUL != status)
+                    indent . pre_cr $ _if (
+                            "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
+                        $ block [
+                            -- rtems_shutdown_executive(1);
+                            no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
+                        ],
+                    -- result = classFunctionName(self, action_msg_data);
+                    indent . pre_cr $ "result" @: CTTypeDef "Result" noqual @=
+                        (classFunctionName @: classFunctionType) @@ ["self" @: classStructType, (action <::> "msg_data") @: cDataType],
+                    -- if (result.__variant != Result__Ok)
+                    indent . pre_cr $ _if (
+                            (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
+                        $ block [
+                            -- rtems_shutdown_executive(1);
+                            no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
+                        ],
+                    indent . pre_cr $ _break
                 ]
 
         genLoop :: CSourceGenerator CStatement
         genLoop = do
             classStructType <- genType noqual (DefinedType classId)
             cases <- concat <$> mapM genCase actions
-            return $ block [
+            return $ trail_cr . block $ [
                     -- | status = rtems_message_queue_receive(
-                    -- |                self->__task.msgq_id, &next_msg, &size, RTEMS_NO_WAIT, RTEMS_NO_TIMEOUT);
+                    -- |                self->__task.msgq_id, &next_msg, &size, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
                     pre_cr $ "status" @: rtems_status_code @= rtems_message_queue_receive @@
                             [
                                 (("self" @: ptr classStructType) @. taskClassIDField @: __termina_task_t) @. "msgq_id" @: rtems_id,
                                 addrOf ("next_msg" @: uint32_t),
                                 addrOf ("size" @: size_t),
-                                "RTEMS_NO_WAIT" @: rtems_option,
-                                "RTEM_NO_TIMEOUT" @: rtems_interval
+                                "RTEMS_WAIT" @: rtems_option,
+                                "RTEMS_NO_TIMEOUT" @: rtems_interval
                             ],
                     -- if (RTEMS_SUCCESSFUL != status)
-                                        -- if (result.__variant != Result__Ok)
                     pre_cr $ _if
-                            ("RTEMS_SUCCESSFUL" @: rtems_status_code @!= "Result__Ok" @: enumFieldType)
+                            ("RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                         $ block [
                             -- break;
                             no_cr _break
                         ],
                     pre_cr $ _switch ("next_msg" @: uint32_t) $
-                        block (cases ++
+                        trail_cr . block $ (cases ++
                             [
                                 -- default:
-                                pre_cr $ _default $ block [
+                                pre_cr $ _default $
                                     -- rtems_shutdown_executive(1);
-                                    no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t],
+                                    indent . pre_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t],
                                     -- break;
-                                    pre_cr _break
-                                ]
+                                    indent . pre_cr $ _break
                             ])
                 ]
 
@@ -467,7 +473,7 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
             loop <- genLoop
             return $ [
                     -- ClassIdentifier * self = (ClassIdentifier *)&arg;
-                    no_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: rtems_task_argument),
+                    pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: rtems_task_argument),
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
                     no_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code,
                     -- uint32_t next_msg = 0;
@@ -475,7 +481,7 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
                     -- size_t size = 0;
                     no_cr $ var "size" size_t @:= dec 0 @: size_t,
                     -- Result result;
-                    no_cr $ var "result" (typeDef "Result"),
+                    pre_cr $ var "result" (typeDef "Result"),
                     -- result.__variant = Result__Ok;
                     no_cr $ ("result" @: typeDef "Result") @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
                 ] ++ msgDataVars ++
@@ -495,7 +501,7 @@ genArmTimer cObj identifier = do
             pre_cr $ __termina__add_timeval @@
                 [
                     addrOf ((cObj @. "__timer" @: __termina_timer_t) @. "current" @: _TimeVal),
-                    addrOf (cObj @. "current" @: _TimeVal)
+                    addrOf (cObj @. "period" @: _TimeVal)
                 ],
             -- status = __rtems__timer_delay_at(timer.__timer.timer_id, 
             --                                  &timer.__timer.current,
@@ -512,14 +518,14 @@ genEmitter :: RTEMSEmitter -> CSourceGenerator CFileItem
 genEmitter (RTEMSInterruptEmitter interrupt _ (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) = do
     let irqArray = emitterToArrayMap M.! interrupt
         classIdType = typeDef classId
-    return $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void] @-> void $
-            block [
+    return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void] @-> void $
+            trail_cr . block $ [
                 -- classId * self = &identifier;
                 pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                 -- Result result; 
                 pre_cr $ var "result" _Result,
                 -- result.__variant = Result__Ok;
-                pre_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
+                no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
                 -- result = classFunctionName(self, interrupt);
                 pre_cr $ "result" @: _Result @=
                     irq_handler classId action @@
@@ -528,7 +534,7 @@ genEmitter (RTEMSInterruptEmitter interrupt _ (RTEMSHandler identifier classId _
                             dec irqArray @: uint32_t
                         ],
                 -- if (result.__variant != Result__Ok)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -552,7 +558,7 @@ genEmitter (RTEMSInterruptEmitter interrupt _ (RTEMSTask {})) = do
                         _sizeOfType uint32_t
                     ],
                 -- if (RTEMS_SUCCESSFUL == status)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
                     $ block [
                         -- status = rtems_message_queue_send(interrupt.task_msgq_id, &vector, sizeof(uint32_t));
@@ -563,7 +569,7 @@ genEmitter (RTEMSInterruptEmitter interrupt _ (RTEMSTask {})) = do
                                 _sizeOfType uint32_t
                             ],
                         -- if (RTEMS_SUCCESSFUL != status)
-                        pre_post_cr $ _if (
+                        pre_cr $ _if (
                                 "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                             $ block [
                                 -- rtems_shutdown_executive(1);
@@ -581,7 +587,7 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (
                 "_timer_id" @: rtems_id,
                 "_ignored" @: void_ptr
             ] @-> void $
-            block $ [
+            trail_cr . block $ [
                 -- classId * self = &identifier;
                 pre_cr $ var "self" (ptr classId) @:= addrOf (identifier @: typeDef classId),
                 -- Result result;
@@ -592,10 +598,10 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (
                 pre_cr $ "result" @: _Result @= irq_handler classId action @@
                     [
                         "self" @: ptr classId,
-                        ("timer" @: _PeriodicTimer) @. "current" @: _TimeVal
+                        ((timer @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "current" @: _TimeVal
                     ],
                 -- if (result.__variant != Result__Ok)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -603,7 +609,7 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSHandler identifier classId _ (
                     ]
             ] ++ armTimer ++ [
                 -- if (RTEMS_SUCCESSFUL != status)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -618,14 +624,14 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
                 "_timer_id" @: rtems_id,
                 "_ignored" @: void_ptr
             ] @-> void $
-            block $ [
+            trail_cr . block $ [
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
                 pre_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code,
                 -- status = rtems_message_queue_send(timer.timer.sink_msg_id, &timer.current, sizeof(TimeVal));
                 pre_cr $ "status" @: rtems_status_code @= rtems_message_queue_send @@
                     [
-                        ((timer @: _PeriodicTimer) @. "timer" @: __termina_timer_t) @. "sink_msgq_id" @: rtems_id,
-                        addrOf (((timer @: _PeriodicTimer) @. "timer" @: __termina_timer_t) @. "current" @: _TimeVal),
+                        ((timer @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "sink_msgq_id" @: rtems_id,
+                        addrOf (((timer @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "current" @: _TimeVal),
                         _sizeOfType _TimeVal
                     ],
                 -- if (RTEMS_SUCCESSFUL == status)
@@ -635,13 +641,13 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
                         -- status = rtems_message_queue_send(timer.__timer.task_msgq_id, &timer.__timer.task_port, sizeof(uint32_t));
                         pre_cr $ "status" @: rtems_status_code @= rtems_message_queue_send @@
                             [
-                                ((timer @: _PeriodicTimer) @. "timer" @: __termina_timer_t) @. "task_msgq_id" @: rtems_id,
-                                addrOf (((timer @: _PeriodicTimer) @. "timer" @: __termina_timer_t) @. "task_port" @: uint32_t),
+                                ((timer @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "task_msgq_id" @: rtems_id,
+                                addrOf (((timer @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "task_port" @: uint32_t),
                                 _sizeOfType uint32_t
                             ]
                     ],
                 -- if (RTEMS_SUCCESSFUL != status)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -649,7 +655,7 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
                     ]
             ] ++ armTimer ++ [
                 -- if (RTEMS_SUCCESSFUL != status)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -660,16 +666,16 @@ genEmitter (RTEMSPeriodicTimerEmitter timer (RTEMSTask {})) = do
 genEmitter (RTEMSPeriodicTimerEmitter _ glb) = throwError $ InternalError $ "Invalid connection for timer: " ++ show glb
 genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) = do
     let classIdType = typeDef classId
-    return $ pre_cr $ function (namefy "rtems_app" <::> "inital_event") [
+    return $ pre_cr $ function (namefy "rtems_app" <::> "initial_event") [
             "current" @: ptr (typeDef "TimeVal")
         ] @-> void $
-            block [
+            trail_cr . block $ [
                 -- classId * self = &identifier;
                 pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                 -- Result result;
                 pre_cr $ var "result" _Result,
                 -- result.__variant = Result__Ok;
-                pre_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
+                no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
                 -- result = classFunctionName(self, current);
                 pre_cr $ "result" @: _Result @=
                     timer_handler classId action @@
@@ -678,7 +684,7 @@ genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEv
                             deref ("current" @: ptr _TimeVal)
                         ],
                 -- if (result.__variant != Result__Ok)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -700,7 +706,7 @@ genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ por
                 -- Result result;
                 pre_cr $ var "result" _Result,
                 -- result.__variant = Result__Ok;
-                pre_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
+                no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
                 -- result = classFunctionName(self, current);
                 pre_cr $ "result" @: _Result @=
                     timer_handler classId action @@
@@ -709,7 +715,7 @@ genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ por
                             deref ("current" @: ptr _TimeVal)
                         ],
                 -- if (result.__variant != Result__Ok)
-                pre_post_cr $ _if (
+                pre_cr $ _if (
                         (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -726,52 +732,85 @@ genEmitter _ = error "Invalid emitter"
 genEnableProtection :: M.Map Identifier (RTEMSGlobal, RTEMSResourceLock) -> CSourceGenerator CFileItem
 genEnableProtection resLockingMap = do
     initResourcesProt <- concat <$> mapM genInitResourceProt (M.toList resLockingMap)
-    return $ static_function (namefy "rtems_app" <::> "enable_protection") [] @-> void $
-        block $ [
+    return $ pre_cr $ static_function (namefy "rtems_app" <::> "enable_protection") [] @-> void $
+        trail_cr . block $ [
                 -- Result result;
                 pre_cr $ var "result" _Result,
                 -- result.__variant = Result__Ok;
-                pre_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
+                no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
             ] ++ initResourcesProt
     where
 
         genInitResourceProt :: (Identifier, (RTEMSGlobal, RTEMSResourceLock)) -> CSourceGenerator [CCompoundBlockItem]
-        genInitResourceProt (identifier, (RTEMSResource resourceId _ _,  RTEMSResourceLockNone)) = do
+        genInitResourceProt (identifier, (RTEMSResource _ resourceClass _,  RTEMSResourceLockNone)) = do
             return [
-                pre_cr $ ((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
-                    @= "RTEMSResourceLock__None" @: __rtems_runtime_resource_lock_t
+                pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    @= namefy "RTEMSResourceLock" <::> "None" @: __rtems_runtime_resource_lock_t
                 ]
-        genInitResourceProt (identifier, (RTEMSResource resourceId _ _, RTEMSResourceLockIrq)) = do
+        genInitResourceProt (identifier, (RTEMSResource _ resourceClass _, RTEMSResourceLockIrq)) = do
             return [
-                pre_cr $ ((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
-                    @= "RTEMSResourceLock__Irq" @: __rtems_runtime_resource_lock_t
+                pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    @= namefy "RTEMSResourceLock" <::> "Irq" @: __rtems_runtime_resource_lock_t
                 ]
-        genInitResourceProt (identifier, (RTEMSResource resourceId _ _, RTEMSResourceLockMutex ceilPrio)) = do
+        genInitResourceProt (identifier, (RTEMSResource _ resourceClass _, RTEMSResourceLockMutex ceilPrio)) = do
             let cCeilPrio = genInteger ceilPrio
             return [
                     -- | identifier.__resource.lock = RTEMSResourceLock__Mutex;
-                    pre_cr $ ((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
-                        @= "RTEMSResourceLock__Mutex" @: __rtems_runtime_resource_lock_t,
-                    pre_cr $
-                        (((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "policy" @: __rtems_runtime_mutex_policy
-                        @= "RTEMSMutexPolicy__Ceiling" @: __rtems_runtime_mutex_policy,
-                    pre_cr $
-                        (((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "prio_ceiling" @: rtems_task_priority
+                    pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                        @= namefy "RTEMSResourceLock" <::> "Mutex" @: __rtems_runtime_resource_lock_t,
+                    no_cr $
+                        (((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "policy" @: __rtems_runtime_mutex_policy
+                        @= namefy "RTEMSMutexPolicy" <::> "Ceiling" @: __rtems_runtime_mutex_policy,
+                    no_cr $
+                        (((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "prio_ceiling" @: rtems_task_priority
                         @= cCeilPrio @: rtems_task_priority,
                     pre_cr $ "result" @: _Result @= __termina_resource__init @@
                         [
-                            addrOf ((identifier @: typeDef resourceId) @. resourceClassIDField @: __termina_resource_t)
+                            addrOf ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t)
                         ],
                     -- if (result.__variant != Result__Ok)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                             (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                         $ block [
                             -- rtems_shutdown_executive(1);
                             no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
-                        ],
-                    pre_cr $ _return Nothing
+                        ]
                 ]
-        genInitResourceProt _ = throwError $ InternalError "Invalid resource"
+        genInitResourceProt (identifier, (RTEMSPool {}, RTEMSResourceLockNone)) = do
+            return [
+                pre_cr $ ((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    @= namefy "RTEMSResourceLock" <::> "None" @: __rtems_runtime_resource_lock_t
+                ]
+        genInitResourceProt (identifier, (RTEMSPool {}, RTEMSResourceLockIrq)) = do
+            return [
+                pre_cr $ ((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    @= namefy "RTEMSResourceLock" <::> "Irq" @: __rtems_runtime_resource_lock_t
+                ]
+        genInitResourceProt (identifier, (RTEMSPool {}, RTEMSResourceLockMutex ceilPrio)) = do
+            let cCeilPrio = genInteger ceilPrio
+            return [
+                    -- | identifier.__resource.lock = RTEMSResourceLock__Mutex;
+                    pre_cr $ ((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                        @= namefy "RTEMSResourceLock" <::> "Mutex" @: __rtems_runtime_resource_lock_t,
+                    no_cr $
+                        (((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "policy" @: __rtems_runtime_mutex_policy
+                        @= namefy "RTEMSMutexPolicy" <::> "Ceiling" @: __rtems_runtime_mutex_policy,
+                    no_cr $
+                        (((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "prio_ceiling" @: rtems_task_priority
+                        @= cCeilPrio @: rtems_task_priority,
+                    pre_cr $ "result" @: _Result @= __termina_resource__init @@
+                        [
+                            addrOf ((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t)
+                        ],
+                    -- if (result.__variant != Result__Ok)
+                    pre_cr $ _if (
+                            (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
+                        $ block [
+                            -- rtems_shutdown_executive(1);
+                            no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
+                        ]
+                ]
+        genInitResourceProt res = throwError $ InternalError ("Invalid resource: " ++ show res)
 
 -- | Function __rtems_app__init_globals. This function is called from the Init task.
 -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
@@ -779,8 +818,6 @@ genEnableProtection resLockingMap = do
 genInitGlobals ::
     -- | Resources 
     [RTEMSGlobal]
-    -- | Pools
-    -> [RTEMSGlobal]
     -- | Task Message Queues
     -> [RTEMSMsgQueue]
     -- | Channel Message Queues  
@@ -794,22 +831,21 @@ genInitGlobals ::
     -- | Complete list of timers
     -> [RTEMSEmitter]
     -> CSourceGenerator CFileItem
-genInitGlobals resources pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers = do
-    initResources <- mapM genInitResource resources
-    initPools <- concat <$> mapM genInitPool pools
+genInitGlobals resources tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers = do
+    initResources <- concat <$> mapM genInitResource resources
     cTaskMessageQueues <- concat <$> mapM genRTEMSCreateMsgQueue tasksMessageQueues
     cChannelMessageQueues <- concat <$> mapM genRTEMSCreateMsgQueue channelMessageQueues
     cInterruptEmittersToTasks <- concat <$> mapM genInitInterruptEmitterToTask interruptEmittersToTasks
     cTimersToTasks <- concat <$> mapM genInitTimerToTask timersToTasks
     cTaskInitialization <- concat <$> mapM genTaskInitialization tasks
     cCreateTimers <- concat <$> mapM genRTEMSCreateTimer timers
-    return $ static_function (namefy "rtems_app" <::> "init_globals") [] @-> void $
-            block $ [
+    return $ pre_cr $ static_function (namefy "rtems_app" <::> "init_globals") [] @-> void $
+            trail_cr . block $ [
                 -- Result result;
                 pre_cr $ var "result" _Result,
                 -- result.__variant = Result__Ok;
-                pre_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
-            ] ++ initResources ++ initPools
+                no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
+            ] ++ initResources 
             ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers) then
                 [
                     pre_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code
@@ -818,23 +854,20 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
 
     where
 
-        genInitResource :: RTEMSGlobal -> CSourceGenerator CCompoundBlockItem
+        genInitResource :: RTEMSGlobal -> CSourceGenerator [CCompoundBlockItem]
         genInitResource (RTEMSResource identifier classId _) = do
             -- | resource.__resource.lock = RTEMSResourceLock__None;
-            return $ pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
-                    @= "RTEMSResourceLock__None" @: __rtems_runtime_resource_lock_t
-        genInitResource obj = throwError $ InternalError $ "Invalid global object (not a resource): " ++ show obj
-
-        genInitPool :: RTEMSGlobal -> CSourceGenerator [CCompoundBlockItem]
-        genInitPool (RTEMSPool identifier ts _) = do
+            return $ [pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    @= namefy "RTEMSResourceLock" <::> "None" @: __rtems_runtime_resource_lock_t]
+        genInitResource (RTEMSPool identifier ts _) = do
             cTs <- genType noqual ts
             return
                 [
                     -- identifier.__resource.lock = __RTEMSResourceLock__None;
                     pre_cr $ ((identifier @: __termina_pool_t) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
-                        @= "RTEMSResourceLock__None" @: __rtems_runtime_resource_lock_t,
+                        @= (namefy "RTEMSResourceLock" <::> "None") @: __rtems_runtime_resource_lock_t,
                     -- result = __termina_pool__init(&identifier, (void *)memory_area_identifier)
-                    pre_cr $ "resut" @: _Result @= __termina_pool__init @@
+                    pre_cr $ "result" @: _Result @= __termina_pool__init @@
                                 [
                                     addrOf (identifier @: ptr __termina_pool_t),
                                     cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
@@ -842,14 +875,14 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                                     _sizeOfType cTs
                                 ],
                     -- if (result.__variant != Result__Ok)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                             (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
                         $ block [
                             -- rtems_shutdown_executive(1);
                             no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
                         ]
                 ]
-        genInitPool obj = throwError $ InternalError $ "Invalid global object (not a pool): " ++ show obj
+        genInitResource obj = throwError $ InternalError $ "Invalid global object (not a pool): " ++ show obj
 
         -- | Prints the code to initialize a message queue. The function is called to generate the code for the
         -- message queues corresponding to the channels declared by the user plus the ones that belong to each
@@ -864,9 +897,9 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                 [
                     pre_cr $ (identifier @: __termina_msg_queue_t) @. "task_msgq_id" @: rtems_id @=
                         ((taskId @: classIdType) @. taskClassIDField @: __termina_task_t) @. "msgq_id" @: rtems_id,
-                    pre_cr $ (identifier @: __termina_msg_queue_t) @. "task_port" @: uint32_t @=
+                    no_cr $ (identifier @: __termina_msg_queue_t) @. "task_port" @: uint32_t @=
                         variantForPort @: uint32_t,
-                    pre_cr $ (identifier @: __termina_msg_queue_t) @. "message_size" @: size_t @=
+                    no_cr $ (identifier @: __termina_msg_queue_t) @. "message_size" @: size_t @=
                             _sizeOfType cTs,
                     -- status = __rtems__create_msg_queue(count, msg_size, &msg_queue_id)
                     pre_cr $ "status" @: rtems_status_code @= __rtems__create_msg_queue @@
@@ -876,7 +909,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                             addrOf ((identifier @: __termina_msg_queue_t) @. "msgq_id" @: rtems_id)
                         ],
                     -- if (RTEMS_SUCCESSFUL != status)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -892,8 +925,9 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                         _ -> error $ "Invalid port connection for channel: " ++ show identifier
 
         genRTEMSCreateMsgQueue obj@(RTEMSChannelMsgQueue {}) = throwError $ InternalError $ "Invalid channel objet: " ++ show obj
-        genRTEMSCreateMsgQueue (RTEMSTaskMsgQueue identifier _classId size) = do
+        genRTEMSCreateMsgQueue (RTEMSTaskMsgQueue taskId classId size) = do
             let cSize = genInteger size
+                classIdType = typeDef classId
             return
                 [
                     -- status = __rtems__create_msg_queue(&identifier, (void *)memory_area_identifier)
@@ -901,10 +935,10 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                         [
                             cSize @: uint32_t,
                             _sizeOfType uint32_t,
-                            addrOf ((identifier @: __termina_msg_queue_t) @. "msgq_id" @: rtems_id)
+                            addrOf (((taskId @: classIdType) @. taskClassIDField @: __termina_task_t) @. "msgq_id" @: rtems_id)
                         ],
                     -- if (RTEMS_SUCCESSFUL != status)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -924,7 +958,7 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                             addrOf ((taskId @: typeDef classId) @. portId @: rtems_id)
                         ],
                     -- if (RTEMS_SUCCESSFUL != status)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -1000,10 +1034,10 @@ genInitGlobals resources pools tasksMessageQueues channelMessageQueues interrupt
                     -- status = __rtems__create_timer(&timer_id)
                     pre_cr $ "status" @: rtems_status_code @= __rtems__create_timer @@
                             [
-                                addrOf (((identifier @: _PeriodicTimer) @. "timer" @: __termina_timer_t) @. "timer_id" @: rtems_id)
+                                addrOf (((identifier @: _PeriodicTimer) @. timerField @: __termina_timer_t) @. "timer_id" @: rtems_id)
                             ],
                     -- if (RTEMS_SUCCESSFUL != status)
-                    pre_post_cr $ _if (
+                    pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
                     $ block [
                         -- rtems_shutdown_executive(1);
@@ -1022,7 +1056,7 @@ genInstallEmitters emitters = do
             [
                 "current" @: ptr (typeDef "TimeVal")
             ] @-> void $
-            block $ 
+            trail_cr . block $ 
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
                 pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : installEmitters
 
@@ -1031,9 +1065,9 @@ genInstallEmitters emitters = do
         genRTEMSInstallEmitter :: RTEMSEmitter -> CSourceGenerator CCompoundBlockItem
         genRTEMSInstallEmitter (RTEMSInterruptEmitter interrupt _ _) = do
             return $
-                post_cr $ _if (
+                pre_cr $ _if (
                         "RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
-                    $ block [
+                    $ trail_cr . block $ [
                         pre_cr $ "status" @: rtems_status_code @= __rtems__install_isr @@
                             [
                                 dec (emitterToArrayMap M.! interrupt) @: uint32_t,
@@ -1044,85 +1078,68 @@ genInstallEmitters emitters = do
             let cExpr = CVar timer (CTTypeDef "PeriodicTimer" noqual)
             armTimer <- genArmTimer cExpr timer
             return $
-                no_cr $ _if ("RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
+                pre_cr $ _if ("RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
                     $ block $ 
                         pre_cr (((timer @: _PeriodicTimer) @. "__timer" @: __termina_timer_t) @. "current" @: _TimeVal @=
-                            "current" @: _TimeVal) : armTimer
+                            deref ("current" @: ptr _TimeVal)) : armTimer
         genRTEMSInstallEmitter (RTEMSSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
-
-{--
+    
 genCreateTasks :: [RTEMSGlobal] -> CSourceGenerator CFileItem
 genCreateTasks tasks = do
     createTasks <- concat <$> mapM genRTEMSCreateTask tasks
-    return $ static_function (namefy "rtems_app" <::> "create_tasks") [] @-> void $ 
-        block $ 
+    return $ pre_cr $ static_function (namefy "rtems_app" <::> "create_tasks") [] @-> void $ 
+        trail_cr . block $ 
             -- rtems_status_code status = RTEMS_SUCCESSFUL;
             pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : createTasks
     where
 
         genRTEMSCreateTask :: RTEMSGlobal -> CSourceGenerator [CCompoundBlockItem]
         genRTEMSCreateTask (RTEMSTask identifier classId _ priority stackSize _) = do
-            let cAnn = internalAnn CGenericAnn
-                stmtAnn = internalAnn (CStatementAnn True False)
-                cPriority = genInteger priority
+            let cPriority = genInteger priority
                 cStackSize = genInteger stackSize
             return [
-                CBlockStmt $ CExpr (Just $ CAssignment (CVar "status" cAnn)
-                    (CCall (CVar (namefy "rtems" <::> "create_task") cAnn)
-                        [CConst (CIntConst cPriority) cAnn,
-                        CConst (CIntConst cStackSize) cAnn,
-                        CVar (namefy $ "rtems_task" <::> classId) cAnn,
-                        CCast
-                            (CDecl [CTypeSpec $ CTypeDef "rtems_task_argument"]
-                                [] (internalAnn (CDeclarationAnn False)))
-                                (CUnary CAdrOp (CVar identifier cAnn) cAnn) cAnn,
-                        CUnary CAdrOp
-                            (CMember (CMember (CVar identifier cAnn) "__task" False cAnn) "task_id" False cAnn) cAnn
-                        ] cAnn) cAnn)
-                    stmtAnn,
-                CBlockStmt $ CIf (CBinary CNeqOp (CVar "RTEMS_SUCCESSFUL" cAnn) (CVar "status" cAnn) cAnn)
-                    (CCompound [
+                    pre_cr $ "status" @: rtems_status_code @= __rtems__create_task @@
+                            [
+                                cPriority @: rtems_task_priority,
+                                cStackSize @: size_t,
+                                namefy ("rtems_task" <::> classId) @: rtems_task_entry,
+                                cast rtems_task_argument (addrOf (identifier @: typeDef classId)),
+                                addrOf (((identifier @: typeDef classId) @. taskClassIDField @: __termina_task_t) @. "task_id" @: rtems_id)
+                            ],
+                    -- if (RTEMS_SUCCESSFUL != status)
+                    pre_cr $ _if (
+                        "RTEMS_SUCCESSFUL" @: rtems_status_code @!= "status" @: rtems_status_code)
+                    $ block [
                         -- rtems_shutdown_executive(1);
-                        CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_shutdown_executive" cAnn)
-                            [CConst (CIntConst (CInteger 1 CDecRepr)) cAnn] cAnn) (internalAnn (CStatementAnn False False))
-                    ] (internalAnn (CCompoundAnn False False))) Nothing stmtAnn
+                        no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
+                    ]
                 ]
         genRTEMSCreateTask obj = throwError $ InternalError $ "Invalid global object (not a task): " ++ show obj
 
 genInitTask :: [RTEMSEmitter] -> CSourceGenerator CFileItem
 genInitTask emitters = do
-    let cAnn = internalAnn CGenericAnn
-        declStmt before = internalAnn (CDeclarationAnn before)
-        cStmtAnn = internalAnn (CStatementAnn True False)
-    return $ CExtDecl $ CFDefExt $
-        CFunDef [CTypeSpec $ CTypeDef "rtems_task"]
-            (CDeclarator (Just $ "Init") [CFunDeclr
-                [CDecl
-                    [CTypeSpec $ CTypeDef "rtems_task_argument"] [(Just (CDeclarator (Just "_ignored") [] [] cAnn), Nothing, Nothing)] (internalAnn (CDeclarationAnn False))]
-                [] cAnn] [] cAnn)
-            (CCompound ([
+    return $ pre_cr $ function "Init" [
+            "_ignored" @: rtems_task_argument
+        ] @-> rtems_task $
+        trail_cr . block $ 
+            [
                 -- rtems_status_code status = RTEMS_SUCCESSFUL;
-                CBlockDecl (CDecl [CTypeSpec $ CTypeDef "TimeVal"]
-                    [(Just $ CDeclarator (Just "current") [] [] cAnn, Nothing, Nothing)] (declStmt True)),
-                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina" <::> "clock_get_uptime") cAnn)
-                                [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn,
-                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "termina_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn,
-                CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "init_globals") cAnn) [] cAnn) cStmtAnn
+                pre_cr $ var "current" _TimeVal,
+                pre_cr $ __termina__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
+                pre_cr $ __termina_app__init_globals @@ [],
+                pre_cr $ __rtems_app__init_globals @@ []
              ] ++
                 (case find (\case { RTEMSSystemInitEmitter {} -> True; _ -> False }) emitters of
                     Just (RTEMSSystemInitEmitter {}) -> [
-                            CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "inital_event") cAnn)
-                                [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn
+                            pre_cr $ __rtems_app__initial_event @@ [addrOf ("current" @: _TimeVal)]
                         ]
                     _ -> []) ++
                 [
-                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "enable_protection") cAnn) [] cAnn) cStmtAnn,
-                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "install_emitters") cAnn)
-                        [CUnary CAdrOp (CVar "current" cAnn) cAnn] cAnn) cStmtAnn,
-                    CBlockStmt $ CExpr (Just $ CCall (CVar (namefy $ "rtems_app" <::> "create_tasks") cAnn) [] cAnn) cStmtAnn,
-                    CBlockStmt $ CExpr (Just $ CCall (CVar "rtems_task_delete" cAnn) [CVar "RTEMS_SELF" cAnn] cAnn) cStmtAnn
+                    pre_cr $ __rtems_app__enable_protection @@ [],
+                    pre_cr $ __rtems_app__install_emitters @@ [addrOf ("current" @: _TimeVal)],
+                    pre_cr $ __rtems_app__create_tasks @@ [],
+                    pre_cr $ rtems_task_delete @@ ["RTEMS_SELF" @: rtems_id]
                 ]
-             ) (internalAnn (CCompoundAnn False True))) (declStmt True)
 
 genAppConfig ::
     [RTEMSGlobal]
@@ -1131,40 +1148,32 @@ genAppConfig ::
     -> [RTEMSResourceLock]
     -> CSourceGenerator [CFileItem]
 genAppConfig tasks msgQueues timers mutexes = do
-    let cppAnn before = internalAnn (CPPDirectiveAnn before)
     messageBufferMemory <- genMessageBufferMemory msgQueues
     return $ [
             -- #define CONFIGURE_MAXIMUM_TASKS
-            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_TASKS" (Just [show (length tasks + 1)]) (cppAnn True),
+            pre_cr $ _define "CONFIGURE_MAXIMUM_TASKS" (Just [show (length tasks + 1)]),
             -- #define CONFIGURE_MAXIMUM_MESSAGE_QUEUES
-            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_MESSAGE_QUEUES" (Just [show (length msgQueues)]) (cppAnn False),
+            _define "CONFIGURE_MAXIMUM_MESSAGE_QUEUES" (Just [show (length msgQueues)]),
             -- #define CONFIGURE_MAXIMUM_TIMERS
-            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_TIMERS" (Just [show (length timers)]) (cppAnn False),
+            _define "CONFIGURE_MAXIMUM_TIMERS" (Just [show (length timers)]),
             -- #define CONFIGURE_MAXIMUM_SEMAPHORES
-            CPPDirective $ CPPDefine "CONFIGURE_MAXIMUM_SEMAPHORES" (Just [show (length mutexes)]) (cppAnn False)
+            _define "CONFIGURE_MAXIMUM_SEMAPHORES" (Just [show (length mutexes)])
         ] ++ messageBufferMemory ++
         [
-            CPPDirective $ CPPDefine "CONFIGURE_APPLICATION_DOES_NOT_NEED_CONSOLE_DRIVER" Nothing (cppAnn True),
-            CPPDirective $ CPPDefine "CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER" Nothing (cppAnn False),
-            CPPDirective $ CPPDefine "CONFIGURE_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]) (cppAnn False),
-            CPPDirective $ CPPDefine "CONFIGURE_RTEMS_INIT_TASKS_TABLE" Nothing (cppAnn True),
-            CPPDirective $ CPPDefine "CONFIGURE_INIT" Nothing (cppAnn True),
-            CPPDirective $ CPPInclude True "rtems/confdefs.h" (cppAnn True)
+            pre_cr $ _define "CONFIGURE_APPLICATION_DOES_NOT_NEED_CONSOLE_DRIVER" Nothing,
+            _define "CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER" Nothing,
+            _define "CONFIGURE_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]),
+            pre_cr $ _define "CONFIGURE_RTEMS_INIT_TASKS_TABLE" Nothing,
+            pre_cr $ _define "CONFIGURE_INIT" Nothing,
+            pre_cr $ _include True "rtems/confdefs.h"
         ]
 
     where
 
-        genSizeOf :: TypeSpecifier -> CSourceGenerator CExpression
-        genSizeOf ts = do
-            let cAnn = internalAnn CGenericAnn
-            declSpec <- genDeclSpecifiers ts
-            return $ CSizeofType (CDecl declSpec [] (internalAnn (CDeclarationAnn False))) cAnn
-
-
         genMessagesForQueue :: RTEMSMsgQueue -> CSourceGenerator [String]
-        genMessagesForQueue (RTEMSTaskMsgQueue _ (TInteger size _)) = do
-            cSizeOf <- genSizeOf UInt32
-            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+        genMessagesForQueue (RTEMSTaskMsgQueue _ _ (TInteger size _)) = do
+            let cSizeOf = _sizeOfType uint32_t
+                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
                     "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
                     "        " <> show size <> ", ",
@@ -1172,17 +1181,19 @@ genAppConfig tasks msgQueues timers mutexes = do
                     "    ) "
                 ]
         genMessagesForQueue (RTEMSChannelMsgQueue _ ts (TInteger size _) _) = do
-            cSizeOf <- genSizeOf ts
-            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+            cTs <- genType noqual ts
+            let cSizeOf = _sizeOfType cTs
+                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
                     "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
                     "        " <> show size <> ", ",
                     "        " <> ppSizeOf <> " ",
                     "    ) "
                 ]
-        genMessagesForQueue (RTEMSSinkPortMsgQueue _ _ ts (TInteger size _)) = do
-            cSizeOf <- genSizeOf ts
-            let ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
+        genMessagesForQueue (RTEMSSinkPortMsgQueue _ _ _ ts (TInteger size _)) = do
+            cTs <- genType noqual ts
+            let cSizeOf = _sizeOfType cTs
+                ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
                     "    CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( ",
                     "        " <> show size <> ", ",
@@ -1203,22 +1214,18 @@ genAppConfig tasks msgQueues timers mutexes = do
         genMessageBufferMemory msgq = do
             messagesForQueue <- genMessagesForQueues msgq
             return [
-                    CPPDirective $ CPPDefine "CONFIGURE_MESSAGE_BUFFER_MEMORY"
+                    CPPDirective (CPPDefine "CONFIGURE_MESSAGE_BUFFER_MEMORY"
                         (Just $
                             "( " : messagesForQueue ++ [")"]
-                        ) (internalAnn (CPPDirectiveAnn True))
+                        )) (internalAnn (CPPDirectiveAnn True))
                 ]
 
 
 genMainFile :: QualifiedName ->  [(QualifiedName, SAST.AnnotatedProgram SemanticAnn)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
-    let cAnn = internalAnn CGenericAnn
-        includeRTEMS = CPPDirective $ CPPInclude True "rtems.h" (internalAnn (CPPDirectiveAnn True))
-        includeTermina = CPPDirective $ CPPInclude True "termina.h" (internalAnn (CPPDirectiveAnn True))
-        externInitGlobals = CExtDecl $ CDeclExt $ CDecl
-            [CStorageSpec CExtern, CTypeSpec CVoidType]
-            [(Just $ CDeclarator (Just $ namefy $ "termina_app" <::> "init_globals") [CFunDeclr [] [] cAnn] [] cAnn, Nothing, Nothing)]
-            (internalAnn (CDeclarationAnn True))
+    let includeRTEMS = CPPDirective (CPPInclude True "rtems.h") (internalAnn (CPPDirectiveAnn True))
+        includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
+        externInitGlobals = CExtDecl (CEDFunction void (namefy $ "termina_app" <::> "init_globals") []) (internalAnn (CDeclarationAnn True))
     cVariantsForTaskPorts <- concat <$> mapM genVariantsForTaskPorts (M.elems taskClss)
     cPoolMemoryAreas <- genPoolMemoryAreas pools
     cAtomicDeclarations <- genAtomicDeclarations atomics
@@ -1226,8 +1233,8 @@ genMainFile mName prjprogs = do
     cInterruptEmitterDeclarations <- genInterruptEmitterDeclarations interruptEmittersToTasks
     cTaskClassesCode <- mapM genTaskClassCode (M.elems taskClss)
     cEmitters <- mapM genEmitter emitters
-    enableProtection <- genEnableProtection resLockingMap
-    initGlobals <- genInitGlobals (M.elems resources) pools tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
+    enableProtection <- genEnableProtection (M.mapWithKey (\k v -> (resources M.! k, v)) resLockingMap) 
+    initGlobals <- genInitGlobals (M.elems resources) tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
     installEmitters <- genInstallEmitters emitters
     createTasks <- genCreateTasks tasks
     initTask <- genInitTask emitters
@@ -1263,7 +1270,7 @@ genMainFile mName prjprogs = do
         -- | List of modules that must be included
         incs = map fst glbs
         -- | List of include directives
-        includes = map (\nm -> CPPDirective $ CPPInclude False (nm <.> "h") (internalAnn (CPPDirectiveAnn True))) incs
+        includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True))) incs
         -- List of RTEMS global declarations (tasks, handlers, resources and channels)
         rtemsGlbs = concatMap (\(_, objs) ->
             map (`buildRTEMSGlobal` classMap)
@@ -1278,7 +1285,9 @@ genMainFile mName prjprogs = do
 
         tasks = [t | t@(RTEMSTask {}) <- rtemsGlbs]
         pools = [p | p@(RTEMSPool {}) <- rtemsGlbs]
-        resources = M.fromList [(ident, r) | r@(RTEMSResource ident _ _) <- rtemsGlbs]
+        resources = M.fromList [(ident, r) | r <- rtemsGlbs, 
+                case r of (RTEMSResource {}) -> True; (RTEMSPool {}) -> True; _ -> False,
+                ident <- [case r of (RTEMSResource resourceId _ _) -> resourceId; (RTEMSPool poolId _ _) -> poolId; _ -> error "Invalid resource"]]    
         atomics = [a | a@(RTEMSAtomic {}) <- rtemsGlbs]
         atomicArrays = [a | a@(RTEMSAtomicArray {}) <- rtemsGlbs]
 
@@ -1296,10 +1305,10 @@ genMainFile mName prjprogs = do
 
         tasksMessageQueues = foldr (\glb acc ->
                 case glb of
-                    RTEMSTask identifier _ _ _ _ ports -> RTEMSTaskMsgQueue identifier (TInteger 1 DecRepr) :
+                    RTEMSTask identifier classId _ _ _ ports -> RTEMSTaskMsgQueue identifier classId (TInteger 1 DecRepr) :
                         foldr (\port acc' ->
                             case port of
-                                RTEMSEventPort portId _ ts _ -> RTEMSSinkPortMsgQueue identifier portId ts (TInteger 1 DecRepr) : acc'
+                                RTEMSEventPort portId _ ts _ -> RTEMSSinkPortMsgQueue identifier classId portId ts (TInteger 1 DecRepr) : acc'
                                 _ -> acc'
                         ) acc ports
                     _ -> acc
@@ -1307,7 +1316,7 @@ genMainFile mName prjprogs = do
 
         channelMessageQueues = concatMap (\(_, objs) ->
             map (\case {
-                    (Channel identifier (MsgQueue ts (K size)) _ _ _) ->
+                    (Channel identifier (MsgQueue ts (SAST.K size)) _ _ _) ->
                         case M.lookup identifier targetChannelConnections of
                             Just task@(RTEMSTask {}) ->
                                 RTEMSChannelMsgQueue identifier ts size task
@@ -1368,7 +1377,7 @@ genMainFile mName prjprogs = do
                     ]
 
         timers = [t | t <- emitters, case t of { RTEMSPeriodicTimerEmitter {} -> True; _ -> False }]
-        interruptEmittersToTasks = [e | e <- emitters, case e of { RTEMSInterruptEmitter _ (RTEMSTask{}) -> True; _ -> False }]
+        interruptEmittersToTasks = [e | e <- emitters, case e of { RTEMSInterruptEmitter _ _ (RTEMSTask{}) -> True; _ -> False }]
         timersToTasks = [e | e <- emitters, case e of { RTEMSPeriodicTimerEmitter _ (RTEMSTask{}) -> True; _ -> False }]
 
         -- | Map between the resources and the locking mechanism that must be used
@@ -1394,4 +1403,3 @@ genMainFile mName prjprogs = do
 
 runGenMainFile :: QualifiedName -> [(QualifiedName, SAST.AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile
 runGenMainFile mainFilePath prjprogs = runReaderT (genMainFile mainFilePath prjprogs) M.empty
---}

@@ -76,10 +76,6 @@ pprintCTInt size signedness = do
             Unsigned -> pretty "u"
     return $ ssignedness <> pretty "int" <> ssize <> pretty "_t"
 
-instance PPrint CArraySize where
-    pprint (CArraySizeK c) = return $ pretty c
-    pprint (CArraySizeV v) = return $ pretty v
-
 instance PPrint CConstant where
     pprint (CIntConst i) = return $ pretty i
     pprint (CCharConst c) = return $ pretty c
@@ -455,117 +451,87 @@ instance PPrint CCompoundBlockItem where
             _ -> error $ "Invalid annotation: " ++ show ann
 
 instance PPrint CPreprocessorDirective where
-    pprint (CPPDefine ident Nothing ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just []) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just [token]) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident <+> pretty token
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just (t : ts)) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ vcat
-                    [
-                        pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
-                        indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
-                    ]
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfDef ident ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#ifdef" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPInclude isSystem path ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#include" <+>
-                    pretty (if isSystem then "<" else "\"") <>
-                        pretty path <> pretty
-                            (if isSystem then ">" else "\"")
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfNDef ident ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#ifndef" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPEndif ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#endif"
-            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDefine ident Nothing) =
+        return $ pretty "#define" <+> pretty ident
+    pprint (CPPDefine ident (Just [])) =
+        return $ pretty "#define" <+> pretty ident
+    pprint (CPPDefine ident (Just [token])) =
+        return $ pretty "#define" <+> pretty ident <+> pretty token
+    pprint (CPPDefine ident (Just (t : ts))) =
+        return $ vcat
+            [
+                pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
+                indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
+            ]
+    pprint (CPPIfDef ident) =
+        return $ pretty "#ifdef" <+> pretty ident
+    pprint (CPPInclude isSystem path) =
+        return $ pretty "#include" <+>
+            pretty (if isSystem then "<" else "\"") <>
+                pretty path <> pretty
+                (if isSystem then ">" else "\"")
+    pprint (CPPIfNDef ident) =
+        return $ pretty "#ifndef" <+> pretty ident
+    pprint CPPEndif =
+        return $ pretty "#endif"
 
 instance PPrint CFunction where
-    pprint (CFunction ty ident params body ann) = do
-        case itemAnnotation ann of 
-            CDeclarationAnn before -> do
-                pty <- pprint ty
-                pparams <- mapM pprint params
-                pbody <- pprint body
-                return $ prependLine before $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
-            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CFunction ty ident params body) = do
+        pty <- pprint ty
+        pparams <- mapM pprint params
+        pbody <- pprint body
+        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
 
 instance PPrint CExternalDeclaration where
-    pprint (CEDVariable stspec decl ann) = do
+    pprint (CEDVariable stspec decl) = do
+        pdecl <- pprint decl
+        return $ pretty stspec <+> pdecl <> semi
+    pprint (CEDFunction ty ident params) = do
+        pty <- pprint ty
+        pparams <- mapM pprint params
+        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <> semi
+    pprint (CEDEnum Nothing enum) = do
+        penum <- pprint enum
+        return $ penum <> semi
+    pprint (CEDEnum (Just typeDefName) enum) = do
+        penum <- pprint enum
+        return $ pretty "typedef" <+> penum <+> pretty typeDefName <> semi
+    pprint (CEDStructUnion Nothing stu) = do
+        pstruct <- pprint stu
+        return $ pstruct <> semi
+    pprint (CEDStructUnion (Just typeDefName) stu) = do
+        pstruct <- pprint stu
+        return $ pretty "typedef" <+> pstruct <+> pretty typeDefName <> semi
+    pprint (CEDTypeDef ident ty) = do
+        pty <- pprint ty
+        return $ pretty "typedef" <+> pty <+> pretty ident <> semi
+
+instance PPrint CFileItem where
+    pprint (CExtDecl decl ann) = 
         case itemAnnotation ann of 
             CDeclarationAnn before -> do
                 pdecl <- pprint decl
-                return $ prependLine before $ pretty stspec <+> pdecl <> semi
+                return $ prependLine before pdecl
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDFunction ty ident params ann) = do
-        case itemAnnotation ann of
+    pprint (CPPDirective directive ann) = 
+        case itemAnnotation ann of 
+            CPPDirectiveAnn before -> do
+                pdir <- pprint directive
+                return $ prependLine before pdir
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CFunctionDef Nothing func ann) = 
+        case itemAnnotation ann of 
             CDeclarationAnn before -> do
-                pty <- pprint ty
-                pparams <- mapM pprint params
-                return $ prependLine before $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <> semi
+                pfunc <- pprint func
+                return $ prependLine before pfunc
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDEnum Nothing enum ann) = do
-        case itemAnnotation ann of
+    pprint (CFunctionDef (Just CStatic) func ann) = do
+        case itemAnnotation ann of 
             CDeclarationAnn before -> do
-                penum <- pprint enum
-                return $ prependLine before $ penum <> semi
+                pfunc <- pprint func
+                return $ prependLine before $ pretty "static" <+> pfunc
             _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDEnum (Just typeDefName) enum ann) =
-        case itemAnnotation ann of
-            CDeclarationAnn before -> do
-                penum <- pprint enum
-                return $ prependLine before $ pretty "typedef" <+> penum <+> pretty typeDefName <> semi
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDStructUnion Nothing stu ann) = do
-        case itemAnnotation ann of
-            CDeclarationAnn before -> do
-                pstruct <- pprint stu
-                return $ prependLine before $ pstruct <> semi
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDStructUnion (Just typeDefName) stu ann) = do
-        case itemAnnotation ann of
-            CDeclarationAnn before -> do
-                pstruct <- pprint stu
-                return $ prependLine before $ pretty "typedef" <+> pstruct <+> pretty typeDefName <> semi
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CEDTypeDef ident ty ann) = do
-        case itemAnnotation ann of
-            CDeclarationAnn before -> do
-                pty <- pprint ty
-                return $ prependLine before $ pretty "typedef" <+> pty <+> pretty ident <> semi
-            _ -> error $ "Invalid annotation: " ++ show ann
-
-instance PPrint CFileItem where
-    pprint (CExtDecl decl) = pprint decl
-    pprint (CPPDirective directive) = pprint directive
-    pprint (CFunctionDef Nothing func) = pprint func
-    pprint (CFunctionDef (Just CStatic) func) = do
-        pfunc <- pprint func
-        return $ pretty "static" <+> pfunc
-    pprint (CFunctionDef {}) = error $ "Invalid function definition"
+    pprint (CFunctionDef {}) = error "Invalid function definition"
 
 instance PPrint CFile where
     pprint (CHeaderFile _path items) = do

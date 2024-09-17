@@ -92,3 +92,22 @@ __termina_pool__init = "__termina_pool__init" @:
             CTSizeT noqual
         ]
 
+__termina__clock_get_uptime :: CExpression
+__termina__clock_get_uptime = "__termina__clock_get_uptime" @:
+    CTFunction void [
+        -- | TimeVal * const current
+        _const . ptr $ _TimeVal
+    ]
+
+__termina_app__init_globals :: CExpression
+__termina_app__init_globals = "__termina_app__init_globals" @:
+    CTFunction void []
+
+__termina_pool__size :: CExpression
+__termina_pool__size = "__termina_pool__size" @:
+    CTFunction size_t [
+        -- | size of type
+        size_t,
+        -- | number of elements
+        size_t
+    ]

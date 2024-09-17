@@ -20,6 +20,10 @@ rtems_task_argument = typeDef "rtems_task_argument"
 rtems_task_priority :: CType
 rtems_task_priority = typeDef "rtems_task_priority"
 
+-- | rtems_task_entry type
+rtems_task_entry :: CType
+rtems_task_entry = typeDef "rtems_task_entry"
+
 -- | rtems_id
 rtems_id :: CType
 rtems_id = typeDef "rtems_id"
@@ -134,3 +138,61 @@ __rtems__install_isr = "__rtems__install_isr" @:
             -- | rtems_interrupt_handler handler
             rtems_interrupt_handler
         ]
+
+-- | rtems_status_code __rtems__create_task(rtems_task_priority initial_priority,
+--                                          size_t stack_size, 
+--                                          rtems_task_entry entry_point,
+--                                          rtems_task_argument argument, 
+--                                          rtems_id * id);
+
+__rtems__create_task :: CExpression
+__rtems__create_task = "__rtems__create_task" @:
+    CTFunction rtems_status_code 
+        [
+            -- | rtems_task_priority initial_priority
+            rtems_task_priority,
+            -- | size_t stack_size
+            size_t,
+            -- | rtems_task_entry entry_point
+            rtems_task_entry,
+            -- | rtems_task_argument argument
+            rtems_task_argument,
+            -- | rtems_id * id
+            ptr rtems_id
+        ]
+
+__rtems_app__init_globals :: CExpression
+__rtems_app__init_globals = "__rtems_app__init_globals" @:
+    CTFunction void []
+
+__rtems_app__initial_event :: CExpression
+__rtems_app__initial_event = "__rtems_app__initial_event" @:
+    CTFunction void [
+        -- | _TimeVal * const current
+        _const . ptr $ _TimeVal
+    ]
+
+__rtems_app__enable_protection :: CExpression
+__rtems_app__enable_protection = "__rtems_app__enable_protection" @:
+    CTFunction void []
+
+__rtems_app__install_emitters :: CExpression
+__rtems_app__install_emitters = "__rtems_app__install_emitters" @:
+    CTFunction void [
+        -- | _TimeVal * const current
+        _const . ptr $ _TimeVal
+    ]
+
+__rtems_app__create_tasks :: CExpression
+__rtems_app__create_tasks = "__rtems_app__create_tasks" @:
+    CTFunction void []
+
+rtems_task_delete :: CExpression
+rtems_task_delete = "rtems_task_delete" @:
+    CTFunction rtems_status_code [
+        -- | rtems_id id
+        rtems_id
+    ]
+
+rtems_task :: CType
+rtems_task = typeDef "rtems_task"

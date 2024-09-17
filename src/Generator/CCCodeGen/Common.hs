@@ -70,18 +70,19 @@ thatField = "__that"
 thisParam = "__this"
 selfParam = "self"
 
-resourceClassIDField, taskClassIDField :: Identifier
+resourceClassIDField, taskClassIDField, timerField :: Identifier
 resourceClassIDField = "__resource"
 taskClassIDField = "__task"
+timerField = "__timer"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
 
 genEnumVariantName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumVariantName enumId variant = return $ enumId <::> variant
+genEnumVariantName enumId this_variant = return $ enumId <::> this_variant
 
 genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumParameterStructName enumId variant = return $ namefy $ "enum_" <> enumId <::> variant <> "_params_t"
+genEnumParameterStructName enumId this_variant = return $ namefy $ "enum_" <> enumId <::> this_variant <> "_params_t"
 
 genClassFunctionName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genClassFunctionName className functionName = return $ className <::> functionName
@@ -229,9 +230,9 @@ getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
 getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
 getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
-getArraySize :: Size -> CArraySize
-getArraySize (K tint) = CArraySizeK (getCInteger tint)
-getArraySize (V ident) = CArraySizeV ident
+getArraySize :: Size -> CExpression
+getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT noqual) (Located CGenericAnn Internal)
+getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (Located CGenericAnn Internal)
 
 -- | Translate type annotation to C type
 genType :: (MonadError CGeneratorError m) => CQualifier -> TypeSpecifier -> m CType
@@ -379,9 +380,8 @@ genArraySizeExpr :: (MonadError CGeneratorError m) => Size -> SemanticAnn -> m C
 genArraySizeExpr (K s) ann = return $ CExprConstant (CIntConst (genInteger s)) (CTSizeT noqual) (buildGenericAnn ann)
 genArraySizeExpr (V v) ann = return $ CExprValOf (CVar v (CTSizeT noqual)) (CTSizeT noqual) (buildGenericAnn ann)
 
-genArraySize :: (MonadError CGeneratorError m) => Size -> m CArraySize
-genArraySize (K s) = return $ CArraySizeK (genInteger s)
-genArraySize (V v) = return $ CArraySizeV v
+genArraySize :: (MonadError CGeneratorError m) => Size -> m CExpression
+genArraySize s = return $ getArraySize s
 
 internalAnn :: CItemAnn -> CAnns
 internalAnn = flip Located Internal

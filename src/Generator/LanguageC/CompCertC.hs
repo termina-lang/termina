@@ -11,17 +11,17 @@ data CFile' a
     = CSourceFile FilePath [CFileItem' a]
     | CHeaderFile FilePath [CFileItem' a]
 
-data CPreprocessorDirective' a
-    = CPPInclude Bool FilePath a
-    | CPPDefine Ident (Maybe [String]) a
-    | CPPIfDef Ident a
-    | CPPIfNDef Ident a
-    | CPPEndif a
+data CPreprocessorDirective
+    = CPPInclude Bool FilePath
+    | CPPDefine Ident (Maybe [String])
+    | CPPIfDef Ident
+    | CPPIfNDef Ident
+    | CPPEndif
 
 data CFileItem' a
-    = CExtDecl (CExternalDeclaration' a)
-    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a)
-    | CPPDirective (CPreprocessorDirective' a)
+    = CExtDecl (CExternalDeclaration' a) a
+    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a) a
+    | CPPDirective CPreprocessorDirective a
 
 data CAttribute' a = CAttr Ident [CExpression' a]
     deriving Show
@@ -63,14 +63,14 @@ data CDeclaration' a =
     deriving Show
 
 data CExternalDeclaration' a
-    = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a) a
-    | CEDFunction CType Ident [CDeclaration' a] a
-    | CEDEnum (Maybe Ident) (CEnum' a) a
-    | CEDStructUnion (Maybe Ident) (CStructureUnion' a) a
-    | CEDTypeDef Ident CType a
+    = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
+    | CEDFunction CType Ident [CDeclaration' a]
+    | CEDEnum (Maybe Ident) (CEnum' a)
+    | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
+    | CEDTypeDef Ident CType
 
 data CFunction' a =
-    CFunction CType Ident [CDeclaration' a] (CStatement' a) a
+    CFunction CType Ident [CDeclaration' a] (CStatement' a)
 
 data CQualifier = CQualifier {
     qual_volatile :: Bool,
@@ -112,7 +112,7 @@ data CType =
     -- | Pointer types
     | CTPointer CType CQualifier
     -- | Array types
-    | CTArray CType CArraySize
+    | CTArray CType CExpression
     -- | Struct types
     | CTStruct CStructTag Ident CQualifier
     -- | Function type
@@ -195,11 +195,6 @@ data CConstant =
   CIntConst   CInteger
   | CCharConst  CChar
   | CStrConst   CString
-    deriving Show
-
-data CArraySize =
-    CArraySizeK CInteger
-    | CArraySizeV Ident
     deriving Show
 
 data CObject' a = 
@@ -323,7 +318,6 @@ itemAnnotation :: CAnns -> CItemAnn
 itemAnnotation = element
 
 type CFile = CFile' CAnns
-type CPreprocessorDirective = CPreprocessorDirective' CAnns
 type CFileItem = CFileItem' CAnns
 type CExternalDeclaration = CExternalDeclaration' CAnns
 type CFunction = CFunction' CAnns

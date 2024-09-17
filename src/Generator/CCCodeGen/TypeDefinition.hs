@@ -36,16 +36,16 @@ genFieldDeclaration (FieldDefinition identifier ts) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
 
-genOptionSomeParameterStruct :: SemanticAnn -> TypeSpecifier ->  CHeaderGenerator CExternalDeclaration
+genOptionSomeParameterStruct :: SemanticAnn -> TypeSpecifier ->  CHeaderGenerator CFileItem
 genOptionSomeParameterStruct ann ts = do
     cTs <- genType noqual ts
     let cAnn = buildDeclarationAnn ann True
         field = CDecl (CTypeSpec cTs) (Just optionSomeField) Nothing
     identifier <- genOptionParameterStructName ts
     return $
-            CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [field] []) cAnn
+            CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [field] [])) cAnn
 
-genOptionStruct :: SemanticAnn -> TypeSpecifier -> CHeaderGenerator [CExternalDeclaration]
+genOptionStruct :: SemanticAnn -> TypeSpecifier -> CHeaderGenerator [CFileItem]
 genOptionStruct ann (Option ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
@@ -58,7 +58,7 @@ genOptionStruct ann (Option ts) = do
     paramStruct <- genOptionSomeParameterStruct ann ts
     return [
             paramStruct,
-            CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [some, this_variant] []) cAnn
+            CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [some, this_variant] [])) cAnn
         ]
 genOptionStruct ts _ = throwError $ InternalError $ "Type not an option: " ++ show ts
 
@@ -82,12 +82,12 @@ genAttribute (Modifier name (Just expr)) = do
                 (B False) -> return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTBool noqual) cAnn
                 (C char) -> return $ CExprConstant (CCharConst (CChar char)) (CTChar noqual) cAnn
 
-genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant -> CHeaderGenerator CExternalDeclaration
-genEnumVariantParameterStruct ann identifier (EnumVariant variant params) = do
+genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant -> CHeaderGenerator CFileItem
+genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
-    paramsStructName <- genEnumParameterStructName identifier variant
-    return $ CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams []) cAnn
+    paramsStructName <- genEnumParameterStructName identifier this_variant
+    return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams [])) cAnn
     where
         genEnumVariantParameter :: TypeSpecifier -> Integer -> CHeaderGenerator CDeclaration
         genEnumVariantParameter ts index = do
@@ -129,48 +129,48 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
     opts <- ask
     optsDeclExt <- concat <$> maybe (return [])
         (mapM (genOptionStruct ann) . S.toList) (M.lookup (DefinedType identifier) opts)
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers) cAnn) : (CExtDecl <$> optsDeclExt)
+    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : optsDeclExt
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
     enumName <- genEnumStructName identifier
-    pEnumVariants <- mapM (\(EnumVariant variant _) -> genEnumVariantName identifier variant) variants
+    pEnumVariants <- mapM (\(EnumVariant this_variant _) -> genEnumVariantName identifier this_variant) variants
     pEnumParameterStructs <- mapM (genEnumVariantParameterStruct ann identifier) variantsWithParams
     enumStruct <- genEnumStruct enumName variantsWithParams
-    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing [(v, Nothing) | v <- pEnumVariants] []) cAnn)
-                : (CExtDecl <$> pEnumParameterStructs) ++ [CExtDecl enumStruct]
+    return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing [(v, Nothing) | v <- pEnumVariants] [])) cAnn
+                : pEnumParameterStructs ++ [enumStruct]
 
         where
 
             genParameterUnionField :: EnumVariant -> CHeaderGenerator CDeclaration
-            genParameterUnionField (EnumVariant variant _) = do
-                paramsStructName <- genEnumParameterStructName identifier variant
+            genParameterUnionField (EnumVariant this_variant _) = do
+                paramsStructName <- genEnumParameterStructName identifier this_variant
                 paramsStructType <- genType noqual (DefinedType paramsStructName)
-                return $ CDecl (CTypeSpec paramsStructType) (Just variant) Nothing
+                return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing
 
             genParameterUnion :: [EnumVariant] -> CHeaderGenerator CDeclaration
             genParameterUnion variantsWithParams = do
                 pFields <- mapM genParameterUnionField variantsWithParams
                 return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing pFields [])) Nothing Nothing
 
-            genEnumStruct :: Identifier -> [EnumVariant] -> CHeaderGenerator CExternalDeclaration
+            genEnumStruct :: Identifier -> [EnumVariant] -> CHeaderGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do
                 enumType <- genType noqual (DefinedType enumName)
                 let cAnn = buildDeclarationAnn ann True
                     enumField = CDecl (CTypeSpec enumType) (Just variant) Nothing
                 case variantsWithParams of
-                    [] -> return $ CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField] []) cAnn
+                    [] -> return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField] [])) cAnn
                     [var] -> do
                         unionField <- genParameterUnionField var
-                        return $ CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField, unionField] []) cAnn
+                        return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField, unionField] [])) cAnn
                     _ -> do
                         unionField <- genParameterUnion variantsWithParams
-                        return $ CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField, unionField] []) cAnn
+                        return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField, unionField] [])) cAnn
 genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         cThatField = CDecl (CTypeSpec (CTPointer (CTVoid noqual) noqual)) (Just thatField) Nothing
     procedureFields <- mapM genInterfaceProcedureField members
-    return [CExtDecl $ CEDStructUnion (Just identifier) (CStruct CStructTag Nothing (cThatField : procedureFields) []) cAnn]
+    return [CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing (cThatField : procedureFields) [])) cAnn]
 
     where
 
@@ -201,8 +201,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 let cIDField = CDecl (CTypeSpec $ CTTypeDef resourceID noqual) (Just resourceClassIDField) Nothing in
                 cIDField : cFields
             _ -> cFields
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing structFields structModifiers) cAnn)
-                : (CExtDecl <$> cFunctions)
+    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing structFields structModifiers)) cAnn
+                : cFunctions
 
     where
 
@@ -210,29 +210,29 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassField (ClassField fld _) = genFieldDeclaration fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
-        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CHeaderGenerator CExternalDeclaration
+        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CHeaderGenerator CFileItem
         genClassFunctionDeclaration (ClassViewer viewer params rts _ _) = do
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
             cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
-            return $ CEDFunction retType clsFuncName (cSelfParam : cParamDecls) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction retType clsFuncName (cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassProcedure procedure params _ _) = do
             cParamDecls <- mapM genParameterDeclaration params
             cThisParam <- genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
-            return $ CEDFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassMethod method rts _ _) = do
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
             cSelfParam <- genSelfParam clsdef
-            return $ CEDFunction retType clsFuncName [cSelfParam] (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction retType clsFuncName [cSelfParam]) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction action param rts _ _) = do
             retType <- genType noqual rts
             cParamDecl <- genParameterDeclaration param
             cSelfParam <- genSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier action
-            return $ CEDFunction retType clsFuncName [cSelfParam, cParamDecl] (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction retType clsFuncName [cSelfParam, cParamDecl]) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
@@ -254,8 +254,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
-                (buildDeclarationAnn ann True))
+                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
@@ -266,8 +266,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls)
-                (CSCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True))
-                (buildDeclarationAnn ann True))
+                (CSCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True)))
+                (buildDeclarationAnn ann True)
 
             where
 
@@ -302,8 +302,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam]
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
-                (buildDeclarationAnn ann True))
+                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             cRetType <- genType noqual rts
@@ -314,8 +314,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 cStmt <- genBlockItem x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam, cParam]
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
-                (buildDeclarationAnn ann True))
+                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (buildDeclarationAnn ann True)
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
 genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e
