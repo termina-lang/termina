@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 module Generator.LanguageC.Printer where
 
@@ -8,7 +7,6 @@ import Prettyprinter
 import Data.Text (Text)
 import Prettyprinter.Render.Terminal
 import Control.Monad.Reader
-
 
 type DocStyle = Doc AnsiStyle
 
@@ -24,6 +22,25 @@ newtype CPrinterError = CPrinterError String
 
 type CPrinter = Reader CPrinterConfig DocStyle
 
+-- precedence of C operators
+binPrec :: CBinaryOp -> Integer
+binPrec COpMul = 20
+binPrec COpDiv = 20
+binPrec COpMod = 20
+binPrec COpAdd = 19
+binPrec COpSub = 19
+binPrec COpShl = 18
+binPrec COpShr = 18
+binPrec COpLt  = 17
+binPrec COpGt  = 17
+binPrec COpLe = 17
+binPrec COpGe = 17
+binPrec COpEq  = 16
+binPrec COpNe = 16
+binPrec COpAnd = 15
+binPrec COpXor = 14
+binPrec COpOr  = 13
+
 class PPrint a where
     pprint :: a -> CPrinter
     pprintPrec :: Integer -> a -> CPrinter
@@ -31,87 +48,207 @@ class PPrint a where
     pprint = pprintPrec 0
     pprintPrec _ = pprint
 
-instance PPrint CDeclarator where
-  pprintPrec prec (CDeclarator name derivedDeclrs _ _) = do
-    printCDerivedDeclarator prec (reverse derivedDeclrs)
-        where
-            printCDerivedDeclarator :: Integer -> [CDerivedDeclarator] -> CPrinter
-            printCDerivedDeclarator p (CPtrDeclr quals _ : declrs) = do
-                case (declrs, quals) of
-                    ([], []) -> do
-                        case name of
-                            Just n -> return $ parenPrec p 5 $ pretty "*" <+> pretty n
-                            Nothing -> return $ parenPrec p 5 $ pretty "*"
-                    ([], _) -> do
-                        pquals <- mapM pprint quals
-                        case name of
-                            Just n -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals <+> pretty n
-                            Nothing -> return $ parenPrec p 5 $ pretty "*" <+> hsep pquals
-                    (_, []) -> do
-                        pdeclrs <- printCDerivedDeclarator 5 declrs
-                        return $ parenPrec p 5 $ pretty "*" <+> pdeclrs
-                    _ -> do
-                        pdeclrs <- printCDerivedDeclarator 5 declrs
-                        pquals <- mapM pprint quals
-                        return $ parenPrec p 5 $ pretty "*" <+> hsep pquals <+> pdeclrs
-            printCDerivedDeclarator p (CArrDeclr quals size _ : declrs) = do
-                psize <- pprint size
-                case (declrs, quals) of
-                    ([], []) -> do
-                        case name of
-                            Just n -> return $ parenPrec p 6 $ pretty n <> brackets psize
-                            Nothing -> return $ parenPrec p 6 $ brackets psize
-                    ([], _) -> do
-                        pquals <- mapM pprint quals
-                        case name of
-                            Just n -> return $ parenPrec p 6 $ pretty n <> brackets (hsep pquals <+> psize)
-                            Nothing -> return $ parenPrec p 6 $ brackets (hsep pquals <+> psize)
-                    (_, []) -> do
-                        pdeclrs <- printCDerivedDeclarator 6 declrs
-                        return $ parenPrec p 6 $ pdeclrs <> brackets psize
-                    _ -> do
-                        pdeclrs <- printCDerivedDeclarator 6 declrs
-                        pquals <- mapM pprint quals
-                        return $ parenPrec p 6 $ pdeclrs <> brackets (hsep pquals <+> psize)
-            printCDerivedDeclarator p (CFunDeclr params funAttrs _ : declrs) = do
-                pdeclrs <- printCDerivedDeclarator 6 declrs
-                pFunAttrs <- pprintCAttributeList funAttrs
-                pparams <- printParams params
-                return $ parenPrec p 6 $ (if not (null funAttrs) then parens (pFunAttrs <+> pdeclrs) else pdeclrs)
-                                    <> parens pparams
-            printCDerivedDeclarator _ [] = return $ maybe emptyDoc pretty name
+instance PPrint CQualifier where
+    pprint (CQualifier True False False) = 
+        return $ pretty "volatile"
+    pprint (CQualifier False True False) =
+        return $ pretty "const"
+    pprint (CQualifier False False True) =
+        return $ pretty "_Atomic"
+    pprint (CQualifier True True False) =
+        return $ pretty "const" <+> pretty "volatile"
+    pprint qual =
+        error $ "Invalid qualifier: " ++ show qual
 
-            printParams :: [CDeclaration] -> CPrinter
-            printParams decls = do
-                pdecls <- mapM pprint decls
-                return $ align (fillSep (punctuate comma pdecls))
+parenPrec :: Integer -> Integer -> DocStyle -> DocStyle
+parenPrec prec prec2 t = if prec <= prec2 then t else parens t
 
-instance PPrint CDeclarationSpecifier where
-    pprint (CStorageSpec sp) = return $ pretty sp
-    pprint (CTypeSpec sp) = pprint sp
-    pprint (CTypeQual qu) = pprint qu
+pprintCTInt :: CIntSize -> CSignedness -> CPrinter
+pprintCTInt size signedness = do
+    let ssize = case size of
+            IntSize8 -> pretty "8"
+            IntSize16 -> pretty "16"
+            IntSize32 -> pretty "32"
+            IntSize64 -> pretty "64"
+            IntSize128 -> pretty "128"
+        ssignedness = case signedness of
+            Signed -> emptyDoc
+            Unsigned -> pretty "u"
+    return $ ssignedness <> pretty "int" <> ssize <> pretty "_t"
 
-instance PPrint CTypeSpecifier where
-    pprint CVoidType = return $ pretty "void"
-    pprint CCharType = return $ pretty "char"
-    pprint CUInt8Type = return $ pretty "uint8_t"
-    pprint CUInt16Type = return $ pretty "uint16_t"
-    pprint CUInt32Type = return $ pretty "uint32_t"
-    pprint CUInt64Type = return $ pretty "uint64_t"
-    pprint CInt8Type = return $ pretty "int8_t"
-    pprint CInt16Type = return $ pretty "int16_t"
-    pprint CInt32Type = return $ pretty "int32_t"
-    pprint CInt64Type = return $ pretty "int64_t"
-    pprint CSizeTType = return $ pretty "size_t"
-    pprint CBoolType = return $ pretty "_Bool"
-    pprint CInt128Type = return $ pretty "int128_t"
-    pprint CUInt128Type = return $ pretty "uint128_t"
-    pprint (CSUType stu) = pprint stu
-    pprint (CEnumType enum) = pprint enum
-    pprint (CTypeDef ident) = return $ pretty ident
-    pprint (CAtomicType decl) = do
+instance PPrint CConstant where
+    pprint (CIntConst i) = return $ pretty i
+    pprint (CCharConst c) = return $ pretty c
+    pprint (CStrConst s) = return $ pretty s
+
+rootCType :: CType -> CType
+rootCType ty =
+    case ty of
+        CTArray ty' _ -> rootCType ty'
+        _ -> ty
+
+pprintCTArray :: CType -> CPrinter
+pprintCTArray arrayTy  =
+    case arrayTy of
+        CTArray ty size -> do
+            pty <- pprintCTArray ty
+            psize <- pprint size
+            return $ brackets psize <> pty
+        _ -> return emptyDoc
+
+instance PPrint CType where
+    pprint (CTVoid (CQualifier False False False)) = return $ pretty "void"
+    pprint (CTVoid qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "void"
+    pprint (CTChar (CQualifier False False False)) = return $ pretty "char"
+    pprint (CTChar qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "char"
+    pprint (CTInt size signedness (CQualifier False False False)) = pprintCTInt size signedness
+    pprint (CTInt size signedness qual) = do
+        pqual <- pprint qual
+        ptype <- pprintCTInt size signedness
+        return $ pqual <+> ptype
+    pprint (CTPointer ty (CQualifier False False False)) = do
+        ptype <- pprint ty
+        return $ ptype <+> pretty "*"
+    pprint (CTPointer ty qual) = do
+        ptype <- pprint ty
+        pqual <- pprint qual
+        return $ ptype <+> pretty "*" <+> pqual
+    pprint (CTArray ty _size) = 
+        case ty of
+            CTArray {} -> do
+                pRootTy <- pprint (rootCType ty)
+                pArraySizes <- pprintCTArray ty
+                return $ pRootTy <+> parens (pretty "*") <> pArraySizes
+            _ -> do
+                pty <- pprint ty
+                return $ pty <+> pretty "*"
+    pprint (CTStruct tag ident (CQualifier False False False)) = do
+        return $ pretty tag <+> pretty ident
+    pprint (CTStruct tag ident qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty tag <+> pretty ident
+    pprint (CTEnum ident (CQualifier False False False)) = return $ pretty "enum" <+> pretty ident
+    pprint (CTEnum ident qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "enum" <+> pretty ident
+    pprint (CTSizeT (CQualifier False False False)) = return $ pretty "size_t"
+    pprint (CTSizeT qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "size_t"
+    pprint (CTBool (CQualifier False False False)) = return $ pretty "_Bool"
+    pprint (CTBool qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "_Bool"
+    pprint (CTTypeDef ident (CQualifier False False False)) = return $ pretty ident
+    pprint (CTTypeDef ident qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty ident
+    pprint ty@(CTFunction {}) = error $ "Printing function types is not supported: " ++ show ty
+
+instance PPrint CObject where
+    pprintPrec _ (CVar ident _) = return $ pretty ident
+    pprintPrec p (CField expr ident _) = do
+        pexpr <- pprintPrec 26 expr
+        case getCObjType expr of
+            CTPointer _ _ -> return $ parenPrec p 26 $ pexpr <> pretty "->" <> pretty ident
+            _ -> return $ parenPrec p 26 $ pexpr <> pretty "." <> pretty ident
+    pprintPrec p (CDeref expr _) = do
+        pexpr <- pprintPrec 25 expr
+        return $ parenPrec p 25 $ pretty "*" <> pexpr
+    pprintPrec p (CIndexOf obj index _) = do
+        pobj <- pprintPrec 26 obj
+        pindex <- pprint index
+        return $ parenPrec p 26 $ pobj <> brackets pindex
+    pprintPrec p (CObjCast obj ty _) = do
+        pexpr <- pprintPrec 25 obj
+        ptype <- pprint ty
+        return $ parenPrec p 25 $ parens ptype <> pexpr
+
+instance PPrint CExpression where
+    pprintPrec _ (CExprConstant c _ _) = pprint c
+    pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj
+    pprintPrec p (CExprAddrOf obj _ _) = do
+        pobj <- pprintPrec 25 obj
+        return $ parenPrec p 25 $ pretty "&" <> pobj
+    pprintPrec p (CExprUnaryOp op expr _ _) = do
+        pexpr <- pprintPrec 25 expr
+        return $ parenPrec p 25 $ pretty op <> pexpr
+    pprintPrec p (CExprBinaryOp op expr1 expr2 _ _) = do
+        let prec = binPrec op
+        pexpr1 <- pprintPrec prec expr1
+        pexpr2 <- pprintPrec (prec + 1) expr2
+        return $ parenPrec p prec $ pexpr1 <+> pretty op <+> pexpr2
+    pprintPrec p (CExprCast expr ty _) = do
+        pexpr <- pprintPrec 25 expr
+        ptype <- pprint ty
+        return $ parenPrec p 25 $ parens ptype <> pexpr
+    pprintPrec p (CExprSeqAnd expr1 expr2 _ _) = do
+        pexpr1 <- pprintPrec 12 expr1
+        pexpr2 <- pprintPrec 13 expr2
+        return $ parenPrec p 12 $ pexpr1 <+> pretty "&&" <+> pexpr2
+    pprintPrec p (CExprSeqOr expr1 expr2 _ _) = do
+        pexpr1 <- pprintPrec 11 expr1
+        pexpr2 <- pprintPrec 12 expr2
+        return $ parenPrec p 11 $ pexpr1 <+> pretty "||" <+> pexpr2
+    pprintPrec p (CExprSizeOfType decl _ _) = do
         pdecl <- pprint decl
-        return $ pretty "_Atomic" <> parens pdecl
+        return $ parenPrec p 25 $ pretty "sizeof" <> parens pdecl
+    pprintPrec p (CExprSizeOfExpr expr _ _) = do
+        pexpr <- pprintPrec 25 expr
+        return $ parenPrec p 25 $ pretty "sizeof" <> parens pexpr
+    pprintPrec p (CExprAlignOfType decl _ _) = do
+        pdecl <- pprint decl
+        return $ parenPrec p 25 $ pretty "_Alignof" <> parens pdecl
+    pprintPrec p (CExprAssign obj expr _ _) = do
+        pobj <- pprintPrec 2 obj
+        pexpr <- pprintPrec 3 expr
+        return $ parenPrec p 2 $ pobj <+> pretty "=" <+> pexpr
+    pprintPrec p (CExprComma expr1 expr2 _ _) = do
+        pexpr1 <- pprintPrec 2 expr1
+        pexpr2 <- pprintPrec 2 expr2
+        return $ parenPrec p (-1) $ pexpr1 <> comma <+> pexpr2
+    pprintPrec p (CExprCall expr args _ _) = do
+        pexpr <- pprintPrec 30 expr
+        pargs <- mapM (pprintPrec 2) args
+        return $ parenPrec p 30 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
+
+prependLine :: Bool -> DocStyle -> DocStyle
+prependLine True doc = line <> doc
+prependLine False doc = doc
+
+indentStmt :: Bool -> DocStyle -> DocStyle
+indentStmt True doc = indentTab doc
+indentStmt False doc = doc
+
+braces' :: DocStyle -> DocStyle
+braces' b = braces (line <> b <> line)
+
+indentTab :: DocStyle -> DocStyle
+indentTab = indent 4
+
+pprintCTypeDecl :: Ident -> CType -> CPrinter
+pprintCTypeDecl ident ty = 
+    case ty of
+        CTArray {} -> do
+            pRootTy <- pprint (rootCType ty)
+            pArraySizes <- pprintCTArray ty
+            return $ pRootTy <+> pretty ident <> pArraySizes
+        CTPointer (CTFunction rTy params) (CQualifier False False False) -> do
+            prTy <- pprint rTy
+            pparams <- mapM pprint params
+            return $ prTy <+> parens (pretty "*" <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
+        CTPointer (CTFunction rTy params) qual -> do
+            prTy <- pprint rTy
+            pqual <- pprint qual
+            pparams <- mapM pprint params
+            return $ prTy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
+        _ -> do
+            pty <- pprint ty
+            return $ pty <+> pretty ident
 
 pprintCAttributeList :: [CAttribute] -> CPrinter
 pprintCAttributeList [] = return emptyDoc
@@ -125,230 +262,64 @@ instance PPrint CAttribute where
         pattrParams <- mapM (pprintPrec 25) attrParams
         return $ pretty attrName <> parens (hsep (punctuate comma pattrParams))
 
-parenPrec :: Integer -> Integer -> DocStyle -> DocStyle
-parenPrec prec prec2 t = if prec <= prec2 then t else parens t
-
-instance PPrint CTypeQualifier where
-    pprint CConstQual = return $ pretty "const"
-    pprint CVolatQual = return $ pretty "volatile"
-    pprint CRestrQual = return $ pretty "__restrict"
-    pprint CAtomicQual = return $ pretty "_Atomic"
-    pprint (CAttrQual a) = pprintCAttributeList [a]
-
-instance PPrint CArraySize where
-    pprint (CArrSize staticMod expr) = do
-        pexpr <- pprintPrec 25 expr
-        return $ if staticMod then pretty "static" else pexpr
-
-instance PPrint CExpression where
-    pprintPrec p (CComma exprs _) = do
-        pexprs <- mapM (pprintPrec 2) exprs
-        return $ parenPrec p (-1) $ hsep (punctuate comma pexprs)
-    pprintPrec p (CAssignment expr1 expr2 _) = do
-        pexpr1 <- pprintPrec 3 expr1
-        pexpr2 <- pprintPrec 2 expr2
-        return $ parenPrec p 2 $ pexpr1 <+> pretty "=" <+> pexpr2
-    pprintPrec p (CBinary op expr1 expr2 _) = do
-        let prec = binPrec op
-        pexpr1 <- pprintPrec prec expr1
-        pexpr2 <- pprintPrec (prec + 1) expr2
-        return $ parenPrec p prec $ pexpr1 <+> pretty op <+> pexpr2
-    pprintPrec p (CUnary op expr _) = do
-        pexpr <- pprintPrec 25 expr
-        return $ parenPrec p 25 $ pretty op <> pexpr
-    pprintPrec p (CSizeofExpr expr _) = do
-        pexpr <- pprintPrec 25 expr
-        return $ parenPrec p 25 $ pretty "sizeof" <> parens pexpr
-    pprintPrec p (CSizeofType decl _) = do
-        pdecl <- pprint decl
-        return $ parenPrec p 25 $ pretty "sizeof" <> parens pdecl
-    pprintPrec p (CAlignofExpr expr _) = do
-        pexpr <- pprintPrec 25 expr
-        return $ parenPrec p 25 $ pretty "_Alignof" <> parens pexpr
-    pprintPrec p (CAlignofType decl _) = do
-        pdecl <- pprint decl
-        return $ parenPrec p 25 $ pretty "_Alignof" <> parens pdecl
-    pprintPrec p (CCast decl expr _) = do
-        pdecl <- pprint decl
-        pexpr <- pprintPrec 25 expr
-        return $ parenPrec p 25 $ parens pdecl <> pexpr
-    pprintPrec p (CIndex expr1 expr2 _) = do
-        pexpr1 <- pprintPrec 26 expr1
-        pexpr2 <- pprint expr2
-        return $ parenPrec p 26 $ pexpr1 <> brackets pexpr2
-    pprintPrec p (CCall expr args _) = do
-        pexpr <- pprintPrec 30 expr
-        pargs <- mapM pprint args
-        return $ parenPrec p 30 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
-    pprintPrec _ (CVar ident _) = return $ pretty ident
-    pprintPrec _ (CConst c _) = pprint c
-    pprintPrec p (CMember expr ident False _) = do
-        pexpr <- pprintPrec 26 expr
-        return $ parenPrec p 26 $ pexpr <> pretty "." <> pretty ident
-    pprintPrec p (CMember expr ident True _) = do
-        pexpr <- pprintPrec 26 expr
-        return $ parenPrec p 26 $ pexpr <> pretty "->" <> pretty ident
-
-instance PPrint CConstant where
-    pprint (CIntConst i) = return $ pretty i
-    pprint (CCharConst c) = return $ pretty c
-    pprint (CStrConst s) = return $ pretty s
-
 instance PPrint CStructureUnion where
-    pprint (CStruct tag ident Nothing cattrs) = do
-        case (cattrs, ident) of
-            ([], Nothing) -> return $ pretty tag
-            ([], Just ident') -> return $ pretty tag <+> pretty ident'
-            (_, Nothing) -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty tag <+> pattrs
-            (_, Just ident') -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty tag <+> pretty ident' <+> pattrs
-    pprint (CStruct tag ident (Just []) cattrs) = do
-        case (cattrs, ident) of
-            ([], Nothing) -> return $ pretty tag <+> pretty "{ }"
-            ([], Just ident') -> return $ pretty tag <+> pretty ident' <+> pretty "{ }"
-            (_, Nothing) -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty tag <+> pretty "{ }" <+> pattrs
-            (_, Just ident') -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty tag <+> pretty ident' <+> pretty "{ }" <+> pattrs
-    pprint (CStruct tag ident (Just decls) cattrs) = do
-        case (cattrs, ident) of
-            ([], Nothing) -> do
-                pdecls <- mapM pprint decls
-                return $ vcat [
-                    pretty tag <+> pretty "{",
-                    indentTab $ vsep (map (<> semi) pdecls),
-                    pretty "}"]
-            ([], Just ident') -> do
-                pdecls <- mapM pprint decls
-                return $ vcat [
-                    pretty tag <+> pretty ident' <+> pretty "{",
-                    indentTab $ vsep (map (<> semi) pdecls),
-                    pretty "}"]
-            (_, Nothing) -> do
-                pattrs <- pprintCAttributeList cattrs
-                pdecls <- mapM pprint decls
-                return $ vcat [
-                    pretty tag  <+> pretty "{",
-                    indent 4 $ vsep (map (<> semi) pdecls),
-                    pretty "}" <+> pattrs]
-            (_, Just ident') -> do
-                pattrs <- pprintCAttributeList cattrs
-                pdecls <- mapM pprint decls
-                return $ vcat [
-                    pretty tag <+> pretty ident' <+> pretty "{",
-                    indent 4 $ vsep (map (<> semi) pdecls),
-                    pretty "}" <+> pattrs]
+    pprint (CStruct tag mid decls attrs) = do
+        pdecls <- mapM pprint decls
+        case mid of
+            Nothing -> do
+                case attrs of 
+                    [] -> return $ vcat [
+                        pretty tag <+> pretty "{",
+                        indentTab $ vsep (map (<> semi) pdecls),
+                        pretty "}"]
+                    _ -> do
+                        pattrs <- pprintCAttributeList attrs
+                        return $ vcat [
+                            pretty tag <+> pretty "{",
+                            indentTab $ vsep (map (<> semi) pdecls),
+                            pretty "}" <+> pattrs]
+            Just ident -> do
+                case attrs of 
+                    [] -> return $ vcat [
+                        pretty tag <+> pretty ident <+> pretty "{",
+                        indentTab $ vsep (map (<> semi) pdecls),
+                        pretty "}"]
+                    _ -> do
+                        pattrs <- pprintCAttributeList attrs
+                        return $ vcat [
+                            pretty tag <+> pretty ident <+> pretty "{",
+                            indentTab $ vsep (map (<> semi) pdecls),
+                            pretty "}" <+> pattrs] 
 
-instance PPrint CPartDesignator where
-    pprint (CArrDesig expr _) = do
-        pexpr <- pprintPrec 25 expr
-        return $ pretty "[" <> pexpr <> pretty "]"
-    pprint (CMemberDesig ident _) = return $ pretty "." <> pretty ident
+instance PPrint CEnum where
 
-
-instance PPrint CInitializer where
-    pprint (CInitExpr expr _) = pprint expr
-    pprint (CInitList initl _) = do
-        pinitl <- mapM p initl
-        return $ pretty "{" <+> hsep (punctuate comma pinitl) <+> pretty "}"
-        where
-            p ([], initializer) = pprint initializer
-            p (desigs, initializer) = do
-                pdesigs <- mapM pprint desigs
-                pinit <- pprint initializer
-                return $ hsep (punctuate comma pdesigs) <+> pretty "=" <+> pinit
-
-instance PPrint CInitializerList where
-    pprint initl = do
-        pinitl <- mapM p initl
-        return $ pretty "{" <+> hsep (punctuate comma pinitl) <+> pretty "}"
-        where
-            p ([], initializer) = pprint initializer
-            p (desigs, initializer) = do
-                pdesigs <- mapM pprint desigs
-                pinit <- pprint initializer
-                return $ hsep (punctuate comma pdesigs) <+> pretty "=" <+> pinit
-
-instance PPrint CDeclaration where
-    pprint d@(CDeclaration specs divs ann) = do
-        case itemAnnotation ann of
-            CDeclarationAnn before -> do
-                pspecs <- mapM pprint specs
-                pdivs <- mapM p divs
-                case pdivs of
-                    [] -> return $ prependLine before $ hsep pspecs
-                    _ -> return $ prependLine before $ hsep pspecs <+> hsep (punctuate comma pdivs)
-            _ -> error $ "Invalid annotation: " ++ show d
-
-        where
-        p (Just declr, Nothing, Nothing) = do
-            pdeclr <- pprint declr
-            case getAttrs declr of
-                [] -> return pdeclr
-                _ -> do
-                    pattrs <- pprintCAttributeList (getAttrs declr)
-                    return $ pdeclr <+> pattrs
-        p (Just declr, Just initializer, Nothing) = do
-            pdeclr <- pprint declr
-            pinit <- pprint initializer
-            case getAttrs declr of
-                [] -> do
-                    return $ pdeclr <+> pretty "=" <+> pinit
-                _ -> do
-                    pattrs <- pprintCAttributeList (getAttrs declr)
-                    return $ pdeclr <+> pattrs <+> pretty "=" <+> pinit
-        p (Just declr, Nothing, Just expr) = do
-            pdeclr <- pprint declr
-            pexpr <- pprint expr
-            case getAttrs declr of
-                [] -> return $ pdeclr <+> pretty ":" <+> pexpr
-                _ -> do
-                    pattrs <- pprintCAttributeList (getAttrs declr)
-                    return $ pdeclr <+> pattrs <+> pretty ":" <+> pexpr
-        p decl = error $ "Invalid CDeclaration: " ++ show decl
-
-        getAttrs :: CDeclarator -> [CAttribute]
-        getAttrs (CDeclarator _ _ cattrs _) = cattrs
-
-instance PPrint CEnumeration where
-    pprint (CEnum ident Nothing cattrs) = do
-        case (cattrs, ident) of
-            ([], Nothing) -> return $ pretty "enum"
-            ([], Just ident') -> return $ pretty "enum" <+> pretty ident'
-            (_, Nothing) -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty "enum" <+> pattrs
-            (_, Just ident') -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ pretty "enum" <+> pattrs <+> pretty ident'
-    pprint (CEnum ident (Just vals) cattrs) = do
-        pvals <- mapM p vals
-        case (cattrs, ident) of
-            ([], Nothing) -> return $ vcat [
-                pretty "enum" <+> pretty "{",
-                indent 4 $ vsep (punctuate comma pvals),
-                pretty "}"]
-            ([], Just ident') -> return $ vcat [
-                pretty "enum" <+> pretty ident' <+> pretty "{",
-                indent 4 $ vsep (punctuate comma pvals),
-                pretty "}"]
-            (_, Nothing) -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ vcat [
-                    pretty "enum" <+> pattrs <+> pretty "{",
-                    indent 4 $ vsep (punctuate comma pvals),
-                    pretty "}"]
-            (_, Just ident') -> do
-                pattrs <- pprintCAttributeList cattrs
-                return $ vcat [
-                    pretty "enum" <+> pattrs <+> pretty ident' <+> pretty "{",
-                    indent 4 $ vsep (punctuate comma pvals),
-                    pretty "}"]
+    pprint (CEnum mid decls attrs) = do
+        pdecls <- mapM p decls
+        case mid of 
+            Nothing -> do
+                case attrs of
+                    [] -> return $ vcat [
+                        pretty "enum" <+> pretty "{",
+                        indentTab $ vsep (punctuate comma pdecls),
+                        pretty "}"]
+                    _ -> do
+                        pattrs <- pprintCAttributeList attrs
+                        return $ vcat [
+                            pretty "enum" <+> pretty "{",
+                            indentTab $ vsep (punctuate comma pdecls),
+                            pretty "}" <+> pattrs]
+            Just ident -> do
+                case attrs of
+                    [] -> return $ vcat [
+                        pretty "enum" <+> pretty ident <+> pretty "{",
+                        indentTab $ vsep (punctuate comma pdecls),
+                        pretty "}"]
+                    _ -> do
+                        pattrs <- pprintCAttributeList attrs
+                        return $ vcat [
+                            pretty "enum" <+> pretty ident <+> pretty "{",
+                            indentTab $ vsep (punctuate comma pdecls),
+                            pretty "}" <+> pattrs]
         where
             p :: (Ident, Maybe CExpression) -> CPrinter
             p (ident', Just expr) = do
@@ -356,50 +327,60 @@ instance PPrint CEnumeration where
                 return $ pretty ident' <+> pretty "=" <+> pexpr
             p (ident', Nothing) = return $ pretty ident'
 
-prependLine :: Bool -> DocStyle -> DocStyle
-prependLine True doc = line <> doc
-prependLine False doc = doc
 
-indentStmt :: Bool -> DocStyle -> DocStyle
-indentStmt True doc = indentTab doc
-indentStmt False doc = doc
+instance PPrint CDeclaration where
+    pprint (CDecl (CTypeSpec ty) (Just ident) Nothing)  = pprintCTypeDecl ident ty
+    pprint (CDecl (CTypeSpec ty) (Just ident) (Just expr)) = do
+        pty <- pprint ty
+        pexpr <- pprint expr
+        return $ pty <+> pretty ident <+> pretty "=" <+> pexpr
+    pprint (CDecl (CTSStructUnion stu) Nothing Nothing) = pprint stu
+    pprint (CDecl (CTSStructUnion stu) (Just ident) Nothing) = do
+        pstruct <- pprint stu
+        return $ pstruct <+> pretty ident
+    pprint (CDecl (CTSEnum enum) Nothing Nothing) = pprint enum
+    pprint (CDecl (CTSEnum enum) (Just ident) Nothing) = do
+        penum <- pprint enum
+        return $ penum <+> pretty ident
+    pprint _ = error "Invalid declaration"
 
 instance PPrint CStatement where
-    pprint s@(CCase expr stat ann) = do
+    pprint CSSkip = return emptyDoc
+    pprint s@(CSCase expr stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
                 return $ prependLine before $ indentStmt expand $ pretty "case" <+> pexpr <> pretty ":" <> line <> pstat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CDefault stat ann) = do
+    pprint s@(CSDefault stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pstat <- pprint stat
                 return $ prependLine before $ indentStmt expand $ pretty "default:" <> line <> pstat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CExpr expr ann) = do
+    pprint s@(CSDo expr ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                pexpr <- maybe (return emptyDoc) pprint expr
+                pexpr <- pprint expr
                 return $ prependLine before $ indentStmt expand $ pexpr <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CIf expr stat estat ann) = do
+    pprint s@(CSIfThenElse expr stat mestat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                pestat <- case estat of
+                pestat <- case mestat of
                     Nothing -> return emptyDoc
-                    Just alt -> do
-                        palt <- pprint alt
+                    Just estat -> do
+                        palt <- pprint estat
                         return $ pretty " else" <+> palt
                 return $ prependLine before $ indentStmt expand $
                     pretty "if" <+> parens pexpr
                     <+> pstat
                     <> pestat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CSwitch expr stat ann) = do
+    pprint s@(CSSwitch expr stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pexpr <- pprint expr
@@ -408,7 +389,7 @@ instance PPrint CStatement where
                     pretty "switch" <+> parens pexpr
                     <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CFor for_init cond step stat ann) = do
+    pprint s@(CSFor for_init cond step stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
@@ -431,32 +412,20 @@ instance PPrint CStatement where
                         return $ prependLine before $ indentStmt expand $
                             pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CCont ann) =
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                return $ prependLine before $ indentStmt expand $
-                    pretty "continue" <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CBreak ann) =
-        case itemAnnotation ann of
-            CStatementAnn before expand -> do
-                return $ prependLine before $ indentStmt expand $
-                    pretty "break" <> semi
-            _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CReturn Nothing ann) =
+    pprint s@(CSReturn Nothing ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 return $ prependLine before $ indentStmt expand $
                     pretty "return" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CReturn (Just e) ann) =
+    pprint s@(CSReturn (Just e) ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
                 pe <- pprint e
                 return $ prependLine before $ indentStmt expand $
                     pretty "return" <+> pe <> semi
             _ -> error $ "Invalid annotation: " ++ show s
-    pprint s@(CCompound items ann) =
+    pprint s@(CSCompound items ann) =
         case itemAnnotation ann of
             CCompoundAnn before trailing -> do
                 pItems <- mapM pprint items
@@ -466,82 +435,103 @@ instance PPrint CStatement where
                     else
                         braces' ((indentTab . align) (vsep pItems))
             _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CSBreak ann) =
+        case itemAnnotation ann of
+            CStatementAnn before expand -> do
+                return $ prependLine before $ indentStmt expand $ pretty "break" <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
-    pprint (CBlockDecl decl) = do
-        pdecl <- pprint decl
-        return $ pdecl <> semi
-
-instance PPrint CExternalDeclaration where
-    pprint (CDeclExt decl) = do
-        pdecl <- pprint decl
-        return $ pdecl <> semi
-    pprint (CFDefExt fund) = pprint fund
-
-instance PPrint CFunctionDef where
-    pprint (CFunDef declspecs declr stat ann) =
-        case itemAnnotation ann of
+    pprint (CBlockDecl decl ann) = do
+        case itemAnnotation ann of 
             CDeclarationAnn before -> do
-                pdeclspecs <- mapM pprint declspecs
-                pdeclr <- pprint declr
-                pstat <- pprintPrec 25 stat
-                return $ prependLine before $ hsep pdeclspecs <+> pdeclr <+> pstat
+                pdecl <- pprint decl
+                return $ prependLine before $ pdecl <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
-
 
 instance PPrint CPreprocessorDirective where
-    pprint (CPPDefine ident Nothing ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just []) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just [token]) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#define" <+> pretty ident <+> pretty token
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPDefine ident (Just (t : ts)) ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ vcat
-                    [
-                        pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
-                        indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
-                    ]
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfDef ident ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#ifdef" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPInclude isSystem path ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#include" <+>
-                    pretty (if isSystem then "<" else "\"") <>
-                        pretty path <> pretty
-                            (if isSystem then ">" else "\"")
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPIfNDef ident ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#ifndef" <+> pretty ident
-            _ -> error $ "Invalid annotation: " ++ show ann
-    pprint (CPPEndif ann) =
-        case itemAnnotation ann of
-            CPPDirectiveAnn before ->
-                return $ prependLine before $ pretty "#endif"
-            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDefine ident Nothing) =
+        return $ pretty "#define" <+> pretty ident
+    pprint (CPPDefine ident (Just [])) =
+        return $ pretty "#define" <+> pretty ident
+    pprint (CPPDefine ident (Just [token])) =
+        return $ pretty "#define" <+> pretty ident <+> pretty token
+    pprint (CPPDefine ident (Just (t : ts))) =
+        return $ vcat
+            [
+                pretty "#define" <+> pretty ident <+> pretty t <+> pretty "\\",
+                indentTab $ vcat $ punctuate (pretty "\\") (map pretty ts)
+            ]
+    pprint (CPPIfDef ident) =
+        return $ pretty "#ifdef" <+> pretty ident
+    pprint (CPPInclude isSystem path) =
+        return $ pretty "#include" <+>
+            pretty (if isSystem then "<" else "\"") <>
+                pretty path <> pretty
+                (if isSystem then ">" else "\"")
+    pprint (CPPIfNDef ident) =
+        return $ pretty "#ifndef" <+> pretty ident
+    pprint CPPEndif =
+        return $ pretty "#endif"
+
+instance PPrint CFunction where
+    pprint (CFunction ty ident params body) = do
+        pty <- pprint ty
+        pparams <- mapM pprint params
+        pbody <- pprint body
+        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
+
+instance PPrint CExternalDeclaration where
+    pprint (CEDVariable stspec decl) = do
+        pdecl <- pprint decl
+        return $ pretty stspec <+> pdecl <> semi
+    pprint (CEDFunction ty ident params) = do
+        pty <- pprint ty
+        pparams <- mapM pprint params
+        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <> semi
+    pprint (CEDEnum Nothing enum) = do
+        penum <- pprint enum
+        return $ penum <> semi
+    pprint (CEDEnum (Just typeDefName) enum) = do
+        penum <- pprint enum
+        return $ pretty "typedef" <+> penum <+> pretty typeDefName <> semi
+    pprint (CEDStructUnion Nothing stu) = do
+        pstruct <- pprint stu
+        return $ pstruct <> semi
+    pprint (CEDStructUnion (Just typeDefName) stu) = do
+        pstruct <- pprint stu
+        return $ pretty "typedef" <+> pstruct <+> pretty typeDefName <> semi
+    pprint (CEDTypeDef ident ty) = do
+        pty <- pprint ty
+        return $ pretty "typedef" <+> pty <+> pretty ident <> semi
 
 instance PPrint CFileItem where
-    pprint (CExtDecl decl) = pprint decl
-    pprint (CPPDirective directive) = pprint directive
+    pprint (CExtDecl decl ann) = 
+        case itemAnnotation ann of 
+            CDeclarationAnn before -> do
+                pdecl <- pprint decl
+                return $ prependLine before pdecl
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CPPDirective directive ann) = 
+        case itemAnnotation ann of 
+            CPPDirectiveAnn before -> do
+                pdir <- pprint directive
+                return $ prependLine before pdir
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CFunctionDef Nothing func ann) = 
+        case itemAnnotation ann of 
+            CDeclarationAnn before -> do
+                pfunc <- pprint func
+                return $ prependLine before pfunc
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CFunctionDef (Just CStatic) func ann) = do
+        case itemAnnotation ann of 
+            CDeclarationAnn before -> do
+                pfunc <- pprint func
+                return $ prependLine before $ pretty "static" <+> pfunc
+            _ -> error $ "Invalid annotation: " ++ show ann
+    pprint (CFunctionDef {}) = error "Invalid function definition"
 
 instance PPrint CFile where
     pprint (CHeaderFile _path items) = do
@@ -550,33 +540,6 @@ instance PPrint CFile where
     pprint (CSourceFile _path items) = do
         pItems <- mapM pprint items
         return $ vsep pItems <> line
-
--- precedence of C operators
-binPrec :: CBinaryOp -> Integer
-binPrec CMulOp = 20
-binPrec CDivOp = 20
-binPrec CRmdOp = 20
-binPrec CAddOp = 19
-binPrec CSubOp = 19
-binPrec CShlOp = 18
-binPrec CShrOp = 18
-binPrec CLeOp  = 17
-binPrec CGrOp  = 17
-binPrec CLeqOp = 17
-binPrec CGeqOp = 17
-binPrec CEqOp  = 16
-binPrec CNeqOp = 16
-binPrec CAndOp = 15
-binPrec CXorOp = 14
-binPrec COrOp  = 13
-binPrec CLndOp = 12
-binPrec CLorOp = 11
-
-braces' :: DocStyle -> DocStyle
-braces' b = braces (line <> b <> line)
-
-indentTab :: DocStyle -> DocStyle
-indentTab = indent 4
 
 runCPrinter :: CFile -> Text
 runCPrinter cFile = render $ runReader (pprint cFile) (CPrinterConfig False False)

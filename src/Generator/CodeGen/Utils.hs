@@ -2,11 +2,11 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Generator.CCCodeGen.Utils where
+module Generator.CodeGen.Utils where
 
 
-import Generator.CCCodeGen.Common
-import Generator.LanguageC.CompCertC
+import Generator.CodeGen.Common
+import Generator.LanguageC.AST
 import Utils.Annotations
 
 class TypeElement a b where

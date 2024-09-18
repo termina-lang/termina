@@ -6,8 +6,8 @@ import Data.Map
 import Semantic.Monad
 import AST.Seman
 import Control.Monad.Reader
-import Generator.CCCodeGen.Expression
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Expression
+import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 

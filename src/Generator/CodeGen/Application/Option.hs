@@ -17,9 +17,7 @@ genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
 
 genSimpleOptionDefinition :: TypeSpecifier -> CHeaderGenerator [CFileItem]
-genSimpleOptionDefinition ts = do
-    optionStruct <- genOptionStruct (Located (STy SimpleStmtType) Internal) ts
-    return $ CExtDecl <$> optionStruct
+genSimpleOptionDefinition = genOptionStruct (Located (STy SimpleStmtType) Internal)
 
 genOptionHeaderFile :: CHeaderGenerator CFile
 genOptionHeaderFile = do
@@ -28,12 +26,12 @@ genOptionHeaderFile = do
     items <- concat <$> mapM genSimpleOptionDefinition (concatMap S.toList (M.elems optionMap))
     return $ CHeaderFile genOptionPathName $
         [
-            CPPDirective $ CPPIfNDef defineLabel (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective $ CPPDefine defineLabel Nothing (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective $ CPPInclude True "termina.h" (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPIfNDef defineLabel) (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPInclude True "termina.h") (Located (CPPDirectiveAnn True) Internal)
         ]
         ++ items ++ [
-            CPPDirective $ CPPEndif (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (Located (CPPDirectiveAnn True) Internal)
         ]
 
 runGenOptionHeaderFile :: OptionTypes -> Either CGeneratorError CFile

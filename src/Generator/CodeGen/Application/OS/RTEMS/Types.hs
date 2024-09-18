@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CCCodeGen.Application.OS.RTEMS.Types where
-import Generator.LanguageC.CompCertC
-import Generator.CCCodeGen.Utils
-import Generator.CCCodeGen.Application.Types
+module Generator.CodeGen.Application.OS.RTEMS.Types where
+import Generator.LanguageC.AST
+import Generator.CodeGen.Utils
+import Generator.CodeGen.Application.Types
 
 -- | Generic RTEMS types
 

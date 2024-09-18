@@ -8,9 +8,9 @@ import Semantic.Monad
 import UT.PPrinter.Expression.Common
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.LanguageC.CompCertCPrinter
-import Generator.CCCodeGen.Function
-import Generator.CCCodeGen.Common
+import Generator.LanguageC.Printer
+import Generator.CodeGen.Function
+import Generator.CodeGen.Common
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"

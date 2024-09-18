@@ -10,9 +10,9 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import AST.Core
 import Generator.Option
-import Generator.CCCodeGen.Module
-import Generator.LanguageC.CompCertCPrinter
-import Generator.CCCodeGen.Application.Option
+import Generator.CodeGen.Module
+import Generator.LanguageC.Printer
+import Generator.CodeGen.Application.Option
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++

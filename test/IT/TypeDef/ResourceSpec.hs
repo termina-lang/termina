@@ -7,8 +7,8 @@ import Text.Parsec
 import Semantic.TypeChecking
 import Semantic.Monad
 import qualified Data.Map as M
-import Generator.CCCodeGen.Module
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Module
+import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "interface TMChannelInterface {\n" ++

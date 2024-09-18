@@ -8,8 +8,8 @@ import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
 import Control.Monad.Reader
-import Generator.CCCodeGen.Module
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Module
+import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "function test0() {\n" ++

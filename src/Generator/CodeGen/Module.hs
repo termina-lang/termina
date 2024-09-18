@@ -23,29 +23,20 @@ genModuleDefineLabel mn =
     in
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
-genInclude :: QualifiedName -> Bool -> CPreprocessorDirective
-genInclude mName before = CPPInclude False (mName <.> "h") (Located (CPPDirectiveAnn before) Internal)
+genInclude :: QualifiedName -> Bool -> CFileItem
+genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn before) Internal)
 
 genHeaderASTElement :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
-genHeaderASTElement typedef@(TypeDefinition {}) = do
-    cTypeDef <- genTypeDefinitionDecl typedef
-    return $ CExtDecl <$> cTypeDef
+genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
 genHeaderASTElement glb@(GlobalDeclaration {}) = genGlobalDecl glb
 genHeaderASTElement func@(Function {}) = do
-    cFunc <- genFunctionDecl func
-    return $ CExtDecl <$> cFunc
+    genFunctionDecl func
 
 genSourceASTElement :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
-genSourceASTElement typedef@(TypeDefinition (Class {}) _) = do
-    cTypeDef <- genClassDefinition typedef
-    return $ CExtDecl <$> cTypeDef
+genSourceASTElement typedef@(TypeDefinition (Class {}) _) = genClassDefinition typedef
 genSourceASTElement (TypeDefinition {}) = return []
-genSourceASTElement glb@(GlobalDeclaration {}) = do
-    cGlobal <- genGlobal glb
-    return $ CExtDecl <$> cGlobal
-genSourceASTElement func@(Function {}) = do
-    cFunc <- genFunction func
-    return $ CExtDecl <$> cFunc
+genSourceASTElement glb@(GlobalDeclaration {}) = genGlobal glb
+genSourceASTElement func@(Function {}) = genFunction func
 
 genHeaderFile ::
     -- | Include option.h
@@ -58,16 +49,16 @@ genHeaderFile ::
     -> CHeaderGenerator CFile
 genHeaderFile includeOptionH mName imports program = do
     let defineLabel = genModuleDefineLabel mName
-        includeList = map (CPPDirective . flip genInclude False) imports
+        includeList = map (`genInclude` False) imports
     items <- concat <$> mapM genHeaderASTElement program
     return $ CHeaderFile mName $
         [
-            CPPDirective $ CPPIfNDef defineLabel (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective $ CPPDefine defineLabel Nothing (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective $ CPPInclude True "termina.h" (Located (CPPDirectiveAnn True) Internal)
-        ] ++ ([CPPDirective $ CPPInclude False "option.h" (Located (CPPDirectiveAnn True) Internal) | includeOptionH]) 
+            CPPDirective (CPPIfNDef defineLabel) (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (Located (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPInclude True "termina.h") (Located (CPPDirectiveAnn True) Internal)
+        ] ++ ([CPPDirective (CPPInclude False "option.h") (Located (CPPDirectiveAnn True) Internal) | includeOptionH])
         ++ includeList ++ items ++ [
-            CPPDirective $ CPPEndif (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (Located (CPPDirectiveAnn True) Internal)
         ]
 
 genSourceFile ::
@@ -79,7 +70,7 @@ genSourceFile ::
 genSourceFile mName program = do
     items <- concat <$> mapM genSourceASTElement program
     return $ CSourceFile mName $
-        CPPDirective (CPPInclude False (mName <.> "h") (Located (CPPDirectiveAnn True) Internal))
+        CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn True) Internal)
         : items
 
 runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile

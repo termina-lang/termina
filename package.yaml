@@ -63,7 +63,7 @@ library:
   source-dirs: src
 
 executables:
-  termina-exec:
+  termina:
     main:                Main.hs
     source-dirs:         app
     ghc-options:

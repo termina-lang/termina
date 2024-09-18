@@ -7,8 +7,8 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Generator.CCCodeGen.Module
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Module
+import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "function for_loop_test0(array0 : & [u16; 10]) -> u16 {\n" ++

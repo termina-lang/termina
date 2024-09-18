@@ -12,11 +12,12 @@ import Generator.LanguageC.AST
 import Data.Char
 import Numeric
 import Utils.Annotations
+    ( Located(Located, location), Location(Internal) )
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-type Substitutions = Map Identifier CExpression
+type Substitutions = Map Identifier CObject
 type OptionTypes = Map TypeSpecifier (Set TypeSpecifier)
 
 type CSourceGenerator = ReaderT Substitutions (Either CGeneratorError)
@@ -58,23 +59,30 @@ resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"
 resourceUnlock = namefy "termina_resource" <::> "unlock"
 
+cResourceIDType, cResourceLockFuncType, cResourceUnlockFuncType :: CType
+cResourceIDType = CTTypeDef resourceID noqual
+cResourceLockFuncType = CTFunction (CTVoid noqual) [CTPointer (CTTypeDef resourceID noqual) noqual]
+cResourceUnlockFuncType = CTFunction (CTVoid noqual) [CTPointer (CTTypeDef resourceID noqual) noqual]
+
+
 thatField, thisParam, selfParam :: Identifier
 thatField = "__that"
 thisParam = "__this"
 selfParam = "self"
 
-resourceClassIDField, taskClassIDField :: Identifier
+resourceClassIDField, taskClassIDField, timerField :: Identifier
 resourceClassIDField = "__resource"
 taskClassIDField = "__task"
+timerField = "__timer"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
 
 genEnumVariantName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumVariantName enumId variant = return $ enumId <::> variant
+genEnumVariantName enumId this_variant = return $ enumId <::> this_variant
 
 genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumParameterStructName enumId variant = return $ namefy $ "enum_" <> enumId <::> variant <> "_params_t"
+genEnumParameterStructName enumId this_variant = return $ namefy $ "enum_" <> enumId <::> this_variant <> "_params_t"
 
 genClassFunctionName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genClassFunctionName className functionName = return $ className <::> functionName
@@ -94,7 +102,7 @@ genOptionParameterStructName Int32 = return $ namefy "option_int32_params_t"
 genOptionParameterStructName Int64 = return $ namefy "option_int64_params_t"
 genOptionParameterStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
 genOptionParameterStructName (BoxSubtype _) = return $ namefy "option_box_params_t"
-genOptionParameterStructName ts = 
+genOptionParameterStructName ts =
     case ts of
         Array {} -> do
             tsName <- genTypeSpecName ts
@@ -122,8 +130,8 @@ genOptionParameterStructName ts =
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
-enumVariantsField :: Identifier
-enumVariantsField = namefy "variant"
+variant :: Identifier
+variant = namefy "variant"
 
 optionSomeVariant, optionNoneVariant :: Identifier
 optionSomeVariant = "Some"
@@ -137,7 +145,7 @@ optionSomeField = "__0"
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
 getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TypeSpecifier
-getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                   = return ts
+getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
@@ -147,7 +155,7 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 
 getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [Parameter]
 getParameters (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
-getParameters ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
+getParameters ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TypeSpecifier
 getExprType (AccessObject obj) = getObjType obj
@@ -164,6 +172,15 @@ getExprType (EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = r
 getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
+
+getConstExprType :: (MonadError CGeneratorError m) => ConstExpression SemanticAnn -> m TypeSpecifier
+getConstExprType (KC _ (Located (ETy (SimpleType ts)) _)) = return ts
+getConstExprType (KV _ (Located (ETy (SimpleType ts)) _)) = return ts
+getConstExprType ann = throwError $ InternalError $ "invalid constant expression annotation: " ++ show ann
+
+unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
+unboxObject (CExprValOf obj _ _) = return obj
+unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 
 -- | Generates the name of the option struct type
 genOptionStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
@@ -207,156 +224,182 @@ genOptionStructName ts =
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
--- | Obtains the corresponding C type of a primitive type
-genDeclSpecifiers :: (MonadError CGeneratorError m) => TypeSpecifier -> m [CDeclarationSpecifier]
+
+getCInteger :: TInteger -> CInteger
+getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
+getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
+getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
+
+getArraySize :: Size -> CExpression
+getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT noqual) (Located CGenericAnn Internal)
+getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (Located CGenericAnn Internal)
+
+-- | Translate type annotation to C type
+genType :: (MonadError CGeneratorError m) => CQualifier -> TypeSpecifier -> m CType
 -- |  Unsigned integer types
-genDeclSpecifiers UInt8  = return [CTypeSpec CUInt8Type]
-genDeclSpecifiers UInt16 = return [CTypeSpec CUInt16Type]
-genDeclSpecifiers UInt32 = return [CTypeSpec CUInt32Type]
-genDeclSpecifiers UInt64 = return [CTypeSpec CUInt64Type]
+genType qual UInt8 = return (CTInt IntSize8 Unsigned qual)
+genType qual UInt16 = return (CTInt IntSize16 Unsigned qual)
+genType qual UInt32 = return (CTInt IntSize32 Unsigned qual)
+genType qual UInt64 = return (CTInt IntSize64 Unsigned qual)
 -- | Signed integer types
-genDeclSpecifiers Int8   = return [CTypeSpec CInt8Type]
-genDeclSpecifiers Int16  = return [CTypeSpec CInt16Type]
-genDeclSpecifiers Int32  = return [CTypeSpec CInt32Type]
-genDeclSpecifiers Int64  = return [CTypeSpec CInt64Type]
--- | Other primitive types
-genDeclSpecifiers USize  = return [CTypeSpec CSizeTType]
-genDeclSpecifiers Bool   = return [CTypeSpec CBoolType]
-genDeclSpecifiers Char   = return [CTypeSpec CCharType]
+genType qual Int8 = return (CTInt IntSize8 Signed qual)
+genType qual Int16 = return (CTInt IntSize16 Signed qual)
+genType qual Int32 = return (CTInt IntSize32 Signed qual)
+genType qual Int64 = return (CTInt IntSize64 Signed qual)
+-- | Other primitive typess
+genType qual USize = return (CTSizeT qual)
+genType qual Bool = return (CTBool qual)
+genType qual Char = return (CTChar qual)
 -- | Primitive type
-genDeclSpecifiers (DefinedType typeIdentifier) = return [CTypeSpec $ CTypeDef typeIdentifier]
+genType qual (DefinedType typeIdentifier) = return (CTTypeDef typeIdentifier qual)
 -- | Array type
--- The type of the vector is the type of the elements
-genDeclSpecifiers (Array ts _) = genDeclSpecifiers ts
--- | Option type
-genDeclSpecifiers (Option (BoxSubtype _))  = return [CTypeSpec $ CTypeDef optionBox]
-genDeclSpecifiers (Option ts)                  = do
+genType qual (Array ts' s) = do
+    ts <- genType qual ts'
+    return (CTArray ts (getArraySize s))
+-- | Option types
+genType _qual (Option (BoxSubtype _)) = return (CTTypeDef optionBox noqual)
+genType _qual (Option ts) = do
     optName <- genOptionStructName ts
-    return [CTypeSpec $ CTypeDef optName]
+    return (CTTypeDef optName noqual)
 -- Non-primitive types:
 -- | Box subtype
-genDeclSpecifiers (BoxSubtype _)           = return [CTypeSpec $ CTypeDef boxStruct]
+genType _qual (BoxSubtype _) = return (CTTypeDef boxStruct noqual)
 -- | Pool type
-genDeclSpecifiers (Pool _ _)                   = return [CTypeSpec $ CTypeDef pool]
-genDeclSpecifiers (MsgQueue _ _)               = return [CTypeSpec $ CTypeDef msgQueue]
-genDeclSpecifiers (Location ts)                = genDeclSpecifiers ts
-genDeclSpecifiers (AccessPort ts)              = genDeclSpecifiers ts
-genDeclSpecifiers (Allocator _)                = return [CTypeSpec $ CTypeDef pool]
-genDeclSpecifiers (Atomic ts)                  = do
-    tsDecl <- genDeclSpecifiers ts
-    return $ CTypeQual CAtomicQual : tsDecl
-genDeclSpecifiers (AtomicArray ts _)           = do
-    tsDecl <- genDeclSpecifiers ts
-    return $ CTypeQual CAtomicQual : tsDecl
-genDeclSpecifiers (AtomicAccess ts)            = do
-    tsDecl <- genDeclSpecifiers ts
-    return $ CTypeQual CAtomicQual : tsDecl
-genDeclSpecifiers (AtomicArrayAccess ts _)     = do
-    tsDecl <- genDeclSpecifiers ts
-    return $ CTypeQual CAtomicQual : tsDecl
+genType _qual (Pool _ _) = return (CTTypeDef pool noqual)
+genType _qual (MsgQueue _ _) = return (CTTypeDef msgQueue noqual)
+genType qual (Location ts) = do
+    ts' <- genType volatile ts
+    return (CTPointer ts' qual)
+genType _qual (AccessPort ts) =  genType noqual ts
+genType _qual (Allocator _) = return (CTPointer (CTTypeDef pool noqual) noqual)
+genType _qual (Atomic ts) = genType atomic ts
+genType _qual (AtomicArray ts _) = genType atomic ts
+genType _qual (AtomicAccess ts) = do
+    ts' <- genType atomic ts
+    return (CTPointer ts' noqual)
+genType _qual (AtomicArrayAccess ts _) = do
+    ts' <- genType atomic ts
+    return (CTPointer ts' noqual)
 -- | Type of the ports
-genDeclSpecifiers (SinkPort {})                = return [CTypeSpec $ CTypeDef sinkPort]
-genDeclSpecifiers (OutPort {})                 = return [CTypeSpec $ CTypeDef outPort]
-genDeclSpecifiers (InPort {})                  = return [CTypeSpec $ CTypeDef inPort]
-genDeclSpecifiers (Reference Immutable ts)     = do
-    tsDecl <- genDeclSpecifiers ts
-    return $ CTypeQual CConstQual : tsDecl
-genDeclSpecifiers (Reference _ ts)             = genDeclSpecifiers ts
-genDeclSpecifiers t                            = throwError $ InternalError $ "Unsupported type: " ++ show t
+genType _qual (SinkPort {}) = return (CTTypeDef sinkPort noqual)
+genType _qual (OutPort {}) = return (CTTypeDef outPort noqual)
+genType _qual (InPort {}) = return (CTTypeDef inPort noqual)
+genType qual (Reference Immutable ts) = do
+    case ts of
+        Array {} -> genType constqual ts
+        _ -> do
+            ts' <- genType qual{qual_const = True} ts
+            return (CTPointer ts' constqual)
+genType _qual (Reference _ ts) = do
+    case ts of
+        Array {} -> genType noqual ts
+        _ -> do
+            ts' <- genType noqual ts
+            return (CTPointer ts' constqual)
+genType _noqual Unit = return (CTVoid noqual)
+
+genFunctionType :: (MonadError CGeneratorError m) => TypeSpecifier -> [TypeSpecifier] -> m CType
+genFunctionType ts tsParams = do
+    ts' <- genType noqual ts
+    tsParams' <- traverse (genType noqual) tsParams
+    return (CTFunction ts' tsParams')
+
+genIndexOf :: (MonadError CGeneratorError m) => CObject -> CExpression -> m CObject
+genIndexOf obj index = 
+    let cObjType = getCObjType obj in
+    case cObjType of
+        CTArray ty _ -> return $ CIndexOf obj index ty
+        CTPointer ty _ -> return $ CIndexOf obj index ty
+        _ -> throwError $ InternalError $ "invalid object type. Not indexable: " ++ show cObjType
+
+genAddrOf :: (MonadError CGeneratorError m) => CObject -> CQualifier -> CAnns -> m CExpression
+genAddrOf obj qual cAnn =
+    let cObjType = getCObjType obj in
+    case cObjType of
+        CTArray {} -> return $ CExprValOf obj cObjType cAnn
+        ty -> return $ CExprAddrOf obj (CTPointer ty qual) cAnn
+
+genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
+genPoolMethodCallExpr mName cObj cArgs cAnn =
+    case mName of
+        "alloc" -> do
+            let cFuncType = CTFunction (CTVoid noqual) (getCExprType cObj : fmap getCExprType cArgs)
+            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+        "free" -> do
+            let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj]
+            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+        _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
+
+genMsgQueueMethodCall :: (MonadError CGeneratorError m) => Identifier -> CObject -> [CExpression] -> CAnns -> m CExpression
+genMsgQueueMethodCall mName cObj cArgs cAnn =
+    case cArgs of
+        [cArg] -> do
+            let cArgType = getCExprType cArg
+            let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
+            let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+            -- | If it is a send, the first parameter is the object to be sent. The
+            -- function is expecting to receive a reference to that object.
+            case cArgType of
+                CTArray {} -> do
+                    let cDataArg = CExprCast cArg (CTPointer (CTVoid noqual) noqual) cAnn
+                    return $
+                        CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+                _ -> do
+                    cArgObj <- unboxObject cArg
+                    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
+                    return $
+                        CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+        _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show cArgs
+
+genAtomicMethodCall :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
+genAtomicMethodCall mName cObj cArgs cAnn =
+    case mName of
+        "load" -> do
+            let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj]
+            return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) [cObj] (CTVoid noqual) cAnn
+        "store" -> do
+            let cFuncType = CTFunction (CTVoid noqual) (getCExprType cObj : fmap getCExprType cArgs)
+            return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+        _ -> throwError $ InternalError $ "invalid atomic method name: " ++ mName
+
+genParameterDeclaration :: (MonadError CGeneratorError m) => Parameter -> m CDeclaration
+genParameterDeclaration (Parameter identifier ts) = do
+    cParamType <- genType noqual ts
+    return $ CDecl (CTypeSpec cParamType) (Just identifier) Nothing
 
 genInteger :: TInteger -> CInteger
 genInteger (TInteger i DecRepr) = CInteger i CDecRepr
 genInteger (TInteger i HexRepr) = CInteger i CHexRepr
 genInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
-genArraySize :: (MonadError CGeneratorError m) => Size -> SemanticAnn -> m CExpression
-genArraySize (K s) ann = return $ CConst (CIntConst (genInteger s)) (buildGenericAnn ann)
-genArraySize (V v) ann = return $ CVar v (buildGenericAnn ann)
+getCArrayItemType :: (MonadError CGeneratorError m) => CType -> m CType
+getCArrayItemType (CTArray ty _) = return ty
+getCArrayItemType ty = throwError $ InternalError $ "invalid array type: " ++ show ty
 
-genArraySizeDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m [CDerivedDeclarator]
-genArraySizeDeclarator (Array ts arraySize) ann = do
-    let cAnn = buildGenericAnn ann
-    cSize <- genArraySize arraySize ann
-    rest <- genArraySizeDeclarator ts ann
-    return $ CArrDeclr [] (CArrSize False cSize) cAnn : rest
-genArraySizeDeclarator (Reference _ (Array ts arraySize)) ann = do
-    let cAnn = buildGenericAnn ann 
-    cSize <- genArraySize arraySize ann
-    rest <- genArraySizeDeclarator ts ann
-    return $ CArrDeclr [] (CArrSize False cSize) cAnn : rest
-genArraySizeDeclarator _ _ = return []
+genArraySizeExpr :: (MonadError CGeneratorError m) => Size -> SemanticAnn -> m CExpression
+genArraySizeExpr (K s) ann = return $ CExprConstant (CIntConst (genInteger s)) (CTSizeT noqual) (buildGenericAnn ann)
+genArraySizeExpr (V v) ann = return $ CExprValOf (CVar v (CTSizeT noqual)) (CTSizeT noqual) (buildGenericAnn ann)
 
-genParameterDeclaration :: (MonadError CGeneratorError m) => SemanticAnn -> Parameter -> m CDeclaration
-genParameterDeclaration ann (Parameter identifier (Reference accKind ts)) = do
-    declSpec <- genDeclSpecifiers ts
-    arrayDecl <- genArraySizeDeclarator ts ann
-    let exprCAnn = buildGenericAnn ann
-        decl = case accKind of
-            Immutable -> CTypeQual CConstQual : declSpec
-            _ -> declSpec
-    case ts of
-        Array {} -> do
-            return $ CDeclaration decl [(Just (CDeclarator (Just identifier) arrayDecl [] exprCAnn), Nothing, Nothing)]
-                (buildDeclarationAnn ann False)
-        _ -> return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [CPtrDeclr [] exprCAnn] [] exprCAnn), Nothing, Nothing)]
-            (buildDeclarationAnn ann False)
-genParameterDeclaration ann (Parameter identifier ts) = do
-    let exprCAnn = buildGenericAnn ann
-    decl <- genDeclSpecifiers ts
-    return $ CDeclaration decl [(Just (CDeclarator (Just identifier) [] [] exprCAnn), Nothing, Nothing)]
-        (buildDeclarationAnn ann False)
-
-genCastDeclaration :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m CDeclaration
-genCastDeclaration (BoxSubtype ts@(Array _ _)) ann = do
-    -- We must obtain the declaration specifier of the vector
-    specs <- genDeclSpecifiers ts
-    decls <- genPtrArrayDeclarator ts ann
-    return $ CDeclaration specs [(Just decls, Nothing, Nothing)] declAnn
-
-    where
-
-        cAnn, declAnn :: CAnns
-        cAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
-
-        genPtrArrayDeclarator :: (MonadError CGeneratorError m) => TypeSpecifier -> SemanticAnn -> m CDeclarator
-        genPtrArrayDeclarator (Array ts' _) ann' = do
-            arrayDecl <- genArraySizeDeclarator ts' ann'
-            return $ CDeclarator Nothing (CPtrDeclr [] cAnn : arrayDecl) [] cAnn
-        genPtrArrayDeclarator ts' _ = throwError $ InternalError $ "Invalid type specifier, not an array: " ++ show ts'
-
-genCastDeclaration (BoxSubtype ts) ann = do
-    let cAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
-    specs <- genDeclSpecifiers ts
-    return $ CDeclaration specs [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
-genCastDeclaration (Location ts) ann = do
-    let cAnn = buildGenericAnn ann
-        declAnn = buildDeclarationAnn ann False
-    specs <- genDeclSpecifiers ts
-    return $ CDeclaration (CTypeQual CVolatQual : specs) [(Just (CDeclarator Nothing [CPtrDeclr [] cAnn] [] cAnn), Nothing, Nothing)] declAnn
-genCastDeclaration ts ann = do
-    let declAnn = buildDeclarationAnn ann False
-    specs <- genDeclSpecifiers ts
-    return $ CDeclaration specs [] declAnn
+genArraySize :: (MonadError CGeneratorError m) => Size -> m CExpression
+genArraySize s = return $ getArraySize s
 
 internalAnn :: CItemAnn -> CAnns
 internalAnn = flip Located Internal
 
 buildGenericAnn :: SemanticAnn -> CAnns
-buildGenericAnn ann = Located CGenericAnn (location ann) 
+buildGenericAnn ann = Located CGenericAnn (location ann)
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn ann before = Located (CStatementAnn before False) (location ann) 
+buildStatementAnn ann before = Located (CStatementAnn before False) (location ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn ann before = Located (CDeclarationAnn before) (location ann) 
+buildDeclarationAnn ann before = Located (CDeclarationAnn before) (location ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn ann before trailing = Located (CCompoundAnn before trailing) (location ann) 
+buildCompoundAnn ann before trailing = Located (CCompoundAnn before trailing) (location ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn ann before = Located (CPPDirectiveAnn before) (location ann) 
+buildCPPDirectiveAnn ann before = Located (CPPDirectiveAnn before) (location ann)
 
 printIntegerLiteral :: TInteger -> String
 printIntegerLiteral (TInteger i DecRepr) = show i
@@ -385,3 +428,8 @@ printLiteral (I ti Nothing) = printIntegerLiteral ti
 printLiteral (B True) = "1"
 printLiteral (B False) = "0"
 printLiteral (C c) = "'" <> [c] <> "'"
+
+-- | TODO: The size of the enum field has been hardcoded, it should be
+-- platform dependent
+enumFieldType :: CType
+enumFieldType = CTInt IntSize32 Unsigned noqual

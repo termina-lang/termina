@@ -1,4 +1,5 @@
 module Generator.LanguageC.AST where
+
 import Prettyprinter
 import Numeric
 import Data.Char
@@ -9,302 +10,261 @@ type Ident = String
 data CFile' a
     = CSourceFile FilePath [CFileItem' a]
     | CHeaderFile FilePath [CFileItem' a]
-    deriving (Show)
 
-data CPreprocessorDirective' a
-    = CPPInclude Bool FilePath a
-    | CPPDefine Ident (Maybe [String]) a
-    | CPPIfDef Ident a
-    | CPPIfNDef Ident a
-    | CPPEndif a
-    deriving (Show)
+data CPreprocessorDirective
+    = CPPInclude Bool FilePath
+    | CPPDefine Ident (Maybe [String])
+    | CPPIfDef Ident
+    | CPPIfNDef Ident
+    | CPPEndif
 
 data CFileItem' a
-    = CExtDecl (CExternalDeclaration' a)
-    | CPPDirective (CPreprocessorDirective' a)
-    deriving (Show)
+    = CExtDecl (CExternalDeclaration' a) a
+    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a) a
+    | CPPDirective CPreprocessorDirective a
+
+data CAttribute' a = CAttr Ident [CExpression' a]
+    deriving Show
+
+data CStructureUnion' a
+  = CStruct
+    CStructTag
+    (Maybe Ident)      -- struct/union name (optional)
+    [CDeclaration' a]  -- member declarations
+    [CAttribute' a]    -- __attribute__s
+    deriving Show
+
+data CStructTag = CStructTag
+                | CUnionTag
+    deriving Show
+
+instance Pretty CStructTag where
+  pretty CStructTag = pretty "struct"
+  pretty CUnionTag = pretty "union"
+
+data CEnum' a = 
+    CEnum 
+    (Maybe Ident) -- ^ enum name (optional)
+    [(Ident, Maybe (CExpression' a))] -- ^ enum constants
+    [CAttribute' a] -- ^ __attribute__s
+    deriving Show
+
+data CTypeSpecifier' a = 
+    -- | Basic type specifiers
+    CTypeSpec CType
+    -- | Annonymous struct/union
+    | CTSStructUnion (CStructureUnion' a)
+    -- | Annonymous enum
+    | CTSEnum (CEnum' a)
+    deriving Show
+
+data CDeclaration' a =
+    CDecl (CTypeSpecifier' a) (Maybe Ident) (Maybe (CExpression' a))
+    deriving Show
 
 data CExternalDeclaration' a
-    = CDeclExt (CDeclaration' a)
-    | CFDefExt (CFunctionDef' a)
-    deriving (Show)
+    = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
+    | CEDFunction CType Ident [CDeclaration' a]
+    | CEDEnum (Maybe Ident) (CEnum' a)
+    | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
+    | CEDTypeDef Ident CType
 
-data CFunctionDef' a
-  = CFunDef
-    [CDeclarationSpecifier' a] -- type specifier and qualifier
-    (CDeclarator' a)           -- declarator
-    (CStatement' a)            -- compound statement
-    a
-    deriving (Show)
+data CFunction' a =
+    CFunction CType Ident [CDeclaration' a] (CStatement' a)
 
-data CDeclaration' a
-  = CDeclaration
-    [CDeclarationSpecifier' a] -- type specifier and qualifier, __attribute__
-    [(Maybe (CDeclarator' a),  -- declarator (may be omitted)
-      Maybe (CInitializer' a), -- optional initialize
-      Maybe (CExpression' a))] -- optional size (const expr)
-    a
-    deriving (Show)
+data CQualifier = CQualifier {
+    qual_volatile :: Bool,
+    qual_const :: Bool,
+    qual_atomic :: Bool
+} deriving Show
 
-data CDeclarator' a
-    = CDeclarator (Maybe Ident) [CDerivedDeclarator' a] [CAttribute' a] a
-    deriving (Show)
+noqual :: CQualifier
+noqual = CQualifier False False False
 
-data CDerivedDeclarator' a
-  = CPtrDeclr [CTypeQualifier' a] a
-  -- ^ Pointer declarator @CPtrDeclr tyquals declr@
-  | CArrDeclr [CTypeQualifier' a] (CArraySize' a) a
-  -- ^ Array declarator @CArrDeclr declr tyquals size-expr?@
-  | CFunDeclr [CDeclaration' a] [CAttribute' a] a
-    -- ^ Function declarator @CFunDeclr declr (old-style-params | new-style-params) c-attrs@
-    deriving (Show)
+constqual :: CQualifier
+constqual = CQualifier False True False
 
-data CArraySize' a
-  = CArrSize Bool (CExpression' a) -- ^ @CArrSize isStatic expr@
-    deriving (Show)
+volatile :: CQualifier
+volatile = CQualifier True False False
 
-data CStatement' a
-  -- | A statement of the form @case expr : stmt@
-  = CCase (CExpression' a) (CStatement' a) a
-  -- | The default case @default : stmt@
-  | CDefault (CStatement' a) a
-  -- | A simple statement, that is in C: evaluating an expression with
-  --   side-effects and discarding the result.
-  | CExpr (Maybe (CExpression' a)) a
-  -- | compound statement @CCompound blockItems at@
-  | CCompound [CCompoundBlockItem' a] a
-  -- | conditional statement @CIf ifExpr thenStmt maybeElseStmt at@
-  | CIf (CExpression' a) (CStatement' a) (Maybe (CStatement' a)) a
-  -- | switch statement @CSwitch selectorExpr switchStmt@, where
-  -- @switchStmt@ usually includes /case/, /break/ and /default/
-  -- statements
-  | CSwitch (CExpression' a) (CStatement' a) a
-  -- | for statement @CFor init expr-2 expr-3 stmt@, where @init@ is
-  -- either a declaration or initializing expression
-  | CFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
-    (Maybe (CExpression' a))
-    (Maybe (CExpression' a))
-    (CStatement' a)
-    a
-  -- | continue statement
-  | CCont a
-  -- | break statement
-  | CBreak a
-  -- | return statement @CReturn returnExpr@
-  | CReturn (Maybe (CExpression' a)) a
-    deriving (Show)
+atomic :: CQualifier
+atomic = CQualifier False False True
 
-data CCompoundBlockItem' a
-  = CBlockStmt    (CStatement' a)    -- ^ A statement
-  | CBlockDecl    (CDeclaration' a)  -- ^ A local declaration
-    deriving (Show)
+data CSignedness =
+    Signed
+    | Unsigned
+    deriving Show
 
-data CDeclarationSpecifier' a
-  = CStorageSpec CStorageSpecifier     -- ^ storage-class specifier or typedef
-  | CTypeSpec    (CTypeSpecifier' a)   -- ^ type name
-  | CTypeQual    (CTypeQualifier' a)   -- ^ type qualifier
-    deriving (Show)
+data CIntSize =
+    IntSize8
+    | IntSize16
+    | IntSize32
+    | IntSize64
+    | IntSize128
+    deriving Show
+
+data CType = 
+    -- | The void type
+    CTVoid CQualifier
+    | CTChar CQualifier
+    -- | Integer types
+    | CTInt CIntSize CSignedness CQualifier
+    -- | Pointer types
+    | CTPointer CType CQualifier
+    -- | Array types
+    | CTArray CType CExpression
+    -- | Struct types
+    | CTStruct CStructTag Ident CQualifier
+    -- | Function type
+    | CTFunction CType [CType]
+    -- | Enumeration types
+    | CTEnum Ident CQualifier
+    -- | size_t type 
+    | CTSizeT CQualifier
+    -- | _Bool type  
+    | CTBool CQualifier
+    -- | typedef name
+    | CTTypeDef Ident CQualifier
+    deriving Show
+
+data CBinaryOp = 
+    COpAdd                   -- ^ addition (+)
+    | COpSub                 -- ^ subtraction (-)
+    | COpMul                 -- ^ multiplication (*)
+    | COpDiv                 -- ^ division (/)
+    | COpMod                 -- ^ remainder of division (%)
+    | COpAnd                 -- ^ bitwise and (&)
+    | COpXor                 -- ^ exclusive bitwise or (^)
+    | COpOr                  -- ^ inclusive bitwise or (|)
+    | COpShl                 -- ^ shift left
+    | COpShr                 -- ^ shift right
+    | COpEq                  -- ^ equal (==)
+    | COpNe                  -- ^ not equal (!=)
+    | COpLt                  -- ^ less (<)
+    | COpGt                  -- ^ greater (>)
+    | COpLe                  -- ^ less than or equal (<=)
+    | COpGe                  -- ^ greater or equal (>=)
+    deriving Show
+
+data CUnaryOp = 
+    CMinOp                   -- ^ prefix minus
+    | CCompOp                -- ^ one's complement
+    | CNegOp                 -- ^ logical negation
+    deriving Show
 
 data CStorageSpecifier
   = CAuto        -- ^ auto
   | CRegister    -- ^ register
   | CStatic      -- ^ static
   | CExtern      -- ^ extern
-  | CTypedef     -- ^ typedef
   | CThread      -- ^ C11/GNUC thread local storage
-    deriving (Show)
 
 instance Pretty CStorageSpecifier where
     pretty CAuto = pretty "auto"
     pretty CRegister = pretty "register"
     pretty CStatic = pretty "static"
     pretty CExtern = pretty "extern"
-    pretty CTypedef = pretty "typedef"
     pretty CThread = pretty "_Thread_local"
 
-data CTypeSpecifier' a
-    = CVoidType
-    | CCharType
-    | CUInt8Type
-    | CInt8Type 
-    | CUInt16Type
-    | CInt16Type
-    | CUInt32Type
-    | CInt32Type
-    | CUInt64Type
-    | CInt64Type
-    | CUInt128Type
-    | CInt128Type
-    | CBoolType
-    | CSizeTType
-    | CSUType      (CStructureUnion' a) -- ^ Struct or Union specifier
-    | CEnumType    (CEnumeration' a)    -- ^ Enumeration specifier
-    | CTypeDef     Ident                -- ^ Typedef name
-    | CAtomicType  (CDeclaration' a)    -- ^ @_Atomic(type)@
-    deriving (Show)
+-- | C char constant
+newtype CChar = CChar Char
+    deriving Show
 
-data CTypeQualifier' a
-  = CConstQual
-  | CVolatQual
-  | CRestrQual
-  | CAtomicQual
-  | CAttrQual  (CAttribute' a)
-    deriving (Show)
+instance Pretty CChar where
+  pretty (CChar c) = pretty $ show c
 
-data CFunctionSpecifier
-  = CInlineQual
-  | CNoreturnQual
-    deriving (Show)
+instance Pretty CString where
+  pretty (CString s) = pretty $ show s
 
-instance Pretty CFunctionSpecifier where
-    pretty CInlineQual = pretty "inline"
-    pretty CNoreturnQual = pretty "_Noreturn"
-
-data CStructureUnion' a
-  = CStruct
-    CStructTag
-    (Maybe Ident)
-    (Maybe [CDeclaration' a])  -- member declarations
-    [CAttribute' a]            -- __attribute__s
-    deriving (Show)
-
-data CStructTag = CStructTag
-                | CUnionTag
-                deriving (Show)
-
-instance Pretty CStructTag where
-  pretty CStructTag = pretty "struct"
-  pretty CUnionTag = pretty "union"
-
-data CEnumeration' a
-  = CEnum
-    (Maybe Ident)
-    (Maybe [(Ident,                    -- variant name
-             Maybe (CExpression' a))]) -- explicit variant value
-    [CAttribute' a]                    -- __attribute__s
-    deriving (Show)
-
-data CInitializer' a
-  -- | assignment expression
-  = CInitExpr (CExpression' a) a
-  -- | initialization list (see 'CInitList')
-  | CInitList (CInitializerList' a) a
-    deriving (Show)
-
-type CInitializerList' a = [([CPartDesignator' a], CInitializer' a)]
-
-data CPartDesignator' a
-  -- | array position designator
-  = CArrDesig     (CExpression' a) a
-  -- | member designator
-  | CMemberDesig  Ident a
-    deriving (Show)
-
-data CAttribute' a = CAttr Ident [CExpression' a]
-                    deriving (Show)
-
-data CBinaryOp = CMulOp
-               | CDivOp
-               | CRmdOp                 -- ^ remainder of division
-               | CAddOp
-               | CSubOp
-               | CShlOp                 -- ^ shift left
-               | CShrOp                 -- ^ shift right
-               | CLeOp                  -- ^ less
-               | CGrOp                  -- ^ greater
-               | CLeqOp                 -- ^ less or equal
-               | CGeqOp                 -- ^ greater or equal
-               | CEqOp                  -- ^ equal
-               | CNeqOp                 -- ^ not equal
-               | CAndOp                 -- ^ bitwise and
-               | CXorOp                 -- ^ exclusive bitwise or
-               | COrOp                  -- ^ inclusive bitwise or
-               | CLndOp                 -- ^ logical and
-               | CLorOp                 -- ^ logical or
-               deriving (Eq, Ord, Show)
-
-data CUnaryOp = CAdrOp                  -- ^ address operator
-              | CIndOp                  -- ^ indirection operator
-              | CMinOp                  -- ^ prefix minus
-              | CCompOp                 -- ^ one's complement
-              | CNegOp                  -- ^ logical negation
-              deriving (Eq, Ord, Show)
-
-data CExpression' a
-  = CComma       [CExpression' a]         -- comma expression list, n >= 2
-                 a
-  | CAssignment  (CExpression' a)         -- l-value
-                 (CExpression' a)         -- r-value
-                 a
-  | CBinary      CBinaryOp                -- binary operator
-                 (CExpression' a)         -- lhs
-                 (CExpression' a)         -- rhs
-                 a
-  | CCast        (CDeclaration' a)        -- type name
-                 (CExpression' a)
-                 a
-  | CUnary       CUnaryOp                 -- unary operator
-                 (CExpression' a)
-                 a
-  | CSizeofExpr  (CExpression' a)
-                 a
-  | CSizeofType  (CDeclaration' a)        -- type name
-                 a
-  | CAlignofExpr (CExpression' a)
-                 a
-  | CAlignofType (CDeclaration' a)        -- type name
-                 a
-  | CIndex       (CExpression' a)         -- array
-                 (CExpression' a)         -- index
-                 a
-  | CCall        (CExpression' a)         -- function
-                 [CExpression' a]         -- arguments
-                 a
-  | CMember      (CExpression' a)         -- structure
-                 Ident                   -- member name
-                 Bool                    -- deref structure? (True for `->')
-                 a
-  | CVar         Ident                   -- identifier (incl. enumeration const)
-                 a
-  | CConst       CConstant  a            -- ^ integer, character, floating point and string constants
-    deriving (Show)
+newtype CString = CString String
+    deriving Show
 
 data CIntRepr = CDecRepr | CHexRepr | COctalRepr
-  deriving (Show, Eq,Ord)
+    deriving Show
 
-data CInteger = CInteger
-                 !Integer
-                 !CIntRepr
-                 deriving (Show, Eq,Ord)
+data CInteger = 
+    CInteger !Integer !CIntRepr
+    deriving Show
 
 instance Pretty CInteger where
   pretty (CInteger i CDecRepr) = pretty i
   pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
   pretty (CInteger i COctalRepr) = pretty "0" <> pretty (showOct i "")
 
--- | C char constants (abstract)
-data CChar = CChar
-              !Char
-           | CChars
-              [Char] -- multi-character character constant
-           deriving (Show, Eq,Ord)
-
-instance Pretty CChar where
-  pretty (CChar c) = pretty $ show c
-  pretty (CChars cs) = pretty $ show cs
-
-newtype CString = CString
-                String    -- characters
-                deriving (Show, Eq,Ord)
-
-instance Pretty CString where
-  pretty (CString s) = pretty $ show s
-
-data CConstant
-  = CIntConst   CInteger
+data CConstant =
+  CIntConst   CInteger
   | CCharConst  CChar
   | CStrConst   CString
-    deriving (Show)
+    deriving Show
+
+data CObject' a = 
+    CVar Ident CType
+    | CField (CObject' a) Ident CType
+    | CDeref (CObject' a) CType -- ^ pointer dereference (unary *)
+    | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
+    | CObjCast (CObject' a) CType a
+    deriving Show
+
+data CExpression' a =
+    CExprConstant CConstant CType a         -- ^ integer, character, floating point and string constants
+    | CExprValOf (CObject' a) CType a       -- ^ l-value used as a r-value  
+    | CExprAddrOf (CObject' a) CType a      -- ^ address-of operator (&)
+    | CExprUnaryOp CUnaryOp (CExpression' a) CType a
+    | CExprBinaryOp CBinaryOp (CExpression' a) (CExpression' a) CType a
+    | CExprCast (CExpression' a) CType a
+    | CExprSeqAnd (CExpression' a) (CExpression' a) CType a -- ^ sequential "and" r1 && r2
+    | CExprSeqOr (CExpression' a) (CExpression' a) CType a -- ^ sequential "or" r1 || r2 
+    | CExprSizeOfType CType CType a
+    | CExprSizeOfExpr (CExpression' a) CType a
+    | CExprAlignOfType CType CType a
+    | CExprAssign (CObject' a) (CExpression' a) CType a
+    | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
+    | CExprCall (CExpression' a) [CExpression' a] CType a
+    deriving Show
+
+getCExprType :: CExpression' a -> CType
+getCExprType (CExprConstant _ t _) = t
+getCExprType (CExprValOf _ t _) = t
+getCExprType (CExprAddrOf _ t _) = t
+getCExprType (CExprUnaryOp _ _ t _) = t
+getCExprType (CExprBinaryOp _ _ _ t _) = t
+getCExprType (CExprCast _ t _) = t
+getCExprType (CExprSeqAnd _ _ t _) = t
+getCExprType (CExprSeqOr _ _ t _) = t
+getCExprType (CExprSizeOfType _ t _) = t
+getCExprType (CExprSizeOfExpr _ t _) = t
+getCExprType (CExprAlignOfType _ t _) = t
+getCExprType (CExprAssign _ _ t _) = t
+getCExprType (CExprComma _ _ t _) = t
+getCExprType (CExprCall _ _ t _) = t
+
+getCObjType :: CObject' a -> CType
+getCObjType (CVar _ t) = t
+getCObjType (CField _ _ t) = t
+getCObjType (CDeref _ t) = t
+getCObjType (CIndexOf _ _ t) = t
+getCObjType (CObjCast _ t _) = t
+
+data CCompoundBlockItem' a
+  = CBlockStmt (CStatement' a)     -- ^ A statement
+  | CBlockDecl (CDeclaration' a) a -- ^ A local declaration
+    deriving Show
+
+data CStatement' a =
+   CSSkip  -- ^ do nothing
+   | CSCase (CExpression' a) (CStatement' a) a -- ^ Case (labeled statement)
+   | CSDefault (CStatement' a) a -- ^ Default (labeled statement)
+   | CSDo (CExpression' a) a -- ^ evaluate expression for side effects
+   | CSCompound [CCompoundBlockItem' a] a -- ^ compound statement 
+   | CSIfThenElse (CExpression' a) (CStatement' a) (Maybe (CStatement' a)) a -- ^ conditional
+   | CSFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
+      (Maybe (CExpression' a))
+      (Maybe (CExpression' a))
+      (CStatement' a) a -- ^ for loop
+   | CSReturn (Maybe (CExpression' a)) a -- ^ return statement
+   | CSSwitch (CExpression' a) (CStatement' a) a -- ^ switch statement
+   | CSBreak a -- ^ break statement
+    deriving Show
 
 instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
@@ -313,29 +273,25 @@ instance Pretty CConstant where
 
 instance Pretty CBinaryOp where
   pretty op = pretty $ case op of
-    CMulOp -> "*"
-    CDivOp -> "/"
-    CRmdOp -> "%"
-    CAddOp -> "+"
-    CSubOp -> "-"
-    CShlOp -> "<<"
-    CShrOp -> ">>"
-    CLeOp  -> "<"
-    CGrOp  -> ">"
-    CLeqOp -> "<="
-    CGeqOp -> ">="
-    CEqOp  -> "=="
-    CNeqOp -> "!="
-    CAndOp -> "&"
-    CXorOp -> "^"
-    COrOp  -> "|"
-    CLndOp -> "&&"
-    CLorOp -> "||"
+    COpMul -> "*"
+    COpDiv -> "/"
+    COpMod -> "%"
+    COpAdd -> "+"
+    COpSub -> "-"
+    COpShl -> "<<"
+    COpShr -> ">>"
+    COpLt  -> "<"
+    COpGt  -> ">"
+    COpLe -> "<="
+    COpGe -> ">="
+    COpEq  -> "=="
+    COpNe -> "!="
+    COpAnd -> "&"
+    COpXor -> "^"
+    COpOr  -> "|"
 
 instance Pretty CUnaryOp where
   pretty op = pretty $ case op of
-    CAdrOp     -> "&"
-    CIndOp     -> "*"
     CMinOp     -> "-"
     CCompOp    -> "~"
     CNegOp     -> "!"
@@ -354,7 +310,7 @@ data CItemAnn =
       Bool -- ^ Add new line before declaration 
     | CPPDirectiveAnn
       Bool -- ^ Add new line before directive
-  deriving (Show)
+    deriving Show
 
 type CAnns = Located CItemAnn
 
@@ -362,23 +318,15 @@ itemAnnotation :: CAnns -> CItemAnn
 itemAnnotation = element
 
 type CFile = CFile' CAnns
-type CPreprocessorDirective = CPreprocessorDirective' CAnns
 type CFileItem = CFileItem' CAnns
 type CExternalDeclaration = CExternalDeclaration' CAnns
-type CFunctionDef = CFunctionDef' CAnns
+type CFunction = CFunction' CAnns
 type CStatement = CStatement' CAnns
+type CCompoundBlockItem = CCompoundBlockItem' CAnns
+type CObject = CObject' CAnns
 type CExpression = CExpression' CAnns
 type CDeclaration = CDeclaration' CAnns
-type CDeclarationSpecifier = CDeclarationSpecifier' CAnns
 type CTypeSpecifier = CTypeSpecifier' CAnns
-type CTypeQualifier = CTypeQualifier' CAnns
-type CDeclarator = CDeclarator' CAnns
-type CDerivedDeclarator = CDerivedDeclarator' CAnns
-type CArraySize = CArraySize' CAnns
-type CInitializer = CInitializer' CAnns
-type CInitializerList = CInitializerList' CAnns
 type CAttribute = CAttribute' CAnns
 type CStructureUnion = CStructureUnion' CAnns
-type CPartDesignator = CPartDesignator' CAnns
-type CEnumeration = CEnumeration' CAnns
-type CCompoundBlockItem = CCompoundBlockItem' CAnns
+type CEnum = CEnum' CAnns

@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CCCodeGen.Application.Types where
-import Generator.LanguageC.CompCertC
-import Generator.CCCodeGen.Utils
-import Generator.CCCodeGen.Common
+module Generator.CodeGen.Application.Types where
+import Generator.LanguageC.AST
+import Generator.CodeGen.Utils
+import Generator.CodeGen.Common
 
 -- | Generic types
 _TimeVal, _Result,

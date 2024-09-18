@@ -7,8 +7,8 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Generator.CCCodeGen.Module
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Module
+import Generator.LanguageC.Printer
 
 test0 :: String
 test0 = "function assignment_test0() {\n" ++

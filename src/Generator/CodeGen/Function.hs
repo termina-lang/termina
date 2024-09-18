@@ -10,27 +10,22 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
 
 
-genFunctionDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CExternalDeclaration]
+genFunctionDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
 genFunctionDecl (Function identifier parameters rts _ _ ann) = do
-    let cAnn = buildGenericAnn ann
-    retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
-    cParams <- mapM (genParameterDeclaration ann) parameters
-    return [ CDeclExt $ CDeclaration retTypeDecl
-        [(Just (CDeclarator (Just identifier) [CFunDeclr cParams [] cAnn] [] cAnn), Nothing, Nothing)]
-        (buildDeclarationAnn ann True)]
+    cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
+    cParamDecls <- mapM genParameterDeclaration parameters
+    return [CExtDecl (CEDFunction cRetType identifier cParamDecls) (buildDeclarationAnn ann True)]
 genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show item
 
-genFunction :: AnnASTElement SemanticAnn -> CSourceGenerator [CExternalDeclaration]
+genFunction :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
 genFunction (Function identifier parameters rts (BlockRet body ret) _ ann) = do
-    retTypeDecl <- maybe (return [CTypeSpec CVoidType]) genDeclSpecifiers rts
-    cParams <- mapM (genParameterDeclaration ann) parameters
+    cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
+    cParamDecls <- mapM genParameterDeclaration parameters
     cReturn <- genReturnStatement ret
-    let cAnn = buildGenericAnn ann
     cBody <- foldM (\acc x -> do
         cStmt <- genBlockItem x
         return $ acc ++ cStmt) [] body
-    return [ CFDefExt $ CFunDef retTypeDecl
-        (CDeclarator (Just identifier) [CFunDeclr cParams [] cAnn] [] cAnn)
-        (CCompound (cBody ++ cReturn) (buildCompoundAnn ann False True))
+    return [ CFunctionDef Nothing (CFunction cRetType identifier cParamDecls
+        (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
         (buildDeclarationAnn ann True)]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item

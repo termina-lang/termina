@@ -8,8 +8,8 @@ import Semantic.Monad
 import Prettyprinter
 import UT.PPrinter.Expression.Common
 import Control.Monad.Reader
-import Generator.CCCodeGen.Statement
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Statement
+import Generator.LanguageC.Printer
 
 
 tmDescriptorTS :: TypeSpecifier

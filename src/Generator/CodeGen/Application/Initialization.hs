@@ -13,34 +13,27 @@ import qualified Data.Map as M
 import Control.Monad.Reader (runReaderT)
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
-genInitializeObj before (Resource identifier _ (Just expr) _ ann) = do
-    let cAnn = buildGenericAnn ann
-        cObj = CVar identifier cAnn
+genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
+    let cObj = CVar identifier (CTTypeDef identifier noqual)
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
-genInitializeObj before (Task identifier _ (Just expr) _ ann) = do
-    let cAnn = buildGenericAnn ann
-        cObj = CVar identifier cAnn
+genInitializeObj before (Task identifier _ (Just expr) _ _) = do
+    let cObj = CVar identifier (CTTypeDef identifier noqual)
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
-genInitializeObj before (Handler identifier _ (Just expr) _ ann) = do
-    let cAnn = buildGenericAnn ann
-        cObj = CVar identifier cAnn
+genInitializeObj before (Handler identifier _ (Just expr) _ _) = do
+    let cObj = CVar identifier (CTTypeDef identifier noqual)
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
-genInitializeObj before (Emitter identifier _ (Just expr) _ ann) = do
-    let cAnn = buildGenericAnn ann
-        cObj = CVar identifier cAnn
+genInitializeObj before (Emitter identifier _ (Just expr) _ _) = do
+    let cObj = CVar identifier (CTTypeDef identifier noqual)
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
 genInitializeObj _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CSourceGenerator CFile
 genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, objs) <- globals])
-    let cAnn = internalAnn CGenericAnn
-        cStmtAnn = internalAnn (CStatementAnn True False)
-        retTypeDecl = [CTypeSpec CVoidType]
-        cReturn = [CBlockStmt $ CReturn Nothing cStmtAnn]
-        initFunction = [ CExtDecl $ CFDefExt $ CFunDef retTypeDecl
-            (CDeclarator (Just initFunctionName) [CFunDeclr [] [] cAnn] [] cAnn)
-            (CCompound (items ++ cReturn) (internalAnn (CCompoundAnn False True)))
+    let cStmtAnn = internalAnn (CStatementAnn True False)
+        cReturn = [CBlockStmt $ CSReturn Nothing cStmtAnn]
+        initFunction = [CFunctionDef Nothing (CFunction (CTVoid noqual) initFunctionName []
+            (CSCompound (items ++ cReturn) (internalAnn (CCompoundAnn False True))))
             (internalAnn (CDeclarationAnn True))]
     return $ CSourceFile mName (includeTermina : includes ++ initFunction)
 
@@ -48,11 +41,11 @@ genInitFile mName prjprogs = do
         globals = map (\(mn, elems) -> (mn, [g | (GlobalDeclaration g) <- elems])) prjprogs
         modsWithGlobals = filter (\(_, objs) -> not (null objs)) globals
         incs = map fst modsWithGlobals
-        includes = map (\nm -> CPPDirective $ CPPInclude False (nm <.> "h") (internalAnn (CPPDirectiveAnn True))) incs
+        includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True))) incs
 
         initFunctionName = namefy $ "termina_app" <::> "init_globals"
 
-        includeTermina = CPPDirective $ CPPInclude True ("termina" <.> "h") (internalAnn (CPPDirectiveAnn True))
+        includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
 
         genItems :: [Global SemanticAnn] -> CSourceGenerator [CCompoundBlockItem]
         genItems [] = return []

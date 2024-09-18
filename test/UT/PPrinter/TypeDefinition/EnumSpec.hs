@@ -8,9 +8,9 @@ import qualified Data.Map as M
 
 import Prettyprinter
 import Control.Monad.Reader
-import Generator.LanguageC.CompCertCPrinter
-import Generator.CCCodeGen.TypeDefinition
-import Generator.CCCodeGen.Common
+import Generator.LanguageC.Printer
+import Generator.CodeGen.TypeDefinition
+import Generator.CodeGen.Common
 
 
 enumWithOneRegularField :: AnnASTElement SemanticAnn

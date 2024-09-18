@@ -7,8 +7,8 @@ import Semantic.Monad
 import UT.PPrinter.Expression.Common
 import Data.Map
 import Control.Monad.Reader
-import Generator.CCCodeGen.Expression
-import Generator.LanguageC.CompCertCPrinter
+import Generator.CodeGen.Expression
+import Generator.LanguageC.Printer
 
 var0 :: Expression SemanticAnn
 -- | var0 : u16
