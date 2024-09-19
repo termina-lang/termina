@@ -28,16 +28,11 @@ import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Parsing as Parser
 
-data ObjectAnn = ObjectAnn
-  {
-    accessKind :: AccessKind
-  , objTy      :: TypeSpecifier
-  } deriving Show
-
 data ESeman
   = SimpleType TypeSpecifier
   | ObjectType AccessKind TypeSpecifier
   | AppType [Parameter] TypeSpecifier
+  | PortConnection ConnectionSeman
   deriving Show
 
 data SSeman
@@ -93,8 +88,6 @@ data SemanticElems
   ETy ESeman
   -- | Statements 
   | STy SSeman
-  -- | Port connections
-  | CTy ConnectionSeman
   -- | Global elements
   | GTy (GEntry SemanticAnn)
   deriving Show
@@ -105,7 +98,13 @@ getEType (ETy t) = Just t
 getEType _ = Nothing
 
 getResultingType :: SemanticElems -> Maybe TypeSpecifier
-getResultingType (ETy ty) = Just (case ty of {SimpleType t -> t; ObjectType _ t -> t; AppType _ t -> t})
+getResultingType (ETy ty) = 
+  Just (
+    case ty of {
+      SimpleType t -> t; 
+      ObjectType _ t -> t; 
+      AppType _ t -> t;
+      PortConnection _ -> Unit})
 getResultingType _        = Nothing
 
 getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TypeSpecifier)
@@ -153,25 +152,25 @@ buildStmtMatchCaseAnn :: Location -> [TypeSpecifier] -> SemanticAnn
 buildStmtMatchCaseAnn loc ts = locate loc (STy (MatchCaseStmtType ts))
 
 buildOutPortConnAnn :: Location -> TypeSpecifier -> SemanticAnn
-buildOutPortConnAnn loc ts = locate loc (CTy (OutPConnTy ts))
+buildOutPortConnAnn loc ts = locate loc (ETy (PortConnection (OutPConnTy ts)))
 
 buildAccessPortConnAnn :: Location -> TypeSpecifier -> [SemanProcedure] -> SemanticAnn
-buildAccessPortConnAnn loc ts procs = locate loc (CTy (APConnTy ts procs))
+buildAccessPortConnAnn loc ts procs = locate loc (ETy (PortConnection (APConnTy ts procs)))
 
 buildPoolConnAnn :: Location -> TypeSpecifier -> Size -> SemanticAnn
-buildPoolConnAnn loc ts s = locate loc (CTy (APPoolConnTy ts s))
+buildPoolConnAnn loc ts s = locate loc (ETy (PortConnection (APPoolConnTy ts s)))
 
 buildAtomicConnAnn :: Location -> TypeSpecifier -> SemanticAnn
-buildAtomicConnAnn loc ts = locate loc (CTy (APAtomicConnTy ts))
+buildAtomicConnAnn loc ts = locate loc (ETy (PortConnection (APAtomicConnTy ts)))
 
 buildAtomicArrayConnAnn :: Location -> TypeSpecifier -> Size -> SemanticAnn
-buildAtomicArrayConnAnn loc ts s = locate loc (CTy (APAtomicArrayConnTy ts s))
+buildAtomicArrayConnAnn loc ts s = locate loc (ETy (PortConnection (APAtomicArrayConnTy ts s)))
 
 buildSinkPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SemanticAnn
-buildSinkPortConnAnn loc ts action = locate loc (CTy (SPConnTy ts action))
+buildSinkPortConnAnn loc ts action = locate loc (ETy (PortConnection (SPConnTy ts action)))
 
 buildInPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SemanticAnn
-buildInPortConnAnn loc ts action = locate loc (CTy (InPConnTy ts action))
+buildInPortConnAnn loc ts action = locate loc (ETy (PortConnection (InPConnTy ts action)))
 
 -- | Expression Semantic Annotations
 type SemanticAnn = Located SemanticElems

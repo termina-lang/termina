@@ -66,8 +66,6 @@ kClassMember (ClassViewer idx ps ty _blk ann) =
 kClassMember (ClassAction idx ps ty _blk ann) =
   ClassAction idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 
--- type GEntry = GEntry' SemAnn
-
 ----------------------------------------
 -- Subtyping.
 -- This fuction says what types can be casted into others.

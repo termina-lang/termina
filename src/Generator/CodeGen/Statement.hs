@@ -212,7 +212,7 @@ genStructInitialization before level cObj expr = do
                 let fieldObj = CField cObj field cTs
                 rest <- genFieldAssignments False xs
                 return $ CSDo (CExprAssign fieldObj (CExprCast (CExprConstant (CIntConst cAddress) cTs exprCAnn) cTs exprCAnn) cTs exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel (Located (CTy (OutPConnTy _)) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel (Located (ETy (PortConnection (OutPConnTy _))) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 let cMsgQueue = CTTypeDef msgQueue noqual
@@ -221,7 +221,7 @@ genStructInitialization before level cObj expr = do
                     fieldObj = CField cObj field cPtrMsgQueue
                 rest <- genFieldAssignments False xs
                 return $ CSDo (CExprAssign fieldObj channelExpr cPtrMsgQueue exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (Located (CTy (APConnTy rts procedures)) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (Located (ETy (PortConnection (APConnTy rts procedures))) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 let thatFieldObj = CField cObj thatField (CTPointer (CTVoid noqual) noqual)
@@ -230,14 +230,14 @@ genStructInitialization before level cObj expr = do
                 rest <- genFieldAssignments False xs
                 cProcedures <- mapM (genProcedureAssignment field rts) procedures
                 return $ CSDo (CExprAssign thatFieldObj resourceExpr (CTPointer cResourceType noqual) exprCAnn) declStmtAnn : (cProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (CTy (APAtomicArrayConnTy ts size)) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (Array ts size)
                 let portFieldObj = CField cObj field cTs
                 return $ CSDo (CExprAssign portFieldObj (CExprValOf (CVar res cTs) cTs exprCAnn) cTs exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (CTy (APAtomicConnTy ts)) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (ETy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 rest <- genFieldAssignments False xs
