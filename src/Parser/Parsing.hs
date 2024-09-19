@@ -1018,7 +1018,7 @@ classMethodParser = do
   startPos <- getPosition
   name <- identifierParser
   parens (reserved "&mut" >> reserved "self")
-  typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
+  typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- braces blockParser
   ClassMethod name typeSpec blockRet . Position startPos <$> getPosition
 
@@ -1038,11 +1038,8 @@ classProcedureParser = do
   startPos <- getPosition
   name <- identifierParser
   params <- parens procedureParamsParser
-  reservedOp "{"
-  block <- many blockItemParser
-  emptyReturn
-  reservedOp "}"
-  ClassProcedure name params block . Position startPos <$> getPosition
+  blockRet <- braces blockParser
+  ClassProcedure name params blockRet . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =

@@ -75,11 +75,11 @@ mapClassMemberOption (ClassMethod _ maybeRet blkRet _) =
   mapMaybeOption maybeRet >>
   -- | Get the option types from the block return type
   mapM_ mapStatementOption (blockBody blkRet)
-mapClassMemberOption (ClassProcedure _ params blk _) =
+mapClassMemberOption (ClassProcedure _ params blkRet _) =
   -- | Get the option types from the parameters
   mapM_ mapParameterOption params >>
   -- | Get the option types from the block return type
-  mapM_ mapStatementOption blk
+  mapM_ mapStatementOption (blockBody blkRet)
 mapClassMemberOption (ClassViewer _ params maybeRet blkRet _) =
   -- | Get the option types from the return type
   mapMaybeOption maybeRet >>

@@ -271,7 +271,7 @@ data ClassMember' expr obj a
     | ClassProcedure
       Identifier -- ^ name of the procedure
       [Parameter] -- ^ list of parameters (possibly empty)
-      (Block' expr obj a) -- ^ statements block (with return) a
+      (BlockRet' expr obj a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the viewer

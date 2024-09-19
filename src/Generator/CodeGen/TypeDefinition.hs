@@ -256,7 +256,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassProcedure procedure parameters body ann) = do
+        genClassFunctionDefinition (ClassProcedure procedure parameters (BlockRet body _ret) ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters

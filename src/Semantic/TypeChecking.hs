@@ -1265,8 +1265,8 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             ClassField {} -> throwError (annotateError Internal EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
-              typed_blk <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlock blk)
-              let newPrc = SAST.ClassProcedure mIdent mps typed_blk (buildExpAnn mann Unit)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet Nothing blk)
+              let newPrc = SAST.ClassProcedure mIdent mps typed_bret (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
               typed_bret <- addLocalImmutObjs mann [("self", Reference Mutable (DefinedType ident))] (typeBlockRet mty mbody)

@@ -311,7 +311,7 @@ useDefCMemb (ClassField fdef ann)
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
-  = useDefBlock blk
+  = useDefBlockRet blk
   >> mapM_ (withLocation (location ann) . defArgumentsProc) ps
   -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)

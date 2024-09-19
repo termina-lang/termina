@@ -111,8 +111,8 @@ selfDepClass
 selfDepClass _ (ClassField {}) = id
 selfDepClass isSelf (ClassMethod mId _type bRet _ann) =
   M.insert mId (selfInvBlockRet isSelf bRet M.empty)
-selfDepClass isSelf (ClassProcedure pId _params blk _ann) =
-  M.insert pId (selfInvBlock isSelf blk M.empty)
+selfDepClass isSelf (ClassProcedure pId _params bRet _ann) =
+  M.insert pId (selfInvBlockRet isSelf bRet M.empty)
 selfDepClass isSelf (ClassViewer vId _params _type bRet _ann) =
   M.insert vId (selfInvBlockRet isSelf bRet M.empty)
 selfDepClass isSelf (ClassAction aId _param _type bRet _ann) =

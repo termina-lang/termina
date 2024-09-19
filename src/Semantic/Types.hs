@@ -60,7 +60,7 @@ kClassMember (ClassField fld a) = ClassField fld a
 kClassMember (ClassMethod idx ps _blk ann) =
   ClassMethod idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 kClassMember (ClassProcedure idx ps _blk ann) =
-  ClassProcedure idx ps [] ann
+  ClassProcedure idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
   ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
 kClassMember (ClassAction idx ps ty _blk ann) =
