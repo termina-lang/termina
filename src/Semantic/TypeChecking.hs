@@ -1362,7 +1362,7 @@ programAdd (TypeDefinition ty anns) =
       _ -> throwError (annotateError Internal EInternalNoGTY)
 
 typeTerminaModule :: 
-  Parser.AnnotatedProgram Parser.ParserAnn 
+  Parser.AnnotatedProgram
   -> SemanticMonad (SAST.AnnotatedProgram SemanticAnn)
 typeTerminaModule = mapM checkAndAdd
 

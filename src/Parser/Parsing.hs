@@ -1124,7 +1124,7 @@ enumDefinitionParser = do
   TypeDefinition (Enum identifier variants modifiers) . Position startPos <$> getPosition
 
 -- | Top Level parser
-topLevel :: Parser (AnnotatedProgram ParserAnn)
+topLevel :: Parser AnnotatedProgram
 topLevel = many1 $
   try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
@@ -1136,18 +1136,16 @@ moduleIdentifierParser = sepBy1 firstCapital dot
       <$> (lower <?> "Module paths begin with a lowercase letter.")
       <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
 
-singleModule :: Parser ([ Modifier ], [String], ParserAnn )
+singleModule :: Parser ([ Modifier ], [String])
 singleModule = do
   modifiers <- many modifierParser
-  startPos <- getPosition
   moduleIdent <- moduleIdentifierParser
-  endPos <- getPosition
-  return (modifiers, moduleIdent, Position startPos endPos)
+  return (modifiers, moduleIdent)
 
 moduleInclusionParser :: Parser Module
 moduleInclusionParser = do
   reserved "import" 
-  (m, ident, _ann) <- singleModule
+  (m, ident) <- singleModule
   _ <- semi
   return $ ModInclusion ident m
 
@@ -1158,7 +1156,7 @@ terminaModuleParser :: Parser (TerminaModule ParserAnn)
 terminaModuleParser = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
 
 -- | Simple function to test parsers
-strParse :: String -> Either ParseError (AnnotatedProgram ParserAnn)
+strParse :: String -> Either ParseError AnnotatedProgram
 strParse = parse topLevel ""
 
 getStartPosition :: ParserAnn -> SourcePos

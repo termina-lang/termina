@@ -28,7 +28,7 @@ type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' Expression Object a]
+type AnnotatedProgram = [AnnASTElement' Expression Object ParserAnn]
 type Block a = Block' Expression Object a
 
 type Module = Module' [String]

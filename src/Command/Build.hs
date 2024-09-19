@@ -98,7 +98,7 @@ loadConfig = do
         Right c -> return c
 
 newtype ParsingData = ParsingData {
-  parsedAST :: Parser.AnnotatedProgram Parser.ParserAnn
+  parsedAST :: Parser.AnnotatedProgram
 } deriving (Show)
 
 newtype SemanticData = SemanticData {
