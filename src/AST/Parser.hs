@@ -21,7 +21,7 @@ import AST.Core
 data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
-  | ArrayIndexExpression (Object a) (Expression a) a
+  | ArrayIndexExpression (Object a) (Expression' Object a) a
   -- ^ Array indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
@@ -32,7 +32,7 @@ data Object a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
   | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
-  | ArraySlice (Object a) (Expression a) (Expression a) a
+  | ArraySlice (Object a) (Expression' Object a) (Expression' Object a) a
   -- ^ Array slicing | eI [ cEx .. cEy ]|,
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound
@@ -107,27 +107,3 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
   getAnnotation (IsOptionVariantExpression _ _ a) = a
-
-----------------------------------------
-
-type Expression = Expression' Object
-
-type ReturnStmt = ReturnStmt' Expression
-type BlockRet = BlockRet' Expression Object
-type AnnASTElement = AnnASTElement' Expression Object
-type FieldAssignment = FieldAssignment' Expression
-type Global = Global' Expression
-
-type TypeDef a = TypeDef' Expression Object a
-
-type ClassMember = ClassMember' Expression Object
-
-type MatchCase = MatchCase' Expression Object
-type ElseIf = ElseIf' Expression Object
-type Statement = Statement' Expression Object
-
-type AnnotatedProgram a = [AnnASTElement' Expression Object a]
-type Block a = Block' Expression Object a
-
-type Module = Module' [String]
-type TerminaModule a = TerminaModule' Expression Object [String] a a

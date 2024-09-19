@@ -11,7 +11,7 @@ import Semantic.Errors.Errors
 import AST.Seman
 import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Error Annotation)
+runNegativeTest :: String -> Maybe (Error Location)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -38,5 +38,5 @@ spec = do
         isECasteable
   
   where
-    isECasteable :: Maybe (Error Annotation) -> Bool
+    isECasteable :: Maybe (Error Location) -> Bool
     isECasteable = \case Just (ENotCasteable Bool UInt32) -> True; _ -> False

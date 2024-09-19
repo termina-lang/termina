@@ -4,8 +4,6 @@ module DataFlow.VarUsage.Errors where
 
 import AST.Core (Identifier)
 
-import Parser.Parsing (Annotation)
-
 import DataFlow.VarUsage.Types
 
 import qualified Data.Set as S
@@ -43,4 +41,4 @@ data Error
   -- vv| NotUsedBox Identifier
   deriving Show
 
-type VarUsageError = AnnotatedError Error Annotation
+type VarUsageError = AnnotatedError Error Location

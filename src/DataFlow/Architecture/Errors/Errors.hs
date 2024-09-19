@@ -3,7 +3,6 @@ module DataFlow.Architecture.Errors.Errors (
 ) where
 
 import AST.Seman
-import Parser.Parsing
 import Utils.Annotations
 
 data Error a = 
@@ -13,4 +12,4 @@ data Error a =
     | UnsupportedEmitterClass Identifier
     deriving Show
 
-type ProgramError = AnnotatedError (Error Annotation) Annotation
+type ProgramError = AnnotatedError (Error Location) Location

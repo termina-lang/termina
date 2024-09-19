@@ -7,7 +7,6 @@ module Semantic.Errors.Errors where
 import AST.Parser
 -- import SemanAST as SAST
 import Semantic.Types
-import Parser.Parsing (Annotation)
 import Utils.Annotations
 
 ----------------------------------------
@@ -196,7 +195,7 @@ data Error a
   | EMsgQueueRcvWrongArgTy TypeSpecifier
   deriving Show
 
-type SemanticErrors = AnnotatedError (Error Annotation) Annotation
+type SemanticErrors = AnnotatedError (Error Location) Location
 
-instance Annotated (AnnotatedError (Error Annotation)) where
+instance Annotated (AnnotatedError (Error Location)) where
   getAnnotation (AnnotatedError _err ann) = ann

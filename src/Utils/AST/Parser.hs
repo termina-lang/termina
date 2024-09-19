@@ -4,6 +4,7 @@ module Utils.AST.Parser where
 
 import           AST.Parser
 import qualified Data.Map as M
+import Parser.Types
 
 -- Type equality
 checkEqTypes :: TypeSpecifier -> TypeSpecifier -> Bool

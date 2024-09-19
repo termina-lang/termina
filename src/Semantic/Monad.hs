@@ -26,7 +26,7 @@ import Utils.TypeSpecifier
 -- Monads
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
-import qualified Parser.Parsing as Parser
+import qualified Parser.Types as Parser
 
 data ESeman
   = SimpleType TypeSpecifier
@@ -509,9 +509,9 @@ getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
 
 catchMismatch :: 
   -- | Location of the error
-  Parser.Annotation 
+  Parser.ParserAnn 
   -- | Function to create the error
-  -> (TypeSpecifier -> Error Parser.Annotation) 
+  -> (TypeSpecifier -> Error Parser.ParserAnn) 
   -- | Action to execute
   -> SemanticMonad a 
   -- | Action to execute
@@ -522,9 +522,9 @@ catchMismatch ann ferror action = catchError action (\err -> case getError err o
 
 catchExpectedSimple ::
   -- | Location of the error
-  Parser.Annotation
+  Parser.ParserAnn
   -- | Function to create the error
-  -> (TypeSpecifier -> Error Parser.Annotation)
+  -> (TypeSpecifier -> Error Location)
   -- | Action to execute
   -> SemanticMonad a
   -- | Action to execute

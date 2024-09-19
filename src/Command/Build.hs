@@ -11,14 +11,14 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
-import qualified AST.Parser as PAST
+import qualified Parser.Types as Parser
 import qualified AST.Seman as SAST
 
 import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv, getPlatformInitialProgram )
 import System.FilePath
 import System.Exit
 import System.Directory
-import Parser.Parsing (Annotation, terminaModuleParser)
+import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
@@ -37,6 +37,7 @@ import Semantic.Errors.PPrinting (ppError)
 import DataFlow.Architecture
 import DataFlow.Architecture.Types
 import DataFlow.Architecture.Checks
+import AST.Core
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -97,7 +98,7 @@ loadConfig = do
         Right c -> return c
 
 newtype ParsingData = ParsingData {
-  parsedAST :: PAST.AnnotatedProgram Annotation
+  parsedAST :: Parser.AnnotatedProgram Parser.ParserAnn
 } deriving (Show)
 
 newtype SemanticData = SemanticData {
@@ -122,8 +123,8 @@ buildModuleName fs = buildModuleName' fs
     buildModuleName' [x] = pure x
     buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
 
-getModuleImports :: PAST.TerminaModule Annotation -> IO [FilePath]
-getModuleImports = mapM (buildModuleName . PAST.moduleIdentifier) . PAST.modules
+getModuleImports :: Parser.TerminaModule Parser.ParserAnn -> IO [FilePath]
+getModuleImports = mapM (buildModuleName . moduleIdentifier) . modules
 
 -- | Load Termina file 
 loadTerminaModule ::
@@ -141,7 +142,7 @@ loadTerminaModule filePath root = do
     Left err -> die . errorMessage $ "Parsing error: " ++ show err
     Right term -> do
       imports <- getModuleImports term
-      return $ TerminaModuleData filePath fullP imports src_code (ParsingData . PAST.frags $ term)
+      return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
 
 -- | Load the modules of the project
 loadModules

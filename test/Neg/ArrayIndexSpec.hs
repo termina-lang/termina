@@ -10,7 +10,7 @@ import Semantic.Monad
 import Semantic.Errors.Errors
 import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Error Annotation)
+runNegativeTest :: String -> Maybe (Error Location)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -37,5 +37,5 @@ spec = do
         isEIfElseNoOtherwise
   
   where
-    isEIfElseNoOtherwise :: Maybe (Error Annotation) -> Bool
+    isEIfElseNoOtherwise :: Maybe (Error Location) -> Bool
     isEIfElseNoOtherwise = \case Just ESliceInvalidUse -> True; _ -> False

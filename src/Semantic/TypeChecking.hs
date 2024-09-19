@@ -1,5 +1,5 @@
 -- | Semantic Analysis Module i.e. Type checking
--- This module defines a mapping from |AST Parser.Annotation|
+-- This module defines a mapping from |AST Parser.ParserAnn|
 -- to |AST SemanticAnnotations|, | SemanAST {ParserInfo , TypeInfo}|
 
 module Semantic.TypeChecking where
@@ -38,10 +38,10 @@ import Data.Maybe
 -- import Control.Monad.State as ST
 import Control.Monad
 import qualified Control.Monad.State.Strict as ST
-import qualified Parser.Parsing as Parser
+import qualified Parser.Types as Parser
 
 
-getMemberFieldType :: Parser.Annotation -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
+getMemberFieldType :: Parser.ParserAnn -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
 getMemberFieldType ann obj_ty ident =
   case obj_ty of
     Location obj_ty' -> getMemberFieldType ann obj_ty' ident
@@ -71,9 +71,9 @@ getMemberFieldType ann obj_ty ident =
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
-  (Parser.Annotation -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier))
+  (Parser.ParserAnn -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier))
   -- The object to type
-  -> Object Parser.Annotation
+  -> Object Parser.ParserAnn
   -> SemanticMonad (SAST.Object SemanticAnn)
 typeObject getVarTy (Variable ident ann) = do
   (ak, ty) <- getVarTy ann ident
@@ -126,10 +126,10 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
 
 typeMemberFunctionCall ::
-  Parser.Annotation
+  Parser.ParserAnn
   -> TypeSpecifier
   -> Identifier
-  -> [Expression Parser.Annotation]
+  -> [Parser.Expression Parser.ParserAnn]
   -> SemanticMonad (([Parameter], [SAST.Expression SemanticAnn]), TypeSpecifier)
 typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
@@ -256,14 +256,14 @@ typeMemberFunctionCall ann obj_ty ident args =
 -- typeLHSObject looks up in write local environment
 -- typeRHSObject looks up in read+write local environment
 -- tyeGlobalObject looks up only in the global environment
-typeRHSObject, typeLHSObject, typeGlobalObject :: Object Parser.Annotation
+typeRHSObject, typeLHSObject, typeGlobalObject :: Object Parser.ParserAnn
   -> SemanticMonad (SAST.Object SemanticAnn)
 typeRHSObject = typeObject getRHSVarTy
 typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
-typeConstExpression :: TypeSpecifier -> ConstExpression Parser.Annotation -> SemanticMonad (SAST.ConstExpression SemanticAnn)
+typeConstExpression :: TypeSpecifier -> ConstExpression Parser.ParserAnn -> SemanticMonad (SAST.ConstExpression SemanticAnn)
 typeConstExpression expected_ty (KC constant ann) = do
   checkConstant ann expected_ty constant
   return $ SAST.KC constant (buildExpAnn ann expected_ty)
@@ -281,9 +281,9 @@ typeExpression ::
   -- | Expected type of the expression
   Maybe TypeSpecifier ->
   -- | Function used to type objects (depends on the scope)
-  (Object Parser.Annotation -> SemanticMonad (SAST.Object SemanticAnn))
+  (Object Parser.ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -- | Expression to type
-  -> Expression Parser.Annotation
+  -> Parser.Expression Parser.ParserAnn
   -> SemanticMonad (SAST.Expression SemanticAnn)
 -- Object access
 typeExpression expectedType typeObj (AccessObject obj) = do
@@ -366,13 +366,13 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameTypeExpressions :: 
       (TypeSpecifier -> Bool)
       -- | Left hand side error constructor
-      -> (TypeSpecifier -> Error Parser.Annotation)
+      -> (TypeSpecifier -> Error Parser.ParserAnn)
       -- | Right hand side error constructor
-      -> (TypeSpecifier -> Error Parser.Annotation)
+      -> (TypeSpecifier -> Error Parser.ParserAnn)
       -- | Left hand side expression
-      -> Expression Parser.Annotation 
+      -> Parser.Expression Parser.ParserAnn 
       -- | Right hand side expression
-      -> Expression Parser.Annotation 
+      -> Parser.Expression Parser.ParserAnn 
       -- | Typed expressions
       -> SemanticMonad (TypeSpecifier, SAST.Expression SemanticAnn, SAST.Expression SemanticAnn)
     sameTypeExpressions isValid lerror rerror lnume rnume = do
@@ -694,10 +694,10 @@ zipSameLength = zipSameLength' []
 --
 
 checkFieldValue
-  :: Parser.Annotation
-  -> (Object Parser.Annotation -> SemanticMonad (SAST.Object SemanticAnn))
+  :: Parser.ParserAnn
+  -> (Object Parser.ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> FieldDefinition
-  -> FieldAssignment Parser.Annotation
+  -> Parser.FieldAssignment Parser.ParserAnn
   -> SemanticMonad (SAST.FieldAssignment SemanticAnn)
 checkFieldValue loc typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
   if fid == faid
@@ -784,10 +784,10 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
   else throwError $ annotateError loc (EFieldMissing [fid])
 
 checkFieldValues
-  :: Parser.Annotation
-  -> (Object Parser.Annotation -> SemanticMonad (SAST.Object SemanticAnn))
+  :: Parser.ParserAnn
+  -> (Object Parser.ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> [FieldDefinition]
-  -> [FieldAssignment Parser.Annotation]
+  -> [Parser.FieldAssignment Parser.ParserAnn]
   -> SemanticMonad [SAST.FieldAssignment SemanticAnn]
 checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas []
   where
@@ -806,7 +806,7 @@ checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas [
     checkSortedFields (d:ds) (a:as) acc =
       checkFieldValue loc typeObj d a >>= checkSortedFields ds as . (:acc)
 
-retStmt :: Maybe TypeSpecifier -> ReturnStmt Parser.Annotation -> SemanticMonad (SAST.ReturnStmt SemanticAnn)
+retStmt :: Maybe TypeSpecifier -> Parser.ReturnStmt Parser.ParserAnn -> SemanticMonad (SAST.ReturnStmt SemanticAnn)
 retStmt Nothing (ReturnStmt Nothing anns) = do
   return $ SAST.ReturnStmt Nothing (buildExpAnn anns Unit)
 retStmt (Just ts) (ReturnStmt (Just e) anns) = do
@@ -816,15 +816,15 @@ retStmt (Just ts) (ReturnStmt (Just e) anns) = do
 retStmt (Just ty) (ReturnStmt Nothing anns) = throwError $ annotateError anns $ EReturnValueExpected ty
 retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotUnit
 
-typeBlockRet :: Maybe TypeSpecifier -> BlockRet Parser.Annotation -> SemanticMonad (SAST.BlockRet SemanticAnn)
+typeBlockRet :: Maybe TypeSpecifier -> Parser.BlockRet Parser.ParserAnn -> SemanticMonad (SAST.BlockRet SemanticAnn)
 typeBlockRet ts (BlockRet bbody rete) = BlockRet <$> typeBlock bbody <*> retStmt ts rete
 
-typeBlock :: Block Parser.Annotation -> SemanticMonad (SAST.Block SemanticAnn)
+typeBlock :: Parser.Block Parser.ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock = mapM typeStatement
 
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.
-typeStatement :: Statement Parser.Annotation -> SemanticMonad (SAST.Statement SemanticAnn)
+typeStatement :: Parser.Statement Parser.ParserAnn -> SemanticMonad (SAST.Statement SemanticAnn)
 -- Declaration semantic analysis
 typeStatement (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- Check type is alright
@@ -868,7 +868,7 @@ typeStatement (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
     <*> maybe (return Nothing) (fmap Just . localScope . typeBlock) otherwise_branch
     <*> return (buildStmtAnn anns)
   where
-    typeCondExpr :: Expression Parser.Annotation -> SemanticMonad (SAST.Expression SemanticAnn)
+    typeCondExpr :: Parser.Expression Parser.ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
     typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr)
       (\err -> case getError err of
         EMismatch Bool ty -> throwError $ annotateError (getAnnotation err) $ EIfElseIfCondNotBool ty
@@ -920,21 +920,21 @@ typeStatement (MatchStmt matchE cases ann) = do
     _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
     where
 
-      checkOptionCases :: [MatchCase Parser.Annotation] -> SemanticMonad Bool
+      checkOptionCases :: [Parser.MatchCase Parser.ParserAnn] -> SemanticMonad Bool
       checkOptionCases [a,b] = return $ (isOptionNone a && isOptionSome b) || (isOptionSome a && isOptionNone b)
       checkOptionCases _ = throwError $ annotateError ann EMatchOptionBadArgs
 
-      isOptionNone :: MatchCase Parser.Annotation -> Bool
+      isOptionNone :: Parser.MatchCase Parser.ParserAnn -> Bool
       isOptionNone c =
         matchIdentifier c == "None"
           && Prelude.null (matchBVars c)
 
-      isOptionSome ::MatchCase Parser.Annotation -> Bool
+      isOptionSome :: Parser.MatchCase Parser.ParserAnn -> Bool
       isOptionSome c =
         matchIdentifier c == "Some"
            && length (matchBVars c) == 1
 
-      typeMatchCase :: MatchCase Parser.Annotation -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnn)
+      typeMatchCase :: Parser.MatchCase Parser.ParserAnn -> EnumVariant -> SemanticMonad (SAST.MatchCase SemanticAnn)
       typeMatchCase c (EnumVariant vId vData) = typeMatchCase' c vId vData
         where
           typeMatchCase' (MatchCase cIdent bVars bd mcann) supIdent tVars
@@ -952,7 +952,7 @@ typeStatement (MatchStmt matchE cases ann) = do
 
 -- Keeping only type information
 -- TODO Check ident is not defined?
-typeGlobal :: Global Parser.Annotation -> SemanticMonad (SAST.Global SemanticAnn)
+typeGlobal :: Parser.Global Parser.ParserAnn -> SemanticMonad (SAST.Global SemanticAnn)
 typeGlobal (Task ident ty mexpr mods anns) = do
   checkTypeSpecifier anns ty
   exprty <- case mexpr of
@@ -1023,7 +1023,7 @@ checkReturnType anns ty =
   checkTypeSpecifier anns ty
 
 -- Here we actually only need Global
-programSeman :: AnnASTElement Parser.Annotation -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
+programSeman :: Parser.AnnASTElement Parser.ParserAnn -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
 programSeman (Function ident ps mty bret mods anns) =
   ----------------------------------------
   -- Check the return type 
@@ -1068,8 +1068,8 @@ semanticTypeDef (Interface i cls m) = Interface i cls m
 -- | This function type checks the members of a class depending on its kind.
 checkClassKind :: Location -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnn],
-      [PAST.ClassMember Location],
-      [PAST.ClassMember Location])
+      [Parser.ClassMember Parser.ParserAnn],
+      [Parser.ClassMember Parser.ParserAnn])
   -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
 checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
@@ -1110,7 +1110,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
 
   where
 
-    checkSortedProcedures :: [(InterfaceMember SemanticAnn, Identifier)] -> [ClassMember Location] -> SemanticMonad ()
+    checkSortedProcedures :: [(InterfaceMember SemanticAnn, Identifier)] -> [Parser.ClassMember Parser.ParserAnn] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
@@ -1130,7 +1130,7 @@ checkClassKind _anns _clsId _kind _members _provides = return ()
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeTypeDefinition :: Location -> TypeDef Location -> SemanticMonad (SAST.TypeDef SemanticAnn)
+typeTypeDefinition :: Location -> Parser.TypeDef Parser.ParserAnn -> SemanticMonad (SAST.TypeDef SemanticAnn)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeTypeDefinition ann (Struct ident fs mds) =
   -- Check every type is well-defined:
@@ -1362,7 +1362,7 @@ programAdd (TypeDefinition ty anns) =
       _ -> throwError (annotateError Internal EInternalNoGTY)
 
 typeTerminaModule :: 
-  PAST.AnnotatedProgram Parser.Annotation 
+  Parser.AnnotatedProgram Parser.ParserAnn 
   -> SemanticMonad (SAST.AnnotatedProgram SemanticAnn)
 typeTerminaModule = mapM checkAndAdd
 
