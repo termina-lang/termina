@@ -1,8 +1,8 @@
 module DataFlow.Architecture.Types where
 
 import Data.Map
-import AST.Seman
-import Semantic.Monad
+import Semantic.AST
+import Semantic.Types
 
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.

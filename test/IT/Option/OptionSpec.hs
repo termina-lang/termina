@@ -8,7 +8,7 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import qualified Data.Map as M
 import qualified Data.Set as S
-import AST.Core
+import Core.AST
 import Generator.Option
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer

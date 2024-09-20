@@ -28,16 +28,17 @@ import qualified Data.Set             as S
 import qualified Data.Map.Strict      as M
 
 -- AST to work with.
-import           AST.Seman            as SAST
+import           Semantic.AST            as SAST
 -- We need to know the type of objects.
-import Semantic.Monad as SM (SemanticAnn, getResultingType, getTypeSemAnn, getObjectSAnns, getSemanticAnn)
+import qualified Semantic.Monad as SM
+import Semantic.Types
 
 
 -- There are two types of arguments :
 -- + Moving out variables of type box and Option<box T>
 -- + Copying expressions, everything.
 -- It is context dependent (AFAIK).
-useArguments :: Expression SM.SemanticAnn -> UDM VarUsageError ()
+useArguments :: Expression SemanticAnn -> UDM VarUsageError ()
 -- If we are giving a variable of type Box, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
   = case SM.getTypeSemAnn ann of
@@ -47,7 +48,7 @@ useArguments e@(AccessObject (Variable ident ann))
 -- Box variables inside expressions are read as values.
 useArguments e = useExpression e
 
-useObject :: Object SM.SemanticAnn -> UDM VarUsageError ()
+useObject :: Object SemanticAnn -> UDM VarUsageError ()
 useObject (Variable ident ann)
   =
   let loc = location ann in
@@ -78,15 +79,15 @@ useObject (DereferenceMemberAccess obj i ann)
 useObject (Unbox obj _ann)
   = useObject obj
 
-useFieldAssignment :: FieldAssignment SM.SemanticAnn -> UDM VarUsageError ()
+useFieldAssignment :: FieldAssignment SemanticAnn -> UDM VarUsageError ()
 useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 -- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignment _ = return ()
 
-getObjectType :: Object SM.SemanticAnn -> UDM Error (AccessKind, TypeSpecifier)
+getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TypeSpecifier)
 getObjectType = maybe (throwError ImpossibleError) return . SM.getObjectSAnns . getAnnotation
 
-useExpression :: Expression SM.SemanticAnn -> UDM VarUsageError ()
+useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
   = useObject obj
 useExpression (Constant _c _a)
@@ -150,16 +151,16 @@ useExpression (FunctionCall _ident args _ann)
       -- TODO Can Box be passed around as arguments?
   = mapM_ useArguments args
 
-useDefBlockRet :: BlockRet SM.SemanticAnn -> UDM VarUsageError ()
+useDefBlockRet :: BlockRet SemanticAnn -> UDM VarUsageError ()
 useDefBlockRet bret =
   maybe (return ()) useExpression (returnExpression (blockRet bret))
   >> useDefBlock (blockBody bret)
 
 -- Not so sure about this.
-useDefBlock :: Block SM.SemanticAnn -> UDM VarUsageError ()
+useDefBlock :: Block SemanticAnn -> UDM VarUsageError ()
 useDefBlock = mapM_ useDefStmt . reverse
 
-useDefStmt :: Statement SM.SemanticAnn -> UDM VarUsageError ()
+useDefStmt :: Statement SemanticAnn -> UDM VarUsageError ()
 useDefStmt (Declaration ident _accK tyS initE ann)
   -- variable def is defined
   =
@@ -252,7 +253,7 @@ useDefStmt (MatchStmt e mcase ann)
         -- Otherwise, it is a simple use variable.
         _ -> runEncapsEOO (map ( (>> get) . useMCase) mcase);
     )
-    (SM.getResultingType $ getSemanticAnn $ getAnnotation e)
+    (SM.getResultingType $ SM.getSemanticAnn $ getAnnotation e)
   >>= \sets ->
   -- Get all OO sets
   let
@@ -279,7 +280,7 @@ useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 
 destroyOptionBox
-  :: (MatchCase SM.SemanticAnn, MatchCase SM.SemanticAnn)
+  :: (MatchCase SemanticAnn, MatchCase SemanticAnn)
   -> (UDM VarUsageError UDSt , UDM VarUsageError UDSt)
 destroyOptionBox (ml, mr)
   =
@@ -292,7 +293,7 @@ destroyOptionBox (ml, mr)
     , useDefBlock (matchBody mNone) >> get)
 
 -- General case, not when it is Option Box
-useMCase :: MatchCase SM.SemanticAnn -> UDM VarUsageError ()
+useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBlock blk
   >> withLocation (location ann) (mapM_ defVariable bvars)
@@ -305,7 +306,7 @@ sameSets :: [VarSet] -> Bool
 sameSets [] = False
 sameSets (x:xs) = all (S.null . S.difference x) xs
 
-useDefCMemb :: ClassMember SM.SemanticAnn -> UDM VarUsageError ()
+useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
 useDefCMemb (ClassField fdef ann)
   = withLocation (location ann) (defVariable (fieldIdentifier fdef))
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
@@ -321,7 +322,7 @@ useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (withLocation (location ann) . defArgumentsProc) [p]
 
-useDefTypeDef :: TypeDef SM.SemanticAnn -> UDM VarUsageError ()
+useDefTypeDef :: TypeDef SemanticAnn -> UDM VarUsageError ()
 useDefTypeDef (Class _k _id members _provides _mods)
   -- First we go through uses
   = mapM_ useDefCMemb muses
@@ -340,7 +341,7 @@ useDefTypeDef (Interface {}) = return ()
 useDefTypeDef (Enum {}) = return ()
 
 -- Globals
-useDefFrag :: AnnASTElement SM.SemanticAnn -> UDM VarUsageError ()
+useDefFrag :: AnnASTElement SemanticAnn -> UDM VarUsageError ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
  >> mapM_ (withLocation (location anns) . defArgumentsProc ) ps
@@ -350,14 +351,14 @@ useDefFrag (GlobalDeclaration {})
 useDefFrag (TypeDefinition tyDef _ann)
   = useDefTypeDef tyDef
 
-runUDFrag :: AnnASTElement SM.SemanticAnn -> Maybe VarUsageError
+runUDFrag :: AnnASTElement SemanticAnn -> Maybe VarUsageError
 runUDFrag =
   either Just (const Nothing)
   . fst
   . runComputation
   . useDefFrag
 
-runUDAnnotatedProgram :: AnnotatedProgram  SM.SemanticAnn -> Maybe VarUsageError
+runUDAnnotatedProgram :: AnnotatedProgram  SemanticAnn -> Maybe VarUsageError
 runUDAnnotatedProgram
   = safeHead
   . filter isJust

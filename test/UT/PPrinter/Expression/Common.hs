@@ -1,8 +1,8 @@
 module UT.PPrinter.Expression.Common where
 
-import AST.Core
+import Core.AST
 import Utils.Annotations
-import Semantic.Monad
+import Semantic.Types
 
 objSemAnn :: AccessKind -> TypeSpecifier -> SemanticAnn
 objSemAnn ak ts = Located (ETy (ObjectType ak ts)) Internal

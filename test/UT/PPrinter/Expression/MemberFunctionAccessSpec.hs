@@ -1,14 +1,14 @@
 module UT.PPrinter.Expression.MemberFunctionAccessSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
 import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
-import Semantic.Monad
+import Semantic.Types
 
 self, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnn
 self = Variable "self" (refDefinedTypeSemAnn "Resource")

@@ -4,7 +4,7 @@
 
 module Parser.Parsing where
 
-import           AST.Parser                  hiding (blockRet)
+import           Parser.AST                  hiding (blockRet)
 -- Importing position from Parsec
 import           Text.Parsec.Pos
 -- Importing parser combinators
@@ -1109,7 +1109,7 @@ enumDefinitionParser = do
   TypeDefinition (Enum identifier variants modifiers) . Position startPos <$> getPosition
 
 -- | Top Level parser
-topLevel :: Parser AnnotatedProgram
+topLevel :: Parser (AnnotatedProgram ParserAnn)
 topLevel = many1 $
   try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
@@ -1141,7 +1141,7 @@ terminaModuleParser :: Parser (TerminaModule ParserAnn)
 terminaModuleParser = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
 
 -- | Simple function to test parsers
-strParse :: String -> Either ParseError AnnotatedProgram
+strParse :: String -> Either ParseError (AnnotatedProgram ParserAnn)
 strParse = parse topLevel ""
 
 getStartPosition :: ParserAnn -> SourcePos

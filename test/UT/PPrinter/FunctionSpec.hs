@@ -1,10 +1,10 @@
 module UT.PPrinter.FunctionSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import qualified Data.Map as M
-import Semantic.Monad
+import Semantic.Types
 import UT.PPrinter.Expression.Common
 import Prettyprinter
 import Control.Monad.Reader

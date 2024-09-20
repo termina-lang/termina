@@ -1,9 +1,9 @@
 module UT.PPrinter.TypeDefinition.StructSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text
-import Semantic.Monad
+import Semantic.Types
 import qualified Data.Map as M
 import qualified Data.Set as S
 

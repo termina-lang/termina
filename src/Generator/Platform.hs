@@ -3,8 +3,7 @@
 module Generator.Platform where
 
 import qualified Data.Text as T
-import AST.Core
-import Semantic.Monad
+import Core.AST
 import Semantic.Types
 import DataFlow.Architecture.Types
 import qualified Data.Map as M

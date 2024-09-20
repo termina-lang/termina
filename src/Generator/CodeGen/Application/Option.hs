@@ -7,10 +7,10 @@ import Generator.CodeGen.Common
 import Control.Monad.Reader
 import System.Path
 import Generator.CodeGen.TypeDefinition
-import Semantic.Monad
+import Semantic.Types
 import qualified Data.Set as S
 import qualified Data.Map as M
-import AST.Seman
+import Semantic.AST
 import Utils.Annotations
 
 genOptionPathName :: FilePath

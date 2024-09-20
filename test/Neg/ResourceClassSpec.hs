@@ -8,7 +8,7 @@ import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors.Errors
-import AST.Seman
+import Semantic.AST
 import Utils.Annotations
 
 runNegativeTest :: String -> Maybe (Error Location)

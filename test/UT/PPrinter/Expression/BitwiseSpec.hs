@@ -1,10 +1,10 @@
 module UT.PPrinter.Expression.BitwiseSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
-import Semantic.Monad
+import Semantic.Types
 import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer

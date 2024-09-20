@@ -1,8 +1,9 @@
 -- | Helper functions for types
 
-module Utils.TypeSpecifier where
+module Core.Utils where
 
-import           AST.Parser
+import Parser.AST
+import qualified Data.List as L
 
 -- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
 primitiveTypes :: TypeSpecifier -> Bool
@@ -153,7 +154,7 @@ memberIntCons i Int64  = ( -9223372036854775808 <= i ) && ( i <= 922337203685477
 memberIntCons i USize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons _ _      = False
 
-identifierType :: TypeDef' expr lho a -> Identifier
+identifierType :: TypeDef' blk a -> Identifier
 identifierType (Struct ident _ _) = ident
 identifierType (Enum ident _ _)   = ident
 identifierType (Class _ ident _ _ _)  = ident
@@ -210,3 +211,104 @@ rootType (Reference _ ts) = rootType ts
 rootType (BoxSubtype ts) = rootType ts
 rootType (Location ts) = rootType ts
 rootType t = t
+
+-- Type equality
+checkEqTypes :: TypeSpecifier -> TypeSpecifier -> Bool
+checkEqTypes  UInt8  UInt8 = True
+checkEqTypes  UInt16  UInt16 = True
+checkEqTypes  UInt32  UInt32 = True
+checkEqTypes  UInt64  UInt64 = True
+checkEqTypes  Int8  Int8 = True
+checkEqTypes  Int16  Int16 = True
+checkEqTypes  Int32  Int32 = True
+checkEqTypes  Int64  Int64 = True
+checkEqTypes  USize  USize = True
+checkEqTypes  Bool  Bool = True
+checkEqTypes  Unit Unit = True
+checkEqTypes  (Option _) (Option Unit) = True
+checkEqTypes  (Option Unit) (Option _) = True
+checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (BoxSubtype tyspecl) (BoxSubtype tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Array typespecl sizel) (Array typespecr sizer) = checkEqTypes typespecl typespecr && (sizel == sizer)
+checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
+-- Location subtypes
+checkEqTypes  (Location tyspecl) (Location tyspecr) = checkEqTypes tyspecl tyspecr
+checkEqTypes  (Location tyspecl) tyspecr = checkEqTypes tyspecl tyspecr
+checkEqTypes  tyspecl (Location tyspecr) = checkEqTypes tyspecl tyspecr
+--
+checkEqTypes  _ _ = False
+
+findWith :: (a -> Maybe b) -> [a] -> Maybe b
+findWith f = L.foldl' (\acc a -> maybe acc Just (f a)) Nothing
+
+findClassField :: Identifier -> [ ClassMember' blk a ] -> Maybe (TypeSpecifier, a)
+findClassField i
+  =
+  fmap
+  (\case { ClassField (FieldDefinition _ t) a -> (t, a);
+           _ -> error "Impossible after find"})
+  .
+  L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
+                 _ -> False;})
+
+findClassProcedure :: Identifier -> [ ClassMember' blk a ] -> Maybe ([Parameter], a)
+findClassProcedure i
+  = fmap
+  (\case {ClassProcedure _ ps _ a -> (ps,a)
+         ; _ -> error "Impossible after find"})
+  .
+  L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
+               ; _ -> False})
+
+findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([Parameter], a)
+findInterfaceProcedure i
+  = fmap
+  (\case {InterfaceProcedure _ ps a -> (ps, a)})
+  .
+  L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
+
+findClassViewerOrMethod :: Identifier -> [ ClassMember' blk a ] -> Maybe ([Parameter], Maybe TypeSpecifier, a)
+findClassViewerOrMethod i
+  = fmap
+  (\case {
+    ClassViewer _ ps mty _ a -> (ps, mty, a);
+    ClassMethod _ ty _ a -> ([], ty, a);
+    _ -> error "Impossible after find"
+  })
+  .
+  L.find (
+    \case{
+      ClassViewer ident _ _ _ _ -> (ident == i);
+      ClassMethod ident _ _ _ -> (ident == i);
+      _ -> False
+    }
+  )
+
+className :: ClassMember' blk a -> Identifier
+className (ClassField e _)                = fieldIdentifier e
+className (ClassMethod mIdent _ _ _)      = mIdent
+className (ClassProcedure pIdent _ _ _) = pIdent
+className (ClassViewer vIdent _ _ _ _)  = vIdent
+className (ClassAction aIdent _ _ _ _)    = aIdent
+----------------------------------------
+
+glbName :: Global' expr a -> Identifier
+glbName (Task tId _ _ _ _)     = tId
+glbName (Resource tId _ _ _ _) = tId
+glbName (Channel tId _ _ _ _)  = tId
+glbName (Emitter tId _ _ _ _) = tId
+glbName (Handler tId _ _ _ _)  = tId
+glbName (Const tId _ _ _ _)    = tId
+
+tyDefName :: TypeDef' blk a -> Identifier
+tyDefName (Struct sId _ _ )= sId
+tyDefName (Enum sId _ _ )=   sId
+tyDefName (Class _ sId _ _ _ )=sId
+tyDefName (Interface sId _ _ )=sId
+
+globalsName :: AnnASTElement' blk expr a -> Identifier
+globalsName (Function fId _ _ _ _ _) = fId
+globalsName (GlobalDeclaration glb)    = glbName glb
+globalsName (TypeDefinition tyDef _)   = tyDefName tyDef

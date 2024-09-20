@@ -1,44 +1,13 @@
--- | Utility AST functions
-
-module Utils.AST.Parser where
-
-import           AST.Parser
+module Semantic.Utils where
+    
+import Core.AST
+import Parser.AST
 import qualified Data.Map as M
-import Parser.Types
-
--- Type equality
-checkEqTypes :: TypeSpecifier -> TypeSpecifier -> Bool
-checkEqTypes  UInt8  UInt8 = True
-checkEqTypes  UInt16  UInt16 = True
-checkEqTypes  UInt32  UInt32 = True
-checkEqTypes  UInt64  UInt64 = True
-checkEqTypes  Int8  Int8 = True
-checkEqTypes  Int16  Int16 = True
-checkEqTypes  Int32  Int32 = True
-checkEqTypes  Int64  Int64 = True
-checkEqTypes  USize  USize = True
-checkEqTypes  Bool  Bool = True
-checkEqTypes  Unit Unit = True
-checkEqTypes  (Option _) (Option Unit) = True
-checkEqTypes  (Option Unit) (Option _) = True
-checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (BoxSubtype tyspecl) (BoxSubtype tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Array typespecl sizel) (Array typespecr sizer) = checkEqTypes typespecl typespecr && (sizel == sizer)
-checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
--- Location subtypes
-checkEqTypes  (Location tyspecl) (Location tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Location tyspecl) tyspecr = checkEqTypes tyspecl tyspecr
-checkEqTypes  tyspecl (Location tyspecr) = checkEqTypes tyspecl tyspecr
---
-checkEqTypes  _ _ = False
 
 -- Helper to detect invocations to 'self'
 objIsSelf :: Object a -> Bool
 objIsSelf (Variable ident _ann ) = ident == "self"
 objIsSelf _ = False
-
 
 ----------------------------------------
 -- Invocation Dependency in a block of code.

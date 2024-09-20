@@ -2,7 +2,7 @@
 
 module DataFlow.VarUsage.Computation where
 
-import AST.Core (Identifier,Parameter(..),TypeSpecifier(..))
+import Core.AST (Identifier,Parameter(..),TypeSpecifier(..))
 
 import DataFlow.VarUsage.Errors
 import DataFlow.VarUsage.Types

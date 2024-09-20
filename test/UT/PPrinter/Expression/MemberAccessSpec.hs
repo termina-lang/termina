@@ -1,14 +1,14 @@
 module UT.PPrinter.Expression.MemberAccessSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
 import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
-import Semantic.Monad
+import Semantic.Types
 
 tmDescriptor0, tmDescriptor1 :: Object SemanticAnn
 tmDescriptor0 = Variable "tm_descriptor0" (definedTypeObjSemAnn Mutable "TMDescriptor")

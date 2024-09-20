@@ -11,8 +11,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
-import qualified Parser.Types as Parser
-import qualified AST.Seman as SAST
+import qualified Parser.AST as PAST
+import qualified Semantic.AST as SAST
 
 import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv, getPlatformInitialProgram )
 import System.FilePath
@@ -22,7 +22,8 @@ import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
 import qualified Data.Map.Strict as M
 import Extras.TopSort
-import Semantic.Monad (SemanticAnn, Environment, makeInitialGlobalEnv)
+import Semantic.Types (SemanticAnn)
+import Semantic.Monad (Environment, makeInitialGlobalEnv)
 import Modules.Modules
 import DataFlow.VarUsage (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
@@ -37,7 +38,8 @@ import Semantic.Errors.PPrinting (ppError)
 import DataFlow.Architecture
 import DataFlow.Architecture.Types
 import DataFlow.Architecture.Checks
-import AST.Core
+import Core.AST
+import Parser.Types
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -98,7 +100,7 @@ loadConfig = do
         Right c -> return c
 
 newtype ParsingData = ParsingData {
-  parsedAST :: Parser.AnnotatedProgram
+  parsedAST :: PAST.AnnotatedProgram ParserAnn
 } deriving (Show)
 
 newtype SemanticData = SemanticData {
@@ -123,7 +125,7 @@ buildModuleName fs = buildModuleName' fs
     buildModuleName' [x] = pure x
     buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
 
-getModuleImports :: Parser.TerminaModule Parser.ParserAnn -> IO [FilePath]
+getModuleImports :: PAST.TerminaModule ParserAnn -> IO [FilePath]
 getModuleImports = mapM (buildModuleName . moduleIdentifier) . modules
 
 -- | Load Termina file 

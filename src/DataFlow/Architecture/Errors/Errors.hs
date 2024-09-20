@@ -2,7 +2,7 @@ module DataFlow.Architecture.Errors.Errors (
     ProgramError, Error(..)
 ) where
 
-import AST.Seman
+import Semantic.AST
 import Utils.Annotations
 
 data Error a = 

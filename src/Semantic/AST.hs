@@ -1,17 +1,16 @@
 {-# LANGUAGE DeriveFunctor  #-}
 {-# LANGUAGE KindSignatures #-}
 
-module AST.Seman
-  ( module AST.Seman
-  , module AST.Core
+module Semantic.AST
+  ( module Semantic.AST
+  , module Core.AST
   ) where
 
 import Utils.Annotations
-import AST.Core
+import Core.AST
+import Modules.Modules
 
-import Modules.Modules (QualifiedName)
-
-  -- | First AST after parsing
+-- | First AST after parsing
 data Expression'
     obj -- ^ objects type
     a -- ^ Annotations
@@ -51,8 +50,8 @@ data Expression'
     (obj a) -- ^ Opion object
     OptionVariantLabel -- ^ Variant label
     a
-  | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
-  -- ^ Array slice. This is a reference to an slice of an array.
+  | ArraySliceExpression AccessKind (Object a) (Expression' obj a) (Expression' obj a) a
+  -- ^ Array slice. This is a reference to an slisce of an array.
   deriving (Show, Functor)
 
 ----------------------------------------
@@ -61,7 +60,7 @@ data Expression'
 data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
-  | ArrayIndexExpression (Object a) (Expression a) a
+  | ArrayIndexExpression (Object a) (Expression' Object a) a
   -- ^ Array indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
@@ -102,25 +101,89 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (ArraySliceExpression _ _ _ _ a)    = a
 ----------------------------------------
 
+
+data MatchCase' expr obj a = MatchCase
+  {
+    matchIdentifier :: Identifier
+  , matchBVars      :: [Identifier]
+  , matchBody       :: Block' expr obj a
+  , matchAnnotation :: a
+  } deriving (Show,Functor)
+
+data ElseIf' expr obj a = ElseIf
+  {
+    elseIfCond       :: expr a
+  , elseIfBody       :: Block' expr obj a
+  , elseIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data Statement' expr obj a =
+  -- | Declaration statement
+  Declaration
+    Identifier -- ^ name of the variable
+    AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
+    TypeSpecifier -- ^ type of the variable
+    (expr a) -- ^ initialization expression
+    a
+  | AssignmentStmt
+    (obj a) -- ^ name of the variable
+    (expr a) -- ^ assignment expression
+    a
+  | IfElseStmt
+    (expr a) -- ^ conditional expression
+    [ Statement' expr obj a ] -- ^ statements in the if block
+    [ ElseIf' expr obj a ] -- ^ list of else if blocks
+    (Maybe [ Statement' expr obj a ]) -- ^ statements in the else block
+    a
+  -- | For loop
+  | ForLoopStmt
+    Identifier -- ^ name of the iterator variable
+    TypeSpecifier -- ^ type of iterator variable
+    (expr a) -- ^ initial value of the iterator
+    (expr a) -- ^ final value of the iterator
+    (Maybe (expr a)) -- ^ break condition (optional)
+    [ Statement' expr obj a ] -- ^ statements in the for loop
+    a
+  | MatchStmt
+    (expr a) -- ^ expression to match
+    [ MatchCase' expr obj a ] -- ^ list of match cases
+    a
+  | SingleExpStmt
+    (expr a) -- ^ expression
+    a
+  deriving (Show, Functor)
+
+-- Blocks are just list of statements
+type Block' expr obj a = [Statement' expr obj a]
+
+-- | |BlockRet| represent a body block with its return statement
+data BlockRet' expr obj a
+  = BlockRet
+  {
+    blockBody :: [Statement' expr obj a]
+  , blockRet  :: ReturnStmt' expr a
+  }
+  deriving (Show, Functor)
+
 -- type OptionVariant a = OptionVariant' (Expression a)
 type Expression = Expression' Object
 
 type ReturnStmt = ReturnStmt' Expression
 type BlockRet = BlockRet' Expression Object
-type AnnASTElement = AnnASTElement' Expression Object
+type AnnASTElement = AnnASTElement' BlockRet Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' Expression
 
-type TypeDef a = TypeDef' Expression Object a
+type TypeDef = TypeDef' BlockRet
 
-type ClassMember = ClassMember' Expression Object
+type ClassMember = ClassMember' BlockRet
 
 type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' Expression Object a]
+type AnnotatedProgram a = [AnnASTElement' BlockRet Expression a]
 type Block a = Block' Expression Object a
 
 type Module = Module' QualifiedName
-type TerminaModule = TerminaModule' Expression Object QualifiedName 
+type TerminaModule = TerminaModule' BlockRet Expression QualifiedName 

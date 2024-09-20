@@ -6,8 +6,7 @@ import DataFlow.Architecture.Types
 import Control.Monad.Except
 import DataFlow.Architecture.Errors.Errors
 import qualified Control.Monad.State.Strict as ST
-import AST.Seman
-import Semantic.Monad
+import Semantic.AST
 import qualified Data.Map as M
 import Data.Maybe
 import DataFlow.Architecture.Utils

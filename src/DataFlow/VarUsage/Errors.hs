@@ -2,7 +2,7 @@
 
 module DataFlow.VarUsage.Errors where
 
-import AST.Core (Identifier)
+import Core.AST (Identifier)
 
 import DataFlow.VarUsage.Types
 

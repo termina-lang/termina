@@ -14,83 +14,17 @@ import Data.Maybe
 
 -- AST Info
 import Utils.Annotations
-import AST.Parser
-import AST.Seman as SAST
-import AST.Core as CAST
-import Utils.AST.Parser (checkEqTypes)
+import Core.AST as CAST
+import Semantic.AST
 
 import Semantic.Errors.Errors
 import Semantic.Types
-import Utils.TypeSpecifier
+import Core.Utils
 
 -- Monads
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser
-
-data ESeman
-  = SimpleType TypeSpecifier
-  | ObjectType AccessKind TypeSpecifier
-  | AppType [Parameter] TypeSpecifier
-  | PortConnection ConnectionSeman
-  deriving Show
-
-data SSeman
-  = SimpleStmtType -- ^ Statement with no type
-    | MatchCaseStmtType [TypeSpecifier] -- ^ Match case with types
-  deriving Show
-
-data SemanProcedure = SemanProcedure Identifier [Parameter]
-  deriving (Show)
-
-data ConnectionSeman =
-    -- | Access port connection
-  APConnTy
-  -- | Type specifier of the connected resource
-    TypeSpecifier
-    -- | List of procedures that can be called on the connected resource
-    [SemanProcedure]
-  | APAtomicConnTy
-    -- | Type specifier of the connected atomic
-    TypeSpecifier
-  | APAtomicArrayConnTy
-    -- | type specifier of the connected atomic array
-    TypeSpecifier
-    -- | Size of the connected atomic array
-    Size
-  | APPoolConnTy
-    -- | Type specifier of the connected pool
-    TypeSpecifier
-    -- | Size of the connected pool
-    Size
-  -- | Sink port connection
-  | SPConnTy
-    -- | Type specifier of the connected event emitter
-    TypeSpecifier
-    -- | Name of the action that will be triggered when the event emitter emits an event 
-    Identifier 
-  -- | In port connection
-  | InPConnTy
-    -- | Type specifier of the connected channel
-    TypeSpecifier
-    -- | Name of the action that will be triggered when the channel receives a message
-    Identifier
-  | OutPConnTy
-    -- | Type specifier of the connected channel
-    TypeSpecifier
-  deriving Show
-
--- | Semantic elements
--- we have three different semantic elements:
-data SemanticElems
-  =
-  -- | Expressions with their types
-  ETy ESeman
-  -- | Statements 
-  | STy SSeman
-  -- | Global elements
-  | GTy (GEntry SemanticAnn)
-  deriving Show
 
 ----------------------------------------
 getEType :: SemanticElems -> Maybe ESeman
@@ -171,9 +105,6 @@ buildSinkPortConnAnn loc ts action = locate loc (ETy (PortConnection (SPConnTy t
 
 buildInPortConnAnn :: Location -> TypeSpecifier -> Identifier -> SemanticAnn
 buildInPortConnAnn loc ts action = locate loc (ETy (PortConnection (InPConnTy ts action)))
-
--- | Expression Semantic Annotations
-type SemanticAnn = Located SemanticElems
 
 getSemanticAnn :: SemanticAnn -> SemanticElems
 getSemanticAnn = element
@@ -481,14 +412,14 @@ checkEqTypesOrError :: Location -> TypeSpecifier -> TypeSpecifier -> SemanticMon
 checkEqTypesOrError loc t1 t2 =
   unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
-unBox :: SAST.Object SemanticAnn -> SAST.Object SemanticAnn
+unBox :: Object SemanticAnn -> Object SemanticAnn
 unBox t = Unbox t (unboxTypeAnn (getAnnotation t))
 
-unBoxExp :: SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
-unBoxExp (SAST.AccessObject obj) =  return $ SAST.AccessObject (unBox obj)
+unBoxExp :: Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
+unBoxExp (AccessObject obj) =  return $ AccessObject (unBox obj)
 unBoxExp _ = throwError $ annotateError Internal EUnBoxExpression
 
-mustBeTy :: TypeSpecifier -> SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
+mustBeTy :: TypeSpecifier -> Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 mustBeTy ty expression =
   getExpType expression >>=
   checkEqTypesOrError loc ty
@@ -497,7 +428,7 @@ mustBeTy ty expression =
     ann_exp = getAnnotation expression
     loc = location ann_exp
 
-blockRetTy :: TypeSpecifier -> SAST.BlockRet SemanticAnn -> SemanticMonad ()
+blockRetTy :: TypeSpecifier -> BlockRet SemanticAnn -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
   (throwError (annotateError Internal EUnboxingBlockRet))
@@ -625,10 +556,10 @@ checkTypeSpecifier _ Unit                    = return ()
 
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
-getObjectType :: SAST.Object SemanticAnn -> SemanticMonad (AccessKind, TypeSpecifier)
+getObjectType :: Object SemanticAnn -> SemanticMonad (AccessKind, TypeSpecifier)
 getObjectType = maybe (throwError $ annotateError Internal EUnboxingObject) return . getObjectSAnns . getAnnotation
 
-getExpType :: SAST.Expression SemanticAnn -> SemanticMonad TypeSpecifier
+getExpType :: Expression SemanticAnn -> SemanticMonad TypeSpecifier
 getExpType
   = maybe (throwError $ annotateError Internal EUnboxingStmtExpr) return
   . getResultingType . getSemanticAnn . getAnnotation

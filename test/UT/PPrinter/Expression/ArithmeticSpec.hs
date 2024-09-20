@@ -1,9 +1,9 @@
 module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
-import Semantic.Monad
+import Semantic.Types
 import UT.PPrinter.Expression.Common
 import Data.Map
 import Control.Monad.Reader

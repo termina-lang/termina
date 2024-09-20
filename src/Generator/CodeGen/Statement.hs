@@ -1,7 +1,9 @@
 module Generator.CodeGen.Statement where
 
-import AST.Seman
+import Core.AST
+import Semantic.AST
 import Generator.LanguageC.AST
+import Semantic.Types
 import Semantic.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common

@@ -1,10 +1,10 @@
 module UT.PPrinter.Statement.AssignmentSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
-import Semantic.Monad
+import Semantic.Types
 import Prettyprinter
 import UT.PPrinter.Expression.Common
 import Control.Monad.Reader

@@ -4,7 +4,7 @@
 
 -- | Module defining core AST
 
-module AST.Core where
+module Core.AST where
 
 import Utils.Annotations
 
@@ -31,23 +31,14 @@ data IntRepr = DecRepr | HexRepr | OctalRepr
 data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
 
--- | |BlockRet| represent a body block with its return statement
-data BlockRet' expr obj a
-  = BlockRet
-  {
-    blockBody :: [Statement' expr obj a]
-  , blockRet  :: ReturnStmt' expr a
-  }
-  deriving (Show, Functor)
-
 -- | Annotated AST element
-data AnnASTElement' expr obj a =
+data AnnASTElement' blk expr a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
     (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-    (BlockRet' expr obj a) -- ^ statements block (with return)
+    (blk a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
@@ -57,11 +48,11 @@ data AnnASTElement' expr obj a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' expr obj a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' blk a) -- ^ the type definition (struct, union, etc.)
     a
   deriving (Show,Functor)
 
-instance Annotated (AnnASTElement' expr glb) where
+instance Annotated (AnnASTElement' blk expr) where
   getAnnotation (Function _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
@@ -216,10 +207,10 @@ instance Annotated (Global' expr) where
   getAnnotation (Const _ _ _ _ a)    = a
 
 -- Extremelly internal type definition
-data TypeDef' expr obj a
+data TypeDef' blk a
   = Struct Identifier [FieldDefinition]  [ Modifier ]
   | Enum Identifier [EnumVariant] [ Modifier ]
-  | Class ClassKind Identifier [ClassMember' expr obj a] [Identifier] [ Modifier ]
+  | Class ClassKind Identifier [ClassMember' blk a] [Identifier] [ Modifier ]
   | Interface Identifier [InterfaceMember a] [ Modifier ]
   deriving (Show, Functor)
 
@@ -239,7 +230,7 @@ data InterfaceMember a
 
 -------------------------------------------------
 -- Class Member
-data ClassMember' expr obj a
+data ClassMember' blk a
   = 
     -- | Fields. They form the state  of the object
     ClassField 
@@ -250,7 +241,7 @@ data ClassMember' expr obj a
     | ClassMethod 
       Identifier  -- ^ name of the method
       (Maybe TypeSpecifier) -- ^ type of the return value (optional)
-      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     -- | Procedures. They can only be used on shared resources, and constitute their
     -- interface with the outside world. They define a list of parameters and a block
@@ -258,19 +249,19 @@ data ClassMember' expr obj a
     | ClassProcedure
       Identifier -- ^ name of the procedure
       [Parameter] -- ^ list of parameters (possibly empty)
-      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the viewer
       [Parameter] -- ^ list of parameters (possibly empty)
       (Maybe TypeSpecifier) -- ^ return type of the viewer
-      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassAction 
       Identifier  -- ^ name of the method
       Parameter -- ^ input parameter
       TypeSpecifier -- ^ type of the return value
-      (BlockRet' expr obj a) -- ^ statements block (with return) a
+      (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)
 
@@ -306,57 +297,6 @@ data EnumVariant = EnumVariant {
   , assocData       :: [ TypeSpecifier ]
 } deriving (Show)
 
-data MatchCase' expr obj a = MatchCase
-  {
-    matchIdentifier :: Identifier
-  , matchBVars      :: [Identifier]
-  , matchBody       :: Block' expr obj a
-  , matchAnnotation :: a
-  } deriving (Show,Functor)
-
-data ElseIf' expr obj a = ElseIf
-  {
-    elseIfCond       :: expr a
-  , elseIfBody       :: Block' expr obj a
-  , elseIfAnnotation :: a
-  } deriving (Show, Functor)
-
-data Statement' expr obj a =
-  -- | Declaration statement
-  Declaration
-    Identifier -- ^ name of the variable
-    AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TypeSpecifier -- ^ type of the variable
-    (expr a) -- ^ initialization expression
-    a
-  | AssignmentStmt
-    (obj a) -- ^ name of the variable
-    (expr a) -- ^ assignment expression
-    a
-  | IfElseStmt
-    (expr a) -- ^ conditional expression
-    [ Statement' expr obj a ] -- ^ statements in the if block
-    [ ElseIf' expr obj a ] -- ^ list of else if blocks
-    (Maybe [ Statement' expr obj a ]) -- ^ statements in the else block
-    a
-  -- | For loop
-  | ForLoopStmt
-    Identifier -- ^ name of the iterator variable
-    TypeSpecifier -- ^ type of iterator variable
-    (expr a) -- ^ initial value of the iterator
-    (expr a) -- ^ final value of the iterator
-    (Maybe (expr a)) -- ^ break condition (optional)
-    [ Statement' expr obj a ] -- ^ statements in the for loop
-    a
-  | MatchStmt
-    (expr a) -- ^ expression to match
-    [ MatchCase' expr obj a ] -- ^ list of match cases
-    a
-  | SingleExpStmt
-    (expr a) -- ^ expression
-    a
-  deriving (Show, Functor)
-
 -- | Constant values:
 -- - Booleans
 -- - Integers
@@ -367,12 +307,9 @@ data Const = B Bool | I TInteger (Maybe TypeSpecifier) | C Char
 ----------------------------------------
 -- Termina Programs definitions
 
--- Blocks are just list of statements
-type Block' expr obj a = [Statement' expr obj a]
-
-data TerminaModule' expr glb pf a = Termina
+data TerminaModule' blk expr pf a = Termina
   { modules :: [ Module' pf]
-  , frags :: [ AnnASTElement' expr glb a ] }
+  , frags :: [ AnnASTElement' blk expr a ] }
   deriving Show
 
-type AnnotatedProgram' expr obj a = [AnnASTElement' expr obj a]
+type AnnotatedProgram' blk expr a = [AnnASTElement' blk expr a]

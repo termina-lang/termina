@@ -1,8 +1,8 @@
 module Generator.Option where
 
 -- Termina Semantic AST
-import AST.Seman as SAST
-import Utils.TypeSpecifier
+import Semantic.AST as SAST
+import Core.Utils
 
 import qualified Data.Map as M
 import qualified Data.Set as S

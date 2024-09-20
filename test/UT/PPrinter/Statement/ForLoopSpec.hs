@@ -1,10 +1,10 @@
 module UT.PPrinter.Statement.ForLoopSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
-import Semantic.Monad
+import Semantic.Types
 import Prettyprinter
 import Control.Monad.Reader
 import Generator.CodeGen.Statement

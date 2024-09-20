@@ -1,14 +1,14 @@
 module UT.PPrinter.Expression.ReferenceSpec (spec) where
 
 import Test.Hspec
-import AST.Seman
+import Semantic.AST
 import Data.Text hiding (empty)
 import Data.Map
 import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
-import Semantic.Monad
+import Semantic.Types
 
 vectorObjAnn, boxArrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn :: SemanticAnn
 vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))

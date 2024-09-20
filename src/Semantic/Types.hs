@@ -3,10 +3,9 @@
 
 module Semantic.Types where
 
-import           AST.Parser
-import           AST.Seman            as SAST
-import           Utils.AST.Parser
-import           Utils.TypeSpecifier
+import Semantic.AST
+import Core.Utils
+import Utils.Annotations
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -25,7 +24,73 @@ data SemGlobal
   | SConst TypeSpecifier Const
   deriving Show
 
--- type SemGlobal = SemGlobal' SemAnn
+-- | Semantic type information
+data ESeman
+  = SimpleType TypeSpecifier
+  | ObjectType AccessKind TypeSpecifier
+  | AppType [Parameter] TypeSpecifier
+  | PortConnection ConnectionSeman
+  deriving Show
+
+data SSeman
+  = SimpleStmtType -- ^ Statement with no type
+    | MatchCaseStmtType [TypeSpecifier] -- ^ Match case with types
+  deriving Show
+
+data SemanProcedure = SemanProcedure Identifier [Parameter]
+  deriving (Show)
+
+data ConnectionSeman =
+    -- | Access port connection
+  APConnTy
+  -- | Type specifier of the connected resource
+    TypeSpecifier
+    -- | List of procedures that can be called on the connected resource
+    [SemanProcedure]
+  | APAtomicConnTy
+    -- | Type specifier of the connected atomic
+    TypeSpecifier
+  | APAtomicArrayConnTy
+    -- | type specifier of the connected atomic array
+    TypeSpecifier
+    -- | Size of the connected atomic array
+    Size
+  | APPoolConnTy
+    -- | Type specifier of the connected pool
+    TypeSpecifier
+    -- | Size of the connected pool
+    Size
+  -- | Sink port connection
+  | SPConnTy
+    -- | Type specifier of the connected event emitter
+    TypeSpecifier
+    -- | Name of the action that will be triggered when the event emitter emits an event 
+    Identifier 
+  -- | In port connection
+  | InPConnTy
+    -- | Type specifier of the connected channel
+    TypeSpecifier
+    -- | Name of the action that will be triggered when the channel receives a message
+    Identifier
+  | OutPConnTy
+    -- | Type specifier of the connected channel
+    TypeSpecifier
+  deriving Show
+
+-- | Semantic elements
+-- we have three different semantic elements:
+data SemanticElems
+  =
+  -- | Expressions with their types
+  ETy ESeman
+  -- | Statements 
+  | STy SSeman
+  -- | Global elements
+  | GTy (GEntry SemanticAnn)
+  deriving Show
+
+-- | Expression Semantic Annotations
+type SemanticAnn = Located SemanticElems
 
 getTySemGlobal :: SemGlobal -> TypeSpecifier
 getTySemGlobal (STask ty) = ty
@@ -50,21 +115,21 @@ data GEntry a
 -- Simple TypeDef
 -- It only has type information.
 -- Aux constant type type-constructor
-data K a = K
-  deriving (Functor, Show)
-type SemanTypeDef a = TypeDef' K SAST.Object a
+data EmptyBlockRet a = EmptyBlockRet
+  deriving (Show, Functor)
+type SemanTypeDef a = TypeDef' EmptyBlockRet a
 
 -- Forgetfull Class member map
-kClassMember :: ClassMember' exp lhs a -> ClassMember' K lhs a
+kClassMember :: ClassMember' blk a -> ClassMember' EmptyBlockRet a
 kClassMember (ClassField fld a) = ClassField fld a
 kClassMember (ClassMethod idx ps _blk ann) =
-  ClassMethod idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+  ClassMethod idx ps EmptyBlockRet ann
 kClassMember (ClassProcedure idx ps _blk ann) =
-  ClassProcedure idx ps (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+  ClassProcedure idx ps EmptyBlockRet ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
-  ClassViewer idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+  ClassViewer idx ps ty EmptyBlockRet ann
 kClassMember (ClassAction idx ps ty _blk ann) =
-  ClassAction idx ps ty (BlockRet [] (ReturnStmt Nothing (returnAnnotation (blockRet _blk)))) ann
+  ClassAction idx ps ty EmptyBlockRet ann
 
 ----------------------------------------
 -- Subtyping.
@@ -76,7 +141,7 @@ casteableTys a b = numTy a && numTy b
 -- we use to define (box A \subseteq A)
 subTypes :: TypeSpecifier -> TypeSpecifier -> Bool
 subTypes (BoxSubtype a) (BoxSubtype b) = checkEqTypes a b
-subTypes (BoxSubtype a) b                  = checkEqTypes a b
-subTypes a (BoxSubtype b)                  = checkEqTypes a b
+subTypes (BoxSubtype a) b              = checkEqTypes a b
+subTypes a (BoxSubtype b)              = checkEqTypes a b
 -- Id \subseteq Subtypes
-subTypes a b                                   = checkEqTypes a b
+subTypes a b                           = checkEqTypes a b

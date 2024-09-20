@@ -2,9 +2,9 @@
 
 module Generator.CodeGen.Function where
 
-import AST.Seman
+import Semantic.AST
 import Generator.LanguageC.AST
-import Semantic.Monad
+import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement

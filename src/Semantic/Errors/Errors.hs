@@ -4,7 +4,7 @@
 module Semantic.Errors.Errors where
 
 -- Termina AST
-import AST.Parser
+import Parser.AST
 -- import SemanAST as SAST
 import Semantic.Types
 import Utils.Annotations

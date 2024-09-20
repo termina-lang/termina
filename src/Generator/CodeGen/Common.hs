@@ -2,8 +2,8 @@
 
 module Generator.CodeGen.Common where
 
-import AST.Seman
-import Semantic.Monad
+import Semantic.AST
+import Semantic.Types
 import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Map
@@ -12,7 +12,6 @@ import Generator.LanguageC.AST
 import Data.Char
 import Numeric
 import Utils.Annotations
-    ( Located(Located, location), Location(Internal) )
 
 newtype CGeneratorError = InternalError String
     deriving (Show)

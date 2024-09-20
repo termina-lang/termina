@@ -5,8 +5,7 @@
 module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike where
 
 import Generator.LanguageC.AST
-import Semantic.Monad
-import AST.Seman
+import Semantic.AST
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
@@ -20,7 +19,7 @@ import Control.Monad.Reader (runReader, ReaderT (runReaderT))
 import Data.Text (unpack)
 import Generator.LanguageC.Printer
 import Modules.Modules (QualifiedName)
-import qualified AST.Seman as SAST
+import qualified Semantic.AST as SAST
 import Utils.Annotations
 import Semantic.Types
 import System.FilePath
@@ -201,7 +200,7 @@ buildRTEMSGlobal (Handler identifier (DefinedType ty) (Just (StructInitializer a
             cls@(Class HandlerClass clsId members _ _) -> (cls, clsId, members)
             cls -> error $ "invalid task class: " ++ show cls
 
-        buildEventPort :: [ClassMember' a b c] -> RTEMSPort
+        buildEventPort :: [ClassMember' blk a] -> RTEMSPort
         buildEventPort [] = error $ "handler does not have an event port: " ++ show clsIdentifier
         buildEventPort (ClassField (FieldDefinition portIdentifier (SinkPort dts action)) _ : _) =
             case findPortConnection portIdentifier assignments of

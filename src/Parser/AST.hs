@@ -6,14 +6,14 @@
 -- ParseAnnotations|.
 -- In this module, we only define what expressions are after parsing.
 
-module AST.Parser
-  ( module AST.Parser
-  , module AST.Core
+module Parser.AST
+  ( module Parser.AST
+  , module Core.AST
   ) where
 
 -- From |CoreAST| we get all basic blocks.
 import Utils.Annotations
-import AST.Core
+import Core.AST
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
@@ -81,7 +81,6 @@ data Expression'
     a
   deriving (Show, Functor)
 
-
 instance Annotated Object where
   getAnnotation (Variable _ a)                = a
   getAnnotation (ArrayIndexExpression _ _ a) = a
@@ -107,3 +106,90 @@ instance (Annotated obj) => Annotated (Expression' obj) where
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
   getAnnotation (IsOptionVariantExpression _ _ a) = a
+
+data MatchCase' expr obj a = MatchCase
+  {
+    matchIdentifier :: Identifier
+  , matchBVars      :: [Identifier]
+  , matchBody       :: Block' expr obj a
+  , matchAnnotation :: a
+  } deriving (Show,Functor)
+
+data ElseIf' expr obj a = ElseIf
+  {
+    elseIfCond       :: expr a
+  , elseIfBody       :: Block' expr obj a
+  , elseIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data Statement' expr obj a =
+  -- | Declaration statement
+  Declaration
+    Identifier -- ^ name of the variable
+    AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
+    TypeSpecifier -- ^ type of the variable
+    (expr a) -- ^ initialization expression
+    a
+  | AssignmentStmt
+    (obj a) -- ^ name of the variable
+    (expr a) -- ^ assignment expression
+    a
+  | IfElseStmt
+    (expr a) -- ^ conditional expression
+    [ Statement' expr obj a ] -- ^ statements in the if block
+    [ ElseIf' expr obj a ] -- ^ list of else if blocks
+    (Maybe [ Statement' expr obj a ]) -- ^ statements in the else block
+    a
+  -- | For loop
+  | ForLoopStmt
+    Identifier -- ^ name of the iterator variable
+    TypeSpecifier -- ^ type of iterator variable
+    (expr a) -- ^ initial value of the iterator
+    (expr a) -- ^ final value of the iterator
+    (Maybe (expr a)) -- ^ break condition (optional)
+    [ Statement' expr obj a ] -- ^ statements in the for loop
+    a
+  | MatchStmt
+    (expr a) -- ^ expression to match
+    [ MatchCase' expr obj a ] -- ^ list of match cases
+    a
+  | SingleExpStmt
+    (expr a) -- ^ expression
+    a
+  deriving (Show, Functor)
+
+-- Blocks are just list of statements
+type Block' expr obj a = [Statement' expr obj a]
+
+-- | |BlockRet| represent a body block with its return statement
+data BlockRet' expr obj a
+  = BlockRet
+  {
+    blockBody :: [Statement' expr obj a]
+  , blockRet  :: ReturnStmt' expr a
+  }
+  deriving (Show, Functor)
+
+----------------------------------------
+
+type Expression = Expression' Object
+
+type ReturnStmt = ReturnStmt' Expression
+type BlockRet = BlockRet' Expression Object
+type AnnASTElement = AnnASTElement' BlockRet Expression
+type FieldAssignment = FieldAssignment' Expression
+type Global = Global' Expression
+
+type TypeDef a = TypeDef' BlockRet a
+
+type ClassMember = ClassMember' BlockRet
+
+type MatchCase = MatchCase' Expression Object
+type ElseIf = ElseIf' Expression Object
+type Statement = Statement' Expression Object
+
+type AnnotatedProgram a = [AnnASTElement' BlockRet Expression a]
+type Block a = Block' Expression Object a
+
+type Module = Module' [String]
+type TerminaModule = TerminaModule' BlockRet Expression [String]

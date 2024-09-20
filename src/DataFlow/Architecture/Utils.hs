@@ -1,6 +1,6 @@
 module DataFlow.Architecture.Utils where
 
-import AST.Seman
+import Semantic.AST
 import DataFlow.Architecture.Types
 
 getEmmiterIdentifier :: TPEmitter a -> Identifier

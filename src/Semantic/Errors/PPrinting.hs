@@ -12,7 +12,7 @@ import qualified Data.Text.Lazy.IO as TL
 import Text.Parsec.Pos
 import Errata
 import Errata.Styles
-import AST.Seman
+import Semantic.AST
 import Numeric
 import qualified Data.Map as M
 import Semantic.Types (SemanTypeDef)

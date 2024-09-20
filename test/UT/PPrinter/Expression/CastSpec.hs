@@ -3,8 +3,8 @@ module UT.PPrinter.Expression.CastSpec (spec) where
 import Test.Hspec
 import Data.Text hiding (empty)
 import Data.Map
-import Semantic.Monad
-import AST.Seman
+import Semantic.Types
+import Semantic.AST
 import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
