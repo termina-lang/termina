@@ -859,6 +859,13 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines "The symbol was previoulsy defined here:" fileName
                 (sourceLine prevPos) (sourceColumn prevPos) (length ident)
                 Nothing
+    EExpressionNotConstant ->
+        let title = "\x1b[31merror [E071]\x1b[0m: expression not constant."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just "The expression is not constant and cannot be evaluated at compile time.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

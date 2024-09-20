@@ -654,8 +654,3 @@ checkIntConstant loc tyI ti@(TInteger i _) =
   if memberIntCons i tyI
   then return ()
   else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
-
-buildSize :: ConstExpression SemanticAnn -> SemanticMonad Size
-buildSize (KC (I ti _) _) = return (SAST.K ti)
-buildSize (KV ident _) = return (SAST.V ident)
-buildSize (KC c _) = throwError $ annotateError Internal $ ENotIntConst c

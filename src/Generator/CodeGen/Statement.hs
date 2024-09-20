@@ -324,8 +324,8 @@ genBlockItem (IfElseStmt expr ifBlk elifsBlks elseBlk ann) = do
             return $ Just (CSIfThenElse cExpr' (CSCompound cBlk (buildCompoundAnn ann' False True)) prev' (buildStatementAnn ann' False))
 genBlockItem (ForLoopStmt iterator iteratorTS initValue endValue breakCond body ann) = do
     let exprCAnn = buildGenericAnn ann
-    initExpr <- genConstExpression initValue
-    endExpr <- genConstExpression endValue
+    initExpr <- genExpression initValue
+    endExpr <- genExpression endValue
     cIteratorType <- genType noqual iteratorTS
     let cIteratorObj = CVar iterator cIteratorType
         cIteratorExpr = CExprValOf cIteratorObj cIteratorType exprCAnn

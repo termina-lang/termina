@@ -757,19 +757,6 @@ constantParser = do
   literal <- constLiteralParser
   Constant literal . Position startPos <$> getPosition
 
-constExprParser :: Parser (ConstExpression ParserAnn)
-constExprParser = 
-  constSymbolParser <|> constExprLiteral
-  where
-    constSymbolParser = do
-      startPos <- getPosition
-      ident <- identifierParser
-      KV ident . Position startPos <$> getPosition
-    constExprLiteral = do
-      startPos <- getPosition
-      literal <- constLiteralParser
-      KC literal . Position startPos <$> getPosition
-
 integerParser :: Parser TInteger
 integerParser = try hexParser <|> decParser
   where
@@ -784,6 +771,7 @@ sizeParser = constValueSizeParser <|> constSizeParser
       optional (reservedOp ":" >> reserved "usize")
       return $ K ks 
     constSizeParser = V <$> identifierParser
+
 
 mutableObjDeclarationParser :: Parser (Statement ParserAnn)
 mutableObjDeclarationParser = do
@@ -883,9 +871,9 @@ forLoopStmtParser = do
   reservedOp ":"
   ty <- typeSpecifierParser
   _ <- reserved "in"
-  start <- constExprParser
+  start <- expressionParser
   _ <- reservedOp ".."
-  end <- constExprParser
+  end <- expressionParser
   breakCondition <- optionMaybe (do
     reserved "while"
     expressionParser)
@@ -971,7 +959,7 @@ constDeclParser = do
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
   _ <- reservedOp "="
-  initializer <- constExprParser
+  initializer <- expressionParser
   _ <- semi
   Const identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
 

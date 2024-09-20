@@ -75,19 +75,6 @@ data Module' pf = ModInclusion
 instance Functor Module' where
   fmap f m = m{moduleIdentifier = f (moduleIdentifier m)}
 
--- | This type represents constant expressions.
--- Since we are not implementing it right now, we only have constants.
--- The idea is to eventually replace it by constant (at compilation time)
--- expressions. We also annotate them for debbuging purposes.
-data ConstExpression a
-  = KC Const a -- ^ Literal const expression
-  | KV Identifier a -- ^ Identifier of a constant
-  deriving (Show, Functor)
-
-instance Annotated ConstExpression where
-  getAnnotation (KC _ a) = a
-  getAnnotation (KV _ a) = a
-
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
@@ -214,7 +201,7 @@ data Global' expr a
     | Const
       Identifier -- ^ name of the constant
       TypeSpecifier -- ^ type of the constant
-      (ConstExpression a) -- ^ initialization expression
+      (expr a) -- ^ initialization expression
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
@@ -356,8 +343,8 @@ data Statement' expr obj a =
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
     TypeSpecifier -- ^ type of iterator variable
-    (ConstExpression a) -- ^ initial value of the iterator
-    (ConstExpression a) -- ^ final value of the iterator
+    (expr a) -- ^ initial value of the iterator
+    (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)
     [ Statement' expr obj a ] -- ^ statements in the for loop
     a

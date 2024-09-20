@@ -173,11 +173,6 @@ getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
-getConstExprType :: (MonadError CGeneratorError m) => ConstExpression SemanticAnn -> m TypeSpecifier
-getConstExprType (KC _ (Located (ETy (SimpleType ts)) _)) = return ts
-getConstExprType (KV _ (Located (ETy (SimpleType ts)) _)) = return ts
-getConstExprType ann = throwError $ InternalError $ "invalid constant expression annotation: " ++ show ann
-
 unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
 unboxObject (CExprValOf obj _ _) = return obj
 unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)

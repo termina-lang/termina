@@ -263,14 +263,25 @@ typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
-typeConstExpression :: TypeSpecifier -> ConstExpression Parser.ParserAnn -> SemanticMonad (SAST.ConstExpression SemanticAnn)
-typeConstExpression expected_ty (KC constant ann) = do
+typeConstExpression :: TypeSpecifier -> Parser.Expression Parser.ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
+typeConstExpression expected_ty (Constant constant ann) = do
   checkConstant ann expected_ty constant
-  return $ SAST.KC constant (buildExpAnn ann expected_ty)
-typeConstExpression expected_ty (KV identifier ann) = do
+  return $ SAST.Constant constant (buildExpAnn ann expected_ty)
+typeConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
   (ty, _value) <- getConst ann identifier
   checkEqTypesOrError ann expected_ty ty
-  return $ SAST.KV identifier (buildExpAnn ann ty)
+  return $ SAST.AccessObject (SAST.Variable identifier (buildExpAnnObj ann Immutable ty))
+typeConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
+
+evalConstExpression :: TypeSpecifier -> Parser.Expression Parser.ParserAnn -> SemanticMonad Const
+evalConstExpression expected_ty (Constant constant ann) = do
+  checkConstant ann expected_ty constant
+  return constant
+evalConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
+  (ty, value) <- getConst ann identifier
+  checkEqTypesOrError ann expected_ty ty
+  return value
+evalConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
 
 -- | Function |typeExpression| takes an expression from the parser, traverse it
 -- annotating each node with its type.
@@ -1002,12 +1013,8 @@ typeGlobal (Channel ident ty mexpr mods anns) = do
 typeGlobal (Const ident ty expr mods anns) = do
   checkTypeSpecifier anns ty
   typed_expr <- typeConstExpression ty expr
-  case expr of
-    KC value _ -> return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
-    KV cident _ -> do
-      (_ty, value) <- getConst anns cident
-      -- TODO: Check that the types match
-      return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
+  value <- evalConstExpression ty expr
+  return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
 
 checkParameterType :: Location -> Parameter -> SemanticMonad ()
 checkParameterType anns p =

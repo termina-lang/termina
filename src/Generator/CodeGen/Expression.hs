@@ -31,21 +31,6 @@ cBinOp BitwiseXor = COpXor
 cBinOp LogicalAnd = error "Logical and is codified as a sequential expression"
 cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 
-genConstExpression :: ConstExpression SemanticAnn -> CSourceGenerator CExpression
-genConstExpression c@(KC (I i _) ann) = do
-    let cInteger = getCInteger i
-    ctype <- getConstExprType c >>= genType noqual
-    return $ CExprConstant (CIntConst cInteger) ctype (buildGenericAnn ann)
-genConstExpression (KC (B True) ann) = 
-    return $ CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTBool noqual) (buildGenericAnn ann)
-genConstExpression (KC (B False) ann) = 
-    return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTBool noqual) (buildGenericAnn ann)
-genConstExpression (KC (C char) ann) = 
-    return $ CExprConstant (CCharConst (CChar char)) (CTChar noqual) (buildGenericAnn ann)
-genConstExpression c@(KV ident ann) = do
-    ctype <- getConstExprType c >>= genType noqual
-    return $ CExprValOf (CVar ident ctype) ctype (buildGenericAnn ann)
-
 genObject :: Object SemanticAnn -> CSourceGenerator CObject
 genObject o@(Variable identifier _ann) = do
     cType <- getObjType o >>= genType noqual

@@ -90,6 +90,7 @@ data Error a
   | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (E068)
   | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (E069)
   | ESymbolDefined Identifier a -- ^ Symbol already defined (E070)
+  | EExpressionNotConstant -- ^ Expression not constant (E071)
   -- | Not Function found
   | EFunctionNotFound Identifier
   -- | Record missing field^

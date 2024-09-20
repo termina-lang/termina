@@ -29,11 +29,12 @@ genGlobalDecl (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
         (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
-genGlobalDecl (GlobalDeclaration (Const identifier ts contExpr _ ann)) = do
-    case contExpr of
-        KC (I ti _) _ -> return [CPPDirective (CPPDefine identifier (Just [printLiteral (I ti (Just ts))])) (buildCPPDirectiveAnn ann True)]
-        KC cst _ -> return [CPPDirective (CPPDefine identifier (Just [printLiteral cst])) (buildCPPDirectiveAnn ann True)]
-        KV v _ -> return [CPPDirective (CPPDefine identifier (Just [show v])) (buildCPPDirectiveAnn ann True)]
+genGlobalDecl (GlobalDeclaration (Const identifier ts expr _ ann)) = do
+    case expr of
+        Constant (I ti _) _ -> return [CPPDirective (CPPDefine identifier (Just [printLiteral (I ti (Just ts))])) (buildCPPDirectiveAnn ann True)]
+        Constant cst _ -> return [CPPDirective (CPPDefine identifier (Just [printLiteral cst])) (buildCPPDirectiveAnn ann True)]
+        (AccessObject (Variable v _)) -> return [CPPDirective (CPPDefine identifier (Just [show v])) (buildCPPDirectiveAnn ann True)]
+        _ -> throwError $ InternalError $ "unsupported constant expression: " ++ show expr
 genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl
 
 
