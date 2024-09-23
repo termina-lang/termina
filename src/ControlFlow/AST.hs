@@ -60,9 +60,15 @@ data BasicBlock' expr obj a =
         [expr a] -- ^ list of arguments
         a
     -- | Call to the alloc procedure of a memory allocator
-    | AllocBox Identifier (expr a) a
+    | AllocBox
+        Identifier -- ^ name of the port that implements the allocator interface
+        (expr a) -- ^ argument expression
+        a
     -- | Call to the free procedure of a memory allocator 
-    | FreeBox Identifier (expr a) a
+    | FreeBox
+        Identifier -- ^ name of the port that implements the allocator interface
+        (expr a) -- ^ argument expression
+        a
     -- | Regular block (list of statements)
     | RegularBlock [Statement' expr obj a]
     deriving (Show, Functor)
