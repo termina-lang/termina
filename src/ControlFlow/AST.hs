@@ -59,6 +59,24 @@ data BasicBlock' expr obj a =
         Identifier -- ^ name of the procedure
         [expr a] -- ^ list of arguments
         a
+    | AtomicLoad 
+        Identifier -- ^ name of the access port
+        (expr a) -- ^ expression that points to the object where the value will be stored
+        a
+    | AtomicStore
+        Identifier -- ^ name of the access port
+        (expr a) -- ^ value to store
+        a
+    | AtomicArrayLoad
+        Identifier -- ^ name of the access port
+        (expr a) -- ^ index expression
+        (expr a) -- ^ expression that points to the object where the value will be stored
+        a
+    | AtomicArrayStore
+        Identifier -- ^ name of the access port
+        (expr a) -- ^ index expression
+        (expr a) -- ^ value to store
+        a
     -- | Call to the alloc procedure of a memory allocator
     | AllocBox
         Identifier -- ^ name of the port that implements the allocator interface
