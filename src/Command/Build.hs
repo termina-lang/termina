@@ -380,12 +380,14 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     useDefCheckModules typedProject
+    -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
+    -- | Obtain the architectural description of the program
     programArchitecture <- genArchitecture typedProject (getPlatformInitialProgram plt) orderedDependencies 
     warnDisconnectedEmitters programArchitecture
-    -- | Obtain the basic blocks of the program
+    -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
     bbProject <- genBasicBlocks typedProject
     -- | Generate the code
