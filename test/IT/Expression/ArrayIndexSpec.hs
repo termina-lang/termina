@@ -38,7 +38,7 @@ renderHeader input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runExcept (genBBModule tast) of
+        case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
             case runGenHeaderFile False "test" [] bbAST M.empty of

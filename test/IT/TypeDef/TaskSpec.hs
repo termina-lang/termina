@@ -10,7 +10,6 @@ import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import ControlFlow.Common
-import Control.Monad.Except
 
 test0 :: String
 test0 = "struct Message {\n" ++
@@ -66,7 +65,7 @@ renderHeader input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runExcept (genBBModule tast) of
+        case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
             case runGenHeaderFile True "test" [] bbAST M.empty of

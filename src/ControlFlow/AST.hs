@@ -20,7 +20,7 @@ data Statement' expr obj a =
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (obj a) -- ^ name of the variable
+    (obj a) -- ^ left hand side of the assignment
     (expr a) -- ^ assignment expression
     a
   | SingleExpStmt
@@ -55,29 +55,29 @@ data BasicBlock' expr obj a =
         (Maybe (expr a)) -- ^ break condition (optional)
         [BasicBlock' expr obj a] a
     -- | Match basic block
-    | MatchBlock (expr a) [MatchCase' expr obj a] a
+    | MatchBlock (expr a) [MatchCase' expr obj a] a
     -- | Send message
     | SendMessage (obj a) (expr a) a
     -- | Call to a resource procedure
-    | ProcedureCall 
+    | ProcedureCall 
         (obj a) -- ^ access port
         Identifier -- ^ name of the procedure
         [expr a] -- ^ list of arguments
         a
-    | AtomicLoad 
+    | AtomicLoad 
         (obj a) -- ^ access port
         (expr a) -- ^ expression that points to the object where the value will be stored
         a
-    | AtomicStore
+    | AtomicStore
         (obj a) -- ^ access port
         (expr a) -- ^ value to store
         a
-    | AtomicArrayLoad
+    | AtomicArrayLoad
         (obj a) -- ^ access port
         (expr a) -- ^ index expression
         (expr a) -- ^ expression that points to the object where the value will be stored
         a
-    | AtomicArrayStore
+    | AtomicArrayStore
         (obj a) -- ^ access port
         (expr a) -- ^ index expression
         (expr a) -- ^ value to store
@@ -88,12 +88,12 @@ data BasicBlock' expr obj a =
         (expr a) -- ^ argument expression
         a
     -- | Call to the free procedure of a memory allocator 
-    | FreeBox
+    | FreeBox
         (obj a) -- port that implements the allocator interface
         (expr a) -- ^ argument expression
         a
     -- | Regular block (list of statements)
-    | RegularBlock [Statement' expr obj a]
+    | RegularBlock [Statement' expr obj a]
     deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
