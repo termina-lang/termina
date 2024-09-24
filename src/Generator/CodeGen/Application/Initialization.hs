@@ -5,8 +5,8 @@ module Generator.CodeGen.Application.Initialization where
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
 import System.FilePath
+import ControlFlow.AST
 import Semantic.Types
-import Semantic.AST
 import Generator.CodeGen.Statement
 import Modules.Modules
 import qualified Data.Map as M

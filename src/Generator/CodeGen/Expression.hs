@@ -1,6 +1,6 @@
 module Generator.CodeGen.Expression where
 
-import Semantic.AST
+import ControlFlow.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
@@ -118,7 +118,7 @@ genMemberFunctionAccess obj ident args ann = do
                 (DefinedType classId) ->
                     return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
                 -- | Anything else should not happen
-                _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
+                _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
         (DefinedType classId) ->
             case obj of
                 (Dereference _ _) ->
@@ -128,49 +128,6 @@ genMemberFunctionAccess obj ident args ann = do
                     -- | If the left hand size is a class:
                 _ -> 
                     return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
-        AccessPort (DefinedType iface) ->
-            let thatFieldCType = CTPointer (CTStruct CStructTag iface noqual) noqual in
-            return $
-                CExprCall (CExprValOf (CField cObj ident cFuncType) cFuncType cAnn)
-                      (CExprValOf (CField cObj thatField thatFieldCType) thatFieldCType cAnn : cArgs) cRetType cAnn
-        -- | If the left hand side is a pool:
-        AccessPort (Allocator {}) ->
-            genPoolMethodCallExpr ident cObjExpr cArgs cAnn
-        AccessPort (AtomicAccess {}) ->
-            case ident of
-                "load" -> 
-                    case args of 
-                        [ReferenceExpression _ refObj _] -> do
-                            cRefObj <- genObject refObj
-                            let cRefObjType = getCObjType cRefObj
-                            mCall <- genAtomicMethodCall ident cObjExpr cArgs cAnn
-                            return $ CExprAssign cRefObj mCall cRefObjType cAnn
-                        _ -> throwError $ InternalError $ "invalid params for atomic load: " ++ show args
-                "store" -> genAtomicMethodCall ident cObjExpr cArgs cAnn
-                _ -> throwError $ InternalError $ "This should not happen. Unsupported atomic access method: " ++ ident
-        AccessPort (AtomicArrayAccess {}) ->
-            case ident of
-                "load_index" -> 
-                    case args of 
-                        [_, ReferenceExpression _ refObj _] -> do
-                            cIndexedObj <- genIndexOf cObj (head cArgs)
-                            cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
-                            cRefObj <- genObject refObj
-                            let cRefObjType = getCObjType cRefObj
-                            mCall <- genAtomicMethodCall "load" cRefIndexedObj cArgs cAnn
-                            return $ CExprAssign cRefObj mCall cRefObjType cAnn
-                        _ -> throwError $ InternalError $ "invalid params for atomic load_index: " ++ show args
-                "store_index" -> 
-                    case cArgs of
-                        [idx, value] -> do
-                            cIndexedObj <- genIndexOf cObj idx
-                            cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
-                            genAtomicMethodCall "store" cRefIndexedObj [value] cAnn
-                        _ -> throwError $ InternalError $ "invalid params for atomic store_index: " ++ show args
-                _ -> throwError $ InternalError $ "This should not happen. Unsupported atomic access method: " ++ ident
-        -- | If the left hand side is a message queue:
-        OutPort {} -> do
-            genMsgQueueMethodCall ident cObj cArgs cAnn
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 

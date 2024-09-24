@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Global where
 
-import Semantic.AST
+import ControlFlow.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except

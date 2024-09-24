@@ -7,7 +7,8 @@ import Semantic.TypeChecking
 import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
-import Control.Monad.Reader
+import ControlFlow.Common
+import Control.Monad.Except
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 
@@ -55,9 +56,12 @@ renderHeader input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runReaderT (genHeaderFile False "test" [] tast) M.empty of
-          Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+        case runExcept (genBBModule tast) of
+          Left err -> pack $ "Basic blocks error: " ++ show err
+          Right bbAST -> 
+            case runGenHeaderFile False "test" [] bbAST M.empty of
+              Left err -> pack $ show err
+              Right cHeaderFile -> runCPrinter cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -66,9 +70,12 @@ renderSource input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runReaderT (genSourceFile "test" tast) M.empty of
-          Left err -> pack $ show err
-          Right cHeaderFile -> render $ runReader (pprint cHeaderFile) (CPrinterConfig False False)
+        case runGenBBModule tast of
+          Left err -> pack $ "Basic blocks error: " ++ show err
+          Right bbAST -> 
+            case runGenSourceFile "test" bbAST of
+              Left err -> pack $ show err
+              Right cSourceFile -> runCPrinter cSourceFile
 
 spec :: Spec
 spec = do

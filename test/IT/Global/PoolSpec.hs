@@ -9,6 +9,7 @@ import Semantic.Monad
 import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
+import ControlFlow.Common
 
 test0 :: String
 test0 = "enum Message {\n" ++
@@ -27,9 +28,12 @@ renderHeader input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runGenHeaderFile False "test" [] tast M.empty of
-          Left err -> pack $ show err
-          Right cHeaderFile -> runCPrinter cHeaderFile
+        case runGenBBModule tast of
+          Left err -> pack $ "Basic blocks error: " ++ show err
+          Right bbAST -> 
+            case runGenHeaderFile False "test" [] bbAST M.empty of
+              Left err -> pack $ show err
+              Right cHeaderFile -> runCPrinter cHeaderFile
 
 spec :: Spec
 spec = do

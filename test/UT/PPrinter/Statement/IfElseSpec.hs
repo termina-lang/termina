@@ -10,6 +10,8 @@ import Control.Monad.Reader
 import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
+import ControlFlow.Common
+import Control.Monad.Except
 
 optionBoxUInt32TS :: TypeSpecifier
 optionBoxUInt32TS = Option (BoxSubtype UInt32)
@@ -73,9 +75,12 @@ ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] (Just oneDeclaration) stmtS
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
-  case runReaderT (genBlockItem stmt) empty of
+  case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
-    Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
+    Right bBlocks ->
+      case runReaderT (Prelude.concat <$> mapM genBlocks bBlocks) empty of
+        Left err -> pack $ show err
+        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

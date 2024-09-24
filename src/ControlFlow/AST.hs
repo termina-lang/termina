@@ -1,9 +1,14 @@
 {-# LANGUAGE DeriveFunctor  #-}
 
-module ControlFlow.AST where
+module ControlFlow.AST (
+  module ControlFlow.AST,
+  module Core.AST,
+  Object(..),
+  Expression'(..)
+) where
 
 import Core.AST
-import Semantic.AST (Expression', Object)
+import Semantic.AST (Expression'(..), Object(..))
 import Modules.Modules
 
 data Statement' expr obj a =
@@ -52,39 +57,39 @@ data BasicBlock' expr obj a =
     -- | Match basic block
     | MatchBlock (expr a) [MatchCase' expr obj a] a
     -- | Send message
-    | SendMessage Identifier (expr a) a
+    | SendMessage (obj a) (expr a) a
     -- | Call to a resource procedure
     | ProcedureCall 
-        Identifier -- ^ name of the access port
+        (obj a) -- ^ access port
         Identifier -- ^ name of the procedure
         [expr a] -- ^ list of arguments
         a
     | AtomicLoad 
-        Identifier -- ^ name of the access port
+        (obj a) -- ^ access port
         (expr a) -- ^ expression that points to the object where the value will be stored
         a
     | AtomicStore
-        Identifier -- ^ name of the access port
+        (obj a) -- ^ access port
         (expr a) -- ^ value to store
         a
     | AtomicArrayLoad
-        Identifier -- ^ name of the access port
+        (obj a) -- ^ access port
         (expr a) -- ^ index expression
         (expr a) -- ^ expression that points to the object where the value will be stored
         a
     | AtomicArrayStore
-        Identifier -- ^ name of the access port
+        (obj a) -- ^ access port
         (expr a) -- ^ index expression
         (expr a) -- ^ value to store
         a
     -- | Call to the alloc procedure of a memory allocator
     | AllocBox
-        Identifier -- ^ name of the port that implements the allocator interface
+        (obj a) -- port that implements the allocator interface
         (expr a) -- ^ argument expression
         a
     -- | Call to the free procedure of a memory allocator 
     | FreeBox
-        Identifier -- ^ name of the port that implements the allocator interface
+        (obj a) -- port that implements the allocator interface
         (expr a) -- ^ argument expression
         a
     -- | Regular block (list of statements)

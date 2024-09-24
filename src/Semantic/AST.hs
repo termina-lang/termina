@@ -8,7 +8,6 @@ module Semantic.AST
 
 import Utils.Annotations
 import Core.AST
-import Modules.Modules
 
 -- | First AST after parsing
 data Expression'
@@ -184,6 +183,3 @@ type Statement = Statement' Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' BlockRet Expression a]
 type Block a = Block' Expression Object a
-
-type Module = Module' QualifiedName
-type TerminaModule = TerminaModule' BlockRet Expression QualifiedName 

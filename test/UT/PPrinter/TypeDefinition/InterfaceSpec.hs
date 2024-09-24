@@ -11,6 +11,9 @@ import Control.Monad.Reader
 import Generator.LanguageC.Printer
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Common
+import ControlFlow.Common
+import Control.Monad.Except
+
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
@@ -28,9 +31,12 @@ interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
 
 renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderTypeDefinitionDecl opts decl = 
-  case runReaderT (genTypeDefinitionDecl decl) opts of
+  case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
-    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+    Right bbDecl ->
+      case runReaderT (genTypeDefinitionDecl bbDecl) opts of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

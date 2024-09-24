@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Common where
 
-import Semantic.AST
+import ControlFlow.AST
 import Semantic.Types
 import Control.Monad.Reader
 import Control.Monad.Except
@@ -51,8 +51,8 @@ atomicMethodName mName = "atomic_" <> mName
 poolMemoryArea :: Identifier -> Identifier
 poolMemoryArea identifier = namefy $ "pool_" <> identifier <> "_memory"
 
-msgQueueMethodName :: Identifier -> Identifier
-msgQueueMethodName mName = namefy "termina_msg_queue" <::> mName
+msgQueueSendMethodName :: Identifier
+msgQueueSendMethodName = namefy "termina_msg_queue" <::> "send"
 
 resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"
@@ -313,37 +313,34 @@ genAddrOf obj qual cAnn =
         CTArray {} -> return $ CExprValOf obj cObjType cAnn
         ty -> return $ CExprAddrOf obj (CTPointer ty qual) cAnn
 
-genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
-genPoolMethodCallExpr mName cObj cArgs cAnn =
+genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CExpression -> CExpression -> CAnns ->  m CExpression
+genPoolMethodCallExpr mName cObj cArg cAnn =
     case mName of
         "alloc" -> do
-            let cFuncType = CTFunction (CTVoid noqual) (getCExprType cObj : fmap getCExprType cArgs)
-            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+            let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj, getCExprType cArg]
+            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) [cObj, cArg] (CTVoid noqual) cAnn
         "free" -> do
             let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj]
-            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
+            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) [cObj, cArg] (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
 
-genMsgQueueMethodCall :: (MonadError CGeneratorError m) => Identifier -> CObject -> [CExpression] -> CAnns -> m CExpression
-genMsgQueueMethodCall mName cObj cArgs cAnn =
-    case cArgs of
-        [cArg] -> do
-            let cArgType = getCExprType cArg
-            let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
-            let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
-            -- | If it is a send, the first parameter is the object to be sent. The
-            -- function is expecting to receive a reference to that object.
-            case cArgType of
-                CTArray {} -> do
-                    let cDataArg = CExprCast cArg (CTPointer (CTVoid noqual) noqual) cAnn
-                    return $
-                        CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
-                _ -> do
-                    cArgObj <- unboxObject cArg
-                    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
-                    return $
-                        CExprCall (CExprValOf (CVar (msgQueueMethodName mName) cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
-        _ -> throwError $ InternalError $ "invalid params for message queue send: " ++ show cArgs
+genMsgQueueSendCall :: (MonadError CGeneratorError m) => CObject -> CExpression -> CAnns -> m CExpression
+genMsgQueueSendCall cObj cArg cAnn = do
+    let cArgType = getCExprType cArg
+    let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
+    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    -- | If it is a send, the first parameter is the object to be sent. The
+    -- function is expecting to receive a reference to that object.
+    case cArgType of
+        CTArray {} -> do
+            let cDataArg = CExprCast cArg (CTPointer (CTVoid noqual) noqual) cAnn
+            return $
+                CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+        _ -> do
+            cArgObj <- unboxObject cArg
+            let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
+            return $
+                CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
 
 genAtomicMethodCall :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
 genAtomicMethodCall mName cObj cArgs cAnn =

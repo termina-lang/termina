@@ -5,7 +5,7 @@
 module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike where
 
 import Generator.LanguageC.AST
-import Semantic.AST
+import ControlFlow.AST
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe
@@ -19,7 +19,6 @@ import Control.Monad.Reader (runReader, ReaderT (runReaderT))
 import Data.Text (unpack)
 import Generator.LanguageC.Printer
 import Modules.Modules (QualifiedName)
-import qualified Semantic.AST as SAST
 import Utils.Annotations
 import Semantic.Types
 import System.FilePath
@@ -1220,7 +1219,7 @@ genAppConfig tasks msgQueues timers mutexes = do
                 ]
 
 
-genMainFile :: QualifiedName ->  [(QualifiedName, SAST.AnnotatedProgram SemanticAnn)] -> CSourceGenerator CFile
+genMainFile :: QualifiedName ->  [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CSourceGenerator CFile
 genMainFile mName prjprogs = do
     let includeRTEMS = CPPDirective (CPPInclude True "rtems.h") (internalAnn (CPPDirectiveAnn True))
         includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
@@ -1253,13 +1252,13 @@ genMainFile mName prjprogs = do
 
     where
         -- | Original program list filtered to only include the global declaration
-        globals = map (\(mn, elems) -> (mn, [g | (SAST.GlobalDeclaration g) <- elems])) prjprogs
+        globals = map (\(mn, elems) -> (mn, [g | (GlobalDeclaration g) <- elems])) prjprogs
         -- | Map between the class identifiers and the class definitions
         classMap = foldr
                 (\(_, objs) accMap ->
                     foldr (\obj currMap ->
                         case obj of
-                            SAST.TypeDefinition cls@(Class _ classId _ _ _) _ -> M.insert classId cls currMap
+                            TypeDefinition cls@(Class _ classId _ _ _) _ -> M.insert classId cls currMap
                             _ -> currMap
                         ) accMap objs
                 ) M.empty prjprogs
@@ -1315,7 +1314,7 @@ genMainFile mName prjprogs = do
 
         channelMessageQueues = concatMap (\(_, objs) ->
             map (\case {
-                    (Channel identifier (MsgQueue ts (SAST.K size)) _ _ _) ->
+                    (Channel identifier (MsgQueue ts (K size)) _ _ _) ->
                         case M.lookup identifier targetChannelConnections of
                             Just task@(RTEMSTask {}) ->
                                 RTEMSChannelMsgQueue identifier ts size task
@@ -1400,5 +1399,5 @@ genMainFile mName prjprogs = do
 
         mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
 
-runGenMainFile :: QualifiedName -> [(QualifiedName, SAST.AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile
+runGenMainFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile
 runGenMainFile mainFilePath prjprogs = runReaderT (genMainFile mainFilePath prjprogs) M.empty

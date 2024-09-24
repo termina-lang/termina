@@ -12,6 +12,8 @@ import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Utils.Annotations
+import ControlFlow.Common
+import Control.Monad.Except
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn
 optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable UInt32
@@ -78,9 +80,12 @@ matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
-  case runReaderT (genBlockItem stmt) empty of
+  case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
-    Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
+    Right bBlocks ->
+      case runReaderT (Prelude.concat <$> mapM genBlocks bBlocks) empty of
+        Left err -> pack $ show err
+        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

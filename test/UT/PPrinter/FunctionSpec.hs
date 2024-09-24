@@ -11,6 +11,8 @@ import Control.Monad.Reader
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Function
 import Generator.CodeGen.Common
+import ControlFlow.Common
+import Control.Monad.Except
 
 tmDescriptorTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
@@ -124,15 +126,21 @@ function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" 
 
 renderFunctionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderFunctionDecl opts decl = 
-  case runReaderT (genFunctionDecl decl) opts of
+  case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
-    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+    Right bbAST -> 
+      case runReaderT (genFunctionDecl bbAST) opts of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
 renderFunction :: AnnASTElement SemanticAnn -> Text
 renderFunction func = 
-  case runReaderT (genFunction func) M.empty of
+  case runExcept . genBBAnnASTElement $ func of
     Left err -> pack $ show err
-    Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+    Right bbAST -> 
+      case runReaderT (genFunction bbAST) M.empty of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

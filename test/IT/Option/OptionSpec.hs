@@ -13,6 +13,8 @@ import Generator.Option
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option
+import ControlFlow.Common
+import Control.Monad.Except
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++
@@ -66,9 +68,12 @@ renderHeader input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runGenHeaderFile True "test" [] tast M.empty of
-          Left err -> pack $ show err
-          Right cHeaderFile -> runCPrinter cHeaderFile
+        case runExcept (genBBModule tast) of
+          Left err -> pack $ "Basic blocks error: " ++ show err
+          Right bbAST -> 
+            case runGenHeaderFile True "test" [] bbAST M.empty of
+              Left err -> pack $ show err
+              Right cHeaderFile -> runCPrinter cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -77,9 +82,12 @@ renderSource input = case parse (contents topLevel) "" input of
     case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
-        case runGenSourceFile "test" tast of
-          Left err -> pack $ show err
-          Right cSourceFile -> runCPrinter cSourceFile
+        case runExcept (genBBModule tast) of
+          Left err -> pack $ "Basic blocks error: " ++ show err
+          Right bbAST -> 
+            case runGenSourceFile "test" bbAST of
+              Left err -> pack $ show err
+              Right cSourceFile -> runCPrinter cSourceFile
 
 renderOption :: OptionMap -> Text
 renderOption optionMap =   case runGenOptionHeaderFile optionMap of

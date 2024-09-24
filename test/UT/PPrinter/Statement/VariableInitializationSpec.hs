@@ -10,6 +10,8 @@ import Control.Monad.Reader
 import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
+import ControlFlow.Common
+import Control.Monad.Except
 
 tmDescriptorTS, messageTS :: TypeSpecifier
 tmDescriptorTS = DefinedType "TMDescriptor"
@@ -99,9 +101,12 @@ option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitiali
 
 renderStatement :: Statement SemanticAnn -> Text
 renderStatement stmt = 
-  case runReaderT (genBlockItem stmt) empty of
+  case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
-    Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
+    Right bBlocks ->
+      case runReaderT (Prelude.concat <$> mapM genBlocks bBlocks) empty of
+        Left err -> pack $ show err
+        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

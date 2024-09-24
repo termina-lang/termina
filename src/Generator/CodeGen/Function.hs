@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Function where
 
-import Semantic.AST
+import ControlFlow.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
@@ -23,7 +23,7 @@ genFunction (Function identifier parameters rts (BlockRet body ret) _ ann) = do
     cParamDecls <- mapM genParameterDeclaration parameters
     cReturn <- genReturnStatement ret
     cBody <- foldM (\acc x -> do
-        cStmt <- genBlockItem x
+        cStmt <- genBlocks x
         return $ acc ++ cStmt) [] body
     return [ CFunctionDef Nothing (CFunction cRetType identifier cParamDecls
         (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))

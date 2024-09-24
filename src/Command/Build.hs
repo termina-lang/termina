@@ -40,6 +40,8 @@ import DataFlow.Architecture.Types
 import DataFlow.Architecture.Checks
 import Core.AST
 import Parser.Types
+import qualified ControlFlow.AST as CFAST
+import ControlFlow.Common
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -107,10 +109,16 @@ newtype SemanticData = SemanticData {
   typedAST :: SAST.AnnotatedProgram SemanticAnn
 } deriving (Show)
 
+newtype BasicBlocksData = BasicBlockData {
+  basicBlocksAST :: CFAST.AnnotatedProgram SemanticAnn
+} deriving (Show)
+
 type ParsedModule = TerminaModuleData ParsingData
 type TypedModule = TerminaModuleData SemanticData
+type BasicBlocksModule = TerminaModuleData BasicBlocksData
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule
+type BasicBlocksProject = M.Map QualifiedName BasicBlocksModule
 type ProjectDependencies = M.Map QualifiedName [QualifiedName]
 
 buildModuleName :: [String] -> IO QualifiedName
@@ -251,16 +259,16 @@ printModules ::
   -- | The output folder 
   -> FilePath
   -- | The project to generate the code from
-  -> TypedProject -> IO ()
+  -> BasicBlocksProject -> IO ()
 printModules includeOptionH definedTypesOptionMap destinationPath =
   mapM_ printModule . M.elems
 
   where
 
-    printModule :: TypedModule -> IO ()
+    printModule :: BasicBlocksModule -> IO ()
     printModule typedModule = do
       let sourceFile = destinationPath </> "src" </> qualifiedName typedModule <.> "c"
-          tAST = typedAST . metadata $ typedModule
+          tAST = basicBlocksAST . metadata $ typedModule
       case runGenSourceFile (qualifiedName typedModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter cSourceFile
@@ -268,18 +276,18 @@ printModules includeOptionH definedTypesOptionMap destinationPath =
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName typedModule <.> "h") $ runCPrinter cHeaderFile
 
-printInitFile :: FilePath -> TypedProject -> IO ()
-printInitFile destinationPath typedProject = do
+printInitFile :: FilePath -> BasicBlocksProject -> IO ()
+printInitFile destinationPath bbProject = do
   let initFilePath = destinationPath </> "init" <.> "c"
-      projectModules = M.toList $ typedAST . metadata <$> typedProject
+      projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
   case runGenInitFile initFilePath projectModules of
     Left err -> die . errorMessage $ show err
     Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter cInitFile
 
-printMainFile :: FilePath -> TypedProject -> IO ()
-printMainFile destinationPath typedProject = do
+printMainFile :: FilePath -> BasicBlocksProject -> IO ()
+printMainFile destinationPath bbProject = do
   let mainFilePath = destinationPath </> "main" <.> "c"
-      projectModules = M.toList $ typedAST . metadata <$> typedProject
+      projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
   case runGenMainFile mainFilePath projectModules of
     Left err -> die . errorMessage $ show err
     Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter cMainFile
@@ -311,6 +319,23 @@ warnDisconnectedEmitters tp =
     let disconnectedEmitters = getDisconnectedEmitters tp in
     unless (null disconnectedEmitters) $
       putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show disconnectedEmitters
+
+genBasicBlocks :: TypedProject -> IO BasicBlocksProject
+genBasicBlocks = mapM genBasicBlocksModule
+
+  where
+
+    genBasicBlocksModule :: TypedModule -> IO BasicBlocksModule
+    genBasicBlocksModule typedModule = do
+      let result = runGenBBModule . typedAST . metadata $ typedModule
+      case result of
+        Left err -> die . errorMessage $ show err
+        Right bbAST -> pure $ TerminaModuleData
+          (qualifiedName typedModule)
+          (fullPath typedModule)
+          (importedModules typedModule)
+          (sourcecode typedModule)
+          (BasicBlockData bbAST)
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
@@ -360,10 +385,13 @@ buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture typedProject (getPlatformInitialProgram plt) orderedDependencies 
     warnDisconnectedEmitters programArchitecture
+    -- | Obtain the basic blocks of the program
+    when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
+    bbProject <- genBasicBlocks typedProject
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) typedProject
-    printInitFile (outputFolder config) typedProject
-    printMainFile (outputFolder config) typedProject
+    printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) bbProject
+    printInitFile (outputFolder config) bbProject
+    printMainFile (outputFolder config) bbProject
     printOptionHeaderFile (outputFolder config) basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

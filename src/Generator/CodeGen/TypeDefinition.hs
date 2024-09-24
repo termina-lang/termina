@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.TypeDefinition where
 
-import Semantic.AST
+import ControlFlow.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
@@ -251,7 +251,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cSelfParam <- genConstSelfParam clsdef
             cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
-                cStmt <- genBlockItem x
+                cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
@@ -263,7 +263,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             selfCastStmt <- genSelfCastStmt
             cBody <- foldM (\acc x -> do
-                cStmt <- genBlockItem x
+                cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls)
                 (CSCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True)))
@@ -299,7 +299,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cSelfParam <- genSelfParam clsdef
             cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
-                cStmt <- genBlockItem x
+                cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam]
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
@@ -311,7 +311,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             cParam <- genParameterDeclaration param
             cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
-                cStmt <- genBlockItem x
+                cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] body
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam, cParam]
                 (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
