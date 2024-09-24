@@ -13,10 +13,10 @@ import UT.PPrinter.Expression.Common
 import ControlFlow.Common
 import Control.Monad.Except
 
-optionBoxUInt32TS :: TypeSpecifier
+optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
-vectorTS :: TypeSpecifier
+vectorTS :: TerminaType
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn

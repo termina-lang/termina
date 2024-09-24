@@ -27,7 +27,7 @@ data RTEMSPort =
     RTEMSEventPort
         Identifier -- ^ port identifier
         Identifier -- ^ event emitter identifier
-        TypeSpecifier -- ^ data type specifier
+        TerminaType -- ^ data type specifier
         Identifier -- ^ action to be executed
     | RTEMSAccessPort
         Identifier -- ^ port identifier
@@ -35,7 +35,7 @@ data RTEMSPort =
     | RTEMSInputPort
         Identifier -- ^ port identifier
         Identifier -- ^ channel identifier
-        TypeSpecifier -- ^ data type specifier
+        TerminaType -- ^ data type specifier
         Identifier -- ^ action to be executed
     | RTEMSOutputPort
         Identifier -- ^ port identifier
@@ -65,14 +65,14 @@ data RTEMSGlobal =
       [RTEMSPort] -- ^ resource access ports
     | RTEMSPool
       Identifier -- ^ pool identifier
-      TypeSpecifier -- ^ type of the elements of the pool
+      TerminaType -- ^ type of the elements of the pool
       Size -- ^ pool size
     | RTEMSAtomic
       Identifier -- ^ atomic identifier
-      TypeSpecifier -- ^ type of the atomic
+      TerminaType -- ^ type of the atomic
     | RTEMSAtomicArray
       Identifier -- ^ atomic array identifier
-      TypeSpecifier -- ^ type of the elements of the atomic array
+      TerminaType -- ^ type of the elements of the atomic array
       Size -- ^ atomic array size
     deriving Show
 
@@ -96,14 +96,14 @@ data RTEMSMsgQueue =
       TInteger -- ^ message queue size
     | RTEMSChannelMsgQueue
       Identifier -- ^ name of the channel
-      TypeSpecifier -- ^ type of the elements of the message queue
+      TerminaType -- ^ type of the elements of the message queue
       TInteger -- ^ message queue size
       RTEMSGlobal -- ^ task that will receive the messages
     | RTEMSSinkPortMsgQueue
       Identifier -- ^ identifier of the receiving task
       Identifier -- ^ identifier of the class of the receiving task
       Identifier -- ^ identifier of the port that will receive the messages
-      TypeSpecifier -- ^ type of the elements of the message queue
+      TerminaType -- ^ type of the elements of the message queue
       TInteger -- ^ message queue size
     deriving Show
 
@@ -365,7 +365,7 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
 
     where
 
-        actions :: [(Identifier, TypeSpecifier, Identifier)]
+        actions :: [(Identifier, TerminaType, Identifier)]
         actions = foldl (\acc member ->
             case member of
                 ClassField (FieldDefinition identifier (SinkPort dts action)) _ -> (identifier, dts, action) : acc
@@ -374,7 +374,7 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
             ) [] members
 
         -- TOOD: The current implementation does not work with vectors
-        getMsgDataVariable :: Bool -> Identifier -> TypeSpecifier -> CSourceGenerator CCompoundBlockItem
+        getMsgDataVariable :: Bool -> Identifier -> TerminaType -> CSourceGenerator CCompoundBlockItem
         getMsgDataVariable before action dts = do
             cDataType <- genType noqual dts
             if before then
@@ -382,14 +382,14 @@ genTaskClassCode (Class TaskClass classId members _ _) = do
             else
                 return $ no_cr $ var (action <::> "msg_data") cDataType
 
-        getMsgDataVariables :: [(Identifier, TypeSpecifier, Identifier)] -> CSourceGenerator [CCompoundBlockItem]
+        getMsgDataVariables :: [(Identifier, TerminaType, Identifier)] -> CSourceGenerator [CCompoundBlockItem]
         getMsgDataVariables [] = return []
         getMsgDataVariables ((_identifier, dts, action) : xs) = do
             decl <- getMsgDataVariable True action dts
             rest <- mapM (uncurry (getMsgDataVariable False) . (\(_, dts', action') -> (action', dts'))) xs
             return $ decl : rest
 
-        genCase :: (Identifier, TypeSpecifier, Identifier) -> CSourceGenerator [CCompoundBlockItem]
+        genCase :: (Identifier, TerminaType, Identifier) -> CSourceGenerator [CCompoundBlockItem]
         genCase (port, dts, action) = do
             this_variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action

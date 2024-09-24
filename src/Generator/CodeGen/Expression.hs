@@ -100,7 +100,7 @@ genMemberFunctionAccess obj ident args ann = do
     -- | Obtain the function type
     (cFuncType, cRetType) <- case ann of
         Located (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genFunctionType ts (paramTypeSpecifier <$> pts)
+            cFuncType <- genFunctionType ts pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann

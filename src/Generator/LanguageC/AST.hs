@@ -49,7 +49,7 @@ data CEnum' a =
     [CAttribute' a] -- ^ __attribute__s
     deriving Show
 
-data CTypeSpecifier' a = 
+data CTerminaType' a = 
     -- | Basic type specifiers
     CTypeSpec CType
     -- | Annonymous struct/union
@@ -59,7 +59,7 @@ data CTypeSpecifier' a =
     deriving Show
 
 data CDeclaration' a =
-    CDecl (CTypeSpecifier' a) (Maybe Ident) (Maybe (CExpression' a))
+    CDecl (CTerminaType' a) (Maybe Ident) (Maybe (CExpression' a))
     deriving Show
 
 data CExternalDeclaration' a
@@ -326,7 +326,7 @@ type CCompoundBlockItem = CCompoundBlockItem' CAnns
 type CObject = CObject' CAnns
 type CExpression = CExpression' CAnns
 type CDeclaration = CDeclaration' CAnns
-type CTypeSpecifier = CTypeSpecifier' CAnns
+type CTerminaType = CTerminaType' CAnns
 type CAttribute = CAttribute' CAnns
 type CStructureUnion = CStructureUnion' CAnns
 type CEnum = CEnum' CAnns

@@ -47,7 +47,7 @@ data Expression'
   | Constant Const a -- ^ | 24 : i8|
   | BinOp Op (Expression' obj a) (Expression' obj a) a
   | ReferenceExpression AccessKind (obj a) a
-  | Casting (Expression' obj a) TypeSpecifier a
+  | Casting (Expression' obj a) TerminaType a
   -- Invocation expressions
   | FunctionCall Identifier [ Expression' obj a ] a
   | MemberFunctionCall (obj a) Identifier [Expression' obj a] a
@@ -127,7 +127,7 @@ data Statement' expr obj a =
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TypeSpecifier -- ^ type of the variable
+    TerminaType -- ^ type of the variable
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
@@ -143,7 +143,7 @@ data Statement' expr obj a =
   -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
-    TypeSpecifier -- ^ type of iterator variable
+    TerminaType -- ^ type of iterator variable
     (expr a) -- ^ initial value of the iterator
     (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)

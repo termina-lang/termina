@@ -340,7 +340,7 @@ instance ForDeclaration CDeclaration where
         CSFor (Right decl) (Just expr2) (Just expr3) stmt cAnn
 
 data Declaration =
-    Declaration Ident CTypeSpecifier
+    Declaration Ident CTerminaType
     deriving Show
 
 var :: Ident -> CType -> Declaration

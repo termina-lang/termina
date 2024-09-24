@@ -10,7 +10,6 @@ import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import ControlFlow.Common
-import Control.Monad.Except
 
 test0 :: String
 test0 = "function vector_test0() {\n" ++

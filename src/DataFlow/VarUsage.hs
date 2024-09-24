@@ -84,7 +84,7 @@ useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 -- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignment _ = return ()
 
-getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TypeSpecifier)
+getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
 getObjectType = maybe (throwError ImpossibleError) return . SM.getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()

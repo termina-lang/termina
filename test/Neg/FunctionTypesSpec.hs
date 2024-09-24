@@ -66,10 +66,10 @@ spec = do
           isEInvalidReturnType (Array UInt8 (K (TInteger 10 DecRepr)))
   
   where
-    isEInvalidParameterType :: Identifier -> TypeSpecifier -> Maybe (Error Location) -> Bool
+    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe (Error Location) -> Bool
     isEInvalidParameterType ident ts = 
       \case Just (EInvalidParameterType (Parameter ident' ts')) -> ident == ident' && ts == ts'; _ -> False
     
-    isEInvalidReturnType :: TypeSpecifier -> Maybe (Error Location) -> Bool
+    isEInvalidReturnType :: TerminaType -> Maybe (Error Location) -> Bool
     isEInvalidReturnType ts = 
       \case Just (EInvalidReturnType ts') -> ts == ts'; _ -> False

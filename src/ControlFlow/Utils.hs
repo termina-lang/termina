@@ -19,7 +19,7 @@ import Control.Monad.Except
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m TypeSpecifier
+getObjType :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m TerminaType
 getObjType (SAST.Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (SAST.ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (SAST.MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
@@ -32,7 +32,7 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 -- expression's semantic annotation. The function assumes that the expression is well-typed
 -- and that the semantic annotation is correct. If the expression is not well-typed, the
 -- function will throw an error.
-getExprType :: (MonadError BBGeneratorError m) => SAST.Expression SemanticAnn -> m TypeSpecifier
+getExprType :: (MonadError BBGeneratorError m) => SAST.Expression SemanticAnn -> m TerminaType
 getExprType (SAST.AccessObject obj) = getObjType obj
 getExprType (SAST.Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts

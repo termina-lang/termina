@@ -13,7 +13,7 @@ import Generator.LanguageC.Printer
 import ControlFlow.Common
 import Control.Monad.Except
 
-tmDescriptorTS :: TypeSpecifier
+tmDescriptorTS :: TerminaType
 tmDescriptorTS = DefinedType "TMDescriptor"
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn

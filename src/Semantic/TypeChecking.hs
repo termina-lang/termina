@@ -40,7 +40,7 @@ import qualified Control.Monad.State.Strict as ST
 import Parser.Types
 
 
-getMemberFieldType :: ParserAnn -> TypeSpecifier -> Identifier -> SemanticMonad TypeSpecifier
+getMemberFieldType :: ParserAnn -> TerminaType -> Identifier -> SemanticMonad TerminaType
 getMemberFieldType ann obj_ty ident =
   case obj_ty of
     Location obj_ty' -> getMemberFieldType ann obj_ty' ident
@@ -51,7 +51,7 @@ getMemberFieldType ann obj_ty ident =
             let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError ann (EMemberAccessNotMember ident))
-              (return . fieldTypeSpecifier) mfield
+              (return . fieldTerminaType) mfield
         ;
         -- Or a class
         Class _ _identTy cls _implements _mods ->
@@ -70,7 +70,7 @@ getMemberFieldType ann obj_ty ident =
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
-  (ParserAnn -> Identifier -> SemanticMonad (AccessKind, TypeSpecifier))
+  (ParserAnn -> Identifier -> SemanticMonad (AccessKind, TerminaType))
   -- The object to type
   -> Object ParserAnn
   -> SemanticMonad (SAST.Object SemanticAnn)
@@ -126,10 +126,10 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
 
 typeMemberFunctionCall ::
   ParserAnn
-  -> TypeSpecifier
+  -> TerminaType
   -> Identifier
   -> [Expression ParserAnn]
-  -> SemanticMonad (([Parameter], [SAST.Expression SemanticAnn]), TypeSpecifier)
+  -> SemanticMonad (([TerminaType], [SAST.Expression SemanticAnn]), TerminaType)
 typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
@@ -146,7 +146,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                   -- Check that the number of parameters are OK
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
-                  typed_args <- zipWithM (\p e -> typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e) ps args
+                  typed_args <- zipWithM (\p e -> typeExpression (Just p) typeRHSObject e) ps args
                   fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -165,7 +165,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
               typed_args <- zipWithM (\p e -> 
                 catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns)) 
-                  (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)) ps args
+                  (typeExpression (Just p) typeRHSObject e)) ps args
               return ((ps, typed_args), Unit)
          ;
          -- Other User defined types do not define methods
@@ -176,63 +176,63 @@ typeMemberFunctionCall ann obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool))), Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Reference Mutable (Option (BoxSubtype ty_pool)), Builtin))
                 (typeExpression (Just (Reference Mutable (Option (BoxSubtype ty_pool)))) typeRHSObject opt)
-              return (([Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Parameter "opt" (Reference Mutable (Option (BoxSubtype ty_pool)))], Builtin) (fromIntegral (length args)))
+              return (([Reference Mutable (Option (BoxSubtype ty_pool))], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Reference Mutable (Option (BoxSubtype ty_pool))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Reference Mutable (Option (BoxSubtype ty_pool))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", Parameter "element" (BoxSubtype ty_pool), Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", BoxSubtype ty_pool, Builtin))
                 (typeExpression (Just (BoxSubtype ty_pool)) typeRHSObject elemnt)
-              return (([Parameter "element" (BoxSubtype ty_pool)], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [Parameter "element" (BoxSubtype ty_pool)], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [Parameter "element" (BoxSubtype ty_pool)], Builtin) (fromIntegral (length args)))
+              return (([BoxSubtype ty_pool], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [BoxSubtype ty_pool], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [BoxSubtype ty_pool], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicAccess ty_atomic) ->
       case ident of
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Parameter "retval" (Reference Mutable ty_atomic), Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Reference Mutable ty_atomic, Builtin))
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
-              return (([Parameter "retval" (Reference Mutable ty_atomic)], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              return (([Reference Mutable ty_atomic], [typed_arg]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Reference Mutable ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store" ->
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", Parameter "value" ty_atomic, Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", ty_atomic, Builtin))
                 (typeExpression (Just ty_atomic) typeRHSObject value)
-              return (([Parameter "value" ty_atomic], [typed_value]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [Parameter "value" ty_atomic], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
+              return (([ty_atomic], [typed_value]), Unit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     AccessPort (AtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "index" USize, Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", USize, Builtin))
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Parameter "retval" (Reference Mutable ty_atomic), Builtin))
+              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Reference Mutable ty_atomic, Builtin))
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
-              return (([Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], [typed_idx, typed_ref]), Unit)
+              return (([USize, Reference Mutable ty_atomic], [typed_idx, typed_ref]), Unit)
             _ -> if length args < 2 then 
-              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [Parameter "index" USize, Parameter "retval" (Reference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [USize, Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [USize, Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "index" USize, Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", USize, Builtin))
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", Parameter "value" ty_atomic, Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", ty_atomic, Builtin))
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
-              return (([Parameter "index" USize, Parameter "value" ty_atomic], [typed_idx, typed_value]), Unit)
+              return (([USize, ty_atomic], [typed_idx, typed_value]), Unit)
             _ -> if length args < 2 then 
-              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [Parameter "index" USize, Parameter "value" ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [USize, ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [USize, ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     OutPort ty ->
       case ident of
@@ -245,7 +245,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               case typed_element of
                 (SAST.AccessObject (SAST.Variable {})) -> return ()
                 _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
-              return (([Parameter "element" ty] , [typed_element]), Unit)
+              return (([ty] , [typed_element]), Unit)
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
         _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
     ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
@@ -262,7 +262,7 @@ typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
-typeConstExpression :: TypeSpecifier -> Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
+typeConstExpression :: TerminaType -> Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
 typeConstExpression expected_ty (Constant constant ann) = do
   checkConstant ann expected_ty constant
   return $ SAST.Constant constant (buildExpAnn ann expected_ty)
@@ -272,7 +272,7 @@ typeConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
   return $ SAST.AccessObject (SAST.Variable identifier (buildExpAnnObj ann Immutable ty))
 typeConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
 
-evalConstExpression :: TypeSpecifier -> Expression ParserAnn -> SemanticMonad Const
+evalConstExpression :: TerminaType -> Expression ParserAnn -> SemanticMonad Const
 evalConstExpression expected_ty (Constant constant ann) = do
   checkConstant ann expected_ty constant
   return constant
@@ -289,7 +289,7 @@ evalConstExpression _ _ = throwError $ annotateError Internal EExpressionNotCons
 -- constructions.
 typeExpression ::
   -- | Expected type of the expression
-  Maybe TypeSpecifier ->
+  Maybe TerminaType ->
   -- | Function used to type objects (depends on the scope)
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -- | Expression to type
@@ -374,17 +374,17 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     -- | This helper function checks that the type of the lhs and the rhs is
     -- the same. It also applies a function to check that the type is valid.
     sameTypeExpressions :: 
-      (TypeSpecifier -> Bool)
+      (TerminaType -> Bool)
       -- | Left hand side error constructor
-      -> (TypeSpecifier -> Error ParserAnn)
+      -> (TerminaType -> Error ParserAnn)
       -- | Right hand side error constructor
-      -> (TypeSpecifier -> Error ParserAnn)
+      -> (TerminaType -> Error ParserAnn)
       -- | Left hand side expression
       -> Expression ParserAnn 
       -- | Right hand side expression
       -> Expression ParserAnn 
       -- | Typed expressions
-      -> SemanticMonad (TypeSpecifier, SAST.Expression SemanticAnn, SAST.Expression SemanticAnn)
+      -> SemanticMonad (TerminaType, SAST.Expression SemanticAnn, SAST.Expression SemanticAnn)
     sameTypeExpressions isValid lerror rerror lnume rnume = do
       tyle <- catchError 
         (typeExpression Nothing typeObj lnume)
@@ -549,7 +549,7 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- zipWithM (\p e -> catchMismatch ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation))
-      (typeExpression (Just (paramTypeSpecifier p)) typeRHSObject e)) ps args
+      (typeExpression (Just p) typeRHSObject e)) ps args
   maybe (return ()) (checkEqTypesOrError ann retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 
@@ -816,7 +816,7 @@ checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas [
     checkSortedFields (d:ds) (a:as) acc =
       checkFieldValue loc typeObj d a >>= checkSortedFields ds as . (:acc)
 
-retStmt :: Maybe TypeSpecifier -> ReturnStmt ParserAnn -> SemanticMonad (SAST.ReturnStmt SemanticAnn)
+retStmt :: Maybe TerminaType -> ReturnStmt ParserAnn -> SemanticMonad (SAST.ReturnStmt SemanticAnn)
 retStmt Nothing (ReturnStmt Nothing anns) = do
   return $ SAST.ReturnStmt Nothing (buildExpAnn anns Unit)
 retStmt (Just ts) (ReturnStmt (Just e) anns) = do
@@ -826,7 +826,7 @@ retStmt (Just ts) (ReturnStmt (Just e) anns) = do
 retStmt (Just ty) (ReturnStmt Nothing anns) = throwError $ annotateError anns $ EReturnValueExpected ty
 retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotUnit
 
-typeBlockRet :: Maybe TypeSpecifier -> BlockRet ParserAnn -> SemanticMonad (SAST.BlockRet SemanticAnn)
+typeBlockRet :: Maybe TerminaType -> BlockRet ParserAnn -> SemanticMonad (SAST.BlockRet SemanticAnn)
 typeBlockRet ts (BlockRet bbody rete) = SAST.BlockRet <$> typeBlock bbody <*> retStmt ts rete
 
 typeBlock :: Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
@@ -838,7 +838,7 @@ typeStatement :: Statement ParserAnn -> SemanticMonad (SAST.Statement SemanticAn
 -- Declaration semantic analysis
 typeStatement (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- Check type is alright
-  checkTypeSpecifier anns lhs_type >>
+  checkTerminaType anns lhs_type >>
   -- Expression and type must match
   typeExpression (Just lhs_type) typeRHSObject expr >>= mustBeTy lhs_type >>=
     \ety ->
@@ -964,7 +964,7 @@ typeStatement (MatchStmt matchE cases ann) = do
 -- TODO Check ident is not defined?
 typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn)
 typeGlobal (Task ident ty mexpr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
@@ -972,7 +972,7 @@ typeGlobal (Task ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   return (SAST.Task ident ty exprty mods (buildGlobalAnn anns (STask ty)))
 typeGlobal (Handler ident ty mexpr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
@@ -980,7 +980,7 @@ typeGlobal (Handler ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   return (SAST.Handler ident ty exprty mods (buildGlobalAnn anns (SHandler ty)))
 typeGlobal (Resource ident ty mexpr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
@@ -988,7 +988,7 @@ typeGlobal (Resource ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   return (SAST.Resource ident ty exprty mods (buildGlobalAnn anns (SResource ty)))
 typeGlobal (Emitter ident ty mexpr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
@@ -1002,7 +1002,7 @@ typeGlobal (Emitter ident ty mexpr mods anns) = do
         _ -> throwError $ annotateError Internal EInternalNoGTY
   return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns glb))
 typeGlobal (Channel ident ty mexpr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
               Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
@@ -1010,23 +1010,23 @@ typeGlobal (Channel ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   return (SAST.Channel ident ty exprty mods (buildGlobalAnn anns (SChannel ty)))
 typeGlobal (Const ident ty expr mods anns) = do
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
   typed_expr <- typeConstExpression ty expr
   value <- evalConstExpression ty expr
   return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
 
 checkParameterType :: Location -> Parameter -> SemanticMonad ()
 checkParameterType anns p =
-    let typeSpec = paramTypeSpecifier p in
+    let typeSpec = paramTerminaType p in
      -- If the type specifier is a box, then we must throw an EArgHasBox error
      -- since we cannot have box types as parameters.
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
-    checkTypeSpecifier anns typeSpec
+    checkTerminaType anns typeSpec
 
-checkReturnType :: Location -> TypeSpecifier -> SemanticMonad ()
+checkReturnType :: Location -> TerminaType -> SemanticMonad ()
 checkReturnType anns ty =
   unless (returnValueTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
-  checkTypeSpecifier anns ty
+  checkTerminaType anns ty
 
 -- Here we actually only need Global
 programSeman :: AnnASTElement ParserAnn -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
@@ -1043,7 +1043,7 @@ programSeman (Function ident ps mty bret mods anns) =
         forM_ ps (checkParameterType anns) >>
           Function ident ps mty
             <$> (addLocalImmutObjs anns
-                  (fmap (\p -> (paramIdentifier p , paramTypeSpecifier p)) ps)
+                  (fmap (\p -> (paramIdentifier p , paramTerminaType p)) ps)
                   (typeBlockRet mty bret) >>= \ typed_bret ->
                 maybe
                     -- Procedure
@@ -1052,7 +1052,7 @@ programSeman (Function ident ps mty bret mods anns) =
                     blockRetTy
                     mty typed_bret >> return typed_bret)
             <*> pure mods
-            <*> pure (buildGlobal anns (GFun ps (fromMaybe Unit mty)))
+            <*> pure (buildGlobal anns (GFun (map paramTerminaType ps) (fromMaybe Unit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> typeGlobal gbl
@@ -1119,15 +1119,15 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     checkSortedProcedures :: [(InterfaceMember SemanticAnn, Identifier)] -> [ClassMember ParserAnn] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
-    checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId):_) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
-    checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId):ds) ((ClassProcedure prcId' ps' _ ann):as) =
+    checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
+    checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
       let psLen = length ps
           psLen' = length ps'
-      when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
-      when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, ps, location pann) (fromIntegral psLen')))
+      when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramTerminaType ps, location pann) (fromIntegral psLen')))
+      when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramTerminaType ps, location pann) (fromIntegral psLen')))
       zipWithM_ (\p@(Parameter _ ts) (Parameter _ ts') ->
-        unless (checkEqTypes ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, p, location pann) ts'))) ps ps'
+        unless (checkEqTypes ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramTerminaType p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EClassTyping)
 
@@ -1172,7 +1172,7 @@ typeTypeDefinition ann (Interface ident cls mds) = do
 
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure procId ps annIP) = do
-      mapM_ (checkTypeSpecifier annIP . paramTypeSpecifier) ps
+      mapM_ (checkTerminaType annIP . paramTerminaType) ps
       return $ InterfaceProcedure procId ps (buildExpAnn annIP Unit)
 
 typeTypeDefinition ann (Class kind ident members provides mds) =
@@ -1186,13 +1186,13 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
         case cl of
           -- ClassFields
           ClassField fld@(FieldDefinition _fs_id fs_ty) annCF
-            -> checkTypeSpecifier annCF fs_ty
+            -> checkTerminaType annCF fs_ty
               >> classFieldTyorFail annCF fs_ty
               >> let checkFs = SAST.ClassField fld (buildExpAnn annCF fs_ty)
                 in return (checkFs : fs, prcs, mths, vws, acts)
           -- Procedures
           prc@(ClassProcedure _fp_id fp_tys _body annCP)
-            -> mapM_ (checkTypeSpecifier annCP . paramTypeSpecifier) fp_tys
+            -> mapM_ (checkTerminaType annCP . paramTerminaType) fp_tys
             >> return (fs, prc : prcs, mths, vws, acts)
           -- Methods
           mth@(ClassMethod _fm_id mty _body annCM)
@@ -1206,7 +1206,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             >> return (fs, prcs, mths, view : vws, acts)
           action@(ClassAction _fa_id fa_ty mty _body annCA)
             -> checkReturnType annCA mty
-            >> (checkTypeSpecifier annCA . paramTypeSpecifier) fa_ty
+            >> (checkTerminaType annCA . paramTerminaType) fa_ty
             >> return (fs, prcs, mths, vws , action : acts)
         )
     ([],[],[],[],[]) members
@@ -1271,7 +1271,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             ClassField {} -> throwError (annotateError Internal EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet Nothing blk)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlockRet Nothing blk)
               let newPrc = SAST.ClassProcedure mIdent mps typed_bret (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
@@ -1280,12 +1280,12 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mps mty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTypeSpecifier p)) mps) (typeBlockRet mty mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlockRet mty mbody)
               maybe (blockRetTy Unit) blockRetTy mty typed_bret
               let newVw = SAST.ClassViewer mIdent mps mty typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTypeSpecifier p)]) (typeBlockRet (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTerminaType p)]) (typeBlockRet (Just ty) mbody)
               blockRetTy ty typed_bret
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
@@ -1297,17 +1297,17 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
 fieldDefinitionTy :: Location -> FieldDefinition -> SemanticMonad ()
 fieldDefinitionTy ann f
   -- First we check its type is well-defined
-  = checkTypeSpecifier ann tyFD
+  = checkTerminaType ann tyFD
   -- and that it is simply (see simple types).
   >> simpleTyorFail ann tyFD
   -- we just return it.
   where
-    tyFD = fieldTypeSpecifier f
+    tyFD = fieldTerminaType f
 
 -- Enum Variant definition helpers.
 enumDefinitionTy :: Location -> EnumVariant -> SemanticMonad ()
 enumDefinitionTy ann ev
-  = mapM_ (\ty -> checkTypeSpecifier ann ty >> simpleTyorFail ann ty) ev_tys
+  = mapM_ (\ty -> checkTerminaType ann ty >> simpleTyorFail ann ty) ev_tys
   where
     ev_tys = assocData ev
 
@@ -1331,7 +1331,7 @@ programAdd :: SAST.AnnASTElement SemanticAnn
   -> SemanticMonad (Identifier, Located (GEntry SemanticAnn))
 programAdd (Function ident params mretType _bd _mods anns) =
   let
-    gbl = GFun params (fromMaybe Unit mretType)
+    gbl = GFun (map paramTerminaType params) (fromMaybe Unit mretType)
     el = Located gbl (location anns)
   in
   insertGlobal ident el

@@ -14,7 +14,7 @@ import Generator.CodeGen.Common
 import ControlFlow.Common
 import Control.Monad.Except
 
-tmDescriptorTS :: TypeSpecifier
+tmDescriptorTS :: TerminaType
 tmDescriptorTS = DefinedType "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnn

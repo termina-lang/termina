@@ -257,7 +257,7 @@ spec = do
     isEProcedureExtraParams = \case Just (EProcedureExtraParams ("TMChannelInterface", "send_packet", [], Position {}) 1) -> True; _ -> False
 
     isEProcedureMissingParams :: Maybe (Error Location) -> Bool
-    isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [Parameter "input" UInt32], Position {}) 0) -> True; _ -> False
+    isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [UInt32], Position {}) 0) -> True; _ -> False
 
     isEProcedureParamMismatch :: Maybe (Error Location) -> Bool
-    isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Parameter "packets" (Reference Mutable UInt32), Position {}) (Reference Mutable UInt16)) -> True; _ -> False
+    isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Reference Mutable UInt32, Position {}) (Reference Mutable UInt16)) -> True; _ -> False

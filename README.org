@@ -160,7 +160,7 @@ strParse "fn f(a : i32){return g((32::i32) + (45::i32));}"
 #+end_src
 Res
 #+begin_src haskell
-Right [Function "f" [Parameter {paramIdentifier = "a", paramTypeSpecifier = Int32}] Nothing (BlockRet {blockBody = [], blockRet = (Just (FunctionCall "g" [BinOp Addition (Constant (I Int32 32)) (Constant (I Int32 45))]),[Position (line 1, column 15)])}) [Position (line 1, column 1)]]
+Right [Function "f" [Parameter {paramIdentifier = "a", paramTerminaType = Int32}] Nothing (BlockRet {blockBody = [], blockRet = (Just (FunctionCall "g" [BinOp Addition (Constant (I Int32 32)) (Constant (I Int32 45))]),[Position (line 1, column 15)])}) [Position (line 1, column 1)]]
 #+end_src
 
 ** DONE [Q3] ~FieldValuesAssignmentsExpression fs? : ??~
@@ -221,12 +221,12 @@ Ask Pablo because I think he wanted to have something more concrete.
 Statics should be a memory address?
 #+begin_src  haskell
 data Global a
-  = Volatile Identifier (TypeSpecifier a) Address [ a ]
-  | Static Identifier (TypeSpecifier a) (Maybe (Expression a)) [ a ]
+  = Volatile Identifier (TerminaType a) Address [ a ]
+  | Static Identifier (TerminaType a) (Maybe (Expression a)) [ a ]
     -- ---------------------------------^^^^^^^^^^^^^^^^^^^^^
-  | Shared Identifier (TypeSpecifier a)  (Maybe (Expression a)) [ a ]
+  | Shared Identifier (TerminaType a)  (Maybe (Expression a)) [ a ]
     -- -------------------------------------^^^^^^^^^^^^^^^^^^^^^
-  | Const Identifier (TypeSpecifier a)  (Expression a) [ a ]
+  | Const Identifier (TerminaType a)  (Expression a) [ a ]
     -- ---------------------------------^^^^^^^^^^^^^^-------
   deriving (Show, Functor)
 #+end_src

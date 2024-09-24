@@ -16,25 +16,25 @@ import Utils.Annotations
 
 -- | Global type information
 data SemGlobal
-  = STask TypeSpecifier
-  | SResource TypeSpecifier
-  | SHandler TypeSpecifier
-  | SEmitter TypeSpecifier
-  | SChannel TypeSpecifier
-  | SConst TypeSpecifier Const
+  = STask TerminaType
+  | SResource TerminaType
+  | SHandler TerminaType
+  | SEmitter TerminaType
+  | SChannel TerminaType
+  | SConst TerminaType Const
   deriving Show
 
 -- | Semantic type information
 data ESeman
-  = SimpleType TypeSpecifier
-  | ObjectType AccessKind TypeSpecifier
-  | AppType [Parameter] TypeSpecifier
+  = SimpleType TerminaType
+  | ObjectType AccessKind TerminaType
+  | AppType [TerminaType] TerminaType
   | PortConnection ConnectionSeman
   deriving Show
 
 data SSeman
   = SimpleStmtType -- ^ Statement with no type
-    | MatchCaseStmtType [TypeSpecifier] -- ^ Match case with types
+    | MatchCaseStmtType [TerminaType] -- ^ Match case with types
   deriving Show
 
 data SemanProcedure = SemanProcedure Identifier [Parameter]
@@ -44,37 +44,37 @@ data ConnectionSeman =
     -- | Access port connection
   APConnTy
   -- | Type specifier of the connected resource
-    TypeSpecifier
+    TerminaType
     -- | List of procedures that can be called on the connected resource
     [SemanProcedure]
   | APAtomicConnTy
     -- | Type specifier of the connected atomic
-    TypeSpecifier
+    TerminaType
   | APAtomicArrayConnTy
     -- | type specifier of the connected atomic array
-    TypeSpecifier
+    TerminaType
     -- | Size of the connected atomic array
     Size
   | APPoolConnTy
     -- | Type specifier of the connected pool
-    TypeSpecifier
+    TerminaType
     -- | Size of the connected pool
     Size
   -- | Sink port connection
   | SPConnTy
     -- | Type specifier of the connected event emitter
-    TypeSpecifier
+    TerminaType
     -- | Name of the action that will be triggered when the event emitter emits an event 
     Identifier 
   -- | In port connection
   | InPConnTy
     -- | Type specifier of the connected channel
-    TypeSpecifier
+    TerminaType
     -- | Name of the action that will be triggered when the channel receives a message
     Identifier
   | OutPConnTy
     -- | Type specifier of the connected channel
-    TypeSpecifier
+    TerminaType
   deriving Show
 
 -- | Semantic elements
@@ -92,7 +92,7 @@ data SemanticElems
 -- | Expression Semantic Annotations
 type SemanticAnn = Located SemanticElems
 
-getTySemGlobal :: SemGlobal -> TypeSpecifier
+getTySemGlobal :: SemGlobal -> TerminaType
 getTySemGlobal (STask ty) = ty
 getTySemGlobal (SResource ty)   = ty
 getTySemGlobal (SHandler ty)   = ty
@@ -104,7 +104,7 @@ getTySemGlobal (SConst ty _) = ty
 
 -- | General global entities
 data GEntry a
-  = GFun [Parameter] TypeSpecifier -- ^ const generic parameters, parameters, return type
+  = GFun [TerminaType] TerminaType -- ^ const generic parameters, parameters, return type
   -- ^ Functions
   | GGlob SemGlobal
   -- ^ Globals
@@ -134,12 +134,12 @@ kClassMember (ClassAction idx ps ty _blk ann) =
 ----------------------------------------
 -- Subtyping.
 -- This fuction says what types can be casted into others.
-casteableTys :: TypeSpecifier -> TypeSpecifier-> Bool
+casteableTys :: TerminaType -> TerminaType-> Bool
 casteableTys a b = numTy a && numTy b
 
 -- Relation between types
 -- we use to define (box A \subseteq A)
-subTypes :: TypeSpecifier -> TypeSpecifier -> Bool
+subTypes :: TerminaType -> TerminaType -> Bool
 subTypes (BoxSubtype a) (BoxSubtype b) = checkEqTypes a b
 subTypes (BoxSubtype a) b              = checkEqTypes a b
 subTypes a (BoxSubtype b)              = checkEqTypes a b

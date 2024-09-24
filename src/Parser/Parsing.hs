@@ -194,7 +194,7 @@ hexadecimal = Tok.lexeme lexer $
 ----------------------------------------
 
 -- | Types
-typeSpecifierParser :: Parser TypeSpecifier
+typeSpecifierParser :: Parser TerminaType
 typeSpecifierParser =
   msgQueueParser
   <|> poolParser
@@ -312,7 +312,7 @@ modifierParser = do
   _ <- reservedOp "]"
   return $ Modifier identifier initializer
 
-msgQueueParser :: Parser TypeSpecifier
+msgQueueParser :: Parser TerminaType
 msgQueueParser = do
   reserved "MsgQueue"
   _ <- reservedOp "<"
@@ -322,7 +322,7 @@ msgQueueParser = do
   _ <- reservedOp ">"
   return $ MsgQueue typeSpecifier size
 
-poolParser :: Parser TypeSpecifier
+poolParser :: Parser TerminaType
 poolParser = do
   reserved "Pool"
   _ <- reservedOp "<"
@@ -332,7 +332,7 @@ poolParser = do
   _ <- reserved ">"
   return $ Pool typeSpecifier size
 
-allocatorParser :: Parser TypeSpecifier
+allocatorParser :: Parser TerminaType
 allocatorParser = do
   reserved "Allocator"
   _ <- reservedOp "<"
@@ -340,7 +340,7 @@ allocatorParser = do
   _ <- reserved ">"
   return $ Allocator typeSpecifier
 
-atomicParser :: Parser TypeSpecifier
+atomicParser :: Parser TerminaType
 atomicParser = do
   reserved "Atomic"
   _ <- reservedOp "<"
@@ -348,7 +348,7 @@ atomicParser = do
   _ <- reserved ">"
   return $ Atomic typeSpecifier
 
-atomicAccessParser :: Parser TypeSpecifier
+atomicAccessParser :: Parser TerminaType
 atomicAccessParser = do
   reserved "AtomicAccess"
   _ <- reservedOp "<"
@@ -356,7 +356,7 @@ atomicAccessParser = do
   _ <- reserved ">"
   return $ AtomicAccess typeSpecifier
 
-atomicArrayParser :: Parser TypeSpecifier
+atomicArrayParser :: Parser TerminaType
 atomicArrayParser = do
   reserved "AtomicArray"
   _ <- reservedOp "<"
@@ -366,7 +366,7 @@ atomicArrayParser = do
   _ <- reserved ">"
   return $ AtomicArray typeSpecifier size
 
-atomicArrayAccessParser :: Parser TypeSpecifier
+atomicArrayAccessParser :: Parser TerminaType
 atomicArrayAccessParser = do
   reserved "AtomicArrayAccess"
   _ <- reservedOp "<"
@@ -376,7 +376,7 @@ atomicArrayAccessParser = do
   _ <- reserved ">"
   return $ AtomicArrayAccess typeSpecifier size
 
-vectorParser :: Parser TypeSpecifier
+vectorParser :: Parser TerminaType
 vectorParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
@@ -385,39 +385,39 @@ vectorParser = do
   _ <- reserved "]"
   return $ Array typeSpecifier size
 
-referenceParser :: Parser TypeSpecifier
+referenceParser :: Parser TerminaType
 referenceParser = reservedOp "&" >> Reference Immutable <$> typeSpecifierParser
 
-mutableReferenceParser :: Parser TypeSpecifier
+mutableReferenceParser :: Parser TerminaType
 mutableReferenceParser = reservedOp "&mut" >> Reference Mutable <$> typeSpecifierParser
 
-boxSubtypeParser :: Parser TypeSpecifier
+boxSubtypeParser :: Parser TerminaType
 boxSubtypeParser = reserved "box" >> BoxSubtype <$> typeSpecifierParser
 
-locationSubtypeParser :: Parser TypeSpecifier
+locationSubtypeParser :: Parser TerminaType
 locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser
 
-sinkPortParser :: Parser TypeSpecifier
+sinkPortParser :: Parser TerminaType
 sinkPortParser = do
   _ <- reserved "sink"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
   SinkPort ts <$> identifierParser
 
-accessPortParser :: Parser TypeSpecifier
+accessPortParser :: Parser TerminaType
 accessPortParser = reservedOp "access" >> AccessPort <$> typeSpecifierParser
 
-outPortParser :: Parser TypeSpecifier
+outPortParser :: Parser TerminaType
 outPortParser = reservedOp "out" >> OutPort <$> typeSpecifierParser
 
-inPortParser :: Parser TypeSpecifier
+inPortParser :: Parser TerminaType
 inPortParser = do
   _ <- reserved "in"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
   InPort ts <$> identifierParser
 
-optionParser :: Parser TypeSpecifier
+optionParser :: Parser TerminaType
 optionParser = do
   _ <- reserved "Option"
   _ <- reservedOp "<"

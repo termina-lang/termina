@@ -2,7 +2,7 @@
 
 module DataFlow.VarUsage.Computation where
 
-import Core.AST (Identifier,Parameter(..),TypeSpecifier(..))
+import Core.AST (Identifier,Parameter(..),TerminaType(..))
 
 import DataFlow.VarUsage.Errors
 import DataFlow.VarUsage.Types
@@ -139,9 +139,9 @@ safeAddUse :: Identifier -> UDM Error ()
 -- Add Variable to use set
 safeAddUse ident
   = do
-    usedSet <- gets usedSet
-    unless (S.size usedSet < maxBound) (throwError SetMaxBound)
-    putUSet $ unsafeAdd ident usedSet
+    usedSet' <- gets usedSet
+    unless (S.size usedSet' < maxBound) (throwError SetMaxBound)
+    putUSet $ unsafeAdd ident usedSet'
 
 safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Error ()
 safeAddUseOnlyOnce ident mv
@@ -235,7 +235,7 @@ defVariable ident =
 -- box.
 defArgumentsProc :: Parameter -> UDM Error ()
 defArgumentsProc ps
-  = (case paramTypeSpecifier ps of
+  = (case paramTerminaType ps of
         BoxSubtype _ -> defBoxVar
         _ -> defVariable)
     (paramIdentifier ps)

@@ -16,7 +16,7 @@ import Utils.Annotations
 genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
 
-genSimpleOptionDefinition :: TypeSpecifier -> CHeaderGenerator [CFileItem]
+genSimpleOptionDefinition :: TerminaType -> CHeaderGenerator [CFileItem]
 genSimpleOptionDefinition = genOptionStruct (Located (STy SimpleStmtType) Internal)
 
 genOptionHeaderFile :: CHeaderGenerator CFile

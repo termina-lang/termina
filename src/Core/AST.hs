@@ -37,7 +37,7 @@ data AnnASTElement' blk expr a =
   Function
     Identifier -- ^ function identifier (name)
     [Parameter] -- ^ list of parameters (possibly empty)
-    (Maybe TypeSpecifier) -- ^ type of the return value (optional)
+    (Maybe TerminaType) -- ^ type of the return value (optional)
     (blk a) -- ^ statements block (with return)
     [ Modifier ] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
@@ -78,32 +78,32 @@ type Identifier = String
 -- | Addresses as `Integer`
 type Address = TInteger
 
--- | General type specifier
-data TypeSpecifier
+-- | Termina types
+data TerminaType
   -- Primitive types
   = UInt8 | UInt16 | UInt32 | UInt64
   | Int8 | Int16 | Int32 | Int64 | USize
   | Bool | Char | DefinedType Identifier
-  | Array TypeSpecifier Size
-  | Option TypeSpecifier
+  | Array TerminaType Size
+  | Option TerminaType
   -- Built-in polymorphic types
-  | MsgQueue TypeSpecifier Size -- Message queues
-  | Pool TypeSpecifier Size -- Memory pools
-  | Atomic TypeSpecifier -- Atomic variables
-  | AtomicArray TypeSpecifier Size -- Atomic arrays
-  | Allocator TypeSpecifier -- Interface of memory pools
-  | AtomicAccess TypeSpecifier -- Interface to access atomic variables
-  | AtomicArrayAccess TypeSpecifier Size -- Interface to access atomic arrays
+  | MsgQueue TerminaType Size -- Message queues
+  | Pool TerminaType Size -- Memory pools
+  | Atomic TerminaType -- Atomic variables
+  | AtomicArray TerminaType Size -- Atomic arrays
+  | Allocator TerminaType -- Interface of memory pools
+  | AtomicAccess TerminaType -- Interface to access atomic variables
+  | AtomicArrayAccess TerminaType Size -- Interface to access atomic arrays
   -- Non-primitive types
-  | Reference AccessKind TypeSpecifier
-  | BoxSubtype TypeSpecifier
+  | Reference AccessKind TerminaType
+  | BoxSubtype TerminaType
   -- | Fixed-location types
-  | Location TypeSpecifier
+  | Location TerminaType
   -- | Port types
-  | AccessPort TypeSpecifier
-  | SinkPort TypeSpecifier Identifier
-  | InPort TypeSpecifier Identifier
-  | OutPort TypeSpecifier
+  | AccessPort TerminaType
+  | SinkPort TerminaType Identifier
+  | InPort TerminaType Identifier
+  | OutPort TerminaType
   -- See Q9
   | Unit
   deriving (Show, Ord, Eq)
@@ -154,28 +154,28 @@ data Global' expr a
     -- | Task global variable constructor
     Task
       Identifier -- ^ name of the task
-      TypeSpecifier -- ^ type of the variable
+      TerminaType -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
     -- | Shared resource global variable constructor
     | Resource
       Identifier -- ^ name of the variable
-      TypeSpecifier -- ^ type of the variable
+      TerminaType -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Channel
       Identifier -- ^ name of the variable
-      TypeSpecifier -- ^ type of the variable
+      TerminaType -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Emitter
       Identifier -- ^ name of the variable
-      TypeSpecifier -- ^ type of the variable
+      TerminaType -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -183,7 +183,7 @@ data Global' expr a
     -- | Handler global variable constructor
     | Handler
       Identifier -- ^ name of the variable
-      TypeSpecifier -- ^ type of the variable
+      TerminaType -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -191,7 +191,7 @@ data Global' expr a
     -- | Constant constructor
     | Const
       Identifier -- ^ name of the constant
-      TypeSpecifier -- ^ type of the constant
+      TerminaType -- ^ type of the constant
       (expr a) -- ^ initialization expression
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -240,7 +240,7 @@ data ClassMember' blk a
     -- state of the object and call other methods of the same class.
     | ClassMethod 
       Identifier  -- ^ name of the method
-      (Maybe TypeSpecifier) -- ^ type of the return value (optional)
+      (Maybe TerminaType) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     -- | Procedures. They can only be used on shared resources, and constitute their
@@ -254,13 +254,13 @@ data ClassMember' blk a
     | ClassViewer
       Identifier -- ^ name of the viewer
       [Parameter] -- ^ list of parameters (possibly empty)
-      (Maybe TypeSpecifier) -- ^ return type of the viewer
+      (Maybe TerminaType) -- ^ return type of the viewer
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassAction 
       Identifier  -- ^ name of the method
       Parameter -- ^ input parameter
-      TypeSpecifier -- ^ type of the return value
+      TerminaType -- ^ type of the return value
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)
@@ -278,7 +278,7 @@ data ClassMember' blk a
 -- - the type of the parameter
 data Parameter = Parameter {
   paramIdentifier      :: Identifier -- ^ paramter identifier (name)
-  , paramTypeSpecifier :: TypeSpecifier -- ^ type of the parameter
+  , paramTerminaType :: TerminaType -- ^ type of the parameter
 } deriving (Show)
 
 data FieldAssignment' expr a =
@@ -289,19 +289,19 @@ data FieldAssignment' expr a =
 
 data FieldDefinition = FieldDefinition {
   fieldIdentifier      :: Identifier
-  , fieldTypeSpecifier :: TypeSpecifier
+  , fieldTerminaType :: TerminaType
 } deriving (Show)
 
 data EnumVariant = EnumVariant {
   variantIdentifier :: Identifier
-  , assocData       :: [ TypeSpecifier ]
+  , assocData       :: [ TerminaType ]
 } deriving (Show)
 
 -- | Constant values:
 -- - Booleans
 -- - Integers
 -- - Characters
-data Const = B Bool | I TInteger (Maybe TypeSpecifier) | C Char
+data Const = B Bool | I TInteger (Maybe TerminaType) | C Char
   deriving (Show)
 
 ----------------------------------------

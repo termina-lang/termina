@@ -112,7 +112,7 @@ genArrayInitialization before level cObj expr = do
         genArrayInitializationFromExpression :: Integer ->
             CObject ->
             CExpression ->
-            TypeSpecifier ->
+            TerminaType ->
             SemanticAnn ->
             CSourceGenerator [CStatement]
         genArrayInitializationFromExpression lvl lhsCObj rhsCExpr ts ann = do
@@ -187,14 +187,14 @@ genStructInitialization before level cObj expr = do
 
         where
 
-            genProcedureAssignment :: Identifier -> TypeSpecifier -> SemanProcedure -> CSourceGenerator CStatement
+            genProcedureAssignment :: Identifier -> TerminaType -> SemanProcedure -> CSourceGenerator CStatement
             genProcedureAssignment field (DefinedType interface) (SemanProcedure procid params) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before
                 cPortFieldType <- genType noqual (DefinedType interface)
                 let portFieldObj = CField cObj field cPortFieldType
                 clsFunctionName <- genClassFunctionName interface procid
-                clsFunctionType <- genFunctionType Unit (fmap paramTypeSpecifier params)
+                clsFunctionType <- genFunctionType Unit (fmap paramTerminaType params)
                 let clsFunctionExpr = CExprValOf (CVar clsFunctionName clsFunctionType) clsFunctionType exprCAnn
                 return $ CSDo (CExprAssign portFieldObj clsFunctionExpr clsFunctionType exprCAnn) declStmtAnn
             genProcedureAssignment _ _ _ = throwError $ InternalError "Unsupported procedure assignment"
@@ -256,7 +256,7 @@ genBlocks (ProcedureCall obj ident args ann) = do
     let cAnn = buildGenericAnn ann
     (cFuncType, cRetType) <- case ann of
         Located (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genFunctionType ts (paramTypeSpecifier <$> pts)
+            cFuncType <- genFunctionType ts pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
@@ -469,7 +469,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -- | A function to get the parameter struct name 
             -> (Identifier -> CSourceGenerator Identifier)
             -- | A function to generate a match case (inside the monad)
-            -> (CTypeSpecifier
+            -> (CTerminaType
                 -> CObject
                 -> MatchCase SemanticAnn
                 -> CSourceGenerator [CCompoundBlockItem])
@@ -496,7 +496,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             return $ Just (CSIfThenElse cExpr' cBlk rest (buildStatementAnn ann' False))
 
         genAnonymousMatchCase ::
-            CTypeSpecifier
+            CTerminaType
             -> CObject
             -> MatchCase SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
@@ -512,7 +512,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
         genAnonymousMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 
         genMatchCase ::
-            CTypeSpecifier
+            CTerminaType
             -> CObject
             -> MatchCase SemanticAnn
             -> CSourceGenerator [CCompoundBlockItem]

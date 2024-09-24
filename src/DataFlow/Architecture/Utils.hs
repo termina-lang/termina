@@ -17,12 +17,12 @@ getTriggeredAction ident (member : members) =
 
   where
 
-    getTriggeredAction' :: TypeSpecifier -> Identifier
+    getTriggeredAction' :: TerminaType -> Identifier
     getTriggeredAction' (SinkPort _ act) = act
     getTriggeredAction' (InPort _ act) = act
     getTriggeredAction' _ = error $ "Internal error: port " ++ ident ++ " is not a sink port or an in port"
 
-getPortType :: Identifier -> [ClassMember a] -> TypeSpecifier
+getPortType :: Identifier -> [ClassMember a] -> TerminaType
 getPortType ident [] = error $ "Internal error: no port with identifier " ++ ident
 getPortType ident (member : members) =
   case member of

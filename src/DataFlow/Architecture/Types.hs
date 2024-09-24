@@ -101,27 +101,27 @@ data TPHandler a = TPHandler {
 
 data TPAtomic a = TPAtomic 
     Identifier -- ^ atomic identifier
-    TypeSpecifier -- ^ data type specifier
+    TerminaType -- ^ data type specifier
     a -- ^ annontations
   deriving Show
 
 data TPAtomicArray a = TPAtomicArray 
     Identifier -- ^ atomic array identifier
-    TypeSpecifier -- ^ data type specifier
+    TerminaType -- ^ data type specifier
     Size -- ^ size of the array
     a -- ^ annontations
   deriving Show
 
 data TPChannel a = TPMsgQueue
     Identifier -- ^ message queue identifier
-    TypeSpecifier -- ^ data type specifier
+    TerminaType -- ^ data type specifier
     Size -- ^ size of the message queue
     a -- ^ annontations
    deriving Show
 
 data TPPool a = TPPool 
     Identifier -- ^ pool identifier
-    TypeSpecifier -- ^ data type specifier
+    TerminaType -- ^ data type specifier
     Size -- ^ size of the pool
     a -- ^ annontations
    deriving Show

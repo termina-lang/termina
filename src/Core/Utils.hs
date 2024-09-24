@@ -5,8 +5,8 @@ module Core.Utils where
 import Parser.AST
 import qualified Data.List as L
 
--- Primitive Types definition. Assuming |TypeSpecifier| is well-formed.
-primitiveTypes :: TypeSpecifier -> Bool
+-- Primitive Types definition. Assuming |TerminaType| is well-formed.
+primitiveTypes :: TerminaType -> Bool
 primitiveTypes UInt8           = True
 primitiveTypes UInt16          = True
 primitiveTypes UInt32          = True
@@ -22,7 +22,7 @@ primitiveTypes (DefinedType _) = True
 primitiveTypes (Array _ _)     = True
 primitiveTypes  _              = False
 
-returnValueTy :: TypeSpecifier -> Bool
+returnValueTy :: TerminaType -> Bool
 returnValueTy UInt8           = True
 returnValueTy UInt16          = True
 returnValueTy UInt32          = True
@@ -37,7 +37,7 @@ returnValueTy Char            = True
 returnValueTy (DefinedType _) = True
 returnValueTy _               = False
 
-parameterTy :: TypeSpecifier -> Bool
+parameterTy :: TerminaType -> Bool
 parameterTy UInt8           = True
 parameterTy UInt16          = True
 parameterTy UInt32          = True
@@ -57,7 +57,7 @@ parameterTy (Option (BoxSubtype _)) = False
 parameterTy (Option _)      = True
 parameterTy _               = False
 
-procedureParamTy :: TypeSpecifier -> Bool
+procedureParamTy :: TerminaType -> Bool
 procedureParamTy UInt8           = True
 procedureParamTy UInt16          = True
 procedureParamTy UInt32          = True
@@ -78,7 +78,7 @@ procedureParamTy _               = False
 -- Simple types can be used at variable creation, inside arrays and user defined structures.
 -- Also at box object and function returned values.
 -- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
-simpleType :: TypeSpecifier -> Bool
+simpleType :: TerminaType -> Bool
 simpleType Unit                = False
 simpleType (Option (BoxSubtype {})) = False
 simpleType (BoxSubtype {}) = False
@@ -90,7 +90,7 @@ simpleType (SinkPort {})       = False
 simpleType (AccessPort {})     = False
 simpleType _                   = True
 
-classFieldType :: TypeSpecifier -> Bool
+classFieldType :: TerminaType -> Bool
 classFieldType Unit                         = False
 classFieldType (BoxSubtype {})          = False
 classFieldType (Option (BoxSubtype {})) = False
@@ -99,12 +99,12 @@ classFieldType (Pool {})                    = False
 classFieldType (Reference {})               = False
 classFieldType _                            = True
 
-boolTy :: TypeSpecifier -> Bool
+boolTy :: TerminaType -> Bool
 boolTy Bool = True
 boolTy _    = False
 
--- | Predicate definining when a |TypeSpecifier| is numeric.
-numTy :: TypeSpecifier -> Bool
+-- | Predicate definining when a |TerminaType| is numeric.
+numTy :: TerminaType -> Bool
 numTy UInt8  = True
 numTy UInt16 = True
 numTy UInt32 = True
@@ -116,7 +116,7 @@ numTy Int64  = True
 numTy USize  = True
 numTy _      = False
 
-posTy :: TypeSpecifier -> Bool
+posTy :: TerminaType -> Bool
 posTy UInt8  = True
 posTy UInt16 = True
 posTy UInt32 = True
@@ -124,8 +124,8 @@ posTy UInt64 = True
 posTy USize  = True
 posTy _      = False
 
--- | Predicate defining when a |TypeSpecifier| can be used in a comparison.
-equatableTy :: TypeSpecifier -> Bool
+-- | Predicate defining when a |TerminaType| can be used in a comparison.
+equatableTy :: TerminaType -> Bool
 equatableTy UInt8  = True
 equatableTy UInt16 = True
 equatableTy UInt32 = True
@@ -139,7 +139,7 @@ equatableTy Bool   = True
 equatableTy Char   = True
 equatableTy _      = False
 
-memberIntCons :: Integer -> TypeSpecifier -> Bool
+memberIntCons :: Integer -> TerminaType -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
 memberIntCons i UInt16 = ( 0 <= i ) && ( i <= 65536)
 memberIntCons i UInt32 = ( 0 <= i ) && ( i <= 4294967295)
@@ -160,7 +160,7 @@ identifierType (Enum ident _ _)   = ident
 identifierType (Class _ ident _ _ _)  = ident
 identifierType (Interface ident _ _) = ident
 
-referenceType :: TypeSpecifier -> Bool
+referenceType :: TerminaType -> Bool
 referenceType Unit            = False
 referenceType (MsgQueue {})   = False
 referenceType (Pool {})       = False
@@ -172,16 +172,16 @@ referenceType _               = True
 
 ----------------------------------------
 -- Box Helpers
-isBox :: TypeSpecifier -> Maybe TypeSpecifier
+isBox :: TerminaType -> Maybe TerminaType
 isBox (BoxSubtype t) = Just t
 isBox _ = Nothing
 
-isNonBoxOption :: TypeSpecifier -> Bool
+isNonBoxOption :: TerminaType -> Bool
 isNonBoxOption (Option (BoxSubtype _)) = False
 isNonBoxOption (Option _) = True
 isNonBoxOption _ = False
 
-hasBoxOrDep :: TypeSpecifier -> Either Identifier Bool
+hasBoxOrDep :: TerminaType -> Either Identifier Bool
 hasBoxOrDep (DefinedType ident) = Left ident
 hasBoxOrDep UInt8 = Right False
 hasBoxOrDep UInt16 = Right False
@@ -202,7 +202,7 @@ hasBoxOrDep (BoxSubtype _) = Right True
 hasBoxOrDep _ = Right False
 ----------------------------------------
 
-rootType :: TypeSpecifier -> TypeSpecifier
+rootType :: TerminaType -> TerminaType
 rootType (Option ts) = rootType ts
 rootType (Array ts _) = rootType ts
 rootType (MsgQueue ts _) = rootType ts
@@ -213,7 +213,7 @@ rootType (Location ts) = rootType ts
 rootType t = t
 
 -- Type equality
-checkEqTypes :: TypeSpecifier -> TypeSpecifier -> Bool
+checkEqTypes :: TerminaType -> TerminaType -> Bool
 checkEqTypes  UInt8  UInt8 = True
 checkEqTypes  UInt16  UInt16 = True
 checkEqTypes  UInt32  UInt32 = True
@@ -243,7 +243,7 @@ checkEqTypes  _ _ = False
 findWith :: (a -> Maybe b) -> [a] -> Maybe b
 findWith f = L.foldl' (\acc a -> maybe acc Just (f a)) Nothing
 
-findClassField :: Identifier -> [ ClassMember' blk a ] -> Maybe (TypeSpecifier, a)
+findClassField :: Identifier -> [ ClassMember' blk a ] -> Maybe (TerminaType, a)
 findClassField i
   =
   fmap
@@ -253,27 +253,27 @@ findClassField i
   L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
                  _ -> False;})
 
-findClassProcedure :: Identifier -> [ ClassMember' blk a ] -> Maybe ([Parameter], a)
+findClassProcedure :: Identifier -> [ ClassMember' blk a ] -> Maybe ([TerminaType], a)
 findClassProcedure i
   = fmap
-  (\case {ClassProcedure _ ps _ a -> (ps,a)
+  (\case {ClassProcedure _ ps _ a -> (map paramTerminaType ps,a)
          ; _ -> error "Impossible after find"})
   .
   L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([Parameter], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([TerminaType], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ ps a -> (ps, a)})
+  (\case {InterfaceProcedure _ ps a -> (map paramTerminaType ps, a)})
   .
   L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
 
-findClassViewerOrMethod :: Identifier -> [ ClassMember' blk a ] -> Maybe ([Parameter], Maybe TypeSpecifier, a)
+findClassViewerOrMethod :: Identifier -> [ ClassMember' blk a ] -> Maybe ([TerminaType], Maybe TerminaType, a)
 findClassViewerOrMethod i
   = fmap
   (\case {
-    ClassViewer _ ps mty _ a -> (ps, mty, a);
+    ClassViewer _ ps mty _ a -> (map paramTerminaType ps, mty, a);
     ClassMethod _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })

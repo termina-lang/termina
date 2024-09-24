@@ -30,8 +30,8 @@ selfDereference :: Object SemanticAnn
 selfDereference = Dereference self (definedTypeObjSemAnn Mutable "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnn
-tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [Parameter "data" UInt16] Unit)
-selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] (funSemAnn [Parameter "p0" UInt16, Parameter "p1" UInt16] Unit)
+tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [UInt16] Unit)
+selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] (funSemAnn [UInt16, UInt16] Unit)
 
 tmChannelSendStmt, selfFoo0Stmt, tmPoolAllocStmt :: Statement SemanticAnn
 tmChannelSendStmt = SingleExpStmt tmChannelsend stmtSemAnn

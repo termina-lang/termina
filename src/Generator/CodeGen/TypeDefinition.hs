@@ -36,7 +36,7 @@ genFieldDeclaration (FieldDefinition identifier ts) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
 
-genOptionSomeParameterStruct :: SemanticAnn -> TypeSpecifier ->  CHeaderGenerator CFileItem
+genOptionSomeParameterStruct :: SemanticAnn -> TerminaType ->  CHeaderGenerator CFileItem
 genOptionSomeParameterStruct ann ts = do
     cTs <- genType noqual ts
     let cAnn = buildDeclarationAnn ann True
@@ -45,7 +45,7 @@ genOptionSomeParameterStruct ann ts = do
     return $
             CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [field] [])) cAnn
 
-genOptionStruct :: SemanticAnn -> TypeSpecifier -> CHeaderGenerator [CFileItem]
+genOptionStruct :: SemanticAnn -> TerminaType -> CHeaderGenerator [CFileItem]
 genOptionStruct ann (Option ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
@@ -89,7 +89,7 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) =
     paramsStructName <- genEnumParameterStructName identifier this_variant
     return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams [])) cAnn
     where
-        genEnumVariantParameter :: TypeSpecifier -> Integer -> CHeaderGenerator CDeclaration
+        genEnumVariantParameter :: TerminaType -> Integer -> CHeaderGenerator CDeclaration
         genEnumVariantParameter ts index = do
             cParamType <- genType noqual ts
             return $ CDecl (CTypeSpec cParamType) (Just (namefy $ show index)) Nothing
@@ -176,7 +176,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
-            cParamTypes <- mapM (genType noqual . paramTypeSpecifier) params
+            cParamTypes <- mapM (genType noqual . paramTerminaType) params
             let cThisParamType = CTPointer (CTVoid noqual) constqual
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing

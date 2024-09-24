@@ -16,7 +16,7 @@ data Statement' expr obj a =
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TypeSpecifier -- ^ type of the variable
+    TerminaType -- ^ type of the variable
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
@@ -49,7 +49,7 @@ data BasicBlock' expr obj a =
     -- | For-loop basic block
     | ForLoopBlock 
         Identifier -- ^ name of the iterator variable
-        TypeSpecifier -- ^ type of iterator variable
+        TerminaType -- ^ type of iterator variable
         (expr a) -- ^ initial value of the iterator
         (expr a) -- ^ final value of the iterator
         (Maybe (expr a)) -- ^ break condition (optional)

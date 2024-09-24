@@ -13,14 +13,14 @@ import UT.PPrinter.Expression.Common
 import ControlFlow.Common
 import Control.Monad.Except
 
-tmDescriptorTS, messageTS :: TypeSpecifier
+tmDescriptorTS, messageTS :: TerminaType
 tmDescriptorTS = DefinedType "TMDescriptor"
 messageTS = DefinedType "Message"
 
-optionBoxUInt32TS :: TypeSpecifier
+optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
-vectorTS, vectorTMDescriptorTS, twoDimArrayTS :: TypeSpecifier
+vectorTS, vectorTMDescriptorTS, twoDimArrayTS :: TerminaType
 vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
 vectorTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
 twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))

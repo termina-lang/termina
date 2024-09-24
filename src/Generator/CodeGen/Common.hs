@@ -17,7 +17,7 @@ newtype CGeneratorError = InternalError String
     deriving (Show)
 
 type Substitutions = Map Identifier CObject
-type OptionTypes = Map TypeSpecifier (Set TypeSpecifier)
+type OptionTypes = Map TerminaType (Set TerminaType)
 
 type CSourceGenerator = ReaderT Substitutions (Either CGeneratorError)
 type CHeaderGenerator = ReaderT OptionTypes (Either CGeneratorError)
@@ -88,7 +88,7 @@ genClassFunctionName className functionName = return $ className <::> functionNa
 
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
-genOptionParameterStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
 genOptionParameterStructName Bool = return $ namefy "option_bool_params_t"
 genOptionParameterStructName Char = return $ namefy "option_char_params_t"
 genOptionParameterStructName UInt8 = return $ namefy "option_uint8_params_t"
@@ -112,7 +112,7 @@ genOptionParameterStructName ts =
             return $ namefy $ "option_" <> tsName <> "_params_t"
 
     where
-        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
         genTypeSpecName UInt8 = return "uint8"
         genTypeSpecName UInt16 = return "uint16"
         genTypeSpecName UInt32 = return "uint32"
@@ -125,7 +125,7 @@ genOptionParameterStructName ts =
         genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
-        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+        genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
@@ -143,7 +143,7 @@ optionSomeField = "__0"
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TypeSpecifier
+getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TerminaType
 getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
@@ -152,11 +152,11 @@ getObjType (Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = r
 getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getParameters :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [Parameter]
-getParameters (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
-getParameters ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
+getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType]
+getParameterTypes (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
+getParameterTypes ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
 
-getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TypeSpecifier
+getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TerminaType
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
@@ -177,7 +177,7 @@ unboxObject (CExprValOf obj _ _) = return obj
 unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 
 -- | Generates the name of the option struct type
-genOptionStructName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+genOptionStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
 genOptionStructName Bool = return $ namefy "option_bool_t"
 genOptionStructName Char = return $ namefy "option_char_t"
 genOptionStructName UInt8 = return $ namefy "option_uint8_t"
@@ -201,7 +201,7 @@ genOptionStructName ts =
             return $ namefy $ "option_" <> tsName <> "_t"
 
     where
-        genTypeSpecName :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
         genTypeSpecName UInt8 = return "uint8"
         genTypeSpecName UInt16 = return "uint16"
         genTypeSpecName UInt32 = return "uint32"
@@ -214,7 +214,7 @@ genOptionStructName ts =
         genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
-        genDimensionOptionTS :: (MonadError CGeneratorError m) => TypeSpecifier -> m Identifier
+        genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
         genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
@@ -229,7 +229,7 @@ getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT no
 getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (Located CGenericAnn Internal)
 
 -- | Translate type annotation to C type
-genType :: (MonadError CGeneratorError m) => CQualifier -> TypeSpecifier -> m CType
+genType :: (MonadError CGeneratorError m) => CQualifier -> TerminaType -> m CType
 -- |  Unsigned integer types
 genType qual UInt8 = return (CTInt IntSize8 Unsigned qual)
 genType qual UInt16 = return (CTInt IntSize16 Unsigned qual)
@@ -292,7 +292,7 @@ genType _qual (Reference _ ts) = do
             return (CTPointer ts' constqual)
 genType _noqual Unit = return (CTVoid noqual)
 
-genFunctionType :: (MonadError CGeneratorError m) => TypeSpecifier -> [TypeSpecifier] -> m CType
+genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
 genFunctionType ts tsParams = do
     ts' <- genType noqual ts
     tsParams' <- traverse (genType noqual) tsParams
@@ -397,7 +397,7 @@ printIntegerLiteral (TInteger i DecRepr) = show i
 printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
 printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
 
-printTypedInteger :: TypeSpecifier -> TInteger -> String
+printTypedInteger :: TerminaType -> TInteger -> String
 printTypedInteger ts ti =
     case ts of
         UInt8 -> "UINT8_C(" <> printIntegerLiteral ti <> ")"

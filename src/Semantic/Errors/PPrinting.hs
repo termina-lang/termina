@@ -51,7 +51,7 @@ instance ShowText Op where
     showText LogicalAnd = "&&"
     showText LogicalOr = "||"
 
-instance ShowText TypeSpecifier where
+instance ShowText TerminaType where
     showText UInt8 = "u8"
     showText UInt16 = "u16"
     showText UInt32 = "u32"
@@ -229,14 +229,13 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureCallParamTypeMismatch (ident, Parameter param expectedTy, ann) actualTy ->
+    EProcedureCallParamTypeMismatch (ident, expectedTy, ann) actualTy ->
         let title = "\x1b[31merror [E011]\x1b[0m: parameter type mismatch in procedure call."
         in
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Parameter \x1b[31m" <> T.pack param <>
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             case ann of
                 Position procPos _procEndPos ->
@@ -430,7 +429,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 procSourceLines "The interface of the procedure is defined here:" procFileName
                 procLineNumber procLineColumn 1
                 Nothing
-    EProcedureParamTypeMismatch (ifaceId, procId, Parameter paramId expectedTy, Position procPos _procEndPos) actualTy ->
+    EProcedureParamTypeMismatch (ifaceId, procId, expectedTy, Position procPos _procEndPos) actualTy ->
         let title = "\x1b[31merror [E023]\x1b[0m: parameter type mismatch in procedure definition."
             procFileName = sourceName procPos
             procLineNumber = sourceLine procPos
@@ -440,8 +439,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn 1
-                (Just ("Parameter \x1b[31m" <> T.pack paramId <>
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             printSimpleError
                 procSourceLines
@@ -492,7 +490,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 funcSourceLines "The interface of the function is defined here:" funcFileName
                 funcLineNumber funcLineColumn (length funcId)
                 Nothing
-    EFunctionCallParamTypeMismatch (funcId, Parameter paramId expectedTy, Position funcPos _funcEndPos) actualTy ->
+    EFunctionCallParamTypeMismatch (funcId, expectedTy, Position funcPos _funcEndPos) actualTy ->
         let title = "\x1b[31merror [E027]\x1b[0m: parameter type mismatch in function call."
             funcFileName = sourceName funcPos
             funcLineNumber = sourceLine funcPos
@@ -502,8 +500,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
             printSimpleError
                 sourceLines title fileName
                 lineNumber lineColumn (length funcId)
-                (Just ("Parameter \x1b[31m" <> T.pack paramId <>
-                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             printSimpleError
                 funcSourceLines

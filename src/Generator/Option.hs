@@ -10,13 +10,13 @@ import qualified Data.Set as S
 import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 
-type OptionMap = M.Map TypeSpecifier (S.Set TypeSpecifier)
+type OptionMap = M.Map TerminaType (S.Set TerminaType)
 
 type OptionTypesMonad = ST.State OptionMap
 
 insertOptionType ::
   -- | The new element
-  TypeSpecifier
+  TerminaType
   -> OptionTypesMonad ()
 insertOptionType ts = do
   when (isNonBoxOption ts) $ ST.gets (M.lookup (rootType ts)) >>=
@@ -34,7 +34,7 @@ mapParameterOption (Parameter _ ts) = insertOptionType ts
 
 mapMaybeOption ::
   -- | The new element
-  Maybe TypeSpecifier
+  Maybe TerminaType
   -> OptionTypesMonad ()
 mapMaybeOption (Just ts) = insertOptionType ts
 mapMaybeOption Nothing = return ()
@@ -69,7 +69,7 @@ mapClassMemberOption ::
   -- | The new element
   ClassMember a
   -> OptionTypesMonad ()
-mapClassMemberOption (ClassField field _) = insertOptionType (fieldTypeSpecifier field)
+mapClassMemberOption (ClassField field _) = insertOptionType (fieldTerminaType field)
 mapClassMemberOption (ClassMethod _ maybeRet blkRet _) =
   -- | Get the option types from the return type
   mapMaybeOption maybeRet >>

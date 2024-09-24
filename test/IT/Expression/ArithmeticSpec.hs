@@ -8,7 +8,6 @@ import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
 import ControlFlow.Common
-import Control.Monad.Except
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 
