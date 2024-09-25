@@ -1,0 +1,5 @@
+function init_val (array : &[u8;6]) -> u8 {
+    (*array)[3] = 0 : u8;
+    return 0 : u8;
+}
+

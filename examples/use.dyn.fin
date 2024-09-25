@@ -3,9 +3,18 @@ struct TMDescriptorT {
     tm_num_bytes : u16;
 };
 
-resource class TMChannel{
+interface Test {
+
+    procedure test (&mut self, testD : box TMDescriptorT);
+
+};
+
+resource class TMChannel provides Test {
+
+    tm_pool : access Allocator<TMDescriptorT>;
+
    procedure test (&mut self, testD : box TMDescriptorT){
-             free(testD);
+             self->tm_pool.free(testD);
              return;
    }
 };

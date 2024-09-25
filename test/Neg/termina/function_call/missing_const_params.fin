@@ -1,0 +1,14 @@
+
+function fun0<const N : usize>() -> u32 {
+
+    return 0;
+
+}
+
+function main() -> u32 {
+
+    let x : u32 = fun0();
+
+    return x;
+
+}

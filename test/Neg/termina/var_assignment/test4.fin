@@ -1,0 +1,6 @@
+function f (n : u8) -> u8 {
+    let foo : u8 = n;
+    foo = foo + 32;
+    return foo;
+}
+

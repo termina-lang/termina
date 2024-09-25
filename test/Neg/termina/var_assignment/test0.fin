@@ -1,0 +1,12 @@
+function f (n : u8) -> u8 {
+    let ntimes : u8 = n;
+    var y : u8 = 0 : u8;
+
+    for i : u8 in 0 .. ntimes {
+        y = i + y;
+    }
+
+    return y;
+
+}
+

@@ -1,0 +1,15 @@
+
+function fun0(p : &u32) -> u32 {
+
+    return 0;
+
+}
+
+function main() -> u32 {
+
+    let input : u32 = 0;
+    let x : u32 = fun0(&mut input);
+
+    return x;
+
+}
