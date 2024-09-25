@@ -4,14 +4,15 @@ module Command.Build (
     buildCmdArgsParser, buildCommand, BuildCmdArgs
 ) where
 
+import Command.Configuration
+import Command.Utils
+import Command.Types
+
 import qualified Options.Applicative as O
 import Control.Monad
-import Data.Yaml
-import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
-import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
 
 import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv, getPlatformInitialProgram )
@@ -25,7 +26,6 @@ import Extras.TopSort
 import Semantic.Types (SemanticAnn)
 import Semantic.Monad (Environment, makeInitialGlobalEnv)
 import Modules.Modules
-import DataFlow.VarUsage (runUDAnnotatedProgram)
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
 import Data.List (foldl')
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
@@ -39,9 +39,6 @@ import DataFlow.Architecture
 import DataFlow.Architecture.Types
 import DataFlow.Architecture.Checks
 import Core.AST
-import Parser.Types
-import qualified ControlFlow.AST as CFAST
-import ControlFlow.Common
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -55,86 +52,6 @@ buildCmdArgsParser = BuildCmdArgs
     <$> O.switch (O.long "verbose"
         <> O.short 'v'
         <> O.help "Enable verbose mode")
-
--- | Data type for the "termina.yaml" configuration file
-data TerminaYaml =
-  TerminaYaml {
-    name :: T.Text,
-    platform :: T.Text,
-    appFolder :: FilePath,
-    appFilename :: FilePath,
-    sourceModulesFolder :: FilePath,
-    outputFolder :: FilePath
-  } deriving (Eq, Show)
-
--- | Instance for parsing the "termina.yaml" configuration file
-instance FromJSON TerminaYaml where
-  parseJSON (Object v) =
-    TerminaYaml <$>
-    v .:   "name"           <*>
-    v .:   "platform"       <*>
-    v .:   "app-folder"     <*>
-    v .:   "app-file"       <*>
-    v .:   "source-modules" <*>
-    v .:   "output-folder"
-  parseJSON _ = fail "Expeected configuration object"
-
--- | Error message formatter
--- Prints error messages in the form "error: <message>"
-errorMessage :: String -> String
-errorMessage msg = "\x1b[31merror\x1b[0m: " ++ msg
-
--- | Debug message formatter
--- Prints debug messages in the form "debug: <message>"
-debugMessage :: String -> String
-debugMessage msg = "\x1b[32mdebug\x1b[0m: " ++ msg
-
-warnMessage :: String -> String
-warnMessage msg = "\x1b[33mwarning\x1b[0m: " ++ msg
-
--- | Load "termina.yaml" configuration file
-loadConfig :: IO TerminaYaml
-loadConfig = do
-    config <- decodeFileEither "termina.yaml"
-    case config of
-        Left (InvalidYaml (Just (YamlException err))) -> die . errorMessage $ err
-        Left err -> die . errorMessage $ show err
-        Right c -> return c
-
-newtype ParsingData = ParsingData {
-  parsedAST :: PAST.AnnotatedProgram ParserAnn
-} deriving (Show)
-
-newtype SemanticData = SemanticData {
-  typedAST :: SAST.AnnotatedProgram SemanticAnn
-} deriving (Show)
-
-newtype BasicBlocksData = BasicBlockData {
-  basicBlocksAST :: CFAST.AnnotatedProgram SemanticAnn
-} deriving (Show)
-
-type ParsedModule = TerminaModuleData ParsingData
-type TypedModule = TerminaModuleData SemanticData
-type BasicBlocksModule = TerminaModuleData BasicBlocksData
-type ParsedProject = M.Map QualifiedName ParsedModule
-type TypedProject = M.Map QualifiedName TypedModule
-type BasicBlocksProject = M.Map QualifiedName BasicBlocksModule
-type ProjectDependencies = M.Map QualifiedName [QualifiedName]
-
-buildModuleName :: [String] -> IO QualifiedName
-buildModuleName [] = error . errorMessage $ "Internal parsing error: empty module name"
-buildModuleName [x] = die . errorMessage $ "Inalid module name \"" ++ show x ++ "\": modules cannot be at the root of the source folder"
-buildModuleName fs = buildModuleName' fs
-
-  where
-
-    buildModuleName' :: [String] -> IO QualifiedName
-    buildModuleName' [] = error . errorMessage $ "Internal parsing error: empty module name"
-    buildModuleName' [x] = pure x
-    buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
-
-getModuleImports :: PAST.TerminaModule ParserAnn -> IO [FilePath]
-getModuleImports = mapM (buildModuleName . moduleIdentifier) . modules
 
 -- | Load Termina file 
 loadTerminaModule ::
@@ -233,14 +150,6 @@ typeModules parsedProject =
 useDefCheckModules :: TypedProject -> IO ()
 useDefCheckModules = mapM_ useDefCheckModule . M.elems
 
-  where
-    useDefCheckModule :: TypedModule -> IO ()
-    useDefCheckModule typedModule =
-      let result = runUDAnnotatedProgram . typedAST . metadata $ typedModule in
-      case result of
-        Nothing -> return ()
-        Just err -> die . errorMessage $ show err
-
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
 optionMapModules = M.partitionWithKey
                 (\k _ -> case k of
@@ -266,15 +175,15 @@ printModules includeOptionH definedTypesOptionMap destinationPath =
   where
 
     printModule :: BasicBlocksModule -> IO ()
-    printModule typedModule = do
-      let sourceFile = destinationPath </> "src" </> qualifiedName typedModule <.> "c"
-          tAST = basicBlocksAST . metadata $ typedModule
-      case runGenSourceFile (qualifiedName typedModule) tAST of
+    printModule bbModule = do
+      let sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
+          tAST = basicBlocksAST . metadata $ bbModule
+      case runGenSourceFile (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter cSourceFile
-      case runGenHeaderFile includeOptionH (qualifiedName typedModule) (importedModules typedModule) tAST definedTypesOptionMap of
+      case runGenHeaderFile includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
-        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName typedModule <.> "h") $ runCPrinter cHeaderFile
+        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName bbModule <.> "h") $ runCPrinter cHeaderFile
 
 printInitFile :: FilePath -> BasicBlocksProject -> IO ()
 printInitFile destinationPath bbProject = do
@@ -322,20 +231,6 @@ warnDisconnectedEmitters tp =
 
 genBasicBlocks :: TypedProject -> IO BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
-
-  where
-
-    genBasicBlocksModule :: TypedModule -> IO BasicBlocksModule
-    genBasicBlocksModule typedModule = do
-      let result = runGenBBModule . typedAST . metadata $ typedModule
-      case result of
-        Left err -> die . errorMessage $ show err
-        Right bbAST -> pure $ TerminaModuleData
-          (qualifiedName typedModule)
-          (fullPath typedModule)
-          (importedModules typedModule)
-          (sourcecode typedModule)
-          (BasicBlockData bbAST)
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()

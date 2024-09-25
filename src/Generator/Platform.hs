@@ -20,6 +20,11 @@ checkPlatform :: T.Text -> Maybe SupportedPlatform
 checkPlatform "rtems5-noel-spike" = Just RTEMS5NoelSpike
 checkPlatform _ = Nothing
 
+supportedPlatforms :: [(SupportedPlatform, String)]
+supportedPlatforms = [
+        (RTEMS5NoelSpike, "RTEMS version 5 for NOEL-Spike simulator")
+    ]
+
 getPlatformInitialGlobalEnv :: SupportedPlatform -> [(Identifier, Located (GEntry SemanticAnn))]
 getPlatformInitialGlobalEnv RTEMS5NoelSpike = 
     [
