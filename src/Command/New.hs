@@ -4,8 +4,10 @@ module Command.New (
 
 import Options.Applicative
 import Control.Monad
+import Command.Configuration
 import Command.Utils
 import Generator.Platform
+import System.FilePath
 import System.Exit
 import System.Directory
 import qualified Data.Text as T
@@ -41,18 +43,45 @@ validateProjectName :: String -> IO ()
 validateProjectName project =
     unless (all (\x -> isAlphaNum x || x == '_') project) (die . errorMessage $ "Project name must be alphanumeric")
 
+emptyAppModuleContent :: String -> String
+emptyAppModuleContent projectName = unlines [
+        "// Main application module of project " ++ projectName,
+        ""
+    ]
+
 -- | Command handler for the "new" command
 newCommand :: NewCmdArgs -> IO ()
 newCommand (NewCmdArgs project pltName chatty) = do
     validateProjectName project
-    let platform = T.pack pltName
+    let pname = T.pack pltName
     plt <- maybe (
-            putStrLn (errorMessage $ "Unsupported platform: " ++ show platform) >>
+            putStrLn (errorMessage $ "Unsupported platform: " ++ show pname) >>
             showSupportedPlatforms >> exitFailure
-        ) return $ checkPlatform platform
+        ) return $ checkPlatform pname
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists
     exists <- doesPathExist project
     when exists (die . errorMessage $ "Path already exists: " ++ project)
+    -- | Create the project directory
+    when chatty (putStrLn . debugMessage $ "Creating project directory: " ++ project)
+    createDirectory project
+    -- | Create project default structure
+    let config = defaultConfig project plt
+    let configFile = project </> "termina" <.> "yaml"
+    let appFolderPath = project </> appFolder config
+    let appModulePath = appFolderPath </> appFilename config <.> "fin"
+    let sourceModulesFolderPath = project </> sourceModulesFolder config
+    let outputFolderPath = project </> outputFolder config
+    when chatty (putStrLn . debugMessage $ "Creating project configuration file: " ++ configFile)
+    serializeConfig project config
+    when chatty (putStrLn . debugMessage $ "Creating project source modules directory: " ++ sourceModulesFolderPath)
+    createDirectory sourceModulesFolderPath
+    when chatty (putStrLn . debugMessage $ "Creating project application directory: " ++ appFolderPath)
+    createDirectory appFolderPath
+    when chatty (putStrLn . debugMessage $ "Creating project output directory: " ++ outputFolderPath)
+    createDirectory outputFolderPath
+    when chatty (putStrLn . debugMessage $ "Creating empty app module")
+    writeFile appModulePath (emptyAppModuleContent project)
+    when chatty (putStrLn . debugMessage $ "Project created successfully")
 
