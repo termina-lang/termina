@@ -51,7 +51,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Global declarations
              ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
-             ["var", "match", "for", "if", "else", "return", "while"]
+             ["var", "let", "match", "for", "if", "else", "return", "while"]
       ++ -- Trigger
              ["triggers"]
       ++ -- Provide
