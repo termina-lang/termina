@@ -5,7 +5,7 @@ function change_flag (flag : &mut bool) {
     return;
 }
 
-function  fill_vector_with_ones (data: &mut [u8;6]){
+function  fill_array_with_ones (data: &mut [u8;6]){
 
 
     var flag : bool = true;

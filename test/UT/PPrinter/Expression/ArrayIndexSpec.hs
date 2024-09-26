@@ -10,21 +10,21 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorObjAnn, boxArrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 boxArrayObjAnn = boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr))
 twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 refArrayAnn :: SemanticAnn
 refArrayAnn = refSemAnn (Array UInt32 (K (TInteger 10 DecRepr)))
 
-var0, vector0, vector1 :: Object SemanticAnn
+var0, array0, array1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
-vector0 = Variable "vector0" vectorObjAnn
-vector1 = Variable "vector1" twoDymArrayObjAnn
+array0 = Variable "array0" arrayObjAnn
+array1 = Variable "array1" twoDymArrayObjAnn
 
 pArray0 :: Object SemanticAnn
-pArray0 = Variable "p_vector0" refArrayAnn
+pArray0 = Variable "p_array0" refArrayAnn
 
 usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnn
 usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just USize)) usizeExprSemAnn
@@ -32,24 +32,24 @@ usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just USize)) usizeExprSemAnn
 usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeExprSemAnn
 
 boxArray0 :: Object SemanticAnn
-boxArray0 = Variable "box_vector0" boxArrayObjAnn
+boxArray0 = Variable "box_array0" boxArrayObjAnn
 
-vector0IndexConstant, vector0IndexVar0 :: Expression SemanticAnn
-vector0IndexConstant = AccessObject (ArrayIndexExpression vector0 usizeConst0x8 (objSemAnn Mutable UInt32))
-vector0IndexVar0 = AccessObject (ArrayIndexExpression vector0 (AccessObject var0) (objSemAnn Mutable UInt32))
+array0IndexConstant, array0IndexVar0 :: Expression SemanticAnn
+array0IndexConstant = AccessObject (ArrayIndexExpression array0 usizeConst0x8 (objSemAnn Mutable UInt32))
+array0IndexVar0 = AccessObject (ArrayIndexExpression array0 (AccessObject var0) (objSemAnn Mutable UInt32))
 
 boxArray0IndexConstant, boxArray0IndexVar0 :: Expression SemanticAnn
-boxArray0IndexConstant = AccessObject (ArrayIndexExpression (Unbox boxArray0 vectorObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
-boxArray0IndexVar0 = AccessObject (ArrayIndexExpression (Unbox boxArray0 vectorObjAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
+boxArray0IndexConstant = AccessObject (ArrayIndexExpression (Unbox boxArray0 arrayObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+boxArray0IndexVar0 = AccessObject (ArrayIndexExpression (Unbox boxArray0 arrayObjAnn) (AccessObject var0) (objSemAnn Mutable UInt32))
 
-vector1IndexFirstDym :: Object SemanticAnn
-vector1IndexFirstDym = ArrayIndexExpression vector1 usizeIndex3 (vectorObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)))
+array1IndexFirstDym :: Object SemanticAnn
+array1IndexFirstDym = ArrayIndexExpression array1 usizeIndex3 (arrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)))
 
-vector1IndexExpression :: Expression SemanticAnn
-vector1IndexExpression = AccessObject (ArrayIndexExpression vector1IndexFirstDym usizeIndex4 (objSemAnn Mutable Int64))
+array1IndexExpression :: Expression SemanticAnn
+array1IndexExpression = AccessObject (ArrayIndexExpression array1IndexFirstDym usizeIndex4 (objSemAnn Mutable Int64))
 
 derefpArray0 :: Object SemanticAnn
-derefpArray0 = Dereference pArray0 vectorObjAnn
+derefpArray0 = Dereference pArray0 arrayObjAnn
 
 derefpArray0IndexConstant, derefpArray0IndexVar0 :: Expression SemanticAnn
 derefpArray0IndexConstant = AccessObject (ArrayIndexExpression derefpArray0 usizeIndex3 (objSemAnn Mutable UInt32))
@@ -63,25 +63,25 @@ renderExpression expr =
 
 spec :: Spec
 spec = do
-  describe "Pretty printing vector index expressions" $ do
-    it "Prints the expression: vector[0x08 : u8]" $ do
-      renderExpression vector0IndexConstant `shouldBe`
-        pack "vector0[8]"
-    it "Prints the expression: vector[var0]" $ do
-      renderExpression vector0IndexVar0 `shouldBe`
-        pack "vector0[var0]"
-    it "Prints the expression: vector1[3 : u32][4 : u32]" $ do
-      renderExpression vector1IndexExpression `shouldBe`
-        pack "vector1[3][4]"
-    it "Prints the expression: box_vector0[0x08 : u8]" $ do
+  describe "Pretty printing array index expressions" $ do
+    it "Prints the expression: array[0x08 : u8]" $ do
+      renderExpression array0IndexConstant `shouldBe`
+        pack "array0[8]"
+    it "Prints the expression: array[var0]" $ do
+      renderExpression array0IndexVar0 `shouldBe`
+        pack "array0[var0]"
+    it "Prints the expression: array1[3 : u32][4 : u32]" $ do
+      renderExpression array1IndexExpression `shouldBe`
+        pack "array1[3][4]"
+    it "Prints the expression: box_array0[0x08 : u8]" $ do
       renderExpression boxArray0IndexConstant `shouldBe`
-        pack "((uint32_t *)box_vector0.data)[8]"
-    it "Prints the expression: box_vector0[var0]" $ do
+        pack "((uint32_t *)box_array0.data)[8]"
+    it "Prints the expression: box_array0[var0]" $ do
       renderExpression boxArray0IndexVar0 `shouldBe`
-        pack "((uint32_t *)box_vector0.data)[var0]"
-    it "Prints the expression: *vector0[3 : u32]" $ do
+        pack "((uint32_t *)box_array0.data)[var0]"
+    it "Prints the expression: *array0[3 : u32]" $ do
       renderExpression derefpArray0IndexConstant `shouldBe`
-        pack "p_vector0[3]"
-    it "Prints the expression: *vector0[var0]" $ do
+        pack "p_array0[3]"
+    it "Prints the expression: *array0[var0]" $ do
       renderExpression derefpArray0IndexVar0 `shouldBe`
-        pack "p_vector0[var0]" 
+        pack "p_array0[var0]" 

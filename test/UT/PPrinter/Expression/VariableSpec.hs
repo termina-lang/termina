@@ -10,21 +10,21 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
-vectorObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 boxThreeDymArrayObjAnn = boxThreeDymArrayObjSemAnn Char (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-var0, vector0, vector1 :: Object SemanticAnn
+var0, array0, array1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable UInt16)
-vector0 = Variable "vector0" vectorObjAnn
-vector1 = Variable "vector1" twoDymArrayObjAnn
+array0 = Variable "array0" arrayObjAnn
+array1 = Variable "array1" twoDymArrayObjAnn
 
 boxVar0, boxArray1, boxArray2 :: Object SemanticAnn
 boxVar0 = Variable "box_var0" boxUInt16SemAnn
-boxArray1 = Variable "box_vector1" boxTwoDymArrayObjAnn
-boxArray2 = Variable "box_vector2" boxThreeDymArrayObjAnn
+boxArray1 = Variable "box_array1" boxTwoDymArrayObjAnn
+boxArray2 = Variable "box_array2" boxThreeDymArrayObjAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
@@ -38,24 +38,24 @@ spec = do
     it "Prints the variable var0 : u16" $ do
       renderExpression (AccessObject var0) `shouldBe`
         pack "var0"
-    it "Prints the variable vector0 : [u32; 10 : u32]" $ do
-      renderExpression (AccessObject vector0) `shouldBe`
-        pack "vector0"
-    it "Prints the variable vector1 : [[i64; 5 : u32]; 10 : u32]" $ do
-      renderExpression (AccessObject vector1) `shouldBe`
-        pack "vector1"
+    it "Prints the variable array0 : [u32; 10 : u32]" $ do
+      renderExpression (AccessObject array0) `shouldBe`
+        pack "array0"
+    it "Prints the variable array1 : [[i64; 5 : u32]; 10 : u32]" $ do
+      renderExpression (AccessObject array1) `shouldBe`
+        pack "array1"
     it "Prints the variable box_var0 : 'box u16" $ do
       renderExpression (AccessObject boxVar0) `shouldBe`
         pack "box_var0"
     it "Prints the unboxed variable box_var0 : 'box u16" $ do
       renderExpression (AccessObject (Unbox boxVar0 (objSemAnn Mutable UInt16))) `shouldBe`
         pack "*(uint16_t *)box_var0.data"
-    it "Prints the variable box_vector1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
+    it "Prints the variable box_array1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject boxArray1) `shouldBe`
-        pack "box_vector1"
-    it "Prints the unboxed variable box_vector1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
+        pack "box_array1"
+    it "Prints the unboxed variable box_array1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Unbox boxArray1 twoDymArrayObjAnn)) `shouldBe`
-        pack "(int64_t (*)[5])box_vector1.data"
-    it "Prints the unboxed variable box_vector2 : [[[char; 40 : u32]; 5 : u32]; 10 : u32]" $ do
+        pack "(int64_t (*)[5])box_array1.data"
+    it "Prints the unboxed variable box_array2 : [[[char; 40 : u32]; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Unbox boxArray2 boxThreeDymArrayObjAnn)) `shouldBe`
-        pack "(char (*)[5][40])box_vector2.data"
+        pack "(char (*)[5][40])box_array2.data"

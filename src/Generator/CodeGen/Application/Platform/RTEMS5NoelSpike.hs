@@ -665,7 +665,7 @@ genEmitter (RTEMSPeriodicTimerEmitter _ glb) = throwError $ InternalError $ "Inv
 genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEventPort _ _ _ action) _)) = do
     let classIdType = typeDef classId
     return $ pre_cr $ function (namefy "rtems_app" <::> "initial_event") [
-            "current" @: ptr (typeDef "TimeVal")
+            "current" @: (_const . ptr $ _TimeVal)
         ] @-> void $
             trail_cr . block $ [
                 -- classId * self = &identifier;
@@ -679,7 +679,7 @@ genEmitter (RTEMSSystemInitEmitter _ (RTEMSHandler identifier classId _ (RTEMSEv
                     timer_handler classId action @@
                         [
                             "self" @: ptr classIdType,
-                            deref ("current" @: ptr _TimeVal)
+                            deref ("current" @: (_const . ptr $ _TimeVal))
                         ],
                 -- if (result.__variant != Result__Ok)
                 pre_cr $ _if (
@@ -696,7 +696,7 @@ genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ por
         Just (RTEMSEventPort _ _ _ actionId) -> return actionId
         _ -> throwError $ InternalError $ "Invalid port connection for interrupt: " ++ show event
     return $ pre_cr $ function (namefy "rtems_app" <::> "inital_event") [
-            "current" @: ptr (typeDef "TimeVal")
+            "current" @: (_const . ptr $ _TimeVal)
         ] @-> void $
             block [
                 -- classId * self = &identifier;
@@ -710,7 +710,7 @@ genEmitter (RTEMSSystemInitEmitter event (RTEMSTask identifier classId _ _ _ por
                     timer_handler classId action @@
                         [
                             "self" @: ptr classIdType,
-                            deref ("current" @: ptr _TimeVal)
+                            deref ("current" @: (_const . ptr $ _TimeVal))
                         ],
                 -- if (result.__variant != Result__Ok)
                 pre_cr $ _if (
@@ -1052,7 +1052,7 @@ genInstallEmitters emitters = do
     installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { RTEMSSystemInitEmitter {} -> False; _ -> True }) emitters
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
             [
-                "current" @: ptr (typeDef "TimeVal")
+                "current" @: (_const . ptr $ _TimeVal)
             ] @-> void $
             trail_cr . block $ 
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
@@ -1079,7 +1079,7 @@ genInstallEmitters emitters = do
                 pre_cr $ _if ("RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
                     $ block $ 
                         pre_cr (((timer @: _PeriodicTimer) @. "__timer" @: __termina_timer_t) @. "current" @: _TimeVal @=
-                            deref ("current" @: ptr _TimeVal)) : armTimer
+                            deref ("current" @: (_const . ptr $ _TimeVal))) : armTimer
         genRTEMSInstallEmitter (RTEMSSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
     
 genCreateTasks :: [RTEMSGlobal] -> CSourceGenerator CFileItem

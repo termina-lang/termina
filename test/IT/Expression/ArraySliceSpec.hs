@@ -19,8 +19,8 @@ test0 = "function add_one(input : &mut [u32; 5]) {\n" ++
         "    return;\n" ++
         "}\n" ++
         "\n" ++
-        "function slice_test0(vector0 : &mut [[u32; 10]; 5]) {\n" ++
-        "    add_one(&mut(*vector0)[0][0..6]);\n" ++
+        "function slice_test0(array0 : &mut [[u32; 10]; 5]) {\n" ++
+        "    add_one(&mut(*array0)[0][0..6]);\n" ++
         "    return;\n" ++
         "}"
 
@@ -54,7 +54,7 @@ renderSource input = case parse (contents topLevel) "" input of
 
 spec :: Spec
 spec = do
-  describe "Pretty printing vector slicing expressions" $ do
+  describe "Pretty printing array slicing expressions" $ do
     it "Prints declaration of function slice_test0" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
@@ -64,7 +64,7 @@ spec = do
               "\n" ++
               "void add_one(uint32_t input[5]);\n" ++
               "\n" ++
-              "void slice_test0(uint32_t vector0[5][10]);\n" ++
+              "void slice_test0(uint32_t array0[5][10]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function slice_test0" $ do
@@ -84,9 +84,9 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void slice_test0(uint32_t vector0[5][10]) {\n" ++
+              "void slice_test0(uint32_t array0[5][10]) {\n" ++
               "    \n" ++
-              "    add_one(&vector0[0][0]);\n" ++
+              "    add_one(&array0[0][0]);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

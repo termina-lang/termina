@@ -47,7 +47,7 @@ genObject o@(ArrayIndexExpression obj index _ann) = do
     ctype <- getObjType o >>= genType noqual
     -- Generate the C code for the index
     cIndex <- genExpression index
-    -- Return the C code for the vector index expression
+    -- Return the C code for the array index expression
     return $ CIndexOf cExpr cIndex ctype
 genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
@@ -61,13 +61,13 @@ genObject o@(Dereference obj _ann) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
-        -- | A dereference to a vector is printed as the name of the vector
+        -- | A dereference to an array is printed as the name of the array
         (Reference _ (Array _ _)) -> return cObj
         _ -> do
             ctype <- getObjType o >>= genType noqual
             return $ CDeref cObj ctype
 -- | If the expression is a box subtype treated as its base type, we need to
--- check if it is a vector
+-- check if it is an array
 genObject o@(Unbox obj ann) = do
     let cAnn = buildGenericAnn ann
     let dataFieldCType = CTPointer (CTInt IntSize8 Unsigned noqual) noqual
@@ -76,7 +76,7 @@ genObject o@(Unbox obj ann) = do
     case typeObj of
         -- | If it is an arrayy, we need to generate the address of the data
         (BoxSubtype ty@(Array _ _)) -> do
-            -- We must obtain the declaration specifier of the vector
+            -- We must obtain the declaration specifier of the array
             ctype <- genType noqual ty
             return $ CObjCast (CField cObj "data" dataFieldCType) ctype cAnn
             -- | Else, we print the derefence to the data
@@ -195,9 +195,9 @@ genExpression (ReferenceExpression _ obj ann) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
-        -- | If it is a vector, we need to generate the address of the data
+        -- | If it is an array, we need to generate the address of the data
         (BoxSubtype ty@(Array {})) -> do
-            -- We must obtain the declaration specifier of the vector
+            -- We must obtain the declaration specifier of the array
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
             return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn

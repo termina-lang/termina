@@ -87,6 +87,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"/" -- Division
                       ,"+" -- Addition
                       ,"-" -- Substraction
+                      ,"%" -- Modulo
                       ,"<<" -- BitwiseLeftShift
                       ,">>" -- BitwiseRightShift
                       ,"<" -- RelationalLT
@@ -198,7 +199,7 @@ typeSpecifierParser :: Parser TerminaType
 typeSpecifierParser =
   msgQueueParser
   <|> poolParser
-  <|> vectorParser
+  <|> arrayParser
   <|> mutableReferenceParser
   <|> referenceParser
   <|> boxSubtypeParser
@@ -376,8 +377,8 @@ atomicArrayAccessParser = do
   _ <- reserved ">"
   return $ AtomicArrayAccess typeSpecifier size
 
-vectorParser :: Parser TerminaType
-vectorParser = do
+arrayParser :: Parser TerminaType
+arrayParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
@@ -565,7 +566,7 @@ objectTermParser = (do
 -- Expression parser
 -- This parser is a variation of the original parser that allows us to chain
 -- two or more unary expressions together. This is useful when parsing expressions
--- such as vector[0][1], where the postfix operator [] is used twice. This code
+-- such as array[0][1], where the postfix operator [] is used twice. This code
 -- has been directly extracted from this StackOverflow answer:
 -- https://stackoverflow.com/questions/33214163/parsec-expr-repeated-prefix-with-different-priority/33534426#33534426
 -- We now use it to parse expressions and object operations.
@@ -602,9 +603,9 @@ objectParser = objectParser' objectTermParser
   where
     objectParser'
       = buildPrattParser -- New parser
-      [[dereferenceMemberAccessPostfix, memberAccessPostfix, vectorOpPostfix]
+      [[dereferenceMemberAccessPostfix, memberAccessPostfix, arrayOpPostfix]
       ,[dereferencePrefix]]
-    vectorOpPostfix
+    arrayOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
             low <- expressionParser 
@@ -642,9 +643,9 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
   where
     accessObjectParser'
       = buildPrattParser -- New parser
-      [[dereferenceMemberAccessPostfix, memberAccessPostfix, vectorOpPostfix]
+      [[dereferenceMemberAccessPostfix, memberAccessPostfix, arrayOpPostfix]
       ,[dereferencePrefix]]
-    vectorOpPostfix
+    arrayOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
             low <- expressionParser
@@ -1110,7 +1111,7 @@ enumDefinitionParser = do
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram ParserAnn)
-topLevel = many1 $
+topLevel = many $
   try functionParser <|> try globalDeclParser
   <|> try typeDefintionParser
 

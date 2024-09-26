@@ -21,11 +21,11 @@ constUInt32 :: Expression SemanticAnn
 -- | 1024 : u32
 constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32ExprSemAnn
 
-vectorObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-vectorExprAnn :: SemanticAnn
-vectorExprAnn = vectorExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayExprAnn :: SemanticAnn
+arrayExprAnn = arrayExprSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 refArrayAnn :: SemanticAnn
 refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
@@ -47,21 +47,21 @@ structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 = 
     StructInitializer
         [FieldValueAssignment "field_a" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 structAFieldsInit1 :: Expression SemanticAnn
 structAFieldsInit1 = 
     StructInitializer
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 structAFieldsInit3 :: Expression SemanticAnn
 structAFieldsInit3 = 
     StructInitializer
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
-         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) vectorObjAnn)) stmtSemAnn,
+         FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) arrayObjAnn)) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn

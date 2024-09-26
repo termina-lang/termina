@@ -35,14 +35,14 @@ __termina__add_timeval = "__termina__add_timeval" @:
         ]
 
 -- Result classId__handle(classId * const self,
---                                  uint32_t _vector);
+--                                  uint32_t _irq_vector);
 irq_handler :: Ident -> Ident -> CExpression
 irq_handler classId handler = (classId <::> handler) @:
     CTFunction (typeDef "Result")
         [
             -- | CRISCVUARTHandler * const self
             _const . ptr $ classId,
-            -- | uint32_t _vector
+            -- | uint32_t _irq_vector
             uint32_t
         ]
 

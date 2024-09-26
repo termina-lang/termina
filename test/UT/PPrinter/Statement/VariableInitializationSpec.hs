@@ -20,35 +20,35 @@ messageTS = DefinedType "Message"
 optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
-vectorTS, vectorTMDescriptorTS, twoDimArrayTS :: TerminaType
-vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
-vectorTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
+arrayTS, arrayTMDescriptorTS, twoDimArrayTS :: TerminaType
+arrayTS = Array UInt32 (K (TInteger 10 DecRepr))
+arrayTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
 twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
 
-vectorObjAnn, twoDymArrayObjAnn, twoDymArrayRowObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-twoDymArrayRowObjAnn = vectorObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
+arrayObjAnn, twoDymArrayObjAnn, twoDymArrayRowObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+twoDymArrayRowObjAnn = arrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
 twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-vectorExprAnn, vectorTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
-vectorExprAnn = vectorExprSemAnn UInt32 (K (TInteger 10 DecRepr))
-vectorTMDescriptorExprAnn = vectorExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowExprAnn = vectorExprSemAnn Int64 (K (TInteger 5 DecRepr))
+arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
+arrayExprAnn = arrayExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
+twoDymArrayRowExprAnn = arrayExprSemAnn Int64 (K (TInteger 5 DecRepr))
 twoDymArrayExprAnn = twoDymArrayExprSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
-vector0 :: Expression SemanticAnn
-vector0 = AccessObject (Variable "vector0" vectorObjAnn)
+array0 :: Expression SemanticAnn
+array0 = AccessObject (Variable "array0" arrayObjAnn)
 
-vector1, vector2, vector3, vector4, vector5, vector6 :: Statement SemanticAnn
-vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
-vector2 = Declaration "vector2" Mutable twoDimArrayTS (AccessObject (Variable "vector1" twoDymArrayObjAnn)) stmtSemAnn
-vector3 = Declaration "vector3" Mutable vectorTS (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn
-vector4 = Declaration "vector4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowExprAnn) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-vector5 = Declaration "vector5" Mutable twoDimArrayTS (ArrayInitializer (AccessObject (Variable "vector_row" twoDymArrayRowObjAnn)) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-vector6 = Declaration "vector6" Mutable vectorTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) vectorTMDescriptorExprAnn) stmtSemAnn
+array1, array2, array3, array4, array5, array6 :: Statement SemanticAnn
+array1 = Declaration "array1" Mutable arrayTS array0 stmtSemAnn
+array2 = Declaration "array2" Mutable twoDimArrayTS (AccessObject (Variable "array1" twoDymArrayObjAnn)) stmtSemAnn
+array3 = Declaration "array3" Mutable arrayTS (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn
+array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowExprAnn) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
+array5 = Declaration "array5" Mutable twoDimArrayTS (ArrayInitializer (AccessObject (Variable "array_row" twoDymArrayRowObjAnn)) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
+array6 = Declaration "array6" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -75,7 +75,7 @@ structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 =
     StructInitializer 
         [FieldValueAssignment "field_a" uint32Const0 undefined,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) vectorExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
@@ -156,58 +156,58 @@ spec = do
     it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
       renderStatement struct1 `shouldBe`
         pack "\nTMDescriptor struct1 = struct0;"
-  describe "Pretty printing vector variable declarations" $ do
-    it "Prints the statement var vector1 : [u32; 10 : u32] = vector0;" $ do
-      renderStatement vector1 `shouldBe`
+  describe "Pretty printing array variable declarations" $ do
+    it "Prints the statement var array1 : [u32; 10 : u32] = array0;" $ do
+      renderStatement array1 `shouldBe`
         pack (
-          "\nuint32_t vector1[10];\n" ++
+          "\nuint32_t array1[10];\n" ++
           "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    vector1[__i0] = vector0[__i0];\n" ++
+          "    array1[__i0] = array0[__i0];\n" ++
           "}")
-    it "Prints the statement var vector2 : [[u32; 5 : u32]; 10 : u32] = vector0;" $ do
-      renderStatement vector2 `shouldBe`
+    it "Prints the statement var array2 : [[u32; 5 : u32]; 10 : u32] = array0;" $ do
+      renderStatement array2 `shouldBe`
         pack (
-          "\nint64_t vector2[10][5];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "        vector2[__i0][__i1] = vector1[__i0][__i1];\n" ++
-          "    }\n" ++
-          "}")
-    it "Prints the statement var vector3 : [u32; 10 : u32] = [0 : u32; 10 : u32];" $ do
-      renderStatement vector3 `shouldBe`
-        pack (
-          "\nuint32_t vector3[10];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    vector3[__i0] = 0;\n" ++
-          "}")
-    it "Prints the statement var vector4 : [[u32; 5 : u32]; 10 : u32] = [[0 : u32; 5 : u32]; 10 : u32];" $ do
-      renderStatement vector4 `shouldBe`
-        pack (
-          "\nint64_t vector4[10][5];\n" ++
+          "\nint64_t array2[10][5];\n" ++
           "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "        vector4[__i0][__i1] = 0;\n" ++
+          "        array2[__i0][__i1] = array1[__i0][__i1];\n" ++
           "    }\n" ++
           "}")
-    it "Prints the statement var vector4 : [[u32; 5 : u32]; 10 : u32] = [vector_row; 10 : u32];" $ do
-      renderStatement vector5 `shouldBe`
+    it "Prints the statement var array3 : [u32; 10 : u32] = [0 : u32; 10 : u32];" $ do
+      renderStatement array3 `shouldBe`
         pack (
-          "\nint64_t vector5[10][5];\n" ++
+          "\nuint32_t array3[10];\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    array3[__i0] = 0;\n" ++
+          "}")
+    it "Prints the statement var array4 : [[u32; 5 : u32]; 10 : u32] = [[0 : u32; 5 : u32]; 10 : u32];" $ do
+      renderStatement array4 `shouldBe`
+        pack (
+          "\nint64_t array4[10][5];\n" ++
           "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
           "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "        vector5[__i0][__i1] = vector_row[__i1];\n" ++
+          "        array4[__i0][__i1] = 0;\n" ++
           "    }\n" ++
           "}")
-    it ("Prints the statement var vector6 : [TMDescriptor; 20 : u32] = " ++
+    it "Prints the statement var array4 : [[u32; 5 : u32]; 10 : u32] = [array_row; 10 : u32];" $ do
+      renderStatement array5 `shouldBe`
+        pack (
+          "\nint64_t array5[10][5];\n" ++
+          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "        array5[__i0][__i1] = array_row[__i1];\n" ++
+          "    }\n" ++
+          "}")
+    it ("Prints the statement var array6 : [TMDescriptor; 20 : u32] = " ++
         "[{field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
-      renderStatement vector6 `shouldBe`
+      renderStatement array6 `shouldBe`
         pack (
-          "\nTMDescriptor vector6[20];\n" ++
+          "\nTMDescriptor array6[20];\n" ++
           "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    vector6[__i0].field0 = 0;\n" ++
-          "    vector6[__i0].field1.field_a = 0;\n" ++
+          "    array6[__i0].field0 = 0;\n" ++
+          "    array6[__i0].field1.field_a = 0;\n" ++
           "    for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
-          "        vector6[__i0].field1.field_b[__i1] = 0;\n" ++
+          "        array6[__i0].field1.field_b[__i1] = 0;\n" ++
           "    }\n" ++
-          "    vector6[__i0].field1.field_c = 4294901760;\n" ++
+          "    array6[__i0].field1.field_c = 4294901760;\n" ++
           "}")

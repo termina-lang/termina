@@ -72,11 +72,11 @@ refInt64SemAnn = refSemAnn Int64
 refCharSemAnn = refSemAnn Char
 refBoolSemAnn = refSemAnn Bool
 
-vectorObjSemAnn :: AccessKind -> TerminaType -> Size -> SemanticAnn
-vectorObjSemAnn ak ts size = objSemAnn ak (Array ts size)
+arrayObjSemAnn :: AccessKind -> TerminaType -> Size -> SemanticAnn
+arrayObjSemAnn ak ts size = objSemAnn ak (Array ts size)
 
-vectorExprSemAnn :: TerminaType -> Size -> SemanticAnn
-vectorExprSemAnn ts size = simpleTySemAnn $ Array ts size
+arrayExprSemAnn :: TerminaType -> Size -> SemanticAnn
+arrayExprSemAnn ts size = simpleTySemAnn $ Array ts size
 
 boxArrayObjSemAnn :: TerminaType -> Size -> SemanticAnn
 boxArrayObjSemAnn ts size = objSemAnn Mutable (BoxSubtype (Array ts size))
@@ -88,8 +88,8 @@ refTwoDymArraySemAnn :: TerminaType -> Size -> Size -> SemanticAnn
 refTwoDymArraySemAnn ts size1 size2 = objSemAnn Immutable (Reference Mutable (Array (Array ts size1) size2))
 
 uint16VecObjSemAnn, uint32VecObjSemAnn :: AccessKind -> Size -> SemanticAnn
-uint16VecObjSemAnn ak = vectorObjSemAnn ak UInt16
-uint32VecObjSemAnn ak = vectorObjSemAnn ak UInt32
+uint16VecObjSemAnn ak = arrayObjSemAnn ak UInt16
+uint32VecObjSemAnn ak = arrayObjSemAnn ak UInt32
 
 twoDymArrayObjSemAnn :: AccessKind -> TerminaType -> Size -> Size -> SemanticAnn
 twoDymArrayObjSemAnn ak ts size1 size2 = objSemAnn ak (Array (Array ts size1) size2)

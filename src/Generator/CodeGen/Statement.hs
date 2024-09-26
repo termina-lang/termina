@@ -65,7 +65,7 @@ genOptionInitialization before level cObj expr =
 genArrayInitialization ::
     -- | Prepend a line to the initialization expression 
     Bool
-    -- | Current vector nesting level. This argument is used to
+    -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
     -> CObject
@@ -117,7 +117,7 @@ genArrayInitialization before level cObj expr = do
             CSourceGenerator [CStatement]
         genArrayInitializationFromExpression lvl lhsCObj rhsCExpr ts ann = do
             case ts of
-                -- | If the initializer is a vector, we must iterate
+                -- | If the initializer is an array, we must iterate
                 (Array ts' (K s)) -> do
                     let iterator = namefy $ "i" ++ show lvl
                         cIteratorExpr = CExprValOf (CVar iterator (CTSizeT noqual)) (CTSizeT noqual) exprCAnn
@@ -139,7 +139,7 @@ genArrayInitialization before level cObj expr = do
 genFieldInitialization ::
     -- | Prepend a line to the initialization expression 
     Bool
-    -- | Current vector nesting level. This argument is used to
+    -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
     -> CObject
@@ -174,7 +174,7 @@ genFieldInitialization before level cObj field expr = do
 genStructInitialization ::
     -- | Prepend a line to the initialization expression 
     Bool
-    -- | Current vector nesting level. This argument is used to
+    -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
     -> CObject

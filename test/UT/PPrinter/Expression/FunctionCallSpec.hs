@@ -31,15 +31,15 @@ dereferencepVar :: Object SemanticAnn
 -- | *p_var : u16
 dereferencepVar = Dereference pVar (objSemAnn Mutable UInt16)
 
-vector0, boxArray0 :: Object SemanticAnn
-vector0 = Variable "vector0" (vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
+array0, boxArray0 :: Object SemanticAnn
+array0 = Variable "array0" (arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr)))
 boxArray0 = Variable "boxArray0" (boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 pArray1 :: Expression SemanticAnn
-pArray1 = AccessObject (Variable "p_vector1" (refArraySemAnn UInt32 (K (TInteger 10 DecRepr))))
+pArray1 = AccessObject (Variable "p_array1" (refArraySemAnn UInt32 (K (TInteger 10 DecRepr))))
 
 referenceArray0 :: Expression SemanticAnn
-referenceArray0 = ReferenceExpression Mutable vector0 (refArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
+referenceArray0 = ReferenceExpression Mutable array0 (refArraySemAnn UInt32 (K (TInteger 10 DecRepr)))
 
 uint16Const :: Expression SemanticAnn
 uint16Const = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
@@ -141,15 +141,15 @@ spec = do
     it "Prints the expression: foo(*p_var + *p_boxVar3)" $ do
       renderExpression functionCallSingleDerefpVarPlusDerefRefVar1 `shouldBe`
         pack "foo(*p_var + *(uint16_t *)var1.data)"
-    it "Prints the expression: foo(&vector0)" $ do
+    it "Prints the expression: foo(&array0)" $ do
       renderExpression functionCallSingleRefArray0 `shouldBe`
-        pack "foo(vector0)"
+        pack "foo(array0)"
     it "Prints the expression: foo(boxArray0)" $ do
       renderExpression functionCallSingleBoxArray0 `shouldBe`
         pack "foo(boxArray0)"
-    it "Prints the expression: foo(p_vector1)" $ do
+    it "Prints the expression: foo(p_array1)" $ do
       renderExpression functionCallSinglepArray1 `shouldBe`
-        pack "foo(p_vector1)"
+        pack "foo(p_array1)"
   describe "Pretty printing function call expressions with multiple parameters" $ do
     it "Prints the expression: foo2(var0 + 1024, var0 + var1)" $ do
       renderExpression call2Parameters `shouldBe`

@@ -18,8 +18,8 @@ import Control.Monad.Except
 optionBoxUInt32ObjSemAnn :: SemanticAnn
 optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable UInt32
 
-vectorObjAnn, boxArrayObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn, boxArrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 boxArrayObjAnn = boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnn
@@ -35,8 +35,8 @@ usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeExprSemAnn
 optionVar :: Expression SemanticAnn
 optionVar = AccessObject (Variable "option_var" optionBoxUInt32ObjSemAnn)
 
-vector0IndexConstant :: Expression SemanticAnn
-vector0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 vectorObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+array0IndexConstant :: Expression SemanticAnn
+array0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 arrayObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
 
 foo1 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
@@ -49,7 +49,7 @@ matchCaseSome0 :: MatchCase SemanticAnn
 matchCaseSome0 = MatchCase "Some" ["param0"] [param0ToFoo1] (matchCaseSemAnn [BoxSubtype UInt32])
 
 param1ToFoo1 :: Statement SemanticAnn
-param1ToFoo1 = AssignmentStmt foo1 vector0IndexConstant stmtSemAnn
+param1ToFoo1 = AssignmentStmt foo1 array0IndexConstant stmtSemAnn
 
 matchCaseSome1 :: MatchCase SemanticAnn
 matchCaseSome1 = MatchCase "Some" ["param1"] [param1ToFoo1] (matchCaseSemAnn [BoxSubtype (Array UInt32 (K (TInteger 10 DecRepr)))])
@@ -104,7 +104,7 @@ spec = do
           "    foo1 = 0;\n" ++
           "\n" ++
           "}")
-    it "Prints a match option vector statement" $ do
+    it "Prints a match option array statement" $ do
       renderStatement matchOption1 `shouldBe`
         pack (
           "\nif (option_var.__variant == None) {\n" ++

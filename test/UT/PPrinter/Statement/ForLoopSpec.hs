@@ -13,21 +13,21 @@ import UT.PPrinter.Expression.Common
 import ControlFlow.Common
 import Control.Monad.Except
 
-vectorObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-vector0 :: Object SemanticAnn
-vector0 = Variable "vector0" vectorObjAnn
+array0 :: Object SemanticAnn
+array0 = Variable "array0" arrayObjAnn
 
 total, i :: Expression SemanticAnn
 total = AccessObject (Variable "total" (objSemAnn Mutable UInt32))
 i = AccessObject (Variable "i" (objSemAnn Mutable USize))
 
-vector0IndexI:: Expression SemanticAnn
-vector0IndexI = AccessObject (ArrayIndexExpression vector0 i (objSemAnn Mutable UInt32))
+array0IndexI:: Expression SemanticAnn
+array0IndexI = AccessObject (ArrayIndexExpression array0 i (objSemAnn Mutable UInt32))
 
 forLoopBody :: [Statement SemanticAnn]
-forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total vector0IndexI uint32ExprSemAnn) stmtSemAnn]
+forLoopBody = [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total array0IndexI uint32ExprSemAnn) stmtSemAnn]
 
 breakCond :: Expression SemanticAnn
 breakCond = BinOp RelationalNotEqual i (Constant (I (TInteger 5 DecRepr) (Just USize)) uint32ExprSemAnn) boolExprSemAnn
@@ -55,7 +55,7 @@ spec = do
         pack (
           "\nfor (size_t i = 0; i < 10; i = i + 1) {\n" ++
           "    \n" ++
-          "    total = total + vector0[i];\n" ++
+          "    total = total + array0[i];\n" ++
           "\n" ++
           "}")
     it "Prints a for loop statement with break condition" $ do
@@ -63,6 +63,6 @@ spec = do
         pack (
           "\nfor (size_t i = 0; i < 10 && i != 5; i = i + 1) {\n" ++
           "    \n" ++
-          "    total = total + vector0[i];\n" ++
+          "    total = total + array0[i];\n" ++
           "\n" ++
           "}")

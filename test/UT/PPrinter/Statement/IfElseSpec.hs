@@ -16,20 +16,20 @@ import Control.Monad.Except
 optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = Option (BoxSubtype UInt32)
 
-vectorTS :: TerminaType
-vectorTS = Array UInt32 (K (TInteger 10 DecRepr))
+arrayTS :: TerminaType
+arrayTS = Array UInt32 (K (TInteger 10 DecRepr))
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
 
-vectorObjAnn :: SemanticAnn
-vectorObjAnn = vectorObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
 
-vector0 :: Expression SemanticAnn
-vector0 = AccessObject (Variable "vector0" vectorObjAnn)
+array0 :: Expression SemanticAnn
+array0 = AccessObject (Variable "array0" arrayObjAnn)
 
-vector1 :: Statement SemanticAnn
-vector1 = Declaration "vector1" Mutable vectorTS vector0 stmtSemAnn
+array1 :: Statement SemanticAnn
+array1 = Declaration "array1" Mutable arrayTS array0 stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -49,7 +49,7 @@ option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitiali
 option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
 twoDeclarations :: [Statement SemanticAnn]
-twoDeclarations = [vector1, option0]
+twoDeclarations = [array1, option0]
 
 oneAssignment :: [Statement SemanticAnn]
 oneAssignment = [constToFoo0]
@@ -90,9 +90,9 @@ spec = do
         pack (
           "\nif (foo0 == 0) {\n" ++
           "    \n" ++
-          "    uint32_t vector1[10];\n" ++
+          "    uint32_t array1[10];\n" ++
           "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector1[__i0] = vector0[__i0];\n" ++
+          "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __option_box_t option0;\n" ++
@@ -105,9 +105,9 @@ spec = do
         pack (
           "\nif (foo0 != 4294901760) {\n" ++
           "    \n" ++
-          "    uint32_t vector1[10];\n" ++
+          "    uint32_t array1[10];\n" ++
           "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector1[__i0] = vector0[__i0];\n" ++
+          "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __option_box_t option0;\n" ++
@@ -125,9 +125,9 @@ spec = do
         pack (
           "\nif (foo0 != 4294901760) {\n" ++
           "    \n" ++
-          "    uint32_t vector1[10];\n" ++
+          "    uint32_t array1[10];\n" ++
           "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "        vector1[__i0] = vector0[__i0];\n" ++
+          "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
           "    __option_box_t option0;\n" ++
