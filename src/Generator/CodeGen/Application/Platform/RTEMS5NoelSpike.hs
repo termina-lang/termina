@@ -585,31 +585,31 @@ genEnableProtection progArchitecture resLockingMap = do
                     -- need to initialize it
                     Nothing -> return [] 
         
-        genInitResourceProt (TPResource identifier resourceClass _ _ _, RTEMSResourceLockNone) = 
+        genInitResourceProt (TPResource identifier classId _ _ _, RTEMSResourceLockNone) = 
             return [
-                pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
                     @= namefy "RTEMSResourceLock" <::> "None" @: __rtems_runtime_resource_lock_t
                 ]
-        genInitResourceProt (TPResource identifier resourceClass _ _ _, RTEMSResourceLockIrq) = do
+        genInitResourceProt (TPResource identifier classId _ _ _, RTEMSResourceLockIrq) = do
             return [
-                pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
                     @= namefy "RTEMSResourceLock" <::> "Irq" @: __rtems_runtime_resource_lock_t
                 ]
-        genInitResourceProt (TPResource identifier resourceClass _ _ _, RTEMSResourceLockMutex ceilPrio) = do
+        genInitResourceProt (TPResource identifier classId _ _ _, RTEMSResourceLockMutex ceilPrio) = do
             let cCeilPrio = genInteger ceilPrio
             return [
                     -- | identifier.__resource.lock = RTEMSResourceLock__Mutex;
-                    pre_cr $ ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
+                    pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
                         @= namefy "RTEMSResourceLock" <::> "Mutex" @: __rtems_runtime_resource_lock_t,
                     no_cr $
-                        (((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "policy" @: __rtems_runtime_mutex_policy
+                        (((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "policy" @: __rtems_runtime_mutex_policy
                         @= namefy "RTEMSMutexPolicy" <::> "Ceiling" @: __rtems_runtime_mutex_policy,
                     no_cr $
-                        (((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "prio_ceiling" @: rtems_task_priority
+                        (((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "mutex" @: __rtems_runtime_resource_lock_mutex_params_t) @. "prio_ceiling" @: rtems_task_priority
                         @= cCeilPrio @: rtems_task_priority,
                     pre_cr $ "result" @: _Result @= __termina_resource__init @@
                         [
-                            addrOf ((identifier @: typeDef resourceClass) @. resourceClassIDField @: __termina_resource_t)
+                            addrOf ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t)
                         ],
                     -- if (result.__variant != Result__Ok)
                     pre_cr $ _if (
@@ -905,8 +905,8 @@ genInitGlobals progArchitecture  = do
 -- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
 -- of the tasks and handlers.
 genInstallEmitters :: [TPEmitter SemanticAnn] -> CSourceGenerator CFileItem
-genInstallEmitters emitters = do
-    installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) emitters
+genInstallEmitters progEmitters = do
+    installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
             [
                 "current" @: (_const . ptr $ _TimeVal)
@@ -940,8 +940,8 @@ genInstallEmitters emitters = do
         genRTEMSInstallEmitter (TPSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
     
 genCreateTasks :: [TPTask SemanticAnn] -> CSourceGenerator CFileItem
-genCreateTasks tasks = do
-    createTasks <- concat <$> mapM genRTEMSCreateTask tasks
+genCreateTasks progTasks = do
+    createTasks <- concat <$> mapM genRTEMSCreateTask progTasks
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "create_tasks") [] @-> void $ 
         trail_cr . block $ 
             -- rtems_status_code status = RTEMS_SUCCESSFUL;
@@ -971,7 +971,7 @@ genCreateTasks tasks = do
                 ]
 
 genInitTask :: [TPEmitter SemanticAnn] -> CSourceGenerator CFileItem
-genInitTask emitters = do
+genInitTask progEmitters = do
     return $ pre_cr $ function "Init" [
             "_ignored" @: rtems_task_argument
         ] @-> rtems_task $
@@ -983,7 +983,7 @@ genInitTask emitters = do
                 pre_cr $ __termina_app__init_globals @@ [],
                 pre_cr $ __rtems_app__init_globals @@ []
              ] ++
-                (case find (\case { TPSystemInitEmitter {} -> True; _ -> False }) emitters of
+                (case find (\case { TPSystemInitEmitter {} -> True; _ -> False }) progEmitters of
                     Just (TPSystemInitEmitter {}) -> [
                             pre_cr $ __rtems_app__initial_event @@ [addrOf ("current" @: _TimeVal)]
                         ]
@@ -1158,7 +1158,7 @@ genMainFile mName progArchitecture = do
                             Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
                                 getResLocking' (min ceilPrio (getPriority modifiers)) ids'
                             Nothing -> error "Internal error when obtaining the resource dependencies."
-        --}
+        
         mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
 
 runGenMainFile :: QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
