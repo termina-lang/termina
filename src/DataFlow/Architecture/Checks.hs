@@ -1,6 +1,6 @@
 module DataFlow.Architecture.Checks where
 import qualified Data.Map as M
-import Semantic.AST
+import ControlFlow.AST
 import Semantic.Types
 import DataFlow.Architecture.Types
 import DataFlow.Architecture.Utils

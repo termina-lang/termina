@@ -193,11 +193,10 @@ printInitFile destinationPath bbProject = do
     Left err -> die . errorMessage $ show err
     Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter cInitFile
 
-printMainFile :: FilePath -> BasicBlocksProject -> IO ()
-printMainFile destinationPath bbProject = do
+printMainFile :: FilePath -> TerminaProgArch SemanticAnn -> IO ()
+printMainFile destinationPath progArchitecture = do
   let mainFilePath = destinationPath </> "main" <.> "c"
-      projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-  case runGenMainFile mainFilePath projectModules of
+  case runGenMainFile mainFilePath progArchitecture of
     Left err -> die . errorMessage $ show err
     Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter cMainFile
 
@@ -208,8 +207,8 @@ printOptionHeaderFile destinationPath basicTypesOptionMap = do
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
 
-genArchitecture :: TypedProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
-genArchitecture typedProject initialTerminaProgram orderedDependencies = do
+genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
+genArchitecture bbProject initialTerminaProgram orderedDependencies = do
   genArchitecture' initialTerminaProgram orderedDependencies
 
   where
@@ -217,8 +216,8 @@ genArchitecture typedProject initialTerminaProgram orderedDependencies = do
     genArchitecture' :: TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
     genArchitecture' tp [] = pure tp
     genArchitecture' tp (m:ms) = do
-      let typedModule = typedAST . metadata $ typedProject M.! m
-      let result = runGenArchitecture tp typedModule
+      let typedModule = basicBlocksAST . metadata $ bbProject M.! m
+      let result = runGenArchitecture tp m typedModule
       case result of
         Left err -> die . errorMessage $ show err
         Right tp' -> genArchitecture' tp' ms
@@ -278,17 +277,17 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
-    when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    -- | Obtain the architectural description of the program
-    programArchitecture <- genArchitecture typedProject (getPlatformInitialProgram plt) orderedDependencies 
-    warnDisconnectedEmitters programArchitecture
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
     bbProject <- genBasicBlocks typedProject
+    -- | Obtain the architectural description of the program
+    when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
+    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
+    warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) bbProject
     printInitFile (outputFolder config) bbProject
-    printMainFile (outputFolder config) bbProject
+    printMainFile (outputFolder config) programArchitecture
     printOptionHeaderFile (outputFolder config) basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

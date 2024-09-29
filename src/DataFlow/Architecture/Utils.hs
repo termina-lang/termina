@@ -1,11 +1,12 @@
 module DataFlow.Architecture.Utils where
 
-import Semantic.AST
+import ControlFlow.AST
 import DataFlow.Architecture.Types
+import qualified Data.Map as M
 
 getEmmiterIdentifier :: TPEmitter a -> Identifier
 getEmmiterIdentifier (TPInterruptEmittter ident _) = ident
-getEmmiterIdentifier (TPPeriodicTimerEmitter ident _) = ident
+getEmmiterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmmiterIdentifier (TPSystemInitEmitter ident _) = ident
 
 getTriggeredAction :: Identifier -> [ClassMember a] -> Identifier
@@ -31,4 +32,8 @@ getPortType ident (member : members) =
 
 getClassMembers :: TypeDef a -> [ClassMember a]
 getClassMembers (Class _ _ members _ _) = members
-getClassMembers _ = error $ "Internal error: getClassMembers called with the non-class type definition"
+getClassMembers _ = error "Internal error: getClassMembers called with the non-class type definition"
+
+getConnectedEmitters :: TerminaProgArch a -> [TPEmitter a]
+getConnectedEmitters tp = 
+  filter (\emitter -> M.member (getEmmiterIdentifier emitter) (emitterTargets tp)) $ M.elems (emitters tp)
