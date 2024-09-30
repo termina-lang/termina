@@ -90,10 +90,10 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader) = do
     terminaModule <- loadSingleModule targetFile
     -- | Type check the module
     typedModule <- typeSingleModule terminaModule
-    -- | Check variable usage (if enabled)
-    unless noUsageChecking (useDefCheckModule typedModule)
     -- | Generate basic blocks
     bbModule <- genBasicBlocksModule typedModule
+    -- | Check variable usage (if enabled)
+    unless noUsageChecking (useDefCheckModule bbModule)
     if printHeader then
         -- | Print the resulting header file into the standard output
         printHeaderModule bbModule

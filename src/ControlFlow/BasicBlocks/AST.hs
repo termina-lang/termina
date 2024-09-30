@@ -28,16 +28,20 @@ data Statement' expr obj a =
     a
   deriving (Show, Functor)
 
-data ElseIf' expr obj a = ElseIf (expr a) [BasicBlock' expr obj a] a
-    deriving (Show, Functor)
+data ElseIf' expr obj a = ElseIf
+  {
+    elseIfCond       :: expr a
+  , elseIfBody       :: [BasicBlock' expr obj a]
+  , elseIfAnnotation :: a
+  } deriving (Show, Functor)
 
-data MatchCase' expr obj a = 
-    MatchCase
-        Identifier
-        [Identifier]
-        [BasicBlock' expr obj a]
-        a
-    deriving (Show, Functor)
+data MatchCase' expr obj a = MatchCase
+  {
+    matchIdentifier :: Identifier
+  , matchBVars      :: [Identifier]
+  , matchBody       :: [BasicBlock' expr obj a]
+  , matchAnnotation :: a
+  } deriving (Show,Functor)
 
 data BasicBlock' expr obj a =
     -- | If-else-if basic block

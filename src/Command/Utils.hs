@@ -44,9 +44,9 @@ buildModuleName fs = buildModuleName' fs
     buildModuleName' [x] = pure x
     buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
 
-useDefCheckModule :: TypedModule -> IO ()
+useDefCheckModule :: BasicBlocksModule -> IO ()
 useDefCheckModule typedModule =
-    let result = runUDAnnotatedProgram . typedAST . metadata $ typedModule in
+    let result = runUDAnnotatedProgram . basicBlocksAST . metadata $ typedModule in
     case result of
     Nothing -> return ()
     Just err -> die . errorMessage $ show err

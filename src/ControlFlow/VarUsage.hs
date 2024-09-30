@@ -28,7 +28,7 @@ import qualified Data.Set             as S
 import qualified Data.Map.Strict      as M
 
 -- AST to work with.
-import           Semantic.AST            as SAST
+import           ControlFlow.BasicBlocks.AST
 -- We need to know the type of objects.
 import qualified Semantic.Monad as SM
 import Semantic.Types
@@ -104,35 +104,8 @@ useExpression (IsOptionVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
-useExpression (MemberFunctionCall obj ident args ann) = do
-    useObject obj
-    obj_type <- withLocation (location ann) (getObjectType obj)
-    case obj_type  of
-      (_, AccessPort (Allocator {})) ->
-        withLocation (location ann) (case ident of
-          "alloc" -> do
-            case args of
-              -- I don't think we can have expression computing variables here.
-              [ReferenceExpression Mutable (Variable avar _anni) _ann] -> allocOO avar
-              _ -> throwError ImpossibleErrorBadAllocArg
-          "free" -> do
-            case args of
-              [AccessObject (Variable var _anni)] -> useBoxVar var
-              _ -> throwError ImpossibleErrorBadFreeArg
-          _ -> throwError ImpossibleError) -- Pools only have alloc
-      (_, OutPort {}) ->
-        case ident of
-          "send" -> do
-            case args of
-              [AccessObject input_obj@(Variable var _)] -> do
-                  input_obj_type <- withLocation (location ann) (getObjectType input_obj)
-                  case input_obj_type of
-                    (_, BoxSubtype _) -> withLocation (location ann) (useBoxVar var)
-                    _ -> useObject input_obj
-              _ -> withLocation (location ann) (throwError ImpossibleErrorBadSendArg)
-          _ -> withLocation (location ann) $ throwError ImpossibleError -- OutPorts only have send
-      -- TODO Can Box be passed around as arguments?
-      _ -> mapM_ useArguments args
+useExpression (MemberFunctionCall obj _ident args _ann) = do
+    useObject obj >> mapM_ useArguments args
 useExpression (DerefMemberFunctionCall obj _ident args _ann)
       -- TODO Can Box be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
@@ -154,11 +127,7 @@ useExpression (FunctionCall _ident args _ann)
 useDefBlockRet :: BlockRet SemanticAnn -> UDM VarUsageError ()
 useDefBlockRet bret =
   maybe (return ()) useExpression (returnExpression (blockRet bret))
-  >> useDefBlock (blockBody bret)
-
--- Not so sure about this.
-useDefBlock :: Block SemanticAnn -> UDM VarUsageError ()
-useDefBlock = mapM_ useDefStmt . reverse
+  >> useDefBasicBlocks (blockBody bret)
 
 useDefStmt :: Statement SemanticAnn -> UDM VarUsageError ()
 useDefStmt (Declaration ident _accK tyS initE ann)
@@ -179,15 +148,25 @@ useDefStmt (AssignmentStmt obj e _ann)
   -- DONE [UseDef.Report.Q1]
   = useExpression e
   >> useObject obj
-useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
+useDefStmt (SingleExpStmt e _ann)
+  = useExpression e
+
+useDefBasicBlocks :: [BasicBlock SemanticAnn] -> UDM VarUsageError ()
+useDefBasicBlocks = mapM_ useDefBasicBlock . reverse
+
+useDefStatements :: [Statement SemanticAnn] -> UDM VarUsageError ()
+useDefStatements = mapM_ useDefStmt . reverse
+
+useDefBasicBlock :: BasicBlock SemanticAnn -> UDM VarUsageError ()
+useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
   sets <- runEncaps
-                ([ useDefBlock bTrue >> get
-                 , maybe (return ()) useDefBlock bFalse >> get
+                ([ useDefBasicBlocks bTrue >> get
+                 , maybe (return ()) useDefBasicBlocks bFalse >> get
                 ]
                 ++
-                 map ((\l -> mapM_ useDefStmt l >> get) . reverse . elseIfBody) elseIfs
+                 map ((\l -> useDefBasicBlocks l >> get) . reverse . elseIfBody) elseIfs
                 )
   -- Rule here is, all branches should have the same onlyonce behaviour.
   let (usedOO, usedBoxes)
@@ -203,7 +182,7 @@ useDefStmt (IfElseStmt eCond bTrue elseIfs bFalse ann)
   -- Issue #40, forgot to use condition expression.
   useExpression eCond
   mapM_ (useExpression . elseIfCond) elseIfs
-useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
+useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block ann)
   =
     -- Iterator body can alloc and free/give memory.
     -- It can only use variables /only/ only if they are declared inside the
@@ -218,7 +197,7 @@ useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
     -- What happens inside the body of a for, may not happen at all.
     runEncapsulated
       ( modify emptyButUsed
-        >> useDefBlock block
+        >> useDefBasicBlocks block
         >> get >>= \st -> -- No Option should be in the state
         unless (M.null (usedOption st)) (throwError $ annotateError (location ann) ForMoreOOpt)
         >> -- No Box should be in the state
@@ -238,7 +217,7 @@ useDefStmt (ForLoopStmt _itIdent _itTy _eB _eE mBrk block ann)
     -- Use expression over begin and end.
 --    >> useExpression eB
 --    >> useExpression eE
-useDefStmt (MatchStmt e mcase ann)
+useDefBasicBlock (MatchBlock e mcase ann)
   =
   -- Depending on expression |e| type
   -- we handle OptionBox special case properly.
@@ -276,8 +255,35 @@ useDefStmt (MatchStmt e mcase ann)
         (head usedBoxes)
   >> -- Use of expression matching
   useExpression e
-useDefStmt (SingleExpStmt e _ann)
-  = useExpression e
+useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
+  case arg of
+    AccessObject input_obj@(Variable var _) -> do
+      input_obj_type <- withLocation (location ann) (getObjectType input_obj)
+      case input_obj_type of
+        (_, BoxSubtype _) -> withLocation (location ann) (useBoxVar var)
+        _ -> useObject input_obj
+    _ -> withLocation (location ann) (throwError ImpossibleErrorBadSendArg)
+useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
+  case arg of
+    -- I don't think we can have expression computing variables here.
+    ReferenceExpression Mutable (Variable avar _anni) _ann -> withLocation (location ann) (allocOO avar)
+    _ -> withLocation (location ann) (throwError ImpossibleErrorBadAllocArg)
+useDefBasicBlock (FreeBox obj arg ann)
+  = useObject obj >> 
+  case arg of
+    AccessObject (Variable var _anni) -> withLocation (location ann) (useBoxVar var)
+    _ -> withLocation (location ann) (throwError ImpossibleError)
+useDefBasicBlock (ProcedureCall obj _ident args _ann)
+  = useObject obj >> mapM_ useArguments args
+useDefBasicBlock (AtomicLoad obj e _ann)
+  = useObject obj >> useExpression e
+useDefBasicBlock (AtomicStore obj e _ann)
+  = useObject obj >> useExpression e
+useDefBasicBlock (AtomicArrayLoad obj eI eO _ann)
+  = useObject obj >> useExpression eI >> useExpression eO
+useDefBasicBlock (AtomicArrayStore obj eI eO _ann)
+  = useObject obj >> useExpression eI >> useExpression eO
+useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
 
 destroyOptionBox
   :: (MatchCase SemanticAnn, MatchCase SemanticAnn)
@@ -286,16 +292,16 @@ destroyOptionBox (ml, mr)
   =
   let (mOpt, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
   in
-    (useDefBlock (matchBody mOpt)
+    (useDefBasicBlocks (matchBody mOpt)
       >>
      withLocation (location (matchAnnotation mOpt)) (defBoxVar (head (matchBVars mOpt)))
      >> get
-    , useDefBlock (matchBody mNone) >> get)
+    , useDefBasicBlocks (matchBody mNone) >> get)
 
 -- General case, not when it is Option Box
 useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
-  = useDefBlock blk
+  = useDefBasicBlocks blk
   >> withLocation (location ann) (mapM_ defVariable bvars)
 
 sameMaps :: [OOVarSt] -> Bool

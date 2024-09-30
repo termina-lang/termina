@@ -147,7 +147,7 @@ typeModules parsedProject =
                   (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
 
-useDefCheckModules :: TypedProject -> IO ()
+useDefCheckModules :: BasicBlocksProject -> IO ()
 useDefCheckModules = mapM_ useDefCheckModule . M.elems
 
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
@@ -271,15 +271,15 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Create the initial global environment
     let initialGlobalEnv = makeInitialGlobalEnv (getPlatformInitialGlobalEnv plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
-    -- | Usage checking
-    when chatty (putStrLn . debugMessage $ "Usage checking project modules")
-    useDefCheckModules typedProject
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
     bbProject <- genBasicBlocks typedProject
+    -- | Usage checking
+    when chatty (putStrLn . debugMessage $ "Usage checking project modules")
+    useDefCheckModules bbProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
