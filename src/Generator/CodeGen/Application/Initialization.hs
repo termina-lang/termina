@@ -5,7 +5,7 @@ module Generator.CodeGen.Application.Initialization where
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
 import System.FilePath
-import ControlFlow.AST
+import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Generator.CodeGen.Statement
 import Modules.Modules

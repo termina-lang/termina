@@ -1,4 +1,0 @@
-import { Hola.Fin.Mundo, ModC }
-function f() {
-    return;
-}

@@ -12,7 +12,7 @@ import Control.Monad.Reader
 import Generator.LanguageC.Printer
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Common
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 

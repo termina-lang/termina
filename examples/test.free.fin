@@ -1,4 +1,0 @@
-fn test0(t : 'box uint16){
-  free(t);
-  return;
-}

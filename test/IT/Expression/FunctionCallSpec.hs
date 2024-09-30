@@ -9,7 +9,7 @@ import Semantic.Monad
 import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 
 test0 :: String
 test0 = "function func_test0_0(a : u16) -> u16 {\n" ++

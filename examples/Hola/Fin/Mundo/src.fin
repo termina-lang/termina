@@ -1,8 +1,0 @@
-function holaFinMundo(){
-  return;
-}
-
-// same as imports.
-function test0(){
-  return;
-}

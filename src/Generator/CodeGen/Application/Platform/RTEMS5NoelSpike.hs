@@ -5,7 +5,7 @@
 module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike where
 
 import Generator.LanguageC.AST
-import ControlFlow.AST
+import ControlFlow.BasicBlocks.AST
 import qualified Data.Map as M
 import Data.List (find)
 import Generator.CodeGen.Utils
@@ -19,9 +19,9 @@ import Generator.LanguageC.Printer
 import Modules.Modules (QualifiedName)
 import Semantic.Types
 import System.FilePath
-import DataFlow.Architecture.Types
-import DataFlow.Architecture.Utils (getConnectedEmitters)
-import DataFlow.Architecture
+import ControlFlow.Architecture.Types
+import ControlFlow.Architecture.Utils (getConnectedEmitters)
+import ControlFlow.Architecture
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
 

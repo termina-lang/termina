@@ -4,10 +4,10 @@
 
 module Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils where
 
-import ControlFlow.AST
+import ControlFlow.BasicBlocks.AST
 import Control.Monad.Except
 import Generator.CodeGen.Common
-import DataFlow.Architecture.Types
+import ControlFlow.Architecture.Types
 import Semantic.Types
 import Generator.LanguageC.AST
 import qualified Data.Map as M

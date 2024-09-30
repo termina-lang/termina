@@ -9,7 +9,7 @@ import Text.Parsec
 import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 
 test0 :: String
 test0 = "function for_loop_test0(array0 : & [u16; 10]) -> u16 {\n" ++

@@ -9,7 +9,7 @@ import Text.Parsec
 import qualified Data.Map as M
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 test0 :: String

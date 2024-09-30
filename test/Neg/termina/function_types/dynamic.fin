@@ -1,7 +1,0 @@
-function foo(param0 : box u8) -> u8 {
-
-    let x : u8 = param0 + 1;
-
-    return x;
-
-}

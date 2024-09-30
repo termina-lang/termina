@@ -12,7 +12,7 @@ import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Utils.Annotations
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn

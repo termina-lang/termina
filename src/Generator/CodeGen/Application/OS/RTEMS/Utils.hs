@@ -1,6 +1,6 @@
 module Generator.CodeGen.Application.OS.RTEMS.Utils where
-    
-import ControlFlow.AST
+
+import ControlFlow.BasicBlocks.AST
 
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).

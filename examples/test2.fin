@@ -1,5 +1,0 @@
-function access_to_slice() -> u8 {
-    var array0: [u8; 10] = [0; 10];
-    let x : u8 = array0[1..4][0];
-    return x;
-}

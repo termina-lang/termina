@@ -1,7 +1,0 @@
-resource class id0 {
-    procedure assignment_test1(&mut self, box_var0 : box u32) {
-        var opt : Option<box u32> = None;
-        opt = Some(box_var0);
-        return;
-    }
-};

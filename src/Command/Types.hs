@@ -4,7 +4,7 @@ import qualified Data.Map.Strict as M
 
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
-import qualified ControlFlow.AST as CFAST
+import qualified ControlFlow.BasicBlocks.AST as CFAST
 
 import Semantic.Types
 import Parser.Types

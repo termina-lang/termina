@@ -10,7 +10,7 @@ import UT.PPrinter.Expression.Common
 import Control.Monad.Reader
 import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType

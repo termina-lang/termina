@@ -2,7 +2,7 @@
 
 module Generator.CodeGen.Common where
 
-import ControlFlow.AST
+import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Control.Monad.Reader
 import Control.Monad.Except

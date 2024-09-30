@@ -10,7 +10,7 @@ import Generator.CodeGen.TypeDefinition
 import Semantic.Types
 import qualified Data.Set as S
 import qualified Data.Map as M
-import ControlFlow.AST
+import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 
 genOptionPathName :: FilePath

@@ -35,9 +35,9 @@ import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Errors.PPrinting (ppError)
-import DataFlow.Architecture
-import DataFlow.Architecture.Types
-import DataFlow.Architecture.Checks
+import ControlFlow.Architecture
+import ControlFlow.Architecture.Types
+import ControlFlow.Architecture.Checks
 import Core.AST
 
 -- | Data type for the "new" command arguments

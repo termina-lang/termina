@@ -9,7 +9,7 @@ import Generator.CodeGen.Statement
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Types
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 import Prettyprinter
 

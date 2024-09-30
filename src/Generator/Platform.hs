@@ -5,9 +5,9 @@ module Generator.Platform where
 import qualified Data.Text as T
 import Core.AST
 import Semantic.Types
-import DataFlow.Architecture.Types
+import ControlFlow.Architecture.Types
 import qualified Data.Map as M
-import DataFlow.Architecture (emptyTerminaProgArch)
+import ControlFlow.Architecture (emptyTerminaProgArch)
 import Utils.Annotations
 
 data SupportedPlatform = 

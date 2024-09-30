@@ -11,7 +11,7 @@ import Control.Monad.Reader
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Function
 import Generator.CodeGen.Common
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType

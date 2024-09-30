@@ -13,7 +13,7 @@ import Generator.Option
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++

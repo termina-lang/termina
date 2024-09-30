@@ -1,9 +1,0 @@
-function foo(param0 : u8) -> [u8; 10] {
-
-    var x : [u8; 10] = [0; 10];
-
-    x[0] = param0;
-
-    return x;
-
-}

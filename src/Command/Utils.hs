@@ -10,11 +10,11 @@ import Core.AST
 
 import Parser.Types
 
-import ControlFlow.Common
+import ControlFlow.BasicBlocks
 
 import Modules.Modules
 
-import DataFlow.VarUsage (runUDAnnotatedProgram)
+import ControlFlow.VarUsage (runUDAnnotatedProgram)
 
 -- | Error message formatter
 -- Prints error messages in the form "error: <message>"

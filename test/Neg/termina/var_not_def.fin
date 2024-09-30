@@ -1,4 +1,0 @@
-function test0() {
-    foo = foo + 1024 : u16;
-    return;
-}

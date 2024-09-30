@@ -1,9 +1,0 @@
-function test0() {
-
-    let foo : bool = true;
-    let bar : u16 = 10;
-
-    let baz : u32 = (foo + bar) as u32;
-
-    return;
-}
