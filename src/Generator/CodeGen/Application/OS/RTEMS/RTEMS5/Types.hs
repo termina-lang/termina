@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CodeGen.Application.OS.RTEMS.Types where
+module Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Types where
 import Generator.LanguageC.AST
 import Generator.CodeGen.Utils
 import Generator.CodeGen.Application.Types

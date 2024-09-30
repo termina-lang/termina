@@ -9,7 +9,7 @@ import ControlFlow.AST
 import qualified Data.Map as M
 import Data.List (find)
 import Generator.CodeGen.Utils
-import Generator.CodeGen.Application.OS.RTEMS.Types
+import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Types
 import Generator.CodeGen.Application.Types
 import Generator.CodeGen.Common
 import Control.Monad.Except (MonadError(throwError))
@@ -22,29 +22,15 @@ import System.FilePath
 import DataFlow.Architecture.Types
 import DataFlow.Architecture.Utils (getConnectedEmitters)
 import DataFlow.Architecture
-import qualified Data.Set as S
-import Generator.CodeGen.Application.OS.RTEMS.RTEMS5
-
--- | Returns the value of the "priority" modifier, if present in the list of modifiers.
--- If not, it returns 255, which is the default value for the priority (the lowest).
-getPriority :: [Modifier] -> TInteger
-getPriority [] = TInteger 255 DecRepr
-getPriority ((Modifier "priority" (Just (I priority _))) : _) = priority
-getPriority (_ : modifiers) = getPriority modifiers
-
--- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
--- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
-getStackSize :: [Modifier] -> TInteger
-getStackSize [] = TInteger 4096 DecRepr
-getStackSize ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
-getStackSize (_ : modifiers) = getStackSize modifiers
+import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
+import Generator.CodeGen.Application.OS.RTEMS.Utils
 
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType noqual (DefinedType (namefy ("rtems" <::> "interrupt_emitter_t")))
     return $ CExtDecl (CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
-genInterruptEmitterDeclaration _ obj = error $ "Invalid object (not an interrupt emitter): " ++ show obj
+genInterruptEmitterDeclaration _ obj = throwError $ InternalError ("Invalid object (not an interrupt emitter): " ++ show obj)
 
 genInterruptEmitterDeclarations :: [TPEmitter SemanticAnn] -> CSourceGenerator [CFileItem]
 genInterruptEmitterDeclarations [] = return []
@@ -210,7 +196,7 @@ genArmTimer cObj identifier = do
                 ]
         ]
 
-genEmitter :: TerminaProgArch SemanticAnn -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
+genEmitter :: TerminaProgArch a -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
 genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
     let irqArray = emitterToArrayMap M.! interrupt
     -- | Obtain the identifier of the target entity and the port to which the
@@ -445,7 +431,7 @@ genEmitter progArchitecture (TPSystemInitEmitter systemInit _) = do
 -- | Function __rtems_app__enable_protection. This function is called from the Init task.
 -- It enables the protection of the shared resources when needed. In case the resource uses a mutex,
 -- it also initializes the mutex. The function is called AFTER the initialization of the tasks and handlers.
-genEnableProtection :: TerminaProgArch SemanticAnn -> M.Map Identifier RTEMSResourceLock -> CSourceGenerator CFileItem
+genEnableProtection :: TerminaProgArch a -> M.Map Identifier RTEMSResourceLock -> CSourceGenerator CFileItem
 genEnableProtection progArchitecture resLockingMap = do
     initResourcesProt <- concat <$> mapM genInitProt (M.toList resLockingMap)
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "enable_protection") [] @-> void $
@@ -537,7 +523,7 @@ genEnableProtection progArchitecture resLockingMap = do
                         ]
                 ]
 
-getInterruptEmittersToTasks :: TerminaProgArch SemanticAnn -> [TPEmitter SemanticAnn]
+getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
         TPInterruptEmittter identifier _ -> 
@@ -550,7 +536,7 @@ getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
         _ -> acc
     ) [] (getConnectedEmitters progArchitecture)
 
-getPeriodicTimersToTasks :: TerminaProgArch SemanticAnn -> [TPEmitter SemanticAnn]
+getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
         TPPeriodicTimerEmitter identifier _ _ -> 
@@ -786,7 +772,7 @@ genInitGlobals progArchitecture  = do
 -- | Function __rtems_app__install_emitters. This function is called from the Init task.
 -- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
 -- of the tasks and handlers.
-genInstallEmitters :: [TPEmitter SemanticAnn] -> CSourceGenerator CFileItem
+genInstallEmitters :: [TPEmitter a] -> CSourceGenerator CFileItem
 genInstallEmitters progEmitters = do
     installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
@@ -799,7 +785,7 @@ genInstallEmitters progEmitters = do
 
     where
 
-        genRTEMSInstallEmitter :: TPEmitter SemanticAnn -> CSourceGenerator CCompoundBlockItem
+        genRTEMSInstallEmitter :: TPEmitter a -> CSourceGenerator CCompoundBlockItem
         genRTEMSInstallEmitter (TPInterruptEmittter interrupt _) = do
             return $
                 pre_cr $ _if (
@@ -821,7 +807,7 @@ genInstallEmitters progEmitters = do
                             deref ("current" @: (_const . ptr $ _TimeVal))) : armTimer
         genRTEMSInstallEmitter (TPSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
     
-genCreateTasks :: [TPTask SemanticAnn] -> CSourceGenerator CFileItem
+genCreateTasks :: [TPTask a] -> CSourceGenerator CFileItem
 genCreateTasks progTasks = do
     createTasks <- concat <$> mapM genRTEMSCreateTask progTasks
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "create_tasks") [] @-> void $ 
@@ -830,7 +816,7 @@ genCreateTasks progTasks = do
             pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : createTasks
     where
 
-        genRTEMSCreateTask :: TPTask SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genRTEMSCreateTask :: TPTask a -> CSourceGenerator [CCompoundBlockItem]
         genRTEMSCreateTask (TPTask identifier classId _ _ _ _ modifiers _ _) = do
             let cPriority = genInteger . getPriority $ modifiers
                 cStackSize = genInteger . getStackSize $ modifiers
@@ -852,7 +838,7 @@ genCreateTasks progTasks = do
                     ]
                 ]
 
-genInitTask :: [TPEmitter SemanticAnn] -> CSourceGenerator CFileItem
+genInitTask :: [TPEmitter a] -> CSourceGenerator CFileItem
 genInitTask progEmitters = do
     return $ pre_cr $ function "Init" [
             "_ignored" @: rtems_task_argument
@@ -978,6 +964,9 @@ genMainFile mName progArchitecture = do
     taskMessageQueues <- getTasksMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
 
+    resLockingMap <- genResLockingMap progArchitecture dependenciesMap
+    let mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
+
     cVariantsForTaskPorts <- concat <$> mapM genVariantsForTaskPorts (M.elems taskClss)
     cPoolMemoryAreas <- genPoolMemoryAreas (M.elems $ pools progArchitecture)
     cAtomicDeclarations <- genAtomicDeclarations (M.elems $ atomics progArchitecture)
@@ -1014,36 +1003,6 @@ genMainFile mName progArchitecture = do
         taskClss = taskClasses progArchitecture
 
         dependenciesMap = getResDependencies progArchitecture
-
-        -- | Map between the resources and the locking mechanism that must be used
-        resLockingMap = fmap (getResLocking . S.toList) dependenciesMap
-        -- | Obtains the locking mechanism that must be used for a resource
-        getResLocking :: [Identifier] -> RTEMSResourceLock
-        getResLocking [] = RTEMSResourceLockNone
-        getResLocking [_] = RTEMSResourceLockNone
-        getResLocking (ident: ids) = 
-            case M.lookup ident (handlers progArchitecture) of
-                Just _ -> RTEMSResourceLockIrq
-                Nothing -> case M.lookup ident (tasks progArchitecture) of
-                    Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
-                        getResLocking' (getPriority modifiers) ids
-                    Nothing -> error "Internal error when obtaining the resource dependencies."
-
-            where
-                getResLocking' :: TInteger -> [Identifier] -> RTEMSResourceLock
-                -- | If we have reach the end of the list, it means that there are at least two different tasks that
-                -- access the resource. We are going to force the use of the priority ceiling algorithm. In the
-                -- (hopefully near) future, we will support algorithm selection via the configuration file.
-                getResLocking' ceilPrio [] = RTEMSResourceLockMutex ceilPrio
-                getResLocking' ceilPrio (ident' : ids') = 
-                    case M.lookup ident' (handlers progArchitecture) of
-                        Just _ -> RTEMSResourceLockIrq
-                        Nothing -> case M.lookup ident' (tasks progArchitecture) of
-                            Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
-                                getResLocking' (min ceilPrio (getPriority modifiers)) ids'
-                            Nothing -> error "Internal error when obtaining the resource dependencies."
-        
-        mutexes = [m | m <- M.elems resLockingMap, (\case{ RTEMSResourceLockMutex {} -> True; _ -> False }) m]
 
 runGenMainFile :: QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
 runGenMainFile mainFilePath progArchitecture = runReaderT (genMainFile mainFilePath progArchitecture) M.empty

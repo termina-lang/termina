@@ -113,7 +113,7 @@ genBBlocks acc (stmt : xs) =
                                 "free" -> case args of
                                     [elemnt] -> genBBlocks (FreeBox obj elemnt ann' : acc) xs
                                     _ -> throwError $ InternalError ("genBBlocks: unexpected number of arguments of procedure " ++ funcName)
-                                _ -> throwError $ InternalError "unexpected function name"
+                                _ -> throwError $ InternalError ("genBBlocks: unexpected function name " ++ funcName)
                         -- | If the object is an access port to an atomic
                         -- object, we shall create a new block of the
                         -- corresponding type (AtomicLoad, AtomicStore,

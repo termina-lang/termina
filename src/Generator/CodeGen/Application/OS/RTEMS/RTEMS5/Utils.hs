@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CodeGen.Application.OS.RTEMS.RTEMS5 where
+module Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils where
 
 import ControlFlow.AST
 import Control.Monad.Except
@@ -13,6 +13,8 @@ import Generator.LanguageC.AST
 import qualified Data.Map as M
 import Generator.CodeGen.Utils
 import Generator.CodeGen.Application.Types
+import qualified Data.Set as S
+import Generator.CodeGen.Application.OS.RTEMS.Utils
 
 -- | Data type used to represent a message queue in RTEMS
 --  There are different types depending on the original source code element that
@@ -143,3 +145,37 @@ genAtomicArrayDeclarations (obj : objs) = do
     decl <- genAtomicArrayDeclaration True obj
     rest <- mapM (genAtomicArrayDeclaration False) objs
     return $ decl : rest
+
+-- | Generates a map between the resources and the locking mechanism that must be used
+genResLockingMap :: (MonadError CGeneratorError m) => TerminaProgArch a -> M.Map Identifier (S.Set Identifier) -> m (M.Map Identifier RTEMSResourceLock)
+genResLockingMap progArchitecture = foldM (\acc (resId, resDeps) -> do
+        resLocking <- getResLocking (S.toList resDeps)
+        return $ M.insert resId resLocking acc
+    ) M.empty . M.toList
+
+    where
+
+        -- | Obtains the locking mechanism that must be used for a resource
+        getResLocking :: (MonadError CGeneratorError m) => [Identifier] -> m RTEMSResourceLock
+        getResLocking [] = return RTEMSResourceLockNone
+        getResLocking [_] = return RTEMSResourceLockNone
+        getResLocking (ident: ids) = 
+            case M.lookup ident (handlers progArchitecture) of
+                Just _ -> return RTEMSResourceLockIrq
+                Nothing -> case M.lookup ident (tasks progArchitecture) of
+                    Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
+                        getResLocking' (getPriority modifiers) ids
+                    Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"
+
+        getResLocking' :: (MonadError CGeneratorError m) =>  TInteger -> [Identifier] -> m RTEMSResourceLock
+        -- | If we have reach the end of the list, it means that there are at least two different tasks that
+        -- access the resource. We are going to force the use of the priority ceiling algorithm. In the
+        -- (hopefully near) future, we will support algorithm selection via the configuration file.
+        getResLocking' ceilPrio [] = return $ RTEMSResourceLockMutex ceilPrio
+        getResLocking' ceilPrio (ident' : ids') = 
+            case M.lookup ident' (handlers progArchitecture) of
+                Just _ -> return RTEMSResourceLockIrq
+                Nothing -> case M.lookup ident' (tasks progArchitecture) of
+                    Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
+                        getResLocking' (min ceilPrio (getPriority modifiers)) ids'
+                    Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"

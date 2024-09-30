@@ -10,7 +10,7 @@ import Generator.LanguageC.AST
 import Utils.Annotations
 
 class TypeElement a b where
-          (@:) :: a -> CType -> b
+    (@:) :: a -> CType -> b
 
 instance TypeElement Ident CObject where
     (@:) = CVar
