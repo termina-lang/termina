@@ -23,6 +23,7 @@ import DataFlow.Architecture.Types
 import DataFlow.Architecture.Utils (getConnectedEmitters)
 import DataFlow.Architecture
 import qualified Data.Set as S
+import Generator.CodeGen.Application.OS.RTEMS.RTEMS5
 
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
@@ -37,125 +38,6 @@ getStackSize :: [Modifier] -> TInteger
 getStackSize [] = TInteger 4096 DecRepr
 getStackSize ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
 getStackSize (_ : modifiers) = getStackSize modifiers
-
-data RTEMSMsgQueue =
-    RTEMSTaskMsgQueue
-      Identifier -- ^ task identifier
-      Identifier -- ^ task class identifier
-      Size -- ^ message queue size
-    | RTEMSChannelMsgQueue
-      Identifier -- ^ name of the channel
-      TerminaType -- ^ type of the elements of the message queue
-      Size -- ^ message queue size
-      Identifier -- ^ name of the task that will receive the messages
-      Identifier -- ^ name of the port to wich the messages will be sent
-    | RTEMSSinkPortMsgQueue
-      Identifier -- ^ identifier of the receiving task
-      Identifier -- ^ identifier of the class of the receiving task
-      Identifier -- ^ identifier of the port that will receive the messages
-      TerminaType -- ^ type of the elements of the message queue
-      Size -- ^ message queue size
-    deriving Show
-
-data RTEMSResourceLock =
-    RTEMSResourceLockNone |
-    RTEMSResourceLockIrq |
-    RTEMSResourceLockMutex TInteger
-    deriving Show
-
-getTasksMessageQueues :: TerminaProgArch SemanticAnn -> [RTEMSMsgQueue]
-getTasksMessageQueues = foldr (\glb acc ->
-        case glb of
-            TPTask identifier classId _ sinkPorts _ _ _ _ _ -> RTEMSTaskMsgQueue identifier classId (K (TInteger 1 DecRepr)) :
-                foldr (\(portId, (ts, _, _)) acc' ->
-                    RTEMSSinkPortMsgQueue identifier classId portId ts (K (TInteger 1 DecRepr)) : acc'
-                ) acc (M.toList sinkPorts)
-    ) [] . tasks
-
-getChannelsMessageQueues :: TerminaProgArch SemanticAnn -> [RTEMSMsgQueue]
-getChannelsMessageQueues progArchitecture = concatMap (\(TPMsgQueue identifier ts size _ _) ->
-    case M.lookup identifier (channelTargets progArchitecture) of
-        Just (task, port, _, _) -> [RTEMSChannelMsgQueue identifier ts size task port]
-        Nothing -> error $ "channel not connected: " ++ show identifier
-    ) (channels progArchitecture)
-
-genVariantForPort ::
-    -- | Name of the task class
-    Identifier
-    -- | Name of the port
-    -> Identifier -> CSourceGenerator Identifier
-genVariantForPort taskCls port = return $ namefy $ taskCls <::> port
-
-genVariantsForTaskPorts :: TypeDef SemanticAnn -> CSourceGenerator [CFileItem]
-genVariantsForTaskPorts (Class _ classId members _ _) =
-    genDefineVariantsForPorts ports
-    where
-
-        ports = foldr (\field acc ->
-                        case field of
-                            ClassField (FieldDefinition prt (SinkPort {})) _ -> prt : acc
-                            ClassField (FieldDefinition prt (InPort {})) _ -> prt : acc
-                            _ -> acc ) [] members
-
-        genDefineVariantsForPorts :: [Identifier] -> CSourceGenerator [CFileItem]
-        genDefineVariantsForPorts [] = return []
-        genDefineVariantsForPorts (port : xs) = do
-            this_variant <- genVariantForPort classId port
-            rest <- genDefineVariantsForPorts' xs 1
-            return $ pre_cr (_define this_variant (Just [show (0 :: Integer)])) : rest
-
-        genDefineVariantsForPorts' :: [Identifier] -> Integer -> CSourceGenerator [CFileItem]
-        genDefineVariantsForPorts' [] _ = return []
-        genDefineVariantsForPorts' (port : xs) value = do
-            rest <- genDefineVariantsForPorts' xs (value + 1)
-            this_variant <- genVariantForPort classId port
-            return $ _define this_variant (Just [show value]) : rest
-
-genVariantsForTaskPorts def = throwError $ InternalError $ "Definition not a class: " ++ show def
-
-genPoolMemoryArea :: Bool -> TPPool a -> CSourceGenerator CFileItem
-genPoolMemoryArea before (TPPool identifier ts size _ _) = do
-    cSize <- genArraySize size
-    cType <- genType noqual ts
-    let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
-    if before then 
-        return $ pre_cr $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
-    else
-        return $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
-
-genPoolMemoryAreas :: [TPPool a] -> CSourceGenerator [CFileItem]
-genPoolMemoryAreas [] = return []
-genPoolMemoryAreas (obj : objs) = do
-    memArea <- genPoolMemoryArea True obj
-    rest <- mapM (genPoolMemoryArea False) objs
-    return $ memArea : rest
-
-genAtomicDeclaration :: Bool -> TPAtomic a -> CSourceGenerator CFileItem
-genAtomicDeclaration before (TPAtomic identifier ts _ _) = do
-    let declStmt = internalAnn (CDeclarationAnn before)
-    cType <- genType atomic ts
-    return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
-
-genAtomicDeclarations :: [TPAtomic a] -> CSourceGenerator [CFileItem]
-genAtomicDeclarations [] = return []
-genAtomicDeclarations (obj : objs) = do
-    decl <- genAtomicDeclaration True obj
-    rest <- mapM (genAtomicDeclaration False) objs
-    return $ decl : rest
-
-genAtomicArrayDeclaration :: Bool -> TPAtomicArray a -> CSourceGenerator CFileItem
-genAtomicArrayDeclaration before (TPAtomicArray identifier ts size _ _) = do
-    let declStmt = internalAnn (CDeclarationAnn before)
-    cSize <- genArraySize size
-    cType <- genType atomic ts
-    return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt
-
-genAtomicArrayDeclarations :: [TPAtomicArray a] -> CSourceGenerator [CFileItem]
-genAtomicArrayDeclarations [] = return []
-genAtomicArrayDeclarations (obj : objs) = do
-    decl <- genAtomicArrayDeclaration True obj
-    rest <- mapM (genAtomicArrayDeclaration False) objs
-    return $ decl : rest
 
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do
@@ -687,12 +569,12 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
 genInitGlobals :: TerminaProgArch SemanticAnn
     -> CSourceGenerator CFileItem
 genInitGlobals progArchitecture  = do
-    let tasksMessageQueues = getTasksMessageQueues progArchitecture
-        channelMessageQueues = getChannelsMessageQueues progArchitecture
-        interruptEmittersToTasks = getInterruptEmittersToTasks progArchitecture
+    let interruptEmittersToTasks = getInterruptEmittersToTasks progArchitecture
         timersToTasks = getPeriodicTimersToTasks progArchitecture
         timers = filter (\case {TPPeriodicTimerEmitter {} -> True; _ -> False}) (getConnectedEmitters progArchitecture)
-    -- tasksMessageQueues channelMessageQueues interruptEmittersToTasks timersToTasks tasks timers
+
+    tasksMessageQueues <- getTasksMessageQueues progArchitecture
+    channelMessageQueues <- getChannelsMessageQueues progArchitecture
     initResources <- concat <$> mapM genInitResource (resources progArchitecture)
     initPools <- concat <$> mapM genInitPool (pools progArchitecture)
     cTaskMessageQueues <- concat <$> mapM genRTEMSCreateMsgQueue tasksMessageQueues
@@ -708,10 +590,10 @@ genInitGlobals progArchitecture  = do
                 -- result.__variant = Result__Ok;
                 no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
             ] ++ initResources ++ initPools
-            ++ (if not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers) then
-                [
+            ++ [
                     pre_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code
-                ] else []) ++ cTaskMessageQueues ++ cChannelMessageQueues
+                        | not (null tasksMessageQueues) || not (null channelMessageQueues) || not (null timers)]
+                ++ cTaskMessageQueues ++ cChannelMessageQueues
                 ++ cInterruptEmittersToTasks ++ cTimersToTasks ++ cTaskInitialization ++ cCreateTimers
 
     where
@@ -1092,6 +974,10 @@ genMainFile mName progArchitecture = do
         interruptEmittersToTasks = getInterruptEmittersToTasks progArchitecture
         connectedEmitters = getConnectedEmitters progArchitecture
         progTasks = M.elems $ tasks progArchitecture
+
+    taskMessageQueues <- getTasksMessageQueues progArchitecture
+    channelMessageQueues <- getChannelsMessageQueues progArchitecture
+
     cVariantsForTaskPorts <- concat <$> mapM genVariantsForTaskPorts (M.elems taskClss)
     cPoolMemoryAreas <- genPoolMemoryAreas (M.elems $ pools progArchitecture)
     cAtomicDeclarations <- genAtomicDeclarations (M.elems $ atomics progArchitecture)
@@ -1104,7 +990,7 @@ genMainFile mName progArchitecture = do
     installEmitters <- genInstallEmitters connectedEmitters
     createTasks <- genCreateTasks progTasks
     initTask <- genInitTask connectedEmitters
-    appConfig <- genAppConfig progArchitecture msgQueues mutexes
+    appConfig <- genAppConfig progArchitecture (taskMessageQueues ++ channelMessageQueues) mutexes
     return $ CSourceFile mName $ [
             -- #include <rtems.h>
             includeRTEMS,
@@ -1126,8 +1012,6 @@ genMainFile mName progArchitecture = do
 
         -- List of used task classes
         taskClss = taskClasses progArchitecture
-
-        msgQueues = getTasksMessageQueues progArchitecture ++ getChannelsMessageQueues progArchitecture
 
         dependenciesMap = getResDependencies progArchitecture
 
