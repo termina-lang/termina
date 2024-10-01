@@ -10,8 +10,8 @@ import qualified Semantic.AST as SAST
 import Core.AST
 import Semantic.Types
 import Utils.Annotations
-import ControlFlow.BasicBlocks.Types
 import Control.Monad.Except
+import ControlFlow.BasicBlocks.Errors.Errors
 
 -- This module contains utility functions that are used in the control flow analysis.
 
