@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Utils.Annotations
 import ControlFlow.BasicBlocks.Errors.Errors
 import Data.Foldable
+import qualified Control.Monad.State as ST
 
 doesBlockExit :: BasicBlock SemanticAnn -> Bool
 doesBlockExit (ReturnBlock {}) = True
@@ -26,8 +27,8 @@ doesBlockExit (MatchBlock _ cases _) =
             prevState && doesBlockExit (last blocks)) True cases
 doesBlockExit _ = False
 
-checkBlockExit :: Location -> [BasicBlock SemanticAnn] -> BBExitCheck BBExitCheckST
-checkBlockExit loc stmts = do
+checkBlockPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck BBPathsCheckST
+checkBlockPaths loc stmts = do
     step <- get
     case step of
         -- | If we are here, it means that the block must exit on this step.
@@ -40,7 +41,7 @@ checkBlockExit loc stmts = do
                 -- rest of the blocks
                 (ReturnBlock {} : xb) ->
                     -- | The rest of the blocks shall not exit
-                    setExitNotAllowed >> checkBlockExit loc xb
+                    setExitNotAllowed >> checkBlockPaths loc xb
                 _ -> throwError $ annotateError loc BBBlockShallExit
         -- | If we are here, it means that the block is not allowed to exit.
         BBExitNotAllowed ->
@@ -49,11 +50,11 @@ checkBlockExit loc stmts = do
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (location ann) BBInvalidReturn
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (location ann) BBInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (location ann) BBInvalidContinue
-                (_ : xb) -> checkBlockExit loc xb
+                (_ : xb) -> checkBlockPaths loc xb
         _ -> throwError $ annotateError Internal BBInvalidCheckState
 
-checkActionExit :: Location -> [BasicBlock SemanticAnn] -> BBExitCheck BBExitCheckST
-checkActionExit loc stmts = do
+checkActionPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck BBPathsCheckST
+checkActionPaths loc stmts = do
     step <- get
     case step of
         -- | If we are here, it means that the block must exit on this step.
@@ -66,22 +67,22 @@ checkActionExit loc stmts = do
                     case x of
                         ReturnBlock {} ->
                             -- | The rest of the blocks shall not exit
-                            setPartialExit >> checkActionExit loc xb
+                            setPartialExit >> checkActionPaths loc xb
                         ContinueBlock {} ->
                             -- | The rest of the blocks shall not exit
-                            setAllowedSend >> checkActionExit loc xb
+                            setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) ann) ->
                             if not (doesBlockExit blk) then
                                 throwError $ annotateError (location ann) BBIfBlockShallExit
                             else do
-                                stateIfBlock <- localScope (checkActionExit loc (reverse ifBlocks))
+                                stateIfBlock <- localScope (checkActionPaths loc (reverse ifBlocks))
                                 stateElseIfs <- foldM
                                     (\prevState (ElseIf _ elifBlocks ann') -> do
-                                        elseIfState <- localScope (checkActionExit (location ann') (reverse elifBlocks))
+                                        elseIfState <- localScope (checkActionPaths (location ann') (reverse elifBlocks))
                                         return (max elseIfState prevState)) stateIfBlock elseIfBlocks
-                                elseBlockState <- localScope (checkActionExit loc (reverse elseBlocks))
+                                elseBlockState <- localScope (checkActionPaths loc (reverse elseBlocks))
                                 put (max elseBlockState stateElseIfs)
-                                checkActionExit loc xb
+                                checkActionPaths loc xb
                         IfElseBlock _ _ _ _ ann ->
                             throwError $ annotateError (location ann) BBBlockIfBlockMissingElseExit
                         blk@(MatchBlock _ cases ann) ->
@@ -90,10 +91,10 @@ checkActionExit loc stmts = do
                             else do
                                 matchCaseState <- foldM
                                     (\prevState (MatchCase _ _ blocks ann') -> do
-                                        matchCaseState <- localScope (checkActionExit (location ann') (reverse blocks))
+                                        matchCaseState <- localScope (checkActionPaths (location ann') (reverse blocks))
                                         return (max matchCaseState prevState)) step cases
                                 put matchCaseState
-                                checkActionExit loc xb
+                                checkActionPaths loc xb
                         _ -> throwError $ annotateError loc BBBlockShallExit
         -- | If we are here, it means that we may exit the block or send messages BUT there
         -- must be a path that does not exit the block
@@ -106,35 +107,35 @@ checkActionExit loc stmts = do
                         ContinueBlock _ ann -> throwError $ annotateError (location ann) BBInvalidContinue
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
-                            setAllowedSend >> checkActionExit loc xb
+                            setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
                             if doesBlockExit blk then
                                 throwError $ annotateError loc BBIfBlockShallNotExit
                             else do
-                                stateIfBlock <- localScope (setAllowedContinue >> checkActionExit loc (reverse ifBlocks))
+                                stateIfBlock <- localScope (setAllowedContinue >> checkActionPaths loc (reverse ifBlocks))
                                 stateElseIfs <- foldM
                                     (\prevState (ElseIf _ elifBlocks ann') -> do
-                                        elseIfState <- localScope (setAllowedContinue >> checkActionExit (location ann') (reverse elifBlocks))
+                                        elseIfState <- localScope (setAllowedContinue >> checkActionPaths (location ann') (reverse elifBlocks))
                                         return (max elseIfState prevState)) stateIfBlock elseIfBlocks
-                                elseBlockState <- localScope (setAllowedContinue >> checkActionExit loc (reverse elseBlocks))
+                                elseBlockState <- localScope (setAllowedContinue >> checkActionPaths loc (reverse elseBlocks))
                                 put (max elseBlockState stateElseIfs)
-                                checkActionExit loc xb
+                                checkActionPaths loc xb
                         IfElseBlock _ ifBlocks _ _ _ ->
-                            checkActionExit loc (reverse ifBlocks) >>
-                            checkActionExit loc xb
+                            checkActionPaths loc (reverse ifBlocks) >>
+                            checkActionPaths loc xb
                         blk@(MatchBlock _ cases _) ->
                             if doesBlockExit blk then
                                 throwError $ annotateError loc BBMatchBlockShallNotExit
                             else do
                                 matchCaseState <- foldM
                                     (\prevState (MatchCase _ _ blocks ann) -> do
-                                        matchCaseState <- localScope (setAllowedContinue >> checkActionExit (location ann) (reverse blocks))
+                                        matchCaseState <- localScope (setAllowedContinue >> checkActionPaths (location ann) (reverse blocks))
                                         return (max matchCaseState prevState)) step cases
                                 put matchCaseState
-                                checkActionExit loc xb
+                                checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
-                            setExitNotAllowed >> checkActionExit (location ann) (reverse loopBlocks) >> checkActionExit loc xb
-                        _ -> setExitNotAllowed >> checkActionExit loc xb
+                            setExitNotAllowed >> checkActionPaths (location ann) (reverse loopBlocks) >> checkActionPaths loc xb
+                        _ -> setExitNotAllowed >> checkActionPaths loc xb
         BBAllowedContinue ->
             case stmts of
                 [] -> return step
@@ -143,32 +144,32 @@ checkActionExit loc stmts = do
                         ReturnBlock _ ann -> throwError $ annotateError (location ann) BBInvalidReturn
                         ContinueBlock {} -> 
                             -- | The rest of the blocks shall not exit
-                            setAllowedSend >> checkActionExit loc xb
+                            setAllowedSend >> checkActionPaths loc xb
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
-                            setAllowedSend >> checkActionExit loc xb
+                            setAllowedSend >> checkActionPaths loc xb
                         (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
-                            stateIfBlock <- localScope (checkActionExit loc (reverse ifBlocks))
+                            stateIfBlock <- localScope (checkActionPaths loc (reverse ifBlocks))
                             stateElseIfs <- foldM
                                 (\prevState (ElseIf _ elifBlocks ann') -> do
-                                    elseIfState <- localScope (checkActionExit (location ann') (reverse elifBlocks))
+                                    elseIfState <- localScope (checkActionPaths (location ann') (reverse elifBlocks))
                                     return (max elseIfState prevState)) stateIfBlock elseIfBlocks
-                            elseBlockState <- localScope (checkActionExit loc (reverse elseBlocks))
+                            elseBlockState <- localScope (checkActionPaths loc (reverse elseBlocks))
                             put (max elseBlockState stateElseIfs)
-                            checkActionExit loc xb
+                            checkActionPaths loc xb
                         (IfElseBlock _ ifBlocks _ _ _) ->
-                            checkActionExit loc (reverse ifBlocks) >>
-                            checkActionExit loc xb
+                            checkActionPaths loc (reverse ifBlocks) >>
+                            checkActionPaths loc xb
                         (MatchBlock _ cases _) -> do
                             matchCaseState <- foldM
                                 (\prevState (MatchCase _ _ blocks ann) -> do
-                                    matchCaseState <- localScope (checkActionExit (location ann) (reverse blocks))
+                                    matchCaseState <- localScope (checkActionPaths (location ann) (reverse blocks))
                                     return (max matchCaseState prevState)) step cases
                             put matchCaseState
-                            checkActionExit loc xb
+                            checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
-                            setExitNotAllowed >> checkActionExit (location ann) (reverse loopBlocks) >> checkActionExit loc xb
-                        _ -> setExitNotAllowed >> checkActionExit loc xb
+                            setExitNotAllowed >> checkActionPaths (location ann) (reverse loopBlocks) >> checkActionPaths loc xb
+                        _ -> setExitNotAllowed >> checkActionPaths loc xb
         BBAllowedSend ->
             case stmts of
                 [] -> return step
@@ -178,30 +179,30 @@ checkActionExit loc stmts = do
                         ContinueBlock _ ann -> throwError $ annotateError (location ann) BBInvalidContinue
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
-                            checkActionExit loc xb
+                            checkActionPaths loc xb
                         (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
-                            stateIfBlock <- localScope (checkActionExit loc (reverse ifBlocks))
+                            stateIfBlock <- localScope (checkActionPaths loc (reverse ifBlocks))
                             stateElseIfs <- foldM
                                 (\prevState (ElseIf _ elifBlocks ann') -> do
-                                    elseIfState <- localScope (checkActionExit (location ann') (reverse elifBlocks))
+                                    elseIfState <- localScope (checkActionPaths (location ann') (reverse elifBlocks))
                                     return (max elseIfState prevState)) stateIfBlock elseIfBlocks
-                            elseBlockState <- localScope (checkActionExit loc (reverse elseBlocks))
+                            elseBlockState <- localScope (checkActionPaths loc (reverse elseBlocks))
                             put (max elseBlockState stateElseIfs)
-                            checkActionExit loc xb
+                            checkActionPaths loc xb
                         (IfElseBlock _ ifBlocks _ _ _) ->
-                            checkActionExit loc (reverse ifBlocks) >>
-                            checkActionExit loc xb
+                            checkActionPaths loc (reverse ifBlocks) >>
+                            checkActionPaths loc xb
                         (MatchBlock _ cases _) -> do
                             matchCaseState <- foldM
                                 (\prevState (MatchCase _ _ blocks ann) -> do
-                                    matchCaseState <- localScope (checkActionExit (location ann) (reverse blocks))
+                                    matchCaseState <- localScope (checkActionPaths (location ann) (reverse blocks))
                                     return (max matchCaseState prevState)) step cases
                             put matchCaseState
-                            checkActionExit loc xb
+                            checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
-                            setExitNotAllowed >> checkActionExit (location ann) (reverse loopBlocks) >> checkActionExit loc xb
+                            setExitNotAllowed >> checkActionPaths (location ann) (reverse loopBlocks) >> checkActionPaths loc xb
                         _ ->
-                            setExitNotAllowed >> checkActionExit loc xb
+                            setExitNotAllowed >> checkActionPaths loc xb
         -- | If we are here, it means that the block is not allowed to exit nor to send messages
         BBExitNotAllowed ->
             case stmts of
@@ -210,20 +211,60 @@ checkActionExit loc stmts = do
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (location ann) BBInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (location ann) BBInvalidContinue
                 (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
-                    checkActionExit loc (reverse ifBlocks) >> 
+                    checkActionPaths loc (reverse ifBlocks) >> 
                     mapM_
                         (\(ElseIf _ elifBlocks ann') -> 
-                            checkActionExit (location ann') (reverse elifBlocks)) elseIfBlocks >>
-                    checkActionExit loc (reverse elseBlocks) >>
-                    checkActionExit loc xb
+                            checkActionPaths (location ann') (reverse elifBlocks)) elseIfBlocks >>
+                    checkActionPaths loc (reverse elseBlocks) >>
+                    checkActionPaths loc xb
                 (IfElseBlock _ ifBlocks _ _ _ : xb) ->
-                    checkActionExit loc (reverse ifBlocks) >>
-                    checkActionExit loc xb
+                    checkActionPaths loc (reverse ifBlocks) >>
+                    checkActionPaths loc xb
                 (MatchBlock _ cases _ : xb) ->
                     mapM_
                         (\(MatchCase _ _ blocks ann) -> 
-                            checkActionExit (location ann) (reverse blocks)) cases >>
-                    checkActionExit loc xb
+                            checkActionPaths (location ann) (reverse blocks)) cases >>
+                    checkActionPaths loc xb
                 (ForLoopBlock _ _ _ _ _ loopBlocks ann : xb) ->
-                    checkActionExit (location ann) (reverse loopBlocks) >> checkActionExit loc xb
-                (_ : xb) -> checkActionExit loc xb
+                    checkActionPaths (location ann) (reverse loopBlocks) >> checkActionPaths loc xb
+                (_ : xb) -> checkActionPaths loc xb
+
+checkBBPathClassMember :: ClassMember SemanticAnn -> BBPathsCheck ()
+checkBBPathClassMember (ClassField {}) = return ()
+checkBBPathClassMember (ClassMethod _name _retType (Block body) ann) = 
+    void $ setMustExit >> checkBlockPaths (location ann) (reverse body)
+checkBBPathClassMember (ClassProcedure _name _args (Block body) ann) = 
+    void $ setMustExit >> checkBlockPaths (location ann) (reverse body)
+checkBBPathClassMember (ClassViewer _name _args _retType (Block body) ann) =
+    void $ setMustExit >> checkBlockPaths (location ann) (reverse body)
+checkBBPathClassMember (ClassAction _name _param _retType (Block body) ann) = 
+    void $ setMustExit >> checkActionPaths (location ann) (reverse body)
+
+-- | This function translates the type definitions from the semantic AST to the
+-- basic block AST.
+checkBBPathTypeDef :: TypeDef SemanticAnn -> BBPathsCheck ()
+checkBBPathTypeDef (Struct {}) = return ()
+checkBBPathTypeDef (Enum {}) = return ()
+checkBBPathTypeDef (Class _kind _name members _parents _ann) = 
+    mapM_ checkBBPathClassMember members
+checkBBPathTypeDef (Interface {}) = return ()
+
+-- | This function translates the annotated AST elements from the semantic AST
+-- to the basic block AST.
+checkBBPathAnnASTElement :: AnnASTElement SemanticAnn -> BBPathsCheck ()
+checkBBPathAnnASTElement (Function _name _args _retType (Block body) _modifiers ann) = 
+    void $ setMustExit >> checkBlockPaths (location ann) (reverse body)
+checkBBPathAnnASTElement (GlobalDeclaration {}) = return ()
+checkBBPathAnnASTElement (TypeDefinition typeDef _ann) =
+    checkBBPathTypeDef typeDef
+
+-- | This function translates the annotated module from the semantic AST to the
+-- basic block AST. 
+checkBBPathModule :: AnnotatedProgram SemanticAnn -> BBPathsCheck ()
+checkBBPathModule = mapM_ checkBBPathAnnASTElement
+
+-- | This function runs the basic block generator on an annotated program
+runCheckBBPaths :: AnnotatedProgram SemanticAnn -> Either BBPathsCheckError ()
+runCheckBBPaths prog = case ST.runState (runExceptT . checkBBPathModule $ prog) BBMustExit of
+    (Left err, _) -> Left err
+    (Right _, _) -> Right ()

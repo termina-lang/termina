@@ -15,6 +15,7 @@ import ControlFlow.BasicBlocks
 import Modules.Modules
 
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
+import ControlFlow.BasicBlocks.Checks
 
 -- | Error message formatter
 -- Prints error messages in the form "error: <message>"
@@ -62,3 +63,10 @@ genBasicBlocksModule typedModule = do
             (importedModules typedModule)
             (sourcecode typedModule)
             (BasicBlockData bbAST)
+
+checkBasicBlocksPaths :: BasicBlocksModule -> IO ()
+checkBasicBlocksPaths bbModule = do
+    let result = runCheckBBPaths . basicBlocksAST . metadata $ bbModule
+    case result of
+        Left err -> die . errorMessage $ show err
+        Right _ -> return ()

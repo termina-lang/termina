@@ -1,7 +1,8 @@
 module ControlFlow.BasicBlocks.Types (
     BBGenerator,
-    BBExitCheck,
-    BBExitCheckST(..),
+    BBPathsCheck,
+    BBPathsCheckST(..),
+    setMustExit,
     setPartialExit,
     setAllowedContinue,
     setAllowedSend,
@@ -16,7 +17,7 @@ import qualified Control.Monad.State as ST
 -- | This type represents the monad used to generate basic blocks.
 type BBGenerator = Except BBGeneratorError
 
-data BBExitCheckST = 
+data BBPathsCheckST = 
     BBMustExit
     | BBPartialExit
     | BBAllowedContinue
@@ -24,27 +25,31 @@ data BBExitCheckST =
     | BBExitNotAllowed
     deriving (Show, Eq, Ord)
 
-type BBExitCheck = ExceptT BBExitCheckError (ST.State BBExitCheckST)
+type BBPathsCheck = ExceptT BBPathsCheckError (ST.State BBPathsCheckST)
 
-setPartialExit :: BBExitCheck ()
+setMustExit :: BBPathsCheck ()
+setMustExit = do
+    ST.put BBMustExit
+
+setPartialExit :: BBPathsCheck ()
 setPartialExit = do
     ST.put BBPartialExit
 
-setAllowedContinue :: BBExitCheck ()
+setAllowedContinue :: BBPathsCheck ()
 setAllowedContinue = do
     ST.put BBAllowedContinue
 
-setAllowedSend :: BBExitCheck ()
+setAllowedSend :: BBPathsCheck ()
 setAllowedSend = do
     ST.put BBAllowedSend
 
-setExitNotAllowed :: BBExitCheck ()
+setExitNotAllowed :: BBPathsCheck ()
 setExitNotAllowed = do
     ST.put BBExitNotAllowed
 
 -- Execute comp but bracktracking the state
 -- Useful for blocks semantic analysis
-localScope :: BBExitCheck a -> BBExitCheck a
+localScope :: BBPathsCheck a -> BBPathsCheck a
 localScope comp = do
   prevst <- ST.get
   res <- comp

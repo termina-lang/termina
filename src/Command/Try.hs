@@ -92,6 +92,8 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader) = do
     typedModule <- typeSingleModule terminaModule
     -- | Generate basic blocks
     bbModule <- genBasicBlocksModule typedModule
+    -- | Check basic blocks paths
+    checkBasicBlocksPaths bbModule
     -- | Check variable usage (if enabled)
     unless noUsageChecking (useDefCheckModule bbModule)
     if printHeader then

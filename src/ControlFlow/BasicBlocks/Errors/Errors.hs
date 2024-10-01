@@ -20,4 +20,4 @@ data ExitCheckError =
     | BBBlockIfBlockMissingElseExit
     deriving (Show)
 
-type BBExitCheckError = AnnotatedError ExitCheckError Location
+type BBPathsCheckError = AnnotatedError ExitCheckError Location

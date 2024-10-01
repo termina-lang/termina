@@ -231,6 +231,9 @@ warnDisconnectedEmitters tp =
 genBasicBlocks :: TypedProject -> IO BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
 
+checkProjectBasicBlocksPaths :: BasicBlocksProject -> IO ()
+checkProjectBasicBlocksPaths = mapM_ checkBasicBlocksPaths . M.elems
+
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
@@ -277,6 +280,8 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
     bbProject <- genBasicBlocks typedProject
+    when chatty (putStrLn . debugMessage $ "Checking basic blocks paths")
+    checkProjectBasicBlocksPaths bbProject
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     useDefCheckModules bbProject
