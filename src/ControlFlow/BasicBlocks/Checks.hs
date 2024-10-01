@@ -240,8 +240,6 @@ checkBBPathClassMember (ClassViewer _name _args _retType (Block body) ann) =
 checkBBPathClassMember (ClassAction _name _param _retType (Block body) ann) = 
     void $ setMustExit >> checkActionPaths (location ann) (reverse body)
 
--- | This function translates the type definitions from the semantic AST to the
--- basic block AST.
 checkBBPathTypeDef :: TypeDef SemanticAnn -> BBPathsCheck ()
 checkBBPathTypeDef (Struct {}) = return ()
 checkBBPathTypeDef (Enum {}) = return ()
@@ -249,8 +247,6 @@ checkBBPathTypeDef (Class _kind _name members _parents _ann) =
     mapM_ checkBBPathClassMember members
 checkBBPathTypeDef (Interface {}) = return ()
 
--- | This function translates the annotated AST elements from the semantic AST
--- to the basic block AST.
 checkBBPathAnnASTElement :: AnnASTElement SemanticAnn -> BBPathsCheck ()
 checkBBPathAnnASTElement (Function _name _args _retType (Block body) _modifiers ann) = 
     void $ setMustExit >> checkBlockPaths (location ann) (reverse body)
@@ -258,12 +254,9 @@ checkBBPathAnnASTElement (GlobalDeclaration {}) = return ()
 checkBBPathAnnASTElement (TypeDefinition typeDef _ann) =
     checkBBPathTypeDef typeDef
 
--- | This function translates the annotated module from the semantic AST to the
--- basic block AST. 
 checkBBPathModule :: AnnotatedProgram SemanticAnn -> BBPathsCheck ()
 checkBBPathModule = mapM_ checkBBPathAnnASTElement
 
--- | This function runs the basic block generator on an annotated program
 runCheckBBPaths :: AnnotatedProgram SemanticAnn -> Either BBPathsCheckError ()
 runCheckBBPaths prog = case ST.runState (runExceptT . checkBBPathModule $ prog) BBMustExit of
     (Left err, _) -> Left err
