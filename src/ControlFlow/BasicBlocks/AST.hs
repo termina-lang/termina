@@ -98,14 +98,19 @@ data BasicBlock' expr obj a =
         a
     -- | Regular block (list of statements)
     | RegularBlock [Statement' expr obj a]
+    | ReturnBlock 
+        (Maybe (expr a)) -- ^ return expression
+        a
+    | ContinueBlock
+        (expr a)
+        a
     deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-data BlockRet' expr obj a
-  = BlockRet
+newtype Block' expr obj a
+  = Block
   {
     blockBody :: [BasicBlock' expr obj a]
-  , blockRet  :: ReturnStmt' expr a
   }
   deriving (Show, Functor)
 
@@ -114,21 +119,20 @@ type Expression = Expression' Object
 
 type BasicBlock = BasicBlock' Expression Object
 
-type ReturnStmt = ReturnStmt' Expression
-type BlockRet = BlockRet' Expression Object
-type AnnASTElement = AnnASTElement' BlockRet Expression
+type Block = Block' Expression Object
+type AnnASTElement = AnnASTElement' Block Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' Expression
 
-type TypeDef = TypeDef' BlockRet
+type TypeDef = TypeDef' Block
 
-type ClassMember = ClassMember' BlockRet
+type ClassMember = ClassMember' Block
 
 type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' BlockRet Expression a]
+type AnnotatedProgram a = [AnnASTElement' Block Expression a]
 
 type Module = Module' QualifiedName
-type TerminaModule = TerminaModule' BlockRet Expression QualifiedName 
+type TerminaModule = TerminaModule' Block Expression QualifiedName 

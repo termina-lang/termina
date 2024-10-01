@@ -91,6 +91,13 @@ data Error a
   | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (E069)
   | ESymbolDefined Identifier a -- ^ Symbol already defined (E070)
   | EExpressionNotConstant -- ^ Expression not constant (E071)
+  | EContinueInvalidExpression -- ^ Invalid expression in continue statement (E072)
+  | EContinueInvalidProcedureCall Identifier -- ^ Invalid procedure call in continue statement (E073)
+  | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement (E074)
+  | EContinueInvalidMemberCall TerminaType -- ^ Invalid member call in continue statement (E075)
+  | EContinueActionNotFound Identifier -- ^ Action not found in continue statement (E076)
+  | EContinueActionExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in action call in continue statement (E077)
+  | EContinueActionMissingParam (Identifier, a) -- ^ Missing parameters in action call in continue statement (E078)
   -- | Not Function found
   | EFunctionNotFound Identifier
   -- | Record missing field^

@@ -428,11 +428,12 @@ mustBeTy ty expression =
     ann_exp = getAnnotation expression
     loc = location ann_exp
 
+{--
 blockRetTy :: TerminaType -> BlockRet SemanticAnn -> SemanticMonad ()
 blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
   maybe
   (throwError (annotateError Internal EUnboxingBlockRet))
-  (void . checkEqTypesOrError (location ann) ty) (getResultingType (getSemanticAnn ann))
+  (void . checkEqTypesOrError (location ann) ty) (getResultingType (getSemanticAnn ann)) --}
 
 getIntConst :: Location -> Const -> SemanticMonad Integer
 getIntConst _ (I (TInteger i _) _) = return i

@@ -130,9 +130,9 @@ data Statement' expr obj a =
     a
   | IfElseStmt
     (expr a) -- ^ conditional expression
-    [ Statement' expr obj a ] -- ^ statements in the if block
-    [ ElseIf' expr obj a ] -- ^ list of else if blocks
-    (Maybe [ Statement' expr obj a ]) -- ^ statements in the else block
+    (Block' expr obj a) -- ^ statements in the if block
+    [ElseIf' expr obj a] -- ^ list of else if blocks
+    (Maybe (Block' expr obj a)) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
@@ -141,7 +141,7 @@ data Statement' expr obj a =
     (expr a) -- ^ initial value of the iterator
     (expr a) -- ^ final value of the iterator
     (Maybe (expr a)) -- ^ break condition (optional)
-    [ Statement' expr obj a ] -- ^ statements in the for loop
+    (Block' expr obj a) -- ^ statements in the for loop
     a
   | MatchStmt
     (expr a) -- ^ expression to match
@@ -150,36 +150,36 @@ data Statement' expr obj a =
   | SingleExpStmt
     (expr a) -- ^ expression
     a
+  | ReturnStmt
+    (Maybe (expr a)) -- ^ return expression
+    a
+  | ContinueStmt
+    (expr a)
+    a
   deriving (Show, Functor)
 
--- Blocks are just list of statements
-type Block' expr obj a = [Statement' expr obj a]
-
 -- | |BlockRet| represent a body block with its return statement
-data BlockRet' expr obj a
-  = BlockRet
+newtype Block' expr obj a
+  = Block
   {
     blockBody :: [Statement' expr obj a]
-  , blockRet  :: ReturnStmt' expr a
   }
   deriving (Show, Functor)
 
 -- type OptionVariant a = OptionVariant' (Expression a)
 type Expression = Expression' Object
 
-type ReturnStmt = ReturnStmt' Expression
-type BlockRet = BlockRet' Expression Object
-type AnnASTElement = AnnASTElement' BlockRet Expression
+type Block = Block' Expression Object
+type AnnASTElement = AnnASTElement' Block Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' Expression
 
-type TypeDef = TypeDef' BlockRet
+type TypeDef = TypeDef' Block
 
-type ClassMember = ClassMember' BlockRet
+type ClassMember = ClassMember' Block
 
 type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' BlockRet Expression a]
-type Block a = Block' Expression Object a
+type AnnotatedProgram a = [AnnASTElement' Block Expression a]

@@ -286,6 +286,18 @@ findClassViewerOrMethod i
     }
   )
 
+findClassAction :: Identifier -> [ ClassMember' blk a ] -> Maybe (TerminaType, TerminaType, a)
+findClassAction i
+  =  fmap
+  (\case {
+    ClassAction _ param rty _ a -> (paramTerminaType param, rty, a);
+    _ -> error "Impossible after find"
+    })
+  .
+  L.find (\case{
+    ClassAction ident _ _ _ _ -> (ident == i);
+    _ -> False})
+
 className :: ClassMember' blk a -> Identifier
 className (ClassField e _)                = fieldIdentifier e
 className (ClassMethod mIdent _ _ _)      = mIdent

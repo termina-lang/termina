@@ -33,45 +33,40 @@ selfInv isSelf (Casting expr _ts _ann) prevMap = selfInv isSelf expr prevMap
 selfInv _isSelf _ prevMap  = prevMap
 
 selfInvStmt :: (Object a -> Bool) -> Statement a -> SelfInvocation a -> SelfInvocation a
-selfInvStmt isSelf (Declaration _vident _accK _type e _ann) = selfInv isSelf e
-selfInvStmt isSelf (AssignmentStmt _obj e _ann) = selfInv isSelf e
-selfInvStmt isSelf (IfElseStmt eC bIf bEls bEl _ann) =
+selfInvStmt isSelf (Declaration _vident _accK _type e _ann) prevMap = selfInv isSelf e prevMap
+selfInvStmt isSelf (AssignmentStmt _obj e _ann) prevMap = selfInv isSelf e prevMap
+selfInvStmt isSelf (IfElseStmt eC (Block bIfStmts) bEls bEl _ann) prevMap =
   selfInv isSelf eC .
-  flip (foldr (selfInvStmt isSelf)) bIf .
-  flip (foldr (selfInvElseIf isSelf)) bEls . 
-  (\prevMap -> maybe prevMap (foldr (selfInvStmt isSelf) prevMap) bEl)
+  flip (foldr (selfInvStmt isSelf)) bIfStmts .
+  flip (foldr (selfInvElseIf isSelf)) bEls $ 
+    maybe prevMap (foldr (selfInvStmt isSelf) prevMap . blockBody) bEl
 
   where
 
     selfInvElseIf :: (Object a -> Bool) -> ElseIf a -> SelfInvocation a -> SelfInvocation a
-    selfInvElseIf isSelf' (ElseIf cond blk _) =
-      selfInv isSelf' cond . flip (foldr (selfInvStmt isSelf')) blk
+    selfInvElseIf isSelf' (ElseIf cond blk _) prevMap' =
+      selfInv isSelf' cond $ foldr (selfInvStmt isSelf') prevMap' (blockBody blk)
 
-selfInvStmt isSelf (ForLoopStmt _loopIdent _type _initV _endV cBreak body _ann) =
-  (\prevMap -> maybe prevMap (flip (selfInv isSelf) prevMap) cBreak) .
-  flip (foldr (selfInvStmt isSelf)) body
-selfInvStmt isSelf (MatchStmt e mcases _ann) =
-  selfInv isSelf e .
-  flip (foldr (selfInvCase isSelf)) mcases
+selfInvStmt isSelf (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts) _ann) prevMap =
+  (\prevMap' -> maybe prevMap' (flip (selfInv isSelf) prevMap') cBreak) $
+    foldr (selfInvStmt isSelf) prevMap stmts
+selfInvStmt isSelf (MatchStmt e mcases _ann) prevMap =
+  selfInv isSelf e $ foldr (selfInvCase isSelf) prevMap mcases
 
   where
 
     selfInvCase :: (Object a -> Bool) -> MatchCase a -> SelfInvocation a -> SelfInvocation a
     selfInvCase isSelf' (MatchCase _ _ body _) =
-      flip (foldr (selfInvStmt isSelf')) body
+      flip (foldr (selfInvStmt isSelf')) . blockBody $ body
 
-selfInvStmt isSelf (SingleExpStmt e _ann) = selfInv isSelf e
+selfInvStmt isSelf (SingleExpStmt e _ann) prevMap = selfInv isSelf e prevMap
+selfInvStmt isSelf (ReturnStmt ret _ann) prevMap = 
+  maybe prevMap (flip (selfInv isSelf) prevMap) ret
+selfInvStmt isSelf (ContinueStmt ret _ann) prevMap = 
+  selfInv isSelf ret prevMap
 
 selfInvBlock :: (Object a -> Bool) -> Block a -> SelfInvocation a -> SelfInvocation a
-selfInvBlock isSelf = flip (foldr (selfInvStmt isSelf))
-
-selfInvRetStmt :: (Object a -> Bool) -> ReturnStmt a -> SelfInvocation a -> SelfInvocation a
-selfInvRetStmt isSelf (ReturnStmt ret _) prevMap =
-  maybe prevMap (flip (selfInv isSelf) prevMap) ret
-
-selfInvBlockRet :: (Object a -> Bool) -> BlockRet a -> SelfInvocation a -> SelfInvocation a
-selfInvBlockRet isSelf (BlockRet body bret)
-  = flip (foldr (selfInvStmt isSelf)) body . selfInvRetStmt isSelf bret
+selfInvBlock isSelf = flip (foldr (selfInvStmt isSelf)) . blockBody
 
 selfDepClass
   :: (Object a -> Bool)
@@ -79,10 +74,10 @@ selfDepClass
   -> SelfDepMap a -> SelfDepMap a
 selfDepClass _ (ClassField {}) = id
 selfDepClass isSelf (ClassMethod mId _type bRet _ann) =
-  M.insert mId (selfInvBlockRet isSelf bRet M.empty)
+  M.insert mId (selfInvBlock isSelf bRet M.empty)
 selfDepClass isSelf (ClassProcedure pId _params bRet _ann) =
-  M.insert pId (selfInvBlockRet isSelf bRet M.empty)
+  M.insert pId (selfInvBlock isSelf bRet M.empty)
 selfDepClass isSelf (ClassViewer vId _params _type bRet _ann) =
-  M.insert vId (selfInvBlockRet isSelf bRet M.empty)
+  M.insert vId (selfInvBlock isSelf bRet M.empty)
 selfDepClass isSelf (ClassAction aId _param _type bRet _ann) =
-  M.insert aId (selfInvBlockRet isSelf bRet M.empty)
+  M.insert aId (selfInvBlock isSelf bRet M.empty)

@@ -48,14 +48,14 @@ option0, option1 :: Statement SemanticAnn
 option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
 option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
-twoDeclarations :: [Statement SemanticAnn]
-twoDeclarations = [array1, option0]
+twoDeclarations :: Block SemanticAnn
+twoDeclarations = Block [array1, option0]
 
-oneAssignment :: [Statement SemanticAnn]
-oneAssignment = [constToFoo0]
+oneAssignment :: Block SemanticAnn
+oneAssignment = Block [constToFoo0]
 
-oneDeclaration :: [Statement SemanticAnn]
-oneDeclaration = [option1]
+oneDeclaration :: Block SemanticAnn
+oneDeclaration = Block [option1]
 
 cond0, cond1 :: Expression SemanticAnn
 cond0 = BinOp RelationalEqual foo0 uint32Const0 boolExprSemAnn

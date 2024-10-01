@@ -531,6 +531,17 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks blk'
             return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
+genBlocks (ReturnBlock (Just expr) ann) = do
+    let cAnn = buildStatementAnn ann True
+    cExpr <- genExpression expr
+    return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
+genBlocks (ReturnBlock Nothing ann) = do
+    let cAnn = buildStatementAnn ann True
+    return [CBlockStmt $ CSReturn Nothing cAnn]
+genBlocks (ContinueBlock expr ann) = do
+    let cAnn = buildStatementAnn ann True
+    cExpr <- genExpression expr
+    return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
 
 genStatement :: Statement SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do
@@ -587,12 +598,3 @@ genStatement (Declaration identifier _ ts expr ann) = do
 genStatement (SingleExpStmt expr ann) = do
     cExpr <- genExpression expr
     return [CBlockStmt $ CSDo cExpr (buildStatementAnn ann True)]
-
-genReturnStatement :: ReturnStmt SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
-genReturnStatement (ReturnStmt (Just expr) ann) = do
-    let cAnn = buildStatementAnn ann True
-    cExpr <- genExpression expr
-    return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
-genReturnStatement (ReturnStmt Nothing ann) = do
-    let cAnn = buildStatementAnn ann True
-    return [CBlockStmt $ CSReturn Nothing cAnn]

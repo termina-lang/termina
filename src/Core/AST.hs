@@ -8,17 +8,6 @@ module Core.AST where
 
 import Utils.Annotations
 
-data ReturnStmt' expr a
-  = ReturnStmt
-  {
-    returnExpression :: Maybe (expr a)
-  , returnAnnotation :: a
-  }
-  deriving (Show, Functor)
-
-instance Annotated (ReturnStmt' expr) where
-  getAnnotation = returnAnnotation
-
 -- | Integer representation.  
 -- A value of this type is used to indicate the representation in which the
 -- value was introduced. It will be later used by the code generator to generate

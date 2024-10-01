@@ -97,32 +97,33 @@ struct0field0 = AccessObject (MemberAccess struct0 "field0" (objSemAnn Mutable U
 struct0Assignment0 :: Statement SemanticAnn
 struct0Assignment0 = AssignmentStmt (MemberAccess struct0 "field0" (objSemAnn Mutable UInt32)) (BinOp Addition struct0field0 constUInt32 uint32ExprSemAnn) unitSemAnn
 
-returnVoid :: ReturnStmt SemanticAnn
+returnVoid :: Statement SemanticAnn
 returnVoid = ReturnStmt Nothing unitSemAnn
 
-returnStructField0 :: ReturnStmt SemanticAnn
+returnStructField0 :: Statement SemanticAnn
 returnStructField0 = ReturnStmt (Just struct0field0) uint32ExprSemAnn
 
 function0 :: AnnASTElement SemanticAnn
-function0 = Function "function0" [] Nothing (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnVoid) [] unitSemAnn
+function0 = Function "function0" [] Nothing (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnVoid]) [] unitSemAnn
 
 function1 :: AnnASTElement SemanticAnn
-function1 = Function "function1" [] (Just UInt32) (BlockRet [struct0Declaration0, struct1Declaration, struct0Assignment0] returnStructField0) [] unitSemAnn
+function1 = Function "function1" [] (Just UInt32) (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnStructField0]) [] unitSemAnn
 
 function2 :: AnnASTElement SemanticAnn
 function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
-  (BlockRet [
+  (Block [
     struct0Declaration1, 
     struct1Declaration, 
-    struct0Assignment0] returnStructField0) [] unitSemAnn
+    struct0Assignment0, 
+    returnStructField0]) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnn
 function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] (Just UInt32) 
-  (BlockRet [
+  (Block [
     struct0Declaration2, 
     struct1Declaration, 
-    struct0Assignment0
-    ] returnStructField0) [] unitSemAnn
+    struct0Assignment0,
+    returnStructField0]) [] unitSemAnn
 
 renderFunctionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
 renderFunctionDecl opts decl = 

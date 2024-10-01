@@ -46,16 +46,16 @@ param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Unbox param0 (objSemAnn Mutabl
 constToFoo1 = AssignmentStmt foo1 uint32Const0 stmtSemAnn
 
 matchCaseSome0 :: MatchCase SemanticAnn
-matchCaseSome0 = MatchCase "Some" ["param0"] [param0ToFoo1] (matchCaseSemAnn [BoxSubtype UInt32])
+matchCaseSome0 = MatchCase "Some" ["param0"] (Block [param0ToFoo1]) (matchCaseSemAnn [BoxSubtype UInt32])
 
 param1ToFoo1 :: Statement SemanticAnn
 param1ToFoo1 = AssignmentStmt foo1 array0IndexConstant stmtSemAnn
 
 matchCaseSome1 :: MatchCase SemanticAnn
-matchCaseSome1 = MatchCase "Some" ["param1"] [param1ToFoo1] (matchCaseSemAnn [BoxSubtype (Array UInt32 (K (TInteger 10 DecRepr)))])
+matchCaseSome1 = MatchCase "Some" ["param1"] (Block [param1ToFoo1]) (matchCaseSemAnn [BoxSubtype (Array UInt32 (K (TInteger 10 DecRepr)))])
 
 matchCaseNone :: MatchCase SemanticAnn
-matchCaseNone = MatchCase "None" [] [constToFoo1] (matchCaseSemAnn [])
+matchCaseNone = MatchCase "None" [] (Block [constToFoo1]) (matchCaseSemAnn [])
 
 -- | A match statement with two cases. In Termina syntax:
 -- match option_var {

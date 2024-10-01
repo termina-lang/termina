@@ -4,7 +4,7 @@
 
 module Parser.Parsing where
 
-import           Parser.AST                  hiding (blockRet)
+import           Parser.AST
 -- Importing position from Parsec
 import           Text.Parsec.Pos
 -- Importing parser combinators
@@ -713,19 +713,16 @@ arrayExprListInitializerParser = do
 
 -- -- Task Definition
 
-blockParser :: Parser (BlockRet ParserAnn)
-blockParser = BlockRet  <$> many blockItemParser <*> returnStmtParser
+blockParser :: Parser (Block ParserAnn)
+blockParser = Block <$> many blockItemParser
 
-returnStmtParser :: Parser (ReturnStmt ParserAnn)
+returnStmtParser :: Parser (Statement ParserAnn)
 returnStmtParser = do
   startPos <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
   _ <- semi
   ReturnStmt ret . Position startPos <$> getPosition
-
-emptyReturn :: Parser ()
-emptyReturn = returnStmtParser >>= maybe mempty (const (fail "Expected Empty return")) . returnExpression
 
 functionParser :: Parser (AnnASTElement  ParserAnn)
 functionParser = do
@@ -813,6 +810,7 @@ blockItemParser
   <|> try assignmentStmtPaser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
+  <|> try returnStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement ParserAnn)
@@ -832,7 +830,7 @@ matchCaseParser = do
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
   compound <- braces $ many blockItemParser
-  MatchCase caseId args compound . Position startPos <$> getPosition
+  MatchCase caseId args (Block compound) . Position startPos <$> getPosition
 
 matchStmtParser :: Parser (Statement ParserAnn)
 matchStmtParser = do
@@ -849,7 +847,7 @@ elseIfParser = do
   _ <- reserved "if"
   expression <- expressionParser
   compound <- braces $ many blockItemParser
-  ElseIf expression compound . Position startPos <$> getPosition
+  ElseIf expression (Block compound) . Position startPos <$> getPosition
 
 ifElseIfStmtParser :: Parser (Statement ParserAnn)
 ifElseIfStmtParser = do
@@ -861,8 +859,8 @@ ifElseIfStmtParser = do
   elseCompound <- option Nothing (do
     _ <- reserved "else"
     stmts <- braces $ many $ try blockItemParser
-    return $ Just stmts)
-  IfElseStmt expression ifCompound elseIfs elseCompound . Position startPos <$> getPosition
+    return $ Just (Block stmts))
+  IfElseStmt expression (Block ifCompound) elseIfs elseCompound . Position startPos <$> getPosition
 
 forLoopStmtParser :: Parser (Statement ParserAnn)
 forLoopStmtParser = do
@@ -879,7 +877,7 @@ forLoopStmtParser = do
     reserved "while"
     expressionParser)
   compound <- braces $ many blockItemParser
-  ForLoopStmt identifier ty start end breakCondition compound . Position startPos <$> getPosition
+  ForLoopStmt identifier ty start end breakCondition (Block compound) . Position startPos <$> getPosition
 
 taskDeclParser :: Parser (Global ParserAnn)
 taskDeclParser = do

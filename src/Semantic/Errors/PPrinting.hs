@@ -112,7 +112,7 @@ printSimpleError sourceLines errorMessage fileName lineNumber lineColumn len msg
     where
 
         genSimpleBlock :: Errata.Block
-        genSimpleBlock = Block
+        genSimpleBlock = Errata.Block
             fancyRedStyle
             (fileName, lineNumber, lineColumn)
             Nothing
@@ -276,7 +276,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                     Errata
                         (Just title)
                         [
-                            Block
+                            Errata.Block
                                 fancyRedStyle
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
@@ -302,7 +302,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                     Errata
                         (Just title)
                         [
-                            Block
+                            Errata.Block
                                 fancyRedStyle
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
@@ -328,7 +328,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                     Errata
                         (Just title)
                         [
-                            Block
+                            Errata.Block
                                 fancyRedStyle
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
@@ -368,7 +368,7 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                     Errata
                         (Just title)
                         [
-                            Block
+                            Errata.Block
                                 fancyRedStyle
                                 (sourceName posClass, sourceLine posClass, sourceColumn posClass)
                                 Nothing
@@ -863,6 +863,77 @@ ppError toModuleAST (AnnotatedError e (Position pos _endPos)) =
                 sourceLines title fileName
                 lineNumber lineColumn 1
                 (Just "The expression is not constant and cannot be evaluated at compile time.")
+    EContinueInvalidExpression -> 
+        let title = "\x1b[31merror [E072]\x1b[0m: invalid expression in continue statement."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just "The expression in a continue statement must be a call to a member action.")
+    EContinueInvalidProcedureCall ident -> 
+        let title = "\x1b[31merror [E073]\x1b[0m: invalid procedure call in continue statement."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("This statement can only be used to call a continuation action.\n" <>
+                       "The procedure call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid."))
+    EContinueInvalidMethodOrViewerCall ident -> 
+        let title = "\x1b[31merror [E074]\x1b[0m: invalid method or viewer call in continue statement."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("This statement can only be used to call a continuation action.\n" <>
+                       "The member function call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid."))
+    EContinueInvalidMemberCall ts ->
+        let title = "\x1b[31merror [E075]\x1b[0m: invalid member call in continue statement."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn 1
+                (Just ("This statement can only be used to call a continuation action.\n" <>
+                       "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid."))
+    EContinueActionNotFound ident -> 
+        let title = "\x1b[31merror [E076]\x1b[0m: continuation action not found."
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Action \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
+    EContinueActionExtraParams (ident, params, Position actPos _endPos) paramNumber ->
+        let title = "\x1b[31merror [E077]\x1b[0m: extra parameters in continuation action."
+            actFileName = sourceName actPos
+            actLineNumber = sourceLine actPos
+            actLineColumn = sourceColumn actPos
+            actSourceLines = toModuleAST M.! actFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Action \x1b[31m" <> T.pack ident <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError
+                actSourceLines "The action is defined here:" actFileName
+                actLineNumber actLineColumn (length ident)
+                Nothing
+    EContinueActionMissingParam (ident, Position actPos _endPos) ->
+        let title = "\x1b[31merror [E078]\x1b[0m: missing parameters in continuation action."
+            actFileName = sourceName actPos
+            actLineNumber = sourceLine actPos
+            actLineColumn = sourceColumn actPos
+            actSourceLines = toModuleAST M.! actFileName
+        in
+            printSimpleError
+                sourceLines title fileName
+                lineNumber lineColumn (length ident)
+                (Just ("Action \x1b[31m" <> T.pack ident <>
+                    "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.")) >>
+            printSimpleError
+                actSourceLines "The action is defined here:" actFileName
+                actLineNumber actLineColumn (length ident)
+                Nothing
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

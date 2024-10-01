@@ -44,16 +44,16 @@ mapStatementOption ::
   Statement a
   -> OptionTypesMonad ()
 mapStatementOption (Declaration _ _ ts _ _) = insertOptionType ts
-mapStatementOption (IfElseStmt _ stmts elseIfs elseBlk _) =
+mapStatementOption (IfElseStmt _ (Block stmts) elseIfs elseBlk _) =
   -- | Get the option types from the statements
   mapM_ mapStatementOption stmts >>
   -- | Get the option types from the else if statements
-  mapM_ (\(ElseIf _ stmts' _) -> mapM_ mapStatementOption stmts') elseIfs >>
+  mapM_ (\(ElseIf _ (Block stmts') _) -> mapM_ mapStatementOption stmts') elseIfs >>
   -- | Get the option types from the else statements
-  maybe (return ()) (mapM_ mapStatementOption) elseBlk
-mapStatementOption (ForLoopStmt _ _ _ _ _ stmts _) = mapM_ mapStatementOption stmts
+  maybe (return ()) (mapM_ mapStatementOption . blockBody) elseBlk
+mapStatementOption (ForLoopStmt _ _ _ _ _ (Block stmts) _) = mapM_ mapStatementOption stmts
 mapStatementOption (MatchStmt _ cases _) =
-  mapM_ (\(MatchCase _ _ stmts _) -> mapM_ mapStatementOption stmts) cases
+  mapM_ (\(MatchCase _ _ (Block stmts) _) -> mapM_ mapStatementOption stmts) cases
 mapStatementOption _ = return ()
 
 mapInterfaceProcedureOption ::

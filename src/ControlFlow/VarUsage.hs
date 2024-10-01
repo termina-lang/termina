@@ -124,10 +124,8 @@ useExpression (FunctionCall _ident args _ann)
       -- TODO Can Box be passed around as arguments?
   = mapM_ useArguments args
 
-useDefBlockRet :: BlockRet SemanticAnn -> UDM VarUsageError ()
-useDefBlockRet bret =
-  maybe (return ()) useExpression (returnExpression (blockRet bret))
-  >> useDefBasicBlocks (blockBody bret)
+useDefBlockRet :: Block SemanticAnn -> UDM VarUsageError ()
+useDefBlockRet bret = useDefBasicBlocks (blockBody bret)
 
 useDefStmt :: Statement SemanticAnn -> UDM VarUsageError ()
 useDefStmt (Declaration ident _accK tyS initE ann)
@@ -284,6 +282,9 @@ useDefBasicBlock (AtomicArrayLoad obj eI eO _ann)
 useDefBasicBlock (AtomicArrayStore obj eI eO _ann)
   = useObject obj >> useExpression eI >> useExpression eO
 useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
+useDefBasicBlock (ReturnBlock e _ann) = 
+  maybe (return ()) useExpression e
+useDefBasicBlock (ContinueBlock e _ann) = useExpression e
 
 destroyOptionBox
   :: (MatchCase SemanticAnn, MatchCase SemanticAnn)

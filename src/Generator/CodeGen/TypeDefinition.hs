@@ -244,29 +244,25 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
     where
 
         genClassFunctionDefinition :: ClassMember SemanticAnn -> CSourceGenerator CFileItem
-        genClassFunctionDefinition (ClassViewer viewer parameters rts (BlockRet body ret) ann) = do
+        genClassFunctionDefinition (ClassViewer viewer parameters rts (Block stmts) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
             cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration parameters
             cSelfParam <- genConstSelfParam clsdef
-            cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] body
+                return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassProcedure procedure parameters (BlockRet body _ret) ann) = do
+        genClassFunctionDefinition (ClassProcedure procedure parameters (Block stmts) ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            cReturn <- genReturnStatement (ReturnStmt Nothing ann)
             selfCastStmt <- genSelfCastStmt
-            cBody <- foldM (\acc x -> do
-                cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] body
+            cBody <- genProcedureStmts [selfCastStmt, genProcedureOnEntry] stmts
             return $ CFunctionDef Nothing (CFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls)
-                (CSCompound ([selfCastStmt, genProcedureOnEntry] ++ cBody ++ (genProcedureOnExit : cReturn)) (buildCompoundAnn ann False True)))
+                (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
 
             where
@@ -292,29 +288,37 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                         selfResourceExpr = CExprAddrOf (CField (CVar selfVariable (CTPointer (CTTypeDef identifier noqual) noqual)) resourceClassIDField cResourceIDType) (CTPointer cResourceIDType noqual) cAnn
                     in
                     CBlockStmt $ CSDo (CExprCall (CExprValOf (CVar resourceUnlock cResourceLockFuncType) cResourceUnlockFuncType cAnn) [selfResourceExpr] (CTVoid noqual) cAnn) (buildStatementAnn ann True)
+                
+                genProcedureStmts :: [CCompoundBlockItem] -> [BasicBlock SemanticAnn] -> CSourceGenerator [CCompoundBlockItem]
+                genProcedureStmts acc [ret@(ReturnBlock {})] = do
+                    cReturn <- genBlocks ret
+                    return $ acc ++ (genProcedureOnExit : cReturn)
+                genProcedureStmts _ [_] = throwError $ InternalError $ "Last block is not a statement: " ++ show procedure
+                genProcedureStmts _ [] = throwError $ InternalError $ "Empty procedure: " ++ show procedure
+                genProcedureStmts acc (x : xs) = do
+                    cStmt <- genBlocks x
+                    genProcedureStmts (acc ++ cStmt) xs
 
-        genClassFunctionDefinition (ClassMethod method rts (BlockRet body ret) ann) = do
+        genClassFunctionDefinition (ClassMethod method rts (Block stmts) ann) = do
             clsFuncName <- genClassFunctionName identifier method
             cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             cSelfParam <- genSelfParam clsdef
-            cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] body
+                return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam]
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassAction action param rts (BlockRet body ret) ann) = do
+        genClassFunctionDefinition (ClassAction action param rts (Block stmts) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             cRetType <- genType noqual rts
             cSelfParam <- genSelfParam clsdef
             cParam <- genParameterDeclaration param
-            cReturn <- genReturnStatement ret
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] body
+                return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam, cParam]
-                (CSCompound (cBody ++ cReturn) (buildCompoundAnn ann False True)))
+                (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 
