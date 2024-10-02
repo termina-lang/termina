@@ -38,33 +38,47 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
-             ["MsgQueue", "Pool", "Option", "Allocator", "Atomic", 
+              -- Polymorphic Types
+             ["MsgQueue", "Pool", "Option", "Allocator", "Atomic",
               "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
       ++ -- Struct and enum types
+              -- Struct and enum types
              ["struct", "enum"]
       ++ -- Box Subtyping
+              -- Box Subtyping
              ["box"]
       ++ -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
              ["loc"]
       ++ -- Ports Subtyping
+              -- Ports Subtyping
              ["access", "sink", "in", "out"]
       ++ -- Global declarations
+              -- Global declarations
              ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
-             ["var", "let", "match", "for", "if", "else", "return", "while"]
+              -- Stmt
+             ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
+              -- Trigger
              ["triggers"]
       ++ -- Provide
+              -- Provide
              ["provides"]
       ++ -- Constants
+              -- Constants
              ["true", "false"]
       ++ -- Modules
+              -- Modules
              ["import"]
       ++ -- Class methods
+              -- Class methods
              ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
+              -- Casting keyword
              ["as"]
       ++ -- option name
+              -- option name
              ["option"]
       ++ -- is variant operator
              ["is"]
@@ -251,8 +265,8 @@ structInitializerParser = do
 
       fieldAssignmentParser :: Parser (FieldAssignment ParserAnn)
       fieldAssignmentParser = do
-        try fieldValueParser <|> try fieldAddressParser <|> try fieldAccessPortConnectionParser 
-            <|> try fieldInboundPortConnectionParser <|> fieldOutboundPortConnectionParser 
+        try fieldValueParser <|> try fieldAddressParser <|> try fieldAccessPortConnectionParser
+            <|> try fieldInboundPortConnectionParser <|> fieldOutboundPortConnectionParser
 
       fieldValueParser :: Parser (FieldAssignment ParserAnn)
       fieldValueParser = do
@@ -261,7 +275,7 @@ structInitializerParser = do
         _ <- reservedOp "="
         expr <- expressionParser
         FieldValueAssignment identifier expr . Position startPos <$> getPosition
-      
+
       fieldAddressParser :: Parser (FieldAssignment ParserAnn)
       fieldAddressParser = do
         startPos <- getPosition
@@ -269,7 +283,7 @@ structInitializerParser = do
         _ <- reservedOp "@"
         addr <- integerParser
         FieldAddressAssignment identifier addr . Position startPos <$> getPosition
-      
+
       fieldAccessPortConnectionParser :: Parser (FieldAssignment ParserAnn)
       fieldAccessPortConnectionParser = do
         startPos <- getPosition
@@ -277,7 +291,7 @@ structInitializerParser = do
         _ <- reservedOp "<->"
         port <- identifierParser
         FieldPortConnection AccessPortConnection identifier port . Position startPos <$> getPosition
-      
+
       fieldInboundPortConnectionParser :: Parser (FieldAssignment ParserAnn)
       fieldInboundPortConnectionParser = do
         startPos <- getPosition
@@ -450,7 +464,7 @@ expressionParser' = buildPrattParser -- New parser
     ,[binaryInfix "||" LogicalOr Ex.AssocLeft]
     ]
     expressionTermParser
-  where 
+  where
     binaryInfix s f = Ex.Infix (do
           _ <- reservedOp s
           return $ \l r -> BinOp f l r (Position (getStartPosition (getAnnotation l)) (getEndPosition (getAnnotation r))))
@@ -608,7 +622,7 @@ objectParser = objectParser' objectTermParser
     arrayOpPostfix
       = Ex.Postfix (try (do
             _ <- reservedOp "["
-            low <- expressionParser 
+            low <- expressionParser
             _ <- reservedOp ".."
             up <- expressionParser
             _ <- reservedOp "]"
@@ -654,13 +668,13 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
             _ <- reservedOp "]"
             endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArraySlice obj low up (Position (getStartPosition (getAnnotation parent)) endPos))  
+              AccessObject obj -> AccessObject (ArraySlice obj low up (Position (getStartPosition (getAnnotation parent)) endPos))
               _ -> error "Unexpected member access to a non object"
           ) <|> (do
             index <- brackets expressionParser
             endPos <- getPosition
             return $ \parent -> case parent of
-              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position (getStartPosition (getAnnotation parent)) endPos))  
+              AccessObject obj -> AccessObject (ArrayIndexExpression obj index (Position (getStartPosition (getAnnotation parent)) endPos))
               _ -> error "Unexpected member access to a non object"
           ))
     dereferenceMemberAccessPostfix
@@ -690,7 +704,7 @@ accessObjectParser = accessObjectParser' (AccessObject <$> objectTermParser)
       startPos <- getPosition
       _ <- reservedOp "*"
       return (\child -> case child of
-        AccessObject obj -> 
+        AccessObject obj ->
           let endPos = getStartPosition (getAnnotation child) in
           AccessObject (Dereference obj (Position startPos endPos))
         _ -> error "Unexpected member access to a non object"))
@@ -724,19 +738,26 @@ returnStmtParser = do
   _ <- semi
   ReturnStmt ret . Position startPos <$> getPosition
 
+continueStmtParser :: Parser (Statement ParserAnn)
+continueStmtParser = do
+  startPos <- getPosition
+  _ <- reserved "continue"
+  ret <- expressionParser
+  _ <- semi
+  ContinueStmt ret . Position startPos <$> getPosition
+
 functionParser :: Parser (AnnASTElement  ParserAnn)
 functionParser = do
   modifiers <- many modifierParser
-  reserved "function"
   startPos <- getPosition
+  reserved "function"
   name <- identifierParser
   params <- parens (sepBy parameterParser comma)
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
-  endPos <- getPosition
   blockRet <- braces blockParser
-  return $ Function name params typeSpec blockRet modifiers (Position startPos endPos)
+  Function name params typeSpec blockRet modifiers . Position startPos <$> getPosition
 
 constLiteralParser :: Parser Const
 constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
@@ -767,7 +788,7 @@ sizeParser = constValueSizeParser <|> constSizeParser
     constValueSizeParser = do
       ks <- integerParser
       optional (reservedOp ":" >> reserved "usize")
-      return $ K ks 
+      return $ K ks
     constSizeParser = V <$> identifierParser
 
 
@@ -811,6 +832,7 @@ blockItemParser
   <|> try forLoopStmtParser
   <|> try matchStmtParser
   <|> try returnStmtParser
+  <|> try continueStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement ParserAnn)
@@ -1001,8 +1023,8 @@ classFieldDefinitionParser = do
 
 classMethodParser :: Parser (ClassMember ParserAnn)
 classMethodParser = do
-  reserved "method"
   startPos <- getPosition
+  reserved "method"
   name <- identifierParser
   parens (reserved "&mut" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
@@ -1011,8 +1033,8 @@ classMethodParser = do
 
 classActionParser :: Parser (ClassMember ParserAnn)
 classActionParser = do
-  reserved "action"
   startPos <- getPosition
+  reserved "action"
   name <- identifierParser
   param <- parens (reserved "&mut" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
@@ -1021,8 +1043,8 @@ classActionParser = do
 
 classProcedureParser :: Parser (ClassMember ParserAnn)
 classProcedureParser = do
-  reserved "procedure"
   startPos <- getPosition
+  reserved "procedure"
   name <- identifierParser
   params <- parens procedureParamsParser
   blockRet <- braces blockParser
@@ -1034,8 +1056,8 @@ classProcedureParser = do
 
 interfaceProcedureParser :: Parser (InterfaceMember ParserAnn)
 interfaceProcedureParser = do
-  reserved "procedure"
   startPos <- getPosition
+  reserved "procedure"
   name <- identifierParser
   params <- parens procedureParamsParser
   reservedOp ";"
@@ -1047,8 +1069,8 @@ interfaceProcedureParser = do
 
 classViewerParser :: Parser (ClassMember ParserAnn)
 classViewerParser = do
-  reserved "viewer"
   startPos <- getPosition
+  reserved "viewer"
   name <- identifierParser
   params <- parens viewerParamsParser
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
@@ -1062,8 +1084,8 @@ classViewerParser = do
 interfaceDefinitionParser :: Parser (AnnASTElement ParserAnn)
 interfaceDefinitionParser = do
   modifiers <- many modifierParser
-  reserved "interface"
   startPos <- getPosition
+  reserved "interface"
   identifier <- identifierParser
   procedures <- braces (many1 interfaceProcedureParser)
   _ <- semi
@@ -1072,9 +1094,9 @@ interfaceDefinitionParser = do
 classDefinitionParser :: Parser (AnnASTElement ParserAnn)
 classDefinitionParser = do
   modifiers <- many modifierParser
+  startPos <- getPosition
   classKind <- classKindParser
   reserved "class"
-  startPos <- getPosition
   identifier <- identifierParser
   provides <- option [] (reserved "provides" >> sepBy identifierParser comma)
   fields <-
@@ -1100,8 +1122,8 @@ variantDefinitionParser = identifierParser >>= \identifier ->
 enumDefinitionParser :: Parser (AnnASTElement ParserAnn)
 enumDefinitionParser = do
   modifiers <- many modifierParser
-  reserved "enum"
   startPos <- getPosition
+  reserved "enum"
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
   _ <- semi
@@ -1128,7 +1150,7 @@ singleModule = do
 
 moduleInclusionParser :: Parser Module
 moduleInclusionParser = do
-  reserved "import" 
+  reserved "import"
   (m, ident) <- singleModule
   _ <- semi
   return $ ModInclusion ident m

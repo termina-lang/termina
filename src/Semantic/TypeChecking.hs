@@ -1346,7 +1346,11 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
-    return (SAST.Class kind ident (fls ++ fnChecked) provides mds)
+    -- | Return the class with the methods, procedures, viewers and actions
+    -- checked. The methods, procedures, viewers and actions are reverse-sorted
+    -- to math the order of the topological sort (they are inserted in reverse
+    -- order).
+    return (SAST.Class kind ident (fls ++ reverse fnChecked) provides mds)
 
 ----------------------------------------
 -- Field definition helpers.

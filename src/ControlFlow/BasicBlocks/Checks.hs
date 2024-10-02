@@ -62,7 +62,7 @@ checkActionPaths loc stmts = do
             case stmts of
                 -- | If the block list is empty and it must exit, then a return
                 -- statement is missing.
-                [] -> throwError $ annotateError loc BBBlockShallExit
+                [] -> throwError $ annotateError loc BBActionShallExit
                 (x : xb) ->
                     case x of
                         ReturnBlock {} ->
@@ -73,7 +73,7 @@ checkActionPaths loc stmts = do
                             setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) ann) ->
                             if not (doesBlockExit blk) then
-                                throwError $ annotateError (location ann) BBIfBlockShallExit
+                                throwError $ annotateError (location ann) BBActionIfBlockShallExit
                             else do
                                 stateIfBlock <- localScope (checkActionPaths loc (reverse ifBlocks))
                                 stateElseIfs <- foldM
@@ -84,10 +84,10 @@ checkActionPaths loc stmts = do
                                 put (max elseBlockState stateElseIfs)
                                 checkActionPaths loc xb
                         IfElseBlock _ _ _ _ ann ->
-                            throwError $ annotateError (location ann) BBBlockIfBlockMissingElseExit
+                            throwError $ annotateError (location ann) BBActionIfBlockMissingElseExit
                         blk@(MatchBlock _ cases ann) ->
                             if not (doesBlockExit blk) then
-                                throwError $ annotateError (location ann) BBMatchBlockShallExit
+                                throwError $ annotateError (location ann) BBActionMatchBlockShallExit
                             else do
                                 matchCaseState <- foldM
                                     (\prevState (MatchCase _ _ blocks ann') -> do
@@ -95,7 +95,7 @@ checkActionPaths loc stmts = do
                                         return (max matchCaseState prevState)) step cases
                                 put matchCaseState
                                 checkActionPaths loc xb
-                        _ -> throwError $ annotateError loc BBBlockShallExit
+                        _ -> throwError $ annotateError loc BBActionShallExit
         -- | If we are here, it means that we may exit the block or send messages BUT there
         -- must be a path that does not exit the block
         BBPartialExit ->
@@ -104,13 +104,13 @@ checkActionPaths loc stmts = do
                 (x : xb) ->
                     case x of
                         ReturnBlock _ ann -> throwError $ annotateError (location ann) BBInvalidReturn
-                        ContinueBlock _ ann -> throwError $ annotateError (location ann) BBInvalidContinue
+                        ContinueBlock _ ann -> throwError $ annotateError (location ann) BBActionInvalidContinue
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
                             if doesBlockExit blk then
-                                throwError $ annotateError loc BBIfBlockShallNotExit
+                                throwError $ annotateError loc BBActionIfBlockShallNotExit
                             else do
                                 stateIfBlock <- localScope (setAllowedContinue >> checkActionPaths loc (reverse ifBlocks))
                                 stateElseIfs <- foldM
@@ -125,7 +125,7 @@ checkActionPaths loc stmts = do
                             checkActionPaths loc xb
                         blk@(MatchBlock _ cases _) ->
                             if doesBlockExit blk then
-                                throwError $ annotateError loc BBMatchBlockShallNotExit
+                                throwError $ annotateError loc BBActionMatchBlockShallNotExit
                             else do
                                 matchCaseState <- foldM
                                     (\prevState (MatchCase _ _ blocks ann) -> do
@@ -176,7 +176,7 @@ checkActionPaths loc stmts = do
                 (x : xb) ->
                     case x of
                         ReturnBlock _ ann -> throwError $ annotateError (location ann) BBInvalidReturn
-                        ContinueBlock _ ann -> throwError $ annotateError (location ann) BBInvalidContinue
+                        ContinueBlock _ ann -> throwError $ annotateError (location ann) BBActionInvalidContinue
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             checkActionPaths loc xb
@@ -208,8 +208,8 @@ checkActionPaths loc stmts = do
             case stmts of
                 [] -> return step
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (location ann) BBInvalidReturn
-                (SendMessage _ _ ann : _) -> throwError $ annotateError (location ann) BBInvalidSend
-                (ContinueBlock _ ann : _) -> throwError $ annotateError (location ann) BBInvalidContinue
+                (SendMessage _ _ ann : _) -> throwError $ annotateError (location ann) BBActionInvalidSend
+                (ContinueBlock _ ann : _) -> throwError $ annotateError (location ann) BBActionInvalidContinue
                 (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
                     checkActionPaths loc (reverse ifBlocks) >> 
                     mapM_

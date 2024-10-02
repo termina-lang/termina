@@ -5,6 +5,8 @@ import Command.Types
 import System.FilePath
 import System.Exit
 
+import qualified Data.Map.Strict as M
+
 import qualified Parser.AST as PAST
 import Core.AST
 
@@ -16,6 +18,7 @@ import Modules.Modules
 
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
 import ControlFlow.BasicBlocks.Checks
+import qualified ControlFlow.BasicBlocks.Errors.PPrinting as BBErrors
 
 -- | Error message formatter
 -- Prints error messages in the form "error: <message>"
@@ -68,5 +71,7 @@ checkBasicBlocksPaths :: BasicBlocksModule -> IO ()
 checkBasicBlocksPaths bbModule = do
     let result = runCheckBBPaths . basicBlocksAST . metadata $ bbModule
     case result of
-        Left err -> die . errorMessage $ show err
+        Left err -> 
+            let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
+            BBErrors.ppError sourceFilesMap err >> exitFailure
         Right _ -> return ()
