@@ -23,7 +23,7 @@ import Utils.Errors
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
 ppError :: M.Map FilePath TL.Text ->
     SemanticErrors -> IO ()
-ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
+ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
   let fileName = sourceName start
       sourceLines = toModuleAST M.! fileName
   in
@@ -131,8 +131,25 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                 sourceLines title fileName pos
                 (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
                        "A resource class must provide at least one interface."))
-    EResourceClassAction (classId, Position posClass _endPosClass) ident ->
+    EResourceClassAction (classId, Position startPosClass endPosClass) ident ->
         let title = "\x1b[31merror [E014]\x1b[0m: resource class defines an action."
+            actionStartLine = sourceLine start
+            actionEndLine = sourceLine end
+            actionStartColumn = sourceColumn start
+            actionEndColumn = 
+                if actionStartLine == actionEndLine then 
+                    sourceColumn end 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (actionStartLine - 1)) + 1
+            classStartLine = sourceLine startPosClass
+            classEndLine = sourceLine endPosClass
+            classStartColumn = sourceColumn startPosClass
+            classEndColumn = 
+                if classStartLine == classEndLine then 
+                    sourceColumn endPosClass 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (classStartLine - 1)) + 1
+
         in
             TLIO.putStrLn $ prettyErrors
                 sourceLines
@@ -142,13 +159,13 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                         [
                             Errata.Block
                                 fancyRedStyle
-                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                (sourceName start, classStartLine, classStartColumn)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass)
-                                            (sourceColumn posClass + length classId)
+                                    Pointer classStartLine classStartColumn
+                                            classEndColumn
                                             True Nothing fancyRedPointer,
-                                    Pointer (sourceLine start) (sourceColumn start) (sourceColumn start + length ident)
+                                    Pointer actionStartLine actionStartColumn actionEndColumn
                                             True (Just " \x1b[31minvalid action definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
@@ -157,8 +174,25 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define actions."))
                 ]
-    EResourceClassInPort (classId, Position posClass _endPosClass) ident ->
+    EResourceClassInPort (classId, Position startPosClass endPosClass) ident ->
         let title = "\x1b[31merror [E015]\x1b[0m: resource class defines an in port."
+            portStartLine = sourceLine start
+            portEndLine = sourceLine end
+            portStartColumn = sourceColumn start
+            portEndColumn = 
+                if portStartLine == portEndLine then 
+                    sourceColumn end 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (portStartLine - 1)) + 1
+            classStartLine = sourceLine startPosClass
+            classEndLine = sourceLine endPosClass
+            classStartColumn = sourceColumn startPosClass
+            classEndColumn = 
+                if classStartLine == classEndLine then 
+                    sourceColumn endPosClass 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (classStartLine - 1)) + 1
+
         in
             TLIO.putStrLn $ prettyErrors
                 sourceLines
@@ -168,13 +202,13 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                         [
                             Errata.Block
                                 fancyRedStyle
-                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                (sourceName start, classStartLine, classStartColumn)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass)
-                                            (sourceColumn posClass + length classId)
+                                    Pointer classStartLine classStartColumn
+                                            classEndColumn
                                             True Nothing fancyRedPointer,
-                                    Pointer (sourceLine start) (sourceColumn start) (sourceColumn start + length ident)
+                                    Pointer portStartLine portStartColumn portEndColumn
                                             True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing
@@ -183,8 +217,25 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                             ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                             <> "Resource classes cannot define in ports."))
                 ]
-    EResourceClassOutPort (classId, Position posClass _endPosClass) ident ->
+    EResourceClassOutPort (classId, Position startPosClass endPosClass) ident ->
         let title = "\x1b[31merror [E016]\x1b[0m: resource class defines an out port."
+            portStartLine = sourceLine start
+            portEndLine = sourceLine end
+            portStartColumn = sourceColumn start
+            portEndColumn = 
+                if portStartLine == portEndLine then 
+                    sourceColumn end 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (portStartLine - 1)) + 1
+            classStartLine = sourceLine startPosClass
+            classEndLine = sourceLine endPosClass
+            classStartColumn = sourceColumn startPosClass
+            classEndColumn = 
+                if classStartLine == classEndLine then 
+                    sourceColumn endPosClass 
+                else 
+                    fromIntegral $ TL.length (TL.lines sourceLines !! (classStartLine - 1)) + 1
+
         in
             TLIO.putStrLn $ prettyErrors
                 sourceLines
@@ -194,13 +245,13 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _)) =
                         [
                             Errata.Block
                                 fancyRedStyle
-                                (sourceName posClass, sourceLine posClass, sourceColumn posClass)
+                                (sourceName start, classStartLine, classStartColumn)
                                 Nothing
                                 [
-                                    Pointer (sourceLine posClass) (sourceColumn posClass)
-                                            (sourceColumn posClass + length classId)
+                                    Pointer classStartLine classStartColumn
+                                            classEndColumn
                                             True Nothing fancyRedPointer,
-                                    Pointer (sourceLine start) (sourceColumn start) (sourceColumn start + length ident)
+                                    Pointer portStartLine portStartColumn portEndColumn
                                             True (Just " \x1b[31minvalid port definition\x1b[0m") fancyRedPointer
                                 ]
                                 Nothing

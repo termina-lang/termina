@@ -574,7 +574,7 @@ objectTermParser :: Parser (Object ParserAnn)
 objectTermParser = (do
     startPos <- getPosition
     ident <- identifierParser
-    Variable ident . Position startPos <$> getPosition)
+    return $ Variable ident (Position startPos (incSourceColumn startPos (length ident))))
   <|> parensObjectParser
 
 -- Expression parser
@@ -735,16 +735,18 @@ returnStmtParser = do
   startPos <- getPosition
   _ <- reserved "return"
   ret <- optionMaybe expressionParser
+  endPos <- getPosition
   _ <- semi
-  ReturnStmt ret . Position startPos <$> getPosition
+  return $ ReturnStmt ret (Position startPos endPos)
 
 continueStmtParser :: Parser (Statement ParserAnn)
 continueStmtParser = do
   startPos <- getPosition
   _ <- reserved "continue"
   ret <- expressionParser
+  endPos <- getPosition
   _ <- semi
-  ContinueStmt ret . Position startPos <$> getPosition
+  return $ ContinueStmt ret (Position startPos endPos)
 
 functionParser :: Parser (AnnASTElement  ParserAnn)
 functionParser = do
@@ -801,8 +803,9 @@ mutableObjDeclarationParser = do
   ty <- typeSpecifierParser
   _ <- reservedOp "="
   initializer <-  expressionParser
+  endPos <- getPosition
   _ <- semi
-  Declaration name Mutable ty initializer . Position startPos <$> getPosition
+  return $ Declaration name Mutable ty initializer (Position startPos endPos)
 
 immutableObjDeclarationParser :: Parser (Statement ParserAnn)
 immutableObjDeclarationParser = do
@@ -813,15 +816,17 @@ immutableObjDeclarationParser = do
   ty <- typeSpecifierParser
   _ <- reservedOp "="
   initializer <-  expressionParser
+  endPos <- getPosition
   _ <- semi
-  Declaration name Immutable ty initializer . Position startPos <$> getPosition
+  return $ Declaration name Immutable ty initializer (Position startPos endPos)
 
 singleExprStmtParser :: Parser (Statement ParserAnn)
 singleExprStmtParser = do
   startPos <- getPosition
   expression <- expressionParser
+  endPos <- getPosition
   _ <- semi
-  SingleExpStmt expression . Position startPos <$> getPosition
+  return $ SingleExpStmt expression (Position startPos endPos)
 
 blockItemParser :: Parser (Statement ParserAnn)
 blockItemParser
@@ -841,8 +846,9 @@ assignmentStmtPaser = do
   lval <- objectParser
   _ <- reservedOp "="
   rval <- expressionParser
+  endPos <- getPosition
   _ <- semi
-  AssignmentStmt lval rval . Position startPos <$> getPosition
+  return $ AssignmentStmt lval rval (Position startPos endPos)
 
 matchCaseParser :: Parser (MatchCase ParserAnn)
 matchCaseParser = do
@@ -912,8 +918,9 @@ taskDeclParser = do
   initializer <- optionMaybe (do
     reservedOp "="
     expressionParser)
+  endPos <- getPosition
   _ <- semi
-  Task identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Task identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 emitterDeclParser :: Parser (Global ParserAnn)
 emitterDeclParser = do
@@ -926,8 +933,9 @@ emitterDeclParser = do
   initializer <- optionMaybe (do
     reservedOp "="
     expressionParser)
+  endPos <- getPosition
   _ <- semi
-  Emitter identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Emitter identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 channelDeclParser :: Parser (Global ParserAnn)
 channelDeclParser = do
@@ -940,8 +948,9 @@ channelDeclParser = do
   initializer <- optionMaybe (do
     reservedOp "="
     expressionParser)
+  endPos <- getPosition
   _ <- semi
-  Channel identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Channel identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 resourceDeclParser :: Parser (Global ParserAnn)
 resourceDeclParser = do
@@ -954,8 +963,9 @@ resourceDeclParser = do
   initializer <- optionMaybe (do
     reservedOp "="
     expressionParser)
+  endPos <- getPosition
   _ <- semi
-  Resource identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Resource identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 handlerDeclParser :: Parser (Global ParserAnn)
 handlerDeclParser = do
@@ -968,8 +978,9 @@ handlerDeclParser = do
   initializer <- optionMaybe (do
     reservedOp "="
     expressionParser)
+  endPos <- getPosition
   _ <- semi
-  Handler identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Handler identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 constDeclParser :: Parser (Global ParserAnn)
 constDeclParser = do
@@ -981,8 +992,9 @@ constDeclParser = do
   typeSpecifier <- typeSpecifierParser
   _ <- reservedOp "="
   initializer <- expressionParser
+  endPos <- getPosition
   _ <- semi
-  Const identifier typeSpecifier initializer modifiers . Position startPos <$> getPosition
+  return $ Const identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
 globalDeclParser :: Parser (AnnASTElement  ParserAnn)
 globalDeclParser = do
@@ -1012,14 +1024,19 @@ structDefinitionParser = do
   startPos <- getPosition
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
+  endPos <- getPosition
   _ <- semi
-  TypeDefinition (Struct identifier fields modifiers) . Position startPos <$> getPosition
+  return $ TypeDefinition (Struct identifier fields modifiers) (Position startPos endPos)
 
 classFieldDefinitionParser :: Parser (ClassMember ParserAnn)
 classFieldDefinitionParser = do
   startPos <- getPosition
-  field <- fieldDefinitionParser
-  ClassField field . Position startPos <$> getPosition
+  identifier <- identifierParser
+  _ <- reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  endPos <- getPosition
+  _ <- semi
+  return $ ClassField (FieldDefinition identifier typeSpecifier) (Position startPos endPos)
 
 classMethodParser :: Parser (ClassMember ParserAnn)
 classMethodParser = do
@@ -1088,8 +1105,9 @@ interfaceDefinitionParser = do
   reserved "interface"
   identifier <- identifierParser
   procedures <- braces (many1 interfaceProcedureParser)
+  endPos <- getPosition
   _ <- semi
-  TypeDefinition (Interface identifier procedures modifiers) . Position startPos <$> getPosition
+  return $ TypeDefinition (Interface identifier procedures modifiers) (Position startPos endPos)
 
 classDefinitionParser :: Parser (AnnASTElement ParserAnn)
 classDefinitionParser = do
@@ -1105,8 +1123,9 @@ classDefinitionParser = do
       <|> classProcedureParser
       <|> classActionParser
       <|> classFieldDefinitionParser)
+  endPos <- getPosition
   _ <- semi
-  TypeDefinition (Class classKind identifier fields provides modifiers) . Position startPos <$> getPosition
+  return $ TypeDefinition (Class classKind identifier fields provides modifiers) (Position startPos endPos)
   where
     classKindParser :: Parser ClassKind
     classKindParser =
@@ -1126,8 +1145,9 @@ enumDefinitionParser = do
   reserved "enum"
   identifier <- identifierParser
   variants <- braces (sepBy1 (try variantDefinitionParser) comma)
+  endPos <- getPosition
   _ <- semi
-  TypeDefinition (Enum identifier variants modifiers) . Position startPos <$> getPosition
+  return $ TypeDefinition (Enum identifier variants modifiers) (Position startPos endPos)
 
 -- | Top Level parser
 topLevel :: Parser (AnnotatedProgram ParserAnn)
