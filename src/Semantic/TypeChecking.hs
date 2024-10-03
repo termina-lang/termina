@@ -712,7 +712,7 @@ checkFieldValue
 checkFieldValue loc typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
-    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeExpression (Just fty) typeObj faexp
+    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
@@ -1019,7 +1019,7 @@ typeGlobal (Task ident ty mexpr mods anns) = do
   checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
+              Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Task ident ty exprty mods (buildGlobalAnn anns (STask ty)))
@@ -1027,7 +1027,7 @@ typeGlobal (Handler ident ty mexpr mods anns) = do
   checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
+              Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Handler ident ty exprty mods (buildGlobalAnn anns (SHandler ty)))
@@ -1035,7 +1035,7 @@ typeGlobal (Resource ident ty mexpr mods anns) = do
   checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
+              Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Resource ident ty exprty mods (buildGlobalAnn anns (SResource ty)))
@@ -1043,7 +1043,7 @@ typeGlobal (Emitter ident ty mexpr mods anns) = do
   checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
+              Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   glb <- case ty of
@@ -1057,7 +1057,7 @@ typeGlobal (Channel ident ty mexpr mods anns) = do
   checkTerminaType anns ty
   exprty <- case mexpr of
               -- If it has an initial value great
-              Just expr -> Just <$> typeExpression (Just ty) typeGlobalObject expr
+              Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
               -- If it has not, we need to check for defaults.
               Nothing   -> return Nothing
   return (SAST.Channel ident ty exprty mods (buildGlobalAnn anns (SChannel ty)))

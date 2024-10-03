@@ -17,8 +17,8 @@ import ControlFlow.BasicBlocks
 import Modules.Modules
 
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
-import ControlFlow.BasicBlocks.Checks
-import qualified ControlFlow.BasicBlocks.Errors.PPrinting as BBErrors
+import ControlFlow.BasicBlocks.Checks.ExitPaths
+import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
 
 -- | Error message formatter
 -- Prints error messages in the form "error: <message>"
@@ -69,9 +69,9 @@ genBasicBlocksModule typedModule = do
 
 checkBasicBlocksPaths :: BasicBlocksModule -> IO ()
 checkBasicBlocksPaths bbModule = do
-    let result = runCheckBBPaths . basicBlocksAST . metadata $ bbModule
+    let result = runCheckExitPaths . basicBlocksAST . metadata $ bbModule
     case result of
         Left err -> 
             let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
-            BBErrors.ppError sourceFilesMap err >> exitFailure
+            EPErrors.ppError sourceFilesMap err >> exitFailure
         Right _ -> return ()

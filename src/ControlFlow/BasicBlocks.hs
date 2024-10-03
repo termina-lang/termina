@@ -14,7 +14,7 @@ import ControlFlow.BasicBlocks.Types
 import Semantic.Types
 import Control.Monad.Except
 import ControlFlow.BasicBlocks.Utils
-import ControlFlow.BasicBlocks.Errors.Errors
+import ControlFlow.BasicBlocks.Errors
 
 -- | This function appends a statement to a regular block.  If the statement is
 -- a declaration or an assignment, or a regular single expression statement, it
