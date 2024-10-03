@@ -260,7 +260,7 @@ useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
       case input_obj_type of
         (_, BoxSubtype _) -> withLocation (location ann) (useBoxVar var)
         _ -> useObject input_obj
-    _ -> withLocation (location ann) (throwError ImpossibleErrorBadSendArg)
+    _ -> useExpression arg
 useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
   case arg of
     -- I don't think we can have expression computing variables here.

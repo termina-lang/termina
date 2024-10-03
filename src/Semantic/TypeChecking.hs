@@ -87,7 +87,7 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
     Reference ref_ak (Array ty_elems _vexp) -> do
         idx_typed  <- typeExpression (Just USize) typeRHSObject idx
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
-    ty -> throwError $ annotateError ann (EArray ty)
+    ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
   -- This is a temporary solution pending confirmation that it works in all cases. 
@@ -242,9 +242,6 @@ typeMemberFunctionCall ann obj_ty ident args =
             [elemnt] -> do
               -- Type the first argument element
               typed_element <- typeExpression (Just ty) typeRHSObject elemnt
-              case typed_element of
-                (SAST.AccessObject (SAST.Variable {})) -> return ()
-                _ -> throwError $ annotateError ann EMsgQueueSendArgNotObject
               return (([ty] , [typed_element]), Unit)
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
         _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
@@ -281,6 +278,94 @@ evalConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
   checkEqTypesOrError ann expected_ty ty
   return value
 evalConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
+
+typeAssignmentExpression :: 
+  TerminaType ->
+  (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn)) ->
+  Expression ParserAnn ->
+  SemanticMonad (SAST.Expression SemanticAnn)
+----------------------------------------
+-- | Struct Initializer
+typeAssignmentExpression ty@(DefinedType id_ty) typeObj (StructInitializer fs mty pann) = do
+  -- | Check field type
+  case mty of
+    (Just id_ty') -> do
+      struct_ty <-
+        catchError
+          (getGlobalTypeDef pann id_ty')
+          (\_ -> throwError $ annotateError pann (EStructInitializerUnknownType id_ty))
+      catchMismatch pann (EStructInitializerTypeMismatch ty) (checkEqTypesOrError pann ty (DefinedType id_ty'))
+      return struct_ty
+    Nothing -> getGlobalTypeDef pann id_ty
+  >>= \case{
+    Struct _ ty_fs _mods  ->
+      SAST.StructInitializer
+        <$> checkFieldValues pann typeObj ty_fs fs
+        <*> pure (Just id_ty)
+        <*> pure (buildExpAnn pann (DefinedType id_ty));
+    Class _clsKind _ident members _provides _mods ->
+      let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
+        SAST.StructInitializer
+        <$> checkFieldValues pann typeObj fields fs
+        <*> pure (Just id_ty)
+        <*> pure (buildExpAnn pann (DefinedType id_ty));
+    x -> throwError $ annotateError pann (EStructInitializerGlobalNotStruct (fmap forgetSemAnn x));
+  }
+-- We shall always expect a type for the struct initializer. If we do not expect a type
+-- it means that we are using the expression in the wild.
+typeAssignmentExpression ty _ (StructInitializer _fs _mty pann) =
+  throwError $ annotateError pann (EStructInitializerExpectedTypeNotStruct ty)
+typeAssignmentExpression expectedType typeObj (EnumVariantInitializer id_ty variant args pann) =
+  -- | Enum Variant
+  getEnumTy pann id_ty
+  >>= \case {
+    (Enum enumId ty_vs _mods, loc) ->
+      case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
+        Nothing -> throwError $ annotateError pann (EEnumVariantNotFound enumId variant)
+        Just (EnumVariant _ ps) ->
+          let (psLen , asLen ) = (length ps, length args) in
+          if psLen == asLen
+          then
+             checkEqTypesOrError pann (DefinedType id_ty) expectedType >>
+             flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (DefinedType id_ty))
+              <$> zipWithM (\(ty, position) e -> 
+                catchMismatch pann (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty)) (typeExpression (Just ty) typeObj e)) (zip ps [0 :: Integer ..]) args
+          else if psLen < asLen
+          then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
+          else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
+     ;
+    _ -> throwError $ annotateError Internal (ENoEnumFound id_ty)
+  }
+-- IDEA Q4
+typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
+-- | Array Initialization
+  case expectedType of
+    Array ts arrsize -> do
+      typed_init <- typeAssignmentExpression ts typeObj iexp
+      unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
+      return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (Array ts size))
+    ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
+typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
+  case expectedType of
+    Array ts arrsize -> do
+      typed_exprs <- mapM (\e ->
+        catchMismatch (getAnnotation e)
+          (EArrayExprListInitializerExprTypeMismatch ts) (typeExpression (Just ts) typeObj e)) exprs
+      size_value <- getIntSize pann arrsize
+      unless (length typed_exprs == fromIntegral size_value)
+        (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
+      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (Array ts arrsize))
+    ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
+typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
+  case expectedType of
+    Option ts -> do
+      case vexp of
+        None -> return $ SAST.OptionVariantInitializer None (buildExpAnn anns (Option ts))
+        Some e -> do
+          typed_e <- typeExpression (Just ts) typeObj e
+          return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (Option ts))
+    _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
+typeAssignmentExpression expectedType typeObj expr = typeExpression (Just expectedType) typeObj expr
 
 -- | Function |typeExpression| takes an expression from the parser, traverse it
 -- annotating each node with its type.
@@ -496,7 +581,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
 typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
   case rhs_e of
-    ArraySlice obj lower upper anns -> do
+    ArraySlice obj lower upper _anns -> do
       typed_obj <- typeObj obj
       (obj_ak, obj_ty) <- getObjectType typed_obj
       typed_lower <- typeExpression (Just USize) typeRHSObject lower
@@ -510,7 +595,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
               return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann rtype))
             Just ety -> throwError $ annotateError pann $ EMismatch (Reference refKind ty) ety
             _ -> throwError $ annotateError pann ESliceInvalidUse
-        ty -> throwError $ annotateError anns (EArray ty) --}
+        _ -> throwError $ annotateError Internal EMalformedSlice
     _ -> do
       -- | Type object
       typed_obj <- typeObj rhs_e
@@ -537,6 +622,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
     checkReferenceAccessKind obj_ak =
       case (obj_ak, refKind) of
         (Immutable, Mutable) -> throwError $ annotateError pann EMutableReferenceToImmutable
+        (Private, Mutable) -> throwError $ annotateError pann EMutableReferenceToPrivate
         _ -> return ()
 
 ---------------------------------------
@@ -573,97 +659,6 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       maybe (return ()) (checkEqTypesOrError ann fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
-----------------------------------------
--- | Struct Initializer
-typeExpression (Just ty@(DefinedType id_ty)) typeObj (StructInitializer fs mty pann) = do
-  -- | Check field type
-  case mty of
-    (Just id_ty') -> do
-      struct_ty <-
-        catchError
-          (getGlobalTypeDef pann id_ty')
-          (\_ -> throwError $ annotateError pann (EStructInitializerUnknownType id_ty))
-      catchMismatch pann (EStructInitializerTypeMismatch ty) (checkEqTypesOrError pann ty (DefinedType id_ty'))
-      return struct_ty
-    Nothing ->
-      catchError
-        (getGlobalTypeDef pann id_ty)
-        -- | Internal error. This should not happen, since we must have checked the
-        -- expected type before calling this function. 
-        (\_ -> throwError $ annotateError Internal (ENoStructFound id_ty))
-  >>= \case{
-    Struct _ ty_fs _mods  ->
-      SAST.StructInitializer
-        <$> checkFieldValues pann typeObj ty_fs fs
-        <*> pure (Just id_ty)
-        <*> pure (buildExpAnn pann (DefinedType id_ty));
-    Class _clsKind _ident members _provides _mods ->
-      let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
-        SAST.StructInitializer
-        <$> checkFieldValues pann typeObj fields fs
-        <*> pure (Just id_ty)
-        <*> pure (buildExpAnn pann (DefinedType id_ty));
-    x -> throwError $ annotateError pann (EStructInitializerGlobalNotStruct (fmap forgetSemAnn x));
-  }
--- We shall always expect a type for the struct initializer. If we do not expect a type
--- it means that we are using the expression in the wild.
-typeExpression (Just ty) _ (StructInitializer _fs _mty pann) =
-  throwError $ annotateError pann (EStructInitializerExpectedTypeNotStruct ty)
-typeExpression _ _ (StructInitializer _fs _mty pann) =
-  throwError $ annotateError pann EStructInitializerInvalidUse
-typeExpression expectedType typeObj (EnumVariantInitializer id_ty variant args pann) =
-  -- | Enum Variant
-  catchError
-    (getGlobalTypeDef pann id_ty)
-    (\_ -> throwError $ annotateError pann (ETyNotEnumFound id_ty))
-  >>= \case{
-   Enum _ ty_vs _mods ->
-     case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
-       Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant)
-       Just (EnumVariant _ ps) ->
-         let (psLen , asLen ) = (length ps, length args) in
-         if psLen == asLen
-         then
-            maybe (return ()) (checkEqTypesOrError pann (DefinedType id_ty)) expectedType >>
-            flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (DefinedType id_ty))
-             <$> zipWithM (\p e -> typeExpression (Just p) typeObj e) ps args
-         else if psLen < asLen
-         then throwError $ annotateError pann EEnumVariantExtraParams
-         else throwError $ annotateError pann EEnumVariantMissingParams
-    ;
-   x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
-  }
--- IDEA Q4
-typeExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
--- | Array Initialization
-  case expectedType of
-    Just (Array ts arrsize) -> do
-      typed_init <- typeExpression (Just ts) typeObj iexp
-      unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
-      return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (Array ts size))
-    Just ts -> throwError $ annotateError pann (EArray ts)
-    _ -> throwError $ annotateError pann EArrayIntitalizerInvalidUse
-typeExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
-  case expectedType of
-    Just (Array ts arrsize) -> do
-      typed_exprs <- mapM (\e ->
-        catchMismatch (getAnnotation e)
-          (EArrayExprListInitializerExprTypeMismatch ts) (typeExpression (Just ts) typeObj e)) exprs
-      size_value <- getIntSize pann arrsize
-      unless (length typed_exprs == fromIntegral size_value)
-        (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
-      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (Array ts arrsize))
-    Just ts -> throwError $ annotateError pann (EArray ts)
-    _ -> throwError $ annotateError pann EArrayExprListIntitalizerInvalidUse
-typeExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
-  case expectedType of
-    Just (Option ts) -> do
-      case vexp of
-        None -> return $ SAST.OptionVariantInitializer None (buildExpAnn anns (Option ts))
-        Some e -> do
-          typed_e <- typeExpression (Just ts) typeObj e
-          return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (Option ts))
-    _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
@@ -679,7 +674,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
           Just (EnumVariant {}) -> do
             maybe (return ()) (checkEqTypesOrError pann Bool) expectedType
             return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann Bool)
-          Nothing -> throwError $ annotateError pann (EEnumVariantNotFound variant_id)
+          Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
       else throwError $ annotateError pann (EIsVariantEnumMismatch lhs_enum id_ty)
     x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
 typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pann) = do
@@ -690,6 +685,11 @@ typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pa
       maybe (return ()) (checkEqTypesOrError pann Bool) expectedType
       return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann Bool)
     _ -> throwError $ annotateError pann (EIsVariantNotOption obj_ty)
+typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
+typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann EArrayInitializerInvalidUse
+typeExpression _ _ (ArrayExprListInitializer _ pann) = throwError $ annotateError pann EArrayExprListInitializerInvalidUse
+typeExpression _ _ (OptionVariantInitializer _ pann) = throwError $ annotateError pann EOptionVariantInitializerInvalidUse
+typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateError pann EEnumVariantInitializerInvalidUse
 
 -- Zipping list of same length
 zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
@@ -816,20 +816,6 @@ checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas [
     checkSortedFields (d:ds) (a:as) acc =
       checkFieldValue loc typeObj d a >>= checkSortedFields ds as . (:acc)
 
-{--
-retStmt :: Maybe TerminaType -> ReturnStmt ParserAnn -> SemanticMonad (SAST.ReturnStmt SemanticAnn)
-retStmt Nothing (ReturnStmt Nothing anns) = do
-  return $ SAST.ReturnStmt Nothing (buildExpAnn anns Unit)
-retStmt (Just ts) (ReturnStmt (Just e) anns) = do
-  typed_e <- typeExpression (Just ts) typeRHSObject e
-  -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExpType ety
-  return $ ReturnStmt (Just typed_e) (buildExpAnn anns ts)
-retStmt (Just ty) (ReturnStmt Nothing anns) = throwError $ annotateError anns $ EReturnValueExpected ty
-retStmt Nothing (ReturnStmt _ anns) = throwError $ annotateError anns EReturnValueNotUnit
-
--- typeBlockRet :: Maybe TerminaType -> BlockRet ParserAnn -> SemanticMonad (SAST.BlockRet SemanticAnn)
--- typeBlockRet ts (BlockRet bbody rete) = SAST.BlockRet <$> typeBlock bbody <*> retStmt ts rete
---}
 typeBlock :: Maybe TerminaType -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock rTy (Block stmts) = SAST.Block <$> mapM (typeStatement rTy) stmts
 
@@ -841,14 +827,15 @@ typeStatement _retTy (Declaration lhs_id lhs_ak lhs_type expr anns) =
   -- Check type is alright
   checkTerminaType anns lhs_type >>
   -- Expression and type must match
-  typeExpression (Just lhs_type) typeRHSObject expr >>= mustBeTy lhs_type >>=
+  typeAssignmentExpression lhs_type typeRHSObject expr >>= mustBeTy lhs_type >>=
     \ety ->
   -- Insert object in the corresponding environment
   -- If the object is mutable, then we insert it in the local mutable environment
   -- otherwise we insert it in the read-only environment
     (case lhs_ak of
       Mutable -> insertLocalMutObj anns lhs_id lhs_type
-      Immutable -> insertLocalImmutObj anns lhs_id lhs_type) >>
+      Immutable -> insertLocalImmutObj anns lhs_id lhs_type
+      Private -> throwError $ annotateError Internal (EInvalidObjectDeclaration lhs_id)) >>
   -- Return annotated declaration
   return (SAST.Declaration lhs_id lhs_ak lhs_type ety (buildStmtAnn anns))
 typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
@@ -858,7 +845,7 @@ typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
   let (lhs_o_typed, lhs_o_ak, lhs_o_type) =
         maybe (lhs_o_typed', lhs_o_ak', lhs_o_type') (unBox lhs_o_typed', Mutable, ) (isBox lhs_o_type')
   unless (lhs_o_ak /= Immutable) (throwError $ annotateError anns EAssignmentToImmutable)
-  rhs_expr_typed' <- typeExpression (Just lhs_o_type) typeRHSObject rhs_expr
+  rhs_expr_typed' <- typeAssignmentExpression lhs_o_type typeRHSObject rhs_expr
   type_rhs' <- getExpType rhs_expr_typed'
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unBoxExp rhs_expr_typed') (isBox type_rhs')
   ety <- mustBeTy lhs_o_type rhs_expr_typed
@@ -1208,11 +1195,8 @@ typeTypeDefinition ann (Struct ident fs mds) =
   -- If everything is fine, return same struct
   >> return (Struct ident fs mds)
 typeTypeDefinition ann (Enum ident evs mds) =
-  -- See https://hackmd.io/@termina-lang/SkglB0mq3#Enumeration-definitions
-  -- Check that the enum is not empty
-  when (Prelude.null evs) (throwError $ annotateError ann (EEnumDefEmpty ident))
   -- Check the enum variants are well-defined
-  >> mapM_ (enumDefinitionTy ann) evs
+  mapM_ (enumDefinitionTy ann) evs
   -- Check names are unique
   >> checkUniqueNames ann EEnumDefNotUniqueField (Data.List.map variantIdentifier evs)
   -- If everything is fine, return the same definition.
@@ -1334,7 +1318,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newPrc = SAST.ClassProcedure mIdent mps typed_bret (buildExpAnn mann Unit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann [("self", Reference Mutable (DefinedType ident))] (typeBlock mty mbody)
+              typed_bret <- addLocalImmutObjs mann [("self", Reference Private (DefinedType ident))] (typeBlock mty mbody)
               let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mps mty mbody mann -> do
@@ -1342,7 +1326,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
               let newVw = SAST.ClassViewer mIdent mps mty typed_bret (buildExpAnn mann (fromMaybe Unit mty))
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : [(paramIdentifier p, paramTerminaType p)]) (typeBlock (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : [(paramIdentifier p, paramTerminaType p)]) (typeBlock (Just ty) mbody)
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder

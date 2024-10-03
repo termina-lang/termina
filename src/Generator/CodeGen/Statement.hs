@@ -46,7 +46,7 @@ genOptionInitialization before level cObj expr =
         (OptionVariantInitializer (Some e) ann) -> do
             let exprCAnn = buildGenericAnn ann
             let declStmtAnn = buildStatementAnn ann before
-            
+
             let cSomeVariantFieldObj = CField cObj optionSomeVariant enumFieldType
             fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj optionSomeField e
             let variantsFieldsObj = CField cObj variant enumFieldType
@@ -108,7 +108,7 @@ genArrayInitialization before level cObj expr = do
             cObjArrayItemType <- getCArrayItemType cObjType
             current <- genArrayInitialization before' level' (CIndexOf cObj (CExprConstant (CIntConst (CInteger idx CDecRepr)) (CTSizeT noqual) (buildGenericAnn ann)) cObjArrayItemType) x
             return $ current ++ rest
-        
+
         genArrayInitializationFromExpression :: Integer ->
             CObject ->
             CExpression ->
@@ -298,7 +298,7 @@ genBlocks (AtomicLoad obj arg ann) = do
     let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    case arg of 
+    case arg of
         ReferenceExpression _ refObj _ -> do
             cRefObj <- genObject refObj
             let cRefObjType = getCObjType cRefObj
@@ -320,9 +320,9 @@ genBlocks (AtomicArrayLoad obj idx arg ann) = do
     cObj <- genObject obj
     cIdx <- genExpression idx
     cArg <- genExpression arg
-    case arg of 
+    case arg of
         ReferenceExpression _ refObj _ -> do
-            cIndexedObj <- genIndexOf cObj cIdx 
+            cIndexedObj <- genIndexOf cObj cIdx
             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
             cRefObj <- genObject refObj
             let cRefObjType = getCObjType cRefObj
@@ -341,15 +341,29 @@ genBlocks (AtomicArrayStore obj idx arg ann) = do
     return $ CBlockStmt <$> [CSDo mCall (buildStatementAnn ann True)]
 genBlocks (SendMessage obj arg ann) = do
     let cAnn = buildGenericAnn ann
-    -- Generate the C code for the object
     cObj <- genObject obj
     cArg <- genExpression arg
-    mCall <- genMsgQueueSendCall cObj cArg cAnn
-    return $ CBlockStmt <$> [CSDo mCall (buildStatementAnn ann True)]
+    -- Generate the C code for the object
+    case arg of
+        -- | If the argument is an access object, we can use it directly
+        (AccessObject {}) -> do
+            mCall <- genMsgQueueSendCall cObj cArg cAnn
+            return $ CBlockStmt <$> [CSDo mCall (buildStatementAnn ann True)]
+        -- | If it is not an object, must store it in a temporary variable
+        _ -> do
+            let cArgType = getCExprType cArg
+                cTmpDecl = CDecl (CTypeSpec cArgType) (Just (namefy "msg")) (Just cArg)
+                cTmp = CExprValOf (CVar (namefy "msg") cArgType) cArgType cAnn
+            mCall <- genMsgQueueSendCall cObj cTmp cAnn
+            return $ CBlockStmt <$> [
+                    CSCompound [
+                        CBlockDecl cTmpDecl (buildDeclarationAnn ann False), CBlockStmt $ CSDo mCall (buildStatementAnn ann False)
+                    ] (buildCompoundAnn ann True False)
+                ]
 genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
     cIfBlk <- concat <$> mapM genBlocks ifBlk
-    cElseBlk <- 
+    cElseBlk <-
         (case elseBlk of
             Nothing -> return Nothing
             Just elseBlk' ->
@@ -547,7 +561,7 @@ genStatement :: Statement SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do
     typeObj <- getObjType obj
     cType <- genType noqual typeObj
-    cObj <- genObject obj 
+    cObj <- genObject obj
     case typeObj of
         Array _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
         (Location _) -> do

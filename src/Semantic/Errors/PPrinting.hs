@@ -28,7 +28,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
       sourceLines = toModuleAST M.! fileName
   in
   case e of
-    (EArray ts) -> 
+    (EInvalidArrayIndexing ts) -> 
         let title = "\x1b[31merror [E001]\x1b[0m: invalid array indexing."
         in
             printSimpleError
@@ -404,8 +404,14 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just "You are trying to create a mutable reference to an immutable object.")
+    EMutableReferenceToPrivate ->
+        let title = "\x1b[31merror [E030]\x1b[0m: mutable reference to private object."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "You are trying to create a mutable reference to a private object.")
     EBinOpExpectedTypeLeft op expectedTy actualTy ->
-        let title = "\x1b[31merror [E030]\x1b[0m: Binary operation expected type on the left."
+        let title = "\x1b[31merror [E031]\x1b[0m: Binary operation expected type on the left."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -414,7 +420,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m but the left operand you are providing is of type \x1b[31m" <>
                     showText actualTy <> "\x1b[0m."))
     EBinOpExpectedTypeRight op expectedTy actualTy ->
-        let title = "\x1b[31merror [E031]\x1b[0m: Binary operation expected type on the right."
+        let title = "\x1b[31merror [E032]\x1b[0m: Binary operation expected type on the right."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -423,7 +429,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m but the right operand you are providing is of type \x1b[31m" <>
                     showText actualTy <> "\x1b[0m."))
     EBinOpTypeMismatch op ty_le ty_re ->
-        let title = "\x1b[31merror [E032]\x1b[0m: binary operation type mismatch."
+        let title = "\x1b[31merror [E033]\x1b[0m: binary operation type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -431,7 +437,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m expects operands of the same type but the left one is of type \x1b[31m" <>
                     showText ty_le <> "\x1b[0m and the right one is of type \x1b[31m" <> showText ty_re <> "\x1b[0m."))
     EBinOpExpectedTypeNotBool op ty ->
-        let title = "\x1b[31merror [E033]\x1b[0m: binary operation expected result type not boolean."
+        let title = "\x1b[31merror [E034]\x1b[0m: binary operation expected result type not boolean."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -439,7 +445,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "will result in a value of type \x1b[31m" <> showText Bool <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotBool op ty ->
-        let title = "\x1b[31merror [E034]\x1b[0m: binary operation expected boolean type on the left."
+        let title = "\x1b[31merror [E035]\x1b[0m: binary operation expected boolean type on the left."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -447,7 +453,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
     EBinOpRightTypeNotBool op ty ->
-        let title = "\x1b[31merror [E035]\x1b[0m: binary operation expected boolean type on the right."
+        let title = "\x1b[31merror [E036]\x1b[0m: binary operation expected boolean type on the right."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -455,14 +461,14 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
     EBinOpExpectedTypeNotNum op ty ->
-        let title = "\x1b[31merror [E036]\x1b[0m: binary operation expected result type not numeric."
+        let title = "\x1b[31merror [E037]\x1b[0m: binary operation expected result type not numeric."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m will result in a numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotNum op ty ->
-        let title = "\x1b[31merror [E037]\x1b[0m: binary operation expected numeric type on the left."
+        let title = "\x1b[31merror [E038]\x1b[0m: binary operation expected numeric type on the left."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -470,7 +476,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of numeric type."))
     EBinOpRightTypeNotNum op ty ->
-        let title = "\x1b[31merror [E038]\x1b[0m: binary operation expected numeric type on the right."
+        let title = "\x1b[31merror [E039]\x1b[0m: binary operation expected numeric type on the right."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -478,7 +484,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of numeric type."))
     EBinOpRightTypeNotPos op ty ->
-        let title = "\x1b[31merror [E039]\x1b[0m: binary operation expected positive numeric type on the right."
+        let title = "\x1b[31merror [E040]\x1b[0m: binary operation expected positive numeric type on the right."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -486,7 +492,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of positive numeric type."))
     EBinOpLeftTypeNotEquatable op ty ->
-        let title = "\x1b[31merror [E040]\x1b[0m: binary operation expected equatable type on the left."
+        let title = "\x1b[31merror [E041]\x1b[0m: binary operation expected equatable type on the left."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -494,7 +500,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of equatable type."))
     EBinOpRightTypeNotEquatable op ty ->
-        let title = "\x1b[31merror [E041]\x1b[0m: binary operation expected equatable type on the right."
+        let title = "\x1b[31merror [E042]\x1b[0m: binary operation expected equatable type on the right."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -502,73 +508,73 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of equatable type."))
     EAtomicAccessInvalidType ty ->
-        let title = "\x1b[31merror [E042]\x1b[0m: invalid type for the atomic access interface."
+        let title = "\x1b[31merror [E043]\x1b[0m: invalid type for the atomic access interface."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic access."))
     EAtomicArrayAccessInvalidType ty ->
-        let title = "\x1b[31merror [E043]\x1b[0m: invalid type for the atomic array access interface."
+        let title = "\x1b[31merror [E044]\x1b[0m: invalid type for the atomic array access interface."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array access."))
     EAtomicInvalidType ty ->
-        let title = "\x1b[31merror [E044]\x1b[0m: invalid atomic type."
+        let title = "\x1b[31merror [E045]\x1b[0m: invalid atomic type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic."))
     EAtomicArrayInvalidType ty ->
-        let title = "\x1b[31merror [E045]\x1b[0m: invalid atomic array type."
+        let title = "\x1b[31merror [E046]\x1b[0m: invalid atomic array type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array."))
     EAtomicConnectionTypeMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [E046]\x1b[0m: atomic connection type mismatch."
+        let title = "\x1b[31merror [E047]\x1b[0m: atomic connection type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the connected atomic resource is expected to be \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EAtomicArrayConnectionTypeMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [E047]\x1b[0m: atomic array connection type mismatch."
+        let title = "\x1b[31merror [E048]\x1b[0m: atomic array connection type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
-        let title = "\x1b[31merror [E048]\x1b[0m: atomic array connection size mismatch."
+        let title = "\x1b[31merror [E049]\x1b[0m: atomic array connection size mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <>
                     "\x1b[0m but the array has size \x1b[31m" <> showText actualSize <> "\x1b[0m."))
     EConstantWithoutKnownType c ->
-        let title = "\x1b[31merror [E049]\x1b[0m: constant without known type."
+        let title = "\x1b[31merror [E050]\x1b[0m: constant without known type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the constant \x1b[31m" <> showText c <>
                     "\x1b[0m cannot be inferred from the environment and must be explicitly defined."))
     EStructInitializerInvalidUse ->
-        let title = "\x1b[31merror [E050]\x1b[0m: invalid use of struct initializer."
+        let title = "\x1b[31merror [E051]\x1b[0m: invalid use of struct initializer."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use a struct initializer in an invalid context.\n" <>
                         "Struct initializers can only be used to initialize struct objects.")
     EStructInitializerTypeMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [E051]\x1b[0m: struct initializer type mismatch."
+        let title = "\x1b[31merror [E052]\x1b[0m: struct initializer type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The struct initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EStructInitializerGlobalNotStruct tydef ->
-        let title = "\x1b[31merror [E052]\x1b[0m: struct initializer expected global type not struct."
+        let title = "\x1b[31merror [E053]\x1b[0m: struct initializer expected global type not struct."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -576,7 +582,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "You are using a struct initializer but the expected type is \x1b[31m" <>
                     showText tydef <> "\x1b[0m."))
     EStructInitializerExpectedTypeNotStruct ty ->
-        let title = "\x1b[31merror [E053]\x1b[0m: struct initializer expected type not struct."
+        let title = "\x1b[31merror [E054]\x1b[0m: struct initializer expected type not struct."
         in
             printSimpleError
                 sourceLines title fileName pos
@@ -584,110 +590,126 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                     "You are using a struct initializer but the expected type is \x1b[31m" <>
                     showText ty <> "\x1b[0m."))
     EStructInitializerUnknownType ident ->
-        let title = "\x1b[31merror [E054]\x1b[0m: struct initializer unknown type."
+        let title = "\x1b[31merror [E055]\x1b[0m: struct initializer unknown type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m of the struct initializer is unknown."))
     ESliceInvalidUse ->
-        let title = "\x1b[31merror [E055]\x1b[0m: invalid use of slice."
+        let title = "\x1b[31merror [E056]\x1b[0m: invalid use of slice."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use a slice in an invalid context.\n" <>
                         "Slices can only be used to create references to a part of an array.")
-    EArrayIntitalizerInvalidUse ->
-        let title = "\x1b[31merror [E056]\x1b[0m: invalid use of an array initializer."
+    EArrayInitializerInvalidUse ->
+        let title = "\x1b[31merror [E057]\x1b[0m: invalid use of an array initializer."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use an array initializer in an invalid context.\n" <>
                         "Array initializers can only be used to initialize array objects.")
-    EArrayExprListIntitalizerInvalidUse ->
-        let title = "\x1b[31merror [E057]\x1b[0m: invalid use of an expression list array initializer."
+    EArrayInitializerNotArray ty ->
+        let title = "\x1b[31merror [E058]\x1b[0m: assignment of an array initializer to a non-array type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Invalid use of an array initializer.\n" <>
+                    "You are trying to assign an array initializer to a non-array type \x1b[31m" <>
+                    showText ty <> "\x1b[0m."))
+    EArrayExprListInitializerInvalidUse ->
+        let title = "\x1b[31merror [E059]\x1b[0m: invalid use of an expression list array initializer."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use an array expression list initializer in an invalid context.\n" <>
                         "Array expression list initializers can only be used to initialize array objects.")
+    EArrayExprListInitializerNotArray ty ->
+        let title = "\x1b[31merror [E060]\x1b[0m: assignment of an array expression list initializer to a non-array type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Invalid use of an array expression list initializer.\n" <>
+                    "You are trying to assign an array expression list initializer to a non-array type \x1b[31m" <>
+                    showText ty <> "\x1b[0m."))
     EOptionVariantInitializerInvalidUse ->
-        let title = "\x1b[31merror [E058]\x1b[0m: invalid use of an option variant initializer."
+        let title = "\x1b[31merror [E061]\x1b[0m: invalid use of an option variant initializer."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use an option variant initializer in an invalid context.\n" <>
                         "Option variant initializers can only be used to initialize option objects.")
     EArrayInitializerSizeMismatch expectedSize initializerSize ->
-        let title = "\x1b[31merror [E059]\x1b[0m: array initializer size mismatch."
+        let title = "\x1b[31merror [E062]\x1b[0m: array initializer size mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The size of the array initializer is \x1b[31m" <> showText initializerSize <>
                     "\x1b[0m but the expected size is \x1b[31m" <> showText expectedSize <> "\x1b[0m."))
     EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
-        let title = "\x1b[31merror [E060]\x1b[0m: array expression list initializer size mismatch."
+        let title = "\x1b[31merror [E063]\x1b[0m: array expression list initializer size mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The size of the array expression list initializer is \x1b[31m" <> T.pack (show initializerSize) <>
                     "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
     EArrayExprListInitializerExprTypeMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [E061]\x1b[0m: array expression list initializer expression type mismatch."
+        let title = "\x1b[31merror [E064]\x1b[0m: array expression list initializer expression type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The expression in the array expression list initializer is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EReturnValueExpected ty ->
-        let title = "\x1b[31merror [E062]\x1b[0m: expected return value."
+        let title = "\x1b[31merror [E065]\x1b[0m: expected return value."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The function is expected to return a value of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EReturnValueNotUnit ->
-        let title = "\x1b[31merror [E063]\x1b[0m: return value not expected."
+        let title = "\x1b[31merror [E066]\x1b[0m: return value not expected."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just "The function is not expected to return a value.")
     EInvalidArrayType ty ->
-        let title = "\x1b[31merror [E064]\x1b[0m: invalid array type."
+        let title = "\x1b[31merror [E067]\x1b[0m: invalid array type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid array type."))
     EInvalidBoxType ty ->
-        let title = "\x1b[31merror [E065]\x1b[0m: invalid box type."
+        let title = "\x1b[31merror [E068]\x1b[0m: invalid box type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid box type."))
     ENoTypeFound ident ->
-        let title = "\x1b[31merror [E066]\x1b[0m: no type found."
+        let title = "\x1b[31merror [E069]\x1b[0m: no type found."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not found."))
-    EGlobalNoType ident -> 
-        let title = "\x1b[31merror [E067]\x1b[0m: global object but not a type."
+    EGlobalNotType ident -> 
+        let title = "\x1b[31merror [E070]\x1b[0m: global object but not a type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type."))
     EInvalidAccessToGlobal ident ->
-        let title = "\x1b[31merror [E068]\x1b[0m: invalid access to global object."
+        let title = "\x1b[31merror [E071]\x1b[0m: invalid access to global object."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed from within this context."))
     EConstantIsReadOnly ident ->
-        let title = "\x1b[31merror [E069]\x1b[0m: invalid write to a constant."
+        let title = "\x1b[31merror [E072]\x1b[0m: invalid write to a constant."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified."))
     ESymbolDefined ident symbolPos@(Position symbolStart _symbolEnd) ->
-        let title = "\x1b[31merror [E070]\x1b[0m: symbol already defined."
+        let title = "\x1b[31merror [E073]\x1b[0m: symbol already defined."
             symbolFileName = sourceName symbolStart
             symbolSourceLines = toModuleAST M.! symbolFileName
         in
@@ -698,46 +720,46 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 symbolSourceLines "The symbol was previoulsy defined here:" symbolFileName
                 symbolPos Nothing
     EExpressionNotConstant ->
-        let title = "\x1b[31merror [E071]\x1b[0m: expression not constant."
+        let title = "\x1b[31merror [E074]\x1b[0m: expression not constant."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just "The expression is not constant and cannot be evaluated at compile time.")
     EContinueInvalidExpression -> 
-        let title = "\x1b[31merror [E072]\x1b[0m: invalid expression in continue statement."
+        let title = "\x1b[31merror [E075]\x1b[0m: invalid expression in continue statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just "The expression in a continue statement must be a call to a member action.")
     EContinueInvalidProcedureCall ident -> 
-        let title = "\x1b[31merror [E073]\x1b[0m: invalid procedure call in continue statement."
+        let title = "\x1b[31merror [E076]\x1b[0m: invalid procedure call in continue statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("This statement can only be used to call a continuation action.\n" <>
                        "The procedure call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid."))
     EContinueInvalidMethodOrViewerCall ident -> 
-        let title = "\x1b[31merror [E074]\x1b[0m: invalid method or viewer call in continue statement."
+        let title = "\x1b[31merror [E077]\x1b[0m: invalid method or viewer call in continue statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("This statement can only be used to call a continuation action.\n" <>
                        "The member function call \x1b[31m" <> T.pack ident <> "\x1b[0m in a continue statement is invalid."))
     EContinueInvalidMemberCall ts ->
-        let title = "\x1b[31merror [E075]\x1b[0m: invalid member call in continue statement."
+        let title = "\x1b[31merror [E078]\x1b[0m: invalid member call in continue statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("This statement can only be used to call a continuation action.\n" <>
                        "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid."))
     EContinueActionNotFound ident -> 
-        let title = "\x1b[31merror [E076]\x1b[0m: continuation action not found."
+        let title = "\x1b[31merror [E079]\x1b[0m: continuation action not found."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Action \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
     EContinueActionExtraParams (ident, params, actionPos@(Position actStartPos _endPos)) paramNumber ->
-        let title = "\x1b[31merror [E077]\x1b[0m: extra parameters in continuation action."
+        let title = "\x1b[31merror [E080]\x1b[0m: extra parameters in continuation action."
             actFileName = sourceName actStartPos
             actSourceLines = toModuleAST M.! actFileName
         in
@@ -750,7 +772,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 actSourceLines "The action is defined here:" actFileName
                 actionPos Nothing
     EContinueActionMissingParam (ident, actionPos@(Position actStartPos _endPos)) ->
-        let title = "\x1b[31merror [E078]\x1b[0m: missing parameters in continuation action."
+        let title = "\x1b[31merror [E081]\x1b[0m: missing parameters in continuation action."
             actFileName = sourceName actStartPos
             actSourceLines = toModuleAST M.! actFileName
         in
@@ -761,6 +783,96 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 actSourceLines "The action is defined here:" actFileName
                 actionPos Nothing
+    EEnumVariantInitializerInvalidUse ->
+        let title = "\x1b[31merror [E082]\x1b[0m: invalid use of an enum variant initializer."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just $ "You are trying to use an enum variant initializer in an invalid context.\n" <>
+                        "Enum variant initializers can only be used to initialize enum objects.")
+    ENoEnumFound ident ->
+        let title = "\x1b[31merror [E083]\x1b[0m: no enum found."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The enum \x1b[31m" <> T.pack ident <> "\x1b[0m is not found."))
+    EGlobalNotEnum (ident, globalPos@(Position globalStart _)) ->
+        let title = "\x1b[31merror [E084]\x1b[0m: global object but not an enum."
+            globalFileName = sourceName globalStart
+            globalSourceLines = toModuleAST M.! globalFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not an enum.")) >>
+            printSimpleError
+                globalSourceLines "The global object is defined here:" globalFileName
+                globalPos Nothing
+    EEnumVariantNotFound enumId variant ->
+        let title = "\x1b[31merror [E085]\x1b[0m: enum variant not found."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m."))
+    EEnumVariantExtraParams (enumId, enumPos@(Position enumStart _end)) (variant, params) paramNumber ->
+        let title = "\x1b[31merror [E086]\x1b[0m: extra parameters in enum variant."
+            enumFileName = sourceName enumStart
+            enumSourceLines = toModuleAST M.! enumFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Enum variant \x1b[31m" <> T.pack variant <>
+                    "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError
+                enumSourceLines "The enum is defined here:" enumFileName
+                enumPos Nothing
+    EEnumVariantMissingParams (enumId, enumPos@(Position enumStart _end)) (variant, params) paramNumber ->
+        let title = "\x1b[31merror [E087]\x1b[0m: missing parameters in enum variant."
+            enumFileName = sourceName enumStart
+            enumSourceLines = toModuleAST M.! enumFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Enum variant \x1b[31m" <> T.pack variant <>
+                    "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+            printSimpleError
+                enumSourceLines "The enum is defined here:" enumFileName
+                enumPos Nothing
+    EEnumVariantParamTypeMismatch (enumId, enumPos@(Position enumStart _end)) (variant, paramNumber, expectedTy) actualTy ->
+        let title = "\x1b[31merror [E088]\x1b[0m: enum variant parameter type mismatch."
+            enumFileName = sourceName enumStart
+            enumSourceLines = toModuleAST M.! enumFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Parameter \x1b[31m" <> T.pack (show paramNumber) <>
+                    "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <>
+                    "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            printSimpleError
+                enumSourceLines "The enum is defined here:" enumFileName
+                enumPos Nothing
+    EFunctionNotFound ident ->
+        let title = "\x1b[31merror [E089]\x1b[0m: function not found."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Function \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
+    EGlobalNotFunction (ident, globalPos@(Position globalStart _)) ->
+        let title = "\x1b[31merror [E090]\x1b[0m: global object but not a function."
+            globalFileName = sourceName globalStart
+            globalSourceLines = toModuleAST M.! globalFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a function.")) >>
+            printSimpleError
+                globalSourceLines "The global object is defined here:" globalFileName
+                globalPos Nothing
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

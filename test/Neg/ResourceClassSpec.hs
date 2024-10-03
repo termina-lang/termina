@@ -36,7 +36,7 @@ test1 = "interface TMChannelInterface {\n" ++
         "resource class TMChannel provides TMChannelInterface {\n" ++
         "  tm_sent_packets : u32;\n" ++
         "\n" ++
-        "  action send_packet(&mut self, input : u32) -> Result {\n" ++
+        "  action send_packet(&priv self, input : u32) -> Result {\n" ++
         "    var ret : Result = Result::Ok;" ++
         "    return ret;\n" ++
         "  }\n" ++

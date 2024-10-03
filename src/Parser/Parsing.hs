@@ -129,6 +129,7 @@ lexer = Tok.makeTokenParser langDef
                       ,")" -- Parens
                       ,".." -- Array slice and for loop range
                       ,"&mut" -- Mutable reference creation
+                      ,"&priv" -- Private reference creation
                       ,"@" -- Field address assignment
                       ,"<->" -- Access port connection
                       ,"<-" -- Inbound/Sink connection
@@ -1043,7 +1044,7 @@ classMethodParser = do
   startPos <- getPosition
   reserved "method"
   name <- identifierParser
-  parens (reserved "&mut" >> reserved "self")
+  parens (reserved "&priv" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- braces blockParser
   ClassMethod name typeSpec blockRet . Position startPos <$> getPosition
@@ -1053,7 +1054,7 @@ classActionParser = do
   startPos <- getPosition
   reserved "action"
   name <- identifierParser
-  param <- parens (reserved "&mut" >> reserved "self" >> comma >> parameterParser)
+  param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
   blockRet <- braces blockParser
   ClassAction name param typeSpec blockRet . Position startPos <$> getPosition

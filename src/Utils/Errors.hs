@@ -24,6 +24,7 @@ instance ShowText Size where
 
 instance ShowText AccessKind where
     showText Mutable = "mut "
+    showText Private = "priv "
     showText Immutable = ""
 
 instance ShowText Op where

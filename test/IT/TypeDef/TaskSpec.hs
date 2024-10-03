@@ -31,7 +31,7 @@ test0 = "struct Message {\n" ++
         "    return ret;\n" ++
         "  }\n" ++
         "\n" ++
-        "  action timeout(&mut self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "\n" ++
@@ -111,16 +111,31 @@ spec = do
               "    uint32_t interval;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
-              "\n" ++
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
+              "\n" ++
+              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
+              "\n" ++
+              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "                                    uint32_t limit) {\n" ++
+              "    \n" ++
+              "    _Bool ret = 1;\n" ++
+              "\n" ++
+              "    if (self->interval > limit) {\n" ++
+              "        \n" ++
+              "        ret = 0;\n" ++
+              "\n" ++
+              "    }\n" ++
+              "\n" ++
+              "    return ret;\n" ++
+              "\n" ++
+              "}\n" ++ 
               "\n" ++
               "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
               "    \n" ++
@@ -150,21 +165,6 @@ spec = do
               "    if (check == 0) {\n" ++
               "        \n" ++
               "        ret.__variant = Result__Error;\n" ++
-              "\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    return ret;\n" ++
-              "\n" ++
-              "}\n" ++
-              "\n" ++
-              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
-              "                                    uint32_t limit) {\n" ++
-              "    \n" ++
-              "    _Bool ret = 1;\n" ++
-              "\n" ++
-              "    if (self->interval > limit) {\n" ++
-              "        \n" ++
-              "        ret = 0;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

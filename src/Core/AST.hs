@@ -97,7 +97,7 @@ data TerminaType
   | Unit
   deriving (Show, Ord, Eq)
 
-data AccessKind = Immutable | Mutable
+data AccessKind = Immutable | Mutable | Private
   deriving (Show, Ord, Eq)
 
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection

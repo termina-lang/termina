@@ -16,7 +16,7 @@ test0 = "task class CHousekeeping {\n" ++
         "  interval : access AtomicAccess<u32>;\n" ++
         "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
-        "  action timeout(&mut self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "    var local : u32 = 0;\n" ++
@@ -34,7 +34,7 @@ test1 = "task class CHousekeeping {\n" ++
         "  interval : access AtomicArrayAccess<u32; 10>;\n" ++
         "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
-        "  action timeout(&mut self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "    var local : u32 = 0;\n" ++

@@ -18,7 +18,7 @@ import ControlFlow.BasicBlocks
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++
         "\n" ++
-        "  method run(&mut self) -> Result {\n" ++
+        "  method run(&priv self) -> Result {\n" ++
         "\n" ++
         "    var ret : Result = Result::Ok;\n" ++
         "\n" ++

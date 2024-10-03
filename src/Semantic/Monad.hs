@@ -207,7 +207,7 @@ getGlobalTypeDef loc tid  = gets global >>=
   -- if so, return its type
   (\case {
       GType tydef -> return tydef;
-        _         -> throwError $ annotateError loc (EGlobalNoType tid)
+        _         -> throwError $ annotateError loc (EGlobalNotType tid)
       } . getEntry) . M.lookup tid
 
 getFunctionTy :: Location -> Identifier -> SemanticMonad ([TerminaType], TerminaType, Location)
@@ -215,7 +215,15 @@ getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
   Located (GFun args retty) entryLoc -> return (args, retty, entryLoc)
-  Located {} -> throwError $ annotateError loc (EFunctionNotFound iden)
+  Located _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
+
+getEnumTy :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnn, Location)
+getEnumTy loc iden = 
+  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (ENoEnumFound iden)) >>=
+  (\case {
+      Located (GType tydef@(Enum {})) entryLoc  -> return (tydef, entryLoc);
+      Located _ entryLoc           -> throwError $ annotateError loc (EGlobalNotEnum (iden, entryLoc))
+    })
 
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
