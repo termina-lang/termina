@@ -39,8 +39,8 @@ genInterruptEmitterDeclarations (obj : objs) = do
     rest <- mapM (genInterruptEmitterDeclaration False) objs
     return $ decl : rest
 
-genTaskClassCode :: TypeDef SemanticAnn -> CSourceGenerator CFileItem
-genTaskClassCode (Class TaskClass classId members _ _) = do
+genTaskClassCode :: TPClass SemanticAnn -> CSourceGenerator CFileItem
+genTaskClassCode (TPClass classId TaskClass (Class _ _ members _ _)) = do
     cBody <- genBody
     return $ pre_cr $ static_function (namefy "rtems_task" <::> classId) [
             "arg" @: rtems_task_argument

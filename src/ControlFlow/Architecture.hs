@@ -18,19 +18,22 @@ type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch Semanti
 
 genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
 genArchTypeDef tydef@(Class TaskClass ident _ _ _) =
+  let tskCls = TPClass ident TaskClass tydef in
   ST.modify $ \tp ->
     tp {
-      taskClasses = M.insert ident tydef (taskClasses tp)
+      taskClasses = M.insert ident tskCls (taskClasses tp)
     }
 genArchTypeDef tydef@(Class HandlerClass ident _ _ _) =
+  let hdlCls = TPClass ident HandlerClass tydef in
   ST.modify $ \tp ->
     tp {
-      handlerClasses = M.insert ident tydef (handlerClasses tp)
+      handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
 genArchTypeDef tydef@(Class ResourceClass ident _ _ _) =
+  let resCls = TPClass ident ResourceClass tydef in
   ST.modify $ \tp ->
     tp {
-      resourceClasses = M.insert ident tydef (resourceClasses tp)
+      resourceClasses = M.insert ident resCls (resourceClasses tp)
     }
 genArchTypeDef _ = return ()
 
@@ -52,7 +55,7 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       }
     _ -> throwError $ annotateError (location ann) (UnsupportedEmitterClass ident)
 genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
-  members <- ST.get >>= \tp -> return $ getClassMembers (fromJust (M.lookup tcls (taskClasses tp)))
+  members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
@@ -138,7 +141,7 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
   members <- ST.get >>= \tp ->
     case M.lookup hcls (handlerClasses tp) of
       Nothing -> error $ "Handler class: " ++ hcls ++ " not found"
-      Just cls -> return $ getClassMembers cls
+      Just cls -> return $ getClassMembers (classTypeDef cls)
   (sinkConn, outpConns, apConns) <- foldM (\(sink, outp, accp) assignment -> do
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->

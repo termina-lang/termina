@@ -2,11 +2,25 @@ module ControlFlow.Architecture.Types where
 
 import Data.Map
 import ControlFlow.BasicBlocks.AST
-import Semantic.Types
 import Modules.Modules
 
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
+
+
+data TPClass a = TPClass {
+
+    -- | Name of the class
+    classIdentifier :: Identifier,
+
+    -- | Kind of the class
+    -- It can be either a task, a handler, or a resource
+    classKind :: ClassKind,
+    
+    -- | Class type definition
+    classTypeDef :: TypeDef a
+
+} deriving Show
 
 data TPTask a = TPTask {
 
@@ -158,13 +172,13 @@ data TerminaProgArch a = TerminaProgArch {
     -- the event is emitted.
     emitterTargets :: Map Identifier (Identifier, Identifier, Identifier, a),
 
-    taskClasses :: Map Identifier (TypeDef a),
+    taskClasses :: Map Identifier (TPClass a),
     tasks :: Map Identifier (TPTask a),
 
-    handlerClasses :: Map Identifier (TypeDef a),
+    handlerClasses :: Map Identifier (TPClass a),
     handlers :: Map Identifier (TPHandler a),
 
-    resourceClasses :: Map Identifier (TypeDef SemanticAnn),
+    resourceClasses :: Map Identifier (TPClass a),
 
     resources :: Map Identifier (TPResource a),
 

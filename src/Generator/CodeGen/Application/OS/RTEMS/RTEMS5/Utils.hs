@@ -75,8 +75,8 @@ genVariantForPort ::
     -> Identifier -> CSourceGenerator Identifier
 genVariantForPort taskCls port = return $ namefy $ taskCls <::> port
 
-genVariantsForTaskPorts :: TypeDef SemanticAnn -> CSourceGenerator [CFileItem]
-genVariantsForTaskPorts (Class _ classId members _ _) =
+genVariantsForTaskPorts :: TPClass SemanticAnn -> CSourceGenerator [CFileItem]
+genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _)) =
     genDefineVariantsForPorts ports
     where
 
