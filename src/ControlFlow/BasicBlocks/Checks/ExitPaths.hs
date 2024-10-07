@@ -10,13 +10,21 @@ import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors
 import Data.Foldable
 import qualified Control.Monad.State as ST
 
+-- | Check if a block exits.
+-- A block exits if it contains a return statement or a continue statement or,
+-- if it ends with a conditional block (if-else or match) and all the branches
+-- exit.
 doesBlockExit :: BasicBlock SemanticAnn -> Bool
 doesBlockExit (ReturnBlock {}) = True
 doesBlockExit (ContinueBlock {}) = True
 doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
     let
+        -- | Check the exit of the if block
         ifBlocksExit = doesBlockExit (last ifBlocks)
     in
+        -- | Check the exit of the else if blocks
+        -- If the if block exits, then we must check the else if blocks
+        -- and the else block (if present) 
         (ifBlocksExit &&
             (let elseIfsExit = foldl' (\prevState (ElseIf _ elifBlocks _) ->
                     prevState && doesBlockExit (last elifBlocks)) ifBlocksExit elseIfBlocks in
@@ -66,7 +74,10 @@ checkActionPaths loc stmts = do
                 (x : xb) ->
                     case x of
                         ReturnBlock {} ->
-                            -- | The rest of the blocks shall not exit
+                            -- | The rest of the blocks shall only partially
+                            -- exit or not exit at all. This means that the must
+                            -- be at least one path that does not exit and thus
+                            -- reaches the end of the block.
                             setPartialExit >> checkActionPaths loc xb
                         ContinueBlock {} ->
                             -- | The rest of the blocks shall not exit
