@@ -203,14 +203,16 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
     let irqArray = emitterToArrayMap M.! interrupt
     -- | Obtain the identifier of the target entity and the port to which the
     -- interrupt emitter is connected
-    (targetEntity, targetAction) <- case M.lookup interrupt (emitterTargets progArchitecture) of
-        Just (entity, _port, action, _) -> return (entity, action)
+    (targetEntity, targetPort) <- case M.lookup interrupt (emitterTargets progArchitecture) of
+        Just (entity, port, _) -> return (entity, port)
         -- | If the interrupt emitter is not connected, throw an error
         Nothing -> throwError $ InternalError $ "Interrupt emitter not connected: " ++ show interrupt
     -- | Now we have to check if the target entity is a task or a handler
     case M.lookup targetEntity (handlers progArchitecture) of
         Just (TPHandler identifier classId _ _ _ _ _ _) -> do
-            let classIdType = typeDef classId
+            let cls = handlerClasses progArchitecture M.! classId
+                (_, targetAction) = sinkPorts cls M.! targetPort
+                classIdType = typeDef classId
             return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void] @-> void $
                     trail_cr . block $ [
                         -- classId * self = &identifier;
@@ -275,13 +277,15 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
             Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
 genEmitter progArchitecture (TPPeriodicTimerEmitter timer _ _) = do
     armTimer <- genArmTimer (CVar timer (CTTypeDef "PeriodicTimer" noqual)) timer
-    (targetEntity, targetAction) <- case M.lookup timer (emitterTargets progArchitecture) of
-        Just (entity, _port, action, _) -> return (entity, action)
+    (targetEntity, targetPort) <- case M.lookup timer (emitterTargets progArchitecture) of
+        Just (entity, port, _) -> return (entity, port)
         -- | If the interrupt emitter is not connected, throw an error
         Nothing -> throwError $ InternalError $ "Periodic timer emitter not connected: " ++ show timer
     -- | Now we have to check if the target entity is a task or a handler
     case M.lookup targetEntity (handlers progArchitecture) of 
-        Just (TPHandler identifier classId _ _ _ _ _ _) ->
+        Just (TPHandler identifier classId _ _ _ _ _ _) -> do
+            let cls = handlerClasses progArchitecture M.! classId
+                (_, targetAction) = sinkPorts cls M.! targetPort 
             return $ pre_cr $ function (namefy "rtems_periodic_timer" <::> timer)
                 [
                     "_timer_id" @: rtems_id,
@@ -364,14 +368,16 @@ genEmitter progArchitecture (TPPeriodicTimerEmitter timer _ _) = do
                 ]
             Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
 genEmitter progArchitecture (TPSystemInitEmitter systemInit _) = do
-    (targetEntity, targetAction) <- case M.lookup systemInit (emitterTargets progArchitecture) of
-        Just (entity, _port, action, _) -> return (entity, action)
+    (targetEntity, targetPort) <- case M.lookup systemInit (emitterTargets progArchitecture) of
+        Just (entity, port, _) -> return (entity, port)
         -- | If the interrupt emitter is not connected, throw an error
         Nothing -> throwError $ InternalError $ "System init emitter not connected: " ++ show systemInit
     -- | Now we have to check if the target entity is a task or a handler
     case M.lookup targetEntity (handlers progArchitecture) of     
         Just (TPHandler identifier classId _ _ _ _ _ _) -> do
-            let classIdType = typeDef classId
+            let cls = handlerClasses progArchitecture M.! classId
+                (_, targetAction) = sinkPorts cls M.! targetPort
+                classIdType = typeDef classId
             return $ pre_cr $ function (namefy "rtems_app" <::> "initial_event") [
                     "current" @: (_const . ptr $ _TimeVal)
                 ] @-> void $
@@ -400,7 +406,9 @@ genEmitter progArchitecture (TPSystemInitEmitter systemInit _) = do
                     ]
         Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
             Just (TPTask identifier classId _ _ _ _ _ _ _) -> do
-                let classIdType = typeDef classId
+                let cls = taskClasses progArchitecture M.! classId
+                    (_, targetAction) = sinkPorts cls M.! targetPort
+                    classIdType = typeDef classId
                 return $ pre_cr $ function (namefy "rtems_app" <::> "inital_event") [
                         "current" @: (_const . ptr $ _TimeVal)
                     ] @-> void $
@@ -530,7 +538,7 @@ getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
         TPInterruptEmittter identifier _ -> 
             case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _action, _) -> 
+                Just (entity, _port, _) -> 
                     case M.lookup entity (tasks progArchitecture) of
                         Just _ -> emitter : acc
                         Nothing -> acc
@@ -543,7 +551,7 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
         TPPeriodicTimerEmitter identifier _ _ -> 
             case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _action, _) -> 
+                Just (entity, _port, _) -> 
                     case M.lookup entity (tasks progArchitecture) of
                         Just _ -> emitter : acc
                         Nothing -> acc
@@ -697,7 +705,7 @@ genInitGlobals progArchitecture  = do
         genInitInterruptEmitterToTask (TPInterruptEmittter identifier _) = do
             let emitterClassId = "Interrupt"
             (targetEntity, targetPort) <- case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, port, _action, _) -> return (entity, port)
+                Just (entity, port, _) -> return (entity, port)
                 -- | If the interrupt emitter is not connected, throw an error
                 Nothing -> throwError $ InternalError $ "Interrupt emitter not connected: " ++ show identifier
             -- | Now we have to check if the target entity is a task
@@ -719,7 +727,7 @@ genInitGlobals progArchitecture  = do
         genInitTimerToTask :: TPEmitter SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
         genInitTimerToTask (TPPeriodicTimerEmitter identifier _ _) = do
             (targetEntity, targetPort) <- case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, port, _action, _) -> return (entity, port)
+                Just (entity, port, _) -> return (entity, port)
                 -- | If the interrupt emitter is not connected, throw an error
                 Nothing -> throwError $ InternalError $ "Interrupt emitter not connected: " ++ show identifier
             -- | Now we have to check if the target entity is a task
@@ -740,13 +748,13 @@ genInitGlobals progArchitecture  = do
         genInitTimerToTask obj = throwError $ InternalError $ "Invalid global object (not a timer connected to a task): " ++ show obj
 
         genTaskInitialization :: TPTask SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
-        genTaskInitialization (TPTask identifier classId inputPorts _ _ _ _ _ _) = do
-            mapM genInputPortInitialization $ M.toList inputPorts
+        genTaskInitialization (TPTask identifier classId inputPtConns _ _ _ _ _ _) = do
+            mapM genInputPortInitialization $ M.toList inputPtConns
 
             where
 
-                genInputPortInitialization :: (Identifier, (TerminaType, Identifier, SemanticAnn)) -> CSourceGenerator CCompoundBlockItem
-                genInputPortInitialization (portId, (_ts, channelId, _)) = do
+                genInputPortInitialization :: (Identifier, (Identifier, SemanticAnn)) -> CSourceGenerator CCompoundBlockItem
+                genInputPortInitialization (portId, (channelId, _)) = do
                     return $ pre_cr $
                         identifier @: typeDef classId @. portId @: rtems_id @=
                             (channelId @: __termina_msg_queue_t) @. "msgq_id" @: rtems_id

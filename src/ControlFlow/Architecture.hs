@@ -71,34 +71,34 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
         case getPortType pname members of
-          InPort ts action -> do
+          InPort {} -> do
             connectedTargets <- channelTargets <$> ST.get
             -- | Check if the target channel is already connected to an in port
             case M.lookup target connectedTargets of
               Nothing -> do
                 ST.modify $ \tp ->
                   tp {
-                    channelTargets = M.insert target (ident, pname, action, cann) connectedTargets
+                    channelTargets = M.insert target (ident, pname, cann) connectedTargets
                   }
-                return (M.insert pname (ts, target, cann) inp, sink, outp, accp)
-              Just (_, _, _, prevcann) ->
+                return (M.insert pname (target, cann) inp, sink, outp, accp)
+              Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (DuplicatedChannelConnection target (location prevcann))
-          SinkPort ts action -> do
+          SinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
             case M.lookup target connectedEmitters of
               Nothing -> do
                 ST.modify $ \tp ->
                   tp {
-                    emitterTargets = M.insert target (ident, pname, action, cann) connectedEmitters
+                    emitterTargets = M.insert target (ident, pname, cann) connectedEmitters
                   }
-                return (inp, M.insert pname (ts, target, cann) sink, outp, accp)
-              Just (_, _, _, prevcann) ->
+                return (inp, M.insert pname (target, cann) sink, outp, accp)
+              Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort ts -> return (inp, sink, M.insert pname (ts, target, cann) outp, accp)
+          OutPort {} -> return (inp, sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann  ->
         return (inp, sink, outp, M.insert pname (target, cann) accp)
@@ -157,22 +157,22 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
         case getPortType pname members of
-          SinkPort ts action -> do
+          SinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
             case M.lookup target connectedEmitters of
               Nothing -> do
                 ST.modify $ \tp ->
                   tp {
-                    emitterTargets = M.insert target (ident, pname, action, cann) connectedEmitters
+                    emitterTargets = M.insert target (ident, pname, cann) connectedEmitters
                   }
-                return (Just (pname, ts, target, cann), outp, accp)
-              Just (_, _, _, prevcann) ->
+                return (Just (pname, target, cann), outp, accp)
+              Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort ts -> return (sink, M.insert pname (ts, target, cann) outp, accp)
+          OutPort {} -> return (sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann  ->
         return (sink, outp, M.insert pname (target, cann) accp)

@@ -50,17 +50,17 @@ data TPTask a = TPTask {
     -- | Map of the input ports of the task
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port.
-    taskInputPortConns :: Map Identifier (TerminaType, Identifier, a),
+    taskInputPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the sink ports of the task
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port.
-    taskSinkPortConns :: Map Identifier (TerminaType, Identifier, a),
+    taskSinkPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the output ports of the task
     -- It maps the name of the port to the name of channel
     -- that is connected to the port.
-    taskOutputPortConns :: Map Identifier (TerminaType, Identifier, a),
+    taskOutputPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the access ports of the task
     -- It maps the name of the port to the name of the resource
@@ -122,13 +122,13 @@ data TPHandler a = TPHandler {
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port. It also conntains the
     -- annotations associated with the port connection assignment.
-    handlerSinkPortConn :: (Identifier, TerminaType, Identifier, a),
+    handlerSinkPortConn :: (Identifier, Identifier, a),
 
     -- | Map of the output ports of the handler
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port. It also conntains the
     -- annotations associated with the port connection assignment.
-    handlerOutputPortConns :: Map Identifier (TerminaType, Identifier, a),
+    handlerOutputPortConns :: Map Identifier (Identifier, a),
 
     -- | Map of the access ports of the handler
     -- It maps the name of the port to the name of the resource
@@ -184,10 +184,9 @@ data TerminaProgArch a = TerminaProgArch {
     emitters :: Map Identifier (TPEmitter a),
 
     -- | Map of all the connected event emitters It maps the name of the emitter
-    -- to the name of the task or handler, the name of the port that is
-    -- connected to the emitter, and the name of the action to be executed when 
-    -- the event is emitted.
-    emitterTargets :: Map Identifier (Identifier, Identifier, Identifier, a),
+    -- to the name of the task or handler and the name of the port that is
+    -- connected to the emitter.
+    emitterTargets :: Map Identifier (Identifier, Identifier, a),
 
     taskClasses :: Map Identifier (TPClass a),
     tasks :: Map Identifier (TPTask a),
@@ -207,10 +206,8 @@ data TerminaProgArch a = TerminaProgArch {
     channels :: Map Identifier (TPChannel a),
 
     -- | Map of all the connected channels
-    -- It maps the name of the channel to the name of the task, the
-    -- name of the port that is connected to the channel, and the 
-    -- name of the action to be executed when a message is received
-    -- from the channel.
-    channelTargets :: Map Identifier (Identifier, Identifier, Identifier, a)
+    -- It maps the name of the channel to the name of the task and the
+    -- name of the port that is connected to the channel.
+    channelTargets :: Map Identifier (Identifier, Identifier, a)
 
 } deriving Show

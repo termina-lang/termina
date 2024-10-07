@@ -51,10 +51,12 @@ data RTEMSResourceLock =
 getTasksMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> m [RTEMSMsgQueue]
 getTasksMessageQueues progArchitecture = return $ foldr (\glb acc ->
         case glb of
-            TPTask identifier classId _ sinkPorts _ _ _ _ _ -> RTEMSTaskMsgQueue identifier classId (K (TInteger 1 DecRepr)) :
-                foldr (\(portId, (ts, _, _)) acc' ->
+            TPTask identifier classId _ sinkPConns _ _ _ _ _ -> RTEMSTaskMsgQueue identifier classId (K (TInteger 1 DecRepr)) :
+                let tpClass = taskClasses progArchitecture M.! classId in
+                foldr (\portId acc' ->
+                    let (ts, _) = sinkPorts tpClass M.! portId in
                     RTEMSSinkPortMsgQueue identifier classId portId ts (K (TInteger 1 DecRepr)) : acc'
-                ) acc (M.toList sinkPorts)
+                ) acc (M.keys sinkPConns)
     ) [] (tasks progArchitecture)
 
 -- | This function generates the list of RTEMS message queues that must be created
@@ -64,7 +66,7 @@ getChannelsMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch Se
 getChannelsMessageQueues progArchitecture = 
     foldM (\acc (TPMsgQueue identifier ts size _ _) ->
         case M.lookup identifier (channelTargets progArchitecture) of
-            Just (task, port, _, _) -> return (RTEMSChannelMsgQueue identifier ts size task port : acc)
+            Just (task, port, _) -> return (RTEMSChannelMsgQueue identifier ts size task port : acc)
             Nothing -> throwError $ InternalError ("channel not connected: " ++ show identifier)
     ) [] (channels progArchitecture)
 
