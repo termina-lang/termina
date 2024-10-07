@@ -20,7 +20,7 @@ import Modules.Modules (QualifiedName)
 import Semantic.Types
 import System.FilePath
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Utils (getConnectedEmitters)
+import ControlFlow.Architecture.Utils (getConnectedEmitters, getClassMembers)
 import ControlFlow.Architecture
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
@@ -40,7 +40,7 @@ genInterruptEmitterDeclarations (obj : objs) = do
     return $ decl : rest
 
 genTaskClassCode :: TPClass SemanticAnn -> CSourceGenerator CFileItem
-genTaskClassCode (TPClass classId TaskClass (Class _ _ members _ _)) = do
+genTaskClassCode tskCls = do
     cBody <- genBody
     return $ pre_cr $ static_function (namefy "rtems_task" <::> classId) [
             "arg" @: rtems_task_argument
@@ -48,6 +48,9 @@ genTaskClassCode (TPClass classId TaskClass (Class _ _ members _ _)) = do
             cBody ++ [pre_cr (_return Nothing)]
 
     where
+
+        classId = classIdentifier tskCls
+        members = getClassMembers . classTypeDef $ tskCls
 
         actions :: [(Identifier, TerminaType, Identifier)]
         actions = foldl (\acc member ->
@@ -171,7 +174,6 @@ genTaskClassCode (TPClass classId TaskClass (Class _ _ members _ _)) = do
                     pre_cr $ _for Nothing Nothing Nothing loop,
                     pre_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
                 ]
-genTaskClassCode obj = throwError $ InternalError $ "Invalid global object (not a task): " ++ show obj
 
 emitterToArrayMap :: M.Map Identifier Integer
 emitterToArrayMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]

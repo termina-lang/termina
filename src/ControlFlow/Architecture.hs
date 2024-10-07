@@ -18,19 +18,30 @@ type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch Semanti
 
 genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
 genArchTypeDef tydef@(Class TaskClass ident _ _ _) =
-  let tskCls = TPClass ident TaskClass tydef in
+  let members = getClassMembers tydef
+      inPs = getInputPorts members
+      sinkPs = getSinkPorts members
+      outputPs = getOutputPorts members
+      tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs in
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
     }
 genArchTypeDef tydef@(Class HandlerClass ident _ _ _) =
-  let hdlCls = TPClass ident HandlerClass tydef in
+  let members = getClassMembers tydef
+      inPs = M.empty
+      sinkPs = getSinkPorts members
+      outputPs = getOutputPorts members
+      hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs in
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
 genArchTypeDef tydef@(Class ResourceClass ident _ _ _) =
-  let resCls = TPClass ident ResourceClass tydef in
+  let inPs = M.empty
+      sinkPs = M.empty
+      outputPs = M.empty
+      resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs in
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)

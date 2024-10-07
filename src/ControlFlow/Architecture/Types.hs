@@ -18,7 +18,24 @@ data TPClass a = TPClass {
     classKind :: ClassKind,
     
     -- | Class type definition
-    classTypeDef :: TypeDef a
+    classTypeDef :: TypeDef a,
+
+    -- | Map of the input ports of the task
+    -- It maps the name of the port to the type of the data that is received by
+    -- the port and the name of the action that is executed when a message is
+    -- received from the port.
+    inputPorts :: Map Identifier (TerminaType, Identifier),
+
+    -- | Map of the sink ports of the task
+    -- It maps the name of the port to the type of the data that is received by
+    -- the port and the name of the action that is executed when an event is
+    -- received from the port.
+    sinkPorts :: Map Identifier (TerminaType, Identifier),
+
+    -- | Map of the output ports of the task
+    -- It maps the name of the port to the type of the data that is sent through
+    -- the port.
+    outputPorts :: Map Identifier TerminaType
 
 } deriving Show
 

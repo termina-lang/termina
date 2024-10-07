@@ -5,26 +5,42 @@ import ControlFlow.Architecture.Types
 import qualified Data.Map as M
 import Modules.Modules
 import qualified Data.Set as S
-import Data.List (group, sort)
+import Data.List (group, sort, foldl')
 
 getEmmiterIdentifier :: TPEmitter a -> Identifier
 getEmmiterIdentifier (TPInterruptEmittter ident _) = ident
 getEmmiterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmmiterIdentifier (TPSystemInitEmitter ident _) = ident
 
-getTriggeredAction :: Identifier -> [ClassMember a] -> Identifier
-getTriggeredAction ident [] = error $ "Internal error: no port with identifier " ++ ident
-getTriggeredAction ident (member : members) =
+getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
+getInputPorts = foldl' (\acc member -> 
   case member of
-    ClassField (FieldDefinition fid fty) _ | fid == ident -> getTriggeredAction' fty
-    _ -> getTriggeredAction ident members
+    ClassField (FieldDefinition fid fty) _ -> 
+      case fty of
+        InPort dataTy action -> M.insert fid (dataTy, action) acc
+        _ -> acc
+    _ -> acc
+  ) M.empty
 
-  where
+getSinkPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
+getSinkPorts = foldl' (\acc member -> 
+  case member of
+    ClassField (FieldDefinition fid fty) _ -> 
+      case fty of
+        SinkPort dataTy action -> M.insert fid (dataTy, action) acc
+        _ -> acc
+    _ -> acc
+  ) M.empty
 
-    getTriggeredAction' :: TerminaType -> Identifier
-    getTriggeredAction' (SinkPort _ act) = act
-    getTriggeredAction' (InPort _ act) = act
-    getTriggeredAction' _ = error $ "Internal error: port " ++ ident ++ " is not a sink port or an in port"
+getOutputPorts :: [ClassMember a] -> M.Map Identifier TerminaType
+getOutputPorts = foldl' (\acc member -> 
+  case member of
+    ClassField (FieldDefinition fid fty) _ -> 
+      case fty of
+        OutPort dataTy -> M.insert fid dataTy acc
+        _ -> acc
+    _ -> acc
+  ) M.empty
 
 getPortType :: Identifier -> [ClassMember a] -> TerminaType
 getPortType ident [] = error $ "Internal error: no port with identifier " ++ ident

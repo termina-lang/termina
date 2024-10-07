@@ -5,11 +5,12 @@ module ControlFlow.Architecture.Errors.Errors (
 import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 
-data Error a = 
+data Error = 
     -- | Error when the task is not defined
-    DuplicatedEmitterConnection Identifier a
-    | DuplicatedChannelConnection Identifier a
+    DuplicatedEmitterConnection Identifier Location
+    | DuplicatedChannelConnection Identifier Location
     | UnsupportedEmitterClass Identifier
+    | InputOutputPortMismatch Identifier Identifier
     deriving Show
 
-type ProgramError = AnnotatedError (Error Location) Location
+type ProgramError = AnnotatedError Error Location
