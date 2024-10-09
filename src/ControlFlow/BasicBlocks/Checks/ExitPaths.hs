@@ -9,6 +9,7 @@ import Utils.Annotations
 import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors
 import Data.Foldable
 import qualified Control.Monad.State as ST
+import Utils.Monad
 
 -- | Check if a block exits.
 -- A block exits if it contains a return statement or a continue statement or,

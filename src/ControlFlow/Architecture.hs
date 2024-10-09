@@ -13,35 +13,48 @@ import Semantic.Types
 import Utils.Annotations
 import qualified Data.Map as M
 import Modules.Modules
+import ControlFlow.Architecture.BoxInOut
 
 type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnn))
 
 genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
-genArchTypeDef tydef@(Class TaskClass ident _ _ _) =
+genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
   let members = getClassMembers tydef
       inPs = getInputPorts members
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
-      tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs in
+  outBoxMap <-
+    case runInOutClass tydef of 
+      Left err -> throwError err
+      Right boxMap -> return boxMap
+  let tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs outBoxMap
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
     }
-genArchTypeDef tydef@(Class HandlerClass ident _ _ _) =
+genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
   let members = getClassMembers tydef
       inPs = M.empty
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
-      hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs in
+  outBoxMap <-
+    case runInOutClass tydef of 
+      Left err -> throwError err
+      Right boxMap -> return boxMap
+  let hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs outBoxMap
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
-genArchTypeDef tydef@(Class ResourceClass ident _ _ _) =
+genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
   let inPs = M.empty
       sinkPs = M.empty
       outputPs = M.empty
-      resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs in
+  outBoxMap <-
+    case runInOutClass tydef of 
+      Left err -> throwError err
+      Right boxMap -> return boxMap
+  let resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs outBoxMap
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
@@ -64,7 +77,7 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
-    _ -> throwError $ annotateError (location ann) (UnsupportedEmitterClass ident)
+    _ -> throwError $ annotateError (location ann) (EUnsupportedEmitterClass ident)
 genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
@@ -82,7 +95,7 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
                   }
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (DuplicatedChannelConnection target (location prevcann))
+                throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
           SinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
@@ -94,7 +107,7 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
                   }
                 return (inp, M.insert pname (target, cann) sink, outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
+                throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
@@ -168,7 +181,7 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
                   }
                 return (Just (pname, target, cann), outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (DuplicatedEmitterConnection target (location prevcann))
+                throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of

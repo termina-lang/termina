@@ -38,6 +38,7 @@ import Data.Maybe
 import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 import Parser.Types
+import Utils.Monad
 
 
 getMemberFieldType :: ParserAnn -> TerminaType -> Identifier -> SemanticMonad TerminaType

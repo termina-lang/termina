@@ -5,8 +5,7 @@ module ControlFlow.BasicBlocks.Checks.ExitPaths.Types (
     setPartialExit,
     setAllowedContinue,
     setAllowedSend,
-    setExitNotAllowed,
-    localScope
+    setExitNotAllowed
 ) where
 
 import Control.Monad.Except
@@ -69,12 +68,3 @@ setAllowedSend = do
 setExitNotAllowed :: BBPathsCheck ()
 setExitNotAllowed = do
     ST.put EPExitNotAllowed
-
--- Executes a computation in a local scope. The state of the checker is saved
--- before the computation is executed and restored afterwards.
-localScope :: BBPathsCheck a -> BBPathsCheck a
-localScope comp = do
-  prevst <- ST.get
-  res <- comp
-  ST.put prevst
-  return res

@@ -3,6 +3,8 @@ module ControlFlow.Architecture.Types where
 import Data.Map
 import ControlFlow.BasicBlocks.AST
 import Modules.Modules
+import qualified Data.Set as S
+import qualified Data.Map as M
 
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
@@ -35,7 +37,11 @@ data TPClass a = TPClass {
     -- | Map of the output ports of the task
     -- It maps the name of the port to the type of the data that is sent through
     -- the port.
-    outputPorts :: Map Identifier TerminaType
+    outputPorts :: Map Identifier TerminaType,
+
+    -- | Map between the output ports that send a box and the port from which
+    -- the box was originated.
+    classBoxIOMaps :: BoxOutputInputMaps
 
 } deriving Show
 
@@ -211,3 +217,37 @@ data TerminaProgArch a = TerminaProgArch {
     channelTargets :: Map Identifier (Identifier, Identifier, a)
 
 } deriving Show
+
+data InOptionBox =
+  InOptionBoxAlloc Identifier
+  | InOptionBoxProcedureCall Identifier Integer
+
+data InBox =
+  InBoxEventSink Identifier
+  | InBoxInput Identifier
+  | InBoxAlloc Identifier
+  | InBoxProcedureCall Identifier Integer
+  deriving (Show, Eq, Ord)
+
+data BoxOutputInputMaps = BoxOutputInputMaps {
+
+  -- | Map between the box parameters of a procedure call and the port from 
+  -- which the box was originated. The key is a tuple with the name of the
+  -- port, the name of the procedure and the index of the box parameter.
+  outBoxProcedureCall :: Map (Identifier, Identifier, Integer) (S.Set InBox),
+
+  -- | Map between the output ports that send a box and the port from which the
+  -- box was originated.
+  outBoxSend :: Map Identifier (S.Set InBox),
+
+  -- | Map between the allocator ports that are used to free a box and the
+  -- port from which the box was originated.
+  outBoxFree :: Map Identifier (S.Set InBox)
+
+} deriving Show
+
+data BoxInOutState = BoxInOutState {
+    inBoxMap :: M.Map Identifier InBox,
+    inOptionBoxMap :: M.Map Identifier InOptionBox,
+    outputInputMaps :: BoxOutputInputMaps
+}

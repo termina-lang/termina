@@ -25,6 +25,7 @@ import Core.Utils
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser
+import Utils.Monad
 
 ----------------------------------------
 getEType :: SemanticElems -> Maybe ESeman
@@ -185,15 +186,6 @@ modify = lift . ST.modify
 -- modifying current state.
 withInState :: Environment -> SemanticMonad a -> SemanticMonad a
 withInState tempState comp = localScope (put tempState >> comp)
-
--- Execute comp but bracktracking the state
--- Useful for blocks semantic analysis
-localScope :: SemanticMonad a -> SemanticMonad a
-localScope comp = do
-  prevst <- get
-  res <- comp
-  put prevst
-  return res
 
 ----------------------------------------
 -- Some helper functions to bring information from the environment.

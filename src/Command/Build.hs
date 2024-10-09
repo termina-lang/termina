@@ -34,7 +34,8 @@ import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
-import Semantic.Errors.PPrinting (ppError)
+import qualified Semantic.Errors.PPrinting as SE
+import qualified ControlFlow.Architecture.Errors.PPrinting as AE
 import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
@@ -136,7 +137,7 @@ typeModules parsedProject =
           let sourceFilesMap = 
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                     M.empty parsedProject in
-          ppError sourceFilesMap err >> exitFailure
+          SE.ppError sourceFilesMap err >> exitFailure
         (Right (typedProgram, newState)) -> do
           let typedModule =
                 TerminaModuleData
@@ -219,7 +220,14 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
       let typedModule = basicBlocksAST . metadata $ bbProject M.! m
       let result = runGenArchitecture tp m typedModule
       case result of
-        Left err -> die . errorMessage $ show err
+        Left err -> 
+          -- | Create the source files map. This map will be used to obtainn the source files that
+          -- will be feed to the error pretty printer. The source files map must use as key the
+          -- path of the source file and as element the text of the source file.
+          let sourceFilesMap = 
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                    M.empty bbProject in
+          AE.ppError sourceFilesMap err >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
 warnDisconnectedEmitters :: TerminaProgArch SemanticAnn -> IO ()
