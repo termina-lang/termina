@@ -160,7 +160,7 @@ getGlobDeclModules progArchitecture =
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError ProgramError m) => Object SemanticAnn -> m TerminaType
+getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m TerminaType
 getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
@@ -173,7 +173,7 @@ getObjType _ = throwError $ annotateError Internal EUnboxingObject
 -- expression's semantic annotation. The function assumes that the expression is well-typed
 -- and that the semantic annotation is correct. If the expression is not well-typed, the
 -- function will throw an error.
-getExprType :: (MonadError ProgramError m) => Expression SemanticAnn -> m TerminaType
+getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m TerminaType
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
@@ -192,7 +192,7 @@ getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 -- | This function returns the name of a port. The function assumes that the object is
 -- a port and that the object is well-typed. If the object is not a port or if the object
 -- is not well-typed, the function will throw an error.    
-getPortName :: (MonadError ProgramError m) => Object SemanticAnn -> m Identifier
+getPortName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getPortName obj = do
     obj_type <- getObjType obj
     case obj_type of 
@@ -208,7 +208,7 @@ getPortName obj = do
                 _ -> throwError $ annotateError Internal EUnboxingPort
         _ -> throwError $ annotateError Internal EUnboxingPort
 
-getObjOptionBoxName :: (MonadError ProgramError m) => Object SemanticAnn -> m Identifier
+getObjOptionBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getObjOptionBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
@@ -217,7 +217,7 @@ getObjOptionBoxName obj@(Variable name _) = do
 getObjOptionBoxName (Dereference expr _) = getObjOptionBoxName expr
 getObjOptionBoxName _ = throwError $ annotateError Internal EUnboxingOptionBox
 
-getObjBoxName :: (MonadError ProgramError m) => Object SemanticAnn -> m Identifier
+getObjBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getObjBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
@@ -225,12 +225,12 @@ getObjBoxName obj@(Variable name _) = do
     _ -> throwError $ annotateError Internal EUnboxingBox
 getObjBoxName _ = throwError $ annotateError Internal EUnboxingBox
   
-getExprOptionBoxName :: (MonadError ProgramError m) => Expression SemanticAnn -> m Identifier
+getExprOptionBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m Identifier
 getExprOptionBoxName (AccessObject obj) = getObjOptionBoxName obj
 getExprOptionBoxName (ReferenceExpression _ak obj _ann) = getObjOptionBoxName obj
 getExprOptionBoxName _ = throwError $ annotateError Internal EUnboxingOptionBox
 
-getExprBoxName :: (MonadError ProgramError m) => Expression SemanticAnn -> m Identifier
+getExprBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m Identifier
 getExprBoxName (AccessObject obj) = getObjBoxName obj
 getExprBoxName _ = throwError $ annotateError Internal EUnboxingBox
 

@@ -15,7 +15,7 @@ import Data.Maybe
 import qualified Data.Set as S
 
 
-type BoxInOutMonad = ExceptT ProgramError (ST.State BoxInOutState)
+type BoxInOutMonad = ExceptT ArchitectureError (ST.State BoxInOutState)
 
 localInputScope :: BoxInOutMonad a -> BoxInOutMonad a
 localInputScope comp = do
@@ -137,8 +137,6 @@ inOutClassMember actionsToPorts (ClassAction name input _ body _) = do
             case fieldTerminaType inPt of
                 InPort _ portName ->
                     addBox (paramIdentifier input) (InBoxInput portName)
-                SinkPort _ portName ->
-                    addBox (paramIdentifier input) (InBoxEventSink portName)
                 _ -> throwError $ annotateError Internal EUnboxingClassField
             inOutBasicBlocks body
         _ -> inOutBasicBlocks body
@@ -180,7 +178,7 @@ emptyBoxInOutState = BoxInOutState M.empty M.empty emptyBoxOutputInputMaps
 
 runInOutClass ::
   TypeDef SemanticAnn
-  -> Either ProgramError BoxOutputInputMaps
+  -> Either ArchitectureError BoxOutputInputMaps
 runInOutClass tyDef =
   case flip ST.runState emptyBoxInOutState . runExceptT $ inOutClass tyDef of
     (Left err, _) -> Left err

@@ -13,7 +13,7 @@ import Utils.Annotations
 import Utils.Errors
 
 ppError :: M.Map FilePath TL.Text ->
-    ProgramError -> IO ()
+    ArchitectureError -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
   let fileName = sourceName startPos
       sourceLines = toModuleAST M.! fileName
@@ -43,13 +43,6 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
             printSimpleError
                 procSourceLines "The previous connection was done here:" procFileName
                 procPos Nothing
-    EUnsupportedEmitterClass classId -> 
-        let title = "\x1b[31merror [AE-003]\x1b[0m: Unsupported emitter class"
-        in
-            printSimpleError
-                sourceLines title fileName pos
-                (Just ("Emitter class \x1b[31m" <> T.pack classId <>
-                    "\x1b[0m is not supported."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

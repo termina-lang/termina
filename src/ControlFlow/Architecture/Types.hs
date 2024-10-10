@@ -41,7 +41,11 @@ data TPClass a = TPClass {
 
     -- | Map between the output ports that send a box and the port from which
     -- the box was originated.
-    classBoxIOMaps :: BoxOutputInputMaps
+    classBoxIOMaps :: BoxOutputInputMaps,
+
+    -- | Map between the actions and the output ports through which the action
+    -- sends messages.
+    actionForwardingMap :: ActionForwardingMap
 
 } deriving Show
 
@@ -211,10 +215,19 @@ data TerminaProgArch a = TerminaProgArch {
     -- | Map of all the task classes in the program
     channels :: Map Identifier (TPChannel a),
 
+    -- | Map the sources of all the connected channels
+    channelSources :: Map Identifier [(Identifier, Identifier, a)],
+
     -- | Map of all the connected channels
     -- It maps the name of the channel to the name of the task and the
     -- name of the port that is connected to the channel.
-    channelTargets :: Map Identifier (Identifier, Identifier, a)
+    channelTargets :: Map Identifier (Identifier, Identifier, a),
+
+    -- | Map of all the connected resources
+    -- It maps the name of the resource to the name of the task, handler or
+    -- resource that is connected to the resource and the name of the port that
+    -- is used to access the resource.
+    resourceSources :: Map Identifier [(Identifier, Identifier, a)]
 
 } deriving Show
 
@@ -223,8 +236,7 @@ data InOptionBox =
   | InOptionBoxProcedureCall Identifier Integer
 
 data InBox =
-  InBoxEventSink Identifier
-  | InBoxInput Identifier
+  InBoxInput Identifier
   | InBoxAlloc Identifier
   | InBoxProcedureCall Identifier Integer
   deriving (Show, Eq, Ord)
@@ -251,3 +263,7 @@ data BoxInOutState = BoxInOutState {
     inOptionBoxMap :: M.Map Identifier InOptionBox,
     outputInputMaps :: BoxOutputInputMaps
 }
+
+-- | Map between the action identifiers and the set of out ports through which
+-- the action sends messages.
+type ActionForwardingMap = Map Identifier (S.Set Identifier)

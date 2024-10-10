@@ -14,8 +14,61 @@ import Utils.Annotations
 import qualified Data.Map as M
 import Modules.Modules
 import ControlFlow.Architecture.BoxInOut
+import ControlFlow.Architecture.Forwarding
 
-type ArchitectureMonad = ExceptT ProgramError (ST.State (TerminaProgArch SemanticAnn))
+type ArchitectureMonad = ExceptT ArchitectureError (ST.State (TerminaProgArch SemanticAnn))
+
+addResourceSource :: 
+  Identifier -- ^ Name of the resource
+  -> Identifier -- ^ Name of the element that is connected to the resource
+  -> Identifier -- ^ Name of the port that is used to connect to the resource
+  -> SemanticAnn
+  -> ArchitectureMonad ()
+addResourceSource target source port ann = do
+  connectedResources <- ST.gets resourceSources
+  case M.lookup target connectedResources of
+    Nothing -> do
+      ST.modify $ \tp ->
+        tp {
+          resourceSources = M.insert target [(source, port, ann)] connectedResources
+        }
+    Just s ->
+      ST.modify $ \tp ->
+        tp {
+          resourceSources = M.insert target ((source, port, ann) : s) connectedResources
+        }
+
+addChannelTarget :: 
+  Identifier -- ^ Name of the channel
+  -> Identifier -- ^ Name of the element that is connected to the channel
+  -> Identifier -- ^ Name of the port that is used to connect to the channel
+  -> SemanticAnn
+  -> ArchitectureMonad ()
+addChannelTarget target ident pname cann = do
+  ST.modify $ \tp ->
+    tp {
+      channelTargets = M.insert target (ident, pname, cann) (channelTargets tp)
+    }
+
+addChannelSource :: 
+  Identifier -- ^ Name of the element that is connected to the channel
+  -> Identifier -- ^ Name of the port that is used to connect to the channel
+  -> Identifier -- ^ Name of the channel
+  -> SemanticAnn
+  -> ArchitectureMonad ()
+addChannelSource ident pname target ann = do
+  channelSrcs <- ST.gets channelSources
+  case M.lookup target channelSrcs of
+    Nothing -> do
+      ST.modify $ \tp ->
+        tp {
+          channelSources = M.insert target [(ident, pname, ann)]channelSrcs
+        }
+    Just s ->
+      ST.modify $ \tp ->
+        tp {
+          channelSources = M.insert target ((ident, pname, ann) : s) channelSrcs
+        }
 
 genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
 genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
@@ -27,7 +80,11 @@ genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  let tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs outBoxMap
+  forwardingMap <-
+    case runGetForwardingMap members of
+      Left err -> throwError err
+      Right m -> return m
+  let tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs outBoxMap forwardingMap
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
@@ -41,7 +98,11 @@ genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  let hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs outBoxMap
+  forwardingMap <-
+    case runGetForwardingMap members of
+      Left err -> throwError err
+      Right m -> return m
+  let hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs outBoxMap forwardingMap
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
@@ -54,7 +115,8 @@ genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  let resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs outBoxMap
+  -- | Resources do not have forwarding actions
+  let resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs outBoxMap M.empty
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
@@ -77,7 +139,7 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
-    _ -> throwError $ annotateError (location ann) (EUnsupportedEmitterClass ident)
+    _ -> throwError $ annotateError Internal (EUnsupportedEmitterClass ident)
 genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
@@ -89,10 +151,8 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
             -- | Check if the target channel is already connected to an in port
             case M.lookup target connectedTargets of
               Nothing -> do
-                ST.modify $ \tp ->
-                  tp {
-                    channelTargets = M.insert target (ident, pname, cann) connectedTargets
-                  }
+                addChannelTarget target ident pname cann
+                addChannelSource ident pname target cann
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
@@ -113,7 +173,8 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
         case getPortType pname members of
           OutPort {} -> return (inp, sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
-      FieldPortConnection AccessPortConnection pname target cann  ->
+      FieldPortConnection AccessPortConnection pname target cann -> do
+        addResourceSource target ident pname cann
         return (inp, sink, outp, M.insert pname (target, cann) accp)
       _ -> return (inp, sink, outp, accp)
     ) (M.empty, M.empty, M.empty, M.empty) assignments
@@ -133,7 +194,8 @@ genArchGlobal modName (Resource ident (DefinedType rcls) initializer _ rann) =
     Just (StructInitializer assignments _ _) -> do
       apConns <- foldM (\accps assignment -> do
         case assignment of
-          FieldPortConnection AccessPortConnection pname target cann  ->
+          FieldPortConnection AccessPortConnection pname target cann  -> do
+            addResourceSource target ident pname cann
             return $ M.insert pname (target, cann) accps
           _ -> return accps
         ) M.empty assignments
@@ -187,7 +249,8 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
         case getPortType pname members of
           OutPort {} -> return (sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
-      FieldPortConnection AccessPortConnection pname target cann  ->
+      FieldPortConnection AccessPortConnection pname target cann  -> do
+        addResourceSource target ident pname cann
         return (sink, outp, M.insert pname (target, cann) accp)
       _ -> return (sink, outp, accp)
     ) (Nothing, M.empty, M.empty) assignments
@@ -226,13 +289,15 @@ emptyTerminaProgArch = TerminaProgArch {
   atomics = M.empty,
   atomicArrays = M.empty,
   channels = M.empty,
-  channelTargets = M.empty
+  channelSources = M.empty,
+  channelTargets = M.empty,
+  resourceSources = M.empty
 }
 
 runGenArchitecture ::
   TerminaProgArch SemanticAnn
   -> QualifiedName -> AnnotatedProgram SemanticAnn
-  -> Either ProgramError (TerminaProgArch SemanticAnn)
+  -> Either ArchitectureError (TerminaProgArch SemanticAnn)
 runGenArchitecture tp modName elements =
   case flip ST.runState tp . runExceptT $ mapM_ (genArchElement modName) elements of
     (Left err, _) -> Left err
