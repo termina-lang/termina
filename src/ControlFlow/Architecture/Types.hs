@@ -41,7 +41,7 @@ data TPClass a = TPClass {
 
     -- | Map between the output ports that send a box and the port from which
     -- the box was originated.
-    classBoxIOMaps :: BoxOutputInputMaps,
+    classBoxIOMaps :: BoxOutputInputMaps a,
 
     -- | Map between the actions and the output ports through which the action
     -- sends messages.
@@ -231,37 +231,37 @@ data TerminaProgArch a = TerminaProgArch {
 
 } deriving Show
 
-data InOptionBox =
-  InOptionBoxAlloc Identifier
-  | InOptionBoxProcedureCall Identifier Integer
+data InOptionBox a =
+  InOptionBoxAlloc Identifier a
+  | InOptionBoxProcedureCall Identifier Integer a
 
-data InBox =
-  InBoxInput Identifier
-  | InBoxAlloc Identifier
-  | InBoxProcedureCall Identifier Integer
+data InBox a =
+  InBoxInput Identifier a
+  | InBoxAlloc Identifier a
+  | InBoxProcedureCall Identifier Integer a
   deriving (Show, Eq, Ord)
 
-data BoxOutputInputMaps = BoxOutputInputMaps {
+data BoxOutputInputMaps a = BoxOutputInputMaps {
 
   -- | Map between the box parameters of a procedure call and the port from 
   -- which the box was originated. The key is a tuple with the name of the
   -- port, the name of the procedure and the index of the box parameter.
-  outBoxProcedureCall :: Map (Identifier, Identifier, Integer) (S.Set InBox),
+  outBoxProcedureCall :: Map (Identifier, Identifier, Integer) [InBox a],
 
   -- | Map between the output ports that send a box and the port from which the
   -- box was originated.
-  outBoxSend :: Map Identifier (S.Set InBox),
+  outBoxSend :: Map Identifier [InBox a],
 
   -- | Map between the allocator ports that are used to free a box and the
   -- port from which the box was originated.
-  outBoxFree :: Map Identifier (S.Set InBox)
+  outBoxFree :: Map Identifier [InBox a]
 
 } deriving Show
 
-data BoxInOutState = BoxInOutState {
-    inBoxMap :: M.Map Identifier InBox,
-    inOptionBoxMap :: M.Map Identifier InOptionBox,
-    outputInputMaps :: BoxOutputInputMaps
+data BoxInOutState a = BoxInOutState {
+    inBoxMap :: M.Map Identifier (InBox a),
+    inOptionBoxMap :: M.Map Identifier (InOptionBox a),
+    outputInputMaps :: BoxOutputInputMaps a
 }
 
 -- | Map between the action identifiers and the set of out ports through which

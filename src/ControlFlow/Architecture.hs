@@ -44,10 +44,10 @@ addChannelTarget ::
   -> Identifier -- ^ Name of the port that is used to connect to the channel
   -> SemanticAnn
   -> ArchitectureMonad ()
-addChannelTarget target ident pname cann = do
+addChannelTarget channel ident pname cann = do
   ST.modify $ \tp ->
     tp {
-      channelTargets = M.insert target (ident, pname, cann) (channelTargets tp)
+      channelTargets = M.insert channel (ident, pname, cann) (channelTargets tp)
     }
 
 addChannelSource :: 
@@ -56,18 +56,18 @@ addChannelSource ::
   -> Identifier -- ^ Name of the channel
   -> SemanticAnn
   -> ArchitectureMonad ()
-addChannelSource ident pname target ann = do
+addChannelSource ident pname channel ann = do
   channelSrcs <- ST.gets channelSources
-  case M.lookup target channelSrcs of
+  case M.lookup ident channelSrcs of
     Nothing -> do
       ST.modify $ \tp ->
         tp {
-          channelSources = M.insert target [(ident, pname, ann)]channelSrcs
+          channelSources = M.insert channel [(ident, pname, ann)] channelSrcs
         }
     Just s ->
       ST.modify $ \tp ->
         tp {
-          channelSources = M.insert target ((ident, pname, ann) : s) channelSrcs
+          channelSources = M.insert channel ((ident, pname, ann) : s) channelSrcs
         }
 
 genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
@@ -152,7 +152,6 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
             case M.lookup target connectedTargets of
               Nothing -> do
                 addChannelTarget target ident pname cann
-                addChannelSource ident pname target cann
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
@@ -171,7 +170,9 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort {} -> return (inp, sink, M.insert pname (target, cann) outp, accp)
+          OutPort {} -> do
+            addChannelSource ident pname target cann
+            return (inp, sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann -> do
         addResourceSource target ident pname cann
@@ -247,7 +248,9 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort {} -> return (sink, M.insert pname (target, cann) outp, accp)
+          OutPort {} -> do
+            addChannelSource ident pname target cann
+            return (sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann  -> do
         addResourceSource target ident pname cann

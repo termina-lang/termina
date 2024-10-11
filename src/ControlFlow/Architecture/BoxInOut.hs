@@ -12,10 +12,8 @@ import Semantic.Types
 import ControlFlow.Architecture.Utils
 import Utils.Annotations
 import Data.Maybe
-import qualified Data.Set as S
 
-
-type BoxInOutMonad = ExceptT ArchitectureError (ST.State BoxInOutState)
+type BoxInOutMonad = ExceptT ArchitectureError (ST.State (BoxInOutState SemanticAnn))
 
 localInputScope :: BoxInOutMonad a -> BoxInOutMonad a
 localInputScope comp = do
@@ -28,37 +26,37 @@ localInputScope comp = do
 clearInputScope :: BoxInOutMonad ()
 clearInputScope = ST.modify (\s -> s { inBoxMap = M.empty, inOptionBoxMap = M.empty }) 
 
-addOptionBox :: Identifier -> InOptionBox -> BoxInOutMonad ()
+addOptionBox :: Identifier -> InOptionBox SemanticAnn -> BoxInOutMonad ()
 addOptionBox inPt optionBox = do
     ST.modify (\s -> s { inOptionBoxMap = M.insert inPt optionBox (inOptionBoxMap s) })
 
-addBox :: Identifier -> InBox -> BoxInOutMonad ()
+addBox :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
 addBox inPt inBox = do
     ST.modify (\s -> s { inBoxMap = M.insert inPt inBox (inBoxMap s) })
 
-addIOMapFree :: Identifier -> InBox -> BoxInOutMonad ()
+addIOMapFree :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
 addIOMapFree outPt inBox = do
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup outPt (outBoxFree prevIOMap) of
-        Just frees -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt (S.insert inBox frees) (outBoxFree prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt (S.singleton inBox) (outBoxFree prevIOMap) } } )
+        Just frees -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt (inBox : frees) (outBoxFree prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt [inBox] (outBoxFree prevIOMap) } } )
 
-addIOMapSend :: Identifier -> InBox -> BoxInOutMonad ()
+addIOMapSend :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
 addIOMapSend outPt inBox = do
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup outPt (outBoxSend prevIOMap) of
-        Just sends -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt (S.insert inBox sends) (outBoxSend prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt (S.singleton inBox) (outBoxSend prevIOMap) } } )
+        Just sends -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt (inBox : sends) (outBoxSend prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt [inBox] (outBoxSend prevIOMap) } } )
 
-addIOMapProcedureCall :: Identifier -> Identifier -> Integer -> InBox -> BoxInOutMonad ()
+addIOMapProcedureCall :: Identifier -> Identifier -> Integer -> InBox SemanticAnn -> BoxInOutMonad ()
 addIOMapProcedureCall outPt procId argNum inBox = do
     let procedureCall = (outPt, procId, argNum)
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup procedureCall (outBoxProcedureCall prevIOMap) of
-        Just calls -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall (S.insert inBox calls) (outBoxProcedureCall prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall (S.singleton inBox) (outBoxProcedureCall prevIOMap) } } )
+        Just calls -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall (inBox : calls) (outBoxProcedureCall prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall [inBox] (outBoxProcedureCall prevIOMap) } } )
 
-inOutDestroyOptionMatchCases :: InOptionBox -> [MatchCase SemanticAnn] -> BoxInOutMonad ()
+inOutDestroyOptionMatchCases :: InOptionBox SemanticAnn -> [MatchCase SemanticAnn] -> BoxInOutMonad ()
 inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do 
     let (someCase, MatchCase _ _ noneBody _) = if matchIdentifier fstCase == "Some" then (fstCase, sndCase) else (sndCase, fstCase)
     case someCase of
@@ -69,11 +67,11 @@ inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do
 inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EUnboxingMatchCase
 
 inOutBasicBlock :: BasicBlock SemanticAnn -> BoxInOutMonad ()
-inOutBasicBlock (AllocBox obj arg _ann) = do
+inOutBasicBlock (AllocBox obj arg ann) = do
     -- | First we need to obtain the name of the allocator port
     inPt <- getPortName obj
     optionBox <- getExprOptionBoxName arg
-    addOptionBox optionBox (InOptionBoxAlloc inPt)
+    addOptionBox optionBox (InOptionBoxAlloc inPt ann)
 inOutBasicBlock (FreeBox obj arg _ann) = do
     outPt <- getPortName obj
     boxName <- getExprBoxName arg
@@ -129,18 +127,15 @@ inOutClassMember :: M.Map Identifier FieldDefinition -> ClassMember SemanticAnn 
 inOutClassMember _ (ClassField {}) = return ()
 inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
-inOutClassMember actionsToPorts (ClassAction name input _ body _) = do
+inOutClassMember actionsToPorts (ClassAction name input _ body ann) = do
     clearInputScope
     case paramTerminaType input of
         (BoxSubtype _) -> do
             let inPt = actionsToPorts M.! name
-            case fieldTerminaType inPt of
-                InPort _ portName ->
-                    addBox (paramIdentifier input) (InBoxInput portName)
-                _ -> throwError $ annotateError Internal EUnboxingClassField
+            addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt) ann)
             inOutBasicBlocks body
         _ -> inOutBasicBlocks body
-inOutClassMember _ (ClassProcedure name params body _) = do
+inOutClassMember _ (ClassProcedure name params body ann) = do
     clearInputScope
     zipWithM_ addInParam [0..] params
     inOutBasicBlocks body
@@ -150,7 +145,7 @@ inOutClassMember _ (ClassProcedure name params body _) = do
         addInParam :: Integer -> Parameter -> BoxInOutMonad ()
         addInParam argNum param = case paramTerminaType param of
             BoxSubtype _ -> do
-                addBox (paramIdentifier param) (InBoxProcedureCall name argNum)
+                addBox (paramIdentifier param) (InBoxProcedureCall name argNum ann)
             _ -> return ()
 
 inOutClass :: TypeDef SemanticAnn -> BoxInOutMonad ()
@@ -170,15 +165,15 @@ inOutClass (Class _ _ members _ _) = do
     mapM_ (inOutClassMember actionsToPorts) members
 inOutClass _ = return ()
 
-emptyBoxOutputInputMaps :: BoxOutputInputMaps
+emptyBoxOutputInputMaps :: BoxOutputInputMaps a
 emptyBoxOutputInputMaps = BoxOutputInputMaps M.empty M.empty M.empty
 
-emptyBoxInOutState :: BoxInOutState
+emptyBoxInOutState :: BoxInOutState a
 emptyBoxInOutState = BoxInOutState M.empty M.empty emptyBoxOutputInputMaps
 
 runInOutClass ::
   TypeDef SemanticAnn
-  -> Either ArchitectureError BoxOutputInputMaps
+  -> Either ArchitectureError (BoxOutputInputMaps SemanticAnn)
 runInOutClass tyDef =
   case flip ST.runState emptyBoxInOutState . runExceptT $ inOutClass tyDef of
     (Left err, _) -> Left err

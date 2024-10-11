@@ -234,6 +234,6 @@ getExprBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> 
 getExprBoxName (AccessObject obj) = getObjBoxName obj
 getExprBoxName _ = throwError $ annotateError Internal EUnboxingBox
 
-getInBox :: InOptionBox -> InBox
-getInBox (InOptionBoxAlloc ident) = InBoxAlloc ident
-getInBox (InOptionBoxProcedureCall ident idx) = InBoxProcedureCall ident idx
+getInBox :: InOptionBox a -> InBox a
+getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
+getInBox (InOptionBoxProcedureCall ident idx ann) = InBoxProcedureCall ident idx ann

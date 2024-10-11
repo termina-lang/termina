@@ -242,6 +242,20 @@ genBasicBlocks = mapM genBasicBlocksModule
 checkProjectBasicBlocksPaths :: BasicBlocksProject -> IO ()
 checkProjectBasicBlocksPaths = mapM_ checkBasicBlocksPaths . M.elems
 
+checkProjectBoxSources :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkProjectBoxSources bbProject progArchitecture = 
+  let result = runCheckBoxSources progArchitecture in
+  case result of
+    Left err -> 
+      -- | Create the source files map. This map will be used to obtainn the source files that
+      -- will be feed to the error pretty printer. The source files map must use as key the
+      -- path of the source file and as element the text of the source file.
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      AE.ppError sourceFilesMap err >> exitFailure
+    Right _ -> return ()
+
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
@@ -296,6 +310,7 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
+    checkProjectBoxSources bbProject programArchitecture
     warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
