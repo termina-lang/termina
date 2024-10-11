@@ -236,6 +236,15 @@ warnDisconnectedEmitters tp =
     unless (null disconnectedEmitters) $
       putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show disconnectedEmitters
 
+checkDisconnectedChannels :: TerminaProgArch SemanticAnn -> IO ()
+checkDisconnectedChannels tp = do
+    let noSourceChannels = getChannelsWithoutInputs tp
+    unless (null noSourceChannels) $
+      (putStrLn . errorMessage $ "The following channels do not have any message sources connected to them: " ++ show noSourceChannels) >> exitFailure
+    let noTargetChannels = getChannelsWithoutTargets tp
+    unless (null noTargetChannels) $
+      (putStrLn . errorMessage $ "The following channels do not have a message sink connected to them: " ++ show noTargetChannels) >> exitFailure
+
 genBasicBlocks :: TypedProject -> IO BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
 
@@ -310,6 +319,7 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
+    checkDisconnectedChannels programArchitecture
     checkProjectBoxSources bbProject programArchitecture
     warnDisconnectedEmitters programArchitecture
     -- | Generate the code

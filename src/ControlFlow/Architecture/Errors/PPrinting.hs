@@ -27,7 +27,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Emitter \x1b[31m" <> T.pack emitter <>
-                    "\x1b[0m is already connected to an sink port.")) >>
+                    "\x1b[0m is already connected to a sink port. " <>
+                    "Only one target is allowed per event source.")) >>
             printSimpleError
                 procSourceLines "The previous connection was done here:" procFileName
                 procPos Nothing
@@ -39,7 +40,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Channel \x1b[31m" <> T.pack channel <>
-                    "\x1b[0m is already connected to an input port.")) >>
+                    "\x1b[0m is already connected to an input port. " <>
+                    "Only one target is allowed per channel.")) >>
             printSimpleError
                 procSourceLines "The previous connection was done here:" procFileName
                 procPos Nothing

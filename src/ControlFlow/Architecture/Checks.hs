@@ -1,5 +1,7 @@
 module ControlFlow.Architecture.Checks (
     getDisconnectedEmitters,
+    getChannelsWithoutInputs,
+    getChannelsWithoutTargets,
     runCheckBoxSources
 ) where
 import qualified Data.Map as M
@@ -14,6 +16,12 @@ import ControlFlow.Architecture.Errors.Errors
 
 getDisconnectedEmitters :: TerminaProgArch SemanticAnn -> [Identifier]
 getDisconnectedEmitters tp = M.keys . M.filter ((`M.notMember` emitterTargets tp) . getEmmiterIdentifier) . emitters $ tp
+
+getChannelsWithoutInputs :: TerminaProgArch SemanticAnn -> [Identifier]
+getChannelsWithoutInputs tp = M.keys . M.filter ((`M.notMember` channelSources tp) . (\(TPMsgQueue ident _ _ _ _) -> ident )) . channels $ tp
+
+getChannelsWithoutTargets :: TerminaProgArch SemanticAnn -> [Identifier]
+getChannelsWithoutTargets tp = M.keys . M.filter ((`M.notMember` channelTargets tp) . (\(TPMsgQueue ident _ _ _ _) -> ident )) . channels $ tp
 
 type BoxCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
@@ -120,12 +128,12 @@ getBoxSourceChannel ::
     Identifier -- ^ Expected source of the box
     -> TPChannel SemanticAnn -- ^ The channel from which the box is being received
     -> BoxCheckMonad ()
-getBoxSourceChannel expectedSource (TPMsgQueue channelId (BoxSubtype _) _ _ cann) = do
+getBoxSourceChannel expectedSource (TPMsgQueue channelId (BoxSubtype _) _ _ _) = do
     -- | First we need to get check if the current channel has been already visited
     progArchitecture <- ask
     let sources = channelSources progArchitecture
     case M.lookup channelId sources of
-        Nothing -> throwError $ annotateError (location cann) (EDisconnectedChannel channelId)
+        Nothing -> throwError $ annotateError Internal EUnboxingChannelSource
         Just ss -> mapM_ (getBoxSourceSend expectedSource) ss
 getBoxSourceChannel _ _ = throwError $ annotateError Internal EUnboxingChannelSource
 

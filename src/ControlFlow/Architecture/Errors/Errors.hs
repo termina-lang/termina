@@ -22,10 +22,11 @@ data Error =
     | EUnboxingFree -- ^ Error when trying to unbox a free (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
-    | EDisconnectedChannel Identifier -- ^ Disconnected channel (AE-003)
-    | EDisconnectedResource Identifier -- ^ Disconnected resource (AE-004)
-    | EDisconnectedPool Identifier -- ^ Disconnected pool (AE-005)
-    | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-006)
+    | EChannelWithoutSources Identifier -- ^ Channel without sources (AE-003)
+    | EChannelWithoutTargets Identifier -- ^ Channel without targets (AE-004)
+    | EDisconnectedResource Identifier -- ^ Disconnected resource (AE-005)
+    | EDisconnectedPool Identifier -- ^ Disconnected pool (AE-006)
+    | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-007)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location
