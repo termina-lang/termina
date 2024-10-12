@@ -244,6 +244,18 @@ checkDisconnectedChannels tp = do
     let noTargetChannels = getChannelsWithoutTargets tp
     unless (null noTargetChannels) $
       (putStrLn . errorMessage $ "The following channels do not have a message sink connected to them: " ++ show noTargetChannels) >> exitFailure
+  
+checkUnusedResources :: TerminaProgArch SemanticAnn -> IO ()
+checkUnusedResources tp = do
+    let unusedResources = getUnusedResources tp
+    unless (null unusedResources) $
+      (putStrLn . errorMessage $ "The following resources are not used: " ++ show unusedResources) >> exitFailure
+
+checkUnusedPools :: TerminaProgArch SemanticAnn -> IO ()
+checkUnusedPools tp = do
+    let unusedPools = getUnusedPools tp
+    unless (null unusedPools) $
+      (putStrLn . errorMessage $ "The following pools are not used: " ++ show unusedPools) >> exitFailure
 
 genBasicBlocks :: TypedProject -> IO BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
@@ -320,6 +332,8 @@ buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
     checkDisconnectedChannels programArchitecture
+    checkUnusedResources programArchitecture
+    checkUnusedPools programArchitecture
     checkProjectBoxSources bbProject programArchitecture
     warnDisconnectedEmitters programArchitecture
     -- | Generate the code

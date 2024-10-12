@@ -2,6 +2,8 @@ module ControlFlow.Architecture.Checks (
     getDisconnectedEmitters,
     getChannelsWithoutInputs,
     getChannelsWithoutTargets,
+    getUnusedResources,
+    getUnusedPools,
     runCheckBoxSources
 ) where
 import qualified Data.Map as M
@@ -22,6 +24,12 @@ getChannelsWithoutInputs tp = M.keys . M.filter ((`M.notMember` channelSources t
 
 getChannelsWithoutTargets :: TerminaProgArch SemanticAnn -> [Identifier]
 getChannelsWithoutTargets tp = M.keys . M.filter ((`M.notMember` channelTargets tp) . (\(TPMsgQueue ident _ _ _ _) -> ident )) . channels $ tp
+
+getUnusedResources :: TerminaProgArch SemanticAnn -> [Identifier]
+getUnusedResources tp = M.keys . M.filter ((`M.notMember` resourceSources tp) . resourceName) . resources $ tp
+
+getUnusedPools :: TerminaProgArch SemanticAnn -> [Identifier]
+getUnusedPools tp = M.keys . M.filter ((`M.notMember` resourceSources tp) . (\(TPPool ident _ _ _ _) -> ident)) . pools $ tp
 
 type BoxCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
@@ -102,7 +110,7 @@ checkBoxSourceTaskSend expectedSource task outPt = do
     case M.lookup outPt (outBoxSend . classBoxIOMaps $ taskCls) of
         Just sources ->
             mapM_ (checkTaskSourceInBox expectedSource task) sources
-        Nothing -> throwError $ annotateError Internal EUnboxingTaskSource
+        Nothing -> throwError $ annotateError Internal EUnboxingTask
 
 checkBoxSourceHandlerSend :: Identifier -> TPHandler SemanticAnn -> Identifier -> BoxCheckMonad ()
 checkBoxSourceHandlerSend expectedSource handler outPt = do
@@ -111,7 +119,7 @@ checkBoxSourceHandlerSend expectedSource handler outPt = do
     case M.lookup outPt (outBoxSend . classBoxIOMaps $ handlerCls) of
         Just sources ->
             mapM_ (checkHandlerSourceInBox expectedSource handler) sources
-        Nothing -> throwError $ annotateError Internal EUnboxingHandlerSource
+        Nothing -> throwError $ annotateError Internal EUnboxingHandler
 
 getBoxSourceSend :: Identifier -> (Identifier, Identifier, SemanticAnn) -> BoxCheckMonad ()
 getBoxSourceSend expectedSource (source, outPort, ann) = do
@@ -122,7 +130,7 @@ getBoxSourceSend expectedSource (source, outPort, ann) = do
         Nothing ->
             case M.lookup source (handlers progArchitecture) of
                 Just handler -> checkNextSource (location ann) (checkBoxSourceHandlerSend expectedSource handler outPort)
-                Nothing -> throwError $ annotateError Internal EUnboxingChannelSource
+                Nothing -> throwError $ annotateError Internal EUnboxingChannel
 
 getBoxSourceChannel ::
     Identifier -- ^ Expected source of the box
@@ -133,9 +141,9 @@ getBoxSourceChannel expectedSource (TPMsgQueue channelId (BoxSubtype _) _ _ _) =
     progArchitecture <- ask
     let sources = channelSources progArchitecture
     case M.lookup channelId sources of
-        Nothing -> throwError $ annotateError Internal EUnboxingChannelSource
+        Nothing -> throwError $ annotateError Internal EUnboxingChannel
         Just ss -> mapM_ (getBoxSourceSend expectedSource) ss
-getBoxSourceChannel _ _ = throwError $ annotateError Internal EUnboxingChannelSource
+getBoxSourceChannel _ _ = throwError $ annotateError Internal EUnboxingChannel
 
 checkResourceSourceInBox ::
     Identifier -- ^ Expected source of the box
@@ -150,7 +158,7 @@ checkResourceSourceInBox expectedSource resource (InBoxAlloc port ann) =
             (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
         -- | This should not happen, since all the ports of the resource
         -- must be connected to something
-        Nothing -> throwError $ annotateError Internal EUnboxingResourceSource
+        Nothing -> throwError $ annotateError Internal EUnboxingResource
 checkResourceSourceInBox expectedSource resource (InBoxProcedureCall procName argNum ann) = do
     progArchitecture <- ask
     -- | The box was received via a call to one of the procedures of the resource
@@ -159,11 +167,11 @@ checkResourceSourceInBox expectedSource resource (InBoxProcedureCall procName ar
     case M.lookup (resourceName resource) (resourceSources progArchitecture) of
         Just callers -> mapM_ (\(caller, accessPt, _) ->
             checkNextSource (location ann) (checkBoxProcedureCall expectedSource caller accessPt procName argNum)) callers
-        -- | This means that the resource is not connected to anything (which would be an error)
-        Nothing -> throwError $ annotateError (location (resourceAnns resource)) (EDisconnectedResource (resourceName resource))
+        -- | This means that the resource is not connected to anything (this shouuld not happen)
+        Nothing -> throwError $ annotateError Internal EUnboxingResource
 -- | The rest of the cases should not happen, since resources do not have procedures
 -- and no event emitter may send us a box  
-checkResourceSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingResourceSource
+checkResourceSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingResource
 
 checkTaskSourceInBox ::
     Identifier -- ^ Expected source of the box
@@ -177,19 +185,19 @@ checkTaskSourceInBox expectedSource task (InBoxAlloc port ann) =
             (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
         -- | This should not happen, since all the ports of the task
         -- must be connected to something
-        Nothing -> throwError $ annotateError Internal EUnboxingTaskSource
+        Nothing -> throwError $ annotateError Internal EUnboxingTask
 checkTaskSourceInBox expectedSource task (InBoxInput port ann) = do
     -- | The box was received from a port connected to a channel. We must
     -- obtain the name of the channel to which the port is connected and then
     -- obtain the source of the box from the box-channel map
     progArchitecture <- ask
     case M.lookup port (taskInputPortConns task) of
-        Nothing -> throwError $ annotateError Internal EUnboxingTaskSource
+        Nothing -> throwError $ annotateError Internal EUnboxingTask
         Just (channel, _) -> case M.lookup channel (channels progArchitecture) of
             Just nextChannel -> checkNextSource (location ann) (getBoxSourceChannel expectedSource nextChannel)
-            Nothing -> throwError $ annotateError Internal EUnboxingTaskSource
+            Nothing -> throwError $ annotateError Internal EUnboxingTask
 -- | The rest of the cases should not happen, since tasks do not have procedures
-checkTaskSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingTaskSource
+checkTaskSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingTask
 
 checkHandlerSourceInBox ::
     Identifier -- ^ Expected source of the box
@@ -204,8 +212,8 @@ checkHandlerSourceInBox expectedSource handler (InBoxAlloc port ann) =
             (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
         -- | This should not happen, since all the ports of the handler
         -- must be connected to something
-        Nothing -> throwError $ annotateError Internal EUnboxingHandlerSource
-checkHandlerSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingHandlerSource
+        Nothing -> throwError $ annotateError Internal EUnboxingHandler
+checkHandlerSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingHandler
 
 checkBoxSourceResourceFree ::
     Identifier -- ^ Expected source of the box
@@ -271,13 +279,13 @@ checkBoxSource :: TPPool SemanticAnn -> BoxCheckMonad ()
 checkBoxSource (TPPool poolName _ _ _ ann) = do
     progArchitecture <- ask
     case M.lookup poolName (resourceSources progArchitecture) of
-        Just [] -> throwError $ annotateError Internal EUnboxingResourceSource
+        Just [] -> throwError $ annotateError Internal EUnboxingResource
         Just callers -> do
             mapM_ (\(caller, accessPt, cann) -> do
                     checkNextSource (location cann) (checkBoxSourceFree poolName caller accessPt)
                 ) callers
-        -- | This means that the resource is not connected to anything (which would be an error)
-        Nothing -> throwError $ annotateError (location ann) (EDisconnectedPool poolName)
+        -- | This means that the resource is not connected to anything (this shouuld not happen)
+        Nothing -> throwError $ annotateError Internal EUnboxingPool
 
 checkBoxSources :: BoxCheckMonad ()
 checkBoxSources = do

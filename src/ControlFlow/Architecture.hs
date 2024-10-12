@@ -139,7 +139,8 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
-    _ -> throwError $ annotateError Internal (EUnsupportedEmitterClass ident)
+    -- | Any other emitter class is not supported (this should not happen)
+    _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
 genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
