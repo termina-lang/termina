@@ -35,7 +35,7 @@ selfInv _isSelf _ prevMap  = prevMap
 selfInvStmt :: (Object a -> Bool) -> Statement a -> SelfInvocation a -> SelfInvocation a
 selfInvStmt isSelf (Declaration _vident _accK _type e _ann) prevMap = selfInv isSelf e prevMap
 selfInvStmt isSelf (AssignmentStmt _obj e _ann) prevMap = selfInv isSelf e prevMap
-selfInvStmt isSelf (IfElseStmt eC (Block bIfStmts) bEls bEl _ann) prevMap =
+selfInvStmt isSelf (IfElseStmt eC (Block bIfStmts _) bEls bEl _ann) prevMap =
   selfInv isSelf eC .
   flip (foldr (selfInvStmt isSelf)) bIfStmts .
   flip (foldr (selfInvElseIf isSelf)) bEls $ 
@@ -47,7 +47,7 @@ selfInvStmt isSelf (IfElseStmt eC (Block bIfStmts) bEls bEl _ann) prevMap =
     selfInvElseIf isSelf' (ElseIf cond blk _) prevMap' =
       selfInv isSelf' cond $ foldr (selfInvStmt isSelf') prevMap' (blockBody blk)
 
-selfInvStmt isSelf (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts) _ann) prevMap =
+selfInvStmt isSelf (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts _) _ann) prevMap =
   (\prevMap' -> maybe prevMap' (flip (selfInv isSelf) prevMap') cBreak) $
     foldr (selfInvStmt isSelf) prevMap stmts
 selfInvStmt isSelf (MatchStmt e mcases _ann) prevMap =

@@ -61,9 +61,9 @@ inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do
     let (someCase, MatchCase _ _ noneBody _) = if matchIdentifier fstCase == "Some" then (fstCase, sndCase) else (sndCase, fstCase)
     case someCase of
         MatchCase "Some" [arg] body _ -> do
-            localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock body)
+            localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
         _ -> throwError $ annotateError Internal EUnboxingMatchCase
-    localInputScope (mapM_ inOutBasicBlock noneBody) 
+    localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
 inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EUnboxingMatchCase
 
 inOutBasicBlock :: BasicBlock SemanticAnn -> BoxInOutMonad ()
@@ -78,7 +78,7 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
     addIOMapFree outPt ann boxSource
 inOutBasicBlock (IfElseBlock _eCond bTrue elseIfs bFalse _ann) =
-    localInputScope $ mapM_ inOutBasicBlock bTrue >> mapM_ (mapM_ inOutBasicBlock) (elseIfBody <$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock) bFalse
+    localInputScope $ mapM_ inOutBasicBlock (blockBody bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . elseIfBody <$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock . blockBody) bFalse
 inOutBasicBlock (ForLoopBlock {}) =
     -- | Inside a for loop, there cannot be any box releasing
     return ()
@@ -95,7 +95,7 @@ inOutBasicBlock (MatchBlock eMatch cases _) = do
             -- | We look for the port where the box came from
             optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
             inOutDestroyOptionMatchCases optionBoxSource cases
-        _ -> mapM_ (mapM_ inOutBasicBlock) (matchBody <$> cases)
+        _ -> mapM_ (mapM_ inOutBasicBlock) (blockBody . matchBody <$> cases)
 inOutBasicBlock (SendMessage obj arg ann) = do
     msgTy <- getExprType arg
     case msgTy of
@@ -121,7 +121,7 @@ inOutBasicBlock (ProcedureCall obj procId args ann) = do
 inOutBasicBlock _ = return () 
 
 inOutBasicBlocks :: Block SemanticAnn -> BoxInOutMonad ()
-inOutBasicBlocks (Block blocks) = mapM_ inOutBasicBlock blocks
+inOutBasicBlocks (Block blocks _) = mapM_ inOutBasicBlock blocks
 
 inOutClassMember :: M.Map Identifier FieldDefinition -> ClassMember SemanticAnn -> BoxInOutMonad ()
 inOutClassMember _ (ClassField {}) = return ()

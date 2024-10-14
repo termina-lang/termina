@@ -818,7 +818,9 @@ checkFieldValues loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas [
       checkFieldValue loc typeObj d a >>= checkSortedFields ds as . (:acc)
 
 typeBlock :: Maybe TerminaType -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
-typeBlock rTy (Block stmts) = SAST.Block <$> mapM (typeStatement rTy) stmts
+typeBlock rTy (Block stmts loc) = do
+  compound <- mapM (typeStatement rTy) stmts
+  return $ SAST.Block compound (buildStmtAnn loc)
 
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.

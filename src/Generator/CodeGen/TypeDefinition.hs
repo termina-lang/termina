@@ -244,7 +244,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
     where
 
         genClassFunctionDefinition :: ClassMember SemanticAnn -> CSourceGenerator CFileItem
-        genClassFunctionDefinition (ClassViewer viewer parameters rts (Block stmts) ann) = do
+        genClassFunctionDefinition (ClassViewer viewer parameters rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
             cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration parameters
@@ -255,7 +255,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassProcedure procedure parameters (Block stmts) ann) = do
+        genClassFunctionDefinition (ClassProcedure procedure parameters (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
@@ -299,7 +299,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                     cStmt <- genBlocks x
                     genProcedureStmts (acc ++ cStmt) xs
 
-        genClassFunctionDefinition (ClassMethod method rts (Block stmts) ann) = do
+        genClassFunctionDefinition (ClassMethod method rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier method
             cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             cSelfParam <- genSelfParam clsdef
@@ -309,7 +309,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam]
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassAction action param rts (Block stmts) ann) = do
+        genClassFunctionDefinition (ClassAction action param rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             cRetType <- genType noqual rts
             cSelfParam <- genSelfParam clsdef

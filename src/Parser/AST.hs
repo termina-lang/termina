@@ -165,10 +165,11 @@ data Statement' expr obj a =
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-newtype Block' expr obj a
+data Block' expr obj a
   = Block
   {
-    blockBody :: [Statement' expr obj a]
+    blockBody :: [Statement' expr obj a],
+    blockAnnotation :: a
   }
   deriving (Show, Functor)
 

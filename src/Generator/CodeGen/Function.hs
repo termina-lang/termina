@@ -18,7 +18,7 @@ genFunctionDecl (Function identifier parameters rts _ _ ann) = do
 genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show item
 
 genFunction :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
-genFunction (Function identifier parameters rts (Block stmts) _ ann) = do
+genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
     cParamDecls <- mapM genParameterDeclaration parameters
     cBody <- foldM (\acc x -> do

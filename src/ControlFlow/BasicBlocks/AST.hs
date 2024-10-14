@@ -31,7 +31,7 @@ data Statement' expr obj a =
 data ElseIf' expr obj a = ElseIf
   {
     elseIfCond       :: expr a
-  , elseIfBody       :: [BasicBlock' expr obj a]
+  , elseIfBody       :: Block' expr obj a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
@@ -39,7 +39,7 @@ data MatchCase' expr obj a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars      :: [Identifier]
-  , matchBody       :: [BasicBlock' expr obj a]
+  , matchBody       :: Block' expr obj a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
@@ -47,9 +47,9 @@ data BasicBlock' expr obj a =
     -- | If-else-if basic block
     IfElseBlock 
         (expr a) -- ^ conditional expression
-        [BasicBlock' expr obj a] -- ^ basic blocks in the if block
+        (Block' expr obj a) -- ^ basic blocks in the if block
         [ElseIf' expr obj a] -- ^ list of else if blocks (possibly empty)
-        (Maybe [BasicBlock' expr obj a]) a -- ^ basic blocks in the else
+        (Maybe (Block' expr obj a)) a -- ^ basic blocks in the else
     -- | For-loop basic block
     | ForLoopBlock 
         Identifier -- ^ name of the iterator variable
@@ -57,7 +57,7 @@ data BasicBlock' expr obj a =
         (expr a) -- ^ initial value of the iterator
         (expr a) -- ^ final value of the iterator
         (Maybe (expr a)) -- ^ break condition (optional)
-        [BasicBlock' expr obj a] a
+        (Block' expr obj a) a
     -- | Match basic block
     | MatchBlock (expr a) [MatchCase' expr obj a] a
     -- | Send message
@@ -107,10 +107,11 @@ data BasicBlock' expr obj a =
     deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-newtype Block' expr obj a
+data Block' expr obj a
   = Block
   {
-    blockBody :: [BasicBlock' expr obj a]
+    blockBody :: [BasicBlock' expr obj a],
+    blockAnnotation :: a
   }
   deriving (Show, Functor)
 

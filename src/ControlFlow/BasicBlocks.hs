@@ -162,15 +162,15 @@ genBBlocks acc (stmt : xs) =
                 _ -> appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
         SAST.Declaration name accessKind typeSpecifier expr ann -> appendRegularBlock acc (RegularBlock [Declaration name accessKind typeSpecifier expr ann]) xs
         SAST.AssignmentStmt obj expr ann -> appendRegularBlock acc (RegularBlock [AssignmentStmt obj expr ann]) xs
-        SAST.ForLoopStmt iterator typeSpecifier initial final breakCondition (SAST.Block loopStmts) ann -> do
+        SAST.ForLoopStmt iterator typeSpecifier initial final breakCondition (SAST.Block loopStmts blkann) ann -> do
             loopBlocks <- genBBlocks [] (reverse loopStmts) 
-            genBBlocks (ForLoopBlock iterator typeSpecifier initial final breakCondition loopBlocks ann : acc) xs
-        SAST.IfElseStmt condition (SAST.Block ifStmts) elseIfs elseStmts ann -> do
-            ifBlocks <- genBBlocks [] (reverse ifStmts)
+            genBBlocks (ForLoopBlock iterator typeSpecifier initial final breakCondition (Block loopBlocks blkann) ann : acc) xs
+        SAST.IfElseStmt condition ifBlk elseIfs elseStmts ann -> do
+            ifBlocks <- genBBBlock ifBlk
             elseIfBlocks <- mapM genElseIfBBlocks elseIfs
             elseBlocks <- case elseStmts of
-                Just (SAST.Block elseSts) -> do
-                    blocks <- genBBlocks [] (reverse elseSts)
+                Just elseBlk -> do
+                    blocks <- genBBBlock elseBlk
                     return $ Just blocks
                 Nothing -> return Nothing
             genBBlocks (IfElseBlock condition ifBlocks elseIfBlocks elseBlocks ann : acc) xs
@@ -184,14 +184,14 @@ genBBlocks acc (stmt : xs) =
 
         -- | This function generates the basic blocks for an else-if block
         genElseIfBBlocks :: SAST.ElseIf SemanticAnn -> BBGenerator (ElseIf SemanticAnn)
-        genElseIfBBlocks (SAST.ElseIf condition (SAST.Block elseIfStmts) ann) = do
-            blocks <- genBBlocks [] (reverse elseIfStmts)
+        genElseIfBBlocks (SAST.ElseIf condition elifBlk ann) = do
+            blocks <- genBBBlock elifBlk
             return $ ElseIf condition blocks ann
 
         -- | This function generates the basic blocks for a match case block
         genMatchCaseBBlocks :: SAST.MatchCase SemanticAnn -> BBGenerator (MatchCase SemanticAnn)
-        genMatchCaseBBlocks (SAST.MatchCase identifier args (SAST.Block caseStmts) ann) = do
-            blocks <- genBBlocks [] (reverse caseStmts)
+        genMatchCaseBBlocks (SAST.MatchCase identifier args caseBlk ann) = do
+            blocks <- genBBBlock caseBlk
             return $ MatchCase identifier args blocks ann
 
 
@@ -200,9 +200,9 @@ genBBlocks acc (stmt : xs) =
 -- composed of a list of basic blocks and an expression that represents the
 -- return value of the function or method.
 genBBBlock :: SAST.Block SemanticAnn -> BBGenerator (Block SemanticAnn)
-genBBBlock (SAST.Block stmts) = do
+genBBBlock (SAST.Block stmts blkann) = do
     blocks <- genBBlocks [] (reverse stmts)
-    return $ Block blocks
+    return $ Block blocks blkann
 
 -- | This function translates the class members from the semantic AST to the
 -- basic block AST. If the member is a field, it will be translated as a field.

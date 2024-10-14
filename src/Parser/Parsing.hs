@@ -39,45 +39,129 @@ lexer = Tok.makeTokenParser langDef
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
               -- Polymorphic Types
+              -- Polymorphic Types
+              -- Polymorphic Types
+              -- Polymorphic Types
+              -- Polymorphic Types
+              -- Polymorphic Types
+              -- Polymorphic Types
              ["MsgQueue", "Pool", "Option", "Allocator", "Atomic",
               "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
       ++ -- Struct and enum types
               -- Struct and enum types
+              -- Struct and enum types
+              -- Struct and enum types
+              -- Struct and enum types
+              -- Struct and enum types
+              -- Struct and enum types
+              -- Struct and enum types
              ["struct", "enum"]
       ++ -- Box Subtyping
+              -- Box Subtyping
+              -- Box Subtyping
+              -- Box Subtyping
+              -- Box Subtyping
+              -- Box Subtyping
+              -- Box Subtyping
               -- Box Subtyping
              ["box"]
       ++ -- Fixed Location Subtyping
               -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
+              -- Fixed Location Subtyping
              ["loc"]
       ++ -- Ports Subtyping
+              -- Ports Subtyping
+              -- Ports Subtyping
+              -- Ports Subtyping
+              -- Ports Subtyping
+              -- Ports Subtyping
+              -- Ports Subtyping
               -- Ports Subtyping
              ["access", "sink", "in", "out"]
       ++ -- Global declarations
               -- Global declarations
+              -- Global declarations
+              -- Global declarations
+              -- Global declarations
+              -- Global declarations
+              -- Global declarations
+              -- Global declarations
              ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
+              -- Stmt
+              -- Stmt
+              -- Stmt
+              -- Stmt
+              -- Stmt
+              -- Stmt
               -- Stmt
              ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
               -- Trigger
+              -- Trigger
+              -- Trigger
+              -- Trigger
+              -- Trigger
+              -- Trigger
+              -- Trigger
              ["triggers"]
       ++ -- Provide
+              -- Provide
+              -- Provide
+              -- Provide
+              -- Provide
+              -- Provide
+              -- Provide
               -- Provide
              ["provides"]
       ++ -- Constants
               -- Constants
+              -- Constants
+              -- Constants
+              -- Constants
+              -- Constants
+              -- Constants
+              -- Constants
              ["true", "false"]
       ++ -- Modules
+              -- Modules
+              -- Modules
+              -- Modules
+              -- Modules
+              -- Modules
+              -- Modules
               -- Modules
              ["import"]
       ++ -- Class methods
               -- Class methods
+              -- Class methods
+              -- Class methods
+              -- Class methods
+              -- Class methods
+              -- Class methods
+              -- Class methods
              ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
               -- Casting keyword
+              -- Casting keyword
+              -- Casting keyword
+              -- Casting keyword
+              -- Casting keyword
+              -- Casting keyword
+              -- Casting keyword
              ["as"]
       ++ -- option name
+              -- option name
+              -- option name
+              -- option name
+              -- option name
+              -- option name
+              -- option name
               -- option name
              ["option"]
       ++ -- is variant operator
@@ -729,7 +813,10 @@ arrayExprListInitializerParser = do
 -- -- Task Definition
 
 blockParser :: Parser (Block ParserAnn)
-blockParser = Block <$> many blockItemParser
+blockParser = do
+  blkStartPos <- getPosition
+  compound <- braces $ many blockItemParser
+  Block compound . Position blkStartPos <$> getPosition
 
 returnStmtParser :: Parser (Statement ParserAnn)
 returnStmtParser = do
@@ -759,7 +846,7 @@ functionParser = do
   typeSpec <- optionMaybe (do
     reservedOp "->"
     typeSpecifierParser)
-  blockRet <- braces blockParser
+  blockRet <- blockParser
   Function name params typeSpec blockRet modifiers . Position startPos <$> getPosition
 
 constLiteralParser :: Parser Const
@@ -858,8 +945,8 @@ matchCaseParser = do
   caseId <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"
-  compound <- braces $ many blockItemParser
-  MatchCase caseId args (Block compound) . Position startPos <$> getPosition
+  caseBlk <- blockParser
+  MatchCase caseId args caseBlk . Position startPos <$> getPosition
 
 matchStmtParser :: Parser (Statement ParserAnn)
 matchStmtParser = do
@@ -875,21 +962,22 @@ elseIfParser = do
   _ <- reserved "else"
   _ <- reserved "if"
   expression <- expressionParser
-  compound <- braces $ many blockItemParser
-  ElseIf expression (Block compound) . Position startPos <$> getPosition
+  elseIfBlk <- blockParser
+  ElseIf expression elseIfBlk . Position startPos <$> getPosition
 
 ifElseIfStmtParser :: Parser (Statement ParserAnn)
 ifElseIfStmtParser = do
   startPos <- getPosition
   _ <- reserved "if"
   expression <- expressionParser
+  ifBlkStartPos <- getPosition
   ifCompound <- braces $ many blockItemParser
+  ifBlk <- Block ifCompound . Position ifBlkStartPos <$> getPosition
   elseIfs <- many $ try elseIfParser
-  elseCompound <- option Nothing (do
+  elseBlk <- option Nothing (do
     _ <- reserved "else"
-    stmts <- braces $ many $ try blockItemParser
-    return $ Just (Block stmts))
-  IfElseStmt expression (Block ifCompound) elseIfs elseCompound . Position startPos <$> getPosition
+    Just <$> blockParser)
+  IfElseStmt expression ifBlk elseIfs elseBlk . Position startPos <$> getPosition
 
 forLoopStmtParser :: Parser (Statement ParserAnn)
 forLoopStmtParser = do
@@ -905,8 +993,8 @@ forLoopStmtParser = do
   breakCondition <- optionMaybe (do
     reserved "while"
     expressionParser)
-  compound <- braces $ many blockItemParser
-  ForLoopStmt identifier ty start end breakCondition (Block compound) . Position startPos <$> getPosition
+  forBlk <- blockParser
+  ForLoopStmt identifier ty start end breakCondition forBlk . Position startPos <$> getPosition
 
 taskDeclParser :: Parser (Global ParserAnn)
 taskDeclParser = do
@@ -1046,7 +1134,7 @@ classMethodParser = do
   name <- identifierParser
   parens (reserved "&priv" >> reserved "self")
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
-  blockRet <- braces blockParser
+  blockRet <- blockParser
   ClassMethod name typeSpec blockRet . Position startPos <$> getPosition
 
 classActionParser :: Parser (ClassMember ParserAnn)
@@ -1056,7 +1144,7 @@ classActionParser = do
   name <- identifierParser
   param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
-  blockRet <- braces blockParser
+  blockRet <- blockParser
   ClassAction name param typeSpec blockRet . Position startPos <$> getPosition
 
 classProcedureParser :: Parser (ClassMember ParserAnn)
@@ -1065,7 +1153,7 @@ classProcedureParser = do
   reserved "procedure"
   name <- identifierParser
   params <- parens procedureParamsParser
-  blockRet <- braces blockParser
+  blockRet <- blockParser
   ClassProcedure name params blockRet . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
@@ -1092,7 +1180,7 @@ classViewerParser = do
   name <- identifierParser
   params <- parens viewerParamsParser
   typeSpec <- optionMaybe (reservedOp "->" >>  typeSpecifierParser)
-  blockRet <- braces blockParser
+  blockRet <- blockParser
   ClassViewer name params typeSpec blockRet . Position startPos <$> getPosition
   where
     viewerParamsParser :: Parser [Parameter]

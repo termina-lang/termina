@@ -362,12 +362,12 @@ genBlocks (SendMessage obj arg ann) = do
                 ]
 genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
-    cIfBlk <- concat <$> mapM genBlocks ifBlk
+    cIfBlk <- concat <$> mapM genBlocks (blockBody ifBlk)
     cElseBlk <-
         (case elseBlk of
             Nothing -> return Nothing
             Just elseBlk' ->
-                mapM genBlocks elseBlk' >>= (return . Just) . flip CSCompound (buildCompoundAnn ann False True) . concat)
+                mapM genBlocks (blockBody elseBlk') >>= (return . Just) . flip CSCompound (buildCompoundAnn ann False True) . concat)
     cAlts <- genAlternatives cElseBlk elifsBlks
 
     return $ CBlockStmt <$>
@@ -379,7 +379,7 @@ genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
             prev' <- genAlternatives prev xs
             cExpr' <- genExpression expr'
-            cBlk <- concat <$> mapM genBlocks blk
+            cBlk <- concat <$> mapM genBlocks (blockBody blk)
             return $ Just (CSIfThenElse cExpr' (CSCompound cBlk (buildCompoundAnn ann' False True)) prev' (buildStatementAnn ann' False))
 genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body ann) = do
     let exprCAnn = buildGenericAnn ann
@@ -395,7 +395,7 @@ genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body an
                     cBreak <- genExpression break'
                     return $ CExprSeqAnd
                         (CExprBinaryOp COpLt cIteratorExpr endExpr (CTBool noqual) exprCAnn) cBreak (CTBool noqual) exprCAnn
-    cBody <- concat <$> mapM genBlocks body
+    cBody <- concat <$> mapM genBlocks (blockBody body)
     return $ CBlockStmt <$>
         [CSFor
             -- | Initialization expression
@@ -514,7 +514,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -> CObject
             -> MatchCase SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
-            concat <$> mapM genBlocks blk'
+            concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase this_variant params blk' ann') = do
             let cObj' = CField cObj this_variant cParamsStructType
             cParamTypes <- case getMatchCaseTypes (element ann') of
@@ -522,7 +522,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
-            Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks blk'
+            Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 
         genMatchCase ::
@@ -531,7 +531,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -> MatchCase SemanticAnn
             -> CSourceGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
-            concat <$> mapM genBlocks blk'
+            concat <$> mapM genBlocks (blockBody blk')
         genMatchCase cTs@(CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
             let cAnn = buildGenericAnn ann'
                 cObj' = CVar (namefy this_variant) cParamsStructType
@@ -542,7 +542,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
                 decl = CDecl cTs (Just (namefy this_variant))
                     (Just $ CExprValOf (CField cExpr this_variant cParamsStructType) cParamsStructType cAnn)
-            cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks blk'
+            cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks (blockBody blk')
             return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 genBlocks (ReturnBlock (Just expr) ann) = do

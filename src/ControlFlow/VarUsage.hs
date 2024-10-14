@@ -160,11 +160,11 @@ useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse ann)
   = do
   -- All sets generated for all different branches.
   sets <- runEncaps
-                ([ useDefBasicBlocks bTrue >> get
-                 , maybe (return ()) useDefBasicBlocks bFalse >> get
+                ([ useDefBasicBlocks (blockBody bTrue) >> get
+                 , maybe (return ()) (useDefBasicBlocks . blockBody) bFalse >> get
                 ]
                 ++
-                 map ((\l -> useDefBasicBlocks l >> get) . reverse . elseIfBody) elseIfs
+                 map ((\l -> useDefBasicBlocks l >> get) . reverse . blockBody . elseIfBody) elseIfs
                 )
   -- Rule here is, all branches should have the same onlyonce behaviour.
   let (usedOO, usedBoxes)
@@ -195,7 +195,7 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block ann)
     -- What happens inside the body of a for, may not happen at all.
     runEncapsulated
       ( modify emptyButUsed
-        >> useDefBasicBlocks block
+        >> useDefBasicBlocks (blockBody block)
         >> get >>= \st -> -- No Option should be in the state
         unless (M.null (usedOption st)) (throwError $ annotateError (location ann) ForMoreOOpt)
         >> -- No Box should be in the state
@@ -293,16 +293,16 @@ destroyOptionBox (ml, mr)
   =
   let (mOpt, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
   in
-    (useDefBasicBlocks (matchBody mOpt)
+    (useDefBasicBlocks (blockBody . matchBody $ mOpt)
       >>
      withLocation (location (matchAnnotation mOpt)) (defBoxVar (head (matchBVars mOpt)))
      >> get
-    , useDefBasicBlocks (matchBody mNone) >> get)
+    , useDefBasicBlocks (blockBody . matchBody $ mNone) >> get)
 
 -- General case, not when it is Option Box
 useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
-  = useDefBasicBlocks blk
+  = useDefBasicBlocks (blockBody blk)
   >> withLocation (location ann) (mapM_ defVariable bvars)
 
 sameMaps :: [OOVarSt] -> Bool

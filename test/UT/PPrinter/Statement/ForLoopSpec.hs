@@ -27,7 +27,7 @@ array0IndexI:: Expression SemanticAnn
 array0IndexI = AccessObject (ArrayIndexExpression array0 i (objSemAnn Mutable UInt32))
 
 forLoopBody :: Block SemanticAnn
-forLoopBody = Block [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total array0IndexI uint32ExprSemAnn) stmtSemAnn]
+forLoopBody = Block [AssignmentStmt (Variable "total" (objSemAnn Mutable UInt32)) (BinOp Addition total array0IndexI uint32ExprSemAnn) stmtSemAnn] stmtSemAnn
 
 breakCond :: Expression SemanticAnn
 breakCond = BinOp RelationalNotEqual i (Constant (I (TInteger 5 DecRepr) (Just USize)) uint32ExprSemAnn) boolExprSemAnn
