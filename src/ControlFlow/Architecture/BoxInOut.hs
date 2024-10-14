@@ -34,27 +34,27 @@ addBox :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
 addBox inPt inBox = do
     ST.modify (\s -> s { inBoxMap = M.insert inPt inBox (inBoxMap s) })
 
-addIOMapFree :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
-addIOMapFree outPt inBox = do
+addIOMapFree :: Identifier -> SemanticAnn -> InBox SemanticAnn -> BoxInOutMonad ()
+addIOMapFree outPt sann inBox = do
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup outPt (outBoxFree prevIOMap) of
-        Just frees -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt (inBox : frees) (outBoxFree prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt [inBox] (outBoxFree prevIOMap) } } )
+        Just frees -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt ((sann, inBox) : frees) (outBoxFree prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxFree = M.insert outPt [(sann, inBox)] (outBoxFree prevIOMap) } } )
 
-addIOMapSend :: Identifier -> InBox SemanticAnn -> BoxInOutMonad ()
-addIOMapSend outPt inBox = do
+addIOMapSend :: Identifier -> SemanticAnn -> InBox SemanticAnn -> BoxInOutMonad ()
+addIOMapSend outPt sann inBox = do
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup outPt (outBoxSend prevIOMap) of
-        Just sends -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt (inBox : sends) (outBoxSend prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt [inBox] (outBoxSend prevIOMap) } } )
+        Just sends -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt ((sann, inBox) : sends) (outBoxSend prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxSend = M.insert outPt [(sann, inBox)] (outBoxSend prevIOMap) } } )
 
-addIOMapProcedureCall :: Identifier -> Identifier -> Integer -> InBox SemanticAnn -> BoxInOutMonad ()
-addIOMapProcedureCall outPt procId argNum inBox = do
+addIOMapProcedureCall :: Identifier -> Identifier -> Integer -> SemanticAnn -> InBox SemanticAnn -> BoxInOutMonad ()
+addIOMapProcedureCall outPt procId argNum sann inBox = do
     let procedureCall = (outPt, procId, argNum)
     prevIOMap <- ST.gets outputInputMaps
     case M.lookup procedureCall (outBoxProcedureCall prevIOMap) of
-        Just calls -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall (inBox : calls) (outBoxProcedureCall prevIOMap) } } ) 
-        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall [inBox] (outBoxProcedureCall prevIOMap) } } )
+        Just calls -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall ((sann, inBox) : calls) (outBoxProcedureCall prevIOMap) } } ) 
+        Nothing -> ST.modify (\s -> s { outputInputMaps = prevIOMap { outBoxProcedureCall = M.insert procedureCall [(sann, inBox)] (outBoxProcedureCall prevIOMap) } } )
 
 inOutDestroyOptionMatchCases :: InOptionBox SemanticAnn -> [MatchCase SemanticAnn] -> BoxInOutMonad ()
 inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do 
@@ -72,11 +72,11 @@ inOutBasicBlock (AllocBox obj arg ann) = do
     inPt <- getPortName obj
     optionBox <- getExprOptionBoxName arg
     addOptionBox optionBox (InOptionBoxAlloc inPt ann)
-inOutBasicBlock (FreeBox obj arg _ann) = do
+inOutBasicBlock (FreeBox obj arg ann) = do
     outPt <- getPortName obj
     boxName <- getExprBoxName arg
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
-    addIOMapFree outPt boxSource
+    addIOMapFree outPt ann boxSource
 inOutBasicBlock (IfElseBlock _eCond bTrue elseIfs bFalse _ann) =
     localInputScope $ mapM_ inOutBasicBlock bTrue >> mapM_ (mapM_ inOutBasicBlock) (elseIfBody <$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock) bFalse
 inOutBasicBlock (ForLoopBlock {}) =
@@ -96,16 +96,16 @@ inOutBasicBlock (MatchBlock eMatch cases _) = do
             optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
             inOutDestroyOptionMatchCases optionBoxSource cases
         _ -> mapM_ (mapM_ inOutBasicBlock) (matchBody <$> cases)
-inOutBasicBlock (SendMessage obj arg _) = do
+inOutBasicBlock (SendMessage obj arg ann) = do
     msgTy <- getExprType arg
     case msgTy of
         BoxSubtype _ -> do
             outPt <- getPortName obj
             boxName <- getExprBoxName arg
             boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
-            addIOMapSend outPt boxSource
+            addIOMapSend outPt ann boxSource
         _ -> return ()
-inOutBasicBlock (ProcedureCall obj procId args _) = do
+inOutBasicBlock (ProcedureCall obj procId args ann) = do
     -- | We need to check if we are sending a box as an argument
     argTys <- mapM getExprType args
     zipWithM_ checkArg [0..] argTys
@@ -116,7 +116,7 @@ inOutBasicBlock (ProcedureCall obj procId args _) = do
                 outPt <- getPortName obj
                 boxName <- getExprBoxName (args !! argNum)
                 boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
-                addIOMapProcedureCall outPt procId (toInteger argNum) boxSource
+                addIOMapProcedureCall outPt procId (toInteger argNum) ann boxSource
             _ -> return ()
 inOutBasicBlock _ = return () 
 
@@ -127,15 +127,15 @@ inOutClassMember :: M.Map Identifier FieldDefinition -> ClassMember SemanticAnn 
 inOutClassMember _ (ClassField {}) = return ()
 inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
-inOutClassMember actionsToPorts (ClassAction name input _ body ann) = do
+inOutClassMember actionsToPorts (ClassAction name input _ body _ann) = do
     clearInputScope
     case paramTerminaType input of
         (BoxSubtype _) -> do
             let inPt = actionsToPorts M.! name
-            addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt) ann)
+            addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt))
             inOutBasicBlocks body
         _ -> inOutBasicBlocks body
-inOutClassMember _ (ClassProcedure name params body ann) = do
+inOutClassMember _ (ClassProcedure name params body _ann) = do
     clearInputScope
     zipWithM_ addInParam [0..] params
     inOutBasicBlocks body
@@ -145,7 +145,7 @@ inOutClassMember _ (ClassProcedure name params body ann) = do
         addInParam :: Integer -> Parameter -> BoxInOutMonad ()
         addInParam argNum param = case paramTerminaType param of
             BoxSubtype _ -> do
-                addBox (paramIdentifier param) (InBoxProcedureCall name argNum ann)
+                addBox (paramIdentifier param) (InBoxProcedureCall name argNum)
             _ -> return ()
 
 inOutClass :: TypeDef SemanticAnn -> BoxInOutMonad ()

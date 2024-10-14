@@ -51,7 +51,7 @@ checkBoxSourceProcedureCallResource expectedSource resource calledPort calledPro
     progArchitecture <- ask
     let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
     forM_ (M.lookup (calledPort, calledProc, calledArgNum) (outBoxProcedureCall. classBoxIOMaps $ resourceCls)) $
-        mapM_ (checkResourceSourceInBox expectedSource resource)
+        mapM_ (uncurry (checkResourceSourceInBox expectedSource resource))
 
 checkBoxSourceProcedureCallHandler ::
     Identifier -- ^ Expected source of the box
@@ -64,7 +64,7 @@ checkBoxSourceProcedureCallHandler expectedSource handler calledPort calledProc 
     progArchitecture <- ask
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
     forM_ (M.lookup (calledPort, calledProc, calledArgNum) (outBoxProcedureCall. classBoxIOMaps $ handlerCls)) $
-        mapM_ (checkHandlerSourceInBox expectedSource handler)
+        mapM_ (uncurry (checkHandlerSourceInBox expectedSource handler))
 
 checkBoxSourceProcedureCallTask ::
     Identifier -- ^ Expected source of the box
@@ -77,7 +77,7 @@ checkBoxSourceProcedureCallTask expectedSource task calledPort calledProc called
     progArchitecture <- ask
     let taskCls = taskClasses progArchitecture M.! taskClass task
     forM_ (M.lookup (calledPort, calledProc, calledArgNum) (outBoxProcedureCall. classBoxIOMaps $ taskCls)) $
-        mapM_ (checkTaskSourceInBox expectedSource task)
+        mapM_ (uncurry (checkTaskSourceInBox expectedSource task))
 
 checkBoxProcedureCall ::
     Identifier -- ^ Expected source of the box
@@ -109,7 +109,7 @@ checkBoxSourceTaskSend expectedSource task outPt = do
     let taskCls = taskClasses progArchitecture M.! taskClass task
     case M.lookup outPt (outBoxSend . classBoxIOMaps $ taskCls) of
         Just sources ->
-            mapM_ (checkTaskSourceInBox expectedSource task) sources
+            mapM_ (uncurry (checkTaskSourceInBox expectedSource task)) sources
         Nothing -> throwError $ annotateError Internal EUnboxingTask
 
 checkBoxSourceHandlerSend :: Identifier -> TPHandler SemanticAnn -> Identifier -> BoxCheckMonad ()
@@ -118,18 +118,18 @@ checkBoxSourceHandlerSend expectedSource handler outPt = do
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
     case M.lookup outPt (outBoxSend . classBoxIOMaps $ handlerCls) of
         Just sources ->
-            mapM_ (checkHandlerSourceInBox expectedSource handler) sources
+            mapM_ (uncurry (checkHandlerSourceInBox expectedSource handler)) sources
         Nothing -> throwError $ annotateError Internal EUnboxingHandler
 
 getBoxSourceSend :: Identifier -> (Identifier, Identifier, SemanticAnn) -> BoxCheckMonad ()
-getBoxSourceSend expectedSource (source, outPort, ann) = do
+getBoxSourceSend expectedSource (source, outPort, _ann) = do
     progArchitecture <- ask
     -- | Check if the element is a task
     case M.lookup source (tasks progArchitecture) of
-        Just task -> checkNextSource (location ann) (checkBoxSourceTaskSend expectedSource task outPort)
+        Just task -> checkBoxSourceTaskSend expectedSource task outPort
         Nothing ->
             case M.lookup source (handlers progArchitecture) of
-                Just handler -> checkNextSource (location ann) (checkBoxSourceHandlerSend expectedSource handler outPort)
+                Just handler -> checkBoxSourceHandlerSend expectedSource handler outPort
                 Nothing -> throwError $ annotateError Internal EUnboxingChannel
 
 getBoxSourceChannel ::
@@ -148,45 +148,46 @@ getBoxSourceChannel _ _ = throwError $ annotateError Internal EUnboxingChannel
 checkResourceSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPResource SemanticAnn -- ^ The name of the resource
+    -> SemanticAnn
     -> InBox SemanticAnn
     -> BoxCheckMonad ()
-checkResourceSourceInBox expectedSource resource (InBoxAlloc port ann) =
+checkResourceSourceInBox expectedSource resource prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
     case M.lookup port (resAPConnections resource) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
+            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
         -- | This should not happen, since all the ports of the resource
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingResource
-checkResourceSourceInBox expectedSource resource (InBoxProcedureCall procName argNum ann) = do
+checkResourceSourceInBox expectedSource resource prevAnn (InBoxProcedureCall procName argNum) = do
     progArchitecture <- ask
     -- | The box was received via a call to one of the procedures of the resource
     -- We need to inspect all the elements that are connected to the resource and
     -- see where do their boxes come from
     case M.lookup (resourceName resource) (resourceSources progArchitecture) of
         Just callers -> mapM_ (\(caller, accessPt, _) ->
-            checkNextSource (location ann) (checkBoxProcedureCall expectedSource caller accessPt procName argNum)) callers
+            checkNextSource (location prevAnn) (checkBoxProcedureCall expectedSource caller accessPt procName argNum)) callers
         -- | This means that the resource is not connected to anything (this shouuld not happen)
         Nothing -> throwError $ annotateError Internal EUnboxingResource
 -- | The rest of the cases should not happen, since resources do not have procedures
 -- and no event emitter may send us a box  
-checkResourceSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingResource
+checkResourceSourceInBox _ _ _ _ = throwError $ annotateError Internal EUnboxingResource
 
 checkTaskSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPTask SemanticAnn
-    -> InBox SemanticAnn -> BoxCheckMonad ()
-checkTaskSourceInBox expectedSource task (InBoxAlloc port ann) =
+    -> SemanticAnn -> InBox SemanticAnn -> BoxCheckMonad ()
+checkTaskSourceInBox expectedSource task prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
     case M.lookup port (taskAPConnections task) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
+            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
         -- | This should not happen, since all the ports of the task
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingTask
-checkTaskSourceInBox expectedSource task (InBoxInput port ann) = do
+checkTaskSourceInBox expectedSource task prevAnn (InBoxInput port) = do
     -- | The box was received from a port connected to a channel. We must
     -- obtain the name of the channel to which the port is connected and then
     -- obtain the source of the box from the box-channel map
@@ -194,26 +195,26 @@ checkTaskSourceInBox expectedSource task (InBoxInput port ann) = do
     case M.lookup port (taskInputPortConns task) of
         Nothing -> throwError $ annotateError Internal EUnboxingTask
         Just (channel, _) -> case M.lookup channel (channels progArchitecture) of
-            Just nextChannel -> checkNextSource (location ann) (getBoxSourceChannel expectedSource nextChannel)
+            Just nextChannel -> checkNextSource (location prevAnn) (getBoxSourceChannel expectedSource nextChannel)
             Nothing -> throwError $ annotateError Internal EUnboxingTask
 -- | The rest of the cases should not happen, since tasks do not have procedures
-checkTaskSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingTask
+checkTaskSourceInBox _ _ _ _ = throwError $ annotateError Internal EUnboxingTask
 
 checkHandlerSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPHandler SemanticAnn
-    -> InBox SemanticAnn
+    -> SemanticAnn -> InBox SemanticAnn
     -> BoxCheckMonad ()
-checkHandlerSourceInBox expectedSource handler (InBoxAlloc port ann) =
+checkHandlerSourceInBox expectedSource handler prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
     case M.lookup port (handlerAPConnections handler) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource []))
+            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
         -- | This should not happen, since all the ports of the handler
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingHandler
-checkHandlerSourceInBox _ _ _ = throwError $ annotateError Internal EUnboxingHandler
+checkHandlerSourceInBox _ _ _ _ = throwError $ annotateError Internal EUnboxingHandler
 
 checkBoxSourceResourceFree ::
     Identifier -- ^ Expected source of the box
@@ -224,7 +225,7 @@ checkBoxSourceResourceFree expectedSource resource outPt = do
     progArchitecture <- ask
     let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
     forM_ (M.lookup outPt (outBoxFree . classBoxIOMaps $ resourceCls)) $
-        mapM_ (checkResourceSourceInBox expectedSource resource)
+        mapM_ (uncurry (checkResourceSourceInBox expectedSource resource))
 
 checkBoxSourceTaskFree ::
     Identifier -- ^ Expected source of the box
@@ -237,7 +238,7 @@ checkBoxSourceTaskFree expectedSource task calledPort = do
     -- | If the port is not on the outBoxFree map, it means that the task only
     -- allocates the box and does not free it
     forM_ (M.lookup calledPort (outBoxFree . classBoxIOMaps $ taskCls)) $ 
-        mapM_ (checkTaskSourceInBox expectedSource task)
+        mapM_ (uncurry (checkTaskSourceInBox expectedSource task))
 
 checkBoxSourceHandlerFree ::
     Identifier -- ^ Expected source of the box
@@ -250,7 +251,7 @@ checkBoxSourceHandlerFree expectedSource handler calledPort = do
     -- | If the port is not on the outBoxFree map, it means that the handler only
     -- allocates the box and does not free it
     forM_ (M.lookup calledPort (outBoxFree . classBoxIOMaps $ handlerCls)) $
-        mapM_ (checkHandlerSourceInBox expectedSource handler)
+        mapM_ (uncurry (checkHandlerSourceInBox expectedSource handler))
 
 checkBoxSourceFree ::
     Identifier -- ^ Expected source of the box
@@ -276,14 +277,12 @@ checkBoxSourceFree expectedSource elemnt accessPt = do
 
 
 checkBoxSource :: TPPool SemanticAnn -> BoxCheckMonad ()
-checkBoxSource (TPPool poolName _ _ _ ann) = do
+checkBoxSource (TPPool poolName _ _ _ _) = do
     progArchitecture <- ask
     case M.lookup poolName (resourceSources progArchitecture) of
         Just [] -> throwError $ annotateError Internal EUnboxingResource
         Just callers -> do
-            mapM_ (\(caller, accessPt, cann) -> do
-                    checkNextSource (location cann) (checkBoxSourceFree poolName caller accessPt)
-                ) callers
+            mapM_ (\(caller, accessPt, _cann) -> checkBoxSourceFree poolName caller accessPt) callers
         -- | This means that the resource is not connected to anything (this shouuld not happen)
         Nothing -> throwError $ annotateError Internal EUnboxingPool
 

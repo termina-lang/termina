@@ -236,9 +236,9 @@ data InOptionBox a =
   | InOptionBoxProcedureCall Identifier Integer a
 
 data InBox a =
-  InBoxInput Identifier a
+  InBoxInput Identifier
   | InBoxAlloc Identifier a
-  | InBoxProcedureCall Identifier Integer a
+  | InBoxProcedureCall Identifier Integer
   deriving (Show, Eq, Ord)
 
 data BoxOutputInputMaps a = BoxOutputInputMaps {
@@ -246,15 +246,15 @@ data BoxOutputInputMaps a = BoxOutputInputMaps {
   -- | Map between the box parameters of a procedure call and the port from 
   -- which the box was originated. The key is a tuple with the name of the
   -- port, the name of the procedure and the index of the box parameter.
-  outBoxProcedureCall :: Map (Identifier, Identifier, Integer) [InBox a],
+  outBoxProcedureCall :: Map (Identifier, Identifier, Integer) [(a, InBox a)],
 
   -- | Map between the output ports that send a box and the port from which the
   -- box was originated.
-  outBoxSend :: Map Identifier [InBox a],
+  outBoxSend :: Map Identifier [(a, InBox a)],
 
   -- | Map between the allocator ports that are used to free a box and the
   -- port from which the box was originated.
-  outBoxFree :: Map Identifier [InBox a]
+  outBoxFree :: Map Identifier [(a, InBox a)]
 
 } deriving Show
 

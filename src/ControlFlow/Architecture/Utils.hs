@@ -236,4 +236,4 @@ getExprBoxName _ = throwError $ annotateError Internal EUnboxingBox
 
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
-getInBox (InOptionBoxProcedureCall ident idx ann) = InBoxProcedureCall ident idx ann
+getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident idx

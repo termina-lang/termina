@@ -11,6 +11,7 @@ import Text.Parsec.Pos
 import qualified Data.Map as M
 import Utils.Annotations
 import Utils.Errors
+import ControlFlow.BasicBlocks.AST
 
 ppError :: M.Map FilePath TL.Text ->
     ArchitectureError -> IO ()
@@ -45,6 +46,54 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
             printSimpleError
                 procSourceLines "The previous connection was done here:" procFileName
                 procPos Nothing
+    EMismatchedBoxSource expectedSource actualSource boxTrace ->
+        let title = "\x1b[31merror [AE-003]\x1b[0m: Mismatched box source" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Expected allocation from \x1b[31m" <> T.pack expectedSource <>
+                "\x1b[0m but the box is being allocated from \x1b[31m" <> T.pack actualSource <>
+                "\x1b[0m.")) >>
+        printBoxTrace expectedSource (reverse boxTrace)
     _ -> putStrLn $ show pos ++ ": " ++ show e
+
+
+    where
+
+        -- | Prints a trace of box allocations 
+        printBoxTrace :: Identifier -> [Location] -> IO ()
+        printBoxTrace _ [] = return ()
+        printBoxTrace expectedSource [tracePos@(Position traceStartPos _)] =
+            let title = "The box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
+                traceFileName = sourceName traceStartPos
+                traceSourceLines = toModuleAST M.! traceFileName
+            in
+                printSimpleError 
+                    traceSourceLines title traceFileName tracePos Nothing
+        printBoxTrace expectedSource (tracePos@(Position traceStartPos _) : xr) =
+            let title = "The box is first moved here:"
+                traceFileName = sourceName traceStartPos
+                traceSourceLines = toModuleAST M.! traceFileName
+            in
+                printSimpleError
+                    traceSourceLines title traceFileName tracePos Nothing >> printBoxTrace' expectedSource xr
+        printBoxTrace _ _ = error "Internal error: invalid error position"
+
+        printBoxTrace' :: Identifier -> [Location] -> IO ()
+        printBoxTrace' _ [] = return ()
+        printBoxTrace' expectedSource [tracePos@(Position traceStartPos _)] =
+            let title = "Finally, box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
+                traceFileName = sourceName traceStartPos
+                traceSourceLines = toModuleAST M.! traceFileName
+            in
+                printSimpleError 
+                    traceSourceLines title traceFileName tracePos Nothing
+        printBoxTrace' expectedSource (tracePos@(Position traceStartPos _) : xr) =
+            let title = "The box is moved again here:"
+                traceFileName = sourceName traceStartPos
+                traceSourceLines = toModuleAST M.! traceFileName
+            in
+                printSimpleError
+                    traceSourceLines title traceFileName tracePos Nothing >> printBoxTrace' expectedSource xr
+        printBoxTrace' _ _ = error "Internal error: invalid error position"
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
