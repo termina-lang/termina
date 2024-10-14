@@ -130,7 +130,7 @@ removeUsed s st = st{usedSet = S.delete s (usedSet st)}
 
 -- safeAdd :: Identifier -> VarSet -> UDM Errors VarSet
 -- safeAdd ident vset =
---   unless (M.size vset < maxBound) (throwError SetMaxBound)
+--   unless (M.size vset < maxBound) (throwError ESetMaxBound)
 --   >> return (unsafeAdd ident vset)
 
 ----------------------------------------
@@ -140,14 +140,14 @@ safeAddUse :: Identifier -> UDM Error ()
 safeAddUse ident
   = do
     usedSet' <- gets usedSet
-    unless (S.size usedSet' < maxBound) (throwError SetMaxBound)
+    unless (S.size usedSet' < maxBound) (throwError ESetMaxBound)
     putUSet $ unsafeAdd ident usedSet'
 
 safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Error ()
 safeAddUseOnlyOnce ident mv
   = do
     ooMap <- gets usedOption
-    unless (M.size ooMap < maxBound) (throwError MapMaxBound)
+    unless (M.size ooMap < maxBound) (throwError EMapMaxBound)
     putOOMap $
       case mv of
         -- We can delete it, because previous stage guarantees no variable
@@ -173,7 +173,7 @@ useBoxVar ident
   then
     throwError (UsingTwice ident)
   else
-    unless (S.size boxSet < maxBound) (throwError SetMaxBound)
+    unless (S.size boxSet < maxBound) (throwError ESetMaxBound)
     >> putBoxSet (unsafeAdd ident boxSet)
 ----------------------------------------
 

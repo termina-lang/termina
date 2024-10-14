@@ -53,9 +53,9 @@ useObject (Variable ident ann)
   =
   let loc = location ann in
   maybe
-        (throwError $ annotateError loc ImpossibleError)
+        (throwError $ annotateError loc EUnboxingObjectType)
         (\case {
-                -- Nothing, we can use it freely, in the normal sense of using it.
+            -- Nothing, we can use it freely, in the normal sense of using it.
                 BoxSubtype _ -> return ()
                 ;
             -- We can use Options only once!
@@ -85,7 +85,7 @@ useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 useFieldAssignment _ = return ()
 
 getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
-getObjectType = maybe (throwError ImpossibleError) return . SM.getObjectSAnns . getAnnotation
+getObjectType = maybe (throwError EUnboxingObjectType) return . SM.getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
@@ -136,7 +136,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
     -- Box are only declared on match statements
     Option (BoxSubtype _) -> defVariableOO ident
     -- Box are not possible, they come from somewhere else.
-    BoxSubtype _ -> throwError (DefiningBox ident)
+    BoxSubtype _ -> throwError EDefiningBox
     --Everything else
     _        -> defVariable ident)
   -- Use everithing in the |initE|
@@ -219,7 +219,7 @@ useDefBasicBlock (MatchBlock e mcase ann)
   =
   -- Depending on expression |e| type
   -- we handle OptionBox special case properly.
-  maybe (throwError $ annotateError (location ann) ImpossibleErrorMatchGetType)
+  maybe (throwError $ annotateError (location ann) EUnboxingMatchType)
     (\case
         Option (BoxSubtype _) ->
           case mcase of
@@ -265,12 +265,12 @@ useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
   case arg of
     -- I don't think we can have expression computing variables here.
     ReferenceExpression Mutable (Variable avar _anni) _ann -> withLocation (location ann) (allocOO avar)
-    _ -> withLocation (location ann) (throwError ImpossibleErrorBadAllocArg)
+    _ -> withLocation (location ann) (throwError EBadAllocArg)
 useDefBasicBlock (FreeBox obj arg ann)
   = useObject obj >> 
   case arg of
     AccessObject (Variable var _anni) -> withLocation (location ann) (useBoxVar var)
-    _ -> withLocation (location ann) (throwError ImpossibleError)
+    _ -> withLocation (location ann) (throwError EBadFreeArg)
 useDefBasicBlock (ProcedureCall obj _ident args _ann)
   = useObject obj >> mapM_ useArguments args
 useDefBasicBlock (AtomicLoad obj e _ann)
