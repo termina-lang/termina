@@ -4,7 +4,7 @@ module ControlFlow.VarUsage.Computation where
 
 import Core.AST (Identifier,Parameter(..),TerminaType(..))
 
-import ControlFlow.VarUsage.Errors
+import ControlFlow.VarUsage.Errors.Errors
 import ControlFlow.VarUsage.Types
 
 import qualified Control.Monad.State as ST
@@ -13,14 +13,14 @@ import Control.Monad.Except as E
 -- Warning: Both implmentations have a limit on the number of elements they can
 -- contain. They do not fail if the limit is rechead.
 -- Sets
-import qualified Data.Set as S
 -- Maps
 import qualified Data.Map.Strict as M
+import Utils.Annotations ( Location(Internal), annotateError )
 
-type VarSet = S.Set Identifier
+type VarMap = M.Map Identifier Location
 
-getVars :: VarSet -> [Identifier]
-getVars = S.toList
+getVars :: VarMap -> [Identifier]
+getVars = M.keys
 
 -- Variables could be defined, allocated or used.
 -- Normal variables go from |Defined| to used |Used|
@@ -30,214 +30,195 @@ getVars = S.toList
 -- We just check that every defined variable is used plus the special ones goes
 -- throw the special process.
 
-type OOVarSt = M.Map Identifier MVars
+type OptionBoxMap = M.Map Identifier MVars
 
 -- Internal state.
-data UDSt
-  = UDSt
-  -- A set of used variables
-    { usedSet :: VarSet
-  -- A map indicating the state of special variables.
-    , usedOption :: OOVarSt
-    , usedBox :: VarSet
-    }
+data UDSt = UDSt { 
+    -- | Set of used variables
+    usedVarMap :: VarMap,
+    -- | Map with the current state of the option-box variables
+    optionBoxesMap :: OptionBoxMap,
+    -- | Map of moved boxes. It maps each box variable to the location where it
+    -- was moved.
+    movedBoxes :: VarMap
+  }
 
 emptyUDSt :: UDSt
 emptyUDSt
-  = UDSt S.empty M.empty S.empty
+  = UDSt M.empty M.empty M.empty
 
 emptyButUsed :: UDSt -> UDSt
-emptyButUsed st = st{usedOption = M.empty, usedBox = S.empty}
+emptyButUsed st = st { optionBoxesMap = M.empty, movedBoxes = M.empty }
 
 type UDM e = ExceptT e (ST.State UDSt)
 
-----------------------------------------
--- Manipulating the state inside monad |UDM|
-get :: UDM e UDSt
-get = lift ST.get
+putOptionBoxesMap :: OptionBoxMap -> UDM e ()
+putOptionBoxesMap = ST.modify . (\s st -> st {optionBoxesMap = s})
 
-put :: UDSt -> UDM e ()
-put = lift . ST.put
-
-putOOMap :: OOVarSt -> UDM e ()
-putOOMap = modify . (\s st -> st{usedOption = s})
-
-putUSet,putBoxSet :: VarSet -> UDM e ()
-putUSet = modify . (\s st -> st{usedSet = s})
-putBoxSet = modify . (\s st -> st{usedBox = s})
-
-gets :: (UDSt -> b) ->  UDM e b
-gets = lift . ST.gets
-
-modify :: (UDSt -> UDSt) -> UDM e ()
-modify = lift . ST.modify
+putUsedVarMap, putMovedBoxSet :: VarMap -> UDM e ()
+putUsedVarMap = ST.modify . (\s st -> st {usedVarMap = s})
+putMovedBoxSet =ST.modify . (\s st -> st {movedBoxes = s})
 
 withState :: (UDSt -> UDSt) -> UDM e a -> UDM e a
-withState f = (modify f >>)
+withState f = (ST.modify f >>)
 
 -- Encapsulation mechanisms.
 -- Useful to run computations in isolated environments.
 
 runEncapsulated :: UDM e a -> UDM e a
 runEncapsulated m =
-  get >>= \st -> m >>= \res -> lift (ST.put st) >> return res
-
-runEncapsEOO :: [UDM e a] -> UDM e [a]
-runEncapsEOO ms =
-  get >>= \st ->
-  mapM (withState emptyButUsed) ms >>=
-  (put st >>) . return
+  ST.get >>= \st -> m >>= \res -> ST.put st >> return res
 
 -- Run computations encapusulates with same first state.
 runEncaps :: [UDM e a] -> UDM e [a]
 runEncaps ms = do
-  st <- get
+  st <- ST.get
   res <- mapM (withState (const st)) ms
-  put st
+  ST.put st
   return res
 ----------------------------------------
 
-emptyOO :: UDM e ()
-emptyOO = get >>= \st -> put (st{usedOption = M.empty})
+getUseVariableStates :: [UDSt] -> ([OptionBoxMap], [VarMap], [VarMap])
+getUseVariableStates =
+  foldr (\s (opts, boxes, regular) ->
+              ( optionBoxesMap s : opts
+              , movedBoxes s : boxes
+              , usedVarMap s : regular
+              )) ([],[],[])
 
-continueWith,unionS :: OOVarSt -> VarSet -> VarSet -> UDM e ()
-continueWith oo uses boxes
-  = put $ UDSt uses oo boxes
-unionS oo uses boxes
-  = get
+unionS :: (OptionBoxMap, VarMap, VarMap) -> UDM e ()
+unionS (oo, boxes, regular)
+  = ST.get
   >>= \st
-  -> put
+  -> ST.put
     -- M.union is left biased. Meaning that it takes priority over the other map
     -- when key collision. It is what we want tho.
-     st{ usedOption = M.union oo (usedOption st)
-       , usedSet = S.union uses (usedSet st)
-       , usedBox = S.union boxes (usedBox st)
-       }
+     st { 
+        optionBoxesMap = M.union oo (optionBoxesMap st),
+        movedBoxes = M.union boxes (movedBoxes st),
+        usedVarMap = M.union regular (usedVarMap st)
+      }
 
-getOnlyOnce :: UDM e OOVarSt
-getOnlyOnce = gets usedOption
+getOnlyOnce :: UDM e OptionBoxMap
+getOnlyOnce = ST.gets optionBoxesMap
 
-unsafeAdd :: Identifier -> VarSet -> VarSet
-unsafeAdd = S.insert
+unsafeAdd :: Identifier -> Location -> VarMap -> VarMap
+unsafeAdd = M.insert
 
-unionUsed :: VarSet -> UDM e ()
+unionUsed :: VarMap -> UDM e ()
 unionUsed vset =
-  modify (\st -> st{usedSet = S.union vset (usedSet st)})
+  ST.modify (\st -> st{usedVarMap = M.union vset (usedVarMap st)})
 
-removeUsedOO,removeUsed :: Identifier -> UDSt -> UDSt
-removeUsedOO s st = st{usedOption = M.delete s (usedOption st)}
-removeUsed s st = st{usedSet = S.delete s (usedSet st)}
-
--- safeAdd :: Identifier -> VarSet -> UDM Errors VarSet
--- safeAdd ident vset =
---   unless (M.size vset < maxBound) (throwError ESetMaxBound)
---   >> return (unsafeAdd ident vset)
+removeUsed :: Identifier -> UDSt -> UDSt
+removeUsed s st = st{usedVarMap = M.delete s (usedVarMap st)}
 
 ----------------------------------------
 -- This function checks we have not reached the limit of the data structure.
-safeAddUse :: Identifier -> UDM Error ()
+safeUseVariable :: Identifier -> Location -> UDM Error ()
 -- Add Variable to use set
-safeAddUse ident
+safeUseVariable ident loc
   = do
-    usedSet' <- gets usedSet
-    unless (S.size usedSet' < maxBound) (throwError ESetMaxBound)
-    putUSet $ unsafeAdd ident usedSet'
+    usedVarMap' <- ST.gets usedVarMap
+    unless (M.size usedVarMap' < maxBound) (throwError ESetMaxBound)
+    putUsedVarMap $ unsafeAdd ident loc usedVarMap'
 
-safeAddUseOnlyOnce :: Identifier -> MVars -> UDM Error ()
-safeAddUseOnlyOnce ident mv
+safeMoveBox :: Identifier -> Location -> UDM Error ()
+safeMoveBox ident loc
+  = ST.gets movedBoxes
+  >>= \boxSet ->
+    case M.lookup ident boxSet of
+      Just prevLoc -> throwError (EBoxMovedTwice ident prevLoc)
+      Nothing -> do
+        unless (M.size boxSet < maxBound) (throwError ESetMaxBound)
+        putMovedBoxSet (unsafeAdd ident loc boxSet)
+
+safeUpdateOptionBox :: Identifier -> MVars -> UDM VarUsageError ()
+safeUpdateOptionBox ident mv
   = do
-    ooMap <- gets usedOption
-    unless (M.size ooMap < maxBound) (throwError EMapMaxBound)
-    putOOMap $
+    ooMap <- ST.gets optionBoxesMap
+    unless (M.size ooMap < maxBound) (throwError $ annotateError Internal EMapMaxBound)
+    putOptionBoxesMap $
       case mv of
         -- We can delete it, because previous stage guarantees no variable
         -- shadowing.
-        Defined -> M.delete ident ooMap
+        Defined _ -> M.delete ident ooMap
         -- Everything else just inserts.
         _ -> M.insert ident mv ooMap
 
--- BoxVar manipulation
-defBoxVar, useBoxVar :: Identifier -> UDM Error ()
-defBoxVar ident
-  = gets usedBox
+-- | Box variable manipulation
+defBox :: Identifier -> Location -> UDM VarUsageError ()
+defBox ident loc
+  = ST.gets movedBoxes
   >>= \boxSet ->
-    if S.member ident boxSet
+    if M.member ident boxSet
     then do
-      putBoxSet $ S.delete ident boxSet
+      putMovedBoxSet $ M.delete ident boxSet
     else
-      throwError (NotUsedOO ident)
-useBoxVar ident
-  = gets usedBox
-  >>= \boxSet ->
-  if S.member ident boxSet
-  then
-    throwError (UsingTwice ident)
-  else
-    unless (S.size boxSet < maxBound) (throwError ESetMaxBound)
-    >> putBoxSet (unsafeAdd ident boxSet)
+      throwError $ annotateError loc (EBoxNotUsed ident)
+
 ----------------------------------------
 
-addUseOnlyOnce :: Identifier -> UDM Error ()
-addUseOnlyOnce ident
+moveOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+moveOptionBox ident loc
   = do
-    ooMap <- gets usedOption
-    when (M.member ident ooMap) (throwError (UsingTwice ident))
-    safeAddUseOnlyOnce ident Used
+    optionBoxMap <- ST.gets optionBoxesMap
+    case M.lookup ident optionBoxMap of
+      Just (Allocated _) -> safeUpdateOptionBox ident (Moved loc)
+      Just s -> throwError $ annotateError loc (EOptionBoxMovedTwice ident (getLocation s))
+      Nothing -> safeUpdateOptionBox ident (Moved loc)
 
-allocOO :: Identifier -> UDM Error ()
-allocOO ident
+allocBox :: Identifier -> Location -> UDM VarUsageError ()
+allocBox ident loc
   =
   maybe
-    (throwError (AllocNotUsed ident))
+    (throwError $ annotateError loc (AllocNotUsed ident))
     (\case{
         -- We use it in the future
-        Used -> safeAddUseOnlyOnce ident Allocated;
+        Moved _ -> safeUpdateOptionBox ident (Allocated loc);
         -- Re-allocation
-        Allocated -> throwError (AllocTwice ident);
+        Allocated prevLoc -> throwError $ annotateError loc (AllocTwice ident prevLoc);
         -- Define in the future? This case shouldn't happen
-        Defined -> throwError (AllocRedef ident);
-        }) . M.lookup ident =<< gets usedOption
+        Defined _ -> throwError $ annotateError Internal EVarRedefinition;
+        }) . M.lookup ident =<< ST.gets optionBoxesMap
 
-defVariableOO :: Identifier -> UDM Error ()
-defVariableOO ident =
+defVariableOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+defVariableOptionBox ident loc =
   maybe
-    (throwError (NotUsed ident))
+    (throwError $ annotateError loc (ENotUsed ident))
     (\case{
         -- Allocated after defined.
-        Allocated ->  safeAddUseOnlyOnce ident Defined;
+        Allocated _ -> safeUpdateOptionBox ident (Defined loc);
         -- Skipped allocation
-        Used -> throwError (DefinedNotAlloc ident);
+        Moved prevLoc -> throwError $ annotateError loc (DefinedNotAlloc ident prevLoc);
         -- Defined;Defined not allowed,
-        Defined -> throwError (DefinedTwice ident);
-        }) . M.lookup ident =<< gets usedOption
+        Defined prevLoc -> throwError $ annotateError loc (DefinedTwice ident prevLoc);
+        }) . M.lookup ident =<< ST.gets optionBoxesMap
 
 -- If we define a variable that was not used, then error.
-defVariable :: Identifier -> UDM Error ()
-defVariable ident =
-  gets usedSet >>=
+defVariable :: Identifier -> Location -> UDM VarUsageError ()
+defVariable ident loc =
+  ST.gets usedVarMap >>=
   \i ->
     case head ident of
       -- If the argument starts with an underscore, then the parameter must be ignored and not used.
-      '_' -> when (S.member ident i) $ throwError (UsedIgnoredVariable ident)
+      '_' -> 
+        case M.lookup ident i of
+          Nothing -> return ()
+          Just useLoc -> throwError $ annotateError useLoc (EUsedIgnoredParameter ident)
       _ ->
-        if S.member ident i
-        then
-            -- Variable is used, strong assumtions on use!
-            -- return () -- we can remove it... but maybe it is more expensive.
-            modify (removeUsed ident)
-        else
-            -- Variable |ident| is not used in the rest of the code :(
-            throwError (NotUsed ident)
+        case M.lookup ident i of
+          Just _ -> ST.modify (removeUsed ident)
+          Nothing -> throwError $ annotateError loc (ENotUsed ident)
 
 -- Procedures can receive /box/ variables as arguments.
 -- Box variables have a special Use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- box.
-defArgumentsProc :: Parameter -> UDM Error ()
-defArgumentsProc ps
+defArgumentsProc :: Parameter -> Location -> UDM VarUsageError ()
+defArgumentsProc ps loc
   = (case paramTerminaType ps of
-        BoxSubtype _ -> defBoxVar
-        _ -> defVariable)
+        BoxSubtype _ -> flip defBox loc
+        _ -> flip defVariable loc)
     (paramIdentifier ps)
 
 ----------------------------------------

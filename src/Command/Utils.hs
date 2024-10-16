@@ -19,6 +19,7 @@ import Modules.Modules
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
 import ControlFlow.BasicBlocks.Checks.ExitPaths
 import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
+import qualified ControlFlow.VarUsage.Errors.PPrinting as VUErrors
 
 -- | Error message formatter
 -- Prints error messages in the form "error: <message>"
@@ -49,11 +50,13 @@ buildModuleName fs = buildModuleName' fs
     buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
 
 useDefCheckModule :: BasicBlocksModule -> IO ()
-useDefCheckModule typedModule =
-    let result = runUDAnnotatedProgram . basicBlocksAST . metadata $ typedModule in
+useDefCheckModule bbModule =
+    let result = runUDAnnotatedProgram . basicBlocksAST . metadata $ bbModule in
     case result of
     Nothing -> return ()
-    Just err -> die . errorMessage $ show err
+    Just err -> 
+        let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
+        VUErrors.ppError sourceFilesMap err >> exitFailure
 
 genBasicBlocksModule :: TypedModule -> IO BasicBlocksModule
 genBasicBlocksModule typedModule = do

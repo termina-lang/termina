@@ -326,12 +326,12 @@ typeSpecifierParser =
   <|> (reserved "bool" >> return Bool)
   <|> (reserved "char" >> return Char)
 
-parameterIdentifierParser :: Parser Identifier
-parameterIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
+objectIdentifierParser :: Parser Identifier
+objectIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
 
 parameterParser :: Parser Parameter
 parameterParser = do
-  identifier <- parameterIdentifierParser
+  identifier <- objectIdentifierParser
   reservedOp ":"
   Parameter identifier <$> typeSpecifierParser
 
@@ -658,7 +658,7 @@ parensObjectParser = parens objectParser
 objectTermParser :: Parser (Object ParserAnn)
 objectTermParser = (do
     startPos <- getPosition
-    ident <- identifierParser
+    ident <- objectIdentifierParser
     return $ Variable ident (Position startPos (incSourceColumn startPos (length ident))))
   <|> parensObjectParser
 
@@ -884,8 +884,8 @@ sizeParser = constValueSizeParser <|> constSizeParser
 
 mutableObjDeclarationParser :: Parser (Statement ParserAnn)
 mutableObjDeclarationParser = do
-  reserved "var"
   startPos <- getPosition
+  reserved "var"
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser
@@ -897,8 +897,8 @@ mutableObjDeclarationParser = do
 
 immutableObjDeclarationParser :: Parser (Statement ParserAnn)
 immutableObjDeclarationParser = do
-  reserved "let"
   startPos <- getPosition
+  reserved "let"
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser
