@@ -24,7 +24,8 @@ data Error
   | EBoxMovedTwice Identifier Location -- ^ Box variable is moved twice (VE-004)
   | EOptionBoxMovedTwice Identifier Location -- ^ Option-box variable is moved twice (VE-005)
   | EDifferentOptionBoxUse Identifier Location -- ^ Option-box final state mismatch (VE-007)
-  | EDifferentBoxSets
+  | EMissingBoxMove Identifier Location -- ^ Box variable is not moved (VE-008)
+  | EDifferentOptionBoxUseLoop Identifier -- ^ Option-box final state mismatch in loop (VE-009)
   | ForMoreOOpt
   | ForMoreOBox [Identifier]
   -- Special Variable errors
