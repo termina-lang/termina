@@ -940,8 +940,8 @@ assignmentStmtPaser = do
 
 matchCaseParser :: Parser (MatchCase ParserAnn)
 matchCaseParser = do
-  reserved "case"
   startPos <- getPosition
+  reserved "case"
   caseId <- identifierParser
   args <- try (parens (sepBy identifierParser comma)) <|> return []
   reservedOp "=>"

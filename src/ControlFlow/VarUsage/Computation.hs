@@ -1,6 +1,12 @@
 -- | DSL to compute Use/Defs of Termina expressions
 
-module ControlFlow.VarUsage.Computation where
+module ControlFlow.VarUsage.Computation (
+  UDM, UDSt(..), VarMap, OptionBoxMap,
+  runEncapsulated, runEncaps, unionUsed, unifyState,
+  defVariableOptionBox, defBox, defVariable, safeUseVariable,
+  moveOptionBox, safeMoveBox, allocOptionBox, defArgumentsProc,
+  runComputation
+) where
 
 import Core.AST (Identifier,Parameter(..),TerminaType(..))
 
@@ -17,19 +23,10 @@ import Control.Monad.Except as E
 import qualified Data.Map.Strict as M
 import Utils.Annotations ( Location(Internal), annotateError )
 
+-- | Map of variables to the last location where were used/moved.
 type VarMap = M.Map Identifier Location
 
-getVars :: VarMap -> [Identifier]
-getVars = M.keys
-
--- Variables could be defined, allocated or used.
--- Normal variables go from |Defined| to used |Used|
-
-
--- We already know that each used variable is defined from previous pass.
--- We just check that every defined variable is used plus the special ones goes
--- throw the special process.
-
+-- | Map of option-box variables to their current state.
 type OptionBoxMap = M.Map Identifier MVars
 
 -- Internal state.
@@ -47,9 +44,7 @@ emptyUDSt :: UDSt
 emptyUDSt
   = UDSt M.empty M.empty M.empty
 
-emptyButUsed :: UDSt -> UDSt
-emptyButUsed st = st { optionBoxesMap = M.empty, movedBoxes = M.empty }
-
+-- | Monad to compute the use/defs of variables.
 type UDM e = ExceptT e (ST.State UDSt)
 
 putOptionBoxesMap :: OptionBoxMap -> UDM e ()
@@ -76,18 +71,9 @@ runEncaps ms = do
   res <- mapM (withState (const st)) ms
   ST.put st
   return res
-----------------------------------------
 
-getUseVariableStates :: [UDSt] -> ([OptionBoxMap], [VarMap], [VarMap])
-getUseVariableStates =
-  foldr (\s (opts, boxes, regular) ->
-              ( optionBoxesMap s : opts
-              , movedBoxes s : boxes
-              , usedVarMap s : regular
-              )) ([],[],[])
-
-unionS :: (OptionBoxMap, VarMap, VarMap) -> UDM e ()
-unionS (oo, boxes, regular)
+unifyState :: (OptionBoxMap, VarMap, VarMap) -> UDM e ()
+unifyState (oo, boxes, regular)
   = ST.get
   >>= \st
   -> ST.put
@@ -98,9 +84,6 @@ unionS (oo, boxes, regular)
         movedBoxes = M.union boxes (movedBoxes st),
         usedVarMap = M.union regular (usedVarMap st)
       }
-
-getOnlyOnce :: UDM e OptionBoxMap
-getOnlyOnce = ST.gets optionBoxesMap
 
 unsafeAdd :: Identifier -> Location -> VarMap -> VarMap
 unsafeAdd = M.insert
@@ -154,9 +137,7 @@ defBox ident loc
     then do
       putMovedBoxSet $ M.delete ident boxSet
     else
-      throwError $ annotateError loc (EBoxNotUsed ident)
-
-----------------------------------------
+      throwError $ annotateError loc (EBoxNotMoved ident)
 
 moveOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 moveOptionBox ident loc
@@ -167,16 +148,16 @@ moveOptionBox ident loc
       Just s -> throwError $ annotateError loc (EOptionBoxMovedTwice ident (getLocation s))
       Nothing -> safeUpdateOptionBox ident (Moved loc)
 
-allocBox :: Identifier -> Location -> UDM VarUsageError ()
-allocBox ident loc
+allocOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+allocOptionBox ident loc
   =
   maybe
-    (throwError $ annotateError loc (AllocNotUsed ident))
+    (throwError $ annotateError loc (EAllocNotMoved ident))
     (\case{
         -- We use it in the future
         Moved _ -> safeUpdateOptionBox ident (Allocated loc);
         -- Re-allocation
-        Allocated prevLoc -> throwError $ annotateError loc (AllocTwice ident prevLoc);
+        Allocated prevLoc -> throwError $ annotateError loc (EAllocTwice ident prevLoc);
         -- Define in the future? This case shouldn't happen
         Defined _ -> throwError $ annotateError Internal EVarRedefinition;
         }) . M.lookup ident =<< ST.gets optionBoxesMap
@@ -189,9 +170,9 @@ defVariableOptionBox ident loc =
         -- Allocated after defined.
         Allocated _ -> safeUpdateOptionBox ident (Defined loc);
         -- Skipped allocation
-        Moved prevLoc -> throwError $ annotateError loc (DefinedNotAlloc ident prevLoc);
+        Moved prevLoc -> throwError $ annotateError loc (EMovedWithoutAlloc ident prevLoc);
         -- Defined;Defined not allowed,
-        Defined prevLoc -> throwError $ annotateError loc (DefinedTwice ident prevLoc);
+        Defined prevLoc -> throwError $ annotateError loc (EDefinedTwice ident prevLoc);
         }) . M.lookup ident =<< ST.gets optionBoxesMap
 
 -- If we define a variable that was not used, then error.

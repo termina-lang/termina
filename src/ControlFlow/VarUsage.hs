@@ -140,10 +140,28 @@ useDefStmt (Declaration ident _accK tyS initE ann)
   -- Use everithing in the |initE|
   >> useExpression initE
 -- All branches should have the same used Only ones.
-useDefStmt (AssignmentStmt obj e _ann)
-  -- DONE [UseDef.Report.Q1]
-  = useExpression e
-  >> useObject obj
+useDefStmt (AssignmentStmt obj e ann) = do
+  -- | We need to check if the object is an option-box
+  obj_ty <- withLocation (location ann) (getObjectType obj)
+  case obj_ty of
+    (_, Option (BoxSubtype _)) -> 
+      -- | We are assigning to an option-box. This can only be done through a
+      -- OptionVariantInitializer.
+      case e of 
+        OptionVariantInitializer None _ -> useObject obj
+        OptionVariantInitializer (Some boxObjExpr) _ -> do
+          -- | We need to move the box object 
+          case boxObjExpr of
+            AccessObject (Variable ident _) -> 
+              let loc = location ann in
+              withLocation loc (safeMoveBox ident loc)
+            _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+          -- | And update the option-box as allocated
+          case obj of
+            Variable ident _ -> allocOptionBox ident (location ann)
+            _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+        _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+    _ -> useObject obj >> useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 
@@ -162,12 +180,21 @@ useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse _ann)
   sets <- mapM (\(body, loc) -> do
     blockSt <- runEncapsulated (useDefBasicBlocks body >> ST.get)
     return (blockSt, loc)) bodiesWithLocs
-  -- Rule here is, when entering, the state of all the boxes must be the same and the
-  -- set of used boxes must be equal.
-  (finalOptionBoxMap, finalBoxes, usedRegular) <- checkUseVariableStates sets
-  unionS (finalOptionBoxMap, finalBoxes, usedRegular)
-  -- Use the else-ifs conditional expressions
-  mapM_ (useExpression . elseIfCond) elseIfs
+  if length sets == 1 then
+    do
+      let branchSt = fst . head $ sets
+      prevSt <- ST.get
+      usedRegular <- checUseVariableSingleBranch prevSt branchSt
+      checkMovedBoxesSingleBranch (M.difference (movedBoxes branchSt) (movedBoxes prevSt))
+      unionUsed usedRegular
+  else
+    do
+      -- Rule here is, when entering, the state of all the boxes must be the same and the
+      -- set of used boxes must be equal.
+      (finalOptionBoxMap, finalBoxes, usedRegular) <- checkUseVariableStates sets
+      unifyState (finalOptionBoxMap, finalBoxes, usedRegular)
+      -- Use the else-ifs conditional expressions
+      mapM_ (useExpression . elseIfCond) elseIfs
   -- Finally, use the if conditional expression
   useExpression eCond
 useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block _ann) = do
@@ -175,13 +202,11 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block _ann) = do
     prevSt <- ST.get
     -- What happens inside the body of a for, may not happen at all.
     loopSt <- runEncapsulated (useDefBasicBlocks (blockBody block) >> ST.get)
-    usedRegular <- checUseVariableLoop prevSt loopSt
-    ----------------------------------------
+    usedRegular <- checUseVariableSingleBranch prevSt loopSt
+    when (isNothing mBrk) $ 
+      checkMovedBoxesSingleBranch (M.difference (movedBoxes loopSt) (movedBoxes prevSt))
     unionUsed usedRegular
-    ----------------------------------------
-    -- Break condition.
-    -- Used at the beggining of for loop.
-    >> maybe (return ()) useExpression mBrk
+    maybe (return ()) useExpression mBrk
 useDefBasicBlock (MatchBlock e mcase ann)
   = do
   -- Depending on expression |e| type
@@ -192,7 +217,7 @@ useDefBasicBlock (MatchBlock e mcase ann)
             case mcase of
               [ml,mr] -> do
                 let (mSome, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
-                someBlk <- runEncapsulated (useDefBasicBlocks (blockBody . matchBody $ mSome) 
+                someBlk <- runEncapsulated (useDefBasicBlocks (blockBody . matchBody $ mSome)
                   >> defBox (head (matchBVars mSome)) (location (matchAnnotation mSome)) >> ST.get)
                 noneBlk <- runEncapsulated (useDefBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
                 return [(someBlk, location . matchAnnotation $ mSome), (noneBlk, location . matchAnnotation $ mNone)]
@@ -204,7 +229,7 @@ useDefBasicBlock (MatchBlock e mcase ann)
             return (blockSt, location . matchAnnotation $ c)) mcase);
     ) (SM.getResultingType $ SM.getSemanticAnn $ getAnnotation e)
   (finalOptionBoxMap, finalBoxes, usedRegular) <- checkUseVariableStates sets
-  unionS (finalOptionBoxMap, finalBoxes, usedRegular)
+  unifyState (finalOptionBoxMap, finalBoxes, usedRegular)
   useExpression e
 useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
   case arg of
@@ -219,7 +244,7 @@ useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
   case arg of
     -- I don't think we can have expression computing variables here.
     ReferenceExpression Mutable (Variable avar _anni) _ann ->
-      allocBox avar (location ann)
+      allocOptionBox avar (location ann)
     _ ->throwError $ annotateError (location ann) EBadAllocArg
 useDefBasicBlock (FreeBox obj arg ann)
   = useObject obj >>
@@ -249,19 +274,15 @@ useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBasicBlocks (blockBody blk)
   >> mapM_ (`defVariable` location ann) bvars
 
-checUseVariableLoop :: UDSt -> UDSt -> UDM VarUsageError VarMap
-checUseVariableLoop prevMap loopst = do
-  let prevOptionBoxes = optionBoxesMap prevMap
-  mapM_ (\k -> 
+checUseVariableSingleBranch :: UDSt -> UDSt -> UDM VarUsageError VarMap
+checUseVariableSingleBranch prevSt branchSt = do
+  let prevOptionBoxes = optionBoxesMap prevSt
+  mapM_ (\k ->
     let pval = prevOptionBoxes M.! k in
-    case M.lookup k (optionBoxesMap loopst) of
+    case M.lookup k (optionBoxesMap branchSt) of
       Nothing -> throwError $ annotateError Internal EMissingOptionBox
-      Just loopval -> unless (sameState pval loopval) (throwError $ annotateError (getLocation loopval) (EDifferentOptionBoxUseLoop k))) (M.keys prevOptionBoxes)
-
---  unless (M.null (movedBoxes loopst)) (
---    throwError $ annotateError )
-  -- Then continue adding uses
-  return $ usedVarMap loopst
+      Just loopval -> unless (sameState pval loopval) (throwError $ annotateError (getLocation loopval) (EDifferentOptionBoxUseSingleBranch k))) (M.keys prevOptionBoxes)
+  return $ usedVarMap branchSt
 
 checkUseVariableStates :: [(UDSt, Location)] -> UDM VarUsageError (OptionBoxMap, VarMap, VarMap)
 checkUseVariableStates sets = do
@@ -272,6 +293,12 @@ checkUseVariableStates sets = do
   -- Then continue adding uses
   return (optionBoxesMap . head $ states, movedBoxes . head $ states, M.unions (usedVarMap <$> states))
 
+checkMovedBoxesSingleBranch :: VarMap -> UDM VarUsageError ()
+checkMovedBoxesSingleBranch boxes =
+  case M.toList boxes of
+    [] -> return ()
+    ((ident, loc):_) -> throwError $ annotateError loc (EBoxMoveConditionalBranch ident)
+
 checkMovedBoxes :: [(VarMap, Location)] -> UDM VarUsageError ()
 checkMovedBoxes [] = return ()
 checkMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
@@ -280,7 +307,7 @@ checkMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
 
     sameMovedBoxes :: (VarMap, Location) -> (VarMap, Location) -> UDM VarUsageError ()
     sameMovedBoxes (lmap, lloc) (rmap, rloc) = do
-      mapM_ (\k -> 
+      mapM_ (\k ->
         case M.lookup k rmap of
           Nothing -> throwError $ annotateError rloc (EMissingBoxMove k lloc)
           Just _ -> return ()) (M.keys lmap)
@@ -292,12 +319,12 @@ checkOptionBoxStates (x:xs) = mapM_ (sameOptionBoxState x) xs
   where
 
     sameOptionBoxState :: (OptionBoxMap, Location) -> (OptionBoxMap, Location) -> UDM VarUsageError ()
-    sameOptionBoxState (lmap, lloc) (rmap, _) = do
-      mapM_ (\k -> 
+    sameOptionBoxState (lmap, lloc) (rmap, rloc) = do
+      mapM_ (\k ->
         let lval = lmap M.! k in
         case M.lookup k rmap of
           Nothing -> throwError $ annotateError Internal EMissingOptionBox
-          Just rval -> unless (sameState rval lval) (throwError $ annotateError (getLocation rval) (EDifferentOptionBoxUse k lloc))) (M.keys lmap)
+          Just rval -> unless (sameState rval lval) (throwError $ annotateError rloc (EDifferentOptionBoxUse k rval (lval, lloc)))) (M.keys lmap)
 
 useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
 useDefCMemb (ClassField fdef ann)
