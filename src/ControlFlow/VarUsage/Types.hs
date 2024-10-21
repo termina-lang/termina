@@ -24,6 +24,10 @@ sameState (Allocated _) (Allocated _) = True
 sameState (Moved _) (Moved _) = True
 sameState _ _ = False
 
+isAllocated :: MVars -> Bool
+isAllocated (Allocated _) = True
+isAllocated _ = False
+
 instance ShowText MVars where
     showText (Defined _) = "defined"
     showText (Allocated _) = "allocated"
