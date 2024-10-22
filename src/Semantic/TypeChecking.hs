@@ -164,9 +164,9 @@ typeMemberFunctionCall ann obj_ty ident args =
               let (psLen , asLen) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
-              typed_args <- zipWithM (\p e ->
-                catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns))
-                  (typeExpression (Just p) typeRHSObject e)) ps args
+              typed_args <- zipWithM (\(p, idx) e ->
+                catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns) idx)
+                  (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), Unit)
          ;
          -- Other User defined types do not define methods
@@ -177,7 +177,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Reference Mutable (Option (BoxSubtype ty_pool)), Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Reference Mutable (Option (BoxSubtype ty_pool)), Builtin) 0)
                 (typeExpression (Just (Reference Mutable (Option (BoxSubtype ty_pool)))) typeRHSObject opt)
               return (([Reference Mutable (Option (BoxSubtype ty_pool))], [typed_arg]), Unit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Reference Mutable (Option (BoxSubtype ty_pool))], Builtin) 0)
@@ -185,7 +185,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", BoxSubtype ty_pool, Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", BoxSubtype ty_pool, Builtin) 0)
                 (typeExpression (Just (BoxSubtype ty_pool)) typeRHSObject elemnt)
               return (([BoxSubtype ty_pool], [typed_arg]), Unit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [BoxSubtype ty_pool], Builtin) 0)
@@ -196,7 +196,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Reference Mutable ty_atomic, Builtin))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Reference Mutable ty_atomic, Builtin) 0)
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
               return (([Reference Mutable ty_atomic], [typed_arg]), Unit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Reference Mutable ty_atomic], Builtin) 0)
@@ -204,7 +204,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         "store" ->
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", ty_atomic, Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", ty_atomic, Builtin) 0)
                 (typeExpression (Just ty_atomic) typeRHSObject value)
               return (([ty_atomic], [typed_value]), Unit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [ty_atomic], Builtin) 0)
@@ -215,9 +215,9 @@ typeMemberFunctionCall ann obj_ty ident args =
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", USize, Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", USize, Builtin) 0)
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Reference Mutable ty_atomic, Builtin))
+              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Reference Mutable ty_atomic, Builtin) 1)
                 (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
               return (([USize, Reference Mutable ty_atomic], [typed_idx, typed_ref]), Unit)
             _ -> if length args < 2 then
@@ -226,9 +226,9 @@ typeMemberFunctionCall ann obj_ty ident args =
         "store_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", USize, Builtin))
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", USize, Builtin) 0)
                 (typeExpression (Just USize) typeRHSObject index)
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", ty_atomic, Builtin))
+              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", ty_atomic, Builtin) 1)
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
               return (([USize, ty_atomic], [typed_idx, typed_value]), Unit)
             _ -> if length args < 2 then
@@ -1152,7 +1152,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     catchError (getGlobalTypeDef anns ifaceId)
       (\_ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)) >>= \case {
       Interface _ iface_prcs _ -> return $ map (, ifaceId) iface_prcs : acc;
-      _ -> throwError $ annotateError anns (EMismatchIdNotInterface ifaceId)
+      _ -> throwError $ annotateError anns (EGlobalNotInterface ifaceId)
     }) [] provides
   let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _, _) -> ifaceId) providedProcedures
   let sorted_prcs = Data.List.sortOn (
@@ -1170,7 +1170,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
     checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
-      unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
+      unless (prcId == prcId') (throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId')) >> do
       let psLen = length ps
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramTerminaType ps, location pann) (fromIntegral psLen')))
@@ -1179,6 +1179,51 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
         unless (checkEqTypes ts ts') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramTerminaType p, location pann) ts'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EClassTyping)
+
+checkClassKind anns clsId TaskClass (_fs, prcs, acts) provides = do
+  -- A task must not provide any interface
+  unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
+  -- A task must not implement any procedures
+  case prcs of
+    [] -> return ()
+    (ClassProcedure procId _ _ ann):_  ->
+        throwError $ annotateError ann (ETaskClassProcedure (clsId, anns) procId)
+    _ -> throwError (annotateError Internal EClassTyping)
+  -- A task must implement at least one action
+  when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
+checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
+  -- A handler must not provide any interface
+  unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
+  -- A handler must not implement any procedures
+  case prcs of
+    [] -> return ()
+    (ClassProcedure procId _ _ ann):_  ->
+        throwError $ annotateError ann (EHandlerClassProcedure (clsId, anns) procId)
+    _ -> throwError (annotateError Internal EClassTyping)
+  -- A handler must implement only one action
+  case acts of
+    [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
+    [ClassAction _actionId _ _ _ _ann] -> return ()
+    [ClassAction _ _ _ _ prevActAnn, ClassAction _ _ _ _ otherActAnn, _]  ->
+        throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
+    _ -> throwError (annotateError Internal EClassTyping)
+  -- A handler must have one single sink port and cannot define any in ports
+  checkHandlerPorts Nothing fs  
+
+  where
+
+    checkHandlerPorts :: Maybe Location -> [SAST.ClassMember SemanticAnn] -> SemanticMonad ()
+    checkHandlerPorts Nothing [] = throwError $ annotateError anns (EHandlerClassNoSinkPort clsId)
+    checkHandlerPorts (Just _) [] = return ()
+    checkHandlerPorts prev ((ClassField (FieldDefinition fs_id fs_ty) annCF): xfs) =
+      case fs_ty of
+        SinkPort _ _ -> 
+          case prev of 
+            Nothing -> checkHandlerPorts (Just (location annCF)) xfs
+            Just prevPort -> throwError $ annotateError (location annCF) (EHandlerClassMultipleSinkPorts clsId prevPort)
+        InPort _ _ -> throwError $ annotateError (location annCF) (EHandlerClassInPort (clsId, anns) fs_id)
+        _ -> checkHandlerPorts Nothing xfs
+    checkHandlerPorts _ _ = throwError $ annotateError Internal EClassTyping
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
 
