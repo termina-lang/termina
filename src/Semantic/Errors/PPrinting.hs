@@ -653,7 +653,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The binary operation \x1b[31m" <> showText op <>
-                    "will result in a value of type \x1b[31m" <> showText Bool <>
+                    "\x1b[0m will result in a value of type \x1b[31m" <> showText Bool <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotBool op ty ->
         let title = "\x1b[31merror [SE-045]\x1b[0m: binary operation expected boolean type on the left."
