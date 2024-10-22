@@ -22,6 +22,7 @@ data Error
   | EUnboxingOptionMap -- ^ Error when trying to unbox an option map (Internal)
   | EUnboxingVariableMap -- ^ Error when trying to unbox a variable map (Internal)
   | EDefinedTwice -- ^ Variable defined twice (Internal)
+  | EOptionBoxUsedInBadContext -- ^ Option-box used in bad context (Internal)
   | EUsedIgnoredParameter Identifier -- ^ Using a variable that is ignored (VE-001)
   | ENotUsed Identifier -- ^ Variable is not used (VE-002)
   | EBoxNotMoved Identifier -- ^ Box variable is not moved (VE-003)

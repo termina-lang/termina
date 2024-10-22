@@ -4,17 +4,14 @@ module ControlFlow.VarUsage (
   runUDAnnotatedProgram
 ) where
 
-{-
-At termina level, each block is a basic block.
-Maybe ask Pablo about this, but functions do not change values unless are
-explicit about it using the |mut| operator.
+{--
+At Termina level, each block is a basic block.
 
 In this module, we implement a backward analysis.
 That is, given a block, i.e. a sequence of statements, we go to the last
-statement and build our sets backwards.
--}
+statement and build our sets and maps backwards.
+--}
 
--- Monad and manipulations
 import ControlFlow.VarUsage.Computation
 import ControlFlow.VarUsage.Errors.Errors
 
@@ -38,11 +35,10 @@ import qualified Data.Set as S
 
 
 -- There are two types of arguments :
--- + Moving out variables of type box and Option<box T>
+-- + Moving out variables of type box T and Option<box T>
 -- + Copying expressions, everything.
--- It is context dependent (AFAIK).
 useArguments :: Expression SemanticAnn -> UDM VarUsageError ()
--- If we are giving a variable of type Box, we moving it out.
+-- If we are giving a variable of type box T, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
   = case SM.getTypeSemAnn ann of
     Just (BoxSubtype _) ->
@@ -59,7 +55,6 @@ useObject (Variable ident ann)
   maybe
         (throwError $ annotateError loc EUnboxingObjectType)
         (\case {
-            BoxSubtype _ -> safeUseVariable ident;
             Option (BoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
             _ -> safeUseVariable ident
         }) (SM.getTypeSemAnn ann)
@@ -72,13 +67,11 @@ useObject (Dereference obj _ann)
 useObject (DereferenceMemberAccess obj i _ann)
   = safeUseVariable i
   >> useObject obj
--- TODO Use Object unbox?
 useObject (Unbox obj _ann)
   = useObject obj
 
 useFieldAssignment :: FieldAssignment SemanticAnn -> UDM VarUsageError ()
 useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
--- Should we also check port connections? This is `global` to taks level :shrug:
 useFieldAssignment _ = return ()
 
 getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
@@ -104,7 +97,6 @@ useExpression (ArraySliceExpression _aK obj eB eT _ann)
 useExpression (MemberFunctionCall obj _ident args _ann) = do
     useObject obj >> mapM_ useArguments args
 useExpression (DerefMemberFunctionCall obj _ident args _ann)
-      -- TODO Can Box be passed around as arguments?
   = useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitializer e _size _ann)
   = useExpression e
@@ -118,7 +110,6 @@ useExpression (OptionVariantInitializer opt _ann)
         None   -> return ()
         Some e -> useExpression e
 useExpression (FunctionCall _ident args _ann)
-      -- TODO Can Box be passed around as arguments?
   = mapM_ useArguments args
 
 useDefBlockRet :: Block SemanticAnn -> UDM VarUsageError ()
@@ -197,10 +188,7 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block ann) = do
     finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, location ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
     maybe (return ()) useExpression mBrk
-useDefBasicBlock (MatchBlock e mcase ann)
-  = do
-  -- Depending on expression |e| type
-  -- we handle OptionBox special case properly.
+useDefBasicBlock (MatchBlock e mcase ann) = do
   prevSt <- ST.get
   sets <- maybe (throwError $ annotateError (location ann) EUnboxingExpressionType)
     (\case
@@ -268,8 +256,7 @@ useMCase (MatchCase _mIdent bvars blk ann)
 checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
 checkUseVariableStates prevSt sets = do
   finalSt <- checkOptionBoxStates prevSt sets 
-  checkSameMovedBoxes (map (first movedBoxes) sets)
-  -- Then continue adding uses
+  checkSameMovedBoxes (map (first (flip M.difference (movedBoxes prevSt) . movedBoxes)) sets)
   return finalSt
 
 checkSameMovedBoxes :: [(VarMap, Location)] -> UDM VarUsageError ()
