@@ -496,7 +496,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple actions.")) >>
             printSimpleError
-                actSourceLines "The previous action is defined here:" actFileName
+                actSourceLines "Another action is defined here:" actFileName
                 prevActPos Nothing
     EHandlerClassNoSinkPort classId ->
         let title = "\x1b[31merror [SE-031]\x1b[0m: handler class does not define any sink port."
@@ -514,7 +514,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple sink ports.")) >>
             printSimpleError
-                portSourceLines "The previous sink port is defined here:" portFileName
+                portSourceLines "Another sink port is defined here:" portFileName
                 prevPortPos Nothing
     EHandlerClassInPort (classId, Position startPosClass endPosClass) ident ->
         let title = "\x1b[31merror [SE-033]\x1b[0m: handler class defines an in port."

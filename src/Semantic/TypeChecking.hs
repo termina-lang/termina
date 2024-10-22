@@ -1118,8 +1118,6 @@ semanticTypeDef (Enum i e m)    = Enum i e m
 semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMember cls) ps m
 semanticTypeDef (Interface i cls m) = Interface i cls m
 
-
-
 -- | This function type checks the members of a class depending on its kind.
 checkClassKind :: Location -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnn],
@@ -1204,7 +1202,7 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
   case acts of
     [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
     [ClassAction _actionId _ _ _ _ann] -> return ()
-    [ClassAction _ _ _ _ prevActAnn, ClassAction _ _ _ _ otherActAnn, _]  ->
+    ClassAction _ _ _ _ prevActAnn : ClassAction _ _ _ _ otherActAnn : _  ->
         throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
     _ -> throwError (annotateError Internal EClassTyping)
   -- A handler must have one single sink port and cannot define any in ports
@@ -1222,7 +1220,7 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
             Nothing -> checkHandlerPorts (Just (location annCF)) xfs
             Just prevPort -> throwError $ annotateError (location annCF) (EHandlerClassMultipleSinkPorts clsId prevPort)
         InPort _ _ -> throwError $ annotateError (location annCF) (EHandlerClassInPort (clsId, anns) fs_id)
-        _ -> checkHandlerPorts Nothing xfs
+        _ -> checkHandlerPorts prev xfs
     checkHandlerPorts _ _ = throwError $ annotateError Internal EClassTyping
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
