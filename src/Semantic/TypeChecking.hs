@@ -51,7 +51,7 @@ getMemberFieldType ann obj_ty ident =
         Struct _identTy fields _mods ->
             let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
-              (throwError $ annotateError ann (EMemberAccessNotMember ident))
+              (throwError $ annotateError ann (EMemberAccessNotField ident))
               (return . fieldTerminaType) mfield
         ;
         -- Or a class
@@ -59,7 +59,7 @@ getMemberFieldType ann obj_ty ident =
           -- TODO Class access?
           -- Find |ident| field in the class.
           case findClassField ident cls of
-            Nothing -> throwError $ annotateError ann (EMemberAccessNotMember ident)
+            Nothing -> throwError $ annotateError ann (EMemberAccessNotField ident)
             -- type |t| and the type inside |a| should be the same, no?
             Just (t , _a) -> return t
         ;

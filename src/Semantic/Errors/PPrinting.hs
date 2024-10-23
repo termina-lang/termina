@@ -1084,6 +1084,18 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 globalSourceLines "The global object is defined here:" globalFileName
                 globalPos Nothing
+    ENumericConstantNotBool ->
+        let title = "\x1b[31merror [SE-101]\x1b[0m: numeric constant not boolean."
+        in 
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "Boolean value expected but a numeric constant is provided.")
+    ENumericConstantNotChar ->
+        let title = "\x1b[31merror [SE-102]\x1b[0m: numeric constant not character."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "Character value expected but a numeric constant is provided.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

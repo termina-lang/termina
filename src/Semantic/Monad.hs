@@ -575,7 +575,10 @@ checkConstant loc expected_type (I ti (Just type_c)) =
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
   -- | Check that the constant is in the range of the type
-  checkIntConstant loc expected_type ti
+  case expected_type of
+    Bool -> throwError $ annotateError loc ENumericConstantNotBool
+    Char -> throwError $ annotateError loc ENumericConstantNotChar
+    _ -> checkIntConstant loc expected_type ti
 checkConstant loc expected_type (B {}) =
   checkEqTypesOrError loc expected_type Bool
 checkConstant loc expected_type (C {}) =

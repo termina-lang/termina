@@ -122,18 +122,20 @@ data Error a
   | EEnumVariantParamTypeMismatch (Identifier, a) (Identifier, Integer, TerminaType) TerminaType -- ^ Parameter type mismatch in enum variant (SE-098)
   | EFunctionNotFound Identifier -- ^ Function not found (SE-099)
   | EGlobalNotFunction (Identifier, a) -- ^ Global object but not a function (SE-100)
+  | ENumericConstantNotBool -- ^ Numeric constant not boolean (SE-101)
+  | ENumericConstantNotChar -- ^ Numeric constant not char (SE-101)
   -- | Record missing field
   | EFieldMissing [Identifier]
   -- | Record extra fields
   | EFieldExtra [Identifier]
   -- | Field is not a fixed location
   | EFieldNotFixedLocation Identifier
-  -- | Field does not have a fixed location
+  -- | Field is not a port
   | EFieldNotPort Identifier
   -- | Expecting a Enumeration when memberAccessing got
   | EMemberAccess TerminaType
   | EFunctionAccessNotResource TerminaType
-  | EMemberAccessNotMember Identifier -- TODO: We can return the list of identifiers.
+  | EMemberAccessNotField Identifier -- TODO: We can return the list of identifiers.
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
   | EMemberAccessUDef (SemanTypeDef a)
