@@ -18,7 +18,9 @@ data Error a
     EMismatch TerminaType TerminaType -- ^ Type mismatch (Internal)
   | ENoStructFound Identifier -- ^ Struct not found (Internal)
   | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
-  | EExpectedSimple TerminaType -- ^ Expected a simple type (Internal)
+  | EExpectedArrayTy TerminaType -- ^ Expected a valid type for the elements of an array (Internal)
+  | EExpectedCopyType TerminaType -- ^ Expected a copiable type (Internal)
+  | EExpectedNumType TerminaType -- ^ Expected a numeric type (Internal)
   | ENotNamedGlobal Identifier -- ^ Global object not found (Internal)
   | EInvalidObjectDeclaration Identifier -- ^ Invalid object declaration (Internal)
   | EMalformedSlice -- ^ Malformed slice (Internal)
@@ -72,8 +74,8 @@ data Error a
   | EBinOpLeftTypeNotNum Op TerminaType -- ^ Binary operation expected numeric type on the left (SE-048)
   | EBinOpRightTypeNotNum Op TerminaType -- ^ Binary operation expected numeric type on the right (SE-049)
   | EBinOpRightTypeNotPos Op TerminaType -- ^ Binary operation expected positive numeric type on the right (SE-050)
-  | EBinOpLeftTypeNotEquatable Op TerminaType -- ^ Binary operation expected equatable type on the left (SE-051)
-  | EBinOpRightTypeNotEquatable Op TerminaType -- ^ Binary operation expected equatable type on the right (SE-052)
+  | EBinOpLeftTypeNotEq Op TerminaType -- ^ Binary operation expected equatable type on the left (SE-051)
+  | EBinOpRightTypeNotEq Op TerminaType -- ^ Binary operation expected equatable type on the right (SE-052)
   | EAtomicAccessInvalidType TerminaType -- ^ Invalid type for the atomic access interface (SE-053)
   | EAtomicArrayAccessInvalidType TerminaType -- ^ Invalid type for the atomic array access interface (SE-054)
   | EAtomicInvalidType TerminaType -- ^ Invalid atomic type (SE-055)
@@ -124,6 +126,16 @@ data Error a
   | EGlobalNotFunction (Identifier, a) -- ^ Global object but not a function (SE-100)
   | ENumericConstantNotBool -- ^ Numeric constant not boolean (SE-101)
   | ENumericConstantNotChar -- ^ Numeric constant not char (SE-101)
+  | EInvalidAssignmentExprType TerminaType -- ^ Invalid assignment expression type (SE-102)
+  | EInvalidMessageType TerminaType -- ^ Invalid message type (SE-103)
+  | EInvalidOptionType TerminaType -- ^ Invalid option type (SE-104)
+  | EInvalidReferenceType TerminaType -- ^ Invalid reference type (SE-105)
+  | EInvalidLocationType TerminaType -- ^ Invalid location type (SE-106)
+  | EInvalidAllocatorType TerminaType -- ^ Invalid allocator type (SE-107)
+  | EInvalidClassFieldType TerminaType -- ^ Invalid class field type (SE-108)
+  | EInvalidStructFieldType TerminaType -- ^ Invalid struct field type (SE-109)
+  | EInvalidEnumParameterType TerminaType -- ^ Invalid enum parameter type (SE-110)
+  | EInvalidAccessPortType TerminaType -- ^ Invalid access port type (SE-111)
   -- | Record missing field
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -170,12 +182,6 @@ data Error a
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
   | EUsedFunName Identifier Location
-  -- | Invalid class field type
-  | EInvalidClassFieldType TerminaType
-  -- | Forbidden Reference Type
-  | EReferenceTy TerminaType
-  -- | Nested Option
-  | EOptionNested 
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier

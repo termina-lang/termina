@@ -5,99 +5,184 @@ module Core.Utils where
 import Parser.AST
 import qualified Data.List as L
 
--- Primitive Types definition. Assuming |TerminaType| is well-formed.
-primitiveTypes :: TerminaType -> Bool
-primitiveTypes UInt8           = True
-primitiveTypes UInt16          = True
-primitiveTypes UInt32          = True
-primitiveTypes UInt64          = True
-primitiveTypes Int8            = True
-primitiveTypes Int16           = True
-primitiveTypes Int32           = True
-primitiveTypes Int64           = True
-primitiveTypes USize           = True
-primitiveTypes Bool            = True
-primitiveTypes Char            = True
-primitiveTypes (DefinedType _) = True
-primitiveTypes (Array _ _)     = True
-primitiveTypes  _              = False
+copyTy :: TerminaType -> Bool
+copyTy UInt8           = True
+copyTy UInt16          = True
+copyTy UInt32          = True
+copyTy UInt64          = True
+copyTy Int8            = True
+copyTy Int16           = True
+copyTy Int32           = True
+copyTy Int64           = True
+copyTy USize           = True
+copyTy Bool            = True
+copyTy Char            = True
+copyTy (DefinedType _) = True
+copyTy (Option (BoxSubtype {})) = False
+copyTy (Option _)      = True
+copyTy (Location _)    = True
+copyTy _               = False
 
-returnValueTy :: TerminaType -> Bool
-returnValueTy UInt8           = True
-returnValueTy UInt16          = True
-returnValueTy UInt32          = True
-returnValueTy UInt64          = True
-returnValueTy Int8            = True
-returnValueTy Int16           = True
-returnValueTy Int32           = True
-returnValueTy Int64           = True
-returnValueTy USize           = True
-returnValueTy Bool            = True
-returnValueTy Char            = True
-returnValueTy (DefinedType _) = True
-returnValueTy _               = False
+optionTy :: TerminaType -> Bool
+optionTy UInt8           = True
+optionTy UInt16          = True
+optionTy UInt32          = True
+optionTy UInt64          = True
+optionTy Int8            = True
+optionTy Int16           = True
+optionTy Int32           = True
+optionTy Int64           = True
+optionTy USize           = True
+optionTy Bool            = True
+optionTy Char            = True
+optionTy (DefinedType _) = True
+optionTy (BoxSubtype _)  = True
+optionTy _               = False 
+
+-- | Predicate defining when a |TerminaType| is a declaration type.
+-- This is used to determine if a type can be used in a declaration.
+declTy :: TerminaType -> Bool
+declTy UInt8           = True
+declTy UInt16          = True
+declTy UInt32          = True
+declTy UInt64          = True
+declTy Int8            = True
+declTy Int16           = True
+declTy Int32           = True
+declTy Int64           = True
+declTy USize           = True
+declTy Bool            = True
+declTy Char            = True
+declTy (Array {})      = True
+declTy (DefinedType _) = True
+declTy (Option _)      = True
+declTy _               = False 
+
+arrayTy :: TerminaType -> Bool
+arrayTy UInt8           = True
+arrayTy UInt16          = True
+arrayTy UInt32          = True
+arrayTy UInt64          = True
+arrayTy Int8            = True
+arrayTy Int16           = True
+arrayTy Int32           = True
+arrayTy Int64           = True
+arrayTy USize           = True
+arrayTy Bool            = True
+arrayTy Char            = True
+arrayTy (Array ty _)    = arrayTy ty
+arrayTy (DefinedType _) = True
+arrayTy (Option (BoxSubtype _)) = False
+arrayTy (Option _)      = True
+arrayTy _               = False 
 
 parameterTy :: TerminaType -> Bool
-parameterTy UInt8           = True
-parameterTy UInt16          = True
-parameterTy UInt32          = True
-parameterTy UInt64          = True
-parameterTy Int8            = True
-parameterTy Int16           = True
-parameterTy Int32           = True
-parameterTy Int64           = True
-parameterTy USize           = True
-parameterTy Bool            = True
-parameterTy Char            = True
-parameterTy (DefinedType _) = True
-parameterTy (Reference _ (BoxSubtype _)) = False
+parameterTy UInt8            = True
+parameterTy UInt16           = True
+parameterTy UInt32           = True
+parameterTy UInt64           = True
+parameterTy Int8             = True
+parameterTy Int16            = True
+parameterTy Int32            = True
+parameterTy Int64            = True
+parameterTy USize            = True
+parameterTy Bool             = True
+parameterTy Char             = True
+parameterTy (DefinedType _)  = True
 parameterTy (Reference _ (Option (BoxSubtype _))) = False
-parameterTy (Reference {})  = True
+parameterTy (Reference {}) = True
 parameterTy (Option (BoxSubtype _)) = False
 parameterTy (Option _)      = True
-parameterTy _               = False
+parameterTy _                = False
 
 procedureParamTy :: TerminaType -> Bool
-procedureParamTy UInt8           = True
-procedureParamTy UInt16          = True
-procedureParamTy UInt32          = True
-procedureParamTy UInt64          = True
-procedureParamTy Int8            = True
-procedureParamTy Int16           = True
-procedureParamTy Int32           = True
-procedureParamTy Int64           = True
-procedureParamTy USize           = True
-procedureParamTy Bool            = True
-procedureParamTy Char            = True
-procedureParamTy (DefinedType _) = True
-procedureParamTy (Reference {})  = True
-procedureParamTy (Option _)      = True
-procedureParamTy _               = False
+procedureParamTy UInt8             = True
+procedureParamTy UInt16            = True
+procedureParamTy UInt32            = True
+procedureParamTy UInt64            = True
+procedureParamTy Int8              = True
+procedureParamTy Int16             = True
+procedureParamTy Int32             = True
+procedureParamTy Int64             = True
+procedureParamTy USize             = True
+procedureParamTy Bool              = True
+procedureParamTy Char              = True
+procedureParamTy (DefinedType _)   = True
+procedureParamTy (Reference {})    = True
+procedureParamTy (Option _)        = True
+procedureParamTy _                 = False
 
--- | The following function defines what we consider to be simple types.
--- Simple types can be used at variable creation, inside arrays and user defined structures.
--- Also at box object and function returned values.
--- Definition https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Simple-types
-simpleType :: TerminaType -> Bool
-simpleType Unit                = False
-simpleType (Option (BoxSubtype {})) = False
-simpleType (BoxSubtype {}) = False
-simpleType (MsgQueue {})       = False
-simpleType (Pool {})           = False
-simpleType (Reference {})      = False
-simpleType (Location {})       = False
-simpleType (SinkPort {})       = False
-simpleType (AccessPort {})     = False
-simpleType _                   = True
+classFieldTy :: TerminaType -> Bool
+classFieldTy (SinkPort {})       = True
+classFieldTy (InPort {})       = True
+classFieldTy (OutPort {})      = True
+classFieldTy (AccessPort {})   = True
+classFieldTy (Location _)      = True
+classFieldTy ty                = fieldTy ty
 
-classFieldType :: TerminaType -> Bool
-classFieldType Unit                         = False
-classFieldType (BoxSubtype {})          = False
-classFieldType (Option (BoxSubtype {})) = False
-classFieldType (MsgQueue {})                = False
-classFieldType (Pool {})                    = False
-classFieldType (Reference {})               = False
-classFieldType _                            = True
+fieldTy :: TerminaType -> Bool
+fieldTy = arrayTy
+
+locTy :: TerminaType -> Bool
+locTy = fieldTy
+
+boxTy :: TerminaType -> Bool
+boxTy UInt8           = True
+boxTy UInt16          = True
+boxTy UInt32          = True
+boxTy UInt64          = True
+boxTy Int8            = True
+boxTy Int16           = True
+boxTy Int32           = True
+boxTy Int64           = True
+boxTy USize           = True
+boxTy Bool            = True
+boxTy Char            = True
+boxTy (DefinedType _) = True
+boxTy _               = False
+
+allocTy :: TerminaType -> Bool
+allocTy = boxTy
+
+accessPortTy :: TerminaType -> Bool
+accessPortTy (DefinedType _) = True
+accessPortTy (Allocator _)  = True
+accessPortTy (AtomicAccess _) = True
+accessPortTy (AtomicArrayAccess {}) = True
+accessPortTy _ = False
+
+msgTy :: TerminaType -> Bool
+msgTy UInt8           = True
+msgTy UInt16          = True
+msgTy UInt32          = True
+msgTy UInt64          = True
+msgTy Int8            = True
+msgTy Int16           = True
+msgTy Int32           = True
+msgTy Int64           = True
+msgTy USize           = True
+msgTy Bool            = True
+msgTy Char            = True
+msgTy (DefinedType _) = True
+msgTy (BoxSubtype {}) = True
+msgTy _               = False
+
+refTy :: TerminaType -> Bool
+refTy UInt8           = True
+refTy UInt16          = True
+refTy UInt32          = True
+refTy UInt64          = True
+refTy Int8            = True
+refTy Int16           = True
+refTy Int32           = True
+refTy Int64           = True
+refTy USize           = True
+refTy Bool            = True
+refTy Char            = True
+refTy (DefinedType _) = True
+refTy (Option _)      = True
+refTy (Array {})      = True
+refTy _               = False
 
 boolTy :: TerminaType -> Bool
 boolTy Bool = True
@@ -125,19 +210,19 @@ posTy USize  = True
 posTy _      = False
 
 -- | Predicate defining when a |TerminaType| can be used in a comparison.
-equatableTy :: TerminaType -> Bool
-equatableTy UInt8  = True
-equatableTy UInt16 = True
-equatableTy UInt32 = True
-equatableTy UInt64 = True
-equatableTy Int8   = True
-equatableTy Int16  = True
-equatableTy Int32  = True
-equatableTy Int64  = True
-equatableTy USize  = True
-equatableTy Bool   = True
-equatableTy Char   = True
-equatableTy _      = False
+eqTy :: TerminaType -> Bool
+eqTy UInt8  = True
+eqTy UInt16 = True
+eqTy UInt32 = True
+eqTy UInt64 = True
+eqTy Int8   = True
+eqTy Int16  = True
+eqTy Int32  = True
+eqTy Int64  = True
+eqTy USize  = True
+eqTy Bool   = True
+eqTy Char   = True
+eqTy _      = False
 
 memberIntCons :: Integer -> TerminaType -> Bool
 memberIntCons i UInt8  = ( 0 <= i ) && ( i <= 255)
@@ -159,16 +244,6 @@ identifierType (Struct ident _ _) = ident
 identifierType (Enum ident _ _)   = ident
 identifierType (Class _ ident _ _ _)  = ident
 identifierType (Interface ident _ _) = ident
-
-referenceType :: TerminaType -> Bool
-referenceType Unit            = False
-referenceType (MsgQueue {})   = False
-referenceType (Pool {})       = False
-referenceType (Reference {})  = False
-referenceType (Location {})   = False
-referenceType (SinkPort {})   = False
-referenceType (AccessPort {}) = False
-referenceType _               = True
 
 ----------------------------------------
 -- Box Helpers
@@ -213,32 +288,32 @@ rootType (Location ts) = rootType ts
 rootType t = t
 
 -- Type equality
-checkEqTypes :: TerminaType -> TerminaType -> Bool
-checkEqTypes  UInt8  UInt8 = True
-checkEqTypes  UInt16  UInt16 = True
-checkEqTypes  UInt32  UInt32 = True
-checkEqTypes  UInt64  UInt64 = True
-checkEqTypes  Int8  Int8 = True
-checkEqTypes  Int16  Int16 = True
-checkEqTypes  Int32  Int32 = True
-checkEqTypes  Int64  Int64 = True
-checkEqTypes  USize  USize = True
-checkEqTypes  Bool  Bool = True
-checkEqTypes  Unit Unit = True
-checkEqTypes  (Option _) (Option Unit) = True
-checkEqTypes  (Option Unit) (Option _) = True
-checkEqTypes  (Option tyspecl) (Option tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (BoxSubtype tyspecl) (BoxSubtype tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Array typespecl sizel) (Array typespecr sizer) = checkEqTypes typespecl typespecr && (sizel == sizer)
-checkEqTypes  (DefinedType idl) (DefinedType idr) = idl == idr
+sameTy :: TerminaType -> TerminaType -> Bool
+sameTy  UInt8  UInt8 = True
+sameTy  UInt16  UInt16 = True
+sameTy  UInt32  UInt32 = True
+sameTy  UInt64  UInt64 = True
+sameTy  Int8  Int8 = True
+sameTy  Int16  Int16 = True
+sameTy  Int32  Int32 = True
+sameTy  Int64  Int64 = True
+sameTy  USize  USize = True
+sameTy  Bool  Bool = True
+sameTy  Unit Unit = True
+sameTy  (Option _) (Option Unit) = True
+sameTy  (Option Unit) (Option _) = True
+sameTy  (Option tyspecl) (Option tyspecr) = sameTy tyspecl tyspecr
+sameTy  (Reference Mutable tyspecl) (Reference Mutable tyspecr) = sameTy tyspecl tyspecr
+sameTy  (Reference Immutable tyspecl) (Reference Immutable tyspecr) = sameTy tyspecl tyspecr
+sameTy  (BoxSubtype tyspecl) (BoxSubtype tyspecr) = sameTy tyspecl tyspecr
+sameTy  (Array typespecl sizel) (Array typespecr sizer) = sameTy typespecl typespecr && (sizel == sizer)
+sameTy  (DefinedType idl) (DefinedType idr) = idl == idr
 -- Location subtypes
-checkEqTypes  (Location tyspecl) (Location tyspecr) = checkEqTypes tyspecl tyspecr
-checkEqTypes  (Location tyspecl) tyspecr = checkEqTypes tyspecl tyspecr
-checkEqTypes  tyspecl (Location tyspecr) = checkEqTypes tyspecl tyspecr
+sameTy  (Location tyspecl) (Location tyspecr) = sameTy tyspecl tyspecr
+sameTy  (Location tyspecl) tyspecr = sameTy tyspecl tyspecr
+sameTy  tyspecl (Location tyspecr) = sameTy tyspecl tyspecr
 --
-checkEqTypes  _ _ = False
+sameTy  _ _ = False
 
 findWith :: (a -> Maybe b) -> [a] -> Maybe b
 findWith f = L.foldl' (\acc a -> maybe acc Just (f a)) Nothing

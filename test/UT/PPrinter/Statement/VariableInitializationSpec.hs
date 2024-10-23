@@ -28,9 +28,8 @@ twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 Dec
 optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
 
-arrayObjAnn, twoDymArrayObjAnn, twoDymArrayRowObjAnn :: SemanticAnn
+arrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-twoDymArrayRowObjAnn = arrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
 twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
@@ -42,13 +41,12 @@ twoDymArrayExprAnn = twoDymArrayExprSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TI
 array0 :: Expression SemanticAnn
 array0 = AccessObject (Variable "array0" arrayObjAnn)
 
-array1, array2, array3, array4, array5, array6 :: Statement SemanticAnn
+array1, array2, array3, array4, array5 :: Statement SemanticAnn
 array1 = Declaration "array1" Mutable arrayTS array0 stmtSemAnn
 array2 = Declaration "array2" Mutable twoDimArrayTS (AccessObject (Variable "array1" twoDymArrayObjAnn)) stmtSemAnn
 array3 = Declaration "array3" Mutable arrayTS (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn
 array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowExprAnn) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-array5 = Declaration "array5" Mutable twoDimArrayTS (ArrayInitializer (AccessObject (Variable "array_row" twoDymArrayRowObjAnn)) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-array6 = Declaration "array6" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
+array5 = Declaration "array5" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
@@ -189,25 +187,16 @@ spec = do
           "        array4[__i0][__i1] = 0;\n" ++
           "    }\n" ++
           "}")
-    it "Prints the statement var array4 : [[u32; 5 : u32]; 10 : u32] = [array_row; 10 : u32];" $ do
-      renderStatement array5 `shouldBe`
-        pack (
-          "\nint64_t array5[10][5];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "        array5[__i0][__i1] = array_row[__i1];\n" ++
-          "    }\n" ++
-          "}")
     it ("Prints the statement var array6 : [TMDescriptor; 20 : u32] = " ++
         "[{field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
-      renderStatement array6 `shouldBe`
+      renderStatement array5 `shouldBe`
         pack (
-          "\nTMDescriptor array6[20];\n" ++
+          "\nTMDescriptor array5[20];\n" ++
           "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    array6[__i0].field0 = 0;\n" ++
-          "    array6[__i0].field1.field_a = 0;\n" ++
+          "    array5[__i0].field0 = 0;\n" ++
+          "    array5[__i0].field1.field_a = 0;\n" ++
           "    for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
-          "        array6[__i0].field1.field_b[__i1] = 0;\n" ++
+          "        array5[__i0].field1.field_b[__i1] = 0;\n" ++
           "    }\n" ++
-          "    array6[__i0].field1.field_c = 4294901760;\n" ++
+          "    array5[__i0].field1.field_c = 4294901760;\n" ++
           "}")

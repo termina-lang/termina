@@ -306,7 +306,7 @@ getConst loc ident = do
 getIntSize :: Location -> Size -> SemanticMonad Integer
 getIntSize loc (CAST.V ident) = do
   (ty, value) <- getConst loc ident
-  checkEqTypesOrError loc USize ty
+  sameTyOrError loc USize ty
   getIntConst loc value
 getIntSize _loc (CAST.K (TInteger value _)) = return value
 
@@ -404,13 +404,13 @@ whereIsDefined ident = do
 -- Type |Type| helpers!
 -- | Checks if two type are the same numeric type.
 sameNumTy :: TerminaType -> TerminaType -> Bool
-sameNumTy a b = checkEqTypes a b && numTy a
+sameNumTy a b = sameTy a b && numTy a
 
 -- | Checks if two type are the same numeric type.
 -- If they are not, it throws a mismatch error.
-checkEqTypesOrError :: Location -> TerminaType -> TerminaType -> SemanticMonad ()
-checkEqTypesOrError loc t1 t2 =
-  unless (checkEqTypes t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
+sameTyOrError :: Location -> TerminaType -> TerminaType -> SemanticMonad ()
+sameTyOrError loc t1 t2 =
+  unless (sameTy t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
 unBox :: Object SemanticAnn -> Object SemanticAnn
 unBox t = Unbox t (unboxTypeAnn (getAnnotation t))
@@ -422,18 +422,11 @@ unBoxExp _ = throwError $ annotateError Internal EUnBoxExpression
 mustBeTy :: TerminaType -> Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 mustBeTy ty expression =
   getExpType expression >>=
-  checkEqTypesOrError loc ty
+  sameTyOrError loc ty
   >> return expression
   where
     ann_exp = getAnnotation expression
     loc = location ann_exp
-
-{--
-blockRetTy :: TerminaType -> BlockRet SemanticAnn -> SemanticMonad ()
-blockRetTy ty (BlockRet _bd (ReturnStmt _me ann)) =
-  maybe
-  (throwError (annotateError Internal EUnboxingBlockRet))
-  (void . checkEqTypesOrError (location ann) ty) (getResultingType (getSemanticAnn ann)) --}
 
 getIntConst :: Location -> Const -> SemanticMonad Integer
 getIntConst _ (I (TInteger i _) _) = return i
@@ -452,7 +445,20 @@ catchMismatch ann ferror action = catchError action (\err -> case getError err o
   EMismatch _ ty -> throwError $ annotateError ann (ferror ty)
   _ -> throwError err)
 
-catchExpectedSimple ::
+-- Helper function failing if a given |TerminaType| is not *simple* |simpleType|.
+arrayTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+arrayTyOrFail pann ty = unless (arrayTy ty) (throwError (annotateError pann (EInvalidArrayType ty)))
+
+msgTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+msgTyOrFail pann ty = unless (msgTy ty) (throwError (annotateError pann (EInvalidMessageType ty)))
+
+structFieldTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+structFieldTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann (EInvalidStructFieldType ty)))
+
+enumParamTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+enumParamTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann (EInvalidEnumParameterType ty)))
+
+catchExpectedCopy ::
   -- | Location of the error
   Parser.ParserAnn
   -- | Function to create the error
@@ -461,21 +467,55 @@ catchExpectedSimple ::
   -> SemanticMonad a
   -- | Action to execute
   -> SemanticMonad a
-catchExpectedSimple ann ferror action = catchError action (\err -> case getError err of
-  EExpectedSimple ty -> throwError $ annotateError ann (ferror ty)
+catchExpectedCopy ann ferror action = catchError action (\err -> case getError err of
+  EExpectedCopyType ty -> throwError $ annotateError ann (ferror ty)
   _ -> throwError err)
 
--- Helper function failing if a given |TerminaType| is not *simple* |simpleType|.
-simpleTyorFail :: Location -> TerminaType -> SemanticMonad ()
-simpleTyorFail pann ty = unless (simpleType ty) (throwError (annotateError pann (EExpectedSimple ty)))
+catchExpectedNum ::
+  -- | Location of the error
+  Parser.ParserAnn
+  -- | Function to create the error
+  -> (TerminaType -> Error Location)
+  -- | Action to execute
+  -> SemanticMonad a
+  -- | Action to execute
+  -> SemanticMonad a
+catchExpectedNum ann ferror action = catchError action (\err -> case getError err of
+  EExpectedNumType ty -> throwError $ annotateError ann (ferror ty)
+  _ -> throwError err)
+
+-- Helper function failing if a given |TerminaType| is not *copiable*.
+copyTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+copyTyOrFail pann ty = unless (copyTy ty) (throwError (annotateError pann (EExpectedCopyType ty)))
+
+numTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+numTyOrFail pann ty = unless (numTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
+
+optionTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+optionTyOrFail pann ty = unless (optionTy ty) (throwError (annotateError pann (EInvalidOptionType ty)))
+
+refTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+refTyOrFail pann ty = unless (refTy ty) (throwError (annotateError pann (EInvalidReferenceType ty)))
+
+boxTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+boxTyOrFail pann ty = unless (boxTy ty) (throwError (annotateError pann (EInvalidBoxType ty)))
+
+locTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+locTyOrFail pann ty = unless (locTy ty) (throwError (annotateError pann (EInvalidLocationType ty)))
+
+accessPortTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+accessPortTyOrFail pann ty = unless (accessPortTy ty) (throwError (annotateError pann (EInvalidAccessPortType ty)))
+
+allocTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+allocTyOrFail pann ty = unless (allocTy ty) (throwError (annotateError pann (EInvalidAllocatorType ty)))
 
 -- Helper function failing if a given |TerminaType| cannot be used to define a class field.
 classFieldTyorFail :: Location -> TerminaType -> SemanticMonad ()
-classFieldTyorFail pann ty = unless (classFieldType ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
+classFieldTyorFail pann ty = unless (classFieldTy ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
 
 checkSize :: Location -> Size -> SemanticMonad ()
 checkSize loc (CAST.K s) = checkIntConstant loc USize s
-checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> checkEqTypesOrError loc USize ty) >> return ()
+checkSize loc (CAST.V ident) = getConst loc ident >>= (\(ty, _) -> sameTyOrError loc USize ty) >> return ()
 
 -- | Function checking that a TerminaType is well-defined.
 -- This is not the same as defining a type, but it is similar.
@@ -489,58 +529,56 @@ checkTerminaType loc (DefinedType identTy) =
   void (getGlobalTypeDef loc identTy)
   -- we assume that only well-formed types are added to globals.
 checkTerminaType loc (Array ty s) =
-  -- Doc: https://hackmd.io/a4CZIjogTi6dXy3RZtyhCA?view#Arrays .
-  -- Only arrays of simple types.
-  catchExpectedSimple loc EInvalidArrayType (simpleTyorFail loc ty) >>
   checkTerminaType loc ty >>
+  arrayTyOrFail loc ty >>
   checkSize loc s
-checkTerminaType loc (MsgQueue ty s) = checkTerminaType loc ty >> checkSize loc s
+checkTerminaType loc (MsgQueue ty s) = 
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty >>
+  checkSize loc s
 checkTerminaType loc (Pool ty s) = checkTerminaType loc ty >> checkSize loc s
--- Box Subtyping
-checkTerminaType loc (Option tyd@(BoxSubtype _ty)) = checkTerminaType loc tyd
--- Regular option subtyping
-checkTerminaType loc (Option (Option _))     = throwError $ annotateError loc EOptionNested
-checkTerminaType loc (Option ty) = simpleTyorFail loc ty >> checkTerminaType loc ty
-checkTerminaType loc (Reference _ ty)        =
-  -- Unless we are referencing a reference we are good
-  unless (referenceType ty) (throwError (annotateError loc (EReferenceTy ty))) >>
-  checkTerminaType loc ty
-checkTerminaType loc (BoxSubtype ty@(Option _)) = throwError $ annotateError loc (EInvalidBoxType ty)
+-- Option Subtyping
+checkTerminaType loc (Option ty) = 
+  checkTerminaType loc ty >>
+  optionTyOrFail loc ty
+checkTerminaType loc (Reference _ ty) =
+  checkTerminaType loc ty >>
+  refTyOrFail loc ty
 checkTerminaType loc (BoxSubtype ty) =
-  catchExpectedSimple loc EInvalidBoxType (simpleTyorFail loc ty) >>
-  checkTerminaType loc ty
+  checkTerminaType loc ty >>
+  boxTyOrFail loc ty
 checkTerminaType loc (Location ty) =
-  simpleTyorFail loc ty >>
-  checkTerminaType loc ty
+  checkTerminaType loc ty >>
+  locTyOrFail loc ty
 checkTerminaType loc (AccessPort ty) =
-  case ty of
-    (Allocator (Option _))  -> throwError $ annotateError loc EOptionNested
-    (Allocator ty') -> simpleTyorFail loc ty' >> checkTerminaType loc ty'
-    (AtomicAccess ty') -> unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
-    (AtomicArrayAccess ty' s) -> 
-      unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty')) >> checkSize loc s
-    (DefinedType identTy) ->
-      getGlobalTypeDef loc identTy >>=
-        \case
-          (Interface {}) -> return ()
-          _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
-    _ -> throwError $ annotateError loc $ EAccessPortNotInterface ty
-checkTerminaType loc (SinkPort (Option _) _) = throwError $ annotateError loc EOptionNested
-checkTerminaType loc (SinkPort ty' _) = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (InPort (Option _) _) = throwError $ annotateError loc EOptionNested
-checkTerminaType loc (InPort (BoxSubtype ty') _) = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (InPort ty' _) = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (OutPort (Option _)) = throwError $ annotateError loc EOptionNested
-checkTerminaType loc (OutPort (BoxSubtype ty')) = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (OutPort ty') = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (Allocator (Option _)) = throwError $ annotateError loc EOptionNested
-checkTerminaType loc (Allocator ty') = simpleTyorFail loc ty' >> checkTerminaType loc ty'
-checkTerminaType loc (AtomicAccess ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicAccessInvalidType ty'))
-checkTerminaType loc (AtomicArrayAccess ty' s) = 
-  unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayAccessInvalidType ty')) >> checkSize loc s
-checkTerminaType loc (Atomic ty') = unless (numTy ty') (throwError $ annotateError loc (EAtomicInvalidType ty'))
-checkTerminaType loc (AtomicArray ty' s) =
-  unless (numTy ty') (throwError $ annotateError loc (EAtomicArrayInvalidType ty')) >> checkSize loc s
+  checkTerminaType loc ty >>
+  accessPortTyOrFail loc ty
+checkTerminaType loc (SinkPort ty _) =
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (InPort ty _) = 
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (OutPort ty) = 
+  checkTerminaType loc ty >>
+  msgTyOrFail loc ty
+checkTerminaType loc (Allocator ty) = 
+  checkTerminaType loc ty >>
+  allocTyOrFail loc ty
+checkTerminaType loc (AtomicAccess ty) = 
+  checkTerminaType loc ty >>
+  catchExpectedNum loc EAtomicAccessInvalidType (numTyOrFail loc ty)
+checkTerminaType loc (AtomicArrayAccess ty s) = 
+  checkTerminaType loc ty >>
+  catchExpectedNum loc EAtomicArrayAccessInvalidType (numTyOrFail loc ty) >>
+  checkSize loc s
+checkTerminaType loc (Atomic ty) = 
+  checkTerminaType loc ty >>
+  catchExpectedNum loc EAtomicInvalidType (numTyOrFail loc ty)
+checkTerminaType loc (AtomicArray ty s) =
+  checkTerminaType loc ty >>
+  catchExpectedNum loc EAtomicArrayInvalidType (numTyOrFail loc ty) >>
+  checkSize loc s
 -- This is explicit just in case
 checkTerminaType _ UInt8                   = return ()
 checkTerminaType _ UInt16                  = return ()
@@ -570,7 +608,7 @@ checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTerminaType loc type_c >>
   -- | Check that the explicit type matches the expected type
-  checkEqTypesOrError loc expected_type type_c >>
+  sameTyOrError loc expected_type type_c >>
   -- | Check that the constant is in the range of the type
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
@@ -580,9 +618,9 @@ checkConstant loc expected_type (I ti Nothing) =
     Char -> throwError $ annotateError loc ENumericConstantNotChar
     _ -> checkIntConstant loc expected_type ti
 checkConstant loc expected_type (B {}) =
-  checkEqTypesOrError loc expected_type Bool
+  sameTyOrError loc expected_type Bool
 checkConstant loc expected_type (C {}) =
-  checkEqTypesOrError loc expected_type Char
+  sameTyOrError loc expected_type Char
 
 checkIntConstant :: Location -> TerminaType -> TInteger -> SemanticMonad ()
 checkIntConstant loc tyI ti@(TInteger i _) =

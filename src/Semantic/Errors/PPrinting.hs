@@ -702,7 +702,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of positive numeric type."))
-    EBinOpLeftTypeNotEquatable op ty ->
+    EBinOpLeftTypeNotEq op ty ->
         let title = "\x1b[31merror [SE-051]\x1b[0m: binary operation expected equatable type on the left."
         in
             printSimpleError
@@ -710,7 +710,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
                     "\x1b[0m but it is expected to be of equatable type."))
-    EBinOpRightTypeNotEquatable op ty ->
+    EBinOpRightTypeNotEq op ty ->
         let title = "\x1b[31merror [SE-052]\x1b[0m: binary operation expected equatable type on the right."
         in
             printSimpleError
@@ -723,13 +723,13 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic access."))
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic access, only numeric types are allowed."))
     EAtomicArrayAccessInvalidType ty ->
         let title = "\x1b[31merror [SE-054]\x1b[0m: invalid type for the atomic array access interface."
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array access."))
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not valid for atomic array access, only numeric types are allowed."))
     EAtomicInvalidType ty ->
         let title = "\x1b[31merror [SE-055]\x1b[0m: invalid atomic type."
         in

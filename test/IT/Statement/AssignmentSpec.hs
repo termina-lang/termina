@@ -47,23 +47,6 @@ test2 = "interface test_iface {\n" ++
         "    }\n" ++
         "};"
 
-test3 :: String
-test3 = "interface test_iface {\n" ++
-        "    procedure assignment_test3(&mut self, box_var0 : box [u32; 10],\n" ++
-        "                               box_var1 : box [u32; 10]);\n" ++
-        "};\n" ++
-        "\n"++
-        "resource class id0 provides test_iface {\n" ++
-        "    procedure assignment_test3(&mut self, box_var0 : box [u32; 10],\n" ++
-        "                               box_var1 : box [u32; 10]) {\n" ++
-        "        var foo : [u32; 10] = [0 : u32; 10];\n" ++
-        "        box_var0 = foo;\n" ++
-        "        foo = box_var1;\n" ++
-        "        box_var1 = box_var0;\n" ++
-        "        return;\n" ++
-        "    }\n" ++
-        "};"
-
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
@@ -201,60 +184,6 @@ spec = do
               "    foo = *(uint32_t *)box_var1.data;\n" ++
               "\n" ++
               "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
-              "\n" ++
-              "    return;\n" ++
-              "\n" ++
-              "}\n")  
-    it "Prints declaration of function assignment_test3" $ do
-     renderHeader test3 `shouldBe`
-       pack ("#ifndef __TEST_H__\n" ++
-              "#define __TEST_H__\n" ++
-              "\n" ++
-              "#include <termina.h>\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* assignment_test3)(void * const, __termina_box_t, __termina_box_t);\n" ++
-              "} test_iface;\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
-              "} id0;\n" ++
-              "\n" ++
-              "void id0__assignment_test3(void * const __this, __termina_box_t box_var0,\n" ++
-              "                           __termina_box_t box_var1);\n" ++
-              "\n" ++
-              "#endif\n")
-    it "Prints definition of function assignment_test2" $ do
-     renderSource test3 `shouldBe`
-        pack ("\n" ++
-              "#include \"test.h\"\n" ++
-              "\n" ++ 
-              "void id0__assignment_test3(void * const __this, __termina_box_t box_var0,\n" ++
-              "                           __termina_box_t box_var1) {\n" ++
-              "    \n" ++
-              "    id0 * self = (id0 *)__this;\n" ++
-              "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
-              "    uint32_t foo[10];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = 0;\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)box_var0.data)[__i0] = foo[__i0];\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        foo[__i0] = ((uint32_t *)box_var1.data)[__i0];\n" ++
-              "    }\n" ++
-              "\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        ((uint32_t *)box_var1.data)[__i0] = ((uint32_t *)box_var0.data)[__i0];\n" ++
-              "    }\n" ++
               "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++

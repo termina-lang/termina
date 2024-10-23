@@ -140,8 +140,8 @@ casteableTys a b = numTy a && numTy b
 -- Relation between types
 -- we use to define (box A \subseteq A)
 subTypes :: TerminaType -> TerminaType -> Bool
-subTypes (BoxSubtype a) (BoxSubtype b) = checkEqTypes a b
-subTypes (BoxSubtype a) b              = checkEqTypes a b
-subTypes a (BoxSubtype b)              = checkEqTypes a b
+subTypes (BoxSubtype a) (BoxSubtype b) = sameTy a b
+subTypes (BoxSubtype a) b              = sameTy a b
+subTypes a (BoxSubtype b)              = sameTy a b
 -- Id \subseteq Subtypes
-subTypes a b                           = checkEqTypes a b
+subTypes a b                           = sameTy a b
