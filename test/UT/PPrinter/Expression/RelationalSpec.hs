@@ -11,14 +11,14 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 uint16Const1024 :: Expression SemanticAnn
-uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
+uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
 
 var0, var1 :: Object SemanticAnn
-var0 = Variable "var0" (objSemAnn Mutable UInt16)
+var0 = Variable "var0" (objSemAnn Mutable TUInt16)
 var1 = Variable "var1" boxUInt16SemAnn
 
 unboxVar1 :: Object SemanticAnn
-unboxVar1 = Unbox var1 (objSemAnn Mutable UInt16)
+unboxVar1 = Unbox var1 (objSemAnn Mutable TUInt16)
 
 trueBool, falseBool :: Expression SemanticAnn
 trueBool = Constant (B True) boolExprSemAnn

@@ -95,9 +95,9 @@ data Error a
   | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer (SE-069)
   | EArrayExprListInitializerNotArray TerminaType -- ^ Assignment of an expression list array initializer to a non-array type (SE-070)
   | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer (SE-071)
-  | EArrayInitializerSizeMismatch Size Size -- ^ Array initializer size mismatch (SE-072)
-  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch (SE-073)
-  | EArrayExprListInitializerExprTypeMismatch TerminaType TerminaType -- ^ Array initializing expression type mismatch (SE-074)
+  | EArrayInitializerSizeMismatch Size Size -- ^ TArray initializer size mismatch (SE-072)
+  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ TArray expression list array initializer size mismatch (SE-073)
+  | EArrayExprListInitializerExprTypeMismatch TerminaType TerminaType -- ^ TArray initializing expression type mismatch (SE-074)
   | EReturnValueExpected TerminaType -- ^ Expected return value (SE-075)
   | EReturnValueNotUnit -- ^ Return value not expected (SE-076)
   | EInvalidArrayType TerminaType -- ^ Invalid array type (SE-077)
@@ -181,7 +181,7 @@ data Error a
   -- | Box (type has a Box inside) as Argument of a function
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
-  | EUsedFunName Identifier Location
+  | EUsedFunName Identifier TLocation
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
@@ -229,7 +229,7 @@ data Error a
   | EMsgQueueRcvWrongArgTy TerminaType
   deriving Show
 
-type SemanticErrors = AnnotatedError (Error Location) Location
+type SemanticErrors = AnnotatedError (Error TLocation) TLocation
 
-instance Annotated (AnnotatedError (Error Location)) where
+instance Annotated (AnnotatedError (Error TLocation)) where
   getAnnotation (AnnotatedError _err ann) = ann

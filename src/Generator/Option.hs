@@ -126,9 +126,9 @@ mapOptions (Function _ params maybeRet blkRet _ _) =
 mapOptions (TypeDefinition typeDef _) =
   -- | Get the option types from the type definition
   mapTypeDefOption typeDef
-mapOptions (GlobalDeclaration (Resource _ (MsgQueue ts _) _ _ _)) =
+mapOptions (GlobalDeclaration (Resource _ (TMsgQueue ts _) _ _ _)) =
   -- | Get the option types from the message queue type
-  insertOptionType (Option ts)
+  insertOptionType (TOption ts)
 mapOptions _ = return ()
 
 mapOptionsAnnotatedProgram ::

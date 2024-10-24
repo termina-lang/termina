@@ -11,17 +11,17 @@ import UT.PPrinter.Expression.Common
 import Semantic.Types
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-boxArrayObjAnn = boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr))
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 refArrayAnn, refTwoDymArrayAnn :: SemanticAnn
-refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
-refTwoDymArrayAnn = refTwoDymArraySemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+refArrayAnn = refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))
+refTwoDymArrayAnn = refTwoDymArraySemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 var0, array0, array1 :: Object SemanticAnn
-var0 = Variable "var0" (objSemAnn Mutable UInt16)
+var0 = Variable "var0" (objSemAnn Mutable TUInt16)
 array0 = Variable "array0" arrayObjAnn
 array1 = Variable "array1" twoDymArrayObjAnn
 
@@ -46,7 +46,7 @@ refBoxArray0expr = ReferenceExpression Mutable boxArray0 refArrayAnn
 refBoxArray1expr = ReferenceExpression Mutable boxArray1 refTwoDymArrayAnn
 
 derefpVar0, derefpArray0, derefpArray1 :: Expression SemanticAnn
-derefpVar0 = AccessObject (Dereference pVar0 (objSemAnn Mutable UInt16)) -- | *p_var0 |
+derefpVar0 = AccessObject (Dereference pVar0 (objSemAnn Mutable TUInt16)) -- | *p_var0 |
 derefpArray0 = AccessObject (Dereference pArray0 arrayObjAnn) -- | *p_array0 |
 derefpArray1 = AccessObject (Dereference pArray1 twoDymArrayObjAnn) -- | *p_array1 |
 

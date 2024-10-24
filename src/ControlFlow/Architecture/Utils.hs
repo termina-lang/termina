@@ -23,7 +23,7 @@ getInputPorts = foldl' (\acc member ->
   case member of
     ClassField (FieldDefinition fid fty) _ -> 
       case fty of
-        InPort dataTy action -> M.insert fid (dataTy, action) acc
+        TInPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
     _ -> acc
   ) M.empty
@@ -33,7 +33,7 @@ getSinkPorts = foldl' (\acc member ->
   case member of
     ClassField (FieldDefinition fid fty) _ -> 
       case fty of
-        SinkPort dataTy action -> M.insert fid (dataTy, action) acc
+        TSinkPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
     _ -> acc
   ) M.empty
@@ -43,7 +43,7 @@ getOutputPorts = foldl' (\acc member ->
   case member of
     ClassField (FieldDefinition fid fty) _ -> 
       case fty of
-        OutPort dataTy -> M.insert fid dataTy acc
+        TOutPort dataTy -> M.insert fid dataTy acc
         _ -> acc
     _ -> acc
   ) M.empty
@@ -196,12 +196,12 @@ getPortName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Ident
 getPortName obj = do
     obj_type <- getObjType obj
     case obj_type of 
-        AccessPort _ -> 
+        TAccessPort _ -> 
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
                 _ -> throwError $ annotateError Internal EUnboxingPort
-        OutPort _ -> 
+        TOutPort _ -> 
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
@@ -212,7 +212,7 @@ getObjOptionBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn ->
 getObjOptionBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
-    Option (BoxSubtype _) -> return name
+    TOption (TBoxSubtype _) -> return name
     _ -> throwError $ annotateError Internal EUnboxingOptionBox
 getObjOptionBoxName (Dereference expr _) = getObjOptionBoxName expr
 getObjOptionBoxName _ = throwError $ annotateError Internal EUnboxingOptionBox
@@ -221,7 +221,7 @@ getObjBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Ide
 getObjBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
-    BoxSubtype _ -> return name
+    TBoxSubtype _ -> return name
     _ -> throwError $ annotateError Internal EUnboxingBox
 getObjBoxName _ = throwError $ annotateError Internal EUnboxingBox
   

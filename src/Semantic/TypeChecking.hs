@@ -44,8 +44,8 @@ import Utils.Monad
 getMemberFieldType :: ParserAnn -> TerminaType -> Identifier -> SemanticMonad TerminaType
 getMemberFieldType ann obj_ty ident =
   case obj_ty of
-    Location obj_ty' -> getMemberFieldType ann obj_ty' ident
-    DefinedType dident -> getGlobalTypeDef Internal dident >>=
+    TLocation obj_ty' -> getMemberFieldType ann obj_ty' ident
+    TDefinedType dident -> getGlobalTypeDef Internal dident >>=
       \case{
         -- Either a struct
         Struct _identTy fields _mods ->
@@ -82,11 +82,11 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
   typed_obj <- typeObject getVarTy obj
   (obj_ak, obj_ty) <- getObjectType typed_obj
   case obj_ty of
-    Array ty_elems _vexp -> do
-        idx_typed  <- typeExpression (Just USize) typeRHSObject idx
+    TArray ty_elems _vexp -> do
+        idx_typed  <- typeExpression (Just TUSize) typeRHSObject idx
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
-    Reference ref_ak (Array ty_elems _vexp) -> do
-        idx_typed  <- typeExpression (Just USize) typeRHSObject idx
+    TReference ref_ak (TArray ty_elems _vexp) -> do
+        idx_typed  <- typeExpression (Just TUSize) typeRHSObject idx
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject _ (MemberAccess obj ident ann) = do
@@ -110,17 +110,17 @@ typeObject getVarTy (Dereference obj ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjectType typed_obj
   case obj_ty of
-    Reference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
+    TReference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
     ty              -> throwError $ annotateError ann $ ETypeNotReference ty
 typeObject _getVarTy (ArraySlice _obj _lower _upper anns) = do
-  -- | Array slices can only be used as part of a reference expression. If we are here,
+  -- | TArray slices can only be used as part of a reference expression. If we are here,
   -- then the array slice is being used in an invalid context.
   throwError $ annotateError anns ESliceInvalidUse
 typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjectType typed_obj
   case obj_ty of
-    Reference ak rTy ->
+    TReference ak rTy ->
       getMemberFieldType ann rTy ident >>=
         \fts -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fts
     ty -> throwError $ annotateError ann $ ETypeNotReference ty
@@ -134,7 +134,7 @@ typeMemberFunctionCall ::
 typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
-    DefinedType dident -> getGlobalTypeDef ann dident >>=
+    TDefinedType dident -> getGlobalTypeDef ann dident >>=
       \case{
         -- This case corresponds to a call to an inner method or viewer from the self object.
         Class _ _identTy cls _provides _mods ->
@@ -155,7 +155,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         -- Other user-defined types do not define methods (yet?)
         ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
       }
-    AccessPort (DefinedType dident) -> getGlobalTypeDef ann dident >>=
+    TAccessPort (TDefinedType dident) -> getGlobalTypeDef ann dident >>=
       \case{
          Interface _identTy cls _mods ->
          case findInterfaceProcedure ident cls of
@@ -167,75 +167,75 @@ typeMemberFunctionCall ann obj_ty ident args =
               typed_args <- zipWithM (\(p, idx) e ->
                 catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns) idx)
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-              return ((ps, typed_args), Unit)
+              return ((ps, typed_args), TUnit)
          ;
          -- Other User defined types do not define methods
          ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
       }
-    AccessPort (Allocator ty_pool) ->
+    TAccessPort (TAllocator ty_pool) ->
       case ident of
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", Reference Mutable (Option (BoxSubtype ty_pool)), Builtin) 0)
-                (typeExpression (Just (Reference Mutable (Option (BoxSubtype ty_pool)))) typeRHSObject opt)
-              return (([Reference Mutable (Option (BoxSubtype ty_pool))], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [Reference Mutable (Option (BoxSubtype ty_pool))], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [Reference Mutable (Option (BoxSubtype ty_pool))], Builtin) (fromIntegral (length args)))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", TReference Mutable (TOption (TBoxSubtype ty_pool)), Builtin) 0)
+                (typeExpression (Just (TReference Mutable (TOption (TBoxSubtype ty_pool)))) typeRHSObject opt)
+              return (([TReference Mutable (TOption (TBoxSubtype ty_pool))], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", BoxSubtype ty_pool, Builtin) 0)
-                (typeExpression (Just (BoxSubtype ty_pool)) typeRHSObject elemnt)
-              return (([BoxSubtype ty_pool], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [BoxSubtype ty_pool], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [BoxSubtype ty_pool], Builtin) (fromIntegral (length args)))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", TBoxSubtype ty_pool, Builtin) 0)
+                (typeExpression (Just (TBoxSubtype ty_pool)) typeRHSObject elemnt)
+              return (([TBoxSubtype ty_pool], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [TBoxSubtype ty_pool], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [TBoxSubtype ty_pool], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    AccessPort (AtomicAccess ty_atomic) ->
+    TAccessPort (TAtomicAccess ty_atomic) ->
       case ident of
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", Reference Mutable ty_atomic, Builtin) 0)
-                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
-              return (([Reference Mutable ty_atomic], [typed_arg]), Unit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [Reference Mutable ty_atomic], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", TReference Mutable ty_atomic, Builtin) 0)
+                (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
+              return (([TReference Mutable ty_atomic], [typed_arg]), TUnit)
+            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [TReference Mutable ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store" ->
           case args of
             [value] -> do
               typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", ty_atomic, Builtin) 0)
                 (typeExpression (Just ty_atomic) typeRHSObject value)
-              return (([ty_atomic], [typed_value]), Unit)
+              return (([ty_atomic], [typed_value]), TUnit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [ty_atomic], Builtin) 0)
             _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    AccessPort (AtomicArrayAccess ty_atomic _size) ->
+    TAccessPort (TAtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", USize, Builtin) 0)
-                (typeExpression (Just USize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", Reference Mutable ty_atomic, Builtin) 1)
-                (typeExpression (Just (Reference Mutable ty_atomic)) typeRHSObject retval)
-              return (([USize, Reference Mutable ty_atomic], [typed_idx, typed_ref]), Unit)
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", TUSize, Builtin) 0)
+                (typeExpression (Just TUSize) typeRHSObject index)
+              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", TReference Mutable ty_atomic, Builtin) 1)
+                (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
+              return (([TUSize, TReference Mutable ty_atomic], [typed_idx, typed_ref]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [USize, Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [USize, Reference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", USize, Builtin) 0)
-                (typeExpression (Just USize) typeRHSObject index)
+              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", TUSize, Builtin) 0)
+                (typeExpression (Just TUSize) typeRHSObject index)
               typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", ty_atomic, Builtin) 1)
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
-              return (([USize, ty_atomic], [typed_idx, typed_value]), Unit)
+              return (([TUSize, ty_atomic], [typed_idx, typed_value]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [USize, ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [USize, ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    OutPort ty ->
+    TOutPort ty ->
       case ident of
         -- send(T)
         "send" ->
@@ -243,7 +243,7 @@ typeMemberFunctionCall ann obj_ty ident args =
             [elemnt] -> do
               -- Type the first argument element
               typed_element <- typeExpression (Just ty) typeRHSObject elemnt
-              return (([ty] , [typed_element]), Unit)
+              return (([ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
         _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
     ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
@@ -287,7 +287,7 @@ typeAssignmentExpression ::
   SemanticMonad (SAST.Expression SemanticAnn)
 ----------------------------------------
 -- | Struct Initializer
-typeAssignmentExpression ty@(DefinedType id_ty) typeObj (StructInitializer fs mty pann) = do
+typeAssignmentExpression ty@(TDefinedType id_ty) typeObj (StructInitializer fs mty pann) = do
   -- | Check field type
   case mty of
     (Just id_ty') -> do
@@ -295,7 +295,7 @@ typeAssignmentExpression ty@(DefinedType id_ty) typeObj (StructInitializer fs mt
         catchError
           (getGlobalTypeDef pann id_ty')
           (\_ -> throwError $ annotateError pann (EStructInitializerUnknownType id_ty))
-      catchMismatch pann (EStructInitializerTypeMismatch ty) (sameTyOrError pann ty (DefinedType id_ty'))
+      catchMismatch pann (EStructInitializerTypeMismatch ty) (sameTyOrError pann ty (TDefinedType id_ty'))
       return struct_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
@@ -303,13 +303,13 @@ typeAssignmentExpression ty@(DefinedType id_ty) typeObj (StructInitializer fs mt
       SAST.StructInitializer
         <$> checkFieldValues pann typeObj ty_fs fs
         <*> pure (Just id_ty)
-        <*> pure (buildExpAnn pann (DefinedType id_ty));
+        <*> pure (buildExpAnn pann (TDefinedType id_ty));
     Class _clsKind _ident members _provides _mods ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
         SAST.StructInitializer
         <$> checkFieldValues pann typeObj fields fs
         <*> pure (Just id_ty)
-        <*> pure (buildExpAnn pann (DefinedType id_ty));
+        <*> pure (buildExpAnn pann (TDefinedType id_ty));
     x -> throwError $ annotateError pann (EStructInitializerGlobalNotStruct (fmap forgetSemAnn x));
   }
 -- We shall always expect a type for the struct initializer. If we do not expect a type
@@ -327,8 +327,8 @@ typeAssignmentExpression expectedType typeObj (EnumVariantInitializer id_ty vari
           let (psLen , asLen ) = (length ps, length args) in
           if psLen == asLen
           then
-             sameTyOrError pann (DefinedType id_ty) expectedType >>
-             flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (DefinedType id_ty))
+             sameTyOrError pann (TDefinedType id_ty) expectedType >>
+             flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (TDefinedType id_ty))
               <$> zipWithM (\(ty, position) e -> 
                 catchMismatch pann (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty)) (typeExpression (Just ty) typeObj e)) (zip ps [0 :: Integer ..]) args
           else if psLen < asLen
@@ -338,32 +338,32 @@ typeAssignmentExpression expectedType typeObj (EnumVariantInitializer id_ty vari
     _ -> throwError $ annotateError Internal (ENoEnumFound id_ty)
   }
 typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
--- | Array Initialization
+-- | TArray Initialization
   case expectedType of
-    Array ts arrsize -> do
+    TArray ts arrsize -> do
       typed_init <- typeAssignmentExpression ts typeObj iexp
       unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
-      return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (Array ts size))
+      return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (TArray ts size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
   case expectedType of
-    Array ts arrsize -> do
+    TArray ts arrsize -> do
       typed_exprs <- mapM (\e ->
         catchMismatch (getAnnotation e)
           (EArrayExprListInitializerExprTypeMismatch ts) (typeExpression (Just ts) typeObj e)) exprs
       size_value <- getIntSize pann arrsize
       unless (length typed_exprs == fromIntegral size_value)
         (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
-      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (Array ts arrsize))
+      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts arrsize))
     ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
   case expectedType of
-    Option ts -> do
+    TOption ts -> do
       case vexp of
-        None -> return $ SAST.OptionVariantInitializer None (buildExpAnn anns (Option ts))
+        None -> return $ SAST.OptionVariantInitializer None (buildExpAnn anns (TOption ts))
         Some e -> do
           typed_e <- typeExpression (Just ts) typeObj e
-          return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (Option ts))
+          return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (TOption ts))
     _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr
@@ -392,11 +392,11 @@ typeExpression expectedType typeObj (AccessObject obj) = do
     -- | Get the type of the object
     (_, obj_type) <- getObjectType typed_obj
     case (expectedType, obj_type) of
-      (Just (BoxSubtype ts), BoxSubtype ts') -> do
+      (Just (TBoxSubtype ts), TBoxSubtype ts') -> do
         -- If the type must be an expected type, then check it.
         sameTyOrError (getAnnotation obj) ts ts'
         return $ SAST.AccessObject typed_obj
-      (Just ts, BoxSubtype ts') -> do
+      (Just ts, TBoxSubtype ts') -> do
         -- If the type must be an expected type, then check it.
         sameTyOrError (getAnnotation obj) ts ts'
         -- If we have an box and expect an unboxed type:
@@ -407,7 +407,7 @@ typeExpression expectedType typeObj (AccessObject obj) = do
         return $ SAST.AccessObject typed_obj
       -- If we are requesting an object without an expected type, then we must
       -- be casting the result. Thus, we must return an unboxed object.
-      (Nothing, BoxSubtype _)->
+      (Nothing, TBoxSubtype _)->
         return $ SAST.AccessObject (unBox typed_obj)
       (Nothing, _) ->
         return $ SAST.AccessObject typed_obj
@@ -425,10 +425,10 @@ typeExpression Nothing _ (Constant c@(I _ Nothing) pann) = do
   throwError $ annotateError pann $ EConstantWithoutKnownType c
 -- | Boolean literals without an expected type.
 typeExpression Nothing _ (Constant c@(B {}) pann) = do
-  return $ SAST.Constant c (buildExpAnn pann Bool)
+  return $ SAST.Constant c (buildExpAnn pann TBool)
 -- | Character literals without an expected type.
 typeExpression Nothing _ (Constant c@(C {}) pann) = do
-  return $ SAST.Constant c (buildExpAnn pann Char)
+  return $ SAST.Constant c (buildExpAnn pann TChar)
 typeExpression expectedType typeObj (Casting e nty pann) = do
   maybe (return ()) (sameTyOrError pann nty) expectedType
   -- | Casting Expressions.
@@ -541,64 +541,64 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameEquatableTyBool :: SemanticMonad (SAST.Expression SemanticAnn)
     sameEquatableTyBool =
       case expectedType of
-        (Just Bool) -> do
+        (Just TBool) -> do
           (_, tyle, tyre) <-
             sameTypeExpressions eqTy
               (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           (_, tyle, tyre) <-
             sameTypeExpressions eqTy
               (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is numeric. This function is used to check the binary expressions <, <=, > and >=.
     sameNumTyBool :: SemanticMonad (SAST.Expression SemanticAnn)
     sameNumTyBool =
       case expectedType of
-        (Just Bool) -> do
+        (Just TBool) -> do
           (_, tyle, tyre) <-
             sameTypeExpressions numTy
               (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           (_, tyle, tyre) <-
             sameTypeExpressions numTy
               (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is boolean. This function is used to check the binary expressions && and ||.
     sameBoolType :: SemanticMonad (SAST.Expression SemanticAnn)
     sameBoolType =
       case expectedType of
-        (Just Bool) -> do
-          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just Bool) typeObj le)
-          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just Bool) typeObj re)
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+        (Just TBool) -> do
+          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just TBool) typeObj le)
+          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just TBool) typeObj re)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just Bool) typeObj le)
-          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just Bool) typeObj re)
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann Bool)
+          tyle <- catchMismatch pann (EBinOpLeftTypeNotBool op) (typeExpression (Just TBool) typeObj le)
+          tyre <- catchMismatch pann (EBinOpRightTypeNotBool op) (typeExpression (Just TBool) typeObj re)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
   case rhs_e of
     ArraySlice obj lower upper _anns -> do
       typed_obj <- typeObj obj
       (obj_ak, obj_ty) <- getObjectType typed_obj
-      typed_lower <- typeExpression (Just USize) typeRHSObject lower
-      typed_upper <- typeExpression (Just USize) typeRHSObject upper
+      typed_lower <- typeExpression (Just TUSize) typeRHSObject lower
+      typed_upper <- typeExpression (Just TUSize) typeRHSObject upper
       case obj_ty of
-        Array ty _ -> do
+        TArray ty _ -> do
           checkReferenceAccessKind obj_ak
           case expectedType of
-            Just rtype@(Reference _ak (Array ts _size)) -> do
+            Just rtype@(TReference _ak (TArray ts _size)) -> do
               unless (sameTy ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
               return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann rtype))
-            Just ety -> throwError $ annotateError pann $ EMismatch (Reference refKind ty) ety
+            Just ety -> throwError $ annotateError pann $ EMismatch (TReference refKind ty) ety
             _ -> throwError $ annotateError pann ESliceInvalidUse
         _ -> throwError $ annotateError Internal EMalformedSlice
     _ -> do
@@ -611,15 +611,15 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
         -- the base type. Objects of a box subtype are always immutable, BUT a reference
         -- to an object of a box subtype can be mutable. Thus, we do not need to check
         -- the access kind of the object.
-        BoxSubtype ty -> do
+        TBoxSubtype ty -> do
           -- | Check that the expected type is the same as the base type.  
-          maybe (return ()) (sameTyOrError pann (Reference refKind ty)) expectedType
-          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind ty)))
+          maybe (return ()) (sameTyOrError pann (TReference refKind ty)) expectedType
+          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind ty)))
         _ -> do
           -- | Check if the we are allowed to create that kind of reference from the object
           checkReferenceAccessKind obj_ak
-          maybe (return ()) (flip (sameTyOrError pann) (Reference refKind obj_type)) expectedType
-          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (Reference refKind obj_type)))
+          maybe (return ()) (flip (sameTyOrError pann) (TReference refKind obj_type)) expectedType
+          return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind obj_type)))
 
   where
 
@@ -655,7 +655,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   case obj_ty of
-    Reference _ rTy -> do
+    TReference _ rTy -> do
       -- NOTE: We have reused the code from MemberFunctionCall, but we must take into
       -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
@@ -668,7 +668,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   lhs_ty <- case obj_ty of
-    DefinedType dident ->
+    TDefinedType dident ->
       catchError (getGlobalTypeDef pann dident) (\_ -> throwError $ annotateError pann (EIsVariantNotEnum obj_ty))
     _ -> throwError $ annotateError pann (EIsVariantNotEnum obj_ty)
   case lhs_ty of
@@ -677,8 +677,8 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
       then
         case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
           Just (EnumVariant {}) -> do
-            maybe (return ()) (sameTyOrError pann Bool) expectedType
-            return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann Bool)
+            maybe (return ()) (sameTyOrError pann TBool) expectedType
+            return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
           Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
       else throwError $ annotateError pann (EIsVariantEnumMismatch lhs_enum id_ty)
     x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
@@ -686,9 +686,9 @@ typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pa
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjectType obj_typed
   case obj_ty of
-    (Option {}) -> do
-      maybe (return ()) (sameTyOrError pann Bool) expectedType
-      return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann Bool)
+    (TOption {}) -> do
+      maybe (return ()) (sameTyOrError pann TBool) expectedType
+      return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
     _ -> throwError $ annotateError pann (EIsVariantNotOption obj_ty)
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann EArrayInitializerInvalidUse
@@ -723,7 +723,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid add
   if fid == faid
   then
     case fty of
-      Location _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
+      TLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
       _ -> throwError $ annotateError loc (EFieldNotFixedLocation fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
 checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
@@ -732,13 +732,13 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPort
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      SinkPort _ action  ->
+      TSinkPort _ action  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
           Located  (GGlob (SEmitter ets)) _ ->
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
-      InPort _ action  ->
+      TInPort _ action  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
           Located (GGlob (SChannel cts)) _ ->
@@ -752,7 +752,7 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection OutboundPor
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      OutPort _ ->
+      TOutPort _ ->
         case gentry of
           -- TODO: Check that the type of the outbound port and the type of the channel match
           Located (GGlob (SChannel cts)) _ -> return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
@@ -765,36 +765,36 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      AccessPort (Allocator {}) ->
+      TAccessPort (TAllocator {}) ->
         case gentry of
           -- TODO: Check that the types match
-          Located (GGlob (SResource (Pool ty s))) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
+          Located (GGlob (SResource (TPool ty s))) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
-      AccessPort (AtomicAccess ty) ->
+      TAccessPort (TAtomicAccess ty) ->
         case gentry of
-          Located (GGlob (SResource (Atomic ty'))) _ -> do
+          Located (GGlob (SResource (TAtomic ty'))) _ -> do
             catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomic sid
-      AccessPort (AtomicArrayAccess ty s) ->
+      TAccessPort (TAtomicArrayAccess ty s) ->
         case gentry of
-          Located (GGlob (SResource (AtomicArray ty' s'))) _ -> do
+          Located (GGlob (SResource (TAtomicArray ty' s'))) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomicArray sid
-      AccessPort (DefinedType iface) ->
+      TAccessPort (TDefinedType iface) ->
         getGlobalTypeDef loc iface >>=
           \case {
             Interface _ members _ ->
               -- Check that the resource provides the interface
               case gentry of
-                Located (GGlob (SResource rts@(DefinedType {}))) _ ->
+                Located (GGlob (SResource rts@(TDefinedType {}))) _ ->
                   let procs = [SemanProcedure procid params | (InterfaceProcedure procid params _) <- members] in
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
               ;
-            _ -> throwError $ annotateError loc (EAccessPortNotInterface (DefinedType iface))
+            _ -> throwError $ annotateError loc (EAccessPortNotInterface (TDefinedType iface))
           }
       _ -> throwError $ annotateError loc (EFieldNotPort fid)
   else throwError $ annotateError loc (EFieldMissing [fid])
@@ -874,9 +874,9 @@ typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns)
     <*> return (buildStmtAnn anns)
   where
     typeCondExpr :: Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
-    typeCondExpr bExpr = catchError (typeExpression (Just Bool) typeRHSObject bExpr)
+    typeCondExpr bExpr = catchError (typeExpression (Just TBool) typeRHSObject bExpr)
       (\err -> case getError err of
-        EMismatch Bool ty -> throwError $ annotateError (getAnnotation err) $ EIfElseIfCondNotBool ty
+        EMismatch TBool ty -> throwError $ annotateError (getAnnotation err) $ EIfElseIfCondNotBool ty
         _ -> throwError err
       )
 -- Here we could implement some abstract interpretation analysis
@@ -891,18 +891,18 @@ typeStatement retTy (ForLoopStmt it_id it_ty from_expr to_expr mWhile body_stmt 
               Nothing -> return Nothing
               Just whileC -> do
                   typed_whileC <- addLocalImmutObjs anns [(it_id, it_ty)] $
-                      typeExpression (Just Bool) typeRHSObject whileC
+                      typeExpression (Just TBool) typeRHSObject whileC
                   return (Just typed_whileC)
         )
     <*> addLocalImmutObjs anns [(it_id, it_ty)] (typeBlock retTy body_stmt)
     <*> return (buildStmtAnn anns)
 typeStatement _retTy (SingleExpStmt expr anns) =
-  flip SAST.SingleExpStmt (buildStmtAnn anns) <$> typeExpression (Just Unit) typeRHSObject expr
+  flip SAST.SingleExpStmt (buildStmtAnn anns) <$> typeExpression (Just TUnit) typeRHSObject expr
 typeStatement retTy (MatchStmt matchE cases ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   type_matchE <- getExpType typed_matchE
   case type_matchE of
-    DefinedType t -> getGlobalTypeDef ann t >>=
+    TDefinedType t -> getGlobalTypeDef ann t >>=
         \case {
           Enum _ident flsDef _mods ->
           -- Sort both lists by identifiers
@@ -917,7 +917,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
           ;
           _ -> throwError $ annotateError ann $ EMatchNotEnum t
         }
-    Option t ->
+    TOption t ->
       let ord_cases = Data.List.sortOn matchIdentifier cases in
       checkOptionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
       >>
@@ -951,7 +951,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of
-    (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn anns Unit)
+    (Nothing, Nothing) -> return $ SAST.ReturnStmt Nothing (buildExpAnn anns TUnit)
     (Just ts, Just e) -> do
       typed_e <- typeExpression (Just ts) typeRHSObject e
       -- ReturnStmt (Just ety) . buildExpAnn anns <$> getExpType ety
@@ -969,7 +969,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
       obj_typed <- typeRHSObject obj
       (_, obj_ty) <- getObjectType obj_typed
       case obj_ty of
-        Reference _ rTy -> do
+        TReference _ rTy -> do
           ((ps, typed_args), fty) <- typeActionCall ann rTy ident args
           return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
         ty -> throwError $ annotateError anns $ ETypeNotReference ty
@@ -985,7 +985,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
       -> SemanticMonad (([TerminaType], [SAST.Expression SemanticAnn]), TerminaType)
     typeActionCall ann obj_ty ident args =
       case obj_ty of
-          DefinedType dident -> getGlobalTypeDef ann dident >>=
+          TDefinedType dident -> getGlobalTypeDef ann dident >>=
             \case{
               -- This case corresponds to a call to an inner method or viewer from the self object.
               Class _ _identTy cls _provides _mods ->
@@ -998,7 +998,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
                         case findClassAction ident cls of
                           Just (ts, rty, aann) -> do
                             case ts of
-                              Unit -> case args of
+                              TUnit -> case args of
                                 [] -> return (([], []), ts)
                                 _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
                               _ -> case args of
@@ -1055,9 +1055,9 @@ typeGlobal (Emitter ident ty mexpr mods anns) = do
               Nothing   -> return Nothing
   glb <- case ty of
         -- | We are going to manually map de Emitter to the proper type
-        (DefinedType "Interrupt") -> return $ SEmitter ty
-        (DefinedType "PeriodicTimer") -> return $  SEmitter ty
-        (DefinedType "SystemInit") -> return $ SEmitter ty
+        (TDefinedType "Interrupt") -> return $ SEmitter ty
+        (TDefinedType "PeriodicTimer") -> return $  SEmitter ty
+        (TDefinedType "SystemInit") -> return $ SEmitter ty
         _ -> throwError $ annotateError Internal EInternalNoGTY
   return (SAST.Emitter ident ty exprty mods (buildGlobalAnn anns glb))
 typeGlobal (Channel ident ty mexpr mods anns) = do
@@ -1074,7 +1074,7 @@ typeGlobal (Const ident ty expr mods anns) = do
   value <- evalConstExpression ty expr
   return (SAST.Const ident ty typed_expr mods (buildGlobalAnn anns (SConst ty value)))
 
-checkParameterType :: Location -> Parameter -> SemanticMonad ()
+checkParameterType :: TLocation -> Parameter -> SemanticMonad ()
 checkParameterType anns p =
     let typeSpec = paramTerminaType p in
      -- If the type specifier is a box, then we must throw an EArgHasBox error
@@ -1082,7 +1082,7 @@ checkParameterType anns p =
     unless (parameterTy typeSpec) (throwError (annotateError anns (EInvalidParameterType p))) >>
     checkTerminaType anns typeSpec
 
-checkReturnType :: Location -> TerminaType -> SemanticMonad ()
+checkReturnType :: TLocation -> TerminaType -> SemanticMonad ()
 checkReturnType anns ty =
   unless (copyTy ty) (throwError (annotateError anns (EInvalidReturnType ty))) >>
   checkTerminaType anns ty
@@ -1105,7 +1105,7 @@ programSeman (Function ident ps mty bret mods anns) =
                   (fmap (\p -> (paramIdentifier p , paramTerminaType p)) ps)
                   (typeBlock mty bret)
             <*> pure mods
-            <*> pure (buildGlobal anns (GFun (map paramTerminaType ps) (fromMaybe Unit mty)))
+            <*> pure (buildGlobal anns (GFun (map paramTerminaType ps) (fromMaybe TUnit mty)))
 programSeman (GlobalDeclaration gbl) =
   -- TODO Add global declarations
   GlobalDeclaration <$> typeGlobal gbl
@@ -1123,7 +1123,7 @@ semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMemb
 semanticTypeDef (Interface i cls m) = Interface i cls m
 
 -- | This function type checks the members of a class depending on its kind.
-checkClassKind :: Location -> Identifier -> ClassKind
+checkClassKind :: TLocation -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnn],
       [ClassMember ParserAnn],
       [ClassMember ParserAnn])
@@ -1143,8 +1143,8 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     \case {
       ClassField (FieldDefinition fs_id fs_ty) annCF ->
         case fs_ty of
-          InPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort (clsId, anns) fs_id)
-          OutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort (clsId, anns) fs_id)
+          TInPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort (clsId, anns) fs_id)
+          TOutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort (clsId, anns) fs_id)
           _ -> return ()
       ;
       _ -> return ();
@@ -1214,16 +1214,16 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
 
   where
 
-    checkHandlerPorts :: Maybe Location -> [SAST.ClassMember SemanticAnn] -> SemanticMonad ()
+    checkHandlerPorts :: Maybe TLocation -> [SAST.ClassMember SemanticAnn] -> SemanticMonad ()
     checkHandlerPorts Nothing [] = throwError $ annotateError anns (EHandlerClassNoSinkPort clsId)
     checkHandlerPorts (Just _) [] = return ()
     checkHandlerPorts prev ((ClassField (FieldDefinition fs_id fs_ty) annCF): xfs) =
       case fs_ty of
-        SinkPort _ _ -> 
+        TSinkPort _ _ -> 
           case prev of 
             Nothing -> checkHandlerPorts (Just (location annCF)) xfs
             Just prevPort -> throwError $ annotateError (location annCF) (EHandlerClassMultipleSinkPorts clsId prevPort)
-        InPort _ _ -> throwError $ annotateError (location annCF) (EHandlerClassInPort (clsId, anns) fs_id)
+        TInPort _ _ -> throwError $ annotateError (location annCF) (EHandlerClassInPort (clsId, anns) fs_id)
         _ -> checkHandlerPorts prev xfs
     checkHandlerPorts _ _ = throwError $ annotateError Internal EClassTyping
 
@@ -1232,7 +1232,7 @@ checkClassKind _anns _clsId _kind _members _provides = return ()
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
-typeTypeDefinition :: Location -> TypeDef ParserAnn -> SemanticMonad (SAST.TypeDef SemanticAnn)
+typeTypeDefinition :: TLocation -> TypeDef ParserAnn -> SemanticMonad (SAST.TypeDef SemanticAnn)
 -- Check Type definitions https://hackmd.io/@termina-lang/SkglB0mq3#Struct-definitions
 typeTypeDefinition ann (Struct ident fs mds) =
   -- Check every type is well-defined:
@@ -1263,10 +1263,10 @@ typeTypeDefinition ann (Interface ident cls mds) = do
 
   where
 
-    typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
+    typeInterfaceProcedure :: InterfaceMember TLocation -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure procId ps annIP) = do
       mapM_ (checkTerminaType annIP . paramTerminaType) ps
-      return $ InterfaceProcedure procId ps (buildExpAnn annIP Unit)
+      return $ InterfaceProcedure procId ps (buildExpAnn annIP TUnit)
 
 typeTypeDefinition ann (Class kind ident members provides mds) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
@@ -1364,19 +1364,19 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
             ClassField {} -> throwError (annotateError Internal EClassTyping)
             -- Interesting case
             ClassProcedure mIdent mps blk mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Mutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlock Nothing blk)
-              let newPrc = SAST.ClassProcedure mIdent mps typed_bret (buildExpAnn mann Unit)
+              typed_bret <- addLocalImmutObjs mann (("self", TReference Mutable (TDefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlock Nothing blk)
+              let newPrc = SAST.ClassProcedure mIdent mps typed_bret (buildExpAnn mann TUnit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann [("self", Reference Private (DefinedType ident))] (typeBlock mty mbody)
-              let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe Unit mty))
+              typed_bret <- addLocalImmutObjs mann [("self", TReference Private (TDefinedType ident))] (typeBlock mty mbody)
+              let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent mps mty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Immutable (DefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlock mty mbody)
-              let newVw = SAST.ClassViewer mIdent mps mty typed_bret (buildExpAnn mann (fromMaybe Unit mty))
+              typed_bret <- addLocalImmutObjs mann (("self", TReference Immutable (TDefinedType ident)) : fmap (\p -> (paramIdentifier p, paramTerminaType p)) mps) (typeBlock mty mbody)
+              let newVw = SAST.ClassViewer mIdent mps mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
             ClassAction mIdent p ty mbody mann -> do
-              typed_bret <- addLocalImmutObjs mann (("self", Reference Private (DefinedType ident)) : [(paramIdentifier p, paramTerminaType p)]) (typeBlock (Just ty) mbody)
+              typed_bret <- addLocalImmutObjs mann (("self", TReference Private (TDefinedType ident)) : [(paramIdentifier p, paramTerminaType p)]) (typeBlock (Just ty) mbody)
               let newAct = SAST.ClassAction mIdent p ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
@@ -1388,7 +1388,7 @@ typeTypeDefinition ann (Class kind ident members provides mds) =
 
 ----------------------------------------
 -- Field definition helpers.
-fieldDefinitionTy :: Location -> FieldDefinition -> SemanticMonad ()
+fieldDefinitionTy :: TLocation -> FieldDefinition -> SemanticMonad ()
 fieldDefinitionTy ann f
   -- First we check its type is well-defined
   = checkTerminaType ann tyFD
@@ -1399,13 +1399,13 @@ fieldDefinitionTy ann f
     tyFD = fieldTerminaType f
 
 -- Enum Variant definition helpers.
-enumDefinitionTy :: Location -> EnumVariant -> SemanticMonad ()
+enumDefinitionTy :: TLocation -> EnumVariant -> SemanticMonad ()
 enumDefinitionTy ann ev
   = mapM_ (\ty -> checkTerminaType ann ty >> enumParamTyOrFail ann ty) ev_tys
   where
     ev_tys = assocData ev
 
-checkUniqueNames :: Location -> ([Identifier] -> Error Location) -> [Identifier] -> SemanticMonad ()
+checkUniqueNames :: TLocation -> ([Identifier] -> Error TLocation) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))
@@ -1425,7 +1425,7 @@ programAdd :: SAST.AnnASTElement SemanticAnn
   -> SemanticMonad (Identifier, Located (GEntry SemanticAnn))
 programAdd (Function ident params mretType _bd _mods anns) =
   let
-    gbl = GFun (map paramTerminaType params) (fromMaybe Unit mretType)
+    gbl = GFun (map paramTerminaType params) (fromMaybe TUnit mretType)
     el = Located gbl (location anns)
   in
   insertGlobal ident el

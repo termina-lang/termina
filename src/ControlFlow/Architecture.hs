@@ -127,27 +127,27 @@ genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal _ (Const {}) = return ()
 genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
-    (DefinedType "Interrupt") -> ST.modify $ \tp ->
+    (TDefinedType "Interrupt") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPInterruptEmittter ident ann) (emitters tp)
       }
-    (DefinedType "PeriodicTimer") -> ST.modify $ \tp ->
+    (TDefinedType "PeriodicTimer") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPPeriodicTimerEmitter ident modName ann) (emitters tp)
        }
-    (DefinedType "SystemInit") -> ST.modify $ \tp ->
+    (TDefinedType "SystemInit") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
     -- | Any other emitter class is not supported (this should not happen)
     _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
-genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
+genArchGlobal modName (Task ident (TDefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
         case getPortType pname members of
-          InPort {} -> do
+          TInPort {} -> do
             connectedTargets <- channelTargets <$> ST.get
             -- | Check if the target channel is already connected to an in port
             case M.lookup target connectedTargets of
@@ -156,7 +156,7 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
-          SinkPort {} -> do
+          TSinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
             case M.lookup target connectedEmitters of
@@ -171,7 +171,7 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort {} -> do
+          TOutPort {} -> do
             addChannelSource ident pname target cann
             return (inp, sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
@@ -187,7 +187,7 @@ genArchGlobal modName (Task ident (DefinedType tcls) (Just (StructInitializer as
 -- | Task declaration without struct initializer or a proper type specifier
 -- This should not happen, since a task must define at least one inbound port
 genArchGlobal _ (Task {}) = error "Internal error: invalid task declaration"
-genArchGlobal modName (Resource ident (DefinedType rcls) initializer _ rann) =
+genArchGlobal modName (Resource ident (TDefinedType rcls) initializer _ rann) =
   case initializer of
     Nothing -> ST.modify $ \tp ->
       tp {
@@ -209,23 +209,23 @@ genArchGlobal modName (Resource ident (DefinedType rcls) initializer _ rann) =
     -- This should not happen, since the type checker must not allow initializing a
     -- resource with anything other than a struct initializer 
     Just _ -> error "Internal error: resource initializer is not a struct initializer"
-genArchGlobal modName (Resource ident (Atomic aty) _ _ rann) =
+genArchGlobal modName (Resource ident (TAtomic aty) _ _ rann) =
   ST.modify $ \tp ->
     tp {
       atomics = M.insert ident (TPAtomic ident aty modName rann)  (atomics tp)
     }
-genArchGlobal modName (Resource ident (AtomicArray aty size) _ _ rann) =
+genArchGlobal modName (Resource ident (TAtomicArray aty size) _ _ rann) =
   ST.modify $ \tp ->
     tp {
       atomicArrays = M.insert ident (TPAtomicArray ident aty size modName rann) (atomicArrays tp)
     }
-genArchGlobal modName (Resource ident (Pool aty size) _ _ rann) =
+genArchGlobal modName (Resource ident (TPool aty size) _ _ rann) =
   ST.modify $ \tp ->
     tp {
       pools = M.insert ident (TPPool ident aty size modName rann) (pools tp)
     }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
-genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer assignments _ _)) modifiers hann) = do
+genArchGlobal modName (Handler ident (TDefinedType hcls) (Just (StructInitializer assignments _ _)) modifiers hann) = do
   members <- ST.get >>= \tp ->
     case M.lookup hcls (handlerClasses tp) of
       Nothing -> error $ "Handler class: " ++ hcls ++ " not found"
@@ -234,7 +234,7 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
         case getPortType pname members of
-          SinkPort {} -> do
+          TSinkPort {} -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
             case M.lookup target connectedEmitters of
@@ -249,7 +249,7 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
           _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case getPortType pname members of
-          OutPort {} -> do
+          TOutPort {} -> do
             addChannelSource ident pname target cann
             return (sink, M.insert pname (target, cann) outp, accp)
           _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
@@ -265,7 +265,7 @@ genArchGlobal modName (Handler ident (DefinedType hcls) (Just (StructInitializer
 -- | Handler declaration without struct initializer or a proper type specifier
 -- This should not happen, since a handler must define one sink port
 genArchGlobal _ (Handler {}) = error "Internal error: invalid handler declaration"
-genArchGlobal modName (Channel ident (MsgQueue mty size) _ _ cann) =
+genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
   ST.modify $ \tp ->
     tp {
       channels = M.insert ident (TPMsgQueue ident mty size modName cann) (channels tp)
@@ -280,7 +280,7 @@ genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 emptyTerminaProgArch :: TerminaProgArch SemanticAnn
 emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (GGlob (SEmitter (DefinedType "SystemInit")))) Internal))
+    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (GGlob (SEmitter (TDefinedType "SystemInit")))) Internal))
   ],
   emitterTargets = M.empty,
   taskClasses = M.empty,

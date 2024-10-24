@@ -11,7 +11,7 @@ import Semantic.Errors.Errors
 import Semantic.AST
 import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe (Error TLocation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -232,32 +232,32 @@ spec = do
   
   where
 
-    isEResourceClassNoProvides :: Maybe (Error Location) -> Bool
+    isEResourceClassNoProvides :: Maybe (Error TLocation) -> Bool
     isEResourceClassNoProvides = \case Just (EResourceClassNoProvides "id0") -> True; _ -> False
 
-    isEResourceClassAction :: Maybe (Error Location) -> Bool
+    isEResourceClassAction :: Maybe (Error TLocation) -> Bool
     isEResourceClassAction = \case Just (EResourceClassAction ("TMChannel", Position {}) "send_packet") -> True; _ -> False
 
-    isEResourceClassInPort :: Maybe (Error Location) -> Bool
+    isEResourceClassInPort :: Maybe (Error TLocation) -> Bool
     isEResourceClassInPort = \case Just (EResourceClassInPort ("TMChannel", Position {}) "input_msg") -> True; _ -> False
 
-    isEResourceClassOutPort :: Maybe (Error Location) -> Bool
+    isEResourceClassOutPort :: Maybe (Error TLocation) -> Bool
     isEResourceClassOutPort = \case Just (EResourceClassOutPort ("TMChannel", Position {}) "output_msg") -> True; _ -> False
 
-    isEInterfaceNotFound :: Maybe (Error Location) -> Bool
+    isEInterfaceNotFound :: Maybe (Error TLocation) -> Bool
     isEInterfaceNotFound = \case Just (EInterfaceNotFound "TMChannelInterface") -> True; _ -> False
 
-    isEProcedureNotFromProvidedInterfaces :: Maybe (Error Location) -> Bool
+    isEProcedureNotFromProvidedInterfaces :: Maybe (Error TLocation) -> Bool
     isEProcedureNotFromProvidedInterfaces = \case Just (EProcedureNotFromProvidedInterfaces ("TMChannel", Position {}) "send_packet") -> True; _ -> False
   
-    isEMissingProcedure :: Maybe (Error Location) -> Bool
+    isEMissingProcedure :: Maybe (Error TLocation) -> Bool
     isEMissingProcedure = \case Just (EMissingProcedure "TMChannelInterface" "send_packet") -> True; _ -> False
 
-    isEProcedureExtraParams :: Maybe (Error Location) -> Bool
+    isEProcedureExtraParams :: Maybe (Error TLocation) -> Bool
     isEProcedureExtraParams = \case Just (EProcedureExtraParams ("TMChannelInterface", "send_packet", [], Position {}) 1) -> True; _ -> False
 
-    isEProcedureMissingParams :: Maybe (Error Location) -> Bool
-    isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [UInt32], Position {}) 0) -> True; _ -> False
+    isEProcedureMissingParams :: Maybe (Error TLocation) -> Bool
+    isEProcedureMissingParams = \case Just (EProcedureMissingParams ("TMChannelInterface", "send_packet", [TUInt32], Position {}) 0) -> True; _ -> False
 
-    isEProcedureParamMismatch :: Maybe (Error Location) -> Bool
-    isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", Reference Mutable UInt32, Position {}) (Reference Mutable UInt16)) -> True; _ -> False
+    isEProcedureParamMismatch :: Maybe (Error TLocation) -> Bool
+    isEProcedureParamMismatch = \case Just (EProcedureParamTypeMismatch ("TMChannelInterface", "get_tm_sent_packets", TReference Mutable TUInt32, Position {}) (TReference Mutable TUInt16)) -> True; _ -> False

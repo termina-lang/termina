@@ -60,7 +60,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
     where
 
         -- | Prints a trace of box allocations 
-        printBoxTrace :: Identifier -> [Location] -> IO ()
+        printBoxTrace :: Identifier -> [TLocation] -> IO ()
         printBoxTrace _ [] = return ()
         printBoxTrace expectedSource [tracePos@(Position traceStartPos _)] =
             let title = "The box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
@@ -78,7 +78,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                     traceSourceLines title traceFileName tracePos Nothing >> printBoxTrace' expectedSource xr
         printBoxTrace _ _ = error "Internal error: invalid error position"
 
-        printBoxTrace' :: Identifier -> [Location] -> IO ()
+        printBoxTrace' :: Identifier -> [TLocation] -> IO ()
         printBoxTrace' _ [] = return ()
         printBoxTrace' expectedSource [tracePos@(Position traceStartPos _)] =
             let title = "Finally, box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"

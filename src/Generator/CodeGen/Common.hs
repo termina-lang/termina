@@ -89,21 +89,21 @@ genClassFunctionName className functionName = return $ className <::> functionNa
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
 genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-genOptionParameterStructName Bool = return $ namefy "option_bool_params_t"
-genOptionParameterStructName Char = return $ namefy "option_char_params_t"
-genOptionParameterStructName UInt8 = return $ namefy "option_uint8_params_t"
-genOptionParameterStructName UInt16 = return $ namefy "option_uint16_params_t"
-genOptionParameterStructName UInt32 = return $ namefy "option_uint32_params_t"
-genOptionParameterStructName UInt64 = return $ namefy "option_uint64_params_t"
-genOptionParameterStructName Int8 = return $ namefy "option_int8_params_t"
-genOptionParameterStructName Int16 = return $ namefy "option_int16_params_t"
-genOptionParameterStructName Int32 = return $ namefy "option_int32_params_t"
-genOptionParameterStructName Int64 = return $ namefy "option_int64_params_t"
-genOptionParameterStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionParameterStructName (BoxSubtype _) = return $ namefy "option_box_params_t"
+genOptionParameterStructName TBool = return $ namefy "option_bool_params_t"
+genOptionParameterStructName TChar = return $ namefy "option_char_params_t"
+genOptionParameterStructName TUInt8 = return $ namefy "option_uint8_params_t"
+genOptionParameterStructName TUInt16 = return $ namefy "option_uint16_params_t"
+genOptionParameterStructName TUInt32 = return $ namefy "option_uint32_params_t"
+genOptionParameterStructName TUInt64 = return $ namefy "option_uint64_params_t"
+genOptionParameterStructName TInt8 = return $ namefy "option_int8_params_t"
+genOptionParameterStructName TInt16 = return $ namefy "option_int16_params_t"
+genOptionParameterStructName TInt32 = return $ namefy "option_int32_params_t"
+genOptionParameterStructName TInt64 = return $ namefy "option_int64_params_t"
+genOptionParameterStructName ts@(TOption _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
+genOptionParameterStructName (TBoxSubtype _) = return $ namefy "option_box_params_t"
 genOptionParameterStructName ts =
     case ts of
-        Array {} -> do
+        TArray {} -> do
             tsName <- genTypeSpecName ts
             tsDimension <- genDimensionOptionTS ts
             return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_params_t"
@@ -113,20 +113,20 @@ genOptionParameterStructName ts =
 
     where
         genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genTypeSpecName UInt8 = return "uint8"
-        genTypeSpecName UInt16 = return "uint16"
-        genTypeSpecName UInt32 = return "uint32"
-        genTypeSpecName UInt64 = return "uint64"
-        genTypeSpecName Int8 = return "int8"
-        genTypeSpecName Int16 = return "int16"
-        genTypeSpecName Int32 = return "int32"
-        genTypeSpecName Int64 = return "int64"
-        genTypeSpecName (Array ts' _) = genTypeSpecName ts'
-        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName TUInt8 = return "uint8"
+        genTypeSpecName TUInt16 = return "uint16"
+        genTypeSpecName TUInt32 = return "uint32"
+        genTypeSpecName TUInt64 = return "uint64"
+        genTypeSpecName TInt8 = return "int8"
+        genTypeSpecName TInt16 = return "int16"
+        genTypeSpecName TInt32 = return "int32"
+        genTypeSpecName TInt64 = return "int64"
+        genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
+        genTypeSpecName (TDefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
+        genDimensionOptionTS (TArray ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
 variant :: Identifier
@@ -178,21 +178,21 @@ unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 
 -- | Generates the name of the option struct type
 genOptionStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-genOptionStructName Bool = return $ namefy "option_bool_t"
-genOptionStructName Char = return $ namefy "option_char_t"
-genOptionStructName UInt8 = return $ namefy "option_uint8_t"
-genOptionStructName UInt16 = return $ namefy "option_uint16_t"
-genOptionStructName UInt32 = return $ namefy "option_uint32_t"
-genOptionStructName UInt64 = return $ namefy "option_uint64_t"
-genOptionStructName Int8 = return $ namefy "option_int8_t"
-genOptionStructName Int16 = return $ namefy "option_int16_t"
-genOptionStructName Int32 = return $ namefy "option_int32_t"
-genOptionStructName Int64 = return $ namefy "option_int64_t"
-genOptionStructName ts@(Option _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionStructName (BoxSubtype _) = return optionBox
+genOptionStructName TBool = return $ namefy "option_bool_t"
+genOptionStructName TChar = return $ namefy "option_char_t"
+genOptionStructName TUInt8 = return $ namefy "option_uint8_t"
+genOptionStructName TUInt16 = return $ namefy "option_uint16_t"
+genOptionStructName TUInt32 = return $ namefy "option_uint32_t"
+genOptionStructName TUInt64 = return $ namefy "option_uint64_t"
+genOptionStructName TInt8 = return $ namefy "option_int8_t"
+genOptionStructName TInt16 = return $ namefy "option_int16_t"
+genOptionStructName TInt32 = return $ namefy "option_int32_t"
+genOptionStructName TInt64 = return $ namefy "option_int64_t"
+genOptionStructName ts@(TOption _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
+genOptionStructName (TBoxSubtype _) = return optionBox
 genOptionStructName ts =
     case ts of
-        Array {} -> do
+        TArray {} -> do
             tsName <- genTypeSpecName ts
             tsDimension <- genDimensionOptionTS ts
             return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_t"
@@ -202,20 +202,20 @@ genOptionStructName ts =
 
     where
         genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genTypeSpecName UInt8 = return "uint8"
-        genTypeSpecName UInt16 = return "uint16"
-        genTypeSpecName UInt32 = return "uint32"
-        genTypeSpecName UInt64 = return "uint64"
-        genTypeSpecName Int8 = return "int8"
-        genTypeSpecName Int16 = return "int16"
-        genTypeSpecName Int32 = return "int32"
-        genTypeSpecName Int64 = return "int64"
-        genTypeSpecName (Array ts' _) = genTypeSpecName ts'
-        genTypeSpecName (DefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName TUInt8 = return "uint8"
+        genTypeSpecName TUInt16 = return "uint16"
+        genTypeSpecName TUInt32 = return "uint32"
+        genTypeSpecName TUInt64 = return "uint64"
+        genTypeSpecName TInt8 = return "int8"
+        genTypeSpecName TInt16 = return "int16"
+        genTypeSpecName TInt32 = return "int32"
+        genTypeSpecName TInt64 = return "int64"
+        genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
+        genTypeSpecName (TDefinedType typeIdentifier) = return typeIdentifier
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genDimensionOptionTS (Array ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
+        genDimensionOptionTS (TArray ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
         genDimensionOptionTS _ = return ""
 
 
@@ -231,66 +231,66 @@ getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqua
 -- | Translate type annotation to C type
 genType :: (MonadError CGeneratorError m) => CQualifier -> TerminaType -> m CType
 -- |  Unsigned integer types
-genType qual UInt8 = return (CTInt IntSize8 Unsigned qual)
-genType qual UInt16 = return (CTInt IntSize16 Unsigned qual)
-genType qual UInt32 = return (CTInt IntSize32 Unsigned qual)
-genType qual UInt64 = return (CTInt IntSize64 Unsigned qual)
+genType qual TUInt8 = return (CTInt IntSize8 Unsigned qual)
+genType qual TUInt16 = return (CTInt IntSize16 Unsigned qual)
+genType qual TUInt32 = return (CTInt IntSize32 Unsigned qual)
+genType qual TUInt64 = return (CTInt IntSize64 Unsigned qual)
 -- | Signed integer types
-genType qual Int8 = return (CTInt IntSize8 Signed qual)
-genType qual Int16 = return (CTInt IntSize16 Signed qual)
-genType qual Int32 = return (CTInt IntSize32 Signed qual)
-genType qual Int64 = return (CTInt IntSize64 Signed qual)
+genType qual TInt8 = return (CTInt IntSize8 Signed qual)
+genType qual TInt16 = return (CTInt IntSize16 Signed qual)
+genType qual TInt32 = return (CTInt IntSize32 Signed qual)
+genType qual TInt64 = return (CTInt IntSize64 Signed qual)
 -- | Other primitive typess
-genType qual USize = return (CTSizeT qual)
-genType qual Bool = return (CTBool qual)
-genType qual Char = return (CTChar qual)
+genType qual TUSize = return (CTSizeT qual)
+genType qual TBool = return (CTBool qual)
+genType qual TChar = return (CTChar qual)
 -- | Primitive type
-genType qual (DefinedType typeIdentifier) = return (CTTypeDef typeIdentifier qual)
--- | Array type
-genType qual (Array ts' s) = do
+genType qual (TDefinedType typeIdentifier) = return (CTTypeDef typeIdentifier qual)
+-- | TArray type
+genType qual (TArray ts' s) = do
     ts <- genType qual ts'
     return (CTArray ts (getArraySize s))
 -- | Option types
-genType _qual (Option (BoxSubtype _)) = return (CTTypeDef optionBox noqual)
-genType _qual (Option ts) = do
+genType _qual (TOption (TBoxSubtype _)) = return (CTTypeDef optionBox noqual)
+genType _qual (TOption ts) = do
     optName <- genOptionStructName ts
     return (CTTypeDef optName noqual)
 -- Non-primitive types:
 -- | Box subtype
-genType _qual (BoxSubtype _) = return (CTTypeDef boxStruct noqual)
--- | Pool type
-genType _qual (Pool _ _) = return (CTTypeDef pool noqual)
-genType _qual (MsgQueue _ _) = return (CTTypeDef msgQueue noqual)
-genType qual (Location ts) = do
+genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
+-- | TPool type
+genType _qual (TPool _ _) = return (CTTypeDef pool noqual)
+genType _qual (TMsgQueue _ _) = return (CTTypeDef msgQueue noqual)
+genType qual (TLocation ts) = do
     ts' <- genType volatile ts
     return (CTPointer ts' qual)
-genType _qual (AccessPort ts) =  genType noqual ts
-genType _qual (Allocator _) = return (CTPointer (CTTypeDef pool noqual) noqual)
-genType _qual (Atomic ts) = genType atomic ts
-genType _qual (AtomicArray ts _) = genType atomic ts
-genType _qual (AtomicAccess ts) = do
+genType _qual (TAccessPort ts) =  genType noqual ts
+genType _qual (TAllocator _) = return (CTPointer (CTTypeDef pool noqual) noqual)
+genType _qual (TAtomic ts) = genType atomic ts
+genType _qual (TAtomicArray ts _) = genType atomic ts
+genType _qual (TAtomicAccess ts) = do
     ts' <- genType atomic ts
     return (CTPointer ts' noqual)
-genType _qual (AtomicArrayAccess ts _) = do
+genType _qual (TAtomicArrayAccess ts _) = do
     ts' <- genType atomic ts
     return (CTPointer ts' noqual)
 -- | Type of the ports
-genType _qual (SinkPort {}) = return (CTTypeDef sinkPort noqual)
-genType _qual (OutPort {}) = return (CTTypeDef outPort noqual)
-genType _qual (InPort {}) = return (CTTypeDef inPort noqual)
-genType qual (Reference Immutable ts) = do
+genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
+genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)
+genType _qual (TInPort {}) = return (CTTypeDef inPort noqual)
+genType qual (TReference Immutable ts) = do
     case ts of
-        Array {} -> genType constqual ts
+        TArray {} -> genType constqual ts
         _ -> do
             ts' <- genType qual{qual_const = True} ts
             return (CTPointer ts' constqual)
-genType _qual (Reference _ ts) = do
+genType _qual (TReference _ ts) = do
     case ts of
-        Array {} -> genType noqual ts
+        TArray {} -> genType noqual ts
         _ -> do
             ts' <- genType noqual ts
             return (CTPointer ts' constqual)
-genType _noqual Unit = return (CTVoid noqual)
+genType _noqual TUnit = return (CTVoid noqual)
 
 genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
 genFunctionType ts tsParams = do
@@ -400,16 +400,16 @@ printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
 printTypedInteger :: TerminaType -> TInteger -> String
 printTypedInteger ts ti =
     case ts of
-        UInt8 -> "UINT8_C(" <> printIntegerLiteral ti <> ")"
-        UInt16 -> "UINT16_C(" <> printIntegerLiteral ti <> ")"
-        UInt32 -> "UINT32_C(" <> printIntegerLiteral ti <> ")"
-        UInt64 -> "UINT64_C(" <> printIntegerLiteral ti <> ")"
-        Int8 -> "INT8_C(" <> printIntegerLiteral ti <> ")"
-        Int16 -> "INT16_C(" <> printIntegerLiteral ti <> ")"
-        Int32 -> "INT32_C(" <> printIntegerLiteral ti <> ")"
-        Int64 -> "INT64_C(" <> printIntegerLiteral ti <> ")"
+        TUInt8 -> "UINT8_C(" <> printIntegerLiteral ti <> ")"
+        TUInt16 -> "UINT16_C(" <> printIntegerLiteral ti <> ")"
+        TUInt32 -> "UINT32_C(" <> printIntegerLiteral ti <> ")"
+        TUInt64 -> "UINT64_C(" <> printIntegerLiteral ti <> ")"
+        TInt8 -> "INT8_C(" <> printIntegerLiteral ti <> ")"
+        TInt16 -> "INT16_C(" <> printIntegerLiteral ti <> ")"
+        TInt32 -> "INT32_C(" <> printIntegerLiteral ti <> ")"
+        TInt64 -> "INT64_C(" <> printIntegerLiteral ti <> ")"
         -- | No correct way to do this for the time being
-        USize -> printIntegerLiteral ti
+        TUSize -> printIntegerLiteral ti
         _ -> error "Invalid type specifier: " <> show ts
 
 

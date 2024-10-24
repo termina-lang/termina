@@ -55,12 +55,12 @@ getPortName :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m I
 getPortName obj = do
     obj_type <- getObjType obj
     case obj_type of 
-        AccessPort _ -> 
+        TAccessPort _ -> 
             case obj of
                 (SAST.MemberAccess _ portName _) -> return portName
                 (SAST.DereferenceMemberAccess _ portName _) -> return portName
                 _ -> throwError $ InternalError ("unexpected object type" ++ show obj_type)
-        OutPort _ -> 
+        TOutPort _ -> 
             case obj of
                 (SAST.MemberAccess _ portName _) -> return portName
                 (SAST.DereferenceMemberAccess _ portName _) -> return portName

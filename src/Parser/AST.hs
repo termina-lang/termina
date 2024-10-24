@@ -22,7 +22,7 @@ data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
   | ArrayIndexExpression (Object a) (Expression' Object a) a
-  -- ^ Array indexing | eI [ eIx ]|,
+  -- ^ TArray indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
   | MemberAccess (Object a) Identifier a
@@ -33,7 +33,7 @@ data Object a
   | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
   | ArraySlice (Object a) (Expression' Object a) (Expression' Object a) a
-  -- ^ Array slicing | eI [ cEx .. cEy ]|,
+  -- ^ TArray slicing | eI [ cEx .. cEy ]|,
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound
   -- |cEx| is an expression for the upper bound
@@ -57,8 +57,8 @@ data Expression'
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitializer (Expression' obj a) Size a -- ^ Array initializer, | (13 : i8) + (2 : i8)|
-  | ArrayExprListInitializer [Expression' obj a] a -- ^ Array expression list initializer, | { 13 : i8, 2 : i8 } |
+  | ArrayInitializer (Expression' obj a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
+  | ArrayExprListInitializer [Expression' obj a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
     [FieldAssignment' (Expression' obj) a] -- ^ Initial value of each field identifier
     (Maybe Identifier) -- ^ Structure type identifier
@@ -178,9 +178,9 @@ data Block' expr obj a
 type Expression = Expression' Object
 
 type Block = Block' Expression Object
-type AnnASTElement = AnnASTElement' Block Expression
+type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression
-type Global = Global' Expression
+type Global = Global' TerminaType Expression
 
 type TypeDef a = TypeDef' Block a
 
@@ -190,7 +190,7 @@ type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' Block Expression a]
+type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
 
 type Module = Module' [String]
-type TerminaModule = TerminaModule' Block Expression [String]
+type TerminaModule = TerminaModule' TerminaType Block Expression [String]

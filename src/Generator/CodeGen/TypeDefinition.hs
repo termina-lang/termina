@@ -20,16 +20,16 @@ filterStructModifiers = filter (\case
       _ -> False)
 
 genFieldDeclaration :: FieldDefinition -> CHeaderGenerator CDeclaration
-genFieldDeclaration (FieldDefinition identifier ts@(Location {})) = do
+genFieldDeclaration (FieldDefinition identifier ts@(TLocation {})) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
-genFieldDeclaration (FieldDefinition identifier (AccessPort ts@(Allocator {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAllocator {}))) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
-genFieldDeclaration (FieldDefinition identifier (AccessPort ts@(AtomicAccess {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicAccess {}))) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
-genFieldDeclaration (FieldDefinition identifier (AccessPort ts@(AtomicArrayAccess {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAccess {}))) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
 genFieldDeclaration (FieldDefinition identifier ts) = do
@@ -46,11 +46,11 @@ genOptionSomeParameterStruct ann ts = do
             CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [field] [])) cAnn
 
 genOptionStruct :: SemanticAnn -> TerminaType -> CHeaderGenerator [CFileItem]
-genOptionStruct ann (Option ts) = do
+genOptionStruct ann (TOption ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
-    paramsStructType <- genType noqual (DefinedType paramsStructName)
-    enumStructType <- genType noqual (DefinedType enumStructName)
+    paramsStructType <- genType noqual (TDefinedType paramsStructName)
+    enumStructType <- genType noqual (TDefinedType enumStructName)
     let cAnn = buildDeclarationAnn ann True
         some = CDecl (CTypeSpec paramsStructType) (Just optionSomeVariant) Nothing
         this_variant = CDecl (CTypeSpec enumStructType) (Just variant) Nothing
@@ -100,8 +100,8 @@ classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
         field@(ClassField fieldDef _) -> case clsKind of
             TaskClass -> (field : fields, funcs)
             _ -> case fieldDef of
-                (FieldDefinition _ (SinkPort {})) -> (fields, funcs)
-                (FieldDefinition _ (InPort {})) -> (fields, funcs)
+                (FieldDefinition _ (TSinkPort {})) -> (fields, funcs)
+                (FieldDefinition _ (TInPort {})) -> (fields, funcs)
                 _ -> (field : fields, funcs)
         func -> (fields, func : funcs)) ([], []) members
 classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
@@ -128,7 +128,7 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
     cFields <- mapM genFieldDeclaration fls
     opts <- ask
     optsDeclExt <- concat <$> maybe (return [])
-        (mapM (genOptionStruct ann) . S.toList) (M.lookup (DefinedType identifier) opts)
+        (mapM (genOptionStruct ann) . S.toList) (M.lookup (TDefinedType identifier) opts)
     return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : optsDeclExt
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
@@ -145,7 +145,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
             genParameterUnionField :: EnumVariant -> CHeaderGenerator CDeclaration
             genParameterUnionField (EnumVariant this_variant _) = do
                 paramsStructName <- genEnumParameterStructName identifier this_variant
-                paramsStructType <- genType noqual (DefinedType paramsStructName)
+                paramsStructType <- genType noqual (TDefinedType paramsStructName)
                 return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing
 
             genParameterUnion :: [EnumVariant] -> CHeaderGenerator CDeclaration
@@ -155,7 +155,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
 
             genEnumStruct :: Identifier -> [EnumVariant] -> CHeaderGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do
-                enumType <- genType noqual (DefinedType enumName)
+                enumType <- genType noqual (TDefinedType enumName)
                 let cAnn = buildDeclarationAnn ann True
                     enumField = CDecl (CTypeSpec enumType) (Just variant) Nothing
                 case variantsWithParams of
@@ -187,8 +187,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     fields' <- case clsKind of
         TaskClass -> return fields
         _ -> return $ filter (\case {
-            ClassField (FieldDefinition _ (SinkPort {})) _ -> False;
-            ClassField (FieldDefinition _ (InPort {})) _ -> False;
+            ClassField (FieldDefinition _ (TSinkPort {})) _ -> False;
+            ClassField (FieldDefinition _ (TInPort {})) _ -> False;
             _ -> True}) fields
     cFields <- mapM genClassField fields'
     cFunctions <- mapM genClassFunctionDeclaration functions
@@ -273,7 +273,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 genSelfCastStmt :: CSourceGenerator CCompoundBlockItem
                 genSelfCastStmt = do
                     let cAnn = buildGenericAnn ann
-                    selfCType <- flip CTPointer noqual <$> genType noqual (DefinedType identifier)
+                    selfCType <- flip CTPointer noqual <$> genType noqual (TDefinedType identifier)
                     let cExpr = CExprCast (CExprValOf (CVar thisParam (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn) selfCType cAnn
                     return $ CBlockDecl (CDecl (CTypeSpec selfCType) (Just selfVariable) (Just cExpr)) (buildDeclarationAnn ann True)
 

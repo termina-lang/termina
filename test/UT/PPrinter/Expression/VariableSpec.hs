@@ -11,13 +11,13 @@ import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 
 arrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxThreeDymArrayObjAnn = boxThreeDymArrayObjSemAnn Char (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+boxThreeDymArrayObjAnn = boxThreeDymArrayObjSemAnn TChar (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 var0, array0, array1 :: Object SemanticAnn
-var0 = Variable "var0" (objSemAnn Mutable UInt16)
+var0 = Variable "var0" (objSemAnn Mutable TUInt16)
 array0 = Variable "array0" arrayObjAnn
 array1 = Variable "array1" twoDymArrayObjAnn
 
@@ -48,7 +48,7 @@ spec = do
       renderExpression (AccessObject boxVar0) `shouldBe`
         pack "box_var0"
     it "Prints the unboxed variable box_var0 : 'box u16" $ do
-      renderExpression (AccessObject (Unbox boxVar0 (objSemAnn Mutable UInt16))) `shouldBe`
+      renderExpression (AccessObject (Unbox boxVar0 (objSemAnn Mutable TUInt16))) `shouldBe`
         pack "*(uint16_t *)box_var0.data"
     it "Prints the variable box_array1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject boxArray1) `shouldBe`

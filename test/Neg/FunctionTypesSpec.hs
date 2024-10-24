@@ -12,7 +12,7 @@ import Semantic.AST
 import Utils.Annotations
 
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe (Error TLocation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -55,21 +55,21 @@ spec = do
     it "Defining a box parameter" $ do
      runNegativeTest test0
        `shouldSatisfy`
-        isEInvalidParameterType "param0" (BoxSubtype UInt8)
+        isEInvalidParameterType "param0" (TBoxSubtype TUInt8)
     it "Defining a fixed size array parameter" $ do
       runNegativeTest test1
         `shouldSatisfy`
-          isEInvalidParameterType "param0" (Array UInt8 (K (TInteger 10 DecRepr)))
+          isEInvalidParameterType "param0" (TArray TUInt8 (K (TInteger 10 DecRepr)))
     it "Defining a fixed size array return type" $ do
       runNegativeTest test2
         `shouldSatisfy`
-          isEInvalidReturnType (Array UInt8 (K (TInteger 10 DecRepr)))
+          isEInvalidReturnType (TArray TUInt8 (K (TInteger 10 DecRepr)))
   
   where
-    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe (Error Location) -> Bool
+    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe (Error TLocation) -> Bool
     isEInvalidParameterType ident ts = 
       \case Just (EInvalidParameterType (Parameter ident' ts')) -> ident == ident' && ts == ts'; _ -> False
     
-    isEInvalidReturnType :: TerminaType -> Maybe (Error Location) -> Bool
+    isEInvalidReturnType :: TerminaType -> Maybe (Error TLocation) -> Bool
     isEInvalidReturnType ts = 
       \case Just (EInvalidReturnType ts') -> ts == ts'; _ -> False

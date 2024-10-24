@@ -21,11 +21,11 @@ unboxTMDescriptor1 :: Object SemanticAnn
 unboxTMDescriptor1 = Unbox tmDescriptor1 (definedTypeObjSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0, tmDescriptor1field0 :: Expression SemanticAnn
-tmDescriptor0field0 = AccessObject (MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable UInt32))
-tmDescriptor1field0 = AccessObject (MemberAccess unboxTMDescriptor1 "field0" (objSemAnn Mutable UInt32))
+tmDescriptor0field0 = AccessObject (MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable TUInt32))
+tmDescriptor1field0 = AccessObject (MemberAccess unboxTMDescriptor1 "field0" (objSemAnn Mutable TUInt32))
 
 pTMDescriptor0field0 :: Expression SemanticAnn
-pTMDescriptor0field0 = AccessObject (DereferenceMemberAccess pTMDescriptor0 "field0" (objSemAnn Mutable UInt32))
+pTMDescriptor0field0 = AccessObject (DereferenceMemberAccess pTMDescriptor0 "field0" (objSemAnn Mutable TUInt32))
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

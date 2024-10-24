@@ -12,14 +12,14 @@ import UT.PPrinter.Expression.Common
 
 var0 :: Expression SemanticAnn
 -- | var0 : u16
-var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt16))
+var0 = AccessObject (Variable "var0" (objSemAnn Mutable TUInt16))
 
 unboxVar1 :: Expression SemanticAnn
-unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable UInt16))
+unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable TUInt16))
 
 constUInt8, constUInt16 :: Expression SemanticAnn
-constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just UInt8)) uint8ExprSemAnn
-constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
+constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just TUInt8)) uint8ExprSemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
 
 var0LeftShiftConstant :: Expression SemanticAnn
 var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16ExprSemAnn

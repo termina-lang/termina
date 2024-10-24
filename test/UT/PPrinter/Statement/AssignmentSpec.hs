@@ -14,25 +14,25 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType
-tmDescriptorTS = DefinedType "TMDescriptor"
+tmDescriptorTS = TDefinedType "TMDescriptor"
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn
-optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable UInt32
+optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable TUInt32
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
-optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 arrayObjAnn, arrayTMDescriptorObjAnn, twoDymArrayRowObjAnn, twoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
 arrayTMDescriptorObjAnn = arrayObjSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowObjAnn = arrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+twoDymArrayRowObjAnn = arrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr))
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayRowExprAnn, twoDymArrayExprAnn  :: SemanticAnn
-arrayExprAnn = arrayExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayExprAnn = arrayExprSemAnn TUInt32 (K (TInteger 10 DecRepr))
 arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowExprAnn = arrayExprSemAnn Int64 (K (TInteger 5 DecRepr))
-twoDymArrayExprAnn = twoDymArrayExprSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (K (TInteger 5 DecRepr))
+twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 array1, array2, array3, array4, array5, array6 :: Object SemanticAnn
 array1 = Variable "array1" arrayObjAnn
@@ -51,11 +51,11 @@ array5Assign = AssignmentStmt array5 (ArrayInitializer (AccessObject (Variable "
 array6Assign = AssignmentStmt array6 (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo1, foo2 :: Object SemanticAnn
-foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
-foo2 = Variable "foo2" (objSemAnn Mutable UInt32)
+foo1 = Variable "foo1" (objSemAnn Mutable TUInt32)
+foo2 = Variable "foo2" (objSemAnn Mutable TUInt32)
 
 foo1Assign, foo2Assign :: Statement SemanticAnn
-foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))) undefined
+foo1Assign = AssignmentStmt foo1 (AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))) undefined
 foo2Assign = AssignmentStmt foo2 uint32Const0 undefined
 
 tmDescriptorObjSemAnn, messageObjSemAnn :: SemanticAnn
@@ -68,8 +68,8 @@ tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
 messageExprSemAnn = definedTypeExprSemAnn "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -111,11 +111,11 @@ option0 =  Variable "option0" optionBoxUInt32ObjSemAnn
 option1 =  Variable "option1" optionBoxUInt32ObjSemAnn
 
 unboxVar0 :: Object SemanticAnn
-unboxVar0 = Unbox boxVar0 (objSemAnn Mutable UInt32)
+unboxVar0 = Unbox boxVar0 (objSemAnn Mutable TUInt32)
 
 unboxVar0AssignFoo1, unboxVar0AssignConst :: Statement SemanticAnn
 unboxVar0AssignFoo1 = AssignmentStmt unboxVar0 (AccessObject foo1) stmtSemAnn
-unboxVar0AssignConst = AssignmentStmt unboxVar0 (Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32ExprSemAnn) stmtSemAnn
+unboxVar0AssignConst = AssignmentStmt unboxVar0 (Constant (I (TInteger 1024 DecRepr) (Just TUInt32)) uint32ExprSemAnn) stmtSemAnn
 
 option0Assign, option1Assign :: Statement SemanticAnn
 option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32ExprSemAnn) stmtSemAnn
@@ -140,12 +140,12 @@ spec = do
       renderStatement foo2Assign `shouldBe`
         pack "\nfoo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement option0 = Some(box_var0); where option0 : Option <'box u32>" $ do
+    it "Prints the statement option0 = Some(box_var0); where option0 : TOption <'box u32>" $ do
       renderStatement option0Assign `shouldBe`
         pack (
           "\noption0.__variant = Some;\n" ++
           "option0.Some.__0 = box_var0;")
-    it "Prints the statement option1 = None; where option1 : Option <'box u32>" $ do
+    it "Prints the statement option1 = None; where option1 : TOption <'box u32>" $ do
       renderStatement option1Assign `shouldBe`
         pack "\noption1.__variant = None;"
   describe "Pretty printing enum variable declarations" $ do

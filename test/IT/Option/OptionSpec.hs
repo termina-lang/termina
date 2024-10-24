@@ -41,7 +41,7 @@ test0 = "task class CHousekeeping {\n" ++
         "};\n"
 
 test0OptionMap :: OptionMap
-test0OptionMap = M.fromList [(UInt32, S.fromList [Option UInt32])]
+test0OptionMap = M.fromList [(TUInt32, S.fromList [TOption TUInt32])]
 
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of

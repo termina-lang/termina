@@ -121,9 +121,9 @@ type Expression = Expression' Object
 type BasicBlock = BasicBlock' Expression Object
 
 type Block = Block' Expression Object
-type AnnASTElement = AnnASTElement' Block Expression
+type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression
-type Global = Global' Expression
+type Global = Global' TerminaType Expression
 
 type TypeDef = TypeDef' Block
 
@@ -133,7 +133,7 @@ type MatchCase = MatchCase' Expression Object
 type ElseIf = ElseIf' Expression Object
 type Statement = Statement' Expression Object
 
-type AnnotatedProgram a = [AnnASTElement' Block Expression a]
+type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
 
 type Module = Module' QualifiedName
-type TerminaModule = TerminaModule' Block Expression QualifiedName 
+type TerminaModule = TerminaModule' TerminaType Block Expression QualifiedName 

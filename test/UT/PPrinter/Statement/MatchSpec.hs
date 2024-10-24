@@ -16,43 +16,43 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn
-optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable UInt32
+optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable TUInt32
 
 arrayObjAnn, boxArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-boxArrayObjAnn = boxArrayObjSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr))
 
 param0, param1 :: Object SemanticAnn
 param0 = Variable "param0" boxUInt32SemAnn
 param1 = Variable "param1" boxArrayObjAnn
 
 uint32Const0 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 usizeConst0x8 :: Expression SemanticAnn
-usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just USize)) usizeExprSemAnn
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just TUSize)) usizeExprSemAnn
 
 optionVar :: Expression SemanticAnn
 optionVar = AccessObject (Variable "option_var" optionBoxUInt32ObjSemAnn)
 
 array0IndexConstant :: Expression SemanticAnn
-array0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 arrayObjAnn) usizeConst0x8 (objSemAnn Mutable UInt32))
+array0IndexConstant = AccessObject (ArrayIndexExpression (Unbox param1 arrayObjAnn) usizeConst0x8 (objSemAnn Mutable TUInt32))
 
 foo1 :: Object SemanticAnn
-foo1 = Variable "foo1" (objSemAnn Mutable UInt32)
+foo1 = Variable "foo1" (objSemAnn Mutable TUInt32)
 
 param0ToFoo1, constToFoo1 :: Statement SemanticAnn
-param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Unbox param0 (objSemAnn Mutable UInt32))) stmtSemAnn
+param0ToFoo1 = AssignmentStmt foo1 (AccessObject (Unbox param0 (objSemAnn Mutable TUInt32))) stmtSemAnn
 constToFoo1 = AssignmentStmt foo1 uint32Const0 stmtSemAnn
 
 matchCaseSome0 :: MatchCase SemanticAnn
-matchCaseSome0 = MatchCase "Some" ["param0"] (Block [param0ToFoo1] stmtSemAnn) (matchCaseSemAnn [BoxSubtype UInt32])
+matchCaseSome0 = MatchCase "Some" ["param0"] (Block [param0ToFoo1] stmtSemAnn) (matchCaseSemAnn [TBoxSubtype TUInt32])
 
 param1ToFoo1 :: Statement SemanticAnn
 param1ToFoo1 = AssignmentStmt foo1 array0IndexConstant stmtSemAnn
 
 matchCaseSome1 :: MatchCase SemanticAnn
-matchCaseSome1 = MatchCase "Some" ["param1"] (Block [param1ToFoo1] stmtSemAnn) (matchCaseSemAnn [BoxSubtype (Array UInt32 (K (TInteger 10 DecRepr)))])
+matchCaseSome1 = MatchCase "Some" ["param1"] (Block [param1ToFoo1] stmtSemAnn) (matchCaseSemAnn [TBoxSubtype (TArray TUInt32 (K (TInteger 10 DecRepr)))])
 
 matchCaseNone :: MatchCase SemanticAnn
 matchCaseNone = MatchCase "None" [] (Block [constToFoo1] stmtSemAnn) (matchCaseSemAnn [])
@@ -73,7 +73,7 @@ matchOption1 :: Statement SemanticAnn
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnn
-getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (Option (BoxSubtype UInt32)))) Internal)
+getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
 
 matchOption2 :: Statement SemanticAnn
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn

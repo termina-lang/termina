@@ -653,7 +653,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The binary operation \x1b[31m" <> showText op <>
-                    "\x1b[0m will result in a value of type \x1b[31m" <> showText Bool <>
+                    "\x1b[0m will result in a value of type \x1b[31m" <> showText TBool <>
                     "\x1b[0m but it is expected to be of type \x1b[31m" <> showText ty <> "\x1b[0m."))
     EBinOpLeftTypeNotBool op ty ->
         let title = "\x1b[31merror [SE-045]\x1b[0m: binary operation expected boolean type on the left."
@@ -662,7 +662,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TBool <> "\x1b[0m."))
     EBinOpRightTypeNotBool op ty ->
         let title = "\x1b[31merror [SE-046]\x1b[0m: binary operation expected boolean type on the right."
         in
@@ -670,7 +670,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
                     "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText Bool <> "\x1b[0m."))
+                    "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TBool <> "\x1b[0m."))
     EBinOpExpectedTypeNotNum op ty ->
         let title = "\x1b[31merror [SE-047]\x1b[0m: binary operation expected result type not numeric."
         in
@@ -819,7 +819,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use an array initializer in an invalid context.\n" <>
-                        "Array initializers can only be used to initialize array objects.")
+                        "TArray initializers can only be used to initialize array objects.")
     EArrayInitializerNotArray ty ->
         let title = "\x1b[31merror [SE-068]\x1b[0m: assignment of an array initializer to a non-array type."
         in
@@ -834,7 +834,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just $ "You are trying to use an array expression list initializer in an invalid context.\n" <>
-                        "Array expression list initializers can only be used to initialize array objects.")
+                        "TArray expression list initializers can only be used to initialize array objects.")
     EArrayExprListInitializerNotArray ty ->
         let title = "\x1b[31merror [SE-070]\x1b[0m: assignment of an array expression list initializer to a non-array type."
         in

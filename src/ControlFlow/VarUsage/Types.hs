@@ -8,12 +8,12 @@ import Utils.Errors
 -- Unless the method is a /procedure/, in which case, it can take boxes as
 -- arguments.
 data MVars
-  = Defined Location
-  | Allocated Location
-  | Moved Location
+  = Defined TLocation
+  | Allocated TLocation
+  | Moved TLocation
   deriving (Show)
 
-getLocation :: MVars -> Location
+getLocation :: MVars -> TLocation
 getLocation (Defined loc) = loc
 getLocation (Allocated loc) = loc
 getLocation (Moved loc) = loc

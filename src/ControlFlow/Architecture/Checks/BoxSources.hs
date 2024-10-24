@@ -14,7 +14,7 @@ import qualified Data.Map as M
 
 type BoxCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
-checkNextSource :: Location -> BoxCheckMonad () -> BoxCheckMonad ()
+checkNextSource :: TLocation -> BoxCheckMonad () -> BoxCheckMonad ()
 checkNextSource loc = withExceptT (\case {
         AnnotatedError (EMismatchedBoxSource expectedSource actualSource traceLocations) lastLocation ->
             AnnotatedError (EMismatchedBoxSource expectedSource actualSource (loc : traceLocations)) lastLocation;
@@ -117,7 +117,7 @@ getBoxSourceChannel ::
     Identifier -- ^ Expected source of the box
     -> TPChannel SemanticAnn -- ^ The channel from which the box is being received
     -> BoxCheckMonad ()
-getBoxSourceChannel expectedSource (TPMsgQueue channelId (BoxSubtype _) _ _ _) = do
+getBoxSourceChannel expectedSource (TPMsgQueue channelId (TBoxSubtype _) _ _ _) = do
     -- | First we need to get check if the current channel has been already visited
     progArchitecture <- ask
     let sources = channelSources progArchitecture

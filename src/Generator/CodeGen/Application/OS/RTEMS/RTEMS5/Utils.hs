@@ -84,8 +84,8 @@ genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
 
         ports = foldr (\field acc ->
                         case field of
-                            ClassField (FieldDefinition prt (SinkPort {})) _ -> prt : acc
-                            ClassField (FieldDefinition prt (InPort {})) _ -> prt : acc
+                            ClassField (FieldDefinition prt (TSinkPort {})) _ -> prt : acc
+                            ClassField (FieldDefinition prt (TInPort {})) _ -> prt : acc
                             _ -> acc ) [] members
 
         genDefineVariantsForPorts :: [Identifier] -> CSourceGenerator [CFileItem]

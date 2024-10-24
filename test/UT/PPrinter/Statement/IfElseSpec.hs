@@ -14,16 +14,16 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 optionBoxUInt32TS :: TerminaType
-optionBoxUInt32TS = Option (BoxSubtype UInt32)
+optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
 
 arrayTS :: TerminaType
-arrayTS = Array UInt32 (K (TInteger 10 DecRepr))
+arrayTS = TArray TUInt32 (K (TInteger 10 DecRepr))
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
-optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 arrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
 
 array0 :: Expression SemanticAnn
 array0 = AccessObject (Variable "array0" arrayObjAnn)
@@ -32,14 +32,14 @@ array1 :: Statement SemanticAnn
 array1 = Declaration "array1" Mutable arrayTS array0 stmtSemAnn
 
 foo0 :: Expression SemanticAnn
-foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
+foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 constToFoo0 :: Statement SemanticAnn
-constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable UInt32)) uint32Const0 stmtSemAnn
+constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable TUInt32)) uint32Const0 stmtSemAnn
 
 boxVar0 :: Expression SemanticAnn
 boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)

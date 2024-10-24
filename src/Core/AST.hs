@@ -21,7 +21,7 @@ data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
 
 -- | Annotated AST element
-data AnnASTElement' blk expr a =
+data AnnASTElement' ty blk expr a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
@@ -33,7 +33,7 @@ data AnnASTElement' blk expr a =
 
   -- | Global declaration constructor
   | GlobalDeclaration
-    (Global' expr a) -- ^ the global object
+    (Global' ty expr a) -- ^ the global object
 
   -- | Type definition constructor
   | TypeDefinition
@@ -41,7 +41,7 @@ data AnnASTElement' blk expr a =
     a
   deriving (Show,Functor)
 
-instance Annotated (AnnASTElement' blk expr) where
+instance Annotated (AnnASTElement' ty blk expr) where
   getAnnotation (Function _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
@@ -67,34 +67,57 @@ type Identifier = String
 -- | Addresses as `Integer`
 type Address = TInteger
 
+data TypeParameter =
+  TypeParamName Identifier
+  | TypeParamSize Size
+  deriving (Show, Ord, Eq)
+
+data TypeSpecifier
+  = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
+  | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
+  | TSBool | TSChar 
+  | TSDefinedType [TypeParameter] Identifier
+  -- Non-primitive types
+  | TSReference AccessKind TypeSpecifier
+  | TSBoxSubtype TypeSpecifier
+  -- | Fixed-location types
+  | TSLocation TypeSpecifier
+  -- | Port types
+  | TSAccessPort TypeSpecifier
+  | TSSinkPort TypeSpecifier Identifier
+  | TSInPort TypeSpecifier Identifier
+  | TSOutPort TypeSpecifier  
+  | TSUnit
+  deriving (Show, Ord, Eq)
+
 -- | Termina types
 data TerminaType
   -- Primitive types
-  = UInt8 | UInt16 | UInt32 | UInt64
-  | Int8 | Int16 | Int32 | Int64 | USize
-  | Bool | Char | DefinedType Identifier
-  | Array TerminaType Size
-  | Option TerminaType
+  = TUInt8 | TUInt16 | TUInt32 | TUInt64
+  | TInt8 | TInt16 | TInt32 | TInt64 | TUSize
+  | TBool | TChar | TDefinedType Identifier
+  | TArray TerminaType Size
+  | TOption TerminaType
   -- Built-in polymorphic types
-  | MsgQueue TerminaType Size -- Message queues
-  | Pool TerminaType Size -- Memory pools
-  | Atomic TerminaType -- Atomic variables
-  | AtomicArray TerminaType Size -- Atomic arrays
-  | Allocator TerminaType -- Interface of memory pools
-  | AtomicAccess TerminaType -- Interface to access atomic variables
-  | AtomicArrayAccess TerminaType Size -- Interface to access atomic arrays
+  | TMsgQueue TerminaType Size -- Message queues
+  | TPool TerminaType Size -- Memory pools
+  | TAtomic TerminaType -- TAtomic variables
+  | TAtomicArray TerminaType Size -- TAtomic arrays
+  | TAllocator TerminaType -- Interface of memory pools
+  | TAtomicAccess TerminaType -- Interface to access atomic variables
+  | TAtomicArrayAccess TerminaType Size -- Interface to access atomic arrays
   -- Non-primitive types
-  | Reference AccessKind TerminaType
-  | BoxSubtype TerminaType
+  | TReference AccessKind TerminaType
+  | TBoxSubtype TerminaType
   -- | Fixed-location types
-  | Location TerminaType
+  | TLocation TerminaType
   -- | Port types
-  | AccessPort TerminaType
-  | SinkPort TerminaType Identifier
-  | InPort TerminaType Identifier
-  | OutPort TerminaType
+  | TAccessPort TerminaType
+  | TSinkPort TerminaType Identifier
+  | TInPort TerminaType Identifier
+  | TOutPort TerminaType
   -- See Q9
-  | Unit
+  | TUnit
   deriving (Show, Ord, Eq)
 
 data AccessKind = Immutable | Mutable | Private
@@ -138,33 +161,33 @@ data OptionVariantLabel = NoneLabel | SomeLabel
 -- There are three types of global declarations:
 -- - global objects  (tasks, resources or handlers)
 -- - constants
-data Global' expr a
+data Global' ty expr a
   =
     -- | Task global variable constructor
     Task
       Identifier -- ^ name of the task
-      TerminaType -- ^ type of the variable
+      ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
     -- | Shared resource global variable constructor
     | Resource
       Identifier -- ^ name of the variable
-      TerminaType -- ^ type of the variable
+      ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Channel
       Identifier -- ^ name of the variable
-      TerminaType -- ^ type of the variable
+      ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Emitter
       Identifier -- ^ name of the variable
-      TerminaType -- ^ type of the variable
+      ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -172,7 +195,7 @@ data Global' expr a
     -- | Handler global variable constructor
     | Handler
       Identifier -- ^ name of the variable
-      TerminaType -- ^ type of the variable
+      ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
@@ -180,14 +203,14 @@ data Global' expr a
     -- | Constant constructor
     | Const
       Identifier -- ^ name of the constant
-      TerminaType -- ^ type of the constant
+      ty -- ^ type of the constant
       (expr a) -- ^ initialization expression
       [ Modifier ] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
   deriving (Show, Functor)
 
-instance Annotated (Global' expr) where
+instance Annotated (Global' ty expr) where
   getAnnotation (Task _ _ _ _ a) = a
   getAnnotation (Resource _ _ _ _ a)   = a
   getAnnotation (Channel _ _ _ _ a)    = a
@@ -296,9 +319,9 @@ data Const = B Bool | I TInteger (Maybe TerminaType) | C Char
 ----------------------------------------
 -- Termina Programs definitions
 
-data TerminaModule' blk expr pf a = Termina
+data TerminaModule' ty blk expr pf a = Termina
   { modules :: [ Module' pf]
-  , frags :: [ AnnASTElement' blk expr a ] }
+  , frags :: [ AnnASTElement' ty blk expr a ] }
   deriving Show
 
-type AnnotatedProgram' blk expr a = [AnnASTElement' blk expr a]
+type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty blk expr a]

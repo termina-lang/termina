@@ -23,7 +23,7 @@ struct id0 {
 };
 -}
 structWithOneField :: AnnASTElement SemanticAnn
-structWithOneField = TypeDefinition (Struct "id0" [FieldDefinition "field0" UInt8] []) undefined
+structWithOneField = TypeDefinition (Struct "id0" [FieldDefinition "field0" TUInt8] []) undefined
 
 {- | Struct type with two fields.
 In Termina's concrete sytax:
@@ -35,8 +35,8 @@ struct id0 {
 structWithTwoFields :: AnnASTElement SemanticAnn
 structWithTwoFields = TypeDefinition
   (Struct "id0" [
-    FieldDefinition "field0" UInt8,
-    FieldDefinition "field1" UInt16
+    FieldDefinition "field0" TUInt8,
+    FieldDefinition "field1" TUInt16
   ] []) undefined
 
 {- | Packed Struct type.
@@ -51,9 +51,9 @@ struct id0 {
 packedStruct :: AnnASTElement SemanticAnn
 packedStruct = TypeDefinition
   (Struct "id0" [
-    FieldDefinition "field0" UInt8,
-    FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
+    FieldDefinition "field0" TUInt8,
+    FieldDefinition "field1" TUInt16,
+    FieldDefinition "field2" (TArray TUInt32 (K (TInteger 10 DecRepr)))
   ] [Modifier "packed" Nothing]) undefined
 
 {- | Aligned Struct type.
@@ -68,10 +68,10 @@ struct id0 {
 alignedStruct :: AnnASTElement SemanticAnn
 alignedStruct = TypeDefinition
   (Struct "id0" [
-    FieldDefinition "field0" UInt8,
-    FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
-  ] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))]) undefined
+    FieldDefinition "field0" TUInt8,
+    FieldDefinition "field1" TUInt16,
+    FieldDefinition "field2" (TArray TUInt32 (K (TInteger 10 DecRepr)))
+  ] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) undefined
 
 {- | Aligned Struct type.
 In Termina's concrete sytax:
@@ -86,12 +86,12 @@ struct id0 {
 packedAndAlignedStruct :: AnnASTElement SemanticAnn
 packedAndAlignedStruct = TypeDefinition
   (Struct "id0" [
-    FieldDefinition "field0" UInt8,
-    FieldDefinition "field1" UInt16,
-    FieldDefinition "field2" (Array UInt32 (K (TInteger 10 DecRepr)))
+    FieldDefinition "field0" TUInt8,
+    FieldDefinition "field1" TUInt16,
+    FieldDefinition "field2" (TArray TUInt32 (K (TInteger 10 DecRepr)))
   ] [
       Modifier "packed" Nothing,
-      Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just UInt32)))
+      Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))
     ]) undefined
 
 renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
@@ -107,7 +107,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypeDefinitionDecl (M.fromList [(DefinedType "id0", S.fromList [Option (DefinedType "id0")])]) structWithOneField `shouldBe`
+       renderTypeDefinitionDecl (M.fromList [(TDefinedType "id0", S.fromList [TOption (TDefinedType "id0")])]) structWithOneField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++

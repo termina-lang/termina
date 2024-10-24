@@ -36,7 +36,7 @@ doesBlockExit (MatchBlock _ cases _) =
             prevState && doesBlockExit (last (blockBody blocks))) True cases
 doesBlockExit _ = False
 
-checkBlockPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPathsCheckST
+checkBlockPaths :: TLocation -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPathsCheckST
 checkBlockPaths loc stmts = do
     step <- get
     case step of
@@ -62,7 +62,7 @@ checkBlockPaths loc stmts = do
                 (_ : xb) -> checkBlockPaths loc xb
         _ -> throwError $ annotateError Internal EEInvalidCheckState
 
-checkActionPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPathsCheckST
+checkActionPaths :: TLocation -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPathsCheckST
 checkActionPaths loc stmts = do
     step <- get
     case step of

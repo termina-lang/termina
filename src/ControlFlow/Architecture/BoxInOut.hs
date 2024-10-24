@@ -88,7 +88,7 @@ inOutBasicBlock (MatchBlock eMatch cases _) = do
     case eTy of
         -- | If the match expression is an option box, we need to destroy the box
         -- and propagate the box to the Some case
-        Option (BoxSubtype _) -> do
+        TOption (TBoxSubtype _) -> do
             -- | First we need to obtain the name of the option box variable, so that
             -- we can look for the port where its box came from.
             optionBox <- getExprOptionBoxName eMatch
@@ -99,7 +99,7 @@ inOutBasicBlock (MatchBlock eMatch cases _) = do
 inOutBasicBlock (SendMessage obj arg ann) = do
     msgTy <- getExprType arg
     case msgTy of
-        BoxSubtype _ -> do
+        TBoxSubtype _ -> do
             outPt <- getPortName obj
             boxName <- getExprBoxName arg
             boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
@@ -112,7 +112,7 @@ inOutBasicBlock (ProcedureCall obj procId args ann) = do
 
     where
         checkArg argNum argTy = case argTy of
-            BoxSubtype _ -> do
+            TBoxSubtype _ -> do
                 outPt <- getPortName obj
                 boxName <- getExprBoxName (args !! argNum)
                 boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
@@ -130,7 +130,7 @@ inOutClassMember _ (ClassViewer {}) = return ()
 inOutClassMember actionsToPorts (ClassAction name input _ body _ann) = do
     clearInputScope
     case paramTerminaType input of
-        (BoxSubtype _) -> do
+        (TBoxSubtype _) -> do
             let inPt = actionsToPorts M.! name
             addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt))
             inOutBasicBlocks body
@@ -144,7 +144,7 @@ inOutClassMember _ (ClassProcedure name params body _ann) = do
 
         addInParam :: Integer -> Parameter -> BoxInOutMonad ()
         addInParam argNum param = case paramTerminaType param of
-            BoxSubtype _ -> do
+            TBoxSubtype _ -> do
                 addBox (paramIdentifier param) (InBoxProcedureCall name argNum)
             _ -> return ()
 
@@ -154,12 +154,12 @@ inOutClass (Class _ _ members _ _) = do
     let actionsToPorts = M.fromList $ 
             (map (
                 \case {
-                    ClassField field@(FieldDefinition _ (InPort _ action)) _ -> (action, field);
-                    ClassField field@(FieldDefinition _ (SinkPort _ action)) _ -> (action, field);
+                    ClassField field@(FieldDefinition _ (TInPort _ action)) _ -> (action, field);
+                    ClassField field@(FieldDefinition _ (TSinkPort _ action)) _ -> (action, field);
                     _ -> error "This should not happen"
                 }) . filter (\case {
-                ClassField (FieldDefinition _ (InPort {})) _ -> True;
-                ClassField (FieldDefinition _ (SinkPort {})) _ -> True;
+                ClassField (FieldDefinition _ (TInPort {})) _ -> True;
+                ClassField (FieldDefinition _ (TSinkPort {})) _ -> True;
                 _ -> False
              })) members
     mapM_ (inOutClassMember actionsToPorts) members

@@ -15,20 +15,20 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType
-tmDescriptorTS = DefinedType "TMDescriptor"
+tmDescriptorTS = TDefinedType "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnn
 -- | 1024 : u32
-constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just UInt32)) uint32ExprSemAnn
+constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 arrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
 
 arrayExprAnn :: SemanticAnn
-arrayExprAnn = arrayExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayExprAnn = arrayExprSemAnn TUInt32 (K (TInteger 10 DecRepr))
 
 refArrayAnn :: SemanticAnn
-refArrayAnn = refArraySemAnn UInt32 (K (TInteger 10 DecRepr))
+refArrayAnn = refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))
 
 tmDescriptorObjSemAnn :: SemanticAnn
 tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
@@ -38,8 +38,8 @@ structAExprSemAnn = definedTypeExprSemAnn "StructA"
 tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -53,14 +53,14 @@ structAFieldsInit0 =
 structAFieldsInit1 :: Expression SemanticAnn
 structAFieldsInit1 = 
     StructInitializer
-        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable TUInt32))) stmtSemAnn,
          FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
 structAFieldsInit3 :: Expression SemanticAnn
 structAFieldsInit3 = 
     StructInitializer
-        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable UInt32))) stmtSemAnn,
+        [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable TUInt32))) stmtSemAnn,
          FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) arrayObjAnn)) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
 
@@ -92,10 +92,10 @@ struct0 :: Object SemanticAnn
 struct0 = Variable "struct0" tmDescriptorObjSemAnn
 
 struct0field0 :: Expression SemanticAnn
-struct0field0 = AccessObject (MemberAccess struct0 "field0" (objSemAnn Mutable UInt32))
+struct0field0 = AccessObject (MemberAccess struct0 "field0" (objSemAnn Mutable TUInt32))
 
 struct0Assignment0 :: Statement SemanticAnn
-struct0Assignment0 = AssignmentStmt (MemberAccess struct0 "field0" (objSemAnn Mutable UInt32)) (BinOp Addition struct0field0 constUInt32 uint32ExprSemAnn) unitSemAnn
+struct0Assignment0 = AssignmentStmt (MemberAccess struct0 "field0" (objSemAnn Mutable TUInt32)) (BinOp Addition struct0field0 constUInt32 uint32ExprSemAnn) unitSemAnn
 
 returnVoid :: Statement SemanticAnn
 returnVoid = ReturnStmt Nothing unitSemAnn
@@ -107,10 +107,10 @@ function0 :: AnnASTElement SemanticAnn
 function0 = Function "function0" [] Nothing (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnVoid] stmtSemAnn) [] unitSemAnn
 
 function1 :: AnnASTElement SemanticAnn
-function1 = Function "function1" [] (Just UInt32) (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnStructField0] stmtSemAnn) [] unitSemAnn
+function1 = Function "function1" [] (Just TUInt32) (Block [struct0Declaration0, struct1Declaration, struct0Assignment0, returnStructField0] stmtSemAnn) [] unitSemAnn
 
 function2 :: AnnASTElement SemanticAnn
-function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
+function2 = Function "function2" [Parameter "param0" TUInt32] (Just TUInt32)
   (Block [
     struct0Declaration1, 
     struct1Declaration, 
@@ -118,7 +118,7 @@ function2 = Function "function2" [Parameter "param0" UInt32] (Just UInt32)
     returnStructField0] stmtSemAnn) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnn
-function3 = Function "function3" [Parameter "param0" UInt32, Parameter "param1" (Reference Mutable (Array UInt32 (K (TInteger 10 DecRepr))))] (Just UInt32) 
+function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1" (TReference Mutable (TArray TUInt32 (K (TInteger 10 DecRepr))))] (Just TUInt32) 
   (Block [
     struct0Declaration2, 
     struct1Declaration, 

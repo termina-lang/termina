@@ -18,10 +18,10 @@ data ExitCheckError =
     | EEActionIfBlockMissingElseExit -- ^ Missing else exit on an action if block (EE-012)
     deriving (Show)
 
-type PathsCheckError = AnnotatedError ExitCheckError Location
+type PathsCheckError = AnnotatedError ExitCheckError TLocation
 
 data TaskBoxAllocationError = 
     TBAEInvalidFree Identifier -- ^ Freeing a box into a different port (TBAE-001)
     | TBAEBoxSendBoxDifferentAllocators Identifier -- ^ Sending boxes from different allocators (TBAE-002)
 
-type TBACheckError = AnnotatedError TaskBoxAllocationError Location
+type TBACheckError = AnnotatedError TaskBoxAllocationError TLocation

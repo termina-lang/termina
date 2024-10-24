@@ -12,14 +12,14 @@ import Generator.LanguageC.Printer
 
 var0 :: Expression SemanticAnn
 -- | var0 : u16
-var0 = AccessObject (Variable "var0" (objSemAnn Mutable UInt16))
+var0 = AccessObject (Variable "var0" (objSemAnn Mutable TUInt16))
 
 unboxVar1 :: Expression SemanticAnn
-unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable UInt16))
+unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable TUInt16))
 
 constUInt16 :: Expression SemanticAnn
 -- | 1024 : u16
-constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just UInt16)) uint16ExprSemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
 
 var0PlusConstant :: Expression SemanticAnn
 -- | var0 + 1024 : u16

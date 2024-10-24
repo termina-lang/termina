@@ -62,7 +62,7 @@ genObject o@(Dereference obj _ann) = do
     cObj <- genObject obj
     case typeObj of
         -- | A dereference to an array is printed as the name of the array
-        (Reference _ (Array _ _)) -> return cObj
+        (TReference _ (TArray _ _)) -> return cObj
         _ -> do
             ctype <- getObjType o >>= genType noqual
             return $ CDeref cObj ctype
@@ -75,12 +75,12 @@ genObject o@(Unbox obj ann) = do
     cObj <- genObject obj
     case typeObj of
         -- | If it is an arrayy, we need to generate the address of the data
-        (BoxSubtype ty@(Array _ _)) -> do
+        (TBoxSubtype ty@(TArray _ _)) -> do
             -- We must obtain the declaration specifier of the array
             ctype <- genType noqual ty
             return $ CObjCast (CField cObj "data" dataFieldCType) ctype cAnn
             -- | Else, we print the derefence to the data
-        (BoxSubtype ty) -> do
+        (TBoxSubtype ty) -> do
             ctype <- genType noqual ty
             let cptrtype = CTPointer ctype noqual
             return $ CDeref (CObjCast (CField cObj "data" dataFieldCType) cptrtype cAnn) ctype
@@ -112,14 +112,14 @@ genMemberFunctionAccess obj ident args ann = do
     -- | Obtain the type of the object
     typeObj <- getObjType obj
     case typeObj of
-        (Reference _ ts) ->
+        (TReference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
-                (DefinedType classId) ->
+                (TDefinedType classId) ->
                     return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
-        (DefinedType classId) ->
+        (TDefinedType classId) ->
             case obj of
                 (Dereference _ _) ->
                     let selfCType = CTPointer (CTStruct CStructTag classId noqual) noqual in
@@ -136,7 +136,7 @@ genExpression (AccessObject obj) = do
     cObj <- genObject obj
     cObjType <- getObjType obj
     case cObjType of
-        (Location _) -> do
+        (TLocation _) -> do
             return $ CExprValOf (CDeref cObj (getCObjType cObj)) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
         _ -> 
             return $ CExprValOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
@@ -196,18 +196,18 @@ genExpression (ReferenceExpression _ obj ann) = do
     cObj <- genObject obj
     case typeObj of
         -- | If it is an array, we need to generate the address of the data
-        (BoxSubtype ty@(Array {})) -> do
+        (TBoxSubtype ty@(TArray {})) -> do
             -- We must obtain the declaration specifier of the array
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
             return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
             -- | Else, we print the address to the data
-        (BoxSubtype ty) -> do
+        (TBoxSubtype ty) -> do
             cType <- genType noqual ty
             let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
                 ptrTy = CTPointer cType noqual
             return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
-        (Array {}) -> return $ CExprValOf cObj (getCObjType cObj) cAnn
+        (TArray {}) -> return $ CExprValOf cObj (getCObjType cObj) cAnn
         ty -> do
             cType <- genType noqual ty
             return $ CExprAddrOf cObj (CTPointer cType noqual) cAnn
@@ -247,7 +247,7 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
 genExpression (ArraySliceExpression _ak obj lower _rb _ann) = do
     cObjType <- getObjType obj
     case cObjType of
-        (Array ty _) -> do
+        (TArray ty _) -> do
             cObj <- genObject obj
             cLower <- genExpression lower
             cType <- genType noqual ty

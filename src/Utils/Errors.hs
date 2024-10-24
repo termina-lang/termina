@@ -48,35 +48,35 @@ instance ShowText Op where
     showText LogicalOr = "||"
 
 instance ShowText TerminaType where
-    showText UInt8 = "u8"
-    showText UInt16 = "u16"
-    showText UInt32 = "u32"
-    showText UInt64 = "u64"
-    showText Int8 = "i8"
-    showText Int16 = "i16"
-    showText Int32 = "i32"
-    showText Int64 = "i64"
-    showText USize = "usize"
-    showText Bool = "bool"
-    showText Char = "char"
-    showText (DefinedType ident) = T.pack ident
-    showText (Array ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
-    showText (Option ts) = "Option<" <> showText ts <> ">"
-    showText (MsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
-    showText (Pool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
-    showText (Allocator ts) = "Allocator<" <> showText ts <> ">"
-    showText (AtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
-    showText (AtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
-    showText (Atomic ts) = "Atomic<" <> showText ts <> ">"
-    showText (AtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
-    showText (Reference ak ts) = "&" <> showText ak <> showText ts
-    showText (BoxSubtype ts) = "box " <> showText ts
-    showText (Location ts) = "loc " <> showText ts
-    showText (AccessPort ts) = "access " <> showText ts
-    showText (SinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
-    showText (InPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
-    showText (OutPort ts) = "out " <> showText ts
-    showText Unit = "()"
+    showText TUInt8 = "u8"
+    showText TUInt16 = "u16"
+    showText TUInt32 = "u32"
+    showText TUInt64 = "u64"
+    showText TInt8 = "i8"
+    showText TInt16 = "i16"
+    showText TInt32 = "i32"
+    showText TInt64 = "i64"
+    showText TUSize = "usize"
+    showText TBool = "bool"
+    showText TChar = "char"
+    showText (TDefinedType ident) = T.pack ident
+    showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (TOption ts) = "Option<" <> showText ts <> ">"
+    showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TPool ts size) = "TPool<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TAllocator ts) = "Allocator<" <> showText ts <> ">"
+    showText (TAtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
+    showText (TAtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TAtomic ts) = "Atomic<" <> showText ts <> ">"
+    showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TReference ak ts) = "&" <> showText ak <> showText ts
+    showText (TBoxSubtype ts) = "box " <> showText ts
+    showText (TLocation ts) = "loc " <> showText ts
+    showText (TAccessPort ts) = "access " <> showText ts
+    showText (TSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (TInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (TOutPort ts) = "out " <> showText ts
+    showText TUnit = "()"
 
 instance ShowText Const where
     showText (I (TInteger value DecRepr) Nothing) = T.pack $ show value
@@ -99,7 +99,7 @@ instance ShowText (TypeDef' blk a) where
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
     showText (Interface ident _ _) = T.pack $ "interface " <> ident
 
-printSimpleError :: TL.Text -> T.Text -> String -> Location -> Maybe T.Text -> IO ()
+printSimpleError :: TL.Text -> T.Text -> String -> TLocation -> Maybe T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName (Position start end) msg = 
     TLIO.putStrLn $ prettyErrors 
         sourceLines

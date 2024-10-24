@@ -38,131 +38,33 @@ lexer = Tok.makeTokenParser langDef
       ,"i8","i16","i32","i64"
       ,"usize", "bool","char"]
       ++ -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
-              -- Polymorphic Types
              ["MsgQueue", "Pool", "Option", "Allocator", "Atomic",
               "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
       ++ -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
-              -- Struct and enum types
              ["struct", "enum"]
       ++ -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
-              -- Box Subtyping
              ["box"]
-      ++ -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
-              -- Fixed Location Subtyping
+      ++ -- Fixed TLocation Subtyping
              ["loc"]
       ++ -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
-              -- Ports Subtyping
              ["access", "sink", "in", "out"]
       ++ -- Global declarations
-              -- Global declarations
-              -- Global declarations
-              -- Global declarations
-              -- Global declarations
-              -- Global declarations
-              -- Global declarations
-              -- Global declarations
              ["task", "function", "handler", "resource", "const"]
       ++ -- Stmt
-              -- Stmt
-              -- Stmt
-              -- Stmt
-              -- Stmt
-              -- Stmt
-              -- Stmt
-              -- Stmt
              ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
-              -- Trigger
-              -- Trigger
-              -- Trigger
-              -- Trigger
-              -- Trigger
-              -- Trigger
-              -- Trigger
              ["triggers"]
       ++ -- Provide
-              -- Provide
-              -- Provide
-              -- Provide
-              -- Provide
-              -- Provide
-              -- Provide
-              -- Provide
              ["provides"]
       ++ -- Constants
-              -- Constants
-              -- Constants
-              -- Constants
-              -- Constants
-              -- Constants
-              -- Constants
-              -- Constants
              ["true", "false"]
       ++ -- Modules
-              -- Modules
-              -- Modules
-              -- Modules
-              -- Modules
-              -- Modules
-              -- Modules
-              -- Modules
              ["import"]
       ++ -- Class methods
-              -- Class methods
-              -- Class methods
-              -- Class methods
-              -- Class methods
-              -- Class methods
-              -- Class methods
-              -- Class methods
              ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
-              -- Casting keyword
              ["as"]
       ++ -- option name
-              -- option name
-              -- option name
-              -- option name
-              -- option name
-              -- option name
-              -- option name
-              -- option name
              ["option"]
       ++ -- is variant operator
              ["is"]
@@ -205,13 +107,13 @@ lexer = Tok.makeTokenParser langDef
                       ,"=" -- Assignment
                       ,"->" -- Function return type/Outbound connection
                       ,"=>" -- Match case
-                      ,"[" -- Array init
-                      ,"]" -- Array init
+                      ,"[" -- TArray init
+                      ,"]" -- TArray init
                       ,"{" -- Field values assignments
                       ,"}" -- Field values assignments
                       ,"(" -- Parens
                       ,")" -- Parens
-                      ,".." -- Array slice and for loop range
+                      ,".." -- TArray slice and for loop range
                       ,"&mut" -- Mutable reference creation
                       ,"&priv" -- Private reference creation
                       ,"@" -- Field address assignment
@@ -313,18 +215,18 @@ typeSpecifierParser =
   <|> outPortParser
   <|> accessPortParser
   <|> optionParser
-  <|> (DefinedType <$> identifierParser)
-  <|> (reserved "u8" >> return UInt8)
-  <|> (reserved "u16" >> return UInt16)
-  <|> (reserved "u32" >> return UInt32)
-  <|> (reserved "u64" >> return UInt64)
-  <|> (reserved "i8" >> return Int8)
-  <|> (reserved "i16" >> return Int16)
-  <|> (reserved "i32" >> return Int32)
-  <|> (reserved "i64" >> return Int64)
-  <|> (reserved "usize" >> return USize)
-  <|> (reserved "bool" >> return Bool)
-  <|> (reserved "char" >> return Char)
+  <|> (TDefinedType <$> identifierParser)
+  <|> (reserved "u8" >> return TUInt8)
+  <|> (reserved "u16" >> return TUInt16)
+  <|> (reserved "u32" >> return TUInt32)
+  <|> (reserved "u64" >> return TUInt64)
+  <|> (reserved "i8" >> return TInt8)
+  <|> (reserved "i16" >> return TInt16)
+  <|> (reserved "i32" >> return TInt32)
+  <|> (reserved "i64" >> return TInt64)
+  <|> (reserved "usize" >> return TUSize)
+  <|> (reserved "bool" >> return TBool)
+  <|> (reserved "char" >> return TChar)
 
 objectIdentifierParser :: Parser Identifier
 objectIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
@@ -420,7 +322,7 @@ msgQueueParser = do
   _ <- semi
   size <- sizeParser
   _ <- reservedOp ">"
-  return $ MsgQueue typeSpecifier size
+  return $ TMsgQueue typeSpecifier size
 
 poolParser :: Parser TerminaType
 poolParser = do
@@ -430,7 +332,7 @@ poolParser = do
   _ <- semi
   size <- sizeParser
   _ <- reserved ">"
-  return $ Pool typeSpecifier size
+  return $ TPool typeSpecifier size
 
 allocatorParser :: Parser TerminaType
 allocatorParser = do
@@ -438,7 +340,7 @@ allocatorParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- reserved ">"
-  return $ Allocator typeSpecifier
+  return $ TAllocator typeSpecifier
 
 atomicParser :: Parser TerminaType
 atomicParser = do
@@ -446,7 +348,7 @@ atomicParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- reserved ">"
-  return $ Atomic typeSpecifier
+  return $ TAtomic typeSpecifier
 
 atomicAccessParser :: Parser TerminaType
 atomicAccessParser = do
@@ -454,7 +356,7 @@ atomicAccessParser = do
   _ <- reservedOp "<"
   typeSpecifier <- typeSpecifierParser
   _ <- reserved ">"
-  return $ AtomicAccess typeSpecifier
+  return $ TAtomicAccess typeSpecifier
 
 atomicArrayParser :: Parser TerminaType
 atomicArrayParser = do
@@ -464,7 +366,7 @@ atomicArrayParser = do
   _ <- semi
   size <- sizeParser
   _ <- reserved ">"
-  return $ AtomicArray typeSpecifier size
+  return $ TAtomicArray typeSpecifier size
 
 atomicArrayAccessParser :: Parser TerminaType
 atomicArrayAccessParser = do
@@ -474,7 +376,7 @@ atomicArrayAccessParser = do
   _ <- semi
   size <- sizeParser
   _ <- reserved ">"
-  return $ AtomicArrayAccess typeSpecifier size
+  return $ TAtomicArrayAccess typeSpecifier size
 
 arrayParser :: Parser TerminaType
 arrayParser = do
@@ -483,39 +385,39 @@ arrayParser = do
   _ <- semi
   size <- sizeParser
   _ <- reserved "]"
-  return $ Array typeSpecifier size
+  return $ TArray typeSpecifier size
 
 referenceParser :: Parser TerminaType
-referenceParser = reservedOp "&" >> Reference Immutable <$> typeSpecifierParser
+referenceParser = reservedOp "&" >> TReference Immutable <$> typeSpecifierParser
 
 mutableReferenceParser :: Parser TerminaType
-mutableReferenceParser = reservedOp "&mut" >> Reference Mutable <$> typeSpecifierParser
+mutableReferenceParser = reservedOp "&mut" >> TReference Mutable <$> typeSpecifierParser
 
 boxSubtypeParser :: Parser TerminaType
-boxSubtypeParser = reserved "box" >> BoxSubtype <$> typeSpecifierParser
+boxSubtypeParser = reserved "box" >> TBoxSubtype <$> typeSpecifierParser
 
 locationSubtypeParser :: Parser TerminaType
-locationSubtypeParser = reservedOp "loc" >> Location <$> typeSpecifierParser
+locationSubtypeParser = reservedOp "loc" >> TLocation <$> typeSpecifierParser
 
 sinkPortParser :: Parser TerminaType
 sinkPortParser = do
   _ <- reserved "sink"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
-  SinkPort ts <$> identifierParser
+  TSinkPort ts <$> identifierParser
 
 accessPortParser :: Parser TerminaType
-accessPortParser = reservedOp "access" >> AccessPort <$> typeSpecifierParser
+accessPortParser = reservedOp "access" >> TAccessPort <$> typeSpecifierParser
 
 outPortParser :: Parser TerminaType
-outPortParser = reservedOp "out" >> OutPort <$> typeSpecifierParser
+outPortParser = reservedOp "out" >> TOutPort <$> typeSpecifierParser
 
 inPortParser :: Parser TerminaType
 inPortParser = do
   _ <- reserved "in"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
-  InPort ts <$> identifierParser
+  TInPort ts <$> identifierParser
 
 optionParser :: Parser TerminaType
 optionParser = do
@@ -523,7 +425,7 @@ optionParser = do
   _ <- reservedOp "<"
   ts <- typeSpecifierParser
   _ <- reservedOp ">"
-  return $ Option ts
+  return $ TOption ts
 
 -- Expression Parser
 expressionParser' :: Parser (Expression ParserAnn)

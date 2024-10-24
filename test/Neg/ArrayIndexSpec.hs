@@ -10,7 +10,7 @@ import Semantic.Monad
 import Semantic.Errors.Errors
 import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe (Error TLocation)
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -30,12 +30,12 @@ test0 = "function access_to_slice() -> u8 {\n" ++
 
 spec :: Spec
 spec = do
-  describe "Array indexing" $ do
+  describe "TArray indexing" $ do
     it "Indexing an array slice" $ do
      runNegativeTest test0
        `shouldSatisfy`
         isEIfElseNoOtherwise
   
   where
-    isEIfElseNoOtherwise :: Maybe (Error Location) -> Bool
+    isEIfElseNoOtherwise :: Maybe (Error TLocation) -> Bool
     isEIfElseNoOtherwise = \case Just ESliceInvalidUse -> True; _ -> False

@@ -14,29 +14,29 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS, messageTS :: TerminaType
-tmDescriptorTS = DefinedType "TMDescriptor"
-messageTS = DefinedType "Message"
+tmDescriptorTS = TDefinedType "TMDescriptor"
+messageTS = TDefinedType "Message"
 
 optionBoxUInt32TS :: TerminaType
-optionBoxUInt32TS = Option (BoxSubtype UInt32)
+optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
 
 arrayTS, arrayTMDescriptorTS, twoDimArrayTS :: TerminaType
-arrayTS = Array UInt32 (K (TInteger 10 DecRepr))
-arrayTMDescriptorTS = Array tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDimArrayTS = Array (Array Int64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
+arrayTS = TArray TUInt32 (K (TInteger 10 DecRepr))
+arrayTMDescriptorTS = TArray tmDescriptorTS (K (TInteger 20 DecRepr))
+twoDimArrayTS = TArray (TArray TInt64 (K (TInteger 5 DecRepr))) (K (TInteger 10 DecRepr))
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
-optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn UInt32
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 arrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable UInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
-arrayExprAnn = arrayExprSemAnn UInt32 (K (TInteger 10 DecRepr))
+arrayExprAnn = arrayExprSemAnn TUInt32 (K (TInteger 10 DecRepr))
 arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowExprAnn = arrayExprSemAnn Int64 (K (TInteger 5 DecRepr))
-twoDymArrayExprAnn = twoDymArrayExprSemAnn Int64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (K (TInteger 5 DecRepr))
+twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
 
 array0 :: Expression SemanticAnn
 array0 = AccessObject (Variable "array0" arrayObjAnn)
@@ -49,11 +49,11 @@ array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInit
 array5 = Declaration "array5" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
-foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable UInt32))
+foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
 
 foo1, foo2 :: Statement SemanticAnn
-foo1 = Declaration "foo1" Mutable UInt32 foo0 stmtSemAnn
-foo2 = Declaration "foo2" Mutable UInt32 uint32Const0 stmtSemAnn
+foo1 = Declaration "foo1" Mutable TUInt32 foo0 stmtSemAnn
+foo2 = Declaration "foo2" Mutable TUInt32 uint32Const0 stmtSemAnn
 
 tmDescriptorObjSemAnn :: SemanticAnn
 tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
@@ -64,8 +64,8 @@ tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
 messageExprSemAnn = definedTypeExprSemAnn "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
-uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just UInt32)) uint32ExprSemAnn
-uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just UInt32)) uint32ExprSemAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 -- | Initialization expression:
 -- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
@@ -116,13 +116,13 @@ spec = do
       renderStatement foo2 `shouldBe`
         pack "\nuint32_t foo2 = 0;"
   describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement var option0 : Option <'box u32> = Some(box_var0);" $ do
+    it "Prints the statement var option0 : TOption <'box u32> = Some(box_var0);" $ do
       renderStatement option0 `shouldBe`
         pack (
           "\n__option_box_t option0;\n" ++
           "option0.__variant = Some;\n" ++
           "option0.Some.__0 = box_var0;")
-    it "Prints the statement var option1 : Option <'box u32> = None;" $ do
+    it "Prints the statement var option1 : TOption <'box u32> = None;" $ do
       renderStatement option1 `shouldBe`
         pack (
           "\n__option_box_t option1;\n" ++

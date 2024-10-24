@@ -46,12 +46,12 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        DefinedType _ -> 
+                        TDefinedType _ -> 
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        Reference {} -> 
+                        TReference {} -> 
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | In any other case, we shall end the current regular
                         -- block and create a new one 
@@ -59,7 +59,7 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                 SAST.DerefMemberFunctionCall obj _ _ _ -> do
                     obj_ty <- getObjType obj
                     case obj_ty of
-                        Reference {} -> 
+                        TReference {} -> 
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         _ -> throwError $ InternalError ("appendRegularBlock: unexpected object type " ++ show obj_ty)
                 _ -> appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs 
@@ -90,22 +90,22 @@ genBBlocks acc (stmt : xs) =
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        DefinedType _ -> 
+                        TDefinedType _ -> 
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If we are calling a function from a reference, it
                         -- means that we are calling an inner function of the
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        Reference {} -> 
+                        TReference {} -> 
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If the object is an access port of a user-defined interface type, we shall create
                         -- a new procedure call block
-                        AccessPort (DefinedType {}) -> 
+                        TAccessPort (TDefinedType {}) -> 
                             genBBlocks (ProcedureCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block
                         -- of the corresponding type (AllocBox or FreeBox)
-                        AccessPort (Allocator _) -> do
+                        TAccessPort (TAllocator _) -> do
                             -- | We need to check the operation (alloc or free)
                             case funcName of 
                                 "alloc" -> case args of
@@ -119,7 +119,7 @@ genBBlocks acc (stmt : xs) =
                         -- object, we shall create a new block of the
                         -- corresponding type (AtomicLoad, AtomicStore,
                         -- AtomicArrayLoad or AtomicArrayStore)
-                        AccessPort (AtomicAccess _) -> do
+                        TAccessPort (TAtomicAccess _) -> do
                             -- | We need to check the operation (load or store)
                             case funcName of
                                 "load" -> case args of
@@ -129,7 +129,7 @@ genBBlocks acc (stmt : xs) =
                                     [value] -> genBBlocks (AtomicStore obj value ann' : acc) xs
                                     _ -> throwError $ InternalError ("genBBlocks: unexpected number of arguments of procedure " ++ funcName)
                                 _ -> throwError $ InternalError ("genBBlocks: unexpected function name " ++ funcName)
-                        AccessPort (AtomicArrayAccess {}) -> do
+                        TAccessPort (TAtomicArrayAccess {}) -> do
                             -- | We need to check the operation (load_index or store_index)
                             case funcName of
                                 "load_index" -> case args of
@@ -141,7 +141,7 @@ genBBlocks acc (stmt : xs) =
                                 _ -> throwError $ InternalError ("genBBlocks: unexpected function name " ++ funcName)
                         -- | If the object is an output port, we shall create a
                         -- new block of the corresponding type (SendMessage)
-                        OutPort _ -> do
+                        TOutPort _ -> do
                             case funcName of
                                 "send" -> case args of
                                     [msg] -> genBBlocks (SendMessage obj msg ann' : acc) xs
@@ -156,7 +156,7 @@ genBBlocks acc (stmt : xs) =
                 SAST.DerefMemberFunctionCall obj _ _ _ -> do
                     obj_ty <- getObjType obj
                     case obj_ty of
-                        Reference {} -> 
+                        TReference {} -> 
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         _ -> throwError $ InternalError ("genBBlocks: unexpected object type " ++ show obj_ty)
                 _ -> appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs

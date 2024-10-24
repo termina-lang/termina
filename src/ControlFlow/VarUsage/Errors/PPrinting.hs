@@ -55,20 +55,20 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                 moveSourceLines "The previous move was done here:" moveFileName
                 prevMove Nothing
     EOptionBoxMovedTwice ident prevMove@(Position moveStart _moveEnd) ->
-        let title = "\x1b[31merror [VE-005]\x1b[0m: Option-box variable is moved twice"
+        let title = "\x1b[31merror [VE-005]\x1b[0m: TOption-box variable is moved twice"
             -- | We can safely assume that the previous move is in the same file
             moveFileName = sourceName moveStart
             moveSourceLines = toModuleAST M.! moveFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is moved twice.")) >>
             printSimpleError
                 moveSourceLines "The previous move was done here:" moveFileName
                 prevMove Nothing
     EDifferentOptionBoxUse ident rval (lval, otherPos@(Position otherStart _otherEnd)) ->
-        let title = "\x1b[31merror [AE-006]\x1b[0m: Option-box final state mismatch"
+        let title = "\x1b[31merror [AE-006]\x1b[0m: TOption-box final state mismatch"
             -- | We can safely assume that the other position is in the same file
             otherFileName = sourceName otherStart
             otherSourceLines = toModuleAST M.! otherFileName
@@ -83,25 +83,25 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                     "\x1b[0m has been \x1b[31m" <> showText lval <> "\x1b[0m:") otherFileName
                 otherPos Nothing
     EDifferentNewOptionBoxUse ident rval ->
-        let title = "\x1b[31merror [AE-007]\x1b[0m: Option-box used in conditional branch or loop"
+        let title = "\x1b[31merror [AE-007]\x1b[0m: TOption-box used in conditional branch or loop"
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m has been \x1b[31m" <> showText rval <>
                     "\x1b[0m in a branch that may not be executed or inside a loop.\n" <> 
                     "This shall cause the final state to be inconsistent."))
     EMissingOptionBox ident prevVal ->
-        let title = "\x1b[31merror [AE-008]\x1b[0m: Option-box unused in a branch but used previously"
+        let title = "\x1b[31merror [AE-008]\x1b[0m: TOption-box unused in a branch but used previously"
             -- | We can safely assume that the other position is in the same file
             otherFileName = case getLocation prevVal of
                 Position otherStart _otherEnd -> sourceName otherStart
-                _ -> error "EMissingUsedOptionBox: Location is not a position"
+                _ -> error "EMissingUsedOptionBox: TLocation is not a position"
             otherSourceLines = toModuleAST M.! otherFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is not used on this branch.\n" <>
                     "The final state of the option-box variables must be the same so that the resulting state is consistent.")) >>
             printSimpleError
@@ -129,32 +129,32 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                 (Just ("Box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is moved in a branch that may not be executed."))
     EAllocNotMoved ident ->
-        let title = "\x1b[31merror [AE-011]\x1b[0m: Option-box allocated but not moved"
+        let title = "\x1b[31merror [AE-011]\x1b[0m: TOption-box allocated but not moved"
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is allocated but not moved."))
     EAllocTwice ident prevAlloc@(Position allocStart _allocEnd) ->
-        let title = "\x1b[31merror [AE-012]\x1b[0m: Option-box allocated twice"
+        let title = "\x1b[31merror [AE-012]\x1b[0m: TOption-box allocated twice"
             allocFileName = sourceName allocStart
             allocSourceLines = toModuleAST M.! allocFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is allocated twice.")) >>
             printSimpleError
                 allocSourceLines "The previous allocation was done here:" allocFileName
                 prevAlloc Nothing
     EMovedWithoutAlloc ident prevMove@(Position moveStart _moveEnd) ->
-        let title = "\x1b[31merror [AE-013]\x1b[0m: Option-box moved but not allocated"
+        let title = "\x1b[31merror [AE-013]\x1b[0m: TOption-box moved but not allocated"
             moveFileName = sourceName moveStart
             moveSourceLines = toModuleAST M.! moveFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
+                (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is moved but not allocated.")) >>
             printSimpleError
                 moveSourceLines "The variable was moved here:" moveFileName

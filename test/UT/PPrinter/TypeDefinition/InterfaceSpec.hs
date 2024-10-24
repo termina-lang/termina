@@ -18,14 +18,14 @@ import Control.Monad.Except
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
     InterfaceProcedure "procedure0" [
-      Parameter "param0" UInt8,
-      Parameter "param1" UInt16,
-      Parameter "param2" UInt32,
-      Parameter "param3" UInt64,
-      Parameter "param4" Int8,
-      Parameter "param5" Int16,
-      Parameter "param6" Int32,
-      Parameter "param7" Int64
+      Parameter "param0" TUInt8,
+      Parameter "param1" TUInt16,
+      Parameter "param2" TUInt32,
+      Parameter "param3" TUInt64,
+      Parameter "param4" TInt8,
+      Parameter "param5" TInt16,
+      Parameter "param6" TInt32,
+      Parameter "param7" TInt64
     ] undefined
   ] []) undefined
 

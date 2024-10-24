@@ -111,7 +111,7 @@ data CType =
     | CTInt CIntSize CSignedness CQualifier
     -- | Pointer types
     | CTPointer CType CQualifier
-    -- | Array types
+    -- | TArray types
     | CTArray CType CExpression
     -- | Struct types
     | CTStruct CStructTag Ident CQualifier

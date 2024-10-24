@@ -118,7 +118,7 @@ genArrayInitialization before level cObj expr = do
         genArrayInitializationFromExpression lvl lhsCObj rhsCExpr ts ann = do
             case ts of
                 -- | If the initializer is an array, we must iterate
-                (Array ts' (K s)) -> do
+                (TArray ts' (K s)) -> do
                     let iterator = namefy $ "i" ++ show lvl
                         cIteratorExpr = CExprValOf (CVar iterator (CTSizeT noqual)) (CTSizeT noqual) exprCAnn
                         exprCAnn = buildGenericAnn ann
@@ -164,7 +164,7 @@ genFieldInitialization before level cObj field expr = do
             exprType <- getExprType expr
             let ann = getAnnotation expr
             case exprType of
-                Array _ _ -> genArrayInitialization before level cFieldObj expr
+                TArray _ _ -> genArrayInitialization before level cFieldObj expr
                 _ -> do
                     let exprCAnn = buildGenericAnn ann
                         declStmtAnn = buildStatementAnn ann before
@@ -188,13 +188,13 @@ genStructInitialization before level cObj expr = do
         where
 
             genProcedureAssignment :: Identifier -> TerminaType -> SemanProcedure -> CSourceGenerator CStatement
-            genProcedureAssignment field (DefinedType interface) (SemanProcedure procid params) = do
+            genProcedureAssignment field (TDefinedType interface) (SemanProcedure procid params) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before
-                cPortFieldType <- genType noqual (DefinedType interface)
+                cPortFieldType <- genType noqual (TDefinedType interface)
                 let portFieldObj = CField cObj field cPortFieldType
                 clsFunctionName <- genClassFunctionName interface procid
-                clsFunctionType <- genFunctionType Unit (fmap paramTerminaType params)
+                clsFunctionType <- genFunctionType TUnit (fmap paramTerminaType params)
                 let clsFunctionExpr = CExprValOf (CVar clsFunctionName clsFunctionType) clsFunctionType exprCAnn
                 return $ CSDo (CExprAssign portFieldObj clsFunctionExpr clsFunctionType exprCAnn) declStmtAnn
             genProcedureAssignment _ _ _ = throwError $ InternalError "Unsupported procedure assignment"
@@ -235,7 +235,7 @@ genStructInitialization before level cObj expr = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before'
                 rest <- genFieldAssignments False xs
-                cTs <- genType noqual (Array ts size)
+                cTs <- genType noqual (TArray ts size)
                 let portFieldObj = CField cObj field cTs
                 return $ CSDo (CExprAssign portFieldObj (CExprValOf (CVar res cTs) cTs exprCAnn) cTs exprCAnn) declStmtAnn : rest
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (ETy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
@@ -267,7 +267,7 @@ genBlocks (ProcedureCall obj ident args ann) = do
     -- | Obtain the type of the object
     typeObj <- getObjType obj
     case typeObj of
-        AccessPort (DefinedType iface) ->
+        TAccessPort (TDefinedType iface) ->
             let thatFieldCType = CTPointer (CTStruct CStructTag iface noqual) noqual in
             return $ CBlockStmt <$>
                 [CSDo (CExprCall (CExprValOf (CField cObj ident cFuncType) cFuncType cAnn)
@@ -419,10 +419,10 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
         case exprType of
             -- | If the expression is an enumeration, the case identifier must 
             -- be prefixed with the enumeration identifier.
-            (DefinedType enumId) -> do
+            (TDefinedType enumId) -> do
                 enumStructName <- genEnumStructName enumId
                 return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
-            (Option ts) -> do
+            (TOption ts) -> do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
                 return (id, sname, const (return pname))
@@ -434,12 +434,12 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 -- | If there is only one case, we do not need to check the variant
                 [m@(MatchCase identifier _ _ _)] -> do
                     paramsStructName <- genParamsStructName identifier
-                    cTs <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+                    cTs <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
                     genMatchCase cTs cObj m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
-                    cTs <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+                    cTs <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
                     rest <- genMatchCases cObj casePrefix genParamsStructName genMatchCase xs
                     cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cObj m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
@@ -452,18 +452,18 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         _ -> do
             cExpr <- genExpression expr
-            cType <- genType noqual (DefinedType structName)
+            cType <- genType noqual (TDefinedType structName)
             let decl = CDecl (CTypeSpec cType) (Just (namefy "match")) (Just cExpr)
                 cObj' = CVar (namefy "match") cType
             case matchCases of
                 [m@(MatchCase identifier _ _ _)] -> do
                     paramsStructName <- genParamsStructName identifier
-                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
                     cBlk <- genAnonymousMatchCase paramsStructTypeSpec cObj' m
                     return [CBlockStmt $ CSCompound (CBlockDecl decl (buildDeclarationAnn ann True) : cBlk) (buildCompoundAnn ann True True)]
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
-                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
                     rest <- genMatchCases cObj' casePrefix genParamsStructName genAnonymousMatchCase xs
                     cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genAnonymousMatchCase paramsStructTypeSpec cObj' m
                     let cEnumVariantsFieldExpr = CExprValOf (CField cObj' variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
@@ -495,7 +495,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
         -- | The last one does not need to check the variant
         genMatchCases cObj _ genParamsStructName genCase [m@(MatchCase identifier _ _ ann')] = do
             paramsStructName <- genParamsStructName identifier
-            cTs <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+            cTs <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
             cBlk <- genCase cTs cObj m
             return $ Just (CSCompound cBlk (buildCompoundAnn ann' False True))
         genMatchCases cObj casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
@@ -504,7 +504,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
                 cExpr' = CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) cAnn
             paramsStructName <- genParamsStructName identifier
-            cTs <- CTypeSpec <$> genType noqual (DefinedType paramsStructName)
+            cTs <- CTypeSpec <$> genType noqual (TDefinedType paramsStructName)
             cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genCase cTs cObj m
             rest <- genMatchCases cObj casePrefix genParamsStructName genCase xs
             return $ Just (CSIfThenElse cExpr' cBlk rest (buildStatementAnn ann' False))
@@ -563,8 +563,8 @@ genStatement (AssignmentStmt obj expr  _) = do
     cType <- genType noqual typeObj
     cObj <- genObject obj
     case typeObj of
-        Array _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
-        (Location _) -> do
+        TArray _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
+        (TLocation _) -> do
             let ann = getAnnotation obj
             return $ CBlockStmt <$> [CSDo (CExprAddrOf cObj cType (buildGenericAnn ann)) (buildStatementAnn ann True)]
         _ -> case expr of
@@ -580,7 +580,7 @@ genStatement (Declaration identifier _ ts expr ann) = do
   cType <- genType noqual ts
   let cObj = CVar identifier cType
   case ts of
-    Array _ _ -> do
+    TArray _ _ -> do
         let declStmt = buildDeclarationAnn ann True
         arrayInitialization <- fmap CBlockStmt <$> genArrayInitialization False 0 cObj expr
         return $

@@ -31,16 +31,16 @@ enumWithTwoRegularFields = TypeDefinition
 enumWithOneParameterizedField :: AnnASTElement SemanticAnn
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" [UInt32]
+    EnumVariant "variant0" [TUInt32]
   ] []) undefined
 
 enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnn
 enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
-    EnumVariant "variant0" [UInt32],
+    EnumVariant "variant0" [TUInt32],
     EnumVariant "variant1" [],
-    EnumVariant "variant2" [UInt64, DefinedType "id1", Char],
-    EnumVariant "variant3" [Int8, Array (Array Char (K (TInteger 20 DecRepr))) (K (TInteger 35 DecRepr))]
+    EnumVariant "variant2" [TUInt64, TDefinedType "id1", TChar],
+    EnumVariant "variant3" [TInt8, TArray (TArray TChar (K (TInteger 20 DecRepr))) (K (TInteger 35 DecRepr))]
   ] []) undefined
 
 renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
