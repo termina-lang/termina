@@ -770,16 +770,17 @@ checkFieldValue loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortC
           -- TODO: Check that the types match
           Located (GGlob (SResource (Pool ty s))) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
-      AccessPort (AtomicAccess {}) ->
+      AccessPort (AtomicAccess ty) ->
         case gentry of
-          -- TODO: Check that the types match
-          Located (GGlob (SResource (Atomic ty))) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
+          Located (GGlob (SResource (Atomic ty'))) _ -> do
+            catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomic sid
       AccessPort (AtomicArrayAccess ty s) ->
         case gentry of
           Located (GGlob (SResource (AtomicArray ty' s'))) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
-            unless (s == s') (throwError $ annotateError loc $ EAtomicArrayConnectionSizeMismatch s s')
+            unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAccessPortNotAtomicArray sid
       AccessPort (DefinedType iface) ->
