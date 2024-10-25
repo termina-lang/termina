@@ -17,7 +17,8 @@ copyTy TInt64           = True
 copyTy TUSize           = True
 copyTy TBool            = True
 copyTy TChar            = True
-copyTy (TDefinedType _) = True
+copyTy (TStruct _)      = True
+copyTy (TEnum _)        = True
 copyTy (TOption (TBoxSubtype {})) = False
 copyTy (TOption _)      = True
 copyTy (TLocation _)    = True
@@ -35,28 +36,30 @@ optionTy TInt64           = True
 optionTy TUSize           = True
 optionTy TBool            = True
 optionTy TChar            = True
-optionTy (TDefinedType _) = True
-optionTy (TBoxSubtype _)  = True
-optionTy _               = False 
+optionTy (TStruct _)      = True
+optionTy (TEnum _)        = True
+optionTy (TBoxSubtype ty) = boxTy ty
+optionTy _                = False 
 
 -- | Predicate defining when a |TerminaType| is a declaration type.
 -- This is used to determine if a type can be used in a declaration.
 declTy :: TerminaType -> Bool
-declTy TUInt8           = True
-declTy TUInt16          = True
-declTy TUInt32          = True
-declTy TUInt64          = True
-declTy TInt8            = True
-declTy TInt16           = True
-declTy TInt32           = True
-declTy TInt64           = True
-declTy TUSize           = True
-declTy TBool            = True
-declTy TChar            = True
-declTy (TArray {})      = True
-declTy (TDefinedType _) = True
-declTy (TOption _)      = True
-declTy _               = False 
+declTy TUInt8      = True
+declTy TUInt16     = True
+declTy TUInt32     = True
+declTy TUInt64     = True
+declTy TInt8       = True
+declTy TInt16      = True
+declTy TInt32      = True
+declTy TInt64      = True
+declTy TUSize      = True
+declTy TBool       = True
+declTy TChar       = True
+declTy (TArray {}) = True
+declTy (TStruct _) = True
+declTy (TEnum _)   = True
+declTy (TOption _) = True
+declTy _           = False 
 
 arrayTy :: TerminaType -> Bool
 arrayTy TUInt8           = True
@@ -71,7 +74,8 @@ arrayTy TUSize           = True
 arrayTy TBool            = True
 arrayTy TChar            = True
 arrayTy (TArray ty _)    = arrayTy ty
-arrayTy (TDefinedType _) = True
+arrayTy (TStruct _)      = True
+arrayTy (TEnum _)        = True
 arrayTy (TOption (TBoxSubtype _)) = False
 arrayTy (TOption _)      = True
 arrayTy _               = False 
@@ -88,36 +92,56 @@ parameterTy TInt64            = True
 parameterTy TUSize            = True
 parameterTy TBool             = True
 parameterTy TChar             = True
-parameterTy (TDefinedType _)  = True
+parameterTy (TStruct _)       = True
+parameterTy (TEnum _)         = True
 parameterTy (TReference _ (TOption (TBoxSubtype _))) = False
 parameterTy (TReference {}) = True
 parameterTy (TOption (TBoxSubtype _)) = False
-parameterTy (TOption _)      = True
+parameterTy (TOption ty)      = optionTy ty
 parameterTy _                = False
 
 procedureParamTy :: TerminaType -> Bool
-procedureParamTy TUInt8             = True
-procedureParamTy TUInt16            = True
-procedureParamTy TUInt32            = True
-procedureParamTy TUInt64            = True
-procedureParamTy TInt8              = True
-procedureParamTy TInt16             = True
-procedureParamTy TInt32             = True
-procedureParamTy TInt64             = True
-procedureParamTy TUSize             = True
-procedureParamTy TBool              = True
-procedureParamTy TChar              = True
-procedureParamTy (TDefinedType _)   = True
-procedureParamTy (TReference {})    = True
-procedureParamTy (TOption _)        = True
+procedureParamTy TUInt8            = True
+procedureParamTy TUInt16           = True
+procedureParamTy TUInt32           = True
+procedureParamTy TUInt64           = True
+procedureParamTy TInt8             = True
+procedureParamTy TInt16            = True
+procedureParamTy TInt32            = True
+procedureParamTy TInt64            = True
+procedureParamTy TUSize            = True
+procedureParamTy TBool             = True
+procedureParamTy TChar             = True
+procedureParamTy (TStruct _)       = True
+procedureParamTy (TEnum _)         = True
+procedureParamTy (TReference _ ty) = refTy ty
+procedureParamTy (TOption ty)      = optionTy ty
+procedureParamTy (TBoxSubtype ty)  = boxTy ty
 procedureParamTy _                 = False
 
+actionParamTy :: TerminaType -> Bool
+actionParamTy TUInt8           = True
+actionParamTy TUInt16          = True
+actionParamTy TUInt32          = True
+actionParamTy TUInt64          = True
+actionParamTy TInt8            = True
+actionParamTy TInt16           = True
+actionParamTy TInt32           = True
+actionParamTy TInt64           = True
+actionParamTy TUSize           = True
+actionParamTy TBool            = True
+actionParamTy TChar            = True
+actionParamTy (TStruct _)      = True
+actionParamTy (TEnum _)        = True
+actionParamTy (TBoxSubtype ty) = boxTy ty
+actionParamTy _                = False
+
 classFieldTy :: TerminaType -> Bool
-classFieldTy (TSinkPort {})       = True
-classFieldTy (TInPort {})       = True
-classFieldTy (TOutPort {})      = True
-classFieldTy (TAccessPort {})   = True
-classFieldTy (TLocation _)      = True
+classFieldTy (TSinkPort {})    = True
+classFieldTy (TInPort {})      = True
+classFieldTy (TOutPort {})     = True
+classFieldTy (TAccessPort {})  = True
+classFieldTy (TLocation _)     = True
 classFieldTy ty                = fieldTy ty
 
 fieldTy :: TerminaType -> Bool
@@ -127,27 +151,28 @@ locTy :: TerminaType -> Bool
 locTy = fieldTy
 
 boxTy :: TerminaType -> Bool
-boxTy TUInt8           = True
-boxTy TUInt16          = True
-boxTy TUInt32          = True
-boxTy TUInt64          = True
-boxTy TInt8            = True
-boxTy TInt16           = True
-boxTy TInt32           = True
-boxTy TInt64           = True
-boxTy TUSize           = True
-boxTy TBool            = True
-boxTy TChar            = True
-boxTy (TDefinedType _) = True
-boxTy _               = False
+boxTy TUInt8      = True
+boxTy TUInt16     = True
+boxTy TUInt32     = True
+boxTy TUInt64     = True
+boxTy TInt8       = True
+boxTy TInt16      = True
+boxTy TInt32      = True
+boxTy TInt64      = True
+boxTy TUSize      = True
+boxTy TBool       = True
+boxTy TChar       = True
+boxTy (TStruct _) = True
+boxTy (TEnum _)   = True
+boxTy _           = False
 
 allocTy :: TerminaType -> Bool
 allocTy = boxTy
 
 accessPortTy :: TerminaType -> Bool
-accessPortTy (TDefinedType _) = True
-accessPortTy (TAllocator _)  = True
-accessPortTy (TAtomicAccess _) = True
+accessPortTy (TInterface _)          = True
+accessPortTy (TAllocator _)          = True
+accessPortTy (TAtomicAccess _)       = True
 accessPortTy (TAtomicArrayAccess {}) = True
 accessPortTy _ = False
 
@@ -163,7 +188,8 @@ msgTy TInt64           = True
 msgTy TUSize           = True
 msgTy TBool            = True
 msgTy TChar            = True
-msgTy (TDefinedType _) = True
+msgTy (TStruct _)      = True
+msgTy (TEnum _)        = True
 msgTy (TBoxSubtype {}) = True
 msgTy _               = False
 
@@ -179,7 +205,8 @@ refTy TInt64           = True
 refTy TUSize           = True
 refTy TBool            = True
 refTy TChar            = True
-refTy (TDefinedType _) = True
+refTy (TStruct _)      = True
+refTy (TEnum _)        = True
 refTy (TOption _)      = True
 refTy (TArray {})      = True
 refTy _               = False
@@ -239,11 +266,27 @@ memberIntCons i TInt64  = ( -9223372036854775808 <= i ) && ( i <= 92233720368547
 memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons _ _      = False
 
-identifierType :: TypeDef' blk a -> Identifier
-identifierType (Struct ident _ _) = ident
-identifierType (Enum ident _ _)   = ident
-identifierType (Class _ ident _ _ _)  = ident
-identifierType (Interface ident _ _) = ident
+getTypeIdentifier :: TypeDef' ty blk a -> Identifier
+getTypeIdentifier (Struct ident _ _) = ident
+getTypeIdentifier (Enum ident _ _)   = ident
+getTypeIdentifier (Class _ ident _ _ _)  = ident
+getTypeIdentifier (Interface ident _ _) = ident
+
+getGlobalIdentifier :: Global' ty expr a -> Identifier
+getGlobalIdentifier (Task ident _ _ _ _)     = ident
+getGlobalIdentifier (Resource ident _ _ _ _) = ident
+getGlobalIdentifier (Channel ident _ _ _ _)  = ident
+getGlobalIdentifier (Emitter ident _ _ _ _)  = ident
+getGlobalIdentifier (Handler ident _ _ _ _)  = ident
+getGlobalIdentifier (Const ident _ _ _ _)    = ident
+
+getGlobalType :: Global' ty expr a -> ty
+getGlobalType (Task _ ty _ _ _)     = ty
+getGlobalType (Resource _ ty _ _ _) = ty
+getGlobalType (Channel _ ty _ _ _)  = ty
+getGlobalType (Emitter _ ty _ _ _)  = ty
+getGlobalType (Handler _ ty _ _ _)  = ty
+getGlobalType (Const _ ty _ _ _)    = ty
 
 ----------------------------------------
 -- Box Helpers
@@ -256,25 +299,6 @@ isNonBoxOption (TOption (TBoxSubtype _)) = False
 isNonBoxOption (TOption _) = True
 isNonBoxOption _ = False
 
-hasBoxOrDep :: TerminaType -> Either Identifier Bool
-hasBoxOrDep (TDefinedType ident) = Left ident
-hasBoxOrDep TUInt8 = Right False
-hasBoxOrDep TUInt16 = Right False
-hasBoxOrDep TUInt32 = Right False
-hasBoxOrDep TUInt64 = Right False
-hasBoxOrDep TInt8 = Right False
-hasBoxOrDep TInt16 = Right False
-hasBoxOrDep TInt32 = Right False
-hasBoxOrDep TInt64 = Right False
-hasBoxOrDep TUSize = Right False
-hasBoxOrDep TBool = Right False
-hasBoxOrDep TChar = Right False
---
-hasBoxOrDep (TArray ty _s) = hasBoxOrDep ty
-hasBoxOrDep (TOption ty) = hasBoxOrDep ty
-hasBoxOrDep (TReference _accK ty) = hasBoxOrDep ty
-hasBoxOrDep (TBoxSubtype _) = Right True
-hasBoxOrDep _ = Right False
 ----------------------------------------
 
 rootType :: TerminaType -> TerminaType
@@ -307,7 +331,10 @@ sameTy  (TReference Mutable tyspecl) (TReference Mutable tyspecr) = sameTy tyspe
 sameTy  (TReference Immutable tyspecl) (TReference Immutable tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TBoxSubtype tyspecl) (TBoxSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TArray typespecl sizel) (TArray typespecr sizer) = sameTy typespecl typespecr && (sizel == sizer)
-sameTy  (TDefinedType idl) (TDefinedType idr) = idl == idr
+sameTy  (TStruct idl) (TStruct idr) = idl == idr
+sameTy  (TEnum idl) (TEnum idr) = idl == idr
+sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
+sameTy  (TInterface idl) (TInterface idr) = idl == idr
 -- TLocation subtypes
 sameTy  (TLocation tyspecl) (TLocation tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TLocation tyspecl) tyspecr = sameTy tyspecl tyspecr
@@ -315,10 +342,7 @@ sameTy  tyspecl (TLocation tyspecr) = sameTy tyspecl tyspecr
 --
 sameTy  _ _ = False
 
-findWith :: (a -> Maybe b) -> [a] -> Maybe b
-findWith f = L.foldl' (\acc a -> maybe acc Just (f a)) Nothing
-
-findClassField :: Identifier -> [ ClassMember' blk a ] -> Maybe (TerminaType, a)
+findClassField :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (ty, a)
 findClassField i
   =
   fmap
@@ -328,27 +352,27 @@ findClassField i
   L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
                  _ -> False;})
 
-findClassProcedure :: Identifier -> [ ClassMember' blk a ] -> Maybe ([TerminaType], a)
+findClassProcedure :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty], a)
 findClassProcedure i
   = fmap
-  (\case {ClassProcedure _ ps _ a -> (map paramTerminaType ps,a)
+  (\case {ClassProcedure _ ps _ a -> (map paramType ps,a)
          ; _ -> error "Impossible after find"})
   .
   L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember a ] -> Maybe ([TerminaType], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe ([ty], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ ps a -> (map paramTerminaType ps, a)})
+  (\case {InterfaceProcedure _ ps a -> (map paramType ps, a)})
   .
   L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
 
-findClassViewerOrMethod :: Identifier -> [ ClassMember' blk a ] -> Maybe ([TerminaType], Maybe TerminaType, a)
+findClassViewerOrMethod :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty], Maybe ty, a)
 findClassViewerOrMethod i
   = fmap
   (\case {
-    ClassViewer _ ps mty _ a -> (map paramTerminaType ps, mty, a);
+    ClassViewer _ ps mty _ a -> (map paramType ps, mty, a);
     ClassMethod _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })
@@ -361,11 +385,11 @@ findClassViewerOrMethod i
     }
   )
 
-findClassAction :: Identifier -> [ ClassMember' blk a ] -> Maybe (TerminaType, TerminaType, a)
+findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (ty, ty, a)
 findClassAction i
   =  fmap
   (\case {
-    ClassAction _ param rty _ a -> (paramTerminaType param, rty, a);
+    ClassAction _ param rty _ a -> (paramType param, rty, a);
     _ -> error "Impossible after find"
     })
   .
@@ -373,7 +397,7 @@ findClassAction i
     ClassAction ident _ _ _ _ -> (ident == i);
     _ -> False})
 
-className :: ClassMember' blk a -> Identifier
+className :: ClassMember' ty blk a -> Identifier
 className (ClassField e _)                = fieldIdentifier e
 className (ClassMethod mIdent _ _ _)      = mIdent
 className (ClassProcedure pIdent _ _ _) = pIdent
@@ -389,7 +413,7 @@ glbName (Emitter tId _ _ _ _) = tId
 glbName (Handler tId _ _ _ _)  = tId
 glbName (Const tId _ _ _ _)    = tId
 
-tyDefName :: TypeDef' blk a -> Identifier
+tyDefName :: TypeDef' ty blk a -> Identifier
 tyDefName (Struct sId _ _ )= sId
 tyDefName (Enum sId _ _ )=   sId
 tyDefName (Class _ sId _ _ _ )=sId

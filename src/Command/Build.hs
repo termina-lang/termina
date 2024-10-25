@@ -154,7 +154,8 @@ useDefCheckModules = mapM_ useDefCheckModule . M.elems
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
 optionMapModules = M.partitionWithKey
                 (\k _ -> case k of
-                  SAST.TDefinedType {} -> False
+                  SAST.TStruct {} -> False
+                  SAST.TEnum {} -> False
                   _ -> True) . foldl' optionMapModule M.empty . M.elems
 
   where

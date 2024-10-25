@@ -107,7 +107,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypeDefinitionDecl (M.fromList [(TDefinedType "id0", S.fromList [TOption (TDefinedType "id0")])]) structWithOneField `shouldBe`
+       renderTypeDefinitionDecl (M.fromList [(TStruct "id0", S.fromList [TOption (TStruct "id0")])]) structWithOneField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++

@@ -21,9 +21,9 @@ data Error =
     | EUnboxingProcedureCall -- ^ Error when trying to unbox a procedure call (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
     | EUnboxingFree -- ^ Error when trying to unbox a free (Internal)
-    | EDuplicatedEmitterConnection Identifier TLocation -- ^ Duplicated emitter connection (AE-001)
-    | EDuplicatedChannelConnection Identifier TLocation -- ^ Duplicated channel connection (AE-002)
-    | EMismatchedBoxSource Identifier Identifier [TLocation] -- ^ Mismatched box source (AE-003)
+    | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
+    | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
+    | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-003)
     deriving Show
 
-type ArchitectureError = AnnotatedError Error TLocation
+type ArchitectureError = AnnotatedError Error Location

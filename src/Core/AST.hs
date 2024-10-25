@@ -25,10 +25,10 @@ data AnnASTElement' ty blk expr a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
-    [Parameter] -- ^ list of parameters (possibly empty)
-    (Maybe TerminaType) -- ^ type of the return value (optional)
+    [Parameter' ty] -- ^ list of parameters (possibly empty)
+    (Maybe ty) -- ^ type of the return value (optional)
     (blk a) -- ^ statements block (with return)
-    [ Modifier ] -- ^ list of possible modifiers
+    [Modifier' ty] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   -- | Global declaration constructor
@@ -37,7 +37,7 @@ data AnnASTElement' ty blk expr a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' blk a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' ty blk a) -- ^ the type definition (struct, union, etc.)
     a
   deriving (Show,Functor)
 
@@ -46,19 +46,19 @@ instance Annotated (AnnASTElement' ty blk expr) where
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
-data Module' pf = ModInclusion
+data Module' ty pf = ModInclusion
   { moduleIdentifier ::  pf  -- Filepath!
-  , moduleMods :: [ Modifier ]
+  , moduleMods :: [Modifier' ty]
   }
   deriving Show
 
-instance Functor Module' where
+instance Functor (Module' ty) where
   fmap f m = m{moduleIdentifier = f (moduleIdentifier m)}
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier = Modifier Identifier (Maybe Const)
+data Modifier' ty = Modifier Identifier (Maybe (Const' ty))
   deriving (Show)
 
 -- | Identifiers as `String`
@@ -68,7 +68,7 @@ type Identifier = String
 type Address = TInteger
 
 data TypeParameter =
-  TypeParamName Identifier
+  TypeParamTypeSpec TypeSpecifier
   | TypeParamSize Size
   deriving (Show, Ord, Eq)
 
@@ -76,7 +76,8 @@ data TypeSpecifier
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
   | TSBool | TSChar 
-  | TSDefinedType [TypeParameter] Identifier
+  | TSDefinedType Identifier [TypeParameter]
+  | TSArray TypeSpecifier Size
   -- Non-primitive types
   | TSReference AccessKind TypeSpecifier
   | TSBoxSubtype TypeSpecifier
@@ -95,7 +96,10 @@ data TerminaType
   -- Primitive types
   = TUInt8 | TUInt16 | TUInt32 | TUInt64
   | TInt8 | TInt16 | TInt32 | TInt64 | TUSize
-  | TBool | TChar | TDefinedType Identifier
+  | TBool | TChar
+  | TStruct Identifier
+  | TEnum Identifier
+  | TInterface Identifier
   | TArray TerminaType Size
   | TOption TerminaType
   -- Built-in polymorphic types
@@ -116,8 +120,10 @@ data TerminaType
   | TSinkPort TerminaType Identifier
   | TInPort TerminaType Identifier
   | TOutPort TerminaType
-  -- See Q9
+  -- | Unit type
   | TUnit
+  -- | Global object types
+  | TGlobal ClassKind Identifier
   deriving (Show, Ord, Eq)
 
 data AccessKind = Immutable | Mutable | Private
@@ -168,28 +174,28 @@ data Global' ty expr a
       Identifier -- ^ name of the task
       ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
     -- | Shared resource global variable constructor
     | Resource
       Identifier -- ^ name of the variable
       ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Channel
       Identifier -- ^ name of the variable
       ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Emitter
       Identifier -- ^ name of the variable
       ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Handler global variable constructor
@@ -197,7 +203,7 @@ data Global' ty expr a
       Identifier -- ^ name of the variable
       ty -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Constant constructor
@@ -205,7 +211,7 @@ data Global' ty expr a
       Identifier -- ^ name of the constant
       ty -- ^ type of the constant
       (expr a) -- ^ initialization expression
-      [ Modifier ] -- ^ list of possible modifiers
+      [Modifier' ty] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
   deriving (Show, Functor)
@@ -219,40 +225,40 @@ instance Annotated (Global' ty expr) where
   getAnnotation (Const _ _ _ _ a)    = a
 
 -- Extremelly internal type definition
-data TypeDef' blk a
-  = Struct Identifier [FieldDefinition]  [ Modifier ]
-  | Enum Identifier [EnumVariant] [ Modifier ]
-  | Class ClassKind Identifier [ClassMember' blk a] [Identifier] [ Modifier ]
-  | Interface Identifier [InterfaceMember a] [ Modifier ]
+data TypeDef' ty blk a
+  = Struct Identifier [FieldDefinition' ty]  [Modifier' ty]
+  | Enum Identifier [EnumVariant' ty] [Modifier' ty]
+  | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty]
+  | Interface Identifier [InterfaceMember' ty a] [Modifier' ty]
   deriving (Show, Functor)
 
 data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass 
-  deriving (Show)
+  deriving (Show, Ord, Eq)
 
 -------------------------------------------------
 -- Interface Member
-data InterfaceMember a
+data InterfaceMember' ty a
   = 
     -- | Procedure
     InterfaceProcedure
       Identifier -- ^ name of the procedure
-      [Parameter] -- ^ list of parameters (possibly empty)
+      [Parameter' ty] -- ^ list of parameters (possibly empty)
       a
   deriving (Show, Functor)
 
 -------------------------------------------------
 -- Class Member
-data ClassMember' blk a
+data ClassMember' ty blk a
   = 
     -- | Fields. They form the state  of the object
     ClassField 
-      FieldDefinition -- ^ the field
+      (FieldDefinition' ty) -- ^ the field
       a -- ^ transpiler annotation
     -- | Methods. Methods are internal functions that can access the
     -- state of the object and call other methods of the same class.
     | ClassMethod 
       Identifier  -- ^ name of the method
-      (Maybe TerminaType) -- ^ type of the return value (optional)
+      (Maybe ty) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     -- | Procedures. They can only be used on shared resources, and constitute their
@@ -260,19 +266,19 @@ data ClassMember' blk a
     -- of statements. They do not return any value.
     | ClassProcedure
       Identifier -- ^ name of the procedure
-      [Parameter] -- ^ list of parameters (possibly empty)
+      [Parameter' ty] -- ^ list of parameters (possibly empty)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassViewer
       Identifier -- ^ name of the viewer
-      [Parameter] -- ^ list of parameters (possibly empty)
-      (Maybe TerminaType) -- ^ return type of the viewer
+      [Parameter' ty] -- ^ list of parameters (possibly empty)
+      (Maybe ty) -- ^ return type of the viewer
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassAction 
       Identifier  -- ^ name of the method
-      Parameter -- ^ input parameter
-      TerminaType -- ^ type of the return value
+      (Parameter' ty) -- ^ input parameter
+      ty -- ^ type of the return value
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
   deriving (Show, Functor)
@@ -288,9 +294,9 @@ data ClassMember' blk a
 -- This type constructor takes two arguments:
 -- - the identifier of the parameter
 -- - the type of the parameter
-data Parameter = Parameter {
+data Parameter' ty = Parameter {
   paramIdentifier      :: Identifier -- ^ paramter identifier (name)
-  , paramTerminaType :: TerminaType -- ^ type of the parameter
+  , paramType :: ty -- ^ type of the parameter
 } deriving (Show)
 
 data FieldAssignment' expr a =
@@ -299,29 +305,29 @@ data FieldAssignment' expr a =
   | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
-data FieldDefinition = FieldDefinition {
+data FieldDefinition' ty = FieldDefinition {
   fieldIdentifier      :: Identifier
-  , fieldTerminaType :: TerminaType
+  , fieldTerminaType :: ty
 } deriving (Show)
 
-data EnumVariant = EnumVariant {
+data EnumVariant' ty = EnumVariant {
   variantIdentifier :: Identifier
-  , assocData       :: [ TerminaType ]
+  , assocData       :: [ ty ]
 } deriving (Show)
 
 -- | Constant values:
 -- - Booleans
 -- - Integers
 -- - Characters
-data Const = B Bool | I TInteger (Maybe TerminaType) | C Char
+data Const' ty = B Bool | I TInteger (Maybe ty) | C Char
   deriving (Show)
 
 ----------------------------------------
 -- Termina Programs definitions
 
 data TerminaModule' ty blk expr pf a = Termina
-  { modules :: [ Module' pf]
-  , frags :: [ AnnASTElement' ty blk expr a ] }
+  { modules :: [Module' ty pf]
+  , frags :: [AnnASTElement' ty blk expr a] }
   deriving Show
 
 type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty blk expr a]

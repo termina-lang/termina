@@ -14,30 +14,23 @@ import Utils.Annotations
 
 ----------------------------------------
 
--- | Global type information
-data SemGlobal
-  = STask TerminaType
-  | SResource TerminaType
-  | SHandler TerminaType
-  | SEmitter TerminaType
-  | SChannel TerminaType
-  | SConst TerminaType Const
-  deriving Show
-
 -- | Semantic type information
-data ESeman
+data ExprSeman
   = SimpleType TerminaType
   | ObjectType AccessKind TerminaType
   | AppType [TerminaType] TerminaType
   | PortConnection ConnectionSeman
   deriving Show
 
-data SSeman
+data StmtSeman
   = SimpleStmtType -- ^ Statement with no type
     | MatchCaseStmtType [TerminaType] -- ^ Match case with types
   deriving Show
 
-data SemanProcedure = SemanProcedure Identifier [Parameter]
+data ProcedureSeman = ProcedureSeman Identifier [TerminaType]
+  deriving (Show)
+
+data FunctionSeman = FunctionSeman [TerminaType] TerminaType
   deriving (Show)
 
 data ConnectionSeman =
@@ -46,7 +39,7 @@ data ConnectionSeman =
   -- | Type specifier of the connected resource
     TerminaType
     -- | List of procedures that can be called on the connected resource
-    [SemanProcedure]
+    [ProcedureSeman]
   | APAtomicConnTy
     -- | Type specifier of the connected atomic
     TerminaType
@@ -82,32 +75,30 @@ data ConnectionSeman =
 data SemanticElems
   =
   -- | Expressions with their types
-  ETy ESeman
+  ETy ExprSeman
   -- | Statements 
-  | STy SSeman
-  -- | Global elements
-  | GTy (GEntry SemanticAnn)
+  | STy StmtSeman
+  -- | Global objects
+  | GTy TerminaType
+  -- | Type definitions 
+  | TTy 
+  -- | Function type
+  | FTy FunctionSeman
   deriving Show
 
 -- | Expression Semantic Annotations
 type SemanticAnn = Located SemanticElems
 
-getTySemGlobal :: SemGlobal -> TerminaType
-getTySemGlobal (STask ty) = ty
-getTySemGlobal (SResource ty)   = ty
-getTySemGlobal (SHandler ty)   = ty
-getTySemGlobal (SEmitter ty)   = ty
-getTySemGlobal (SChannel ty)   = ty
-getTySemGlobal (SConst ty _) = ty
-
 ----------------------------------------
 
 -- | General global entities
 data GEntry a
-  = GFun [TerminaType] TerminaType -- ^ const generic parameters, parameters, return type
+  = GFun FunctionSeman
   -- ^ Functions
-  | GGlob SemGlobal
+  | GGlob TerminaType
   -- ^ Globals
+  | GConst TerminaType Const
+  -- ^ Constants
   | GType (SemanTypeDef a)
   -- ^ Types
   deriving (Functor,Show)
@@ -115,26 +106,26 @@ data GEntry a
 -- Simple TypeDef
 -- It only has type information.
 -- Aux constant type type-constructor
-data EmptyBlockRet a = EmptyBlockRet
+data EmptyBlock a = EmptyBlock
   deriving (Show, Functor)
-type SemanTypeDef a = TypeDef' EmptyBlockRet a
+type SemanTypeDef a = TypeDef' TerminaType EmptyBlock a
 
 -- Forgetfull Class member map
-kClassMember :: ClassMember' blk a -> ClassMember' EmptyBlockRet a
+kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a
 kClassMember (ClassField fld a) = ClassField fld a
 kClassMember (ClassMethod idx ps _blk ann) =
-  ClassMethod idx ps EmptyBlockRet ann
+  ClassMethod idx ps EmptyBlock ann
 kClassMember (ClassProcedure idx ps _blk ann) =
-  ClassProcedure idx ps EmptyBlockRet ann
+  ClassProcedure idx ps EmptyBlock ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
-  ClassViewer idx ps ty EmptyBlockRet ann
+  ClassViewer idx ps ty EmptyBlock ann
 kClassMember (ClassAction idx ps ty _blk ann) =
-  ClassAction idx ps ty EmptyBlockRet ann
+  ClassAction idx ps ty EmptyBlock ann
 
 ----------------------------------------
 -- Subtyping.
 -- This fuction says what types can be casted into others.
-casteableTys :: TerminaType -> TerminaType-> Bool
+casteableTys :: TerminaType -> TerminaType -> Bool
 casteableTys a b = numTy a && numTy b
 
 -- Relation between types

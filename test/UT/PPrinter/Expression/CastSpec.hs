@@ -23,7 +23,7 @@ castVar0toUInt8 = Casting var0 TUInt8 uint8ExprSemAnn
 castVar0toUInt32 = Casting var0 TUInt32 uint32ExprSemAnn
 
 tmDescriptor0 :: Object SemanticAnn
-tmDescriptor0 = Variable "tm_descriptor0" (definedTypeObjSemAnn Mutable "TMDescriptor")
+tmDescriptor0 = Variable "tm_descriptor0" (structObjSemAnn Mutable "TMDescriptor")
 
 tmDescriptor0field0 :: Object SemanticAnn
 tmDescriptor0field0 = MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable TUInt32)

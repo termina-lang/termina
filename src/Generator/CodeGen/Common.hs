@@ -112,6 +112,7 @@ genOptionParameterStructName ts =
             return $ namefy $ "option_" <> tsName <> "_params_t"
 
     where
+
         genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
         genTypeSpecName TUInt8 = return "uint8"
         genTypeSpecName TUInt16 = return "uint16"
@@ -122,7 +123,8 @@ genOptionParameterStructName ts =
         genTypeSpecName TInt32 = return "int32"
         genTypeSpecName TInt64 = return "int64"
         genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
-        genTypeSpecName (TDefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName (TStruct name) = return name
+        genTypeSpecName (TEnum name) = return name
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
@@ -211,7 +213,9 @@ genOptionStructName ts =
         genTypeSpecName TInt32 = return "int32"
         genTypeSpecName TInt64 = return "int64"
         genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
-        genTypeSpecName (TDefinedType typeIdentifier) = return typeIdentifier
+        genTypeSpecName (TGlobal _ clsIdentifier) = return clsIdentifier
+        genTypeSpecName (TStruct name) = return name
+        genTypeSpecName (TEnum name) = return name
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
@@ -245,7 +249,7 @@ genType qual TUSize = return (CTSizeT qual)
 genType qual TBool = return (CTBool qual)
 genType qual TChar = return (CTChar qual)
 -- | Primitive type
-genType qual (TDefinedType typeIdentifier) = return (CTTypeDef typeIdentifier qual)
+genType qual (TGlobal _ clsIdentifier) = return (CTTypeDef clsIdentifier qual)
 -- | TArray type
 genType qual (TArray ts' s) = do
     ts <- genType qual ts'
@@ -291,6 +295,9 @@ genType _qual (TReference _ ts) = do
             ts' <- genType noqual ts
             return (CTPointer ts' constqual)
 genType _noqual TUnit = return (CTVoid noqual)
+genType qual (TEnum name) = return (CTTypeDef name qual)
+genType qual (TStruct name) = return (CTTypeDef name qual)
+genType qual (TInterface name) = return (CTTypeDef name qual)
 
 genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
 genFunctionType ts tsParams = do
@@ -397,6 +404,7 @@ printIntegerLiteral (TInteger i DecRepr) = show i
 printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
 printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
 
+{--
 printTypedInteger :: TerminaType -> TInteger -> String
 printTypedInteger ts ti =
     case ts of
@@ -411,11 +419,10 @@ printTypedInteger ts ti =
         -- | No correct way to do this for the time being
         TUSize -> printIntegerLiteral ti
         _ -> error "Invalid type specifier: " <> show ts
-
+--}
 
 printLiteral :: Const -> String
-printLiteral (I ti (Just ts)) = printTypedInteger ts ti
-printLiteral (I ti Nothing) = printIntegerLiteral ti
+printLiteral (I ti _) = printIntegerLiteral ti
 printLiteral (B True) = "1"
 printLiteral (B False) = "0"
 printLiteral (C c) = "'" <> [c] <> "'"

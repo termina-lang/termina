@@ -7,7 +7,7 @@ import Data.Kind
 import Control.Monad.Except
 import Text.Parsec.Pos
 
-data TLocation =
+data Location =
   Position SourcePos SourcePos -- ^ Source code start and end position
   | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
@@ -18,10 +18,10 @@ data Located a = Located {
     -- | Located element
     element :: a,
      -- | TLocation on source code
-    location :: TLocation
+    location :: Location
 } deriving Show
 
-locate :: TLocation -> a -> Located a
+locate :: Location -> a -> Located a
 locate = flip Located
 
 class Annotated (d :: Type -> Type) where

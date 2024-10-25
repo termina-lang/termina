@@ -129,7 +129,7 @@ inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
 inOutClassMember actionsToPorts (ClassAction name input _ body _ann) = do
     clearInputScope
-    case paramTerminaType input of
+    case paramType input of
         (TBoxSubtype _) -> do
             let inPt = actionsToPorts M.! name
             addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt))
@@ -143,7 +143,7 @@ inOutClassMember _ (ClassProcedure name params body _ann) = do
     where
 
         addInParam :: Integer -> Parameter -> BoxInOutMonad ()
-        addInParam argNum param = case paramTerminaType param of
+        addInParam argNum param = case paramType param of
             TBoxSubtype _ -> do
                 addBox (paramIdentifier param) (InBoxProcedureCall name argNum)
             _ -> return ()

@@ -127,21 +127,21 @@ genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal _ (Const {}) = return ()
 genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
-    (TDefinedType "Interrupt") -> ST.modify $ \tp ->
+    (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPInterruptEmittter ident ann) (emitters tp)
       }
-    (TDefinedType "PeriodicTimer") -> ST.modify $ \tp ->
+    (TGlobal EmitterClass "PeriodicTimer") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPPeriodicTimerEmitter ident modName ann) (emitters tp)
        }
-    (TDefinedType "SystemInit") -> ST.modify $ \tp ->
+    (TGlobal EmitterClass "SystemInit") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
     -- | Any other emitter class is not supported (this should not happen)
     _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
-genArchGlobal modName (Task ident (TDefinedType tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
+genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
@@ -187,7 +187,7 @@ genArchGlobal modName (Task ident (TDefinedType tcls) (Just (StructInitializer a
 -- | Task declaration without struct initializer or a proper type specifier
 -- This should not happen, since a task must define at least one inbound port
 genArchGlobal _ (Task {}) = error "Internal error: invalid task declaration"
-genArchGlobal modName (Resource ident (TDefinedType rcls) initializer _ rann) =
+genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _ rann) =
   case initializer of
     Nothing -> ST.modify $ \tp ->
       tp {
@@ -225,7 +225,7 @@ genArchGlobal modName (Resource ident (TPool aty size) _ _ rann) =
       pools = M.insert ident (TPPool ident aty size modName rann) (pools tp)
     }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
-genArchGlobal modName (Handler ident (TDefinedType hcls) (Just (StructInitializer assignments _ _)) modifiers hann) = do
+genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _ _)) modifiers hann) = do
   members <- ST.get >>= \tp ->
     case M.lookup hcls (handlerClasses tp) of
       Nothing -> error $ "Handler class: " ++ hcls ++ " not found"
@@ -280,7 +280,7 @@ genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 emptyTerminaProgArch :: TerminaProgArch SemanticAnn
 emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (GGlob (SEmitter (TDefinedType "SystemInit")))) Internal))
+    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (TGlobal EmitterClass "SystemInit")) Internal))
   ],
   emitterTargets = M.empty,
   taskClasses = M.empty,

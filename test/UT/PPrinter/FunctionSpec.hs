@@ -15,7 +15,7 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType
-tmDescriptorTS = TDefinedType "TMDescriptor"
+tmDescriptorTS = TStruct "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnn
 -- | 1024 : u32
@@ -31,11 +31,11 @@ refArrayAnn :: SemanticAnn
 refArrayAnn = refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))
 
 tmDescriptorObjSemAnn :: SemanticAnn
-tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
+tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"
 
 structAExprSemAnn, tmDescriptorExprSemAnn :: SemanticAnn
-structAExprSemAnn = definedTypeExprSemAnn "StructA"
-tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
+structAExprSemAnn = structExprSemAnn "StructA"
+tmDescriptorExprSemAnn = structExprSemAnn "TMDescriptor"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn

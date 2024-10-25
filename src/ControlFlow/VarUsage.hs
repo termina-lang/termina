@@ -74,8 +74,8 @@ useFieldAssignment :: FieldAssignment SemanticAnn -> UDM VarUsageError ()
 useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 useFieldAssignment _ = return ()
 
-getObjectType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
-getObjectType = maybe (throwError EUnboxingObjectType) return . SM.getObjectSAnns . getAnnotation
+getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
+getObjType = maybe (throwError EUnboxingObjectType) return . SM.getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
@@ -131,7 +131,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e ann) = do
   -- | We need to check if the object is an option-box
-  obj_ty <- withLocation (location ann) (getObjectType obj)
+  obj_ty <- withLocation (location ann) (getObjType obj)
   case obj_ty of
     (_, TOption (TBoxSubtype _)) -> 
       -- | We are assigning to an option-box. This can only be done through a
@@ -213,7 +213,7 @@ useDefBasicBlock (MatchBlock e mcase ann) = do
 useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
   case arg of
     AccessObject input_obj@(Variable var _) -> do
-      input_obj_type <- withLocation (location ann) (getObjectType input_obj)
+      input_obj_type <- withLocation (location ann) (getObjType input_obj)
       case input_obj_type of
         (_, TBoxSubtype _) -> let loc = location ann in
           safeMoveBox var loc
@@ -253,13 +253,13 @@ useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBasicBlocks (blockBody blk)
   >> mapM_ (`defVariable` location ann) bvars
 
-checkUseVariableStates :: UDSt -> [(UDSt, TLocation)] -> UDM VarUsageError UDSt
+checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
 checkUseVariableStates prevSt sets = do
   finalSt <- checkOptionBoxStates prevSt sets 
   checkSameMovedBoxes (map (first (flip M.difference (movedBoxes prevSt) . movedBoxes)) sets)
   return finalSt
 
-checkSameMovedBoxes :: [(VarMap, TLocation)] -> UDM VarUsageError ()
+checkSameMovedBoxes :: [(VarMap, Location)] -> UDM VarUsageError ()
 checkSameMovedBoxes [] = return ()
 checkSameMovedBoxes [(boxes, _)] = 
   case M.toList boxes of
@@ -269,7 +269,7 @@ checkSameMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
 
   where
 
-    sameMovedBoxes :: (VarMap, TLocation) -> (VarMap, TLocation) -> UDM VarUsageError ()
+    sameMovedBoxes :: (VarMap, Location) -> (VarMap, Location) -> UDM VarUsageError ()
     sameMovedBoxes (lmap, lloc) (rmap, rloc) = do
       mapM_ (\k ->
         case (M.lookup k lmap, M.lookup k rmap) of
@@ -278,7 +278,7 @@ checkSameMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
           (Just vloc, Nothing)  -> throwError $ annotateError rloc (EMissingBoxMove k vloc)
           _ -> return ()) (M.keys $ M.union lmap rmap)
 
-checkOptionBoxStates :: UDSt -> [(UDSt, TLocation)] -> UDM VarUsageError UDSt
+checkOptionBoxStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
 checkOptionBoxStates prevSt [] = return prevSt
 checkOptionBoxStates prevSt [(state, loc)] = do
   let lmap = optionBoxesMap prevSt

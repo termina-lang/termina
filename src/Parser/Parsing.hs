@@ -36,10 +36,8 @@ lexer = Tok.makeTokenParser langDef
       -- Basic Types
       ["u8","u16","u32","u64"
       ,"i8","i16","i32","i64"
-      ,"usize", "bool","char"]
-      ++ -- Polymorphic Types
-             ["MsgQueue", "Pool", "Option", "Allocator", "Atomic",
-              "AtomicArray", "AtomicAccess", "AtomicArrayAccess"]
+      ,"usize", "bool","char"
+      ,"unit"]
       ++ -- Struct and enum types
              ["struct", "enum"]
       ++ -- Box Subtyping
@@ -64,8 +62,6 @@ lexer = Tok.makeTokenParser langDef
              ["procedure", "viewer", "method", "action"]
       ++ -- Casting keyword
              ["as"]
-      ++ -- option name
-             ["option"]
       ++ -- is variant operator
              ["is"]
 
@@ -195,38 +191,43 @@ hexadecimal = Tok.lexeme lexer $
 -- Parser
 ----------------------------------------
 
+typeParamParser :: Parser TypeParameter
+typeParamParser = do
+  TypeParamTypeSpec <$> typeSpecifierParser
+  <|> TypeParamSize <$> sizeParser
+
+
+definedTypeParser :: Parser TypeSpecifier
+definedTypeParser = do
+  name <- identifierParser
+  typeParams <- option [] (angles (sepBy typeParamParser semi))
+  return $ TSDefinedType name typeParams
+
 -- | Types
-typeSpecifierParser :: Parser TerminaType
+typeSpecifierParser :: Parser TypeSpecifier
 typeSpecifierParser =
-  msgQueueParser
-  <|> poolParser
+  definedTypeParser 
   <|> arrayParser
+  <|> boxSubtypeParser
   <|> mutableReferenceParser
   <|> referenceParser
-  <|> boxSubtypeParser
   <|> locationSubtypeParser
-  <|> allocatorParser
-  <|> atomicParser
-  <|> atomicArrayParser
-  <|> atomicAccessParser
-  <|> atomicArrayAccessParser
   <|> sinkPortParser
   <|> inPortParser
   <|> outPortParser
   <|> accessPortParser
-  <|> optionParser
-  <|> (TDefinedType <$> identifierParser)
-  <|> (reserved "u8" >> return TUInt8)
-  <|> (reserved "u16" >> return TUInt16)
-  <|> (reserved "u32" >> return TUInt32)
-  <|> (reserved "u64" >> return TUInt64)
-  <|> (reserved "i8" >> return TInt8)
-  <|> (reserved "i16" >> return TInt16)
-  <|> (reserved "i32" >> return TInt32)
-  <|> (reserved "i64" >> return TInt64)
-  <|> (reserved "usize" >> return TUSize)
-  <|> (reserved "bool" >> return TBool)
-  <|> (reserved "char" >> return TChar)
+  <|> (reserved "u8" >> return TSUInt8)
+  <|> (reserved "u16" >> return TSUInt16)
+  <|> (reserved "u32" >> return TSUInt32)
+  <|> (reserved "u64" >> return TSUInt64)
+  <|> (reserved "i8" >> return TSInt8)
+  <|> (reserved "i16" >> return TSInt16)
+  <|> (reserved "i32" >> return TSInt32)
+  <|> (reserved "i64" >> return TSInt64)
+  <|> (reserved "usize" >> return TSUSize)
+  <|> (reserved "bool" >> return TSBool)
+  <|> (reserved "char" >> return TSChar)
+  <|> (reserved "unit" >> return TSUnit)
 
 objectIdentifierParser :: Parser Identifier
 objectIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
@@ -246,8 +247,8 @@ structInitializerParser :: Parser (Expression ParserAnn)
 structInitializerParser = do
     startpos <- getPosition
     assignments <- braces (sepBy (wspcs *> fieldAssignmentParser <* wspcs) comma)
-    identifier <- optionMaybe (reservedOp ":" >> identifierParser)
-    StructInitializer assignments identifier . Position startpos <$> getPosition
+    typeSpecifier <- optionMaybe (reservedOp ":" >> typeSpecifierParser)
+    StructInitializer assignments typeSpecifier . Position startpos <$> getPosition
     where
 
       fieldAssignmentParser :: Parser (FieldAssignment ParserAnn)
@@ -314,118 +315,46 @@ modifierParser = do
   _ <- reservedOp "]"
   return $ Modifier identifier initializer
 
-msgQueueParser :: Parser TerminaType
-msgQueueParser = do
-  reserved "MsgQueue"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- semi
-  size <- sizeParser
-  _ <- reservedOp ">"
-  return $ TMsgQueue typeSpecifier size
-
-poolParser :: Parser TerminaType
-poolParser = do
-  reserved "Pool"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- semi
-  size <- sizeParser
-  _ <- reserved ">"
-  return $ TPool typeSpecifier size
-
-allocatorParser :: Parser TerminaType
-allocatorParser = do
-  reserved "Allocator"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- reserved ">"
-  return $ TAllocator typeSpecifier
-
-atomicParser :: Parser TerminaType
-atomicParser = do
-  reserved "Atomic"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- reserved ">"
-  return $ TAtomic typeSpecifier
-
-atomicAccessParser :: Parser TerminaType
-atomicAccessParser = do
-  reserved "AtomicAccess"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- reserved ">"
-  return $ TAtomicAccess typeSpecifier
-
-atomicArrayParser :: Parser TerminaType
-atomicArrayParser = do
-  reserved "AtomicArray"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- semi
-  size <- sizeParser
-  _ <- reserved ">"
-  return $ TAtomicArray typeSpecifier size
-
-atomicArrayAccessParser :: Parser TerminaType
-atomicArrayAccessParser = do
-  reserved "AtomicArrayAccess"
-  _ <- reservedOp "<"
-  typeSpecifier <- typeSpecifierParser
-  _ <- semi
-  size <- sizeParser
-  _ <- reserved ">"
-  return $ TAtomicArrayAccess typeSpecifier size
-
-arrayParser :: Parser TerminaType
+arrayParser :: Parser TypeSpecifier
 arrayParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
   size <- sizeParser
   _ <- reserved "]"
-  return $ TArray typeSpecifier size
+  return $ TSArray typeSpecifier size
 
-referenceParser :: Parser TerminaType
-referenceParser = reservedOp "&" >> TReference Immutable <$> typeSpecifierParser
+referenceParser :: Parser TypeSpecifier
+referenceParser = reservedOp "&" >> TSReference Immutable <$> typeSpecifierParser
 
-mutableReferenceParser :: Parser TerminaType
-mutableReferenceParser = reservedOp "&mut" >> TReference Mutable <$> typeSpecifierParser
+mutableReferenceParser :: Parser TypeSpecifier
+mutableReferenceParser = reservedOp "&mut" >> TSReference Mutable <$> typeSpecifierParser
 
-boxSubtypeParser :: Parser TerminaType
-boxSubtypeParser = reserved "box" >> TBoxSubtype <$> typeSpecifierParser
+boxSubtypeParser :: Parser TypeSpecifier
+boxSubtypeParser = reserved "box" >> TSBoxSubtype <$> typeSpecifierParser
 
-locationSubtypeParser :: Parser TerminaType
-locationSubtypeParser = reservedOp "loc" >> TLocation <$> typeSpecifierParser
+locationSubtypeParser :: Parser TypeSpecifier
+locationSubtypeParser = reservedOp "loc" >> TSLocation <$> typeSpecifierParser
 
-sinkPortParser :: Parser TerminaType
+sinkPortParser :: Parser TypeSpecifier
 sinkPortParser = do
   _ <- reserved "sink"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
-  TSinkPort ts <$> identifierParser
+  TSSinkPort ts <$> identifierParser
 
-accessPortParser :: Parser TerminaType
-accessPortParser = reservedOp "access" >> TAccessPort <$> typeSpecifierParser
+accessPortParser :: Parser TypeSpecifier
+accessPortParser = reservedOp "access" >> TSAccessPort <$> typeSpecifierParser
 
-outPortParser :: Parser TerminaType
-outPortParser = reservedOp "out" >> TOutPort <$> typeSpecifierParser
+outPortParser :: Parser TypeSpecifier
+outPortParser = reservedOp "out" >> TSOutPort <$> typeSpecifierParser
 
-inPortParser :: Parser TerminaType
+inPortParser :: Parser TypeSpecifier
 inPortParser = do
   _ <- reserved "in"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
-  TInPort ts <$> identifierParser
-
-optionParser :: Parser TerminaType
-optionParser = do
-  _ <- reserved "Option"
-  _ <- reservedOp "<"
-  ts <- typeSpecifierParser
-  _ <- reservedOp ">"
-  return $ TOption ts
+  TSInPort ts <$> identifierParser
 
 -- Expression Parser
 expressionParser' :: Parser (Expression ParserAnn)
@@ -550,7 +479,7 @@ expressionTermParser = try isEnumVariantExprParser
 parensExprParser :: Parser (Expression ParserAnn)
 parensExprParser = parens expressionParser
 
-parensObjectParser :: Parser (Object  ParserAnn)
+parensObjectParser :: Parser (Object ParserAnn)
 parensObjectParser = parens objectParser
 
 ----------------------------------------
@@ -738,7 +667,7 @@ continueStmtParser = do
   _ <- semi
   return $ ContinueStmt ret (Position startPos endPos)
 
-functionParser :: Parser (AnnASTElement  ParserAnn)
+functionParser :: Parser (AnnASTElement ParserAnn)
 functionParser = do
   modifiers <- many modifierParser
   startPos <- getPosition
@@ -1153,7 +1082,7 @@ moduleIdentifierParser = sepBy1 firstCapital dot
       <$> (lower <?> "Module paths begin with a lowercase letter.")
       <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
 
-singleModule :: Parser ([ Modifier ], [String])
+singleModule :: Parser ([Modifier], [String])
 singleModule = do
   modifiers <- many modifierParser
   moduleIdent <- moduleIdentifierParser

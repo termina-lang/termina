@@ -8,7 +8,7 @@ module ControlFlow.VarUsage.Computation (
   defArgumentsProc, runComputation, emptyUDSt
 ) where
 
-import Core.AST (Identifier,Parameter(..),TerminaType(..))
+import ControlFlow.BasicBlocks.AST 
 
 import ControlFlow.VarUsage.Errors.Errors
 import ControlFlow.VarUsage.Types
@@ -21,11 +21,11 @@ import Control.Monad.Except as E
 -- Sets
 -- Maps
 import qualified Data.Map.Strict as M
-import Utils.Annotations ( TLocation(Internal), annotateError )
+import Utils.Annotations ( Location(Internal), annotateError )
 import qualified Data.Set as S
 
 -- | Map of variables to the last location where were used/moved.
-type VarMap = M.Map Identifier TLocation
+type VarMap = M.Map Identifier Location
 type VarSet = S.Set Identifier
 
 -- | Map of option-box variables to their current state.
@@ -99,7 +99,7 @@ unifyStates prev curr
     usedVarSet = S.union (usedVarSet curr) (usedVarSet prev)
   }
 
-unsafeAddMap :: Identifier -> TLocation -> VarMap -> VarMap
+unsafeAddMap :: Identifier -> Location -> VarMap -> VarMap
 unsafeAddMap = M.insert
 
 unsafeAddSet :: Identifier -> VarSet -> VarSet
@@ -124,7 +124,7 @@ safeUseVariable ident
     unless (S.size usedVarSet' < maxBound) (throwError $ annotateError Internal ESetMaxBound)
     putUsedVarSet $ unsafeAddSet ident usedVarSet'
 
-safeMoveBox :: Identifier -> TLocation -> UDM VarUsageError ()
+safeMoveBox :: Identifier -> Location -> UDM VarUsageError ()
 safeMoveBox ident loc
   = ST.gets movedBoxes
   >>= \boxSet ->
@@ -149,7 +149,7 @@ safeUpdateOptionBox ident mv
         _ -> M.insert ident mv ooMap
 
 -- | Box variable manipulation
-defBox :: Identifier -> TLocation -> UDM VarUsageError ()
+defBox :: Identifier -> Location -> UDM VarUsageError ()
 defBox ident loc
   = ST.gets movedBoxes
   >>= \boxSet ->
@@ -159,7 +159,7 @@ defBox ident loc
     else
       throwError $ annotateError loc (EBoxNotMoved ident)
 
-moveOptionBox :: Identifier -> TLocation -> UDM VarUsageError ()
+moveOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 moveOptionBox ident loc
   = do
     optionBoxMap <- ST.gets optionBoxesMap
@@ -169,7 +169,7 @@ moveOptionBox ident loc
       Just (Defined _) -> throwError $ annotateError Internal EVarRedefinition;
       Nothing -> safeUpdateOptionBox ident (Moved loc) >> safeUseVariable ident
 
-initializeOptionBox :: Identifier -> TLocation -> UDM VarUsageError ()
+initializeOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 initializeOptionBox ident loc
   = do
     optionBoxMap <- ST.gets optionBoxesMap
@@ -179,7 +179,7 @@ initializeOptionBox ident loc
       Just (Defined _) -> throwError $ annotateError Internal EVarRedefinition;
       _ -> return ()
       
-allocOptionBox :: Identifier -> TLocation -> UDM VarUsageError ()
+allocOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 allocOptionBox ident loc
   =
   maybe
@@ -193,7 +193,7 @@ allocOptionBox ident loc
         Defined _ -> throwError $ annotateError Internal EVarRedefinition;
       }) . M.lookup ident =<< ST.gets optionBoxesMap
 
-defVariableOptionBox :: Identifier -> TLocation -> UDM VarUsageError ()
+defVariableOptionBox :: Identifier -> Location -> UDM VarUsageError ()
 defVariableOptionBox ident loc =
   maybe
     (throwError $ annotateError loc (ENotUsed ident))
@@ -207,7 +207,7 @@ defVariableOptionBox ident loc =
         }) . M.lookup ident =<< ST.gets optionBoxesMap
 
 -- If we define a variable that was not used, then error.
-defVariable :: Identifier -> TLocation -> UDM VarUsageError ()
+defVariable :: Identifier -> Location -> UDM VarUsageError ()
 defVariable ident loc =
   ST.gets usedVarSet >>=
   \i ->
@@ -222,9 +222,9 @@ defVariable ident loc =
 -- Box variables have a special Use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- box.
-defArgumentsProc :: Parameter -> TLocation -> UDM VarUsageError ()
+defArgumentsProc :: Parameter -> Location -> UDM VarUsageError ()
 defArgumentsProc ps loc
-  = (case paramTerminaType ps of
+  = (case paramType ps of
         TBoxSubtype _ -> flip defBox loc
         _ -> flip defVariable loc)
     (paramIdentifier ps)

@@ -4,8 +4,7 @@
 module Semantic.Errors.Errors where
 
 -- Termina AST
-import Parser.AST
--- import SemanAST as SAST
+import Semantic.AST
 import Semantic.Types
 import Utils.Annotations
 
@@ -18,6 +17,8 @@ data Error a
     EMismatch TerminaType TerminaType -- ^ Type mismatch (Internal)
   | ENoStructFound Identifier -- ^ Struct not found (Internal)
   | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
+  | EUnboxingStructType -- ^ Error when unboxing a struct type (Internal)
+  | EUnboxingClassType -- ^ Error when unboxing a class type (Internal)
   | EExpectedArrayTy TerminaType -- ^ Expected a valid type for the elements of an array (Internal)
   | EExpectedCopyType TerminaType -- ^ Expected a copiable type (Internal)
   | EExpectedNumType TerminaType -- ^ Expected a numeric type (Internal)
@@ -30,7 +31,9 @@ data Error a
   | EAssignmentToImmutable -- ^ Assignment to immutable variable (SE-004)
   | EIfElseNoOtherwise -- ^ Missing else clause (SE-005)
   | ENotCasteable TerminaType TerminaType -- ^ Casting error (SE-006)
+  -- TODO: Re-enumerate the errors
   | EInvalidParameterType Parameter -- ^ Invalid parameter type (SE-007)
+  | EInvalidProcedureParameterType Parameter -- ^ Invalid procedure parameter type (SE-007)
   | EInvalidReturnType TerminaType -- ^ Invalid return type (SE-008)
   | EProcedureCallExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in procedure call (SE-009)
   | EProcedureCallMissingParams (Identifier, [TerminaType], a) Integer -- ^ Missing parameters in procedure call (SE-010)
@@ -87,6 +90,9 @@ data Error a
   | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (SE-061)
   | EStructInitializerTypeMismatch TerminaType TerminaType -- ^ Struct initializer type mismatch (SE-062)
   | EStructInitializerGlobalNotStruct (SemanTypeDef a) -- ^ Struct initializer expected global type not struct (SE-063)  
+  -- TODO: Re-enumerate the errors
+  | EStructInitializerGlobalNotClass (SemanTypeDef a) -- ^ Struct initializer expected global type not class (SE-063)
+  | EEnumInitializerExpectedTypeMismatch TerminaType TerminaType -- ^ Enum initializer expected type mismatch (SE-064)
   | EStructInitializerExpectedTypeNotStruct TerminaType -- ^ Struct initializer expected type not struct (SE-064)
   | EStructInitializerUnknownType Identifier -- ^ Struct initializer unknown type (SE-065)
   | ESliceInvalidUse -- ^ Invalid use of a slice (SE-066)
@@ -136,6 +142,8 @@ data Error a
   | EInvalidStructFieldType TerminaType -- ^ Invalid struct field type (SE-109)
   | EInvalidEnumParameterType TerminaType -- ^ Invalid enum parameter type (SE-110)
   | EInvalidAccessPortType TerminaType -- ^ Invalid access port type (SE-111)
+  | EInvalidTypeSpecifier TypeSpecifier -- ^ Invalid type specifier (SE-112)
+  | EInvalidTypeNotAStruct Identifier -- ^ Invalid type not a struct (SE-113)
   -- | Record missing field
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -181,7 +189,7 @@ data Error a
   -- | Box (type has a Box inside) as Argument of a function
   | EConstParameterNotNum Parameter
   -- | Function Declaration error,
-  | EUsedFunName Identifier TLocation
+  | EUsedFunName Identifier Location
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
@@ -229,7 +237,7 @@ data Error a
   | EMsgQueueRcvWrongArgTy TerminaType
   deriving Show
 
-type SemanticErrors = AnnotatedError (Error TLocation) TLocation
+type SemanticErrors = AnnotatedError (Error Location) Location
 
-instance Annotated (AnnotatedError (Error TLocation)) where
+instance Annotated (AnnotatedError (Error Location)) where
   getAnnotation (AnnotatedError _err ann) = ann

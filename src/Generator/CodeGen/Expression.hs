@@ -115,11 +115,11 @@ genMemberFunctionAccess obj ident args ann = do
         (TReference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
-                (TDefinedType classId) ->
+                (TGlobal _ classId) ->
                     return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
-        (TDefinedType classId) ->
+        (TGlobal _ classId) ->
             case obj of
                 (Dereference _ _) ->
                     let selfCType = CTPointer (CTStruct CStructTag classId noqual) noqual in

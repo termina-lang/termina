@@ -49,8 +49,8 @@ genOptionStruct :: SemanticAnn -> TerminaType -> CHeaderGenerator [CFileItem]
 genOptionStruct ann (TOption ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
-    paramsStructType <- genType noqual (TDefinedType paramsStructName)
-    enumStructType <- genType noqual (TDefinedType enumStructName)
+    paramsStructType <- genType noqual (TStruct paramsStructName)
+    enumStructType <- genType noqual (TStruct enumStructName)
     let cAnn = buildDeclarationAnn ann True
         some = CDecl (CTypeSpec paramsStructType) (Just optionSomeVariant) Nothing
         this_variant = CDecl (CTypeSpec enumStructType) (Just variant) Nothing
@@ -128,7 +128,7 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
     cFields <- mapM genFieldDeclaration fls
     opts <- ask
     optsDeclExt <- concat <$> maybe (return [])
-        (mapM (genOptionStruct ann) . S.toList) (M.lookup (TDefinedType identifier) opts)
+        (mapM (genOptionStruct ann) . S.toList) (M.lookup (TStruct identifier) opts)
     return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : optsDeclExt
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
@@ -145,7 +145,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
             genParameterUnionField :: EnumVariant -> CHeaderGenerator CDeclaration
             genParameterUnionField (EnumVariant this_variant _) = do
                 paramsStructName <- genEnumParameterStructName identifier this_variant
-                paramsStructType <- genType noqual (TDefinedType paramsStructName)
+                paramsStructType <- genType noqual (TStruct paramsStructName)
                 return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing
 
             genParameterUnion :: [EnumVariant] -> CHeaderGenerator CDeclaration
@@ -155,7 +155,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
 
             genEnumStruct :: Identifier -> [EnumVariant] -> CHeaderGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do
-                enumType <- genType noqual (TDefinedType enumName)
+                enumType <- genType noqual (TStruct enumName)
                 let cAnn = buildDeclarationAnn ann True
                     enumField = CDecl (CTypeSpec enumType) (Just variant) Nothing
                 case variantsWithParams of
@@ -176,7 +176,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CHeaderGenerator CDeclaration
         genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
-            cParamTypes <- mapM (genType noqual . paramTerminaType) params
+            cParamTypes <- mapM (genType noqual . paramType) params
             let cThisParamType = CTPointer (CTVoid noqual) constqual
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
@@ -273,7 +273,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class _clsKind identifier _member
                 genSelfCastStmt :: CSourceGenerator CCompoundBlockItem
                 genSelfCastStmt = do
                     let cAnn = buildGenericAnn ann
-                    selfCType <- flip CTPointer noqual <$> genType noqual (TDefinedType identifier)
+                    selfCType <- flip CTPointer noqual <$> genType noqual (TStruct identifier)
                     let cExpr = CExprCast (CExprValOf (CVar thisParam (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn) selfCType cAnn
                     return $ CBlockDecl (CDecl (CTypeSpec selfCType) (Just selfVariable) (Just cExpr)) (buildDeclarationAnn ann True)
 

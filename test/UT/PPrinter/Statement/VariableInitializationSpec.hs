@@ -14,8 +14,8 @@ import ControlFlow.BasicBlocks
 import Control.Monad.Except
 
 tmDescriptorTS, messageTS :: TerminaType
-tmDescriptorTS = TDefinedType "TMDescriptor"
-messageTS = TDefinedType "Message"
+tmDescriptorTS = TStruct "TMDescriptor"
+messageTS = TStruct "Message"
 
 optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
@@ -56,12 +56,12 @@ foo1 = Declaration "foo1" Mutable TUInt32 foo0 stmtSemAnn
 foo2 = Declaration "foo2" Mutable TUInt32 uint32Const0 stmtSemAnn
 
 tmDescriptorObjSemAnn :: SemanticAnn
-tmDescriptorObjSemAnn = definedTypeObjSemAnn Mutable "TMDescriptor"
+tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"
 
 structAExprSemAnn, tmDescriptorExprSemAnn, messageExprSemAnn :: SemanticAnn
-structAExprSemAnn = definedTypeExprSemAnn "StructA"
-tmDescriptorExprSemAnn = definedTypeExprSemAnn "TMDescriptor"
-messageExprSemAnn = definedTypeExprSemAnn "Message"
+structAExprSemAnn = structExprSemAnn "StructA"
+tmDescriptorExprSemAnn = structExprSemAnn "TMDescriptor"
+messageExprSemAnn = structExprSemAnn "Message"
 
 uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn

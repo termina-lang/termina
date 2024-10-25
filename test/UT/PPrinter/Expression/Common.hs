@@ -118,17 +118,35 @@ uint16ThreeDymVecObjSemAnn, uint32ThreeDymVecObjSemAnn :: AccessKind -> Size -> 
 uint16ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt16
 uint32ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt32
 
-definedTypeObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
-definedTypeObjSemAnn ak name = objSemAnn ak (TDefinedType name)
+structObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
+structObjSemAnn ak name = objSemAnn ak (TStruct name)
 
-definedTypeExprSemAnn :: Identifier -> SemanticAnn
-definedTypeExprSemAnn name = simpleTySemAnn (TDefinedType name)
+enumObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
+enumObjSemAnn ak name = objSemAnn ak (TEnum name)
 
-boxDefinedTypeSemAnn :: Identifier -> SemanticAnn
-boxDefinedTypeSemAnn name = boxTySemAnn (TDefinedType name)
+structExprSemAnn :: Identifier -> SemanticAnn
+structExprSemAnn name = simpleTySemAnn (TStruct name)
 
-refDefinedTypeSemAnn :: Identifier -> SemanticAnn
-refDefinedTypeSemAnn name = refSemAnn (TDefinedType name)
+enumExprSemAnn :: Identifier -> SemanticAnn
+enumExprSemAnn name = simpleTySemAnn (TEnum name)
+
+boxStructTypeSemAnn :: Identifier -> SemanticAnn
+boxStructTypeSemAnn name = boxTySemAnn (TStruct name)
+
+boxEnumTypeSemAnn :: Identifier -> SemanticAnn
+boxEnumTypeSemAnn name = boxTySemAnn (TStruct name)
+
+refStructSemAnn :: Identifier -> SemanticAnn
+refStructSemAnn name = refSemAnn (TStruct name)
+
+refGlobalResourceSemAnn :: Identifier -> SemanticAnn
+refGlobalResourceSemAnn name = refSemAnn (TGlobal ResourceClass name)
+
+resourceObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
+resourceObjSemAnn ak name = objSemAnn ak (TGlobal ResourceClass name)
+
+refEnumSemAnn :: Identifier -> SemanticAnn
+refEnumSemAnn name = refSemAnn (TEnum name)
 
 poolSemAnn :: TerminaType -> SemanticAnn
 poolSemAnn ts = objSemAnn Mutable (TAccessPort (TAllocator ts))

@@ -8,7 +8,7 @@ import qualified Data.Text.Lazy.IO as TLIO
 import Errata
 import Errata.Styles
 
-import Core.AST
+import Semantic.AST
 import Numeric
 import Utils.Annotations
 import Text.Parsec.Pos
@@ -59,7 +59,10 @@ instance ShowText TerminaType where
     showText TUSize = "usize"
     showText TBool = "bool"
     showText TChar = "char"
-    showText (TDefinedType ident) = T.pack ident
+    showText (TStruct ident) = T.pack ident
+    showText (TEnum ident) = T.pack ident
+    showText (TInterface ident) = T.pack ident
+    showText (TGlobal _ ident) = T.pack ident
     showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TOption ts) = "Option<" <> showText ts <> ">"
     showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
@@ -78,7 +81,7 @@ instance ShowText TerminaType where
     showText (TOutPort ts) = "out " <> showText ts
     showText TUnit = "()"
 
-instance ShowText Const where
+instance (ShowText ty) => ShowText (Const' ty) where
     showText (I (TInteger value DecRepr) Nothing) = T.pack $ show value
     showText (I (TInteger value HexRepr) Nothing) = T.toUpper . T.pack $ "0x" <> showHex value ""
     showText (I (TInteger value DecRepr) (Just ts)) = T.pack (show value) <> " : " <> showText ts
@@ -89,7 +92,7 @@ instance ShowText Const where
     showText (B False) = "false"
     showText (C c) = T.pack [c]
 
-instance ShowText (TypeDef' blk a) where
+instance ShowText (TypeDef' ty blk a) where
     showText (Struct ident _ _) = T.pack $ "struct " <> ident
     showText (Enum ident _ _) = T.pack $ "enum " <> ident
     showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
@@ -99,7 +102,7 @@ instance ShowText (TypeDef' blk a) where
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
     showText (Interface ident _ _) = T.pack $ "interface " <> ident
 
-printSimpleError :: TL.Text -> T.Text -> String -> TLocation -> Maybe T.Text -> IO ()
+printSimpleError :: TL.Text -> T.Text -> String -> Location -> Maybe T.Text -> IO ()
 printSimpleError sourceLines errorMessage fileName (Position start end) msg = 
     TLIO.putStrLn $ prettyErrors 
         sourceLines

@@ -14,20 +14,20 @@ import Control.Monad.Except
 import Prettyprinter
 
 self, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnn
-self = Variable "self" (refDefinedTypeSemAnn "Resource")
-tmChannel = Variable "tm_channel" (msgQueueSemAnn (TDefinedType "TMDescriptor"))
+self = Variable "self" (refGlobalResourceSemAnn "Resource")
+tmChannel = Variable "tm_channel" (msgQueueSemAnn (TStruct "TMDescriptor"))
 tmPool = Variable "tm_pool" (poolSemAnn TUInt32)
 bar0 = Variable "bar0" (objSemAnn Mutable TUInt16)
 bar1 = Variable "bar1" boxUInt16SemAnn
 
 refObj :: Expression SemanticAnn
-refObj = (ReferenceExpression Mutable (Variable "memory" (objSemAnn Mutable (TOption (TBoxSubtype TUInt32)))) (refSemAnn (TOption (TBoxSubtype TUInt32))))
+refObj = ReferenceExpression Mutable (Variable "memory" (objSemAnn Mutable (TOption (TBoxSubtype TUInt32)))) (refSemAnn (TOption (TBoxSubtype TUInt32)))
 
 tmPoolAlloc :: Expression SemanticAnn
 tmPoolAlloc = MemberFunctionCall tmPool "alloc" [refObj] (funSemAnn [] TUnit)
 
 selfDereference :: Object SemanticAnn
-selfDereference = Dereference self (definedTypeObjSemAnn Mutable "Resource")
+selfDereference = Dereference self (resourceObjSemAnn Mutable "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnn
 tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [TUInt16] TUnit)

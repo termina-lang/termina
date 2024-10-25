@@ -3,20 +3,54 @@
 module ControlFlow.BasicBlocks.AST (
   module ControlFlow.BasicBlocks.AST,
   module Core.AST,
-  Object(..),
-  Expression'(..)
+  Object'(..),
+  Expression'(..),
+  Object,
+  Expression,
+  FieldDefinition,
+  InterfaceMember,
+  EnumVariant,
+  Parameter,
+  Modifier,
+  Const
 ) where
 
 import Core.AST
-import Semantic.AST (Expression'(..), Object(..))
+import Semantic.AST (
+  Expression'(..), 
+  Object'(..), 
+  FieldDefinition, 
+  InterfaceMember,
+  EnumVariant,
+  Parameter, 
+  Expression, 
+  Object, 
+  Modifier, 
+  Const)
 import Modules.Modules
 
-data Statement' expr obj a =
+
+data MatchCase' ty expr obj a = MatchCase
+  {
+    matchIdentifier :: Identifier
+  , matchBVars      :: [Identifier]
+  , matchBody       :: Block' ty expr obj a
+  , matchAnnotation :: a
+  } deriving (Show,Functor)
+
+data ElseIf' ty expr obj a = ElseIf
+  {
+    elseIfCond       :: expr a
+  , elseIfBody       :: Block' ty expr obj a
+  , elseIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data Statement' ty expr obj a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TerminaType -- ^ type of the variable
+    ty -- ^ type of the variable
     (expr a) -- ^ initialization expression
     a
   | AssignmentStmt
@@ -28,38 +62,23 @@ data Statement' expr obj a =
     a
   deriving (Show, Functor)
 
-data ElseIf' expr obj a = ElseIf
-  {
-    elseIfCond       :: expr a
-  , elseIfBody       :: Block' expr obj a
-  , elseIfAnnotation :: a
-  } deriving (Show, Functor)
-
-data MatchCase' expr obj a = MatchCase
-  {
-    matchIdentifier :: Identifier
-  , matchBVars      :: [Identifier]
-  , matchBody       :: Block' expr obj a
-  , matchAnnotation :: a
-  } deriving (Show,Functor)
-
-data BasicBlock' expr obj a =
+data BasicBlock' ty expr obj a =
     -- | If-else-if basic block
     IfElseBlock 
         (expr a) -- ^ conditional expression
-        (Block' expr obj a) -- ^ basic blocks in the if block
-        [ElseIf' expr obj a] -- ^ list of else if blocks (possibly empty)
-        (Maybe (Block' expr obj a)) a -- ^ basic blocks in the else
+        (Block' ty expr obj a) -- ^ basic blocks in the if block
+        [ElseIf' ty expr obj a] -- ^ list of else if blocks (possibly empty)
+        (Maybe (Block' ty expr obj a)) a -- ^ basic blocks in the else
     -- | For-loop basic block
     | ForLoopBlock 
         Identifier -- ^ name of the iterator variable
-        TerminaType -- ^ type of iterator variable
+        ty -- ^ type of iterator variable
         (expr a) -- ^ initial value of the iterator
         (expr a) -- ^ final value of the iterator
         (Maybe (expr a)) -- ^ break condition (optional)
-        (Block' expr obj a) a
+        (Block' ty expr obj a) a
     -- | Match basic block
-    | MatchBlock (expr a) [MatchCase' expr obj a] a
+    | MatchBlock (expr a) [MatchCase' ty expr obj a] a
     -- | Send message
     | SendMessage (obj a) (expr a) a
     -- | Call to a resource procedure
@@ -97,7 +116,7 @@ data BasicBlock' expr obj a =
         (expr a) -- ^ argument expression
         a
     -- | Regular block (list of statements)
-    | RegularBlock [Statement' expr obj a]
+    | RegularBlock [Statement' ty expr obj a]
     | ReturnBlock 
         (Maybe (expr a)) -- ^ return expression
         a
@@ -107,31 +126,28 @@ data BasicBlock' expr obj a =
     deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-data Block' expr obj a
+data Block' ty expr obj a
   = Block
   {
-    blockBody :: [BasicBlock' expr obj a],
+    blockBody :: [BasicBlock' ty expr obj a],
     blockAnnotation :: a
   }
   deriving (Show, Functor)
 
--- type OptionVariant a = OptionVariant' (Expression a)
-type Expression = Expression' Object
+type BasicBlock = BasicBlock' TerminaType Expression Object
 
-type BasicBlock = BasicBlock' Expression Object
-
-type Block = Block' Expression Object
+type Block = Block' TerminaType Expression Object
 type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TerminaType Expression
 
-type TypeDef = TypeDef' Block
+type TypeDef = TypeDef' TerminaType Block
 
-type ClassMember = ClassMember' Block
+type ClassMember = ClassMember' TerminaType Block
 
-type MatchCase = MatchCase' Expression Object
-type ElseIf = ElseIf' Expression Object
-type Statement = Statement' Expression Object
+type MatchCase = MatchCase' TerminaType Expression Object
+type ElseIf = ElseIf' TerminaType Expression Object
+type Statement = Statement' TerminaType Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
 

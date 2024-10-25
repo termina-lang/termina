@@ -14,7 +14,7 @@ import qualified Data.Map as M
 
 type BoxCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
-checkNextSource :: TLocation -> BoxCheckMonad () -> BoxCheckMonad ()
+checkNextSource :: Location -> BoxCheckMonad () -> BoxCheckMonad ()
 checkNextSource loc = withExceptT (\case {
         AnnotatedError (EMismatchedBoxSource expectedSource actualSource traceLocations) lastLocation ->
             AnnotatedError (EMismatchedBoxSource expectedSource actualSource (loc : traceLocations)) lastLocation;

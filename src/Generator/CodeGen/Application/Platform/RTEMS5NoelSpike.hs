@@ -28,7 +28,7 @@ import Generator.CodeGen.Application.OS.RTEMS.Utils
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do
     let declStmt = internalAnn (CDeclarationAnn before)
-    cType <- genType noqual (TDefinedType (namefy ("rtems" <::> "interrupt_emitter_t")))
+    cType <- genType noqual (TStruct (namefy ("rtems" <::> "interrupt_emitter_t")))
     return $ CExtDecl (CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 genInterruptEmitterDeclaration _ obj = throwError $ InternalError ("Invalid object (not an interrupt emitter): " ++ show obj)
 
@@ -80,7 +80,7 @@ genTaskClassCode tskCls = do
         genCase (port, dts, action) = do
             this_variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action
-            classStructType <- genType noqual (TDefinedType classId)
+            classStructType <- genType noqual (TStruct classId)
             cDataType <- genType noqual dts
             let classFunctionType = CTFunction _Result
                     [_const . ptr $ classStructType, cDataType]
@@ -120,7 +120,7 @@ genTaskClassCode tskCls = do
 
         genLoop :: CSourceGenerator CStatement
         genLoop = do
-            classStructType <- genType noqual (TDefinedType classId)
+            classStructType <- genType noqual (TStruct classId)
             cases <- concat <$> mapM genCase actions
             return $ trail_cr . block $ [
                     -- | status = rtems_message_queue_receive(

@@ -39,7 +39,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [TUInt32],
     EnumVariant "variant1" [],
-    EnumVariant "variant2" [TUInt64, TDefinedType "id1", TChar],
+    EnumVariant "variant2" [TUInt64, TEnum "id1", TChar],
     EnumVariant "variant3" [TInt8, TArray (TArray TChar (K (TInteger 20 DecRepr))) (K (TInteger 35 DecRepr))]
   ] []) undefined
 

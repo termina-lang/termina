@@ -46,7 +46,7 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        TDefinedType _ -> 
+                        TGlobal _ _ -> 
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
@@ -90,7 +90,7 @@ genBBlocks acc (stmt : xs) =
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        TDefinedType _ -> 
+                        TGlobal _ _ -> 
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If we are calling a function from a reference, it
                         -- means that we are calling an inner function of the
@@ -101,7 +101,7 @@ genBBlocks acc (stmt : xs) =
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If the object is an access port of a user-defined interface type, we shall create
                         -- a new procedure call block
-                        TAccessPort (TDefinedType {}) -> 
+                        TAccessPort (TInterface {}) -> 
                             genBBlocks (ProcedureCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block
                         -- of the corresponding type (AllocBox or FreeBox)

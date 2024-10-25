@@ -26,16 +26,16 @@ data Error
   | EUsedIgnoredParameter Identifier -- ^ Using a variable that is ignored (VE-001)
   | ENotUsed Identifier -- ^ Variable is not used (VE-002)
   | EBoxNotMoved Identifier -- ^ Box variable is not moved (VE-003)
-  | EBoxMovedTwice Identifier TLocation -- ^ Box variable is moved twice (VE-004)
-  | EOptionBoxMovedTwice Identifier TLocation -- ^ TOption-box variable is moved twice (VE-005)
-  | EDifferentOptionBoxUse Identifier MVars (MVars, TLocation) -- ^ TOption-box final state mismatch (VE-006)
+  | EBoxMovedTwice Identifier Location -- ^ Box variable is moved twice (VE-004)
+  | EOptionBoxMovedTwice Identifier Location -- ^ TOption-box variable is moved twice (VE-005)
+  | EDifferentOptionBoxUse Identifier MVars (MVars, Location) -- ^ TOption-box final state mismatch (VE-006)
   | EDifferentNewOptionBoxUse Identifier MVars -- ^ TOption-box used in conditional branch (VE-007)
   | EMissingOptionBox Identifier MVars -- ^ TOption-box unused in a branch but used previously (VE-008)
-  | EMissingBoxMove Identifier TLocation -- ^ Box variable is not always moved (VE-009)
+  | EMissingBoxMove Identifier Location -- ^ Box variable is not always moved (VE-009)
   | EBoxMoveConditionalBranch Identifier -- ^ Box variable moved in conditional branch (VE-010)
   | EAllocNotMoved Identifier -- ^ TOption-box allocated but not moved (VE-011)
-  | EAllocTwice Identifier TLocation -- ^ TOption-box allocated twice (VE-012)
-  | EMovedWithoutAlloc Identifier TLocation -- ^ TOption-box moved but not allocated (VE-013)
+  | EAllocTwice Identifier Location -- ^ TOption-box allocated twice (VE-012)
+  | EMovedWithoutAlloc Identifier Location -- ^ TOption-box moved but not allocated (VE-013)
   deriving Show
 
-type VarUsageError = AnnotatedError Error TLocation
+type VarUsageError = AnnotatedError Error Location
