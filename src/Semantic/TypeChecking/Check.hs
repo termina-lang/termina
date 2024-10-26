@@ -105,25 +105,19 @@ checkTerminaType _ _ = return ()
 checkParameterType :: Location -> SAST.Parameter -> SemanticMonad ()
 checkParameterType loc p =
     let typeSpec = paramType p in
-     -- If the type specifier is a box, then we must throw an EArgHasBox error
-     -- since we cannot have box types as parameters.
     unless (parameterTy typeSpec) (throwError (annotateError loc (EInvalidParameterType p))) >>
     checkTerminaType loc typeSpec
 
 checkProcedureParameterType :: Location -> SAST.Parameter -> SemanticMonad ()
 checkProcedureParameterType loc p =
     let typeSpec = paramType p in
-     -- If the type specifier is a box, then we must throw an EArgHasBox error
-     -- since we cannot have box types as parameters.
     unless (procedureParamTy typeSpec) (throwError (annotateError loc (EInvalidProcedureParameterType p))) >>
     checkTerminaType loc typeSpec
 
 checkActionParameterType :: Location -> SAST.Parameter -> SemanticMonad ()
 checkActionParameterType loc p =
     let typeSpec = paramType p in
-     -- If the type specifier is a box, then we must throw an EArgHasBox error
-     -- since we cannot have box types as parameters.
-    unless (actionParamTy typeSpec) (throwError (annotateError loc (EInvalidProcedureParameterType p))) >>
+    unless (actionParamTy typeSpec) (throwError (annotateError loc (EInvalidActionParameterType p))) >>
     checkTerminaType loc typeSpec
     
 checkReturnType :: Location -> TerminaType -> SemanticMonad ()
