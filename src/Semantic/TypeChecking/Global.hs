@@ -54,6 +54,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
   case ty of
+    -- | User-defined resources
     TGlobal ResourceClass _ -> do
       exprty <-
         case mexpr of
@@ -62,10 +63,26 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Nothing   -> return Nothing
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+    -- | Memory pools 
     TPool _ _ -> do
       exprty <-
         case mexpr of
-          -- If it has an initial value great
+          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
+          Nothing   -> return Nothing
+      tyMods <- mapM (typeModifier anns) mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+    -- | Atomic variables 
+    TAtomic _ -> do
+      exprty <-
+        case mexpr of
+          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
+          Nothing   -> return Nothing
+      tyMods <- mapM (typeModifier anns) mods
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+    -- | Atomic arrays
+    TAtomicArray _ _ -> do
+      exprty <-
+        case mexpr of
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           Nothing   -> return Nothing
       tyMods <- mapM (typeModifier anns) mods

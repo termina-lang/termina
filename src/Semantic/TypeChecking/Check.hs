@@ -15,16 +15,17 @@ checkConstant :: Location -> TerminaType -> SAST.Const -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTerminaType loc type_c >>
+  -- | Check that the constant is well-typed
+  catchExpectedNum loc EInvalidNumericConstantType (numTyOrFail loc type_c) >>
   -- | Check that the explicit type matches the expected type
   sameTyOrError loc expected_type type_c >>
   -- | Check that the constant is in the range of the type
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
+  -- | Check that the expected type is a number
+  catchExpectedNum loc EUnexpectedNumericConstant (numTyOrFail loc expected_type) >>
   -- | Check that the constant is in the range of the type
-  case expected_type of
-    TBool -> throwError $ annotateError loc ENumericConstantNotBool
-    TChar -> throwError $ annotateError loc ENumericConstantNotChar
-    _ -> checkIntConstant loc expected_type ti
+  checkIntConstant loc expected_type ti
 checkConstant loc expected_type (B {}) =
   sameTyOrError loc expected_type TBool
 checkConstant loc expected_type (C {}) =
