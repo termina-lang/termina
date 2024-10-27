@@ -487,9 +487,9 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameTypeExpressions ::
       (TerminaType -> Bool)
       -- | Left hand side error constructor
-      -> (TerminaType -> Error ParserAnn)
+      -> (TerminaType -> Error)
       -- | Right hand side error constructor
-      -> (TerminaType -> Error ParserAnn)
+      -> (TerminaType -> Error)
       -- | Left hand side expression
       -> Expression ParserAnn
       -- | Right hand side expression

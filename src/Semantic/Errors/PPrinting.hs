@@ -916,7 +916,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified."))
-    ESymbolDefined ident symbolPos@(Position symbolStart _symbolEnd) ->
+    ESymbolAlreadyDefined (ident, symbolPos@(Position symbolStart _symbolEnd)) ->
         let title = "\x1b[31merror [SE-082]\x1b[0m: symbol already defined."
             symbolFileName = sourceName symbolStart
             symbolSourceLines = toModuleAST M.! symbolFileName

@@ -11,7 +11,7 @@ import Utils.Annotations
 ----------------------------------------
 -- Type checker error handling
 ----------------------------------------
-data Error a
+data Error
   -- | Expected /similar/ types?
   = 
     EMismatch TerminaType TerminaType -- ^ Type mismatch (Internal)
@@ -36,35 +36,35 @@ data Error a
   | ENotCasteable TerminaType TerminaType -- ^ Casting error (SE-006)
   | EInvalidParameterType Parameter -- ^ Invalid parameter type (SE-007)
   | EInvalidReturnType TerminaType -- ^ Invalid return type (SE-008)
-  | EProcedureCallExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in procedure call (SE-009)
-  | EProcedureCallMissingParams (Identifier, [TerminaType], a) Integer -- ^ Missing parameters in procedure call (SE-010)
-  | EProcedureCallParamTypeMismatch (Identifier, TerminaType, a) Integer TerminaType -- ^ Parameter type mismatch in procedure call (SE-011)
+  | EProcedureCallExtraParams (Identifier, [TerminaType], Location) Integer -- ^ Extra parameters in procedure call (SE-009)
+  | EProcedureCallMissingParams (Identifier, [TerminaType], Location) Integer -- ^ Missing parameters in procedure call (SE-010)
+  | EProcedureCallParamTypeMismatch (Identifier, TerminaType, Location) Integer TerminaType -- ^ Parameter type mismatch in procedure call (SE-011)
   | EUnknownProcedure Identifier -- ^ Unknown procedure (SE-012)
   | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (SE-013)
-  | EResourceClassAction (Identifier, a) Identifier -- ^ Resource class defines an action (SE-014)
-  | EResourceClassInPort (Identifier, a) Identifier -- ^ Resource class defines an in port (SE-015)
-  | EResourceClassOutPort (Identifier, a) Identifier -- ^ Resource class defines an out port (SE-016)
+  | EResourceClassAction (Identifier, Location) Identifier -- ^ Resource class defines an action (SE-014)
+  | EResourceClassInPort (Identifier, Location) Identifier -- ^ Resource class defines an in port (SE-015)
+  | EResourceClassOutPort (Identifier, Location) Identifier -- ^ Resource class defines an out port (SE-016)
   | EInterfaceNotFound Identifier -- ^ Interface not found (SE-017)
   | EGlobalNotInterface Identifier -- ^ The type is not an interface (SE-018)
-  | EProcedureNotFromProvidedInterfaces (Identifier, a) Identifier -- ^ Procedure not from provided interfaces (SE-019)
+  | EProcedureNotFromProvidedInterfaces (Identifier, Location) Identifier -- ^ Procedure not from provided interfaces (SE-019)
   | EMissingProcedure Identifier Identifier -- ^ Missing procedure (SE-020)
-  | EProcedureExtraParams (Identifier, Identifier, [TerminaType], a) Integer -- ^ Extra parameters in procedure definition (SE-021)
-  | EProcedureMissingParams (Identifier, Identifier, [TerminaType], a) Integer -- ^ Missing parameters in procedure definition (SE-022)
-  | EProcedureParamTypeMismatch (Identifier, Identifier, TerminaType, a) TerminaType -- ^ Parameter type mismatch in procedure definition (SE-023)
+  | EProcedureExtraParams (Identifier, Identifier, [TerminaType], Location) Integer -- ^ Extra parameters in procedure definition (SE-021)
+  | EProcedureMissingParams (Identifier, Identifier, [TerminaType], Location) Integer -- ^ Missing parameters in procedure definition (SE-022)
+  | EProcedureParamTypeMismatch (Identifier, Identifier, TerminaType, Location) TerminaType -- ^ Parameter type mismatch in procedure definition (SE-023)
   | ETaskClassProvides Identifier -- ^ Task class provides an interface (SE-024)
-  | ETaskClassProcedure (Identifier, a) Identifier -- ^ Task class defines a procedure (SE-025)
+  | ETaskClassProcedure (Identifier, Location) Identifier -- ^ Task class defines a procedure (SE-025)
   | ETaskClassNoActions Identifier -- ^ Task class does not define any actions (SE-026)
   | EHandlerClassProvides Identifier -- ^ Handler class provides an interface (SE-027)
-  | EHandlerClassProcedure (Identifier, a) Identifier -- ^ Handler class defines a procedure (SE-028)
+  | EHandlerClassProcedure (Identifier, Location) Identifier -- ^ Handler class defines a procedure (SE-028)
   | EHandlerClassNoAction Identifier -- ^ Handler class does not define any actions (SE-029)
-  | EHandlerClassMultipleActions Identifier a -- ^ Handler class defines multiple actions (SE-030)
+  | EHandlerClassMultipleActions Identifier Location -- ^ Handler class defines multiple actions (SE-030)
   | EHandlerClassNoSinkPort Identifier -- ^ Handler class does not define a sink port (SE-031)
-  | EHandlerClassMultipleSinkPorts Identifier a -- ^ Handler class defines multiple sink ports (SE-032)
-  | EHandlerClassInPort (Identifier, a) Identifier -- ^ Handler class defines an in port (SE-033)
+  | EHandlerClassMultipleSinkPorts Identifier Location -- ^ Handler class defines multiple sink ports (SE-032)
+  | EHandlerClassInPort (Identifier, Location) Identifier -- ^ Handler class defines an in port (SE-033)
   | EIfElseIfCondNotBool TerminaType -- ^ If-else-if condition is not a boolean (SE-034)
-  | EFunctionCallExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in function call (SE-035)
-  | EFunctionCallMissingParams (Identifier, [TerminaType], a) Integer -- ^ Missing parameters in function call (SE-036)
-  | EFunctionCallParamTypeMismatch (Identifier, TerminaType, a) TerminaType -- ^ Parameter type mismatch in function call (SE-037)
+  | EFunctionCallExtraParams (Identifier, [TerminaType], Location) Integer -- ^ Extra parameters in function call (SE-035)
+  | EFunctionCallMissingParams (Identifier, [TerminaType], Location) Integer -- ^ Missing parameters in function call (SE-036)
+  | EFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) TerminaType -- ^ Parameter type mismatch in function call (SE-037)
   | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (SE-038)
   | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (SE-039)
   | EMutableReferenceToPrivate -- ^ Mutable reference to immutable object (SE-040)
@@ -106,25 +106,25 @@ data Error a
   | EInvalidArrayType TerminaType -- ^ Invalid array type (SE-076)
   | EInvalidBoxType TerminaType -- ^ Invalid box type (SE-077)
   | ENoTypeFound Identifier -- ^ Type not found (SE-078)
-  | EGlobalNotType (Identifier, a) -- ^ Global object but not a type (SE-079)
+  | EGlobalNotType (Identifier, Location) -- ^ Global object but not a type (SE-079)
   | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (SE-080)
   | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (SE-081)
-  | ESymbolDefined Identifier a -- ^ Symbol already defined (SE-082)
+  | ESymbolAlreadyDefined (Identifier, Location) -- ^ Symbol already defined (SE-082)
   | EExpressionNotConstant -- ^ Expression not constant (SE-083)
   | EContinueInvalidExpression -- ^ Invalid expression in continue statement (SE-084)
   | EContinueInvalidProcedureCall Identifier -- ^ Invalid procedure call in continue statement (SE-085)
   | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement (SE-086)
   | EContinueInvalidMemberCall TerminaType -- ^ Invalid member call in continue statement (SE-087)
   | EContinueActionNotFound Identifier -- ^ Action not found in continue statement (SE-088)
-  | EContinueActionExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in action call in continue statement (SE-089)
-  | EContinueActionMissingParam (Identifier, a) -- ^ Missing parameters in action call in continue statement (SE-090)
+  | EContinueActionExtraParams (Identifier, [TerminaType], Location) Integer -- ^ Extra parameters in action call in continue statement (SE-089)
+  | EContinueActionMissingParam (Identifier, Location) -- ^ Missing parameters in action call in continue statement (SE-090)
   | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer (SE-091)
   | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found (SE-092)
-  | EEnumVariantExtraParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Extra parameters in enum variant (SE-093)
-  | EEnumVariantMissingParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Missing parameters in enum variant (SE-094)
-  | EEnumVariantParamTypeMismatch (Identifier, a) (Identifier, Integer, TerminaType) TerminaType -- ^ Parameter type mismatch in enum variant (SE-095)
+  | EEnumVariantExtraParams (Identifier, Location) (Identifier, [TerminaType]) Integer -- ^ Extra parameters in enum variant (SE-093)
+  | EEnumVariantMissingParams (Identifier, Location) (Identifier, [TerminaType]) Integer -- ^ Missing parameters in enum variant (SE-094)
+  | EEnumVariantParamTypeMismatch (Identifier, Location) (Identifier, Integer, TerminaType) TerminaType -- ^ Parameter type mismatch in enum variant (SE-095)
   | EFunctionNotFound Identifier -- ^ Function not found (SE-096)
-  | EGlobalNotFunction (Identifier, a) -- ^ Global object but not a function (SE-097)
+  | EGlobalNotFunction (Identifier, Location) -- ^ Global object but not a function (SE-097)
   | EUnexpectedNumericConstant TerminaType -- ^ Unexpected numeric constant (SE-098)
   | EInvalidAssignmentExprType TerminaType -- ^ Invalid assignment expression type (SE-099)
   | EInvalidMessageType TerminaType -- ^ Invalid message type (SE-100)
@@ -140,7 +140,7 @@ data Error a
   | EInvalidNumericConstantType TerminaType -- ^ Invalid numeric constant type (SE-110)
   | EInvalidActionParameterType Parameter -- ^ Invalid action parameter type (SE-111)
   | EInvalidProcedureParameterType Parameter -- ^ Invalid procedure parameter type (SE-112)
-  | EMemberFunctionCallParamTypeMismatch (Identifier, TerminaType, a) Integer TerminaType -- ^ Parameter type mismatch in member function call (SE-113)
+  | EMemberFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) Integer TerminaType -- ^ Parameter type mismatch in member function call (SE-113)
   | EArrayIndexNotUSize TerminaType -- ^ Array index not usize (SE-114)
   | EArraySliceLowerBoundNotUSize TerminaType -- ^ Array slice lower bound not usize (SE-115)
   | EArraySliceUpperBoundNotUSize TerminaType -- ^ Array slice upper bound not usize (SE-116)
@@ -159,7 +159,7 @@ data Error a
   | EMemberAccessNotField Identifier -- TODO: We can return the list of identifiers.
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
-  | EMemberFunctionUDef (SemanTypeDef a)
+  | EMemberFunctionUDef (SemanTypeDef Location)
   | EMemberMethodType
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
@@ -169,14 +169,14 @@ data Error a
   -- | ForLoop
   | EForIteratorWrongType TerminaType
   -- | Defined GEntry
-  | EDefinedGEntry (GEntry a)
+  | EDefinedGEntry (GEntry Location)
   -- | Impossible Cases. Internal Transpiler errors
   | EUnboxingStmtExpr -- Unboxing statement as an expression.
   | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
-  | EUsedTypeName Identifier a
+  | EUsedTypeName Identifier Location
   -- | Unique names for Global
-  | EUsedGlobalName Identifier a
+  | EUsedGlobalName Identifier Location
   -- | Access port does not have an Interface type
   | EAccessPortNotInterface TerminaType
   | EAccessPortNotResource Identifier 
@@ -216,7 +216,7 @@ data Error a
   | EMatchExtraCases
   -- Enum variant expressions
   | ETyNotEnumFound Identifier
-  | ETyNotEnum Identifier (SemanTypeDef a)
+  | ETyNotEnum Identifier (SemanTypeDef Location)
   | EIsVariantNotEnum TerminaType
   | EIsVariantNotOption TerminaType
   | EIsVariantEnumMismatch Identifier Identifier
@@ -226,7 +226,7 @@ data Error a
   | EOutputPortSendWrongArgs
   deriving Show
 
-type SemanticErrors = AnnotatedError (Error Location) Location
+type SemanticErrors = AnnotatedError Error Location
 
-instance Annotated (AnnotatedError (Error Location)) where
+instance Annotated (AnnotatedError Error) where
   getAnnotation (AnnotatedError _err ann) = ann

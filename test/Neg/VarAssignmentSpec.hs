@@ -10,7 +10,7 @@ import Semantic.Monad
 import Semantic.Errors.Errors
 import Utils.Annotations
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe Error
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -87,5 +87,5 @@ spec = do
         isEAssignmentToImmutable
   
   where
-    isEAssignmentToImmutable :: Maybe (Error Location) -> Bool
+    isEAssignmentToImmutable :: Maybe Error -> Bool
     isEAssignmentToImmutable = \case Just EAssignmentToImmutable -> True; _ -> False

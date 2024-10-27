@@ -12,7 +12,7 @@ import Semantic.AST
 import Utils.Annotations
 
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe Error
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -66,10 +66,10 @@ spec = do
           isEInvalidReturnType (TArray TUInt8 (K (TInteger 10 DecRepr)))
   
   where
-    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe (Error Location) -> Bool
+    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe Error -> Bool
     isEInvalidParameterType ident ts = 
       \case Just (EInvalidParameterType (Parameter ident' ts')) -> ident == ident' && ts == ts'; _ -> False
     
-    isEInvalidReturnType :: TerminaType -> Maybe (Error Location) -> Bool
+    isEInvalidReturnType :: TerminaType -> Maybe Error -> Bool
     isEInvalidReturnType ts = 
       \case Just (EInvalidReturnType ts') -> ts == ts'; _ -> False

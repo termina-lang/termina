@@ -224,7 +224,7 @@ insertLocalMutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
     Nothing -> modify (\s -> s{local = M.insert ident (Located (Mutable, ty) loc) (local s)})
-    Just prevloc -> throwError $ annotateError loc $ ESymbolDefined ident prevloc
+    Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
 
 -- | Insert immutable object (variable) in local scope.
 insertLocalImmutObj :: Location -> Identifier -> TerminaType -> SemanticMonad ()
@@ -232,7 +232,7 @@ insertLocalImmutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
     Nothing -> modify (\s -> s{local = M.insert ident (Located (Immutable, ty) loc) (local s)})
-    Just prevloc -> throwError $ annotateError loc $ ESymbolDefined ident prevloc
+    Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
   
 insertGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticMonad ()
 insertGlobalTy loc tydef =
@@ -244,7 +244,7 @@ insertGlobalFun :: Location -> Identifier -> [TerminaType] -> TerminaType -> Sem
 insertGlobalFun loc ident ps rettype =
   insertGlobal ident (Located (GFun (FunctionSeman ps rettype)) loc) (EUsedFunName ident)
 
-insertGlobal :: Identifier -> Located (GEntry SemanticAnn) -> (Location -> Error Location) -> SemanticMonad ()
+insertGlobal :: Identifier -> Located (GEntry SemanticAnn) -> (Location -> Error) -> SemanticMonad ()
 insertGlobal ident entry err =
   glbWhereIsDefined ident >>=
   \case
@@ -423,7 +423,7 @@ catchMismatch ::
   -- | Location of the error
   Parser.ParserAnn 
   -- | Function to create the error
-  -> (TerminaType -> Error Parser.ParserAnn) 
+  -> (TerminaType -> Error) 
   -- | Action to execute
   -> SemanticMonad a 
   -- | Action to execute
@@ -449,7 +449,7 @@ catchExpectedCopy ::
   -- | Location of the error
   Parser.ParserAnn
   -- | Function to create the error
-  -> (TerminaType -> Error Location)
+  -> (TerminaType -> Error)
   -- | Action to execute
   -> SemanticMonad a
   -- | Action to execute
@@ -462,7 +462,7 @@ catchExpectedNum ::
   -- | Location of the error
   Parser.ParserAnn
   -- | Function to create the error
-  -> (TerminaType -> Error Location)
+  -> (TerminaType -> Error)
   -- | Action to execute
   -> SemanticMonad a
   -- | Action to execute

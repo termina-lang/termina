@@ -125,7 +125,7 @@ checkReturnType anns ty =
   checkTerminaType anns ty >>
   unless (copyTy ty) (throwError (annotateError anns (EInvalidReturnType ty)))
 
-checkUniqueNames :: Location -> ([Identifier] -> Error Location) -> [Identifier] -> SemanticMonad ()
+checkUniqueNames :: Location -> ([Identifier] -> Error) -> [Identifier] -> SemanticMonad ()
 checkUniqueNames ann err is =
   if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))

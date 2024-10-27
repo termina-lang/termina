@@ -12,7 +12,7 @@ import Semantic.AST
 import Utils.Annotations
 
 
-runNegativeTest :: String -> Maybe (Error Location)
+runNegativeTest :: String -> Maybe Error
 runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
@@ -65,8 +65,8 @@ spec = do
         isEIfElseIfCondNotBool
   
   where
-    isEIfElseNoOtherwise :: Maybe (Error Location) -> Bool
+    isEIfElseNoOtherwise :: Maybe Error -> Bool
     isEIfElseNoOtherwise = \case Just EIfElseNoOtherwise -> True; _ -> False
 
-    isEIfElseIfCondNotBool :: Maybe (Error Location) -> Bool
+    isEIfElseIfCondNotBool :: Maybe Error -> Bool
     isEIfElseIfCondNotBool = \case Just (EIfElseIfCondNotBool TUInt32) -> True; _ -> False
