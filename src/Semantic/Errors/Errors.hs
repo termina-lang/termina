@@ -17,7 +17,9 @@ data Error a
     EMismatch TerminaType TerminaType -- ^ Type mismatch (Internal)
   | ENoStructFound Identifier -- ^ Struct not found (Internal)
   | EUnboxingObject -- ^ Error when unboxing an annotated object to get its type (Internal)
+  | EUnboxingExpression -- ^ Error when unboxing an expression to get its type (Internal)
   | EUnboxingStructType -- ^ Error when unboxing a struct type (Internal)
+  | EUnboxingEnumType -- ^ Error when unboxing an enum type (Internal)
   | EUnboxingClassType -- ^ Error when unboxing a class type (Internal)
   | EExpectedArrayTy TerminaType -- ^ Expected a valid type for the elements of an array (Internal)
   | EExpectedCopyType TerminaType -- ^ Expected a copiable type (Internal)
@@ -25,6 +27,7 @@ data Error a
   | ENotNamedGlobal Identifier -- ^ Global object not found (Internal)
   | EInvalidObjectDeclaration Identifier -- ^ Invalid object declaration (Internal)
   | EMalformedSlice -- ^ Malformed slice (Internal)
+  | EMalformedClassTyping -- ^ Malformed class typing (Internal)
   | EInvalidArrayIndexing TerminaType -- ^ Invalid array indexing (SE-001)
   | ENotNamedObject Identifier -- ^ Object not found (SE-002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (SE-003)
@@ -87,61 +90,61 @@ data Error a
   | EConstantWithoutKnownType Const -- ^ Constant without known type (SE-060)
   | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (SE-061)
   | EStructInitializerTypeMismatch TerminaType TerminaType -- ^ Struct initializer type mismatch (SE-062)
-  | EStructInitializerGlobalNotStruct (SemanTypeDef a) -- ^ Struct initializer expected global type not struct (SE-063)  
-  | EEnumInitializerExpectedTypeMismatch TerminaType TerminaType -- ^ Enum initializer expected type mismatch (SE-064)
-  | EStructInitializerExpectedTypeNotStruct TerminaType -- ^ Struct initializer expected type not struct (SE-064)
-  | EStructInitializerUnknownType Identifier -- ^ Struct initializer unknown type (SE-065)
-  | ESliceInvalidUse -- ^ Invalid use of a slice (SE-066)
-  | EArrayInitializerInvalidUse -- ^ Invalid use of an array initializer (SE-067)
-  | EArrayInitializerNotArray TerminaType -- ^ Assignment of an array initializer to a non-array type (SE-068)
-  | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer (SE-069)
-  | EArrayExprListInitializerNotArray TerminaType -- ^ Assignment of an expression list array initializer to a non-array type (SE-070)
-  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer (SE-071)
-  | EArrayInitializerSizeMismatch Size Size -- ^ TArray initializer size mismatch (SE-072)
-  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ TArray expression list array initializer size mismatch (SE-073)
-  | EArrayExprListInitializerExprTypeMismatch TerminaType TerminaType -- ^ TArray initializing expression type mismatch (SE-074)
-  | EReturnValueExpected TerminaType -- ^ Expected return value (SE-075)
-  | EReturnValueNotUnit -- ^ Return value not expected (SE-076)
-  | EInvalidArrayType TerminaType -- ^ Invalid array type (SE-077)
-  | EInvalidBoxType TerminaType -- ^ Invalid box type (SE-078)
-  | ENoTypeFound Identifier -- ^ Type not found (SE-079 & Internal)
-  | EGlobalNotType Identifier -- ^ Global object but not a type (SE-080)
-  | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (SE-081)
-  | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (SE-082)
-  | ESymbolDefined Identifier a -- ^ Symbol already defined (SE-083)
-  | EExpressionNotConstant -- ^ Expression not constant (SE-084)
-  | EContinueInvalidExpression -- ^ Invalid expression in continue statement (SE-085)
-  | EContinueInvalidProcedureCall Identifier -- ^ Invalid procedure call in continue statement (SE-086)
-  | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement (SE-087)
-  | EContinueInvalidMemberCall TerminaType -- ^ Invalid member call in continue statement (SE-088)
-  | EContinueActionNotFound Identifier -- ^ Action not found in continue statement (SE-089)
-  | EContinueActionExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in action call in continue statement (SE-090)
-  | EContinueActionMissingParam (Identifier, a) -- ^ Missing parameters in action call in continue statement (SE-091)
-  | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer (SE-092)
-  | ENoEnumFound Identifier -- ^ Enum not found (SE-093 & Internal)
-  | EGlobalNotEnum (Identifier, a) -- ^ Global object but not an enum (SE-094)
-  | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found (SE-095)
-  | EEnumVariantExtraParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Extra parameters in enum variant (SE-096)
-  | EEnumVariantMissingParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Missing parameters in enum variant (SE-097)
-  | EEnumVariantParamTypeMismatch (Identifier, a) (Identifier, Integer, TerminaType) TerminaType -- ^ Parameter type mismatch in enum variant (SE-098)
-  | EFunctionNotFound Identifier -- ^ Function not found (SE-099)
-  | EGlobalNotFunction (Identifier, a) -- ^ Global object but not a function (SE-100)
-  | EUnexpectedNumericConstant TerminaType -- ^ Unexpected numeric constant (SE-101)
-  | EInvalidAssignmentExprType TerminaType -- ^ Invalid assignment expression type (SE-102)
-  | EInvalidMessageType TerminaType -- ^ Invalid message type (SE-103)
-  | EInvalidOptionType TerminaType -- ^ Invalid option type (SE-104)
-  | EInvalidReferenceType TerminaType -- ^ Invalid reference type (SE-105)
-  | EInvalidLocationType TerminaType -- ^ Invalid location type (SE-106)
-  | EInvalidAllocatorType TerminaType -- ^ Invalid allocator type (SE-107)
-  | EInvalidClassFieldType TerminaType -- ^ Invalid class field type (SE-108)
-  | EInvalidStructFieldType TerminaType -- ^ Invalid struct field type (SE-109)
-  | EInvalidEnumParameterType TerminaType -- ^ Invalid enum parameter type (SE-110)
-  | EInvalidAccessPortType TerminaType -- ^ Invalid access port type (SE-111)
-  | EInvalidTypeSpecifier TypeSpecifier -- ^ Invalid type specifier (SE-112)
-  | EInvalidNumericConstantType TerminaType -- ^ Invalid numeric constant type (SE-113)
-  | EInvalidActionParameterType Parameter -- ^ Invalid action parameter type (SE-114)
-  | EInvalidProcedureParameterType Parameter -- ^ Invalid procedure parameter type (SE-115)
-  | EStructInitializerGlobalNotClass (SemanTypeDef a) -- ^ Struct initializer expected global type not class (SE-116)
+  | EEnumInitializerExpectedTypeMismatch TerminaType TerminaType -- ^ Enum initializer expected type mismatch (SE-063)
+  | ESliceInvalidUse -- ^ Invalid use of a slice (SE-064)
+  | EArrayInitializerInvalidUse -- ^ Invalid use of an array initializer (SE-065)
+  | EArrayInitializerNotArray TerminaType -- ^ Assignment of an array initializer to a non-array type (SE-066)
+  | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer (SE-067)
+  | EArrayExprListInitializerNotArray TerminaType -- ^ Assignment of an expression list array initializer to a non-array type (SE-068)
+  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer (SE-069)
+  | EArrayInitializerSizeMismatch Size Size -- ^ Array initializer size mismatch (SE-070)
+  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch (SE-071)
+  | EArrayInitializerExprTypeMismatch TerminaType TerminaType -- ^ Array initializing expression type mismatch (SE-072)
+  | EArrayExprListInitializerExprTypeMismatch TerminaType TerminaType -- ^ List of initializing expressions type mismatch (SE-073)
+  | EReturnValueExpected TerminaType -- ^ Expected return value (SE-074)
+  | EReturnValueNotUnit -- ^ Return value not expected (SE-075)
+  | EInvalidArrayType TerminaType -- ^ Invalid array type (SE-076)
+  | EInvalidBoxType TerminaType -- ^ Invalid box type (SE-077)
+  | ENoTypeFound Identifier -- ^ Type not found (SE-078)
+  | EGlobalNotType (Identifier, a) -- ^ Global object but not a type (SE-079)
+  | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (SE-080)
+  | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (SE-081)
+  | ESymbolDefined Identifier a -- ^ Symbol already defined (SE-082)
+  | EExpressionNotConstant -- ^ Expression not constant (SE-083)
+  | EContinueInvalidExpression -- ^ Invalid expression in continue statement (SE-084)
+  | EContinueInvalidProcedureCall Identifier -- ^ Invalid procedure call in continue statement (SE-085)
+  | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement (SE-086)
+  | EContinueInvalidMemberCall TerminaType -- ^ Invalid member call in continue statement (SE-087)
+  | EContinueActionNotFound Identifier -- ^ Action not found in continue statement (SE-088)
+  | EContinueActionExtraParams (Identifier, [TerminaType], a) Integer -- ^ Extra parameters in action call in continue statement (SE-089)
+  | EContinueActionMissingParam (Identifier, a) -- ^ Missing parameters in action call in continue statement (SE-090)
+  | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer (SE-091)
+  | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found (SE-092)
+  | EEnumVariantExtraParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Extra parameters in enum variant (SE-093)
+  | EEnumVariantMissingParams (Identifier, a) (Identifier, [TerminaType]) Integer -- ^ Missing parameters in enum variant (SE-094)
+  | EEnumVariantParamTypeMismatch (Identifier, a) (Identifier, Integer, TerminaType) TerminaType -- ^ Parameter type mismatch in enum variant (SE-095)
+  | EFunctionNotFound Identifier -- ^ Function not found (SE-096)
+  | EGlobalNotFunction (Identifier, a) -- ^ Global object but not a function (SE-097)
+  | EUnexpectedNumericConstant TerminaType -- ^ Unexpected numeric constant (SE-098)
+  | EInvalidAssignmentExprType TerminaType -- ^ Invalid assignment expression type (SE-099)
+  | EInvalidMessageType TerminaType -- ^ Invalid message type (SE-100)
+  | EInvalidOptionType TerminaType -- ^ Invalid option type (SE-101)
+  | EInvalidReferenceType TerminaType -- ^ Invalid reference type (SE-102)
+  | EInvalidLocationType TerminaType -- ^ Invalid location type (SE-103)
+  | EInvalidAllocatorType TerminaType -- ^ Invalid allocator type (SE-104)
+  | EInvalidClassFieldType TerminaType -- ^ Invalid class field type (SE-105)
+  | EInvalidStructFieldType TerminaType -- ^ Invalid struct field type (SE-106)
+  | EInvalidEnumParameterType TerminaType -- ^ Invalid enum parameter type (SE-107)
+  | EInvalidAccessPortType TerminaType -- ^ Invalid access port type (SE-108)
+  | EInvalidTypeSpecifier TypeSpecifier -- ^ Invalid type specifier (SE-109)
+  | EInvalidNumericConstantType TerminaType -- ^ Invalid numeric constant type (SE-110)
+  | EInvalidActionParameterType Parameter -- ^ Invalid action parameter type (SE-111)
+  | EInvalidProcedureParameterType Parameter -- ^ Invalid procedure parameter type (SE-112)
+  | EMemberFunctionCallParamTypeMismatch (Identifier, TerminaType, a) Integer TerminaType -- ^ Parameter type mismatch in member function call (SE-113)
+  | EArrayIndexNotUSize TerminaType -- ^ Array index not usize (SE-114)
+  | EArraySliceLowerBoundNotUSize TerminaType -- ^ Array slice lower bound not usize (SE-115)
+  | EArraySliceUpperBoundNotUSize TerminaType -- ^ Array slice upper bound not usize (SE-116)
+  | EOutputPortParamTypeMismatch TerminaType TerminaType -- ^ Parameter type mismatch in output port (SE-117)
   -- | Record missing field
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -156,7 +159,6 @@ data Error a
   | EMemberAccessNotField Identifier -- TODO: We can return the list of identifiers.
   -- | Calling a procedure within another member function
   | EMemberAccessInvalidProcedureCall Identifier
-  | EMemberAccessUDef (SemanTypeDef a)
   | EMemberFunctionUDef (SemanTypeDef a)
   | EMemberMethodType
   | EMemberMethodExtraParams
@@ -165,7 +167,7 @@ data Error a
   | ENotIntConst Const
   | EConstantOutRange Const
   -- | ForLoop
-  | EForIteratorWrongType TerminaType
+  | EForIteratorWrongType TerminaType
   -- | Defined GEntry
   | EDefinedGEntry (GEntry a)
   -- | Impossible Cases. Internal Transpiler errors
@@ -194,18 +196,15 @@ data Error a
   -- | Enums Definition 
   | EEnumDefNotUniqueField [Identifier]
   -- | Interface Definition
-  | EInterfaceEmpty Identifier
+  | EInterfaceEmpty Identifier
   | EInterfaceNotUniqueProcedure [Identifier]
   -- | Class Definition
   | EClassEmptyMethods Identifier
   | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
   | EMissingIdentifier -- Should not happen
   | ENotClassField Identifier
-  | EClassTyping
   -- Dereference Object
   | ETypeNotReference TerminaType
-  -- Internal Unbox
-  | EUnBoxExpression
   -- Match
   | EMatchNotEnum Identifier
   | EMatchWrongType TerminaType
@@ -216,23 +215,15 @@ data Error a
   | EMatchCaseBadName Identifier Identifier
   | EMatchExtraCases
   -- Enum variant expressions
-  | ETyNotEnumFound Identifier
+  | ETyNotEnumFound Identifier
   | ETyNotEnum Identifier (SemanTypeDef a)
-  | EIsVariantNotEnum TerminaType
-  | EIsVariantNotOption TerminaType
+  | EIsVariantNotEnum TerminaType
+  | EIsVariantNotOption TerminaType
   | EIsVariantEnumMismatch Identifier Identifier
-  | EIsVariantNotFound Identifier
-  -- | Unexpected Global element unboxing.
-  | EInternalNoGTY
+  | EIsVariantNotFound Identifier
   -- | MsgQueue operations errors
-  | EMsgQueueWrongProcedure Identifier
-  | ENoMsgQueueSendWrongArgs
-  | ENoMsgQueueRcvWrongArgs
-  | EMsgQueueSendArgNotObject
-  | EMsgQueueSendArgNotRefMutResult TerminaType
-  | EMsgQueueSendArgNotRefImmTimeout TerminaType
-  | EMsgQueueWrongType TerminaType TerminaType
-  | EMsgQueueRcvWrongArgTy TerminaType
+  | EOutputPortWrongProcedure Identifier
+  | EOutputPortSendWrongArgs
   deriving Show
 
 type SemanticErrors = AnnotatedError (Error Location) Location

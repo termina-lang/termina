@@ -191,7 +191,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
           -- Now analyze new member.
           case newMember of
             -- Filtered Cases
-            ClassField {} -> throwError (annotateError Internal EClassTyping)
+            ClassField {} -> throwError (annotateError Internal EMalformedClassTyping)
             -- Interesting case
             ClassProcedure mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.

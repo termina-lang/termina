@@ -186,23 +186,28 @@ getGlobalTypeDef loc tid  = gets global >>=
   (throwError $ annotateError loc (ENoTypeFound tid))
   -- if so, return its type
   (\case {
-      GType tydef -> return tydef;
-        _         -> throwError $ annotateError loc (EGlobalNotType tid)
-      } . getEntry) . M.lookup tid
+      Located (GType tydef) _ -> return tydef;
+      Located _ entryLoc -> throwError $ annotateError loc (EGlobalNotType (tid, entryLoc))
+      }) . M.lookup tid
 
 getFunctionTy :: Location -> Identifier -> SemanticMonad ([TerminaType], TerminaType, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-  Located (GFun (FunctionSeman args retty)) entryLoc -> return (args, retty, entryLoc)
-  Located _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
+    Located (GFun (FunctionSeman args retty)) entryLoc -> return (args, retty, entryLoc)
+    Located _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
 
+-- | Get the type definition of an enum type from the global environment.
+-- This function is only called for a type that we know is an enum type. If
+-- there is an error it is an internal error.
 getEnumTy :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnn, Location)
 getEnumTy loc iden = 
-  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (ENoEnumFound iden)) >>=
+  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EUnboxingEnumType) >>=
   (\case {
       Located (GType tydef@(Enum {})) entryLoc  -> return (tydef, entryLoc);
-      Located _ entryLoc           -> throwError $ annotateError loc (EGlobalNotEnum (iden, entryLoc))
+      -- | If we are here, it means that the type was not an enum type.
+      -- This should never happen.
+      _ -> throwError $ annotateError Internal EUnboxingEnumType
     })
 
 -- | Add new *local* immutable objects and execute computation in the
@@ -399,7 +404,7 @@ unBox t = Unbox t (unboxTypeAnn (getAnnotation t))
 
 unBoxExp :: Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 unBoxExp (AccessObject obj) =  return $ AccessObject (unBox obj)
-unBoxExp _ = throwError $ annotateError Internal EUnBoxExpression
+unBoxExp _ = throwError $ annotateError Internal EUnboxingExpression
 
 mustBeTy :: TerminaType -> Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 mustBeTy ty expression =

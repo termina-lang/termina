@@ -154,7 +154,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     [] -> return ()
     (ClassAction actionId _ _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
-    _ -> throwError (annotateError Internal EClassTyping)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
     \case {
@@ -198,7 +198,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
         ty' <- typeTypeSpecifier (location pann) ts
         unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, location pann) ty'))) ps ps'
       checkSortedProcedures ds as
-    checkSortedProcedures _ _ = throwError (annotateError Internal EClassTyping)
+    checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
 
 checkClassKind anns clsId TaskClass (_fs, prcs, acts) provides = do
   -- A task must not provide any interface
@@ -208,7 +208,7 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts) provides = do
     [] -> return ()
     (ClassProcedure procId _ _ ann):_  ->
         throwError $ annotateError ann (ETaskClassProcedure (clsId, anns) procId)
-    _ -> throwError (annotateError Internal EClassTyping)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A task must implement at least one action
   when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
 checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
@@ -219,14 +219,14 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
     [] -> return ()
     (ClassProcedure procId _ _ ann):_  ->
         throwError $ annotateError ann (EHandlerClassProcedure (clsId, anns) procId)
-    _ -> throwError (annotateError Internal EClassTyping)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must implement only one action
   case acts of
     [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
     [ClassAction _actionId _ _ _ _ann] -> return ()
     ClassAction _ _ _ _ prevActAnn : ClassAction _ _ _ _ otherActAnn : _  ->
         throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
-    _ -> throwError (annotateError Internal EClassTyping)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must have one single sink port and cannot define any in ports
   checkHandlerPorts Nothing fs
 
@@ -243,6 +243,6 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
             Just prevPort -> throwError $ annotateError (location annCF) (EHandlerClassMultipleSinkPorts clsId prevPort)
         TInPort _ _ -> throwError $ annotateError (location annCF) (EHandlerClassInPort (clsId, anns) fs_id)
         _ -> checkHandlerPorts prev xfs
-    checkHandlerPorts _ _ = throwError $ annotateError Internal EClassTyping
+    checkHandlerPorts _ _ = throwError $ annotateError Internal EMalformedClassTyping
 
 checkClassKind _anns _clsId _kind _members _provides = return ()

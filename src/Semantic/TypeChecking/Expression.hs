@@ -71,10 +71,10 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
   (obj_ak, obj_ty) <- getObjType typed_obj
   case obj_ty of
     TArray ty_elems _vexp -> do
-        idx_typed  <- typeExpression (Just TUSize) typeRHSObject idx
+        idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
     TReference ref_ak (TArray ty_elems _vexp) -> do
-        idx_typed  <- typeExpression (Just TUSize) typeRHSObject idx
+        idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
         return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject _ (MemberAccess obj ident ann) = do
@@ -135,7 +135,9 @@ typeMemberFunctionCall ann obj_ty ident args =
                   -- Check that the number of parameters are OK
                   when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
                   when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
-                  typed_args <- zipWithM (\p e -> typeExpression (Just p) typeRHSObject e) ps args
+                  typed_args <- zipWithM (\(p, idx) e -> 
+                    catchMismatch ann (EMemberFunctionCallParamTypeMismatch (ident, p, location anns) idx)
+                      (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -230,10 +232,10 @@ typeMemberFunctionCall ann obj_ty ident args =
           case args of
             [elemnt] -> do
               -- Type the first argument element
-              typed_element <- typeExpression (Just ty) typeRHSObject elemnt
+              typed_element <- catchMismatch ann (EOutputPortParamTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
               return (([ty] , [typed_element]), TUnit)
-            _ -> throwError $ annotateError ann ENoMsgQueueSendWrongArgs
-        _ -> throwError $ annotateError ann $ EMsgQueueWrongProcedure ident
+            _ -> throwError $ annotateError ann EOutputPortSendWrongArgs
+        _ -> throwError $ annotateError ann $ EOutputPortWrongProcedure ident
     ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
 
 ----------------------------------------
@@ -308,7 +310,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
         <$> typeFieldAssignments pann typeObj ty_fs fs
         <*> pure (Just id_ty)
         <*> pure (buildExpAnn pann (TStruct id_ty));
-    x -> throwError $ annotateError pann (EStructInitializerGlobalNotStruct (fmap forgetSemAnn x));
+    _ -> throwError $ annotateError Internal EUnboxingStructType;
   }
 typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
@@ -327,12 +329,8 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
         <$> typeFieldAssignments pann typeObj fields fs
         <*> pure (Just id_ty)
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
-    x -> throwError $ annotateError pann (EStructInitializerGlobalNotClass (fmap forgetSemAnn x));
+    _ -> throwError $ annotateError Internal EUnboxingClassType;
   }
--- We shall always expect a type for the struct initializer. If we do not expect a type
--- it means that we are using the expression in the wild.
-typeAssignmentExpression ty _ (StructInitializer _fs _mty pann) =
-  throwError $ annotateError pann (EStructInitializerExpectedTypeNotStruct ty)
 typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantInitializer id_ty variant args pann) = do
   unless (id_expected == id_ty) (throwError $ annotateError pann (EEnumInitializerExpectedTypeMismatch expected_type (TEnum id_ty)))
   -- | Enum Variant
@@ -352,13 +350,13 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
           then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
           else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
      ;
-    _ -> throwError $ annotateError Internal (ENoEnumFound id_ty)
+    _ -> throwError $ annotateError Internal EUnboxingEnumType
   }
 typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
 -- | TArray Initialization
   case expectedType of
     TArray ts arrsize -> do
-      typed_init <- typeAssignmentExpression ts typeObj iexp
+      typed_init <- catchMismatch (getAnnotation iexp) (EArrayInitializerExprTypeMismatch ts) (typeAssignmentExpression ts typeObj iexp)
       unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
       return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (TArray ts size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
@@ -612,8 +610,8 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
     PAST.ArraySlice obj lower upper _anns -> do
       typed_obj <- typeObj obj
       (obj_ak, obj_ty) <- getObjType typed_obj
-      typed_lower <- typeExpression (Just TUSize) typeRHSObject lower
-      typed_upper <- typeExpression (Just TUSize) typeRHSObject upper
+      typed_lower <- catchMismatch (getAnnotation lower) EArraySliceLowerBoundNotUSize (typeExpression (Just TUSize) typeRHSObject lower)
+      typed_upper <- catchMismatch (getAnnotation upper) EArraySliceUpperBoundNotUSize (typeExpression (Just TUSize) typeRHSObject upper)
       case obj_ty of
         TArray ty _ -> do
           checkReferenceAccessKind obj_ak
