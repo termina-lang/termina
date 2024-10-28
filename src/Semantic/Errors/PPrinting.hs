@@ -1044,6 +1044,54 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Expected a value of type \x1b[31m" <> showText ty <> "\x1b[0m but found a numeric constant."))
+    EInvalidAssignmentExprType ty ->
+        let title = "\x1b[31merror [SE-095]\x1b[0m: invalid assignment expression type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be copied."))
+    EInvalidMessageType ty ->
+        let title = "\x1b[31merror [SE-096]\x1b[0m: invalid message type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid message type."))
+    EInvalidOptionType ty ->
+        let title = "\x1b[31merror [SE-097]\x1b[0m: invalid option type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid option type."))
+    EInvalidReferenceType ty ->
+        let title = "\x1b[31merror [SE-098]\x1b[0m: invalid reference type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("References to objects of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be created."))
+    EInvalidFixedLocationType ty ->
+        let title = "\x1b[31merror [SE-099]\x1b[0m: invalid fixed-location type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Fixed-location fields of type \x1b[31m" <> showText ty <> "\x1b[0m cannot be defined."))
+    EInvalidAllocatorType ty ->
+        let title = "\x1b[31merror [SE-100]\x1b[0m: invalid allocator type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid allocator type."))
+    EInvalidClassFieldType ty ->
+        let title = "\x1b[31merror [SE-101]\x1b[0m: invalid class field type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid class field type."))
+    EInvalidStructFieldType ty ->
+        let title = "\x1b[31merror [SE-102]\x1b[0m: invalid struct field type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid struct field type."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

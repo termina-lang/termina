@@ -488,7 +488,7 @@ boxTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 boxTyOrFail pann ty = unless (boxTy ty) (throwError (annotateError pann (EInvalidBoxType ty)))
 
 locTyOrFail :: Location -> TerminaType -> SemanticMonad ()
-locTyOrFail pann ty = unless (locTy ty) (throwError (annotateError pann (EInvalidLocationType ty)))
+locTyOrFail pann ty = unless (locTy ty) (throwError (annotateError pann (EInvalidFixedLocationType ty)))
 
 declTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 declTyOrFail pann ty = unless (declTy ty) (throwError (annotateError pann (EInvalidDeclarationType ty)))

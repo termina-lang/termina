@@ -128,7 +128,7 @@ data Error
   | EInvalidMessageType TerminaType -- ^ Invalid message type (SE-096)
   | EInvalidOptionType TerminaType -- ^ Invalid option type (SE-097)
   | EInvalidReferenceType TerminaType -- ^ Invalid reference type (SE-098)
-  | EInvalidLocationType TerminaType -- ^ Invalid location type (SE-099)
+  | EInvalidFixedLocationType TerminaType -- ^ Invalid fixed-location type (SE-099)
   | EInvalidAllocatorType TerminaType -- ^ Invalid allocator type (SE-100)
   | EInvalidClassFieldType TerminaType -- ^ Invalid class field type (SE-101)
   | EInvalidStructFieldType TerminaType -- ^ Invalid struct field type (SE-102)
