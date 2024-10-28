@@ -567,5 +567,5 @@ getObjType = maybe (throwError $ annotateError Internal EUnboxingObject) return 
 
 getExprType :: Expression SemanticAnn -> SemanticMonad TerminaType
 getExprType
-  = maybe (throwError $ annotateError Internal EUnboxingStmtExpr) return
+  = maybe (throwError $ annotateError Internal EUnboxingExpression) return
   . getResultingType . getSemanticAnn . getAnnotation

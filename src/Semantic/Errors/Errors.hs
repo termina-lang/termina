@@ -30,6 +30,7 @@ data Error
   | EMalformedClassTyping -- ^ Malformed class typing (Internal)
   | EExpressionNotConstant -- ^ Expression not constant (Internal)
   | EContinueActionNotFound -- ^ Action not found in continue statement (Internal)
+  | EMissingIdentifier -- ^ Missing identifier (Internal)
   | EInvalidArrayIndexing TerminaType -- ^ Invalid array indexing (SE-001)
   | ENotNamedObject Identifier -- ^ Object not found (SE-002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (SE-003)
@@ -144,7 +145,7 @@ data Error
   | EArraySliceLowerBoundNotUSize TerminaType -- ^ Array slice lower bound not usize (SE-112)
   | EArraySliceUpperBoundNotUSize TerminaType -- ^ Array slice upper bound not usize (SE-113)
   | EOutputPortParamTypeMismatch TerminaType TerminaType -- ^ Parameter type mismatch in output port (SE-114)
-  | EAssignmentExprMismatch TerminaType TerminaType -- ^ Assignment expression type mismatch (SE-115)
+  | EAssignmentExprMismatch TerminaType TerminaType -- ^ Assignment expression type mismatch (SE-115)
   -- | Record missing field
   | EFieldMissing [Identifier]
   -- | Record extra fields
@@ -168,15 +169,12 @@ data Error
   | EConstantOutRange Const
   -- | ForLoop
   | EForIteratorWrongType TerminaType
-  -- | Defined GEntry
-  | EDefinedGEntry (GEntry Location)
-  -- | Impossible Cases. Internal Transpiler errors
-  | EUnboxingStmtExpr -- Unboxing statement as an expression.
-  | EUnboxingBlockRet -- Unboxing Blockret statement
   -- | Unique names for types.
   | EUsedTypeName Identifier Location
   -- | Unique names for Global
   | EUsedGlobalName Identifier Location
+  -- | Function Declaration error,
+  | EUsedFunName Identifier Location
   -- | Access port does not have an Interface type
   | EAccessPortNotInterface TerminaType
   | EAccessPortNotResource Identifier 
@@ -186,10 +184,6 @@ data Error
   | EAccessPortNotPool Identifier
   | EAccessPortNotAtomic Identifier
   | EAccessPortNotAtomicArray Identifier
-  -- | Box (type has a Box inside) as Argument of a function
-  | EConstParameterNotNum Parameter
-  -- | Function Declaration error,
-  | EUsedFunName Identifier Location
   -- | Struct Definition
   | EStructDefNotUniqueField [Identifier]
   | EStructDefEmptyStruct Identifier
@@ -201,7 +195,6 @@ data Error
   -- | Class Definition
   | EClassEmptyMethods Identifier
   | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
-  | EMissingIdentifier -- Should not happen
   | ENotClassField Identifier
   -- Dereference Object
   | ETypeNotReference TerminaType

@@ -940,8 +940,8 @@ fieldDefinitionParser = do
 structDefinitionParser :: Parser (AnnASTElement ParserAnn)
 structDefinitionParser = do
   modifiers <- many modifierParser
-  reserved "struct"
   startPos <- getPosition
+  reserved "struct"
   identifier <- identifierParser
   fields <- braces (many1 $ try fieldDefinitionParser)
   endPos <- getPosition
