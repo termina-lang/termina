@@ -87,7 +87,7 @@ typeObject _ (MemberAccess obj ident ann) = do
   -- This way, only the fields of objects that are in the local environment of the
   -- function can be accessed.
   typed_obj' <- typeObject (\loc ident' -> do
-    (ak, ts) <- getLocalObjTy loc ident'
+    (ak, ts) <- getLHSVarTy loc ident'
     return (ak, ts)) obj
   (obj_ak', obj_ty') <- getObjType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
@@ -356,7 +356,9 @@ typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) 
 -- | TArray Initialization
   case expectedType of
     TArray ts arrsize -> do
-      typed_init <- catchMismatch (getAnnotation iexp) (EArrayInitializerExprTypeMismatch ts) (typeAssignmentExpression ts typeObj iexp)
+      -- | We do not need to catch any error, since it will be correctly handler
+      -- by the recursive call to |typeAssignmentExpression|
+      typed_init <- typeAssignmentExpression ts typeObj iexp
       unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
       return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (TArray ts size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
@@ -382,7 +384,7 @@ typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp ann
     _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr
-  typed_expr <- typeExpression (Just expectedType) typeObj expr
+  typed_expr <- catchMismatch (getAnnotation expr) (EAssignmentExprMismatch expectedType) (typeExpression (Just expectedType) typeObj expr)
   expr_type <- getExprType typed_expr
   catchExpectedCopy loc EInvalidAssignmentExprType (copyTyOrFail loc expr_type)
   return typed_expr

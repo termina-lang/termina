@@ -43,6 +43,8 @@ typeStatement _retTy (Declaration lhs_id lhs_ak lhs_ts expr anns) = do
   lhs_type <- typeTypeSpecifier anns lhs_ts
   -- Check type is alright
   checkTerminaType anns lhs_type
+  -- Check if the type is a valid declaration type
+  declTyOrFail anns lhs_type
   -- Expression and type must match
   typed_aexpr <- typeAssignmentExpression lhs_type typeRHSObject expr
   ety <- mustBeTy lhs_type typed_aexpr
@@ -199,25 +201,24 @@ typeStatement _rTy (ContinueStmt contE anns) =
             \case{
               -- This case corresponds to a call to an inner method or viewer from the self object.
               Class _ _identTy cls _provides _mods ->
-                case findClassProcedure ident cls of
-                  Just _ -> throwError $ annotateError ann (EContinueInvalidProcedureCall ident)
+                case findClassViewerOrMethod ident cls of
+                  Just _ -> throwError $ annotateError ann ( EContinueInvalidMethodOrViewerCall ident)
                   Nothing ->
-                    case findClassViewerOrMethod ident cls of
-                      Just _ -> throwError $ annotateError ann ( EContinueInvalidMethodOrViewerCall ident)
-                      Nothing ->
-                        case findClassAction ident cls of
-                          Just (ts, rty, aann) -> do
-                            case ts of
-                              TUnit -> case args of
-                                [] -> return (([], []), ts)
-                                _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
-                              _ -> case args of
-                                [arg] -> do
-                                  typed_arg <- typeExpression (Just ts) typeRHSObject arg
-                                  return (([ts], [typed_arg]), rty)
-                                [] -> throwError $ annotateError ann (EContinueActionMissingParam (ident, location aann))
-                                _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [ts], location aann) (fromIntegral (length args)))
-                          _ -> throwError $ annotateError ann (EContinueActionNotFound ident)
+                    case findClassAction ident cls of
+                      Just (ts, rty, aann) -> do
+                        case ts of
+                          TUnit -> case args of
+                            [] -> return (([], []), ts)
+                            _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
+                          _ -> case args of
+                            [arg] -> do
+                              typed_arg <- typeExpression (Just ts) typeRHSObject arg
+                              return (([ts], [typed_arg]), rty)
+                            [] -> throwError $ annotateError ann (EContinueActionMissingParam (ident, location aann))
+                            _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [ts], location aann) (fromIntegral (length args)))
+                      -- This should not happen, since the expression has been 
+                      -- type-checked before and the method should have been found.
+                      _ -> throwError $ annotateError Internal EContinueActionNotFound
                 ;
               -- Other user-defined types do not define methods (yet?)
               ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))

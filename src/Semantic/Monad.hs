@@ -269,7 +269,7 @@ getLocalObjTy loc ident =
       Nothing -> throwError $ annotateError loc (ENotNamedObject ident)
   }) . M.lookup ident
 
--- | Get the Type of a defined  readonlye variable. If it is not defined throw an error.
+-- | Get the Type of a defined read-only variable. If it is not defined throw an error.
 getConst :: Location -> Identifier -> SemanticMonad (TerminaType, Const)
 getConst loc ident = do
     catchError (getGlobalEntry loc ident)
@@ -489,6 +489,9 @@ boxTyOrFail pann ty = unless (boxTy ty) (throwError (annotateError pann (EInvali
 
 locTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 locTyOrFail pann ty = unless (locTy ty) (throwError (annotateError pann (EInvalidLocationType ty)))
+
+declTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+declTyOrFail pann ty = unless (declTy ty) (throwError (annotateError pann (EInvalidDeclarationType ty)))
 
 accessPortTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 accessPortTyOrFail pann ty = unless (accessPortTy ty) (throwError (annotateError pann (EInvalidAccessPortType ty)))
