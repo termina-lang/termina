@@ -114,7 +114,7 @@ data TerminaType
   | TReference AccessKind TerminaType
   | TBoxSubtype TerminaType
   -- | Fixed-location types
-  | TLocation TerminaType
+  | TFixedLocation TerminaType
   -- | Port types
   | TAccessPort TerminaType
   | TSinkPort TerminaType Identifier

@@ -66,7 +66,7 @@ checkTerminaType loc (TReference _ ty) =
 checkTerminaType loc (TBoxSubtype ty) =
   checkTerminaType loc ty >>
   boxTyOrFail loc ty
-checkTerminaType loc (TLocation ty) =
+checkTerminaType loc (TFixedLocation ty) =
   checkTerminaType loc ty >>
   locTyOrFail loc ty
 checkTerminaType loc (TAccessPort ty) =
@@ -111,13 +111,13 @@ checkParameterType loc p =
 checkProcedureParameterType :: Location -> SAST.Parameter -> SemanticMonad ()
 checkProcedureParameterType loc p =
     let typeSpec = paramType p in
-    unless (procedureParamTy typeSpec) (throwError (annotateError loc (EInvalidProcedureParameterType p))) >>
+    unless (procedureParamTy typeSpec) (throwError (annotateError loc (EInvalidProcedureParameterType typeSpec))) >>
     checkTerminaType loc typeSpec
 
 checkActionParameterType :: Location -> SAST.Parameter -> SemanticMonad ()
 checkActionParameterType loc p =
     let typeSpec = paramType p in
-    unless (actionParamTy typeSpec) (throwError (annotateError loc (EInvalidActionParameterType p))) >>
+    unless (actionParamTy typeSpec) (throwError (annotateError loc (EInvalidActionParameterType typeSpec))) >>
     checkTerminaType loc typeSpec
     
 checkReturnType :: Location -> TerminaType -> SemanticMonad ()
@@ -170,7 +170,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   providedProcedures <- concat <$> foldM (\acc ifaceId ->
     catchError (getGlobalTypeDef anns ifaceId)
       (\_ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)) >>= \case {
-      Interface _ iface_prcs _ -> return $ map (, ifaceId) iface_prcs : acc;
+      (Located (Interface _ iface_prcs _) _) -> return $ map (, ifaceId) iface_prcs : acc;
       _ -> throwError $ annotateError anns (EGlobalNotInterface ifaceId)
     }) [] provides
   let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _, _) -> ifaceId) providedProcedures

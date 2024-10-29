@@ -96,7 +96,7 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
             -- | We can safely assume that the other position is in the same file
             otherFileName = case getLocation prevVal of
                 Position otherStart _otherEnd -> sourceName otherStart
-                _ -> error "EMissingUsedOptionBox: TLocation is not a position"
+                _ -> error "EMissingUsedOptionBox: TFixedLocation is not a position"
             otherSourceLines = toModuleAST M.! otherFileName
         in
             printSimpleError

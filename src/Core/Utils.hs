@@ -21,7 +21,7 @@ copyTy (TStruct _)      = True
 copyTy (TEnum _)        = True
 copyTy (TOption (TBoxSubtype {})) = False
 copyTy (TOption _)      = True
-copyTy (TLocation _)    = True
+copyTy (TFixedLocation _)    = True
 copyTy _               = False
 
 optionTy :: TerminaType -> Bool
@@ -141,7 +141,7 @@ classFieldTy (TSinkPort {})    = True
 classFieldTy (TInPort {})      = True
 classFieldTy (TOutPort {})     = True
 classFieldTy (TAccessPort {})  = True
-classFieldTy (TLocation _)     = True
+classFieldTy (TFixedLocation _)     = True
 classFieldTy ty                = fieldTy ty
 
 fieldTy :: TerminaType -> Bool
@@ -308,7 +308,7 @@ rootType (TMsgQueue ts _) = rootType ts
 rootType (TPool ts _) = rootType ts
 rootType (TReference _ ts) = rootType ts
 rootType (TBoxSubtype ts) = rootType ts
-rootType (TLocation ts) = rootType ts
+rootType (TFixedLocation ts) = rootType ts
 rootType t = t
 
 -- Type equality
@@ -335,10 +335,10 @@ sameTy  (TStruct idl) (TStruct idr) = idl == idr
 sameTy  (TEnum idl) (TEnum idr) = idl == idr
 sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
 sameTy  (TInterface idl) (TInterface idr) = idl == idr
--- TLocation subtypes
-sameTy  (TLocation tyspecl) (TLocation tyspecr) = sameTy tyspecl tyspecr
-sameTy  (TLocation tyspecl) tyspecr = sameTy tyspecl tyspecr
-sameTy  tyspecl (TLocation tyspecr) = sameTy tyspecl tyspecr
+-- TFixedLocation subtypes
+sameTy  (TFixedLocation tyspecl) (TFixedLocation tyspecr) = sameTy tyspecl tyspecr
+sameTy  (TFixedLocation tyspecl) tyspecr = sameTy tyspecl tyspecr
+sameTy  tyspecl (TFixedLocation tyspecr) = sameTy tyspecl tyspecr
 --
 sameTy  _ _ = False
 

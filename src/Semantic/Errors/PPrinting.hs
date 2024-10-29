@@ -591,14 +591,15 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                 funcPos Nothing
-    EFunctionCallParamTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) actualTy ->
+    EFunctionCallParamTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) paramNumber actualTy ->
         let title = "\x1b[31merror [SE-037]\x1b[0m: parameter type mismatch in function call."
             funcFileName = sourceName funcStart
             funcSourceLines = toModuleAST M.! funcFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
+                (Just ("Parameter \x1b[31m#" <> T.pack (show paramNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             printSimpleError
                 funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
@@ -1092,6 +1093,97 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid struct field type."))
+    EInvalidEnumParameterType ty ->
+        let title = "\x1b[31merror [SE-103]\x1b[0m: invalid enum parameter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an enum variant."))
+    EInvalidAccessPortType ty ->
+        let title = "\x1b[31merror [SE-104]\x1b[0m: invalid access port type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid access port type."))
+    EInvalidDeclarationType ty ->
+        let title = "\x1b[31merror [SE-105]\x1b[0m: invalid declaration type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid object declaration type."))
+    EInvalidTypeSpecifier ts ->
+        let title = "\x1b[31merror [SE-106]\x1b[0m: invalid type specifier."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type specifier \x1b[31m" <> showText ts <> "\x1b[0m is not valid."))
+    EInvalidNumericConstantType ty ->
+        let title = "\x1b[31merror [SE-107]\x1b[0m: invalid numeric constant type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The expected type of this expression is \x1b[31m" <> showText ty <> "\x1b[0m but it is a numeric constant."))
+    EInvalidActionParameterType ty ->
+        let title = "\x1b[31merror [SE-108]\x1b[0m: invalid action parameter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for an action."))
+    EInvalidProcedureParameterType ty ->
+        let title = "\x1b[31merror [SE-109]\x1b[0m: invalid procedure parameter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for a procedure."))
+    EMemberFunctionCallParamTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) paramNumber actualTy ->
+        let title = "\x1b[31merror [SE-110]\x1b[0m: member function call parameter type mismatch."
+            funcFileName = sourceName funcStart
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Parameter \x1b[31m#" <> T.pack (show paramNumber) <>
+                    "\x1b[0m of member function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
+            printSimpleError
+                funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
+                funcPos Nothing
+    EArrayIndexNotUSize ty ->
+        let title = "\x1b[31merror [SE-111]\x1b[0m: invalid array index type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type of the array index is \x1b[31m" <> showText ty <>
+                 "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
+    EArraySliceLowerBoundNotUSize ty ->
+        let title = "\x1b[31merror [SE-112]\x1b[0m: invalid array slice lower bound type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type of the lower bound of the array slice is \x1b[31m" <> showText ty <>
+                 "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
+    EArraySliceUpperBoundNotUSize ty ->
+        let title = "\x1b[31merror [SE-113]\x1b[0m: invalid array slice upper bound type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type of the upper bound of the array slice is \x1b[31m" <> showText ty <>
+                 "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
+    EOutputPortParamTypeMismatch expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-114]\x1b[0m: output port parameter type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The output data is expected to be of type \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EAssignmentExprMismatch expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-115]\x1b[0m: assignment expression type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The expected type of the assignment is \x1b[31m" <> showText expectedTy <>
+                    "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

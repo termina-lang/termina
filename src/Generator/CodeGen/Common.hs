@@ -265,7 +265,7 @@ genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
 -- | TPool type
 genType _qual (TPool _ _) = return (CTTypeDef pool noqual)
 genType _qual (TMsgQueue _ _) = return (CTTypeDef msgQueue noqual)
-genType qual (TLocation ts) = do
+genType qual (TFixedLocation ts) = do
     ts' <- genType volatile ts
     return (CTPointer ts' qual)
 genType _qual (TAccessPort ts) =  genType noqual ts

@@ -179,14 +179,14 @@ withInState tempState comp = localScope (put tempState >> comp)
 -- Some helper functions to bring information from the environment.
 
 -- | Get global definition of a Type
-getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnn)
+getGlobalTypeDef :: Location -> Identifier -> SemanticMonad (Located (SemanTypeDef SemanticAnn))
 getGlobalTypeDef loc tid  = gets global >>=
   maybe
   -- if there is no varialbe name |tid|
   (throwError $ annotateError loc (ENoTypeFound tid))
   -- if so, return its type
   (\case {
-      Located (GType tydef) _ -> return tydef;
+      Located (GType tydef) tyloc -> return (Located tydef tyloc);
       Located _ entryLoc -> throwError $ annotateError loc (EGlobalNotType (tid, entryLoc))
       }) . M.lookup tid
 
@@ -200,11 +200,11 @@ getFunctionTy loc iden =
 -- | Get the type definition of an enum type from the global environment.
 -- This function is only called for a type that we know is an enum type. If
 -- there is an error it is an internal error.
-getEnumTy :: Location -> Identifier -> SemanticMonad (SemanTypeDef SemanticAnn, Location)
+getEnumTy :: Location -> Identifier -> SemanticMonad (Located (SemanTypeDef SemanticAnn))
 getEnumTy loc iden = 
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EUnboxingEnumType) >>=
   (\case {
-      Located (GType tydef@(Enum {})) entryLoc  -> return (tydef, entryLoc);
+      Located (GType tydef@(Enum {})) entryLoc  -> return (Located tydef entryLoc);
       -- | If we are here, it means that the type was not an enum type.
       -- This should never happen.
       _ -> throwError $ annotateError Internal EUnboxingEnumType
@@ -300,7 +300,7 @@ getIntSize :: Location -> Size -> SemanticMonad Integer
 getIntSize loc (CAST.V ident) = do
   (ty, value) <- getConst loc ident
   sameTyOrError loc TUSize ty
-  getIntConst loc value
+  getIntConst value
 getIntSize _loc (CAST.K (TInteger value _)) = return value
 
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
@@ -415,9 +415,9 @@ mustBeTy ty expression =
     ann_exp = getAnnotation expression
     loc = location ann_exp
 
-getIntConst :: Location -> Const -> SemanticMonad Integer
-getIntConst _ (I (TInteger i _) _) = return i
-getIntConst loc e     = throwError $ annotateError loc $ ENotIntConst e
+getIntConst :: Const -> SemanticMonad Integer
+getIntConst (I (TInteger i _) _) = return i
+getIntConst _ = throwError $ annotateError Internal EUnboxingIntConst
 
 catchMismatch :: 
   -- | Location of the error
@@ -507,7 +507,7 @@ classFieldTyorFail pann ty = unless (classFieldTy ty) (throwError (annotateError
 typeTypeSpecifier :: Location -> TypeSpecifier -> SemanticMonad TerminaType
 typeTypeSpecifier loc (TSDefinedType ident []) = do
   -- Check that the type was defined
-  glbTypeDef <- getGlobalTypeDef loc ident
+  (Located glbTypeDef _) <- getGlobalTypeDef loc ident
   case glbTypeDef of 
     Struct name _ _ -> return $ TStruct name
     Enum name _ _ -> return $ TEnum name
@@ -536,7 +536,7 @@ typeTypeSpecifier loc (TSReference ak ts) =
 typeTypeSpecifier loc (TSBoxSubtype ts) = 
   TBoxSubtype <$> typeTypeSpecifier loc ts
 typeTypeSpecifier loc (TSLocation ts) = 
-  TLocation <$> typeTypeSpecifier loc ts
+  TFixedLocation <$> typeTypeSpecifier loc ts
 typeTypeSpecifier loc (TSAccessPort ty) =
   TAccessPort <$> typeTypeSpecifier loc ty
 typeTypeSpecifier loc (TSSinkPort ty action) =

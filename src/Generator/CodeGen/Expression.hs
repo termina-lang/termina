@@ -136,7 +136,7 @@ genExpression (AccessObject obj) = do
     cObj <- genObject obj
     cObjType <- getObjType obj
     case cObjType of
-        (TLocation _) -> do
+        (TFixedLocation _) -> do
             return $ CExprValOf (CDeref cObj (getCObjType cObj)) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
         _ -> 
             return $ CExprValOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))

@@ -20,7 +20,7 @@ filterStructModifiers = filter (\case
       _ -> False)
 
 genFieldDeclaration :: FieldDefinition -> CHeaderGenerator CDeclaration
-genFieldDeclaration (FieldDefinition identifier ts@(TLocation {})) = do
+genFieldDeclaration (FieldDefinition identifier ts@(TFixedLocation {})) = do
     cTs <- genType noqual ts
     return $ CDecl (CTypeSpec cTs) (Just identifier) Nothing
 genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAllocator {}))) = do

@@ -21,6 +21,8 @@ data Error
   | EUnboxingStructType -- ^ Error when unboxing a struct type (Internal)
   | EUnboxingEnumType -- ^ Error when unboxing an enum type (Internal)
   | EUnboxingClassType -- ^ Error when unboxing a class type (Internal)
+  | EUnboxingMemberFunctionType -- ^ Error when unboxing a member function type (Internal)
+  | EUnboxingIntConst -- ^ Error when unboxing an integer constant (Internal)
   | EExpectedArrayTy TerminaType -- ^ Expected a valid type for the elements of an array (Internal)
   | EExpectedCopyType TerminaType -- ^ Expected a copiable type (Internal)
   | EExpectedNumType TerminaType -- ^ Expected a numeric type (Internal)
@@ -31,6 +33,7 @@ data Error
   | EExpressionNotConstant -- ^ Expression not constant (Internal)
   | EContinueActionNotFound -- ^ Action not found in continue statement (Internal)
   | EMissingIdentifier -- ^ Missing identifier (Internal)
+  | EMatchCaseInternalError -- ^ Internal error in match case (Internal)
   | EInvalidArrayIndexing TerminaType -- ^ Invalid array indexing (SE-001)
   | ENotNamedObject Identifier -- ^ Object not found (SE-002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (SE-003)
@@ -67,7 +70,7 @@ data Error
   | EIfElseIfCondNotBool TerminaType -- ^ If-else-if condition is not a boolean (SE-034)
   | EFunctionCallExtraParams (Identifier, [TerminaType], Location) Integer -- ^ Extra parameters in function call (SE-035)
   | EFunctionCallMissingParams (Identifier, [TerminaType], Location) Integer -- ^ Missing parameters in function call (SE-036)
-  | EFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) TerminaType -- ^ Parameter type mismatch in function call (SE-037)
+  | EFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) Integer TerminaType -- ^ Parameter type mismatch in function call (SE-037)
   | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (SE-038)
   | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (SE-039)
   | EMutableReferenceToPrivate -- ^ Mutable reference to immutable object (SE-040)
@@ -138,73 +141,52 @@ data Error
   | EInvalidDeclarationType TerminaType -- ^ Invalid declaration type (SE-105)
   | EInvalidTypeSpecifier TypeSpecifier -- ^ Invalid type specifier (SE-106)
   | EInvalidNumericConstantType TerminaType -- ^ Invalid numeric constant type (SE-107)
-  | EInvalidActionParameterType Parameter -- ^ Invalid action parameter type (SE-108)
-  | EInvalidProcedureParameterType Parameter -- ^ Invalid procedure parameter type (SE-109)
-  | EMemberFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) Integer TerminaType -- ^ Parameter type mismatch in member function call (SE-110)
-  | EArrayIndexNotUSize TerminaType -- ^ Array index not usize (SE-111)
-  | EArraySliceLowerBoundNotUSize TerminaType -- ^ Array slice lower bound not usize (SE-112)
-  | EArraySliceUpperBoundNotUSize TerminaType -- ^ Array slice upper bound not usize (SE-113)
-  | EOutputPortParamTypeMismatch TerminaType TerminaType -- ^ Parameter type mismatch in output port (SE-114)
-  | EAssignmentExprMismatch TerminaType TerminaType -- ^ Assignment expression type mismatch (SE-115)
-  -- | Record missing field
-  | EFieldMissing [Identifier]
-  -- | Record extra fields
-  | EFieldExtra [Identifier]
-  -- | Field is not a fixed location
-  | EFieldNotFixedLocation Identifier
-  -- | Field is not a port
-  | EFieldNotPort Identifier
-  -- | Expecting a Enumeration when memberAccessing got
-  | EMemberAccess TerminaType
-  | EFunctionAccessNotResource TerminaType
-  | EMemberAccessNotField Identifier -- TODO: We can return the list of identifiers.
-  -- | Calling a procedure within another member function
-  | EMemberAccessInvalidProcedureCall Identifier
-  | EMemberFunctionUDef (SemanTypeDef Location)
-  | EMemberMethodType
+  | EInvalidActionParameterType TerminaType -- ^ Invalid action parameter type (SE-108)
+  | EInvalidProcedureParameterType TerminaType -- ^ Invalid procedure parameter type (SE-109)
   | EMemberMethodExtraParams
   | EMemberMethodMissingParams
-  -- | Not an integer const
-  | ENotIntConst Const
-  | EConstantOutRange Const
-  -- | ForLoop
-  | EForIteratorWrongType TerminaType
-  -- | Unique names for types.
-  | EUsedTypeName Identifier Location
-  -- | Unique names for Global
-  | EUsedGlobalName Identifier Location
-  -- | Function Declaration error,
-  | EUsedFunName Identifier Location
-  -- | Access port does not have an Interface type
-  | EAccessPortNotInterface TerminaType
-  | EAccessPortNotResource Identifier 
-  | EInboundPortNotEmitter Identifier 
-  | EInboundPortNotChannel Identifier
-  | EOutboundPortNotChannel Identifier
-  | EAccessPortNotPool Identifier
-  | EAccessPortNotAtomic Identifier
-  | EAccessPortNotAtomicArray Identifier
-  -- | Struct Definition
-  | EStructDefNotUniqueField [Identifier]
-  | EStructDefEmptyStruct Identifier
-  -- | Enums Definition 
-  | EEnumDefNotUniqueField [Identifier]
-  -- | Interface Definition
-  | EInterfaceEmpty Identifier
-  | EInterfaceNotUniqueProcedure [Identifier]
+  | EMemberFunctionCallParamTypeMismatch (Identifier, TerminaType, Location) Integer TerminaType -- ^ Parameter type mismatch in member function call (SE-110)
+  | EArrayIndexNotUSize TerminaType -- ^ Invalid array index type (SE-111)
+  | EArraySliceLowerBoundNotUSize TerminaType -- ^ Invalid array slice lower bound type (SE-112)
+  | EArraySliceUpperBoundNotUSize TerminaType -- ^ Invalid array slice upper bound type (SE-113)
+  | EOutputPortParamTypeMismatch TerminaType TerminaType -- ^ Parameter type mismatch in output port (SE-114)
+  | EAssignmentExprMismatch TerminaType TerminaType -- ^ Assignment expression type mismatch (SE-115)
+  | EFieldMissing (Identifier, Location) [Identifier] -- ^ Missing field/s in field assignment expression (SE-116)
+  | EFieldExtra (Identifier, Location) [Identifier] -- ^ Extra field/s in field assignment expression (SE-117)
+  | EFieldNotFixedLocation Identifier TerminaType -- ^ Field is not a fixed-location (SE-118)
+  | EFieldNotAccessPort Identifier TerminaType -- ^ Field is not an access port (SE-119)
+  | EFieldNotSinkOrInPort Identifier TerminaType -- ^ Field is not a sink or in port (SE-120)
+  | EFieldNotOutPort Identifier TerminaType -- ^ Field is not an out port (SE-121)
+  | EMemberAccessInvalidType TerminaType -- ^ Invalid member access type (SE-122)
+  | EMemberFunctionAccessInvalidType TerminaType -- ^ Invalid member function access type (SE-123)
+  | EMemberAccessUnknownField (Identifier, Location) Identifier -- ^ Unknown field in member access (SE-124)
+  | EMemberAccessInvalidProcedureCall Identifier -- ^ Invalid procedure call inside member function (SE-125)
+  | EConstantOutRange Const -- ^ Numeric constant out of range (SE-126)
+  | EForIteratorInvalidType TerminaType -- ^ Invalid for iterator type (SE-127)
+  | EUsedTypeName Identifier Location -- ^ Type name already used (SE-128)
+  | EUsedGlobalName Identifier Location -- ^ Global object name already used (SE-129)
+  | EUsedFunName Identifier Location -- ^ Function name already used (SE-130)
+  | EAccessPortFieldInvalidType TerminaType -- ^ Invalid access port field type (SE-131)
+  | EAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid access port connection (SE-132)
+  | ESinkPortConnectionInvalidGlobal Identifier -- ^ Invalid sink port connection (SE-133)
+  | EInboundPortConnectionInvalidObject Identifier -- ^ Invalid inbound port connection (SE-134)
+  | EOutboundPortConnectionInvalidGlobal Identifier -- ^ Invalid outbound port connection (SE-135)
+  | EAllocatorPortConnectionInvalidGlobal Identifier -- ^ Invalid allocator port connection (SE-136)
+  | EAtomicAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic access port connection (SE-137)
+  | EAtomicArrayAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic array access port connection (SE-138)
+  | EStructDefNotUniqueField [Identifier] -- ^ Repeated field in struct definition (SE-139)
+  | EStructDefEmpty Identifier -- ^ Empty struct definition (SE-140)
+  | EEnumDefEmpty Identifier -- ^ Empty enum definition (SE-141)
+  | EEnumDefNotUniqueVariant [Identifier] -- ^ Repeated variant in enum definition (SE-142)
+  | EInterfaceEmpty Identifier -- ^ Empty interface definition (SE-143)
+  | EInterfaceNotUniqueProcedure [Identifier] -- ^ Repeated procedure in interface definition (SE-144)
   -- | Class Definition
-  | EClassEmptyMethods Identifier
   | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
-  | ENotClassField Identifier
-  -- Dereference Object
-  | ETypeNotReference TerminaType
+  | EDereferenceInvalidType TerminaType
   -- Match
-  | EMatchNotEnum Identifier
-  | EMatchWrongType TerminaType
+  | EMatchInvalidType TerminaType
   | EMatchOptionBadArgs
-  | EMatchOptionBadSome
   | EMatchOptionBad
-  | EMatchCaseInternalError
   | EMatchCaseBadName Identifier Identifier
   | EMatchExtraCases
   -- Enum variant expressions

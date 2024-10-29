@@ -65,7 +65,7 @@ typeTypeDefinition :: Location -> TypeDef ParserAnn -> SemanticMonad (SAST.TypeD
 typeTypeDefinition ann (Struct ident fs_ts mds_ts) = do
   -- Check every type is well-defined:
   -- Check that the struct is not empty
-  when (Prelude.null fs_ts) (throwError $ annotateError ann (EStructDefEmptyStruct ident))
+  when (Prelude.null fs_ts) (throwError $ annotateError ann (EStructDefEmpty ident))
   -- Check that every field is well-defined
   fs_ty <- mapM (typeFieldDefinition ann) fs_ts
   -- Check field names are unique
@@ -75,10 +75,12 @@ typeTypeDefinition ann (Struct ident fs_ts mds_ts) = do
   -- If everything is fine, return same struct
   return (SAST.Struct ident fs_ty mds_ty)
 typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
+  -- Check that the enum is not empty
+  when (Prelude.null evs_ts) (throwError $ annotateError ann (EEnumDefEmpty ident))
   -- Check the enum variants are well-defined
   evs_ty <- mapM (typeEnumVariant ann) evs_ts
   -- Check names are unique
-  checkUniqueNames ann EEnumDefNotUniqueField (Data.List.map variantIdentifier evs_ty)
+  checkUniqueNames ann EEnumDefNotUniqueVariant (Data.List.map variantIdentifier evs_ty)
   -- Type the modifiers
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
@@ -107,7 +109,6 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   -- check that it defines at least one method.
   -- TODO: Check class well-formedness depending on its kind
   -- TODO: Check the class procedures belong to a provided interface
-  -- when (emptyClass cls) (throwError $ annotateError ann (EClassEmptyMethods ident))
   foldM
     (\(fs, prcs, mths, vws, acts) cl ->
         case cl of

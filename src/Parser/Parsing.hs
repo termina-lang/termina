@@ -42,7 +42,7 @@ lexer = Tok.makeTokenParser langDef
              ["struct", "enum"]
       ++ -- Box Subtyping
              ["box"]
-      ++ -- Fixed TLocation Subtyping
+      ++ -- Fixed-location subtyping
              ["loc"]
       ++ -- Ports Subtyping
              ["access", "sink", "in", "out"]

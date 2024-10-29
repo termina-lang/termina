@@ -29,14 +29,14 @@ import Semantic.TypeChecking.Check
 getMemberFieldType :: Location -> TerminaType -> Identifier -> SemanticMonad TerminaType
 getMemberFieldType loc obj_ty ident =
   case obj_ty of
-    TLocation obj_ty' -> getMemberFieldType loc obj_ty' ident
+    TFixedLocation obj_ty' -> getMemberFieldType loc obj_ty' ident
     TStruct dident -> getGlobalTypeDef loc dident >>=
       \case{
         -- Either a struct
-        Struct _identTy fields _mods ->
+        (Located (Struct _identTy fields _mods) strLoc) ->
             let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
-              (throwError $ annotateError loc (EMemberAccessNotField ident))
+              (throwError $ annotateError loc (EMemberAccessUnknownField (dident, strLoc) ident))
               (return . fieldTerminaType) mfield
         ;
         _ -> throwError $ annotateError Internal EUnboxingStructType
@@ -44,18 +44,18 @@ getMemberFieldType loc obj_ty ident =
     TGlobal _ dident -> getGlobalTypeDef loc dident >>=
       \case {
         -- Or a class
-        Class _clsKind _identTy cls _implements _mods ->
+        Located (Class _clsKind _identTy cls _implements _mods) clsLoc ->
           -- TODO Class access?
           -- Find |ident| field in the class.
           case findClassField ident cls of
-            Nothing -> throwError $ annotateError loc (EMemberAccessNotField ident)
+            Nothing -> throwError $ annotateError loc (EMemberAccessUnknownField (dident, clsLoc) ident)
             -- type |t| and the type inside |a| should be the same, no?
             Just (t , _a) -> return t
         ;
         -- Other types do not have members.
         _ -> throwError $ annotateError Internal EUnboxingClassType
       }
-    ty -> throwError $ annotateError loc (EMemberAccess ty)
+    ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
@@ -99,7 +99,7 @@ typeObject getVarTy (Dereference obj ann) = do
   (_, obj_ty) <- getObjType typed_obj
   case obj_ty of
     TReference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
-    ty              -> throwError $ annotateError ann $ ETypeNotReference ty
+    ty              -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeObject _getVarTy (PAST.ArraySlice _obj _lower _upper anns) = do
   -- | TArray slices can only be used as part of a reference expression. If we are here,
   -- then the array slice is being used in an invalid context.
@@ -111,7 +111,7 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
     TReference ak rTy ->
       getMemberFieldType ann rTy ident >>=
         \fts -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fts
-    ty -> throwError $ annotateError ann $ ETypeNotReference ty
+    ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 
 typeMemberFunctionCall ::
   ParserAnn
@@ -125,7 +125,7 @@ typeMemberFunctionCall ann obj_ty ident args =
     TGlobal _clsKind dident -> getGlobalTypeDef ann dident >>=
       \case{
         -- This case corresponds to a call to an inner method or viewer from the self object.
-        Class _ _identTy cls _provides _mods ->
+        Located (Class _ _identTy cls _provides _mods) _ ->
           case findClassProcedure ident cls of
             Just _ -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
             Nothing ->
@@ -138,19 +138,18 @@ typeMemberFunctionCall ann obj_ty ident args =
                   typed_args <- zipWithM (\(p, idx) e -> 
                     catchMismatch ann (EMemberFunctionCallParamTypeMismatch (ident, p, location anns) idx)
                       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-                  fty <- maybe (throwError $ annotateError Internal EMemberMethodType) return (getTypeSemAnn anns)
+                  fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
           ;
-        -- Other user-defined types do not define methods (yet?)
-        ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
+        _ -> throwError $ annotateError Internal EUnboxingClassType
       }
     TAccessPort (TInterface dident) -> getGlobalTypeDef ann dident >>=
       \case{
-         Interface _identTy cls _mods ->
-         case findInterfaceProcedure ident cls of
-           Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
-           Just (ps, anns) -> do
+        Located (Interface _identTy cls _mods) _ ->
+          case findInterfaceProcedure ident cls of
+            Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
+            Just (ps, anns) -> do
               let (psLen , asLen) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
@@ -158,9 +157,8 @@ typeMemberFunctionCall ann obj_ty ident args =
                 catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns) idx)
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
-         ;
-         -- Other User defined types do not define methods
-         ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
+          ;
+        _ -> throwError $ annotateError Internal EUnboxingClassType
       }
     TAccessPort (TAllocator ty_pool) ->
       case ident of
@@ -236,7 +234,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               return (([ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann EOutputPortSendWrongArgs
         _ -> throwError $ annotateError ann $ EOutputPortWrongProcedure ident
-    ty -> throwError $ annotateError ann (EFunctionAccessNotResource ty)
+    ty -> throwError $ annotateError ann (EMemberFunctionAccessInvalidType ty)
 
 ----------------------------------------
 -- These functions are useful:
@@ -305,9 +303,9 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
       getGlobalTypeDef pann id_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
-    Struct _ ty_fs _mods  ->
+    Located (Struct _ ty_fs _mods) strLoc  ->
       SAST.StructInitializer
-        <$> typeFieldAssignments pann typeObj ty_fs fs
+        <$> typeFieldAssignments pann (id_ty, strLoc) typeObj ty_fs fs
         <*> pure (Just id_ty)
         <*> pure (buildExpAnn pann (TStruct id_ty));
     _ -> throwError $ annotateError Internal EUnboxingStructType;
@@ -323,10 +321,10 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
       getGlobalTypeDef pann id_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
-    Class clsKind _ident members _provides _mods ->
+    Located (Class clsKind _ident members _provides _mods) clsLoc ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
         SAST.StructInitializer
-        <$> typeFieldAssignments pann typeObj fields fs
+        <$> typeFieldAssignments pann (id_ty, clsLoc) typeObj fields fs
         <*> pure (Just id_ty)
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
     _ -> throwError $ annotateError Internal EUnboxingClassType;
@@ -336,7 +334,7 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
   -- | Enum Variant
   getEnumTy pann id_ty
   >>= \case {
-    (Enum enumId ty_vs _mods, loc) ->
+    Located (Enum enumId ty_vs _mods) loc ->
       case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound enumId variant)
         Just (EnumVariant _ ps) ->
@@ -662,8 +660,8 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   -- Check that the number of parameters are OK
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
-  typed_args <- zipWithM (\p e -> catchMismatch ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation))
-      (typeExpression (Just p) typeRHSObject e)) ps args
+  typed_args <- zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation) idx)
+      (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
   maybe (return ()) (sameTyOrError ann retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 
@@ -686,11 +684,11 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       ((ps, typed_args), fty) <- typeMemberFunctionCall ann rTy ident args
       maybe (return ()) (sameTyOrError ann fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
-    ty -> throwError $ annotateError ann $ ETypeNotReference ty
+    ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
-  (lhs_ty, _) <- case obj_ty of
+  Located lhs_ty _ <- case obj_ty of
     TEnum lhs_id -> do
       unless (lhs_id == id_ty) (throwError $ annotateError pann (EIsVariantEnumMismatch lhs_id id_ty))
       getEnumTy pann id_ty
@@ -730,24 +728,24 @@ zipSameLength = zipSameLength' []
 --
 
 typeFieldAssignment
-  :: ParserAnn
+  :: Location -> (Identifier, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> SAST.FieldDefinition
   -> FieldAssignment ParserAnn
   -> SemanticMonad (SAST.FieldAssignment SemanticAnn)
-typeFieldAssignment loc typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
+typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
     flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
-  else throwError $ annotateError loc (EFieldMissing [fid])
-typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
+  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
-      TLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
-      _ -> throwError $ annotateError loc (EFieldNotFixedLocation fid)
-  else throwError $ annotateError loc (EFieldMissing [fid])
-typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
+      TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
+      ty -> throwError $ annotateError loc (EFieldNotFixedLocation fid ty)
+  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
@@ -758,7 +756,7 @@ typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection Inbound
           -- TODO: Check that the type of the inbound port and the type of the emitter match
           Located  (GGlob ets@(TGlobal EmitterClass _)) _ ->
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
-          _ -> throwError $ annotateError loc $ EInboundPortNotEmitter sid
+          _ -> throwError $ annotateError loc $ ESinkPortConnectionInvalidGlobal sid
       TInPort _ action  ->
         case gentry of
           -- TODO: Check that the type of the inbound port and the type of the emitter match
@@ -766,10 +764,10 @@ typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection Inbound
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           Located (GGlob cts@(TMsgQueue _ _)) _ ->
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
-          _ -> throwError $ annotateError loc $ EInboundPortNotChannel sid
-      _ -> throwError $ annotateError loc (EFieldNotPort fid)
-  else throwError $ annotateError loc (EFieldMissing [fid])
-typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
+          _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
+      ty -> throwError $ annotateError loc (EFieldNotSinkOrInPort fid ty)
+  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
@@ -782,10 +780,10 @@ typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection Outboun
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           Located (GGlob cts@(TMsgQueue _ _)) _ ->
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
-          _ -> throwError $ annotateError loc $ EOutboundPortNotChannel sid
-      _ -> throwError $ annotateError loc (EFieldNotPort fid)
-  else throwError $ annotateError loc (EFieldMissing [fid])
-typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
+          _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
+      ty -> throwError $ annotateError loc (EFieldNotOutPort fid ty)
+  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
@@ -795,45 +793,45 @@ typeFieldAssignment loc _ (FieldDefinition fid fty) (FieldPortConnection AccessP
         case gentry of
           -- TODO: Check that the types match
           Located (GGlob (TPool ty s)) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
-          _ -> throwError $ annotateError loc $ EAccessPortNotPool sid
+          _ -> throwError $ annotateError loc $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
           Located (GGlob (TAtomic ty')) _ -> do
             catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
-          _ -> throwError $ annotateError loc $ EAccessPortNotAtomic sid
+          _ -> throwError $ annotateError loc $ EAtomicAccessPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicArrayAccess ty s) ->
         case gentry of
           Located (GGlob (TAtomicArray ty' s')) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
-          _ -> throwError $ annotateError loc $ EAccessPortNotAtomicArray sid
+          _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort (TInterface iface) ->
         getGlobalTypeDef loc iface >>=
           \case {
-            Interface _ members _ ->
+            Located (Interface _ members _) _ ->
               -- Check that the resource provides the interface
               case gentry of
                 Located (GGlob rts@(TGlobal ResourceClass _)) _ ->
                   let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members] in
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
-                _ -> throwError $ annotateError loc $ EAccessPortNotResource sid
+                _ -> throwError $ annotateError loc $ EAccessPortConnectionInvalidGlobal sid
               ;
-            _ -> throwError $ annotateError loc (EAccessPortNotInterface (TInterface iface))
+            _ -> throwError $ annotateError loc (EAccessPortFieldInvalidType (TInterface iface))
           }
-      _ -> throwError $ annotateError loc (EFieldNotPort fid)
-  else throwError $ annotateError loc (EFieldMissing [fid])
+      ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)
+  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
 
 typeFieldAssignments
-  :: ParserAnn
+  :: Location -> (Identifier, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> [SAST.FieldDefinition]
   -> [FieldAssignment ParserAnn]
   -> SemanticMonad [SAST.FieldAssignment SemanticAnn]
-typeFieldAssignments loc typeObj fds fas = checkSortedFields sorted_fds sorted_fas []
+typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds sorted_fas []
   where
-    tError = throwError . annotateError loc
+    tError = throwError . annotateError faLoc
     getFid = \case {
       FieldValueAssignment fid _ _ -> fid;
       FieldAddressAssignment fid _ _ -> fid;
@@ -843,7 +841,7 @@ typeFieldAssignments loc typeObj fds fas = checkSortedFields sorted_fds sorted_f
     sorted_fas = Data.List.sortOn getFid fas
     -- Same length monadic Zipwith
     checkSortedFields [] [] xs = return $ reverse xs
-    checkSortedFields [] es _ = tError (EFieldExtra (fmap getFid es))
-    checkSortedFields ms [] _ = tError (EFieldMissing (fmap fieldIdentifier ms))
+    checkSortedFields [] es _ = tError (EFieldExtra tyDef (fmap getFid es))
+    checkSortedFields ms [] _ = tError (EFieldMissing tyDef (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
-      typeFieldAssignment loc typeObj d a >>= checkSortedFields ds as . (:acc)
+      typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)

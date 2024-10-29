@@ -94,7 +94,7 @@ typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns)
 typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt anns) = do
   it_ty <- typeTypeSpecifier anns it_ts
   -- Check the iterator is of numeric type
-  unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorWrongType it_ty))
+  unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorInvalidType it_ty))
   -- Both boundaries should have the same numeric type
   typed_fromexpr <- typeConstExpression it_ty from_expr
   typed_toexpr <- typeConstExpression it_ty to_expr
@@ -116,7 +116,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
   case type_matchE of
     TEnum t -> getGlobalTypeDef ann t >>=
         \case {
-          Enum _ident flsDef _mods ->
+          Located (Enum _ident flsDef _mods) _ ->
           -- Sort both lists by identifiers
           let ord_flsDef = Data.List.sortOn variantIdentifier flsDef in
           let ord_cases = Data.List.sortOn matchIdentifier cases in
@@ -127,14 +127,14 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
             Left e -> throwError e
             Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
           ;
-          _ -> throwError $ annotateError ann $ EMatchNotEnum t
+          _ -> throwError $ annotateError Internal EUnboxingEnumType
         }
     TOption t ->
       let ord_cases = Data.List.sortOn matchIdentifier cases in
       checkOptionCases ord_cases >>= flip unless (throwError $  annotateError ann EMatchOptionBad)
       >>
       SAST.MatchStmt typed_matchE <$> zipWithM typeMatchCase ord_cases [EnumVariant "None" [],EnumVariant "Some" [t]] <*> pure (buildStmtAnn ann)
-    _ -> throwError $  annotateError ann $ EMatchWrongType type_matchE
+    _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
     where
 
       checkOptionCases :: [MatchCase ParserAnn] -> SemanticMonad Bool
@@ -184,7 +184,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
         TReference _ rTy -> do
           ((ps, typed_args), fty) <- typeActionCall ann rTy ident args
           return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
-        ty -> throwError $ annotateError anns $ ETypeNotReference ty
+        ty -> throwError $ annotateError anns $ EDereferenceInvalidType ty
     _ -> throwError $ annotateError anns EContinueInvalidExpression
 
   where
@@ -197,30 +197,30 @@ typeStatement _rTy (ContinueStmt contE anns) =
       -> SemanticMonad (([TerminaType], [SAST.Expression SemanticAnn]), TerminaType)
     typeActionCall ann obj_ty ident args =
       case obj_ty of
-          TGlobal _ dident -> getGlobalTypeDef ann dident >>=
-            \case{
-              -- This case corresponds to a call to an inner method or viewer from the self object.
-              Class _ _identTy cls _provides _mods ->
-                case findClassViewerOrMethod ident cls of
-                  Just _ -> throwError $ annotateError ann ( EContinueInvalidMethodOrViewerCall ident)
-                  Nothing ->
-                    case findClassAction ident cls of
-                      Just (ts, rty, aann) -> do
-                        case ts of
-                          TUnit -> case args of
-                            [] -> return (([], []), ts)
-                            _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
-                          _ -> case args of
-                            [arg] -> do
-                              typed_arg <- typeExpression (Just ts) typeRHSObject arg
-                              return (([ts], [typed_arg]), rty)
-                            [] -> throwError $ annotateError ann (EContinueActionMissingParam (ident, location aann))
-                            _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [ts], location aann) (fromIntegral (length args)))
-                      -- This should not happen, since the expression has been 
-                      -- type-checked before and the method should have been found.
-                      _ -> throwError $ annotateError Internal EContinueActionNotFound
-                ;
-              -- Other user-defined types do not define methods (yet?)
-              ty -> throwError $ annotateError ann (EMemberFunctionUDef (fmap forgetSemAnn ty))
-            }
-          _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
+        TGlobal _ dident -> getGlobalTypeDef ann dident >>=
+          \case{
+            -- This case corresponds to a call to an inner method or viewer from the self object.
+            Located (Class _ _identTy cls _provides _mods) _ ->
+              case findClassViewerOrMethod ident cls of
+                Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
+                Nothing ->
+                  case findClassAction ident cls of
+                    Just (ts, rty, aann) -> do
+                      case ts of
+                        TUnit -> case args of
+                          [] -> return (([], []), ts)
+                          _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
+                        _ -> case args of
+                          [arg] -> do
+                            typed_arg <- typeExpression (Just ts) typeRHSObject arg
+                            return (([ts], [typed_arg]), rty)
+                          [] -> throwError $ annotateError ann (EContinueActionMissingParam (ident, location aann))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [ts], location aann) (fromIntegral (length args)))
+                    -- This should not happen, since the expression has been 
+                    -- type-checked before and the method should have been found.
+                    _ -> throwError $ annotateError Internal EContinueActionNotFound
+              ;
+            -- Other user-defined types do not define methods (yet?)
+            _ -> throwError $ annotateError Internal EUnboxingClassType
+          }
+        _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)

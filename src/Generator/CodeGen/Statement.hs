@@ -565,7 +565,7 @@ genStatement (AssignmentStmt obj expr  _) = do
     cObj <- genObject obj
     case typeObj of
         TArray _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
-        (TLocation _) -> do
+        (TFixedLocation _) -> do
             let ann = getAnnotation obj
             return $ CBlockStmt <$> [CSDo (CExprAddrOf cObj cType (buildGenericAnn ann)) (buildStatementAnn ann True)]
         _ -> case expr of

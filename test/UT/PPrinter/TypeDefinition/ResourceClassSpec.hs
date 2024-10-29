@@ -100,7 +100,7 @@ classWithFixedLocationField :: AnnASTElement SemanticAnn
 classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt32) undefined,
-    ClassField (FieldDefinition "field1" (TLocation TUInt32)) undefined,
+    ClassField (FieldDefinition "field1" (TFixedLocation TUInt32)) undefined,
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 

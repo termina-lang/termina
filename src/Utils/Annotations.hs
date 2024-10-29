@@ -17,7 +17,7 @@ data Location =
 data Located a = Located {
     -- | Located element
     element :: a,
-     -- | TLocation on source code
+     -- | TFixedLocation on source code
     location :: Location
 } deriving Show
 

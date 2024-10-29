@@ -47,6 +47,35 @@ instance ShowText Op where
     showText LogicalAnd = "&&"
     showText LogicalOr = "||"
 
+instance ShowText TypeParameter where
+    showText (TypeParamTypeSpec ts) = showText ts
+    showText (TypeParamSize size) = showText size
+
+instance ShowText TypeSpecifier where
+    showText TSUInt8 = "u8"
+    showText TSUInt16 = "u16"
+    showText TSUInt32 = "u32"
+    showText TSUInt64 = "u64"
+    showText TSInt8 = "i8"
+    showText TSInt16 = "i16"
+    showText TSInt32 = "i32"
+    showText TSInt64 = "i64"
+    showText TSUSize = "usize"
+    showText TSBool = "bool"
+    showText TSChar = "char"
+    showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (TSBoxSubtype ts) = "box " <> showText ts
+    showText (TSLocation ts) = "loc " <> showText ts
+    showText (TSAccessPort ts) = "access " <> showText ts
+    showText (TSSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSOutPort ts) = "out " <> showText ts
+    showText (TSReference ak ts) = "&" <> showText ak <> showText ts
+    showText (TSDefinedType ident []) = T.pack ident
+    showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
+    showText TSUnit = "()"
+
+
 instance ShowText TerminaType where
     showText TUInt8 = "u8"
     showText TUInt16 = "u16"
@@ -74,7 +103,7 @@ instance ShowText TerminaType where
     showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (TReference ak ts) = "&" <> showText ak <> showText ts
     showText (TBoxSubtype ts) = "box " <> showText ts
-    showText (TLocation ts) = "loc " <> showText ts
+    showText (TFixedLocation ts) = "loc " <> showText ts
     showText (TAccessPort ts) = "access " <> showText ts
     showText (TSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
     showText (TInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
