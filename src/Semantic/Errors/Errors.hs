@@ -180,24 +180,16 @@ data Error
   | EEnumDefNotUniqueVariant [Identifier] -- ^ Repeated variant in enum definition (SE-142)
   | EInterfaceEmpty Identifier -- ^ Empty interface definition (SE-143)
   | EInterfaceNotUniqueProcedure [Identifier] -- ^ Repeated procedure in interface definition (SE-144)
-  -- | Class Definition
-  | EClassLoop [Identifier] -- Detected loop between procs, method and viewers
-  | EDereferenceInvalidType TerminaType
-  -- Match
-  | EMatchInvalidType TerminaType
-  | EMatchOptionBadArgs
-  | EMatchOptionBad
-  | EMatchCaseBadName Identifier Identifier
-  | EMatchExtraCases
-  -- Enum variant expressions
-  | ETyNotEnumFound Identifier
-  | ETyNotEnum Identifier (SemanTypeDef Location)
-  | EIsVariantNotEnum TerminaType
-  | EIsVariantNotOption TerminaType
-  | EIsVariantEnumMismatch Identifier Identifier
-  | EIsVariantNotFound Identifier
-  -- | MsgQueue operations errors
-  | EOutputPortWrongProcedure Identifier
+  | EClassLoop [Identifier] -- ^ Loop between member function calls in class definition (SE-145)
+  | EDereferenceInvalidType TerminaType -- ^ Invalid dereference type (SE-146)
+  | EMatchInvalidType TerminaType -- ^ Invalid match type (SE-147)
+  | EMatchCaseUnknownVariant Identifier -- ^ Unknown variant in match case (SE-149)
+  | EMatchMissingCases [Identifier] -- ^ Missing cases in match statement (SE-150)
+  | EMatchExtraCases [Identifier] -- ^ Extra cases in match statement (SE-151)
+  | EIsVariantInvalidType TerminaType -- ^ Invalid type for is variant expression (SE-152)
+  | EIsOptionVariantInvalidType TerminaType -- ^ Invalid type for is option variant expression (SE-153)
+  | EIsVariantEnumTypeMismatch Identifier Identifier -- ^ Enum type mismatch in is variant expression (SE-154)
+  | EOutputPortInvalidProcedure Identifier -- ^ Invalid procedure in output port (SE-155)
   | EOutputPortSendWrongArgs
   deriving Show
 

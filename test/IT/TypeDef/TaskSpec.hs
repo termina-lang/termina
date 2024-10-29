@@ -149,14 +149,14 @@ spec = do
               "\n" ++
               "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
               "\n"  ++
-              "    if (alloc_msg.__variant == None) {\n"  ++
-              "        \n"  ++
-              "\n"  ++
-              "    } else {\n" ++
+              "    if (alloc_msg.__variant == Some) {\n"  ++
               "        \n" ++
               "        __option_box_params_t __Some = alloc_msg.Some;\n" ++
               "\n" ++
               "        __termina_pool__free(self->message_pool, __Some.__0);\n" ++
+              "\n" ++
+              "    } else {\n" ++
+              "        \n"  ++
               "\n" ++
               "    }\n" ++
               "\n" ++

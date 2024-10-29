@@ -141,15 +141,15 @@ spec = do
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    if (option0.__variant == None) {\n" ++
-              "        \n" ++
-              "        foo = 0;\n" ++
-              "\n" ++
-              "    } else {\n" ++
+              "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
               "        __option_box_params_t __Some = option0.Some;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)__Some.__0.data;\n" ++
+              "\n" ++
+              "    } else {\n" ++
+              "        \n" ++
+              "        foo = 0;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -190,14 +190,14 @@ spec = do
               "\n" ++
               "    uint32_t foo = 0;\n" ++
               "\n" ++
-              "    if (option0.__variant == None) {\n" ++
-              "        \n" ++
-              "\n" ++
-              "    } else {\n" ++
+              "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
               "        __option_box_params_t __Some = option0.Some;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)__Some.__0.data;\n" ++
+              "\n" ++
+              "    } else {\n" ++
+              "        \n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

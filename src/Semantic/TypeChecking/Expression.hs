@@ -233,7 +233,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               typed_element <- catchMismatch ann (EOutputPortParamTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
               return (([ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann EOutputPortSendWrongArgs
-        _ -> throwError $ annotateError ann $ EOutputPortWrongProcedure ident
+        _ -> throwError $ annotateError ann $ EOutputPortInvalidProcedure ident
     ty -> throwError $ annotateError ann (EMemberFunctionAccessInvalidType ty)
 
 ----------------------------------------
@@ -690,9 +690,9 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
   (_, obj_ty) <- getObjType obj_typed
   Located lhs_ty _ <- case obj_ty of
     TEnum lhs_id -> do
-      unless (lhs_id == id_ty) (throwError $ annotateError pann (EIsVariantEnumMismatch lhs_id id_ty))
+      unless (lhs_id == id_ty) (throwError $ annotateError pann (EIsVariantEnumTypeMismatch lhs_id id_ty))
       getEnumTy pann id_ty
-    _ -> throwError $ annotateError pann (EIsVariantNotEnum obj_ty)
+    _ -> throwError $ annotateError pann (EIsVariantInvalidType obj_ty)
   case lhs_ty of
     Enum lhs_enum ty_vs _mods ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
@@ -700,7 +700,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
           maybe (return ()) (sameTyOrError pann TBool) expectedType
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
-    x -> throwError $ annotateError pann (ETyNotEnum id_ty (fmap forgetSemAnn x))
+    x -> throwError $ annotateError Internal EUnboxingEnumType
 typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
@@ -708,24 +708,12 @@ typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pa
     (TOption {}) -> do
       maybe (return ()) (sameTyOrError pann TBool) expectedType
       return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
-    _ -> throwError $ annotateError pann (EIsVariantNotOption obj_ty)
+    _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann EArrayInitializerInvalidUse
 typeExpression _ _ (ArrayExprListInitializer _ pann) = throwError $ annotateError pann EArrayExprListInitializerInvalidUse
 typeExpression _ _ (OptionVariantInitializer _ pann) = throwError $ annotateError pann EOptionVariantInitializerInvalidUse
 typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateError pann EEnumVariantInitializerInvalidUse
-
--- Zipping list of same length
-zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-zipSameLength = zipSameLength' []
-  where
-    -- Tail recursive version
-    zipSameLength' :: [c] -> ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-    zipSameLength' acc _ _ _ [] [] = Right acc
-    zipSameLength' acc erra errb f (a : as) (b : bs) = zipSameLength' (f a b : acc) erra errb f as bs
-    zipSameLength' _ erra _ _ [] bs = Left (erra bs)
-    zipSameLength' _ _ errb _ as [] = Left (errb as)
---
 
 typeFieldAssignment
   :: Location -> (Identifier, Location)
