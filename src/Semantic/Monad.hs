@@ -276,7 +276,7 @@ getConst loc ident = do
         (\errorGlobal ->
             -- | We have not found a global object with the name |ident|
             case getError errorGlobal of {
-              ENotNamedGlobal _ ->
+              EUnknownGlobal _ ->
                 -- | If we have not found a global object with the name |ident|, then check the local objects.
                 -- Any path that goes through here is an error.
                 catchError (getLocalObjTy loc ident)
@@ -308,7 +308,7 @@ getGlobalEntry :: Location -> Identifier -> SemanticMonad (Located (GEntry Seman
 getGlobalEntry loc ident =
   gets global
   -- | Get local variables map and check if |ident| is a member of that map
-  >>= maybe (throwError (annotateError loc (ENotNamedGlobal ident))) return . M.lookup ident
+  >>= maybe (throwError (annotateError loc (EUnknownGlobal ident))) return . M.lookup ident
   -- ^ if |ident| is not a member throw error |ENotNamedVar| or return its type
 
 getLHSVarTy, getRHSVarTy, getGlobalVarTy ::
@@ -328,7 +328,7 @@ getLHSVarTy loc ident =
               ENotConstant _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case getError errorGlobal of {
-                    ENotNamedGlobal _ -> 
+                    EUnknownGlobal _ -> 
                       throwError $ annotateError loc (ENotNamedObject ident);
                     _  -> throwError errorGlobal;
                   }
@@ -352,7 +352,7 @@ getRHSVarTy loc ident =
               ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
                 (\errorGlobal ->
                   case getError errorGlobal of {
-                    ENotNamedGlobal _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                    EUnknownGlobal _ -> throwError $ annotateError loc (ENotNamedObject ident);
                     _  -> throwError errorGlobal;
                   }
                 ) >>= (\case{
@@ -368,7 +368,7 @@ getGlobalVarTy loc ident =
   catchError (getGlobalEntry loc ident)
              (\errorGlobal ->
                 case getError errorGlobal of {
-                  ENotNamedGlobal errvar ->
+                  EUnknownGlobal errvar ->
                     if errvar == ident then
                       throwError $ annotateError loc (ENotNamedObject ident);
                     else

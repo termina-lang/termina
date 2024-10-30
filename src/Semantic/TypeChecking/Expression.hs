@@ -127,7 +127,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         -- This case corresponds to a call to an inner method or viewer from the self object.
         Located (Class _ _identTy cls _provides _mods) _ ->
           case findClassProcedure ident cls of
-            Just _ -> throwError $ annotateError ann (EMemberAccessInvalidProcedureCall ident)
+            Just _ -> throwError $ annotateError ann (EInvalidProcedureCallInsideMemberFunction ident)
             Nothing ->
               case findClassViewerOrMethod ident cls of
                 Just (ps, _, anns) -> do
@@ -234,7 +234,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               return (([ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
         _ -> throwError $ annotateError ann $ EOutputPortInvalidProcedure ident
-    ty -> throwError $ annotateError ann (EMemberFunctionAccessInvalidType ty)
+    ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
 
 ----------------------------------------
 -- These functions are useful:
@@ -700,7 +700,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
           maybe (return ()) (sameTyOrError pann TBool) expectedType
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
-    x -> throwError $ annotateError Internal EUnboxingEnumType
+    _ -> throwError $ annotateError Internal EUnboxingEnumType
 typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
@@ -725,14 +725,14 @@ typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty) (FieldValueAssig
   if fid == faid
   then
     flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
-  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [faid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
       TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
       ty -> throwError $ annotateError loc (EFieldNotFixedLocation fid ty)
-  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [faid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
@@ -754,7 +754,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection I
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
       ty -> throwError $ annotateError loc (EFieldNotSinkOrInboundPort fid ty)
-  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
@@ -770,7 +770,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection O
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
       ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
-  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
@@ -809,7 +809,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             _ -> throwError $ annotateError loc (EAccessPortFieldInvalidType (TInterface iface))
           }
       ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)
-  else throwError $ annotateError loc (EFieldMissing tyDef [fid])
+  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
 
 typeFieldAssignments
   :: Location -> (Identifier, Location)
@@ -829,7 +829,7 @@ typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds 
     sorted_fas = Data.List.sortOn getFid fas
     -- Same length monadic Zipwith
     checkSortedFields [] [] xs = return $ reverse xs
-    checkSortedFields [] es _ = tError (EFieldExtra tyDef (fmap getFid es))
-    checkSortedFields ms [] _ = tError (EFieldMissing tyDef (fmap fieldIdentifier ms))
+    checkSortedFields [] es _ = tError (EFieldValueAssignmentExtraFields tyDef (fmap getFid es))
+    checkSortedFields ms [] _ = tError (EFieldValueAssignmentMissingFields tyDef (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
       typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)

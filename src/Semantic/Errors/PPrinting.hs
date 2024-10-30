@@ -1217,6 +1217,98 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("The expected type of the assignment is \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EFieldValueAssignmentMissingFields (recordId, recordPos@(Position recordStart _end)) [field] ->
+        let title = "\x1b[31merror [SE-119]\x1b[0m: missing field/s in field assignment expression."
+            recordFileName = sourceName recordStart
+            recordSourceLines = toModuleAST M.! recordFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack field <>
+                    "\x1b[0m is not being assigned a value in the field assignment expression.")) >>
+            printSimpleError
+                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
+                recordPos Nothing
+    EFieldValueAssignmentMissingFields (recordId, recordPos@(Position recordStart _end)) fields ->
+        let title = "\x1b[31merror [SE-119]\x1b[0m: missing field/s in field assignment expression."
+            recordFileName = sourceName recordStart
+            recordSourceLines = toModuleAST M.! recordFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
+                    "\x1b[0m are not being assigned a value in the field assignment expression.")) >>
+            printSimpleError
+                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
+                recordPos Nothing
+    EFieldValueAssignmentExtraFields (recordId, recordPos@(Position recordStart _end)) [field] ->
+        let title = "\x1b[31merror [SE-120]\x1b[0m: extra field/s in field assignment expression."
+            recordFileName = sourceName recordStart
+            recordSourceLines = toModuleAST M.! recordFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack field <>
+                    "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) >>
+            printSimpleError
+                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
+                recordPos Nothing
+    EFieldValueAssignmentExtraFields (recordId, recordPos@(Position recordStart _end)) fields ->
+        let title = "\x1b[31merror [SE-120]\x1b[0m: extra field/s in field assignment expression."
+            recordFileName = sourceName recordStart
+            recordSourceLines = toModuleAST M.! recordFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
+                    "\x1b[0m are not fields of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) >>
+            printSimpleError
+                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
+                recordPos Nothing
+    EFieldNotFixedLocation fieldName ty ->
+        let title = "\x1b[31merror [SE-121]\x1b[0m: field is not a fixed-location field."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack fieldName <>
+                    "\x1b[0m of type \x1b[31m" <> showText ty <>
+                    "\x1b[0m is not a fixed-location field."))
+    EFieldNotAccessPort fieldName ty ->
+        let title = "\x1b[31merror [SE-122]\x1b[0m: field is not an access port field."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack fieldName <>
+                    "\x1b[0m of type \x1b[31m" <> showText ty <>
+                    "\x1b[0m is not an access port field."))
+    EFieldNotSinkOrInboundPort fieldName ty ->
+        let title = "\x1b[31merror [SE-123]\x1b[0m: field is not a sink or inbound port field."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack fieldName <>
+                    "\x1b[0m of type \x1b[31m" <> showText ty <>
+                    "\x1b[0m is not a sink or inbound port field."))
+    EFieldNotOutboundPort fieldName ty ->
+        let title = "\x1b[31merror [SE-124]\x1b[0m: field is not an outbound port field."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack fieldName <>
+                    "\x1b[0m of type \x1b[31m" <> showText ty <>
+                    "\x1b[0m is not an outbound port field."))
+    EMemberAccessInvalidType ty ->
+        let title = "\x1b[31merror [SE-125]\x1b[0m: invalid member access type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member access."))
+    EMemberFunctionCallInvalidType ty -> 
+        let title = "\x1b[31merror [SE-126]\x1b[0m: invalid member function call type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member function call."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
