@@ -1309,6 +1309,69 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member function call."))
+    EMemberAccessUnknownField (recordId, recordPos@(Position recordStart _end)) field ->
+        let title = "\x1b[31merror [SE-127]\x1b[0m: unknown field in member access."
+            recordFileName = sourceName recordStart
+            recordSourceLines = toModuleAST M.! recordFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack field <>
+                    "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) >>
+            printSimpleError
+                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
+                recordPos Nothing
+    EInvalidProcedureCallInsideMemberFunction -> 
+        let title = "\x1b[31merror [SE-128]\x1b[0m: invalid procedure call inside member function."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "Procedure calls are not allowed inside member functions.")
+    EConstantOutRange ty ->
+        let title = "\x1b[31merror [SE-129]\x1b[0m: constant out of range."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The constant value \x1b[31m" <> showText ty <> "\x1b[0m is out of range for its type."))
+    EForIteratorInvalidType ty -> 
+        let title = "\x1b[31merror [SE-130]\x1b[0m: invalid type for for-loop iterator."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a for-loop iterator."))
+    EUsedTypeName ident prevPos@(Position prevStart _) ->
+        let title = "\x1b[31merror [SE-131]\x1b[0m: type name already used."
+            prevFileName = sourceName prevStart
+            prevSourceLines = toModuleAST M.! prevFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type cannot be defined because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) >>
+            printSimpleError
+                prevSourceLines "The symbol is previously used here:" prevFileName
+                prevPos Nothing
+    EUsedGlobalName ident prevPos@(Position prevStart _) ->
+        let title = "\x1b[31merror [SE-132]\x1b[0m: global name already used."
+            prevFileName = sourceName prevStart
+            prevSourceLines = toModuleAST M.! prevFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) >>
+            printSimpleError
+                prevSourceLines "The symbol is previously used here:" prevFileName
+                prevPos Nothing
+    EUsedFunName ident prevPos@(Position prevStart _) ->
+        let title = "\x1b[31merror [SE-133]\x1b[0m: function name already used."
+            prevFileName = sourceName prevStart
+            prevSourceLines = toModuleAST M.! prevFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The function cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) >>
+            printSimpleError
+                prevSourceLines "The symbol is previously used here:" prevFileName
+                prevPos Nothing
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

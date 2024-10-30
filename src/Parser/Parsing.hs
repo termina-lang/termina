@@ -830,8 +830,8 @@ forLoopStmtParser = do
 taskDeclParser :: Parser (Global ParserAnn)
 taskDeclParser = do
   modifiers <- many modifierParser
-  reserved "task"
   startPos <- getPosition
+  reserved "task"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -845,8 +845,8 @@ taskDeclParser = do
 emitterDeclParser :: Parser (Global ParserAnn)
 emitterDeclParser = do
   modifiers <- many modifierParser
-  reserved "emitter"
   startPos <- getPosition
+  reserved "emitter"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -860,8 +860,8 @@ emitterDeclParser = do
 channelDeclParser :: Parser (Global ParserAnn)
 channelDeclParser = do
   modifiers <- many modifierParser
-  reserved "channel"
   startPos <- getPosition
+  reserved "channel"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -875,8 +875,8 @@ channelDeclParser = do
 resourceDeclParser :: Parser (Global ParserAnn)
 resourceDeclParser = do
   modifiers <- many modifierParser
-  reserved "resource"
   startPos <- getPosition
+  reserved "resource"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -890,8 +890,8 @@ resourceDeclParser = do
 handlerDeclParser :: Parser (Global ParserAnn)
 handlerDeclParser = do
   modifiers <- many modifierParser
-  reserved "handler"
   startPos <- getPosition
+  reserved "handler"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser
@@ -905,8 +905,8 @@ handlerDeclParser = do
 constDeclParser :: Parser (Global ParserAnn)
 constDeclParser = do
   modifiers <- many modifierParser
-  reserved "const"
   startPos <- getPosition
+  reserved "const"
   identifier <- identifierParser
   reservedOp ":"
   typeSpecifier <- typeSpecifierParser

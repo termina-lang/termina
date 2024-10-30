@@ -127,7 +127,7 @@ typeMemberFunctionCall ann obj_ty ident args =
         -- This case corresponds to a call to an inner method or viewer from the self object.
         Located (Class _ _identTy cls _provides _mods) _ ->
           case findClassProcedure ident cls of
-            Just _ -> throwError $ annotateError ann (EInvalidProcedureCallInsideMemberFunction ident)
+            Just _ -> throwError $ annotateError ann EInvalidProcedureCallInsideMemberFunction
             Nothing ->
               case findClassViewerOrMethod ident cls of
                 Just (ps, _, anns) -> do
@@ -806,7 +806,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
                   return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                 _ -> throwError $ annotateError loc $ EAccessPortConnectionInvalidGlobal sid
               ;
-            _ -> throwError $ annotateError loc (EAccessPortFieldInvalidType (TInterface iface))
+            _ -> throwError $ annotateError Internal EUnboxingInterface
           }
       ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)
   else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
