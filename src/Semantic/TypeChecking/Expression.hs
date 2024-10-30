@@ -133,10 +133,10 @@ typeMemberFunctionCall ann obj_ty ident args =
                 Just (ps, _, anns) -> do
                   let (psLen , asLen ) = (length ps, length args)
                   -- Check that the number of parameters are OK
-                  when (psLen < asLen) (throwError $ annotateError ann EMemberMethodExtraParams)
-                  when (psLen > asLen) (throwError $ annotateError ann EMemberMethodMissingParams)
+                  when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, location anns) (fromIntegral asLen)))
+                  when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, location anns) (fromIntegral asLen)))
                   typed_args <- zipWithM (\(p, idx) e -> 
-                    catchMismatch ann (EMemberFunctionCallParamTypeMismatch (ident, p, location anns) idx)
+                    catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, location anns) idx)
                       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
@@ -151,10 +151,10 @@ typeMemberFunctionCall ann obj_ty ident args =
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
             Just (ps, anns) -> do
               let (psLen , asLen) = (length ps, length args)
-              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraParams (ident, ps, location anns) (fromIntegral asLen)))
-              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingParams (ident, ps, location anns) (fromIntegral asLen)))
+              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, location anns) (fromIntegral asLen)))
+              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, location anns) (fromIntegral asLen)))
               typed_args <- zipWithM (\(p, idx) e ->
-                catchMismatch ann (EProcedureCallParamTypeMismatch (ident, p, location anns) idx)
+                catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, location anns) idx)
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
           ;
@@ -165,63 +165,63 @@ typeMemberFunctionCall ann obj_ty ident args =
         "alloc" ->
           case args of
             [opt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("alloc", TReference Mutable (TOption (TBoxSubtype ty_pool)), Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("alloc", TReference Mutable (TOption (TBoxSubtype ty_pool)), Builtin) 0)
                 (typeExpression (Just (TReference Mutable (TOption (TBoxSubtype ty_pool)))) typeRHSObject opt)
               return (([TReference Mutable (TOption (TBoxSubtype ty_pool))], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("alloc", [TReference Mutable (TOption (TBoxSubtype ty_pool))], Builtin) (fromIntegral (length args)))
         "free" ->
           case args of
             [elemnt] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("free", TBoxSubtype ty_pool, Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("free", TBoxSubtype ty_pool, Builtin) 0)
                 (typeExpression (Just (TBoxSubtype ty_pool)) typeRHSObject elemnt)
               return (([TBoxSubtype ty_pool], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("free", [TBoxSubtype ty_pool], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("free", [TBoxSubtype ty_pool], Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("free", [TBoxSubtype ty_pool], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("free", [TBoxSubtype ty_pool], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TAccessPort (TAtomicAccess ty_atomic) ->
       case ident of
         "load" ->
           case args of
             [retval] -> do
-              typed_arg <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load", TReference Mutable ty_atomic, Builtin) 0)
+              typed_arg <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load", TReference Mutable ty_atomic, Builtin) 0)
                 (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
               return (([TReference Mutable ty_atomic], [typed_arg]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("load", [TReference Mutable ty_atomic], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("load", [TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("load", [TReference Mutable ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("load", [TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store" ->
           case args of
             [value] -> do
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store", ty_atomic, Builtin) 0)
+              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store", ty_atomic, Builtin) 0)
                 (typeExpression (Just ty_atomic) typeRHSObject value)
               return (([ty_atomic], [typed_value]), TUnit)
-            [] -> throwError $ annotateError ann (EProcedureCallMissingParams ("store", [ty_atomic], Builtin) 0)
-            _ -> throwError $ annotateError ann (EProcedureCallExtraParams ("store", [ty_atomic], Builtin) (fromIntegral (length args)))
+            [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("store", [ty_atomic], Builtin) 0)
+            _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("store", [ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TAccessPort (TAtomicArrayAccess ty_atomic _size) ->
       case ident of
         "load_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", TUSize, Builtin) 0)
+              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", TUSize, Builtin) 0)
                 (typeExpression (Just TUSize) typeRHSObject index)
-              typed_ref <- catchMismatch ann (EProcedureCallParamTypeMismatch ("load_index", TReference Mutable ty_atomic, Builtin) 1)
+              typed_ref <- catchMismatch ann (EProcedureCallArgTypeMismatch ("load_index", TReference Mutable ty_atomic, Builtin) 1)
                 (typeExpression (Just (TReference Mutable ty_atomic)) typeRHSObject retval)
               return (([TUSize, TReference Mutable ty_atomic], [typed_idx, typed_ref]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingParams ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingArgs ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraArgs ("load_index", [TUSize, TReference Mutable ty_atomic], Builtin) (fromIntegral (length args)))
         "store_index" ->
           case args of
             [index, retval] -> do
-              typed_idx <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", TUSize, Builtin) 0)
+              typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", TUSize, Builtin) 0)
                 (typeExpression (Just TUSize) typeRHSObject index)
-              typed_value <- catchMismatch ann (EProcedureCallParamTypeMismatch ("store_index", ty_atomic, Builtin) 1)
+              typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", ty_atomic, Builtin) 1)
                 (typeExpression (Just ty_atomic) typeRHSObject retval)
               return (([TUSize, ty_atomic], [typed_idx, typed_value]), TUnit)
             _ -> if length args < 2 then
-              throwError $ annotateError ann (EProcedureCallMissingParams ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
-              else throwError $ annotateError ann (EProcedureCallExtraParams ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
+              throwError $ annotateError ann (EProcedureCallMissingArgs ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
+              else throwError $ annotateError ann (EProcedureCallExtraArgs ("store_index", [TUSize, ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
     TOutPort ty ->
       case ident of
@@ -230,9 +230,9 @@ typeMemberFunctionCall ann obj_ty ident args =
           case args of
             [elemnt] -> do
               -- Type the first argument element
-              typed_element <- catchMismatch ann (EOutputPortParamTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
+              typed_element <- catchMismatch ann (EOutboundPortArgTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
               return (([ty] , [typed_element]), TUnit)
-            _ -> throwError $ annotateError ann EOutputPortSendWrongArgs
+            _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
         _ -> throwError $ annotateError ann $ EOutputPortInvalidProcedure ident
     ty -> throwError $ annotateError ann (EMemberFunctionAccessInvalidType ty)
 
@@ -658,9 +658,9 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   let expAnn = buildExpAnnApp ann ps retty
       (psLen , asLen) = (length ps, length args)
   -- Check that the number of parameters are OK
-  when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraParams (ident, ps, funcLocation) (fromIntegral asLen)))
-  when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingParams (ident, ps, funcLocation) (fromIntegral asLen)))
-  typed_args <- zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallParamTypeMismatch (ident, p, funcLocation) idx)
+  when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
+  when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
+  typed_args <- zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
   maybe (return ()) (sameTyOrError ann retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
@@ -753,7 +753,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection I
           Located (GGlob cts@(TMsgQueue _ _)) _ ->
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
-      ty -> throwError $ annotateError loc (EFieldNotSinkOrInPort fid ty)
+      ty -> throwError $ annotateError loc (EFieldNotSinkOrInboundPort fid ty)
   else throwError $ annotateError loc (EFieldMissing tyDef [fid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
@@ -769,7 +769,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection O
           Located (GGlob cts@(TMsgQueue _ _)) _ ->
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
-      ty -> throwError $ annotateError loc (EFieldNotOutPort fid ty)
+      ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
   else throwError $ annotateError loc (EFieldMissing tyDef [fid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid

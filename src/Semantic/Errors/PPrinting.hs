@@ -78,14 +78,14 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Invalid return type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EProcedureCallExtraParams (procId, params, procPos) paramNumber ->
-        let title = "\x1b[31merror [SE-009]\x1b[0m: extra parameters in procedure call."
+    EProcedureCallExtraArgs (procId, params, procPos) argNumber ->
+        let title = "\x1b[31merror [SE-009]\x1b[0m: extra arguments in procedure call."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Procedure \x1b[31m" <> T.pack procId <>
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
             case procPos of 
                 Position procStart _procEnd -> 
                     let procFileName = sourceName procStart
@@ -94,14 +94,14 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                         procSourceLines "The interface of the procedure is defined here:" procFileName
                         procPos Nothing
                 _ -> return ()
-    EProcedureCallMissingParams (ident, params, procPos) paramNumber ->
-        let title = "\x1b[31merror [SE-010]\x1b[0m: missing parameters in procedure call."
+    EProcedureCallMissingArgs (ident, params, procPos) argNumber ->
+        let title = "\x1b[31merror [SE-010]\x1b[0m: missing arguments in procedure call."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Procedure \x1b[31m" <> T.pack ident <>
                     "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
             case procPos of 
                 Position procStart _procEnd -> 
                     let procFileName = sourceName procStart
@@ -111,12 +111,12 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                         ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:")
                         procFileName procPos Nothing
                 _ -> return ()
-    EProcedureCallParamTypeMismatch (ident, expectedTy, procPos) paramCount actualTy ->
+    EProcedureCallArgTypeMismatch (ident, expectedTy, procPos) paramCount actualTy ->
         let title = "\x1b[31merror [SE-011]\x1b[0m: parameter type mismatch in procedure call."
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Parameter \x1b[31m#" <> T.pack (show paramCount) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <>
+                (Just ("Argument \x1b[31m#" <> T.pack (show paramCount) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <>
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             case procPos of 
@@ -565,8 +565,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
-    EFunctionCallExtraParams (funcId, params, funcPos@(Position funcStart _procEnd)) paramNumber ->
-        let title = "\x1b[31merror [SE-035]\x1b[0m: extra parameters in function call."
+    EFunctionCallExtraArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+        let title = "\x1b[31merror [SE-035]\x1b[0m: extra arguments in function call."
             funcFileName = sourceName funcStart
             funcSourceLines = toModuleAST M.! funcFileName
         in
@@ -574,12 +574,12 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("Function \x1b[31m" <> T.pack funcId <>
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
             printSimpleError
                 funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                 funcPos Nothing
-    EFunctionCallMissingParams (funcId, params, funcPos@(Position funcStart _procEnd)) paramNumber ->
-        let title = "\x1b[31merror [SE-036]\x1b[0m: missing parameters in function call."
+    EFunctionCallMissingArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+        let title = "\x1b[31merror [SE-036]\x1b[0m: missing arguments in function call."
             funcFileName = sourceName funcStart
             funcSourceLines = toModuleAST M.! funcFileName
         in
@@ -587,18 +587,18 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("Function \x1b[31m" <> T.pack funcId <>
                     "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
             printSimpleError
                 funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                 funcPos Nothing
-    EFunctionCallParamTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) paramNumber actualTy ->
-        let title = "\x1b[31merror [SE-037]\x1b[0m: parameter type mismatch in function call."
+    EFunctionCallArgTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+        let title = "\x1b[31merror [SE-037]\x1b[0m: argument type mismatch in function call."
             funcFileName = sourceName funcStart
             funcSourceLines = toModuleAST M.! funcFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Parameter \x1b[31m#" <> T.pack (show paramNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <>
+                (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <>
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
             printSimpleError
@@ -941,8 +941,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("This statement can only be used to call a continuation action.\n" <>
                        "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid."))
-    EContinueActionExtraParams (ident, params, actionPos@(Position actStartPos _endPos)) paramNumber ->
-        let title = "\x1b[31merror [SE-085]\x1b[0m: extra parameters in continuation action."
+    EContinueActionExtraArgs (ident, params, actionPos@(Position actStartPos _endPos)) argNumber ->
+        let title = "\x1b[31merror [SE-085]\x1b[0m: extra arguments in continuation action."
             actFileName = sourceName actStartPos
             actSourceLines = toModuleAST M.! actFileName
         in
@@ -950,12 +950,12 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("Action \x1b[31m" <> T.pack ident <>
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) >>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
             printSimpleError
                 actSourceLines "The action is defined here:" actFileName
                 actionPos Nothing
-    EContinueActionMissingParam (ident, actionPos@(Position actStartPos _endPos)) ->
-        let title = "\x1b[31merror [SE-086]\x1b[0m: missing parameters in continuation action."
+    EContinueActionMissingArgs (ident, actionPos@(Position actStartPos _endPos)) ->
+        let title = "\x1b[31merror [SE-086]\x1b[0m: missing arguments in continuation action."
             actFileName = sourceName actStartPos
             actSourceLines = toModuleAST M.! actFileName
         in
@@ -1135,14 +1135,40 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for a procedure."))
-    EMemberFunctionCallParamTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) paramNumber actualTy ->
-        let title = "\x1b[31merror [SE-110]\x1b[0m: member function call parameter type mismatch."
+    EMemberFunctionCallExtraArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+        let title = "\x1b[31merror [SE-110]\x1b[0m: extra arguments in member function call."
             funcFileName = sourceName funcStart
             funcSourceLines = toModuleAST M.! funcFileName
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("Parameter \x1b[31m#" <> T.pack (show paramNumber) <>
+                (Just ("Member function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
+                    "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
+            printSimpleError
+                funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
+                funcPos Nothing
+    EMemberFunctionCallMissingArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+        let title = "\x1b[31merror [SE-111]\x1b[0m: missing arguments in member function call."
+            funcFileName = sourceName funcStart
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Member function \x1b[31m" <> T.pack funcId <>
+                    "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
+                    "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) >>
+            printSimpleError
+                funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
+                funcPos Nothing
+    EMemberFunctionCallArgTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+        let title = "\x1b[31merror [SE-112]\x1b[0m: member function call argument type mismatch."
+            funcFileName = sourceName funcStart
+            funcSourceLines = toModuleAST M.! funcFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <>
                     "\x1b[0m of member function \x1b[31m" <> T.pack funcId <>
                     "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) >>
@@ -1150,35 +1176,42 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                 funcPos Nothing
     EArrayIndexNotUSize ty ->
-        let title = "\x1b[31merror [SE-111]\x1b[0m: invalid array index type."
+        let title = "\x1b[31merror [SE-113]\x1b[0m: invalid array index type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the array index is \x1b[31m" <> showText ty <>
                  "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
     EArraySliceLowerBoundNotUSize ty ->
-        let title = "\x1b[31merror [SE-112]\x1b[0m: invalid array slice lower bound type."
+        let title = "\x1b[31merror [SE-114]\x1b[0m: invalid array slice lower bound type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the lower bound of the array slice is \x1b[31m" <> showText ty <>
                  "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
     EArraySliceUpperBoundNotUSize ty ->
-        let title = "\x1b[31merror [SE-113]\x1b[0m: invalid array slice upper bound type."
+        let title = "\x1b[31merror [SE-115]\x1b[0m: invalid array slice upper bound type."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type of the upper bound of the array slice is \x1b[31m" <> showText ty <>
                  "\x1b[0m but it is expected to be of type \x1b[31m" <> showText TUSize <> "\x1b[0m."))
-    EOutputPortParamTypeMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [SE-114]\x1b[0m: output port parameter type mismatch."
+    EOutboundPortSendInvalidNumArgs argNumber ->
+        let title = "\x1b[31merror [SE-116]\x1b[0m: invalid number of arguments in outbound port send."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The send procedure of an outbound port expects \x1b[31mone\x1b[0m argument but you are providing \x1b[31m" <>
+                    T.pack (show argNumber) <> "\x1b[0m."))
+    EOutboundPortArgTypeMismatch expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-117]\x1b[0m: output port argument type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The output data is expected to be of type \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     EAssignmentExprMismatch expectedTy actualTy ->
-        let title = "\x1b[31merror [SE-115]\x1b[0m: assignment expression type mismatch."
+        let title = "\x1b[31merror [SE-118]\x1b[0m: assignment expression type mismatch."
         in
             printSimpleError
                 sourceLines title fileName pos

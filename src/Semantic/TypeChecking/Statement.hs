@@ -222,13 +222,13 @@ typeStatement _rTy (ContinueStmt contE anns) =
                       case ts of
                         TUnit -> case args of
                           [] -> return (([], []), ts)
-                          _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [], location aann) (fromIntegral (length args)))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], location aann) (fromIntegral (length args)))
                         _ -> case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ts) typeRHSObject arg
                             return (([ts], [typed_arg]), rty)
-                          [] -> throwError $ annotateError ann (EContinueActionMissingParam (ident, location aann))
-                          _ -> throwError $ annotateError ann (EContinueActionExtraParams (ident, [ts], location aann) (fromIntegral (length args)))
+                          [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, location aann))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [ts], location aann) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound
