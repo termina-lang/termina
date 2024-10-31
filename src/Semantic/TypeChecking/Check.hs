@@ -246,3 +246,12 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
     checkHandlerPorts _ _ = throwError $ annotateError Internal EMalformedClassTyping
 
 checkClassKind _anns _clsId _kind _members _provides = return ()
+
+checkEmitterDataType :: Location -> Identifier -> TerminaType -> SemanticMonad ()
+checkEmitterDataType loc "Interrupt" ty =
+  unless (sameTy ty TUInt32) (throwError $ annotateError loc (EInvalidInterruptEmitterType ty))
+checkEmitterDataType loc "PeriodicTimer" ty =
+  unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidPeriodicTimerEmitterType ty))
+checkEmitterDataType loc "SystemInit" ty =
+  unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidSystemInitEmitterType ty))
+checkEmitterDataType _ _ _ = throwError $ annotateError Internal EUnboxingEmittterClass

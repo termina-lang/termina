@@ -124,7 +124,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases) in
             case zipSameLength
                   (annotateError ann . EMatchMissingCases)
-                  (annotateError ann . EMatchExtraCases)
+                  (annotateError ann . EMatchCaseUnknownVariants)
                   (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
               Left e -> throwError e
               Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
@@ -138,7 +138,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases) in
       case zipSameLength
             (annotateError ann . EMatchMissingCases)
-            (annotateError ann . EMatchExtraCases)
+            (annotateError ann . EMatchCaseUnknownVariants)
             (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
         Left e -> throwError e
         Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
@@ -172,7 +172,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
               if length bVars == length tVars then
               flip (SAST.MatchCase cIdent bVars) (buildStmtMatchCaseAnn (matchAnnotation c) tVars) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock retTy bd)
               else throwError $ annotateError Internal EMatchCaseInternalError
-            | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariant supIdent
+            | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariants [supIdent]
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of

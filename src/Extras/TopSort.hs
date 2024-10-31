@@ -113,7 +113,7 @@ visit graph parent src
   else
     do
       tempSet <- gets getTemp
-      when (S.member src tempSet) (throwError (ELoop (S.toList tempSet)))
+      when (S.member src tempSet) (throwError (ELoop (S.toList tempSet ++ [src])))
       -- temp mark |src|
       lmodifyE (addTemp src)
       --

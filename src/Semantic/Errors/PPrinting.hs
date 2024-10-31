@@ -1241,8 +1241,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
                 recordPos Nothing
-    EFieldValueAssignmentExtraFields (recordId, recordPos@(Position recordStart _end)) [field] ->
-        let title = "\x1b[31merror [SE-120]\x1b[0m: extra field/s in field assignment expression."
+    EFieldValueAssignmentUnknownFields (recordId, recordPos@(Position recordStart _end)) [field] ->
+        let title = "\x1b[31merror [SE-120]\x1b[0m: unknown field/s in field assignment expression."
             recordFileName = sourceName recordStart
             recordSourceLines = toModuleAST M.! recordFileName
         in
@@ -1253,8 +1253,8 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
                 recordPos Nothing
-    EFieldValueAssignmentExtraFields (recordId, recordPos@(Position recordStart _end)) fields ->
-        let title = "\x1b[31merror [SE-120]\x1b[0m: extra field/s in field assignment expression."
+    EFieldValueAssignmentUnknownFields (recordId, recordPos@(Position recordStart _end)) fields ->
+        let title = "\x1b[31merror [SE-120]\x1b[0m: unknown field/s in field assignment expression."
             recordFileName = sourceName recordStart
             recordSourceLines = toModuleAST M.! recordFileName
         in
@@ -1372,6 +1372,145 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 prevSourceLines "The symbol is previously used here:" prevFileName
                 prevPos Nothing
+    EAccessPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-134]\x1b[0m: invalid global object in access port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be used in an access port connection."))
+    EAccessPortConnectionInterfaceNotProvided ident iface ->
+        let title = "\x1b[31merror [SE-135]\x1b[0m: resource does not provide the interface"
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Resource \x1b[31m" <> T.pack ident <>
+                    "\x1b[0m does not provide the interface \x1b[31m" <> T.pack iface <> "\x1b[0m."))
+    ESinkPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-136]\x1b[0m: invalid sink port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to a sink port."))
+    EInboundPortConnectionInvalidObject ident ->
+        let title = "\x1b[31merror [SE-137]\x1b[0m: invalid inbound port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an inbound port."))
+    EOutboundPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-138]\x1b[0m: invalid outbound port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an outbound port."))
+    EAllocatorPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-139]\x1b[0m: invalid allocator port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an allocator port."))
+    EAtomicAccessPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-140]\x1b[0m: invalid atomic access port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic access port."))
+    EAtomicArrayAccessPortConnectionInvalidGlobal ident ->
+        let title = "\x1b[31merror [SE-141]\x1b[0m: invalid atomic array access port connection."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be connected to an atomic array access port."))
+    EStructDefNotUniqueField [fieldName] ->
+        let title = "\x1b[31merror [SE-142]\x1b[0m: duplicate field in struct definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Field \x1b[31m" <> T.pack fieldName <> "\x1b[0m is duplicated in the struct definition."))
+    EStructDefNotUniqueField fieldNames ->
+        let title = "\x1b[31merror [SE-142]\x1b[0m: duplicate field in struct definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fieldNames) <>
+                    "\x1b[0m are duplicated in the struct definition."))
+    EEnumDefNotUniqueVariant [variantName] ->
+        let title = "\x1b[31merror [SE-143]\x1b[0m: duplicate variant in enum definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the enum definition."))
+    EEnumDefNotUniqueVariant variantNames ->
+        let title = "\x1b[31merror [SE-143]\x1b[0m: duplicate variant in enum definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <>
+                    "\x1b[0m are duplicated in the enum definition."))
+    EInterfaceNotUniqueProcedure [procName] ->
+        let title = "\x1b[31merror [SE-144]\x1b[0m: duplicate procedure in interface definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is duplicated in the interface definition."))
+    EInterfaceNotUniqueProcedure procNames ->
+        let title = "\x1b[31merror [SE-144]\x1b[0m: duplicate procedure in interface definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Procedures \x1b[31m" <> T.intercalate ", " (map T.pack procNames) <>
+                    "\x1b[0m are duplicated in the interface definition."))
+    EClassLoop funcNames ->
+        let title = "\x1b[31merror [SE-145]\x1b[0m: Loop between member function calls in class definition."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The member functions \x1b[31m" <> T.intercalate " -> " (map T.pack funcNames) <>
+                    "\x1b[0m form a recursive calling loop in the class definition."))
+    EDereferenceInvalidType ty ->
+        let title = "\x1b[31merror [SE-146]\x1b[0m: invalid type for dereference."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m cannot be dereferenced."))
+    EMatchInvalidType ty ->
+        let title = "\x1b[31merror [SE-147]\x1b[0m: invalid type for match statement."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for match statement."))
+    EMatchCaseUnknownVariants [variantName] ->
+        let title = "\x1b[31merror [SE-148]\x1b[0m: unknown variant/s in match case."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant of the enum or option."))
+    EMatchCaseUnknownVariants variantNames ->
+        let title = "\x1b[31merror [SE-148]\x1b[0m: unknown variant/s in match case."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <>
+                    "\x1b[0m are not valid variants of the enum or option."))
+    EMatchMissingCases [caseIdent] -> 
+        let title = "\x1b[31merror [SE-149]\x1b[0m: missing case/s in match statement."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Case \x1b[31m" <> T.pack caseIdent <> "\x1b[0m is missing in the match statement."))
+    EMatchMissingCases caseIdents ->
+        let title = "\x1b[31merror [SE-149]\x1b[0m: missing case/s in match statement."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Cases \x1b[31m" <> T.intercalate ", " (map T.pack caseIdents) <>
+                    "\x1b[0m are missing in the match statement."))
+    EIsVariantInvalidType ty ->
+        let title = "\x1b[31merror [SE-150]\x1b[0m: invalid type for is-variant."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-variant expression."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

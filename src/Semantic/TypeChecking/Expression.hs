@@ -725,62 +725,59 @@ typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty) (FieldValueAssig
   if fid == faid
   then
     flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
-  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [faid])
+  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
       TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
       ty -> throwError $ annotateError loc (EFieldNotFixedLocation fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [faid])
+  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      TSinkPort _ action  ->
+      TSinkPort ty action  ->
         case gentry of
-          -- TODO: Check that the type of the inbound port and the type of the emitter match
-          Located  (GGlob ets@(TGlobal EmitterClass _)) _ ->
+          Located  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
+            checkEmitterDataType loc clsId ty
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError loc $ ESinkPortConnectionInvalidGlobal sid
-      TInPort _ action  ->
+      TInPort ty action  ->
         case gentry of
-          -- TODO: Check that the type of the inbound port and the type of the emitter match
-          Located (GGlob cts@(TGlobal ChannelClass _)) _ ->
-            return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
-          Located (GGlob cts@(TMsgQueue _ _)) _ ->
+          Located (GGlob cts@(TMsgQueue ty' _)) _ -> do
+            catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
       ty -> throwError $ annotateError loc (EFieldNotSinkOrInboundPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
+  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      TOutPort _ ->
+      TOutPort ty ->
         case gentry of
-          -- TODO: Check that the type of the outbound port and the type of the channel match
-          Located (GGlob cts@(TGlobal ChannelClass _)) _ ->
-            return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
-          Located (GGlob cts@(TMsgQueue _ _)) _ ->
+          Located (GGlob cts@(TMsgQueue ty' _)) _ -> do
+            catchMismatch pann (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
       ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
+  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry loc sid >>=
     \gentry ->
     case fty of
-      TAccessPort (TAllocator {}) ->
+      TAccessPort (TAllocator ty) ->
         case gentry of
-          -- TODO: Check that the types match
-          Located (GGlob (TPool ty s)) _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
+          Located (GGlob (TPool ty' s)) _ -> do
+            catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError loc ty ty')
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
@@ -801,15 +798,23 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             Located (Interface _ members _) _ ->
               -- Check that the resource provides the interface
               case gentry of
-                Located (GGlob rts@(TGlobal ResourceClass _)) _ ->
+                Located (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
                   let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members] in
-                  return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
+                  getGlobalTypeDef loc clsId >>=
+                  \case {
+                      Located (Class _ _ _ provides _) _ ->
+                        case Data.List.find (iface ==) provides of
+                          Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
+                          _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface
+                        ;
+                      _ -> throwError $ annotateError Internal EUnboxingInterface
+                  }
                 _ -> throwError $ annotateError loc $ EAccessPortConnectionInvalidGlobal sid
               ;
             _ -> throwError $ annotateError Internal EUnboxingInterface
           }
       ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentExtraFields tyDef [pid])
+  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
 
 typeFieldAssignments
   :: Location -> (Identifier, Location)
@@ -829,7 +834,7 @@ typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds 
     sorted_fas = Data.List.sortOn getFid fas
     -- Same length monadic Zipwith
     checkSortedFields [] [] xs = return $ reverse xs
-    checkSortedFields [] es _ = tError (EFieldValueAssignmentExtraFields tyDef (fmap getFid es))
+    checkSortedFields [] es _ = tError (EFieldValueAssignmentUnknownFields tyDef (fmap getFid es))
     checkSortedFields ms [] _ = tError (EFieldValueAssignmentMissingFields tyDef (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
       typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)
