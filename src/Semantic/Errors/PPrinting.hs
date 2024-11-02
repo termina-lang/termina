@@ -1479,38 +1479,86 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for match statement."))
+    EMatchCaseDuplicate variantName prevCase@(Position prevStart _) ->
+        let title = "\x1b[31merror [SE-148]\x1b[0m: duplicate case in match statement."
+            prevFileName = sourceName prevStart
+            prevSourceLines = toModuleAST M.! prevFileName
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the match statement.")) >>
+            printSimpleError
+                prevSourceLines "The variant is previously used here:" prevFileName
+                prevCase Nothing
     EMatchCaseUnknownVariants [variantName] ->
-        let title = "\x1b[31merror [SE-148]\x1b[0m: unknown variant/s in match case."
+        let title = "\x1b[31merror [SE-149]\x1b[0m: unknown variant/s in match case."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant of the enum or option."))
     EMatchCaseUnknownVariants variantNames ->
-        let title = "\x1b[31merror [SE-148]\x1b[0m: unknown variant/s in match case."
+        let title = "\x1b[31merror [SE-149]\x1b[0m: unknown variant/s in match case."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <>
                     "\x1b[0m are not valid variants of the enum or option."))
     EMatchMissingCases [caseIdent] -> 
-        let title = "\x1b[31merror [SE-149]\x1b[0m: missing case/s in match statement."
+        let title = "\x1b[31merror [SE-150]\x1b[0m: missing case/s in match statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Case \x1b[31m" <> T.pack caseIdent <> "\x1b[0m is missing in the match statement."))
     EMatchMissingCases caseIdents ->
-        let title = "\x1b[31merror [SE-149]\x1b[0m: missing case/s in match statement."
+        let title = "\x1b[31merror [SE-150]\x1b[0m: missing case/s in match statement."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Cases \x1b[31m" <> T.intercalate ", " (map T.pack caseIdents) <>
                     "\x1b[0m are missing in the match statement."))
     EIsVariantInvalidType ty ->
-        let title = "\x1b[31merror [SE-150]\x1b[0m: invalid type for is-variant."
+        let title = "\x1b[31merror [SE-151]\x1b[0m: invalid type for is-variant expression."
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-variant expression."))
+    EIsOptionVariantInvalidType ty ->
+        let title = "\x1b[31merror [SE-152]\x1b[0m: invalid type for is-option-variant expression."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not an option type."))
+    EIsVariantEnumTypeMismatch expectedEnum actualEnum ->
+        let title = "\x1b[31merror [SE-153]\x1b[0m: type mismatch in is-variant expression."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The expected enum type is \x1b[31m" <> T.pack expectedEnum <>
+                    "\x1b[0m but the actual type is \x1b[31m" <> T.pack actualEnum <> "\x1b[0m."))
+    EOutboundPortInvalidProcedure ident ->
+        let title = "\x1b[31merror [SE-154]\x1b[0m: invalid procedure in outbound port."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is not a valid procedure for an outbound port."))
+    EInvalidPoolInitialization -> 
+        let title = "\x1b[31merror [SE-155]\x1b[0m: invalid pool initialization."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "A pool object cannot be initialized with a value.")
+    EAtomicUninitialized -> 
+        let title = "\x1b[31merror [SE-156]\x1b[0m: atomic object is uninitialized."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "Atomic objects must be initialized with a value.")
+    EAtomicArrayUninitialized ->
+        let title = "\x1b[31merror [SE-157]\x1b[0m: atomic array object is uninitialized."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just "Atomic array objects must be initialized with a value.")
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

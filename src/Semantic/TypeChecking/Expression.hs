@@ -233,7 +233,7 @@ typeMemberFunctionCall ann obj_ty ident args =
               typed_element <- catchMismatch ann (EOutboundPortArgTypeMismatch ty) (typeExpression (Just ty) typeRHSObject elemnt)
               return (([ty] , [typed_element]), TUnit)
             _ -> throwError $ annotateError ann (EOutboundPortSendInvalidNumArgs (fromIntegral $ length args))
-        _ -> throwError $ annotateError ann $ EOutputPortInvalidProcedure ident
+        _ -> throwError $ annotateError ann $ EOutboundPortInvalidProcedure ident
     ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
 
 ----------------------------------------
