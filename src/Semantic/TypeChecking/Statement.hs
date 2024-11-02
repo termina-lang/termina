@@ -114,28 +114,28 @@ typeStatement _retTy (SingleExpStmt expr anns) =
 typeStatement retTy (MatchStmt matchE cases ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   type_matchE <- getExprType typed_matchE
+  -- Check for duplicate cases
+  ord_cases <- sortAndCheckCaseDuplicates M.empty cases
   case type_matchE of
     TEnum t -> getGlobalTypeDef ann t >>=
         \case {
-          Located (Enum _ident flsDef _mods) _ ->
+          Located (Enum _ident flsDef _mods) _ -> do
             let ord_flsDef = Data.List.sort (variantIdentifier <$> flsDef)
-                ord_cases = Data.List.sort (matchIdentifier <$> cases)
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
-                caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases) in
+                caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             case zipSameLength
                   (annotateError ann . EMatchMissingCases)
                   (annotateError ann . EMatchCaseUnknownVariants)
                   (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
               Left e -> throwError e
               Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
-            ;
+          ;
           _ -> throwError $ annotateError Internal EUnboxingEnumType
         }
-    TOption t ->
-      let ord_cases = Data.List.sort (matchIdentifier <$> cases)
-          ord_flsDef = ["None", "Some"]
+    TOption t -> do
+      let ord_flsDef = ["None", "Some"]
           variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [t])] 
-          caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases) in
+          caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       case zipSameLength
             (annotateError ann . EMatchMissingCases)
             (annotateError ann . EMatchCaseUnknownVariants)
@@ -143,7 +143,15 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
         Left e -> throwError e
         Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
     _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
+
     where
+
+      sortAndCheckCaseDuplicates :: M.Map Identifier Location -> [MatchCase ParserAnn] -> SemanticMonad [Identifier]
+      sortAndCheckCaseDuplicates acc [] = return $ Data.List.sort (M.keys acc)
+      sortAndCheckCaseDuplicates acc ((MatchCase i _ _ loc) : cs) =
+        case M.lookup i acc of
+          Nothing -> sortAndCheckCaseDuplicates (M.insert i loc acc) cs
+          Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
 
       -- Zipping list of same length
       zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
