@@ -1,4 +1,4 @@
-module Neg.ArrayIndexSpec (spec) where
+module Negative.ReferenceSpec (spec) where
 
 import Test.Hspec
 
@@ -19,23 +19,22 @@ runNegativeTest input = case parse (contents topLevel) "" input of
       Right _ -> Nothing
 
 test0 :: String
-test0 = "function access_to_slice() -> u8 {\n" ++
-        "    var array0: [u8; 10] = [0; 10];\n" ++
+test0 = "function test_ref(input : &mut u16) {\n" ++
+        "    *input = 1024;\n" ++
+        "    return;\n" ++
+        "}\n" ++
         "\n" ++
-        "    let x : u8 = array0[1..4][0];\n" ++
-        "\n" ++
-        "    return x;\n" ++
-        "\n" ++
+        "function test0() {\n" ++
+        "    let foo : u16 = 1024;\n" ++
+        "    test_ref(&mut foo);\n" ++
+        "    return;\n" ++
         "}"
 
 spec :: Spec
 spec = do
-  describe "TArray indexing" $ do
-    it "Indexing an array slice" $ do
+  describe "References" $ do
+    it "Mutable reference to immutable object" $ do
      runNegativeTest test0
        `shouldSatisfy`
-        isEIfElseNoOtherwise
-  
-  where
-    isEIfElseNoOtherwise :: Maybe Error -> Bool
-    isEIfElseNoOtherwise = \case Just ESliceInvalidUse -> True; _ -> False
+        (\case Just EMutableReferenceToImmutable -> True; _ -> False)
+

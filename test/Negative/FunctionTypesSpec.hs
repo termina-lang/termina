@@ -1,4 +1,4 @@
-module Neg.FunctionTypesSpec (spec) where
+module Negative.FunctionTypesSpec (spec) where
 
 import Test.Hspec
 

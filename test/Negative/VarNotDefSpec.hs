@@ -1,4 +1,4 @@
-module Neg.VarNotDefSpec (spec) where
+module Negative.VarNotDefSpec (spec) where
 
 import Test.Hspec
 

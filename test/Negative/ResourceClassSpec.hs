@@ -1,4 +1,4 @@
-module Neg.ResourceClassSpec (spec) where
+module Negative.ResourceClassSpec (spec) where
 
 import Test.Hspec
 

@@ -1,4 +1,4 @@
-module Neg.VarAssignmentSpec (spec) where
+module Negative.VarAssignmentSpec (spec) where
 
 import Test.Hspec
 

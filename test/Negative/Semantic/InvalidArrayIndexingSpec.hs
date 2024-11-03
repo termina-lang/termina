@@ -1,4 +1,4 @@
-module Neg.ReferenceSpec (spec) where
+module Negative.Semantic.InvalidArrayIndexingSpec (spec) where
 
 import Test.Hspec
 
@@ -8,6 +8,7 @@ import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Monad
 import Semantic.Errors.Errors
+import Semantic.AST
 import Utils.Annotations
 
 runNegativeTest :: String -> Maybe Error
@@ -18,23 +19,25 @@ runNegativeTest input = case parse (contents topLevel) "" input of
       Left err -> Just $ getError err
       Right _ -> Nothing
 
-test0 :: String
-test0 = "function test_ref(input : &mut u16) {\n" ++
-        "    *input = 1024;\n" ++
-        "    return;\n" ++
-        "}\n" ++
+test0:: String
+test0 = "function test0() {\n" ++
         "\n" ++
-        "function test0() {\n" ++
-        "    let foo : u16 = 1024;\n" ++
-        "    test_ref(&mut foo);\n" ++
+        "    var foo : u32 = 0;\n" ++
+        "\n" ++
+        "    foo[0] = 1024;\n" ++
+        "\n" ++
         "    return;\n" ++
-        "}"
+        "\n" ++
+        "}\n"
 
 spec :: Spec
 spec = do
-  describe "References" $ do
-    it "Mutable reference to immutable object" $ do
+  describe "Semantic Error SE-001" $ do
+    it "Invalid array indexing" $ do
      runNegativeTest test0
        `shouldSatisfy`
-        (\case Just EMutableReferenceToImmutable -> True; _ -> False)
-
+        isEInvalidArrayIndexing
+  
+  where
+    isEInvalidArrayIndexing :: Maybe Error -> Bool
+    isEInvalidArrayIndexing = \case Just (EInvalidArrayIndexing TUInt32) -> True; _ -> False

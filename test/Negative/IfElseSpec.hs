@@ -1,4 +1,4 @@
-module Neg.IfElseSpec (spec) where
+module Negative.IfElseSpec (spec) where
 
 import Test.Hspec
 
