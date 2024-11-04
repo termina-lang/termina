@@ -335,6 +335,8 @@ sameTy  (TStruct idl) (TStruct idr) = idl == idr
 sameTy  (TEnum idl) (TEnum idr) = idl == idr
 sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
 sameTy  (TInterface idl) (TInterface idr) = idl == idr
+sameTy  (TAtomic tyl) (TAtomic tyr) = sameTy tyl tyr 
+sameTy  (TAtomicArray tyl sizel) (TAtomicArray tyr sizer) = sameTy tyl tyr && (sizel == sizer)
 -- TFixedLocation subtypes
 sameTy  (TFixedLocation tyspecl) (TFixedLocation tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TFixedLocation tyspecl) tyspecr = sameTy tyspecl tyspecr

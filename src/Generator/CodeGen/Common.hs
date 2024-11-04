@@ -168,7 +168,7 @@ getExprType (Casting _ _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (FunctionCall _ _ (Located (ETy (AppType _ ts)) _)) = return ts
 getExprType (MemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
 getExprType (DerefMemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (StructInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (StructInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
@@ -271,7 +271,9 @@ genType qual (TFixedLocation ts) = do
 genType _qual (TAccessPort ts) =  genType noqual ts
 genType _qual (TAllocator _) = return (CTPointer (CTTypeDef pool noqual) noqual)
 genType _qual (TAtomic ts) = genType atomic ts
-genType _qual (TAtomicArray ts _) = genType atomic ts
+genType _qual (TAtomicArray ts s) = do
+    ts' <- genType atomic ts
+    return (CTArray ts' (getArraySize s))
 genType _qual (TAtomicAccess ts) = do
     ts' <- genType atomic ts
     return (CTPointer ts' noqual)

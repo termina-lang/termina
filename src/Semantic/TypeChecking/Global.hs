@@ -65,7 +65,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
     -- | Memory pools 
-    TPool _ _ -> do
+    TPool {} -> do
       exprty <-
         case mexpr of
           Just _ -> throwError $ annotateError anns EInvalidPoolInitialization
@@ -73,19 +73,19 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
     -- | Atomic variables 
-    TAtomic ty' -> do
+    TAtomic {} -> do
       exprty <-
         case mexpr of
-          Just expr -> Just <$> typeAssignmentExpression ty' typeGlobalObject expr
-          Nothing   -> throwError $ annotateError anns EAtomicUninitialized
+          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
     -- | Atomic arrays
-    TAtomicArray ty' size -> do
+    TAtomicArray {} -> do
       exprty <-
         case mexpr of
-          Just expr -> Just <$> typeAssignmentExpression (TArray ty' size) typeGlobalObject expr
-          Nothing -> throwError $ annotateError anns EAtomicArrayUninitialized
+          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
+          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
     _ -> throwError $ annotateError anns EUnboxingClassType

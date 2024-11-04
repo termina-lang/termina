@@ -292,6 +292,32 @@ typeAssignmentExpression ::
   SemanticMonad (SAST.Expression SemanticAnn)
 ----------------------------------------
 -- | Struct Initializer
+typeAssignmentExpression expected_type@(TAtomic ty) typeObj (StructInitializer fs mts pann) = do
+  -- | Check field type
+  case mts of
+    (Just ts) -> do
+      init_ty <- typeTypeSpecifier pann ts
+      catchMismatch pann
+        (EStructInitializerTypeMismatch expected_type)
+        (sameTyOrError pann expected_type init_ty)
+    Nothing -> return ()
+  -- | The type is ok. Now we have to check the field
+  SAST.StructInitializer
+        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "value" ty] fs
+        <*> pure (buildExpAnn pann expected_type)
+typeAssignmentExpression expected_type@(TAtomicArray ty size) typeObj (StructInitializer fs mts pann) = do
+  -- | Check field type
+  case mts of
+    (Just ts) -> do
+      init_ty <- typeTypeSpecifier pann ts
+      catchMismatch pann
+        (EStructInitializerTypeMismatch expected_type)
+        (sameTyOrError pann expected_type init_ty)
+    Nothing -> return ()
+  -- | The type is ok. Now we have to check the field
+  SAST.StructInitializer
+        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "values" (TArray ty size)] fs
+        <*> pure (buildExpAnn pann expected_type)
 typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
   case mts of
@@ -305,8 +331,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
   >>= \case{
     Located (Struct _ ty_fs _mods) strLoc  ->
       SAST.StructInitializer
-        <$> typeFieldAssignments pann (id_ty, strLoc) typeObj ty_fs fs
-        <*> pure (Just id_ty)
+        <$> typeFieldAssignments pann (expected_type, strLoc) typeObj ty_fs fs
         <*> pure (buildExpAnn pann (TStruct id_ty));
     _ -> throwError $ annotateError Internal EUnboxingStructType;
   }
@@ -324,8 +349,7 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
     Located (Class clsKind _ident members _provides _mods) clsLoc ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
         SAST.StructInitializer
-        <$> typeFieldAssignments pann (id_ty, clsLoc) typeObj fields fs
-        <*> pure (Just id_ty)
+        <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
     _ -> throwError $ annotateError Internal EUnboxingClassType;
   }
@@ -716,7 +740,7 @@ typeExpression _ _ (OptionVariantInitializer _ pann) = throwError $ annotateErro
 typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateError pann EEnumVariantInitializerInvalidUse
 
 typeFieldAssignment
-  :: Location -> (Identifier, Location)
+  :: Location -> (TerminaType, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> SAST.FieldDefinition
   -> FieldAssignment ParserAnn
@@ -817,7 +841,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
 
 typeFieldAssignments
-  :: Location -> (Identifier, Location)
+  :: Location -> (TerminaType, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> [SAST.FieldDefinition]
   -> [FieldAssignment ParserAnn]

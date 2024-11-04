@@ -52,7 +52,6 @@ data Expression'
   | ArrayExprListInitializer [Expression' ty obj a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
     [FieldAssignment' (Expression' ty obj) a] -- ^ Initial value of each field identifier
-    (Maybe Identifier) -- ^ Structure type identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantInitializer
@@ -89,7 +88,7 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   getAnnotation (ReferenceExpression _ _ a)       = a
   getAnnotation (Casting _ _ a)                   = a
   getAnnotation (FunctionCall _ _ a)              = a
-  getAnnotation (StructInitializer _ _ a)         = a
+  getAnnotation (StructInitializer _ a)           = a
   getAnnotation (EnumVariantInitializer _ _ _ a)  = a
   getAnnotation (ArrayInitializer _ _ a)          = a
   getAnnotation (ArrayExprListInitializer _ a)    = a

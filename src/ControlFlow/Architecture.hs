@@ -141,7 +141,7 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       }
     -- | Any other emitter class is not supported (this should not happen)
     _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
-genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitializer assignments _ _)) modifiers tann) = do
+genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitializer assignments _)) modifiers tann) = do
   members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
@@ -193,7 +193,7 @@ genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _
       tp {
         resources = M.insert ident (TPResource ident rcls M.empty modName rann) (resources tp)
       }
-    Just (StructInitializer assignments _ _) -> do
+    Just (StructInitializer assignments _) -> do
       apConns <- foldM (\accps assignment -> do
         case assignment of
           FieldPortConnection AccessPortConnection pname target cann  -> do
@@ -225,7 +225,7 @@ genArchGlobal modName (Resource ident (TPool aty size) _ _ rann) =
       pools = M.insert ident (TPPool ident aty size modName rann) (pools tp)
     }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
-genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _ _)) modifiers hann) = do
+genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _)) modifiers hann) = do
   members <- ST.get >>= \tp ->
     case M.lookup hcls (handlerClasses tp) of
       Nothing -> error $ "Handler class: " ++ hcls ++ " not found"

@@ -101,7 +101,7 @@ useExpression (DerefMemberFunctionCall obj _ident args _ann)
 useExpression (ArrayInitializer e _size _ann)
   = useExpression e
 useExpression (ArrayExprListInitializer exprs _ann) = mapM_ useExpression exprs
-useExpression (StructInitializer fs _ident _ann)
+useExpression (StructInitializer fs _ann)
   = mapM_ useFieldAssignment fs
 useExpression (EnumVariantInitializer _ident _ident2 es _ann)
   = mapM_ useExpression es

@@ -1217,54 +1217,70 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 sourceLines title fileName pos
                 (Just ("The expected type of the assignment is \x1b[31m" <> showText expectedTy <>
                     "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-    EFieldValueAssignmentMissingFields (recordId, recordPos@(Position recordStart _end)) [field] ->
+    EFieldValueAssignmentMissingFields (record, recordPos) [field] ->
         let title = "\x1b[31merror [SE-119]\x1b[0m: missing field/s in field assignment expression."
-            recordFileName = sourceName recordStart
-            recordSourceLines = toModuleAST M.! recordFileName
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Field \x1b[31m" <> T.pack field <>
                     "\x1b[0m is not being assigned a value in the field assignment expression.")) >>
-            printSimpleError
-                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
-                recordPos Nothing
-    EFieldValueAssignmentMissingFields (recordId, recordPos@(Position recordStart _end)) fields ->
+            case recordPos of
+                Position recordStart _end ->
+                    let recordFileName = sourceName recordStart
+                        recordSourceLines = toModuleAST M.! recordFileName
+                    in
+                    printSimpleError
+                        recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                        recordPos Nothing
+                _ -> return ()
+    EFieldValueAssignmentMissingFields (record, recordPos) fields ->
         let title = "\x1b[31merror [SE-119]\x1b[0m: missing field/s in field assignment expression."
-            recordFileName = sourceName recordStart
-            recordSourceLines = toModuleAST M.! recordFileName
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
                     "\x1b[0m are not being assigned a value in the field assignment expression.")) >>
-            printSimpleError
-                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
-                recordPos Nothing
-    EFieldValueAssignmentUnknownFields (recordId, recordPos@(Position recordStart _end)) [field] ->
+            case recordPos of
+                Position recordStart _end ->
+                    let recordFileName = sourceName recordStart
+                        recordSourceLines = toModuleAST M.! recordFileName
+                    in
+                    printSimpleError
+                        recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                        recordPos Nothing
+                _ -> return ()
+    EFieldValueAssignmentUnknownFields (record, recordPos) [field] ->
         let title = "\x1b[31merror [SE-120]\x1b[0m: unknown field/s in field assignment expression."
-            recordFileName = sourceName recordStart
-            recordSourceLines = toModuleAST M.! recordFileName
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Field \x1b[31m" <> T.pack field <>
-                    "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) >>
-            printSimpleError
-                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
-                recordPos Nothing
-    EFieldValueAssignmentUnknownFields (recordId, recordPos@(Position recordStart _end)) fields ->
+                    "\x1b[0m is not a field of the type \x1b[31m" <> showText record <> "\x1b[0m.")) >>
+            case recordPos of
+                Position recordStart _end ->
+                    let recordFileName = sourceName recordStart
+                        recordSourceLines = toModuleAST M.! recordFileName
+                    in
+                    printSimpleError
+                        recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                        recordPos Nothing
+                _ -> return ()
+    EFieldValueAssignmentUnknownFields (record, recordPos) fields ->
         let title = "\x1b[31merror [SE-120]\x1b[0m: unknown field/s in field assignment expression."
-            recordFileName = sourceName recordStart
-            recordSourceLines = toModuleAST M.! recordFileName
         in
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
-                    "\x1b[0m are not fields of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) >>
-            printSimpleError
-                recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
-                recordPos Nothing
+                    "\x1b[0m are not fields of the type \x1b[31m" <> showText record <> "\x1b[0m.")) >>
+            case recordPos of
+                Position recordStart _end ->
+                    let recordFileName = sourceName recordStart
+                        recordSourceLines = toModuleAST M.! recordFileName
+                    in
+                    printSimpleError
+                        recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                        recordPos Nothing
+                _ -> return ()
     EFieldNotFixedLocation fieldName ty ->
         let title = "\x1b[31merror [SE-121]\x1b[0m: field is not a fixed-location field."
         in
@@ -1547,18 +1563,63 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just "A pool object cannot be initialized with a value.")
-    EAtomicUninitialized -> 
-        let title = "\x1b[31merror [SE-156]\x1b[0m: atomic object is uninitialized."
+    EInvalidMsgQueueInitialization -> 
+        let title = "\x1b[31merror [SE-156]\x1b[0m: invalid message queue initialization."
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just "Atomic objects must be initialized with a value.")
-    EAtomicArrayUninitialized ->
-        let title = "\x1b[31merror [SE-157]\x1b[0m: atomic array object is uninitialized."
+                (Just "A message queue object cannot be initialized with a value.")
+    EUnknownGlobal ident ->
+        let title = "\x1b[31merror [SE-157]\x1b[0m: unknown global object."
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just "Atomic array objects must be initialized with a value.")
+                (Just ("Global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined."))
+    EInvalidInterruptEmitterType ty ->
+        let title = "\x1b[31merror [SE-158]\x1b[0m: invalid interrupt emitter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Interrupts emit data of type \x1b[31m" <> showText TUInt32 <> 
+                       "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EInvalidPeriodicTimerEmitterType ty ->
+        let title = "\x1b[31merror [SE-159]\x1b[0m: invalid periodic timer emitter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Periodic timers emit data of type \x1b[31m" <> showText (TStruct "TimeVal") <> 
+                       "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EInvalidSystemInitEmitterType ty ->
+        let title = "\x1b[31merror [SE-160]\x1b[0m: invalid system init emitter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("System init emitters emit data of type \x1b[31m" <> showText (TStruct "TimeVal") <> 
+                       "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
+    EInboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-161]\x1b[0m: message queue type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The message queue \x1b[31m" <> T.pack msgQueueId <> 
+                       "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> 
+                       "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EOutboundPortConnectionMsgQueueTypeMismatch msgQueueId expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-162]\x1b[0m: message queue type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The message queue \x1b[31m" <> T.pack msgQueueId <> 
+                       "\x1b[0m exchanges data messages of type \x1b[31m" <> showText expectedTy <> 
+                       "\x1b[0m but you are sending data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EAllocatorPortConnectionPoolTypeMismatch poolId expectedTy actualTy ->
+        let title = "\x1b[31merror [SE-163]\x1b[0m: pool type mismatch."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The pool \x1b[31m" <> T.pack poolId <> 
+                       "\x1b[0m serves data of type \x1b[31m" <> showText expectedTy <> 
+                       "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
