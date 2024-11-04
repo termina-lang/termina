@@ -35,7 +35,7 @@ typeGlobal (Task ident ts mexpr mods anns) = do
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Task ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
-    _ -> throwError $ annotateError anns EUnboxingClassType
+    _ -> throwError $ annotateError anns (EInvalidTaskType ty)
 typeGlobal (Handler ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
@@ -49,7 +49,7 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
-    _ -> throwError $ annotateError anns EUnboxingClassType
+    _ -> throwError $ annotateError anns (EInvalidHandlerType ty)
 typeGlobal (Resource ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
@@ -88,7 +88,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
-    _ -> throwError $ annotateError anns EUnboxingClassType
+    _ -> throwError $ annotateError anns (EInvalidResourceType ty)
 typeGlobal (Emitter ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
@@ -102,20 +102,11 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
-    _ -> throwError $ annotateError anns EUnboxingClassType
+    _ -> throwError $ annotateError anns (EInvalidEmitterType ty)
 typeGlobal (Channel ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
   case ty of
-    TGlobal ChannelClass _ -> do
-      exprty <-
-        case mexpr of
-          -- If it has an initial value great
-          Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
-          -- If it has not, we need to check that the type has actually NO fields
-          Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
-      tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
     TMsgQueue _ _ -> do
       exprty <-
         case mexpr of
@@ -125,7 +116,7 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
           Nothing -> return Nothing
       tyMods <- mapM (typeModifier anns) mods
       return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
-    _ -> throwError $ annotateError anns EUnboxingClassType
+    _ -> throwError $ annotateError anns (EInvalidChannelType ty)
 typeGlobal (Const ident ts expr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty

@@ -1620,6 +1620,36 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
                 (Just ("The pool \x1b[31m" <> T.pack poolId <> 
                        "\x1b[0m serves data of type \x1b[31m" <> showText expectedTy <> 
                        "\x1b[0m but you are expecting data of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+    EInvalidTaskType ty ->
+        let title = "\x1b[31merror [SE-164]\x1b[0m: invalid task type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid task type."))
+    EInvalidHandlerType ty ->
+        let title = "\x1b[31merror [SE-165]\x1b[0m: invalid handler type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid handler type."))
+    EInvalidResourceType ty ->
+        let title = "\x1b[31merror [SE-166]\x1b[0m: invalid resource type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid resource type."))
+    EInvalidEmitterType ty ->
+        let title = "\x1b[31merror [SE-167]\x1b[0m: invalid emitter type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid emitter type."))
+    EInvalidChannelType ty ->
+        let title = "\x1b[31merror [SE-168]\x1b[0m: invalid channel type."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid channel type."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

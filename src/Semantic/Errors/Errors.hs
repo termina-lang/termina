@@ -200,6 +200,11 @@ data Error
   | EInboundPortConnectionMsgQueueTypeMismatch Identifier TerminaType TerminaType -- ^ Message queue type mismatch in inbound port connection (SE-161)
   | EOutboundPortConnectionMsgQueueTypeMismatch Identifier TerminaType TerminaType -- ^ Message queue type mismatch in outbound port connection (SE-162)
   | EAllocatorPortConnectionPoolTypeMismatch Identifier TerminaType TerminaType -- ^ Pool type mismatch in allocator port connection (SE-163)
+  | EInvalidTaskType TerminaType -- ^ Invalid task type (SE-164)
+  | EInvalidHandlerType TerminaType -- ^ Invalid handler type (SE-165)
+  | EInvalidResourceType TerminaType -- ^ Invalid resource type (SE-166)
+  | EInvalidEmitterType TerminaType -- ^ Invalid emitter type (SE-167)
+  | EInvalidChannelType TerminaType -- ^ Invalid channel type (SE-168)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location

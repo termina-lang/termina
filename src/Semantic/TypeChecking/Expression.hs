@@ -158,7 +158,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
           ;
-        _ -> throwError $ annotateError Internal EUnboxingClassType
+        _ -> throwError $ annotateError Internal EUnboxingInterface
       }
     TAccessPort (TAllocator ty_pool) ->
       case ident of
