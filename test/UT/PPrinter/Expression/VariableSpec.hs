@@ -9,6 +9,7 @@ import Control.Monad.Reader
 import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
+import Control.Monad.Except
 
 arrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -28,7 +29,7 @@ boxArray2 = Variable "box_array2" boxThreeDymArrayObjAnn
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
-  case runReaderT (genExpression expr) empty of
+  case runReader (runExceptT (genExpression expr)) empty of
     Left err -> pack $ show err
     Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 

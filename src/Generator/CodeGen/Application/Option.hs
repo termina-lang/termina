@@ -12,6 +12,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
+import Control.Monad.Except
 
 genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
@@ -35,4 +36,4 @@ genOptionHeaderFile = do
         ]
 
 runGenOptionHeaderFile :: OptionTypes -> Either CGeneratorError CFile
-runGenOptionHeaderFile = runReaderT genOptionHeaderFile
+runGenOptionHeaderFile = runReader (runExceptT genOptionHeaderFile)

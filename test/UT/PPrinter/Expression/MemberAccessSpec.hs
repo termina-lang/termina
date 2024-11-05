@@ -9,6 +9,7 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Types
+import Control.Monad.Except
 
 tmDescriptor0, tmDescriptor1 :: Object SemanticAnn
 tmDescriptor0 = Variable "tm_descriptor0" (structObjSemAnn Mutable "TMDescriptor")
@@ -29,7 +30,7 @@ pTMDescriptor0field0 = AccessObject (DereferenceMemberAccess pTMDescriptor0 "fie
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
-  case runReaderT (genExpression expr) empty of
+  case runReader (runExceptT (genExpression expr)) empty of
     Left err -> pack $ show err
     Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 

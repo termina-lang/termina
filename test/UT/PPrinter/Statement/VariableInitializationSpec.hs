@@ -74,13 +74,13 @@ structAFieldsInit0 =
     StructInitializer 
         [FieldValueAssignment "field_a" uint32Const0 undefined,
          FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
 tmDescriptorFieldsInit0 =
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 undefined,
-         FieldValueAssignment "field1" structAFieldsInit0 undefined] (Just "TMDescriptor") tmDescriptorExprSemAnn
+         FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorExprSemAnn
 
 struct0, struct1 :: Statement SemanticAnn
 struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
@@ -102,7 +102,7 @@ renderStatement stmt =
   case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
-      case runReaderT (Prelude.concat <$> mapM genBlocks bBlocks) empty of
+      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
         Left err -> pack $ show err
         Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 

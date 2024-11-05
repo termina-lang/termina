@@ -10,7 +10,8 @@ import Semantic.Types
 import Generator.CodeGen.Statement
 import Modules.Modules
 import qualified Data.Map as M
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Reader (runReader)
+import Control.Monad.Except (runExceptT)
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
@@ -55,4 +56,4 @@ genInitFile mName prjprogs = do
             return $ items ++ rest
 
 runGenInitFile :: FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile initFilePath prjprogs = runReaderT (genInitFile initFilePath prjprogs) M.empty
+runGenInitFile initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) M.empty

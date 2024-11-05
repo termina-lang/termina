@@ -48,39 +48,39 @@ structAFieldsInit0 =
     StructInitializer
         [FieldValueAssignment "field_a" uint32Const0 stmtSemAnn,
          FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 structAFieldsInit1 :: Expression SemanticAnn
 structAFieldsInit1 = 
     StructInitializer
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable TUInt32))) stmtSemAnn,
          FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 structAFieldsInit3 :: Expression SemanticAnn
 structAFieldsInit3 = 
     StructInitializer
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable TUInt32))) stmtSemAnn,
          FieldValueAssignment "field_b" (AccessObject (Dereference (Variable "param1" refArrayAnn) arrayObjAnn)) stmtSemAnn,
-         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] (Just "StructA") structAExprSemAnn
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
 tmDescriptorFieldsInit0 = 
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field1" structAFieldsInit0 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
+         FieldValueAssignment "field1" structAFieldsInit0 stmtSemAnn] tmDescriptorExprSemAnn
 
 tmDescriptorFieldsInit1 :: Expression SemanticAnn
 tmDescriptorFieldsInit1 = 
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field1" structAFieldsInit1 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
+         FieldValueAssignment "field1" structAFieldsInit1 stmtSemAnn] tmDescriptorExprSemAnn
 
 tmDescriptorFieldsInit3 :: Expression SemanticAnn
 tmDescriptorFieldsInit3 = 
     StructInitializer
         [FieldValueAssignment "field0" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field1" structAFieldsInit3 stmtSemAnn] (Just "TMDescriptor") tmDescriptorExprSemAnn
+         FieldValueAssignment "field1" structAFieldsInit3 stmtSemAnn] tmDescriptorExprSemAnn
 
 struct0Declaration0, struct0Declaration1, struct0Declaration2, struct1Declaration :: Statement SemanticAnn
 struct0Declaration0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
@@ -130,7 +130,7 @@ renderFunctionDecl opts decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbAST -> 
-      case runReaderT (genFunctionDecl bbAST) opts of
+      case runReader (runExceptT (genFunctionDecl bbAST)) opts of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -139,7 +139,7 @@ renderFunction func =
   case runExcept . genBBAnnASTElement $ func of
     Left err -> pack $ show err
     Right bbAST -> 
-      case runReaderT (genFunction bbAST) M.empty of
+      case runReader (runExceptT (genFunction bbAST)) M.empty of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 

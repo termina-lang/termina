@@ -99,7 +99,7 @@ renderTypeDefinitionDecl opts decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbDecl ->
-      case runReaderT (genTypeDefinitionDecl bbDecl) opts of
+      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) opts of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 

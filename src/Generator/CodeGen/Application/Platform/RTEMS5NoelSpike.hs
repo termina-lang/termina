@@ -12,8 +12,8 @@ import Generator.CodeGen.Utils
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Types
 import Generator.CodeGen.Application.Types
 import Generator.CodeGen.Common
-import Control.Monad.Except (MonadError(throwError))
-import Control.Monad.Reader (runReader, ReaderT (runReaderT))
+import Control.Monad.Except (runExceptT, MonadError(throwError))
+import Control.Monad.Reader (runReader)
 import Data.Text (unpack)
 import Generator.LanguageC.Printer
 import Modules.Modules (QualifiedName)
@@ -1015,4 +1015,4 @@ genMainFile mName progArchitecture = do
         dependenciesMap = getResDependencies progArchitecture
 
 runGenMainFile :: QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
-runGenMainFile mainFilePath progArchitecture = runReaderT (genMainFile mainFilePath progArchitecture) M.empty
+runGenMainFile mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) M.empty

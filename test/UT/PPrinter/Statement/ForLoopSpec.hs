@@ -43,7 +43,7 @@ renderStatement stmt =
   case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
-      case runReaderT (Prelude.concat <$> mapM genBlocks bBlocks) empty of
+      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
         Left err -> pack $ show err
         Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 

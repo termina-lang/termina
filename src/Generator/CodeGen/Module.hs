@@ -13,8 +13,9 @@ import Modules.Modules
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map as M
-import Control.Monad.Reader (runReaderT)
+import Control.Monad.Reader (runReader)
 import Utils.Annotations
+import Control.Monad.Except
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -74,7 +75,7 @@ genSourceFile mName program = do
         : items
 
 runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
-runGenSourceFile mName program = runReaderT (genSourceFile mName program) M.empty
+runGenSourceFile mName program = runReader (runExceptT (genSourceFile mName program)) M.empty
 
 runGenHeaderFile :: Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
-runGenHeaderFile includeOptionH mName imports program = runReaderT (genHeaderFile includeOptionH mName imports program)
+runGenHeaderFile includeOptionH mName imports program = runReader (runExceptT (genHeaderFile includeOptionH mName imports program))

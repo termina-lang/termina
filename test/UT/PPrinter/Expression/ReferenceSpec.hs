@@ -9,6 +9,7 @@ import Generator.CodeGen.Expression
 import Generator.LanguageC.Printer
 import UT.PPrinter.Expression.Common
 import Semantic.Types
+import Control.Monad.Except
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -52,7 +53,7 @@ derefpArray1 = AccessObject (Dereference pArray1 twoDymArrayObjAnn) -- | *p_arra
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
-  case runReaderT (genExpression expr) empty of
+  case runReader (runExceptT (genExpression expr)) empty of
     Left err -> pack $ show err
     Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
  

@@ -19,8 +19,8 @@ newtype CGeneratorError = InternalError String
 type Substitutions = Map Identifier CObject
 type OptionTypes = Map TerminaType (Set TerminaType)
 
-type CSourceGenerator = ReaderT Substitutions (Either CGeneratorError)
-type CHeaderGenerator = ReaderT OptionTypes (Either CGeneratorError)
+type CSourceGenerator = ExceptT CGeneratorError (Reader Substitutions)
+type CHeaderGenerator = ExceptT CGeneratorError (Reader OptionTypes)
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.

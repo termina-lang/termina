@@ -24,7 +24,8 @@ data TerminaYaml =
     appFolder :: FilePath,
     appFilename :: FilePath,
     sourceModulesFolder :: FilePath,
-    outputFolder :: FilePath
+    outputFolder :: FilePath,
+    platformFlags :: PlatformFlags
   } deriving (Eq, Show)
 
 -- | Instance for parsing the "termina.yaml" configuration file
@@ -36,7 +37,8 @@ instance FromJSON TerminaYaml where
     v .:   "app-folder"     <*>
     v .:   "app-file"       <*>
     v .:   "source-modules" <*>
-    v .:   "output-folder"
+    v .:   "output-folder"  <*>
+    v .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
 instance ToJSON TerminaYaml where
@@ -48,13 +50,15 @@ instance ToJSON TerminaYaml where
             prjAppFilename 
             prjSourceModulesFolder 
             prjOutputFolder
+            prjPlatformFlags
         ) = object [
             "name" .= prjName,
             "platform" .= prjPlatform,
             "app-folder" .= prjAppFolder,
             "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
-            "output-folder" .= prjOutputFolder
+            "output-folder" .= prjOutputFolder,
+            "platform-flags" .= prjPlatformFlags
         ]
 
 -- | Load "termina.yaml" configuration file
@@ -70,12 +74,13 @@ serializeConfig :: FilePath -> TerminaYaml -> IO ()
 serializeConfig filePath config = do
     encodeFile (filePath </> "termina" <.> "yaml") config
 
-defaultConfig :: String -> SupportedPlatform -> TerminaYaml
+defaultConfig :: String -> Platform -> TerminaYaml
 defaultConfig projectName plt = TerminaYaml {
     name = T.pack projectName,
     platform = T.pack $ show plt,
     appFolder = "app",
     appFilename = "app",
     sourceModulesFolder = "src",
-    outputFolder = "output"
+    outputFolder = "output",
+    platformFlags = defaultPlatformFlags
 }
