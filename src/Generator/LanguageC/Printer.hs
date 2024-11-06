@@ -541,5 +541,5 @@ instance PPrint CFile where
         pItems <- mapM pprint items
         return $ vsep pItems <> line
 
-runCPrinter :: CFile -> Text
-runCPrinter cFile = render $ runReader (pprint cFile) (CPrinterConfig False False)
+runCPrinter :: Bool -> CFile -> Text
+runCPrinter debugLines cFile = render $ runReader (pprint cFile) (CPrinterConfig debugLines False)

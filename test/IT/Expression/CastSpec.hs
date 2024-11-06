@@ -3,15 +3,7 @@ module IT.Expression.CastSpec (spec) where
 import IT.Common
 
 import Test.Hspec
-import Parser.Parsing
-import Data.Text hiding (empty)
-import Text.Parsec
-import Semantic.TypeChecking
-import Semantic.Monad
-import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
-import ControlFlow.BasicBlocks
+import Data.Text
 
 test0 :: String
 test0 = "function casting_test0() {\n" ++

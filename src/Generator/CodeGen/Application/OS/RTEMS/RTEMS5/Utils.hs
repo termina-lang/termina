@@ -11,7 +11,7 @@ import ControlFlow.Architecture.Types
 import Semantic.Types
 import Generator.LanguageC.AST
 import qualified Data.Map as M
-import Generator.CodeGen.Utils
+import Generator.LanguageC.Embedded
 import Generator.CodeGen.Application.Types
 import qualified Data.Set as S
 import Generator.CodeGen.Application.OS.RTEMS.Utils

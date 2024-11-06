@@ -2,6 +2,7 @@
 
 module Command.Configuration (
     TerminaConfig(..),
+    ProjectBuild(..),
     loadConfig,
     serializeConfig,
     defaultConfig
@@ -16,6 +17,17 @@ import Data.Yaml
 import System.FilePath
 import System.Exit
 
+data ProjectBuild = Debug | Release deriving (Eq, Show)
+
+instance FromJSON ProjectBuild where
+    parseJSON (String "debug") = return Debug
+    parseJSON (String "release") = return Release
+    parseJSON _ = fail "Expected build type"
+  
+instance ToJSON ProjectBuild where
+    toJSON Debug = String "debug"
+    toJSON Release = String "release"
+
 -- | Data type for the "termina.yaml" configuration file
 data TerminaConfig =
   TerminaConfig {
@@ -25,20 +37,22 @@ data TerminaConfig =
     appFilename :: !FilePath,
     sourceModulesFolder :: !FilePath,
     outputFolder :: !FilePath,
+    build :: !ProjectBuild,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
 
 -- | Instance for parsing the "termina.yaml" configuration file
 instance FromJSON TerminaConfig where
-  parseJSON (Object v) =
+  parseJSON (Object o) =
     TerminaConfig <$>
-    v .:   "name"           <*>
-    v .:   "platform"       <*>
-    v .:   "app-folder"     <*>
-    v .:   "app-file"       <*>
-    v .:   "source-modules" <*>
-    v .:   "output-folder"  <*>
-    v .:?  "platform-flags" .!= defaultPlatformFlags
+    o .:   "name"           <*>
+    o .:   "platform"       <*>
+    o .:   "app-folder"     <*>
+    o .:   "app-file"       <*>
+    o .:   "source-modules" <*>
+    o .:   "output-folder"  <*>
+    o .:?  "build" .!= Release <*>         
+    o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
 instance ToJSON TerminaConfig where
@@ -50,6 +64,7 @@ instance ToJSON TerminaConfig where
             prjAppFilename 
             prjSourceModulesFolder 
             prjOutputFolder
+            prjBuild
             prjPlatformFlags
         ) = object [
             "name" .= prjName,
@@ -58,6 +73,7 @@ instance ToJSON TerminaConfig where
             "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
             "output-folder" .= prjOutputFolder,
+            "build" .= prjBuild,
             "platform-flags" .= prjPlatformFlags
         ]
 
@@ -82,5 +98,6 @@ defaultConfig projectName plt = TerminaConfig {
     appFilename = "app",
     sourceModulesFolder = "src",
     outputFolder = "output",
+    build = Release,
     platformFlags = defaultPlatformFlags
 }

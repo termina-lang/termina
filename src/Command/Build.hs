@@ -171,47 +171,47 @@ printModules ::
   -> OptionMap
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-printModules configParams includeOptionH definedTypesOptionMap =
+printModules params includeOptionH definedTypesOptionMap =
   mapM_ printModule . M.elems
 
   where
 
     printModule :: BasicBlocksModule -> IO ()
     printModule bbModule = do
-      let destinationPath = outputFolder configParams
+      let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
-      case runGenSourceFile configParams (qualifiedName bbModule) tAST of
+      case runGenSourceFile params (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
-        Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter cSourceFile
-      case runGenHeaderFile configParams includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
+        Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter (build params == Debug) cSourceFile
+      case runGenHeaderFile params includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
-        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName bbModule <.> "h") $ runCPrinter cHeaderFile
+        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName bbModule <.> "h") $ runCPrinter (build params == Debug) cHeaderFile
 
 printInitFile :: TerminaConfig -> BasicBlocksProject -> IO ()
-printInitFile configParams bbProject = do
-  let destinationPath = outputFolder configParams
+printInitFile params bbProject = do
+  let destinationPath = outputFolder params
       initFilePath = destinationPath </> "init" <.> "c"
       projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-  case runGenInitFile configParams initFilePath projectModules of
+  case runGenInitFile params initFilePath projectModules of
     Left err -> die . errorMessage $ show err
-    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter cInitFile
+    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (build params == Debug) cInitFile
 
 printMainFile :: TerminaConfig -> TerminaProgArch SemanticAnn -> IO ()
-printMainFile configParams progArchitecture = do
-  let destinationPath = outputFolder configParams
+printMainFile params progArchitecture = do
+  let destinationPath = outputFolder params
       mainFilePath = destinationPath </> "main" <.> "c"
-  case runGenMainFile configParams mainFilePath progArchitecture of
+  case runGenMainFile params mainFilePath progArchitecture of
     Left err -> die . errorMessage $ show err
-    Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter cMainFile
+    Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter (build params == Debug) cMainFile
 
 printOptionHeaderFile :: TerminaConfig -> OptionMap -> IO ()
-printOptionHeaderFile configParams basicTypesOptionMap = do
-  let destinationPath = outputFolder configParams
+printOptionHeaderFile params basicTypesOptionMap = do
+  let destinationPath = outputFolder params
       optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
-  case runGenOptionHeaderFile configParams basicTypesOptionMap of
+  case runGenOptionHeaderFile params basicTypesOptionMap of
     Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
+    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter (build params == Debug) cOptionsFile
 
 genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture bbProject initialTerminaProgram orderedDependencies = do

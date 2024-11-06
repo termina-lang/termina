@@ -8,7 +8,7 @@ import Generator.LanguageC.AST
 import ControlFlow.BasicBlocks.AST
 import qualified Data.Map as M
 import Data.List (find)
-import Generator.CodeGen.Utils
+import Generator.LanguageC.Embedded
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Types
 import Generator.CodeGen.Application.Types
 import Generator.CodeGen.Common

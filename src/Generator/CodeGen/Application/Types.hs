@@ -3,7 +3,7 @@
 
 module Generator.CodeGen.Application.Types where
 import Generator.LanguageC.AST
-import Generator.CodeGen.Utils
+import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
 
 -- | Generic types

@@ -2,7 +2,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Generator.CodeGen.Utils where
+module Generator.LanguageC.Embedded where
 
 
 import Generator.CodeGen.Common

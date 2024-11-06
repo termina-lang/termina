@@ -3,15 +3,7 @@ module IT.Expression.RelationalSpec (spec) where
 import IT.Common
 
 import Test.Hspec
-import Data.Text hiding (empty)
-import Parser.Parsing
-import Semantic.TypeChecking
-import Semantic.Monad
-import Text.Parsec
-import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
-import ControlFlow.BasicBlocks
+import Data.Text
 
 test0 :: String
 test0 = "function relational_test0(foo : u16) {\n" ++

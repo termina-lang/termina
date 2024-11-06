@@ -173,8 +173,8 @@ funSemAnn params ts = Located (ETy (AppType params ts)) Internal
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
-  let configParams = defaultConfig "test" TestPlatform in
-  case runReader (runExceptT (genExpression expr)) (CGeneratorEnv M.empty M.empty configParams) of
+  let config = defaultConfig "test" TestPlatform in
+  case runReader (runExceptT (genExpression expr)) (CGeneratorEnv M.empty M.empty config) of
     Left err -> pack $ show err
     Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -183,8 +183,8 @@ renderStatement stmt =
   case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
-      let configParams = defaultConfig "test" TestPlatform in
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv M.empty M.empty configParams) of
+      let config = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv M.empty M.empty config) of
         Left err -> pack $ show err
         Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -193,8 +193,8 @@ renderTypeDefinitionDecl opts decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbDecl ->
-      let configParams = defaultConfig "test" TestPlatform in
-      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv M.empty opts configParams) of
+      let config = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv M.empty opts config) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -203,8 +203,8 @@ renderFunctionDecl opts decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbAST -> 
-      let configParams = defaultConfig "test" TestPlatform in
-      case runReader (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv M.empty opts configParams) of
+      let config = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv M.empty opts config) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -213,7 +213,7 @@ renderFunction func =
   case runExcept . genBBAnnASTElement $ func of
     Left err -> pack $ show err
     Right bbAST -> 
-      let configParams = defaultConfig "test" TestPlatform in
-      case runReader (runExceptT (genFunction bbAST)) (CGeneratorEnv M.empty M.empty configParams) of
+      let config = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genFunction bbAST)) (CGeneratorEnv M.empty M.empty config) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
