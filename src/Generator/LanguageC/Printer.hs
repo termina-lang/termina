@@ -7,6 +7,8 @@ import Prettyprinter
 import Data.Text (Text)
 import Prettyprinter.Render.Terminal
 import Control.Monad.Reader
+import Utils.Annotations
+import Text.Parsec.Pos
 
 type DocStyle = Doc AnsiStyle
 
@@ -224,6 +226,13 @@ indentStmt :: Bool -> DocStyle -> DocStyle
 indentStmt True doc = indentTab doc
 indentStmt False doc = doc
 
+addDebugLine :: Bool -> Location -> DocStyle -> DocStyle
+addDebugLine True (Position startPos _) doc = vsep [
+        pretty "#line" <+> pretty (sourceLine startPos) <+> pretty "\"" <> pretty (sourceName startPos) <> pretty "\"",
+        doc
+    ]
+addDebugLine _ _ doc = doc
+
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
 
@@ -362,12 +371,16 @@ instance PPrint CStatement where
     pprint s@(CSDo expr ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
+                debugLines <- asks printDebugLines
                 pexpr <- pprint expr
-                return $ prependLine before $ indentStmt expand $ pexpr <> semi
+                return $ 
+                    prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
+                    $ pexpr <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSIfThenElse expr stat mestat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
+                debugLines <- asks printDebugLines
                 pexpr <- pprint expr
                 pstat <- pprint stat
                 pestat <- case mestat of
@@ -375,7 +388,7 @@ instance PPrint CStatement where
                     Just estat -> do
                         palt <- pprint estat
                         return $ pretty " else" <+> palt
-                return $ prependLine before $ indentStmt expand $
+                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "if" <+> parens pexpr
                     <+> pstat
                     <> pestat
@@ -383,46 +396,50 @@ instance PPrint CStatement where
     pprint s@(CSSwitch expr stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
+                debugLines <- asks printDebugLines
                 pexpr <- pprint expr
                 pstat <- pprint stat
-                return $ prependLine before $ indentStmt expand $
+                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "switch" <+> parens pexpr
                     <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSFor for_init cond step stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
+                debugLines <- asks printDebugLines
                 pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
                 pstat <- pprint stat
                 case (cond, step) of
                     (Nothing, Nothing) ->
-                        return $ prependLine before $ indentStmt expand $
+                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                             pretty "for" <+> parens (pfor_init <> semi <> semi) <+> pstat
                     (Just cond', Nothing) -> do
                         pcond <- pprint cond'
-                        return $ prependLine before $ indentStmt expand $
+                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                             pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi) <+> pstat
                     (Nothing, Just step') -> do
                         pstep <- pprint step'
-                        return $ prependLine before $ indentStmt expand $
+                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                             pretty "for" <+> parens (pfor_init <> semi <> semi <+> pstep) <+> pstat
                     (Just cond', Just step') -> do
                         pcond <- pprint cond'
                         pstep <- pprint step'
-                        return $ prependLine before $ indentStmt expand $
+                        return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                             pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSReturn Nothing ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                return $ prependLine before $ indentStmt expand $
+                debugLines <- asks printDebugLines
+                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "return" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSReturn (Just e) ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
+                debugLines <- asks printDebugLines
                 pe <- pprint e
-                return $ prependLine before $ indentStmt expand $
+                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "return" <+> pe <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSCompound items ann) =
@@ -438,7 +455,10 @@ instance PPrint CStatement where
     pprint s@(CSBreak ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                return $ prependLine before $ indentStmt expand $ pretty "break" <> semi
+                debugLines <- asks printDebugLines
+                return $ 
+                    prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
+                    $ pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
 
 instance PPrint CCompoundBlockItem where
@@ -446,8 +466,9 @@ instance PPrint CCompoundBlockItem where
     pprint (CBlockDecl decl ann) = do
         case itemAnnotation ann of 
             CDeclarationAnn before -> do
+                debugLines <- asks printDebugLines
                 pdecl <- pprint decl
-                return $ prependLine before $ pdecl <> semi
+                return $ prependLine before . addDebugLine debugLines (location ann) $ pdecl <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
 
 instance PPrint CPreprocessorDirective where
