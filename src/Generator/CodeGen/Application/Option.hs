@@ -13,17 +13,18 @@ import qualified Data.Map as M
 import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 import Control.Monad.Except
+import Command.Configuration
 
 genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
 
-genSimpleOptionDefinition :: TerminaType -> CHeaderGenerator [CFileItem]
+genSimpleOptionDefinition :: TerminaType -> CGenerator [CFileItem]
 genSimpleOptionDefinition = genOptionStruct (Located (STy SimpleStmtType) Internal)
 
-genOptionHeaderFile :: CHeaderGenerator CFile
+genOptionHeaderFile :: CGenerator CFile
 genOptionHeaderFile = do
     let defineLabel = "__OPTION_H__"
-    optionMap <- ask
+    optionMap <- asks optionTypes
     items <- concat <$> mapM genSimpleOptionDefinition (concatMap S.toList (M.elems optionMap))
     return $ CHeaderFile genOptionPathName $
         [
@@ -35,5 +36,5 @@ genOptionHeaderFile = do
             CPPDirective CPPEndif (Located (CPPDirectiveAnn True) Internal)
         ]
 
-runGenOptionHeaderFile :: OptionTypes -> Either CGeneratorError CFile
-runGenOptionHeaderFile = runReader (runExceptT genOptionHeaderFile)
+runGenOptionHeaderFile :: TerminaConfig -> OptionTypes -> Either CGeneratorError CFile
+runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv M.empty opts config)

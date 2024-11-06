@@ -8,7 +8,7 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
 import Utils.Annotations
 import Data.Map (fromList, union)
-import qualified Control.Monad.Reader
+import Control.Monad.Reader
 import Semantic.Monad (getMatchCaseTypes)
 
 genEnumInitialization ::
@@ -19,7 +19,7 @@ genEnumInitialization ::
     CObject ->
     -- |  The initialization expression
     Expression SemanticAnn ->
-    CSourceGenerator [CStatement]
+    CGenerator [CStatement]
 genEnumInitialization before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
@@ -40,7 +40,7 @@ genOptionInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CSourceGenerator [CStatement]
+    -> CGenerator [CStatement]
 genOptionInitialization before level cObj expr =
     case expr of
         (OptionVariantInitializer (Some e) ann) -> do
@@ -70,7 +70,7 @@ genArrayInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CSourceGenerator [CStatement]
+    -> CGenerator [CStatement]
 genArrayInitialization before level cObj expr = do
     case expr of
         (ArrayInitializer expr' size ann) -> do
@@ -99,7 +99,7 @@ genArrayInitialization before level cObj expr = do
             genArrayInitializationFromExpression level cObj cExpr exprType ann
     where
 
-        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CSourceGenerator [CStatement]
+        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CGenerator [CStatement]
         genArrayItemsInitialization _before _level _idx [] = return []
         genArrayItemsInitialization before' level' idx (x:xs) = do
             let ann = getAnnotation x
@@ -114,7 +114,7 @@ genArrayInitialization before level cObj expr = do
             CExpression ->
             TerminaType ->
             SemanticAnn ->
-            CSourceGenerator [CStatement]
+            CGenerator [CStatement]
         genArrayInitializationFromExpression lvl lhsCObj rhsCExpr ts ann = do
             case ts of
                 -- | If the initializer is an array, we must iterate
@@ -145,7 +145,7 @@ genFieldInitialization ::
     -> CObject
     -> Identifier
     -> Expression SemanticAnn
-    -> CSourceGenerator [CStatement]
+    -> CGenerator [CStatement]
 genFieldInitialization before level cObj field expr = do
     cExprType <- getExprType expr >>= genType noqual
     let cFieldObj = CField cObj field cExprType
@@ -179,7 +179,7 @@ genStructInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CSourceGenerator [CStatement]
+    -> CGenerator [CStatement]
 genStructInitialization before level cObj expr = do
   case expr of
     -- \| This function can only be called with a field values assignments expressions
@@ -187,7 +187,7 @@ genStructInitialization before level cObj expr = do
 
         where
 
-            genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CSourceGenerator CStatement
+            genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CStatement
             genProcedureAssignment field (TGlobal ResourceClass resource) (ProcedureSeman procid ptys) = do
                 let exprCAnn = buildGenericAnn ann
                     declStmtAnn = buildStatementAnn ann before
@@ -200,7 +200,7 @@ genStructInitialization before level cObj expr = do
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
-            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CSourceGenerator [CStatement]
+            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CGenerator [CStatement]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment field expr' _: xs) = do
                 fieldInit <- genFieldInitialization before' level cObj field expr'
@@ -251,7 +251,7 @@ genStructInitialization before level cObj expr = do
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
-genBlocks :: BasicBlock SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBlocks (RegularBlock stmts) = concat <$> mapM genStatement stmts
 genBlocks (ProcedureCall obj ident args ann) = do
     let cAnn = buildGenericAnn ann
@@ -375,7 +375,7 @@ genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
         [CSIfThenElse cExpr (CSCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
 
     where
-        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnn] -> CSourceGenerator (Maybe CStatement)
+        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnn] -> CGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
             prev' <- genAlternatives prev xs
@@ -482,15 +482,15 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -- | A function to prefix the case identifier
             -> (Identifier -> Identifier)
             -- | A function to get the parameter struct name 
-            -> (Identifier -> CSourceGenerator Identifier)
+            -> (Identifier -> CGenerator Identifier)
             -- | A function to generate a match case (inside the monad)
             -> (CTerminaType
                 -> CObject
                 -> MatchCase SemanticAnn
-                -> CSourceGenerator [CCompoundBlockItem])
+                -> CGenerator [CCompoundBlockItem])
             -- | The list of remaining match cases
             -> [MatchCase SemanticAnn]
-            -> CSourceGenerator (Maybe CStatement)
+            -> CGenerator (Maybe CStatement)
         -- | This should never happen
         genMatchCases _ _ _ _ [] = return Nothing
         -- | The last one does not need to check the variant
@@ -513,7 +513,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
         genAnonymousMatchCase ::
             CTerminaType
             -> CObject
-            -> MatchCase SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+            -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase this_variant params blk' ann') = do
@@ -523,14 +523,14 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
-            Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks (blockBody blk')
+            local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 
         genMatchCase ::
             CTerminaType
             -> CObject
             -> MatchCase SemanticAnn
-            -> CSourceGenerator [CCompoundBlockItem]
+            -> CGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlocks (blockBody blk')
         genMatchCase cTs@(CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
@@ -543,7 +543,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
                 decl = CDecl cTs (Just (namefy this_variant))
                     (Just $ CExprValOf (CField cExpr this_variant cParamsStructType) cParamsStructType cAnn)
-            cBlk <- Control.Monad.Reader.local (union newKeyVals) $ concat <$> mapM genBlocks (blockBody blk')
+            cBlk <- local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
             return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 genBlocks (ReturnBlock (Just expr) ann) = do
@@ -558,7 +558,7 @@ genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
 
-genStatement :: Statement SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do
     typeObj <- getObjType obj
     cType <- genType noqual typeObj

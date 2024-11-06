@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.ArrayIndexSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -55,12 +51,6 @@ derefpArray0 = Dereference pArray0 arrayObjAnn
 derefpArray0IndexConstant, derefpArray0IndexVar0 :: Expression SemanticAnn
 derefpArray0IndexConstant = AccessObject (ArrayIndexExpression derefpArray0 usizeIndex3 (objSemAnn Mutable TUInt32))
 derefpArray0IndexVar0 = AccessObject (ArrayIndexExpression derefpArray0 (AccessObject var0) (objSemAnn Mutable TUInt32))
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

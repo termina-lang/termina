@@ -22,9 +22,9 @@ instance FromJSON RTEMS5NoelSpikeFlags where
   parseJSON (Object o) =
     RTEMS5NoelSpikeFlags <$>
     o .:? "enable-irq-1" .!= False <*>
-    o .: "enable-irq-2" .!= False <*>
-    o .: "enable-irq-3" .!= False <*>
-    o .: "enable-irq-4" .!= False
+    o .:? "enable-irq-2" .!= False <*>
+    o .:? "enable-irq-3" .!= False <*>
+    o .:? "enable-irq-4" .!= False
   parseJSON _ = fail "Expected configuration object"
 
 instance ToJSON RTEMS5NoelSpikeFlags where

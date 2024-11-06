@@ -1,16 +1,11 @@
 module UT.PPrinter.Expression.CastSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Data.Text hiding (empty)
-import Data.Map
 import Semantic.Types
 import Semantic.AST
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
-
 
 castUInt32toUInt8, castUInt32toUInt16 :: Expression SemanticAnn
 castUInt32toUInt8 = Casting (Constant (I (TInteger 0xFFFF0000 HexRepr) (Just TUInt32)) uint32ExprSemAnn) TUInt8 uint8ExprSemAnn
@@ -31,12 +26,6 @@ tmDescriptor0field0 = MemberAccess tmDescriptor0 "field0" (objSemAnn Mutable TUI
 
 castTMDescriptor0field0toUInt8 :: Expression SemanticAnn
 castTMDescriptor0field0toUInt8 = Casting (AccessObject tmDescriptor0field0) TUInt8 uint8ExprSemAnn
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

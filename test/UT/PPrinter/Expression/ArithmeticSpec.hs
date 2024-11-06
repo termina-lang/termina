@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.ArithmeticSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
+import Data.Text
 import Semantic.Types
-import UT.PPrinter.Expression.Common
-import Data.Map
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import Control.Monad.Except
 
 var0 :: Expression SemanticAnn
 -- | var0 : u16
@@ -69,12 +65,6 @@ var1ModConstant = BinOp Modulo unboxVar1 constUInt16 uint16ExprSemAnn
 
 var0ModVar1 :: Expression SemanticAnn
 var0ModVar1 = BinOp Modulo var0 unboxVar1 uint16ExprSemAnn
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

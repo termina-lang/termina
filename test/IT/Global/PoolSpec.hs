@@ -1,15 +1,9 @@
 module IT.Global.PoolSpec (spec) where
 
+import IT.Common
+
 import Test.Hspec
-import Parser.Parsing
-import Data.Text hiding (empty)
-import Text.Parsec
-import Semantic.TypeChecking
-import Semantic.Monad
-import qualified Data.Map as M
-import Generator.CodeGen.Module
-import Generator.LanguageC.Printer
-import ControlFlow.BasicBlocks
+import Data.Text
 
 test0 :: String
 test0 = "enum Message {\n" ++
@@ -21,25 +15,11 @@ test0 = "enum Message {\n" ++
         "\n" ++
         "resource message_pool : Pool<Message; 10>;\n"
 
-renderHeader :: String -> Text
-renderHeader input = case parse (contents topLevel) "" input of
-  Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> pack $ "Type error: " ++ show err
-      Right (tast, _) -> 
-        case runGenBBModule tast of
-          Left err -> pack $ "Basic blocks error: " ++ show err
-          Right bbAST -> 
-            case runGenHeaderFile False "test" [] bbAST M.empty of
-              Left err -> pack $ show err
-              Right cHeaderFile -> runCPrinter cHeaderFile
-
 spec :: Spec
 spec = do
   describe "Pretty printing pool methods" $ do
     it "Prints declaration of Message type and external pool" $ do
-      renderHeader test0 `shouldBe`
+      renderHeader False test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

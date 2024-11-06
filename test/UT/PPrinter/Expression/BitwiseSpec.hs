@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.BitwiseSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
 
 var0 :: Expression SemanticAnn
 -- | var0 : u16
@@ -66,12 +62,6 @@ var1BitwiseXorconstant = BinOp BitwiseXor unboxVar1 constUInt16 uint16ExprSemAnn
 
 var0BitwiseXorVar1 :: Expression SemanticAnn
 var0BitwiseXorVar1 = BinOp BitwiseXor var0 unboxVar1 uint16ExprSemAnn
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

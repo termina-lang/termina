@@ -15,7 +15,7 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Semantic.AST as SAST
 
-import Generator.Platform ( checkPlatform, getPlatformInitialGlobalEnv, getPlatformInitialProgram )
+import Generator.Platform ( checkPlatform )
 import System.FilePath
 import System.Exit
 import System.Directory
@@ -40,6 +40,7 @@ import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
 import Core.AST
+import Generator.Environment
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -163,49 +164,52 @@ optionMapModules = M.partitionWithKey
     optionMapModule prevMap typedModule = runMapOptionsAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
 
 printModules ::
+  TerminaConfig
   -- | Whether to include the option.h file or not
-  Bool
+  -> Bool
   -- | The map with the option types to generate from defined types 
   -> OptionMap
-  -- | The output folder 
-  -> FilePath
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-printModules includeOptionH definedTypesOptionMap destinationPath =
+printModules configParams includeOptionH definedTypesOptionMap =
   mapM_ printModule . M.elems
 
   where
 
     printModule :: BasicBlocksModule -> IO ()
     printModule bbModule = do
-      let sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
+      let destinationPath = outputFolder configParams
+          sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
-      case runGenSourceFile (qualifiedName bbModule) tAST of
+      case runGenSourceFile configParams (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter cSourceFile
-      case runGenHeaderFile includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
+      case runGenHeaderFile configParams includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName bbModule <.> "h") $ runCPrinter cHeaderFile
 
-printInitFile :: FilePath -> BasicBlocksProject -> IO ()
-printInitFile destinationPath bbProject = do
-  let initFilePath = destinationPath </> "init" <.> "c"
+printInitFile :: TerminaConfig -> BasicBlocksProject -> IO ()
+printInitFile configParams bbProject = do
+  let destinationPath = outputFolder configParams
+      initFilePath = destinationPath </> "init" <.> "c"
       projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-  case runGenInitFile initFilePath projectModules of
+  case runGenInitFile configParams initFilePath projectModules of
     Left err -> die . errorMessage $ show err
     Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter cInitFile
 
-printMainFile :: FilePath -> TerminaProgArch SemanticAnn -> IO ()
-printMainFile destinationPath progArchitecture = do
-  let mainFilePath = destinationPath </> "main" <.> "c"
-  case runGenMainFile mainFilePath progArchitecture of
+printMainFile :: TerminaConfig -> TerminaProgArch SemanticAnn -> IO ()
+printMainFile configParams progArchitecture = do
+  let destinationPath = outputFolder configParams
+      mainFilePath = destinationPath </> "main" <.> "c"
+  case runGenMainFile configParams mainFilePath progArchitecture of
     Left err -> die . errorMessage $ show err
     Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter cMainFile
 
-printOptionHeaderFile :: FilePath -> OptionMap -> IO ()
-printOptionHeaderFile destinationPath basicTypesOptionMap = do
-  let optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
-  case runGenOptionHeaderFile basicTypesOptionMap of
+printOptionHeaderFile :: TerminaConfig -> OptionMap -> IO ()
+printOptionHeaderFile configParams basicTypesOptionMap = do
+  let destinationPath = outputFolder configParams
+      optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
+  case runGenOptionHeaderFile configParams basicTypesOptionMap of
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter cOptionsFile
 
@@ -283,28 +287,28 @@ buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
-    config <- loadConfig
+    configParams <- loadConfig
     -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (platform config)
+    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform configParams) ++ "\"") return $ checkPlatform (platform configParams)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     -- | Check that the files are in place
-    existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
-    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
-    existAppFolder <- doesDirectoryExist (appFolder config)
-    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder config ++ "\" does not exist")
+    existSourceFolder <- doesDirectoryExist (sourceModulesFolder configParams)
+    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder configParams ++ "\" does not exist")
+    existAppFolder <- doesDirectoryExist (appFolder configParams)
+    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder configParams ++ "\" does not exist")
     -- | Create output header and source folder if it does not exist
-    let outputSrcFolder = outputFolder config </> "src"
-    let outputIncludeFolder = outputFolder config </> "include"
+    let outputSrcFolder = outputFolder configParams </> "src"
+    let outputIncludeFolder = outputFolder configParams </> "include"
     when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
     createDirectoryIfMissing True outputSrcFolder
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule (appFilename config) (appFolder config)
+    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder configParams </> appFilename configParams <.> "fin" ++ "\"")
+    appModule <- loadTerminaModule (appFilename configParams) (appFolder configParams)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
+    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder configParams)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
@@ -316,7 +320,7 @@ buildCommand (BuildCmdArgs chatty) = do
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
     -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv (getPlatformInitialGlobalEnv plt)
+    let initialGlobalEnv = makeInitialGlobalEnv (getPlatformInitialGlobalEnv configParams plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
@@ -331,7 +335,7 @@ buildCommand (BuildCmdArgs chatty) = do
     useDefCheckModules bbProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram plt) orderedDependencies 
+    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram configParams plt) orderedDependencies 
     checkDisconnectedChannels programArchitecture
     checkUnusedResources programArchitecture
     checkUnusedPools programArchitecture
@@ -339,8 +343,8 @@ buildCommand (BuildCmdArgs chatty) = do
     warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    printModules (not (M.null basicTypesOptionMap)) definedTypesOptionMap (outputFolder config) bbProject
-    printInitFile (outputFolder config) bbProject
-    printMainFile (outputFolder config) programArchitecture
-    printOptionHeaderFile (outputFolder config) basicTypesOptionMap
+    printModules configParams (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
+    printInitFile configParams bbProject
+    printMainFile configParams programArchitecture
+    printOptionHeaderFile configParams basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

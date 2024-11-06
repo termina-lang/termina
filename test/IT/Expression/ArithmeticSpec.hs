@@ -1,5 +1,7 @@
 module IT.Expression.ArithmeticSpec (spec) where
 
+import IT.Common
+
 import Test.Hspec
 import Data.Text hiding (empty)
 import Parser.Parsing
@@ -8,6 +10,8 @@ import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
 import ControlFlow.BasicBlocks
+import Command.Configuration
+import Generator.Platform
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 
@@ -48,39 +52,11 @@ test1 = "interface test_iface {\n" ++
         "    }\n" ++
         "};"
 
-renderHeader :: String -> Text
-renderHeader input = case parse (contents topLevel) "" input of
-  Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> pack $ "Type error: " ++ show err
-      Right (tast, _) -> 
-        case runGenBBModule tast of
-          Left err -> pack $ "Basic blocks error: " ++ show err
-          Right bbAST -> 
-            case runGenHeaderFile False "test" [] bbAST M.empty of
-              Left err -> pack $ show err
-              Right cHeaderFile -> runCPrinter cHeaderFile
-
-renderSource :: String -> Text
-renderSource input = case parse (contents topLevel) "" input of
-  Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> pack $ "Type error: " ++ show err
-      Right (tast, _) -> 
-        case runGenBBModule tast of
-          Left err -> pack $ "Basic blocks error: " ++ show err
-          Right bbAST -> 
-            case runGenSourceFile "test" bbAST of
-              Left err -> pack $ show err
-              Right cSourceFile -> runCPrinter cSourceFile
-
 spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints declaration of function test0" $ do
-      renderHeader test0 `shouldBe`
+      renderHeader False test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
@@ -122,7 +98,7 @@ spec = do
               "\n" ++
               "}\n")    
     it "Prints declaration of function test1" $ do
-     renderHeader test1 `shouldBe`
+     renderHeader False test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

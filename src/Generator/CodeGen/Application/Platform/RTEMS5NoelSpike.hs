@@ -24,22 +24,23 @@ import ControlFlow.Architecture.Utils (getConnectedEmitters, getClassMembers)
 import ControlFlow.Architecture
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
+import Command.Configuration
 
-genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
+genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType noqual (TStruct (namefy ("rtems" <::> "interrupt_emitter_t")))
     return $ CExtDecl (CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 genInterruptEmitterDeclaration _ obj = throwError $ InternalError ("Invalid object (not an interrupt emitter): " ++ show obj)
 
-genInterruptEmitterDeclarations :: [TPEmitter SemanticAnn] -> CSourceGenerator [CFileItem]
+genInterruptEmitterDeclarations :: [TPEmitter SemanticAnn] -> CGenerator [CFileItem]
 genInterruptEmitterDeclarations [] = return []
 genInterruptEmitterDeclarations (obj : objs) = do
     decl <- genInterruptEmitterDeclaration True obj
     rest <- mapM (genInterruptEmitterDeclaration False) objs
     return $ decl : rest
 
-genTaskClassCode :: TPClass SemanticAnn -> CSourceGenerator CFileItem
+genTaskClassCode :: TPClass SemanticAnn -> CGenerator CFileItem
 genTaskClassCode tskCls = do
     cBody <- genBody
     return $ pre_cr $ static_function (namefy "rtems_task" <::> classId) [
@@ -61,7 +62,7 @@ genTaskClassCode tskCls = do
             ) [] members
 
         -- TOOD: The current implementation does not work with vectors
-        getMsgDataVariable :: Bool -> Identifier -> TerminaType -> CSourceGenerator CCompoundBlockItem
+        getMsgDataVariable :: Bool -> Identifier -> TerminaType -> CGenerator CCompoundBlockItem
         getMsgDataVariable before action dts = do
             cDataType <- genType noqual dts
             if before then
@@ -69,14 +70,14 @@ genTaskClassCode tskCls = do
             else
                 return $ no_cr $ var (action <::> "msg_data") cDataType
 
-        getMsgDataVariables :: [(Identifier, TerminaType, Identifier)] -> CSourceGenerator [CCompoundBlockItem]
+        getMsgDataVariables :: [(Identifier, TerminaType, Identifier)] -> CGenerator [CCompoundBlockItem]
         getMsgDataVariables [] = return []
         getMsgDataVariables ((_identifier, dts, action) : xs) = do
             decl <- getMsgDataVariable True action dts
             rest <- mapM (uncurry (getMsgDataVariable False) . (\(_, dts', action') -> (action', dts'))) xs
             return $ decl : rest
 
-        genCase :: (Identifier, TerminaType, Identifier) -> CSourceGenerator [CCompoundBlockItem]
+        genCase :: (Identifier, TerminaType, Identifier) -> CGenerator [CCompoundBlockItem]
         genCase (port, dts, action) = do
             this_variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action
@@ -118,7 +119,7 @@ genTaskClassCode tskCls = do
                     indent . pre_cr $ _break
                 ]
 
-        genLoop :: CSourceGenerator CStatement
+        genLoop :: CGenerator CStatement
         genLoop = do
             classStructType <- genType noqual (TStruct classId)
             cases <- concat <$> mapM genCase actions
@@ -152,7 +153,7 @@ genTaskClassCode tskCls = do
                             ])
                 ]
 
-        genBody :: CSourceGenerator [CCompoundBlockItem]
+        genBody :: CGenerator [CCompoundBlockItem]
         genBody = do
             msgDataVars <- getMsgDataVariables actions
             loop <- genLoop
@@ -178,7 +179,7 @@ genTaskClassCode tskCls = do
 emitterToArrayMap :: M.Map Identifier Integer
 emitterToArrayMap = M.fromList [("irq_0", 0), ("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
 
-genArmTimer :: CObject -> Identifier -> CSourceGenerator [CCompoundBlockItem]
+genArmTimer :: CObject -> Identifier -> CGenerator [CCompoundBlockItem]
 genArmTimer cObj identifier = do
     return [
             -- __termina__add_timeval(&timer.__timer.current, timer.period);
@@ -198,7 +199,7 @@ genArmTimer cObj identifier = do
                 ]
         ]
 
-genEmitter :: TerminaProgArch a -> TPEmitter SemanticAnn -> CSourceGenerator CFileItem
+genEmitter :: TerminaProgArch a -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
     let irqArray = emitterToArrayMap M.! interrupt
     -- | Obtain the identifier of the target entity and the port to which the
@@ -441,7 +442,7 @@ genEmitter progArchitecture (TPSystemInitEmitter systemInit _) = do
 -- | Function __rtems_app__enable_protection. This function is called from the Init task.
 -- It enables the protection of the shared resources when needed. In case the resource uses a mutex,
 -- it also initializes the mutex. The function is called AFTER the initialization of the tasks and handlers.
-genEnableProtection :: TerminaProgArch a -> M.Map Identifier RTEMSResourceLock -> CSourceGenerator CFileItem
+genEnableProtection :: TerminaProgArch a -> M.Map Identifier RTEMSResourceLock -> CGenerator CFileItem
 genEnableProtection progArchitecture resLockingMap = do
     initResourcesProt <- concat <$> mapM genInitProt (M.toList resLockingMap)
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "enable_protection") [] @-> void $
@@ -453,7 +454,7 @@ genEnableProtection progArchitecture resLockingMap = do
             ] ++ initResourcesProt
     where
 
-        genInitProt :: (Identifier, RTEMSResourceLock) -> CSourceGenerator [CCompoundBlockItem]
+        genInitProt :: (Identifier, RTEMSResourceLock) -> CGenerator [CCompoundBlockItem]
         genInitProt (identifier, lock) = do
             case M.lookup identifier (resources progArchitecture) of
                 Just glb -> genInitResourceProt (glb, lock)
@@ -563,7 +564,7 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
 -- The function is called BEFORE the initialization of the tasks and handlers. The function disables
 -- the protection of the global resources, since it is not needed when running in the Init task. 
 genInitGlobals :: TerminaProgArch SemanticAnn
-    -> CSourceGenerator CFileItem
+    -> CGenerator CFileItem
 genInitGlobals progArchitecture  = do
     let interruptEmittersToTasks = getInterruptEmittersToTasks progArchitecture
         timersToTasks = getPeriodicTimersToTasks progArchitecture
@@ -594,13 +595,13 @@ genInitGlobals progArchitecture  = do
 
     where
 
-        genInitResource :: TPResource SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genInitResource :: TPResource SemanticAnn -> CGenerator [CCompoundBlockItem]
         genInitResource (TPResource identifier classId _ _ _) = do
             -- | resource.__resource.lock = RTEMSResourceLock__None;
             return [pre_cr $ ((identifier @: typeDef classId) @. resourceClassIDField @: __termina_resource_t) @. "lock" @: __rtems_runtime_resource_lock_t
                     @= namefy "RTEMSResourceLock" <::> "None" @: __rtems_runtime_resource_lock_t]
 
-        genInitPool :: TPPool SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genInitPool :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
         genInitPool (TPPool identifier ts _ _ _) = do
             cTs <- genType noqual ts
             return
@@ -628,7 +629,7 @@ genInitGlobals progArchitecture  = do
         -- | Prints the code to initialize a message queue. The function is called to generate the code for the
         -- message queues corresponding to the channels declared by the user plus the ones that belong to each
         -- of the tasks that is used to notify the inclusion of a given message on a specific queue.
-        genRTEMSCreateMsgQueue :: RTEMSMsgQueue -> CSourceGenerator [CCompoundBlockItem]
+        genRTEMSCreateMsgQueue :: RTEMSMsgQueue -> CGenerator [CCompoundBlockItem]
         genRTEMSCreateMsgQueue (RTEMSChannelMsgQueue identifier ts size taskId portId) = do
             cSize <- genArraySize size
             cTs <- genType noqual ts
@@ -701,7 +702,7 @@ genInitGlobals progArchitecture  = do
                     ]
                 ]
 
-        genInitInterruptEmitterToTask :: TPEmitter SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genInitInterruptEmitterToTask :: TPEmitter SemanticAnn -> CGenerator [CCompoundBlockItem]
         genInitInterruptEmitterToTask (TPInterruptEmittter identifier _) = do
             let emitterClassId = "Interrupt"
             (targetEntity, targetPort) <- case M.lookup identifier (emitterTargets progArchitecture) of
@@ -724,7 +725,7 @@ genInitGlobals progArchitecture  = do
                 Nothing -> return []
         genInitInterruptEmitterToTask obj = throwError $ InternalError $ "Invalid global object (not an interrupt emitter): " ++ show obj
 
-        genInitTimerToTask :: TPEmitter SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genInitTimerToTask :: TPEmitter SemanticAnn -> CGenerator [CCompoundBlockItem]
         genInitTimerToTask (TPPeriodicTimerEmitter identifier _ _) = do
             (targetEntity, targetPort) <- case M.lookup identifier (emitterTargets progArchitecture) of
                 Just (entity, port, _) -> return (entity, port)
@@ -747,19 +748,19 @@ genInitGlobals progArchitecture  = do
 
         genInitTimerToTask obj = throwError $ InternalError $ "Invalid global object (not a timer connected to a task): " ++ show obj
 
-        genTaskInitialization :: TPTask SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+        genTaskInitialization :: TPTask SemanticAnn -> CGenerator [CCompoundBlockItem]
         genTaskInitialization (TPTask identifier classId inputPtConns _ _ _ _ _ _) = do
             mapM genInputPortInitialization $ M.toList inputPtConns
 
             where
 
-                genInputPortInitialization :: (Identifier, (Identifier, SemanticAnn)) -> CSourceGenerator CCompoundBlockItem
+                genInputPortInitialization :: (Identifier, (Identifier, SemanticAnn)) -> CGenerator CCompoundBlockItem
                 genInputPortInitialization (portId, (channelId, _)) = do
                     return $ pre_cr $
                         identifier @: typeDef classId @. portId @: rtems_id @=
                             (channelId @: __termina_msg_queue_t) @. "msgq_id" @: rtems_id
 
-        genRTEMSCreateTimer :: TPEmitter SemanticAnn  -> CSourceGenerator [CCompoundBlockItem]
+        genRTEMSCreateTimer :: TPEmitter SemanticAnn  -> CGenerator [CCompoundBlockItem]
         genRTEMSCreateTimer (TPPeriodicTimerEmitter identifier _ _) = do
             return
                 [
@@ -782,7 +783,7 @@ genInitGlobals progArchitecture  = do
 -- | Function __rtems_app__install_emitters. This function is called from the Init task.
 -- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
 -- of the tasks and handlers.
-genInstallEmitters :: [TPEmitter a] -> CSourceGenerator CFileItem
+genInstallEmitters :: [TPEmitter a] -> CGenerator CFileItem
 genInstallEmitters progEmitters = do
     installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
@@ -795,7 +796,7 @@ genInstallEmitters progEmitters = do
 
     where
 
-        genRTEMSInstallEmitter :: TPEmitter a -> CSourceGenerator CCompoundBlockItem
+        genRTEMSInstallEmitter :: TPEmitter a -> CGenerator CCompoundBlockItem
         genRTEMSInstallEmitter (TPInterruptEmittter interrupt _) = do
             return $
                 pre_cr $ _if (
@@ -817,7 +818,7 @@ genInstallEmitters progEmitters = do
                             deref ("current" @: (_const . ptr $ _TimeVal))) : armTimer
         genRTEMSInstallEmitter (TPSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
     
-genCreateTasks :: [TPTask a] -> CSourceGenerator CFileItem
+genCreateTasks :: [TPTask a] -> CGenerator CFileItem
 genCreateTasks progTasks = do
     createTasks <- concat <$> mapM genRTEMSCreateTask progTasks
     return $ pre_cr $ static_function (namefy "rtems_app" <::> "create_tasks") [] @-> void $ 
@@ -826,7 +827,7 @@ genCreateTasks progTasks = do
             pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : createTasks
     where
 
-        genRTEMSCreateTask :: TPTask a -> CSourceGenerator [CCompoundBlockItem]
+        genRTEMSCreateTask :: TPTask a -> CGenerator [CCompoundBlockItem]
         genRTEMSCreateTask (TPTask identifier classId _ _ _ _ modifiers _ _) = do
             let cPriority = genInteger . getPriority $ modifiers
                 cStackSize = genInteger . getStackSize $ modifiers
@@ -848,7 +849,7 @@ genCreateTasks progTasks = do
                     ]
                 ]
 
-genInitTask :: [TPEmitter a] -> CSourceGenerator CFileItem
+genInitTask :: [TPEmitter a] -> CGenerator CFileItem
 genInitTask progEmitters = do
     return $ pre_cr $ function "Init" [
             "_ignored" @: rtems_task_argument
@@ -877,7 +878,7 @@ genAppConfig ::
     TerminaProgArch SemanticAnn
     -> [RTEMSMsgQueue]
     -> [RTEMSResourceLock]
-    -> CSourceGenerator [CFileItem]
+    -> CGenerator [CFileItem]
 genAppConfig progArchitecture msgQueues mutexes = do
     let progTasks = M.elems $ tasks progArchitecture
         progTimers = M.elems . M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) $ emitters progArchitecture
@@ -903,7 +904,7 @@ genAppConfig progArchitecture msgQueues mutexes = do
 
     where
 
-        genMessagesForQueue :: RTEMSMsgQueue -> CSourceGenerator [String]
+        genMessagesForQueue :: RTEMSMsgQueue -> CGenerator [String]
         genMessagesForQueue (RTEMSTaskMsgQueue _ _ size) = do
             cSize <- genArraySize size
             let cSizeOf = _sizeOfType uint32_t
@@ -940,7 +941,7 @@ genAppConfig progArchitecture msgQueues mutexes = do
                     "    ) "
                 ]
 
-        genMessagesForQueues :: [RTEMSMsgQueue] -> CSourceGenerator [String]
+        genMessagesForQueues :: [RTEMSMsgQueue] -> CGenerator [String]
         genMessagesForQueues [msgq] = genMessagesForQueue msgq
         genMessagesForQueues (msgq : xs) = do
             msgsForQueue <- genMessagesForQueue msgq
@@ -948,7 +949,7 @@ genAppConfig progArchitecture msgQueues mutexes = do
             return $ msgsForQueue ++ ["+ "] ++ msgsForQueues
         genMessagesForQueues [] = throwError $ InternalError "Invalid message queue list: empty list"
 
-        genMessageBufferMemory :: [RTEMSMsgQueue] -> CSourceGenerator [CFileItem]
+        genMessageBufferMemory :: [RTEMSMsgQueue] -> CGenerator [CFileItem]
         genMessageBufferMemory [] = return []
         genMessageBufferMemory msgq = do
             messagesForQueue <- genMessagesForQueues msgq
@@ -962,7 +963,7 @@ genAppConfig progArchitecture msgQueues mutexes = do
 
 genMainFile :: QualifiedName 
     -> TerminaProgArch SemanticAnn 
-    -> CSourceGenerator CFile
+    -> CGenerator CFile
 genMainFile mName progArchitecture = do
     let includeRTEMS = CPPDirective (CPPInclude True "rtems.h") (internalAnn (CPPDirectiveAnn True))
         includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
@@ -1014,5 +1015,5 @@ genMainFile mName progArchitecture = do
 
         dependenciesMap = getResDependencies progArchitecture
 
-runGenMainFile :: QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
-runGenMainFile mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) M.empty
+runGenMainFile :: TerminaConfig -> QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
+runGenMainFile config mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) (CGeneratorEnv M.empty M.empty config)

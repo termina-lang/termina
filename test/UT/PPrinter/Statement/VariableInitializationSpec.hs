@@ -1,17 +1,11 @@
 module UT.PPrinter.Statement.VariableInitializationSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
 
 tmDescriptorTS, messageTS :: TerminaType
 tmDescriptorTS = TStruct "TMDescriptor"
@@ -96,15 +90,6 @@ boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 option0, option1 :: Statement SemanticAnn
 option0 = Declaration "option0" Mutable optionBoxUInt32TS (OptionVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
 option1 = Declaration "option1" Mutable optionBoxUInt32TS (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
-
-renderStatement :: Statement SemanticAnn -> Text
-renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
-    Left err -> pack $ show err
-    Right bBlocks ->
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
-        Left err -> pack $ show err
-        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

@@ -8,7 +8,7 @@ import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
 
-genGlobalDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
+genGlobalDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genGlobalDecl (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable (Just CExtern) (CDecl (CTypeSpec cTs)
@@ -38,7 +38,7 @@ genGlobalDecl (GlobalDeclaration (Const identifier ts expr _ ann)) = do
 genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl
 
 
-genGlobal :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
+genGlobal :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genGlobal (GlobalDeclaration (Resource identifier ts _ _ ann)) = do
     cTs <- genType noqual ts
     return [CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cTs)

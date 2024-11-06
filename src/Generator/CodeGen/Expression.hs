@@ -31,11 +31,11 @@ cBinOp BitwiseXor = COpXor
 cBinOp LogicalAnd = error "Logical and is codified as a sequential expression"
 cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 
-genObject :: Object SemanticAnn -> CSourceGenerator CObject
+genObject :: Object SemanticAnn -> CGenerator CObject
 genObject o@(Variable identifier _ann) = do
     cType <- getObjType o >>= genType noqual
     -- Obtain the substitutions map
-    subs <- ask
+    subs <- asks substitutions
     -- If the identifier is in the substitutions map, use the substituted identifier
     let ident = fromMaybe (CVar identifier cType) (Data.Map.lookup identifier subs)
     -- Return the C identifier
@@ -94,7 +94,7 @@ genMemberFunctionAccess ::
     -> Identifier 
     -> [Expression SemanticAnn] 
     -> SemanticAnn 
-    -> CSourceGenerator CExpression
+    -> CGenerator CExpression
 genMemberFunctionAccess obj ident args ann = do
     let cAnn = buildGenericAnn ann
     -- | Obtain the function type
@@ -131,7 +131,7 @@ genMemberFunctionAccess obj ident args ann = do
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 
-genExpression :: Expression SemanticAnn -> CSourceGenerator CExpression
+genExpression :: Expression SemanticAnn -> CGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
     cObjType <- getObjType obj
@@ -217,7 +217,7 @@ genExpression e@(FunctionCall name args ann) = do
     cArgs <- mapM genExpression args
     let cFunctionType = CTFunction cRetType . fmap getCExprType $ cArgs
     -- Obtain the substitutions map
-    subs <- ask
+    subs <- asks substitutions
     -- If the identifier is in the substitutions map, use the substituted identifier
     let ident = fromMaybe (CVar name cFunctionType) (Data.Map.lookup name subs)
     return $ CExprCall (CExprValOf ident (getCObjType ident) cAnn) cArgs cFunctionType cAnn

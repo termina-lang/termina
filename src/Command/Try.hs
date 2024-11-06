@@ -21,6 +21,8 @@ import Semantic.Errors.PPrinting (ppError)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Semantic.Monad
 import Core.AST
+import Command.Configuration (defaultConfig)
+import Generator.Platform
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -72,14 +74,16 @@ typeSingleModule parsedModule = do
 printSourceModule :: BasicBlocksModule -> IO ()
 printSourceModule bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
-    case runGenSourceFile (qualifiedName bbModule) tAST of
+        configParams = defaultConfig "test" TestPlatform
+    case runGenSourceFile configParams (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter cSourceFile
 
 printHeaderModule :: BasicBlocksModule -> IO ()
 printHeaderModule bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
-    case runGenHeaderFile False (qualifiedName bbModule) (importedModules bbModule) tAST M.empty of
+        configParams = defaultConfig "test" TestPlatform
+    case runGenHeaderFile configParams False (qualifiedName bbModule) (importedModules bbModule) tAST M.empty of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> TIO.putStrLn $ runCPrinter cHeaderFile
 

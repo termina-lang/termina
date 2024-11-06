@@ -1,17 +1,11 @@
 module UT.PPrinter.Statement.IfElseSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
 
 optionBoxUInt32TS :: TerminaType
 optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
@@ -72,15 +66,6 @@ elseIf = ElseIf cond0 oneAssignment stmtSemAnn
 
 ifElseIf :: Statement SemanticAnn
 ifElseIf = IfElseStmt cond1 twoDeclarations [elseIf] (Just oneDeclaration) stmtSemAnn
-
-renderStatement :: Statement SemanticAnn -> Text
-renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
-    Left err -> pack $ show err
-    Right bBlocks ->
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
-        Left err -> pack $ show err
-        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

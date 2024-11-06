@@ -10,14 +10,14 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
 
 
-genFunctionDecl :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
+genFunctionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunctionDecl (Function identifier parameters rts _ _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
     cParamDecls <- mapM genParameterDeclaration parameters
     return [CExtDecl (CEDFunction cRetType identifier cParamDecls) (buildDeclarationAnn ann True)]
 genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show item
 
-genFunction :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
+genFunction :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
     cParamDecls <- mapM genParameterDeclaration parameters

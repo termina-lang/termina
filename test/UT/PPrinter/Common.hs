@@ -1,8 +1,22 @@
-module UT.PPrinter.Expression.Common where
+module UT.PPrinter.Common where
 
-import Core.AST
 import Utils.Annotations
 import Semantic.Types
+import Control.Monad.Reader
+import Control.Monad.Except
+import Generator.CodeGen.Expression
+import Command.Configuration
+import Generator.Platform
+import Generator.CodeGen.Common
+import Generator.LanguageC.Printer
+import qualified Data.Map as M
+import Semantic.AST
+import Data.Text
+import ControlFlow.BasicBlocks
+import Generator.CodeGen.Statement
+import Generator.CodeGen.TypeDefinition
+import Generator.CodeGen.Function
+import Prettyprinter
 
 objSemAnn :: AccessKind -> TerminaType -> SemanticAnn
 objSemAnn ak ts = Located (ETy (ObjectType ak ts)) Internal
@@ -119,34 +133,34 @@ uint16ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt16
 uint32ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt32
 
 structObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
-structObjSemAnn ak name = objSemAnn ak (TStruct name)
+structObjSemAnn ak ident = objSemAnn ak (TStruct ident)
 
 enumObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
-enumObjSemAnn ak name = objSemAnn ak (TEnum name)
+enumObjSemAnn ak ident = objSemAnn ak (TEnum ident)
 
 structExprSemAnn :: Identifier -> SemanticAnn
-structExprSemAnn name = simpleTySemAnn (TStruct name)
+structExprSemAnn ident = simpleTySemAnn (TStruct ident)
 
 enumExprSemAnn :: Identifier -> SemanticAnn
-enumExprSemAnn name = simpleTySemAnn (TEnum name)
+enumExprSemAnn ident = simpleTySemAnn (TEnum ident)
 
 boxStructTypeSemAnn :: Identifier -> SemanticAnn
-boxStructTypeSemAnn name = boxTySemAnn (TStruct name)
+boxStructTypeSemAnn ident = boxTySemAnn (TStruct ident)
 
 boxEnumTypeSemAnn :: Identifier -> SemanticAnn
-boxEnumTypeSemAnn name = boxTySemAnn (TStruct name)
+boxEnumTypeSemAnn ident = boxTySemAnn (TStruct ident)
 
 refStructSemAnn :: Identifier -> SemanticAnn
-refStructSemAnn name = refSemAnn (TStruct name)
+refStructSemAnn ident = refSemAnn (TStruct ident)
 
 refGlobalResourceSemAnn :: Identifier -> SemanticAnn
-refGlobalResourceSemAnn name = refSemAnn (TGlobal ResourceClass name)
+refGlobalResourceSemAnn ident = refSemAnn (TGlobal ResourceClass ident)
 
 resourceObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
-resourceObjSemAnn ak name = objSemAnn ak (TGlobal ResourceClass name)
+resourceObjSemAnn ak ident = objSemAnn ak (TGlobal ResourceClass ident)
 
 refEnumSemAnn :: Identifier -> SemanticAnn
-refEnumSemAnn name = refSemAnn (TEnum name)
+refEnumSemAnn ident = refSemAnn (TEnum ident)
 
 poolSemAnn :: TerminaType -> SemanticAnn
 poolSemAnn ts = objSemAnn Mutable (TAccessPort (TAllocator ts))
@@ -156,3 +170,50 @@ msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
 funSemAnn :: [TerminaType] -> TerminaType -> SemanticAnn
 funSemAnn params ts = Located (ETy (AppType params ts)) Internal
+
+renderExpression :: Expression SemanticAnn -> Text
+renderExpression expr = 
+  let configParams = defaultConfig "test" TestPlatform in
+  case runReader (runExceptT (genExpression expr)) (CGeneratorEnv M.empty M.empty configParams) of
+    Left err -> pack $ show err
+    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
+
+renderStatement :: Statement SemanticAnn -> Text
+renderStatement stmt = 
+  case runExcept (genBBlocks [] [stmt]) of
+    Left err -> pack $ show err
+    Right bBlocks ->
+      let configParams = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv M.empty M.empty configParams) of
+        Left err -> pack $ show err
+        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
+
+renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
+renderTypeDefinitionDecl opts decl = 
+  case runExcept . genBBAnnASTElement $ decl of
+    Left err -> pack $ show err
+    Right bbDecl ->
+      let configParams = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv M.empty opts configParams) of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
+
+renderFunctionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
+renderFunctionDecl opts decl = 
+  case runExcept . genBBAnnASTElement $ decl of
+    Left err -> pack $ show err
+    Right bbAST -> 
+      let configParams = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv M.empty opts configParams) of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
+
+renderFunction :: AnnASTElement SemanticAnn -> Text
+renderFunction func = 
+  case runExcept . genBBAnnASTElement $ func of
+    Left err -> pack $ show err
+    Right bbAST -> 
+      let configParams = defaultConfig "test" TestPlatform in
+      case runReader (runExceptT (genFunction bbAST)) (CGeneratorEnv M.empty M.empty configParams) of
+        Left err -> pack $ show err
+        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)

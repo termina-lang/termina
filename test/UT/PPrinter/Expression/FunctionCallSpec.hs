@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.FunctionCallSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
 
 var0, var1, pVar :: Object SemanticAnn
 -- | var0 : u16
@@ -99,12 +95,6 @@ call3Parameters = FunctionCall "foo4"
       TUInt16,
       TUInt16
     ] TUnit)
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

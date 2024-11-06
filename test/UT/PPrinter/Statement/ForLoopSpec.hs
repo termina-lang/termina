@@ -1,17 +1,11 @@
 module UT.PPrinter.Statement.ForLoopSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
 
 arrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -37,15 +31,6 @@ forLoop0 = ForLoopStmt "i" TUSize (Constant (I (TInteger 0 DecRepr) (Just TUSize
 
 forLoop1 :: Statement SemanticAnn
 forLoop1 = ForLoopStmt "i" TUSize (Constant (I (TInteger 0 DecRepr) (Just TUSize)) uint32ExprSemAnn) (Constant (I (TInteger 10 DecRepr) (Just TUSize)) uint32ExprSemAnn) (Just breakCond) forLoopBody stmtSemAnn
-
-renderStatement :: Statement SemanticAnn -> Text
-renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
-    Left err -> pack $ show err
-    Right bBlocks ->
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
-        Left err -> pack $ show err
-        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

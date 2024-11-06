@@ -3,18 +3,13 @@
 module Generator.Platform where
 
 import qualified Data.Text as T
-import Core.AST
-import Semantic.Types
-import ControlFlow.Architecture.Types
-import qualified Data.Map as M
-import ControlFlow.Architecture (emptyTerminaProgArch)
-import Utils.Annotations ( Location(Internal), Located(Located) )
 import Generator.Platform.RTEMS5NoelSpike
 
 import Data.Yaml
 
 data Platform = 
     RTEMS5NoelSpike
+    | TestPlatform
     deriving Eq
 
 newtype PlatformFlags = PlatformFlags {
@@ -34,6 +29,7 @@ instance FromJSON PlatformFlags where
 
 instance Show Platform where
     show RTEMS5NoelSpike = "rtems5-noel-spike"
+    show TestPlatform = "test-platform"
 
 instance ToJSON PlatformFlags where
     toJSON (
@@ -51,23 +47,3 @@ supportedPlatforms :: [(Platform, String)]
 supportedPlatforms = [
         (RTEMS5NoelSpike, "RTEMS version 5 for NOEL-Spike simulator")
     ]
-
-getPlatformInitialGlobalEnv :: Platform -> [(Identifier, Located (GEntry SemanticAnn))]
-getPlatformInitialGlobalEnv RTEMS5NoelSpike = 
-    [
-       ("irq_1", Located (GGlob (TGlobal EmitterClass "Interrupt")) Internal),
-       ("irq_2", Located (GGlob (TGlobal EmitterClass "Interrupt")) Internal),
-       ("irq_3", Located (GGlob (TGlobal EmitterClass "Interrupt")) Internal),
-       ("irq_4", Located (GGlob (TGlobal EmitterClass "Interrupt")) Internal)
-    ]
-
-getPlatformInitialProgram :: Platform -> TerminaProgArch SemanticAnn
-getPlatformInitialProgram RTEMS5NoelSpike = 
-    emptyTerminaProgArch {
-        emitters = M.union (emitters emptyTerminaProgArch) $ M.fromList [
-            ("irq_1", TPInterruptEmittter "irq_1" (Located (GTy (TGlobal EmitterClass "Interrupt")) Internal)),
-            ("irq_2", TPInterruptEmittter "irq_2" (Located (GTy (TGlobal EmitterClass "Interrupt")) Internal)),
-            ("irq_3", TPInterruptEmittter "irq_3" (Located (GTy (TGlobal EmitterClass "Interrupt")) Internal)),
-            ("irq_4", TPInterruptEmittter "irq_4" (Located (GTy (TGlobal EmitterClass "Interrupt")) Internal))
-        ]
-    }

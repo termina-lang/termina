@@ -6,14 +6,7 @@ import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
 
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.TypeDefinition
-import Generator.CodeGen.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
-
+import UT.PPrinter.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
@@ -28,15 +21,6 @@ interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
       Parameter "param7" TInt64
     ] undefined
   ] []) undefined
-
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
-renderTypeDefinitionDecl opts decl = 
-  case runExcept . genBBAnnASTElement $ decl of
-    Left err -> pack $ show err
-    Right bbDecl ->
-      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) opts of
-        Left err -> pack $ show err
-        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

@@ -1,17 +1,11 @@
 module UT.PPrinter.Statement.AssignmentSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Prettyprinter
-import UT.PPrinter.Expression.Common
-import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
 
 tmDescriptorTS :: TerminaType
 tmDescriptorTS = TStruct "TMDescriptor"
@@ -120,15 +114,6 @@ unboxVar0AssignConst = AssignmentStmt unboxVar0 (Constant (I (TInteger 1024 DecR
 option0Assign, option1Assign :: Statement SemanticAnn
 option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32ExprSemAnn) stmtSemAnn
 option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
-
-renderStatement :: Statement SemanticAnn -> Text
-renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
-    Left err -> pack $ show err
-    Right bBlocks ->
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
-        Left err -> pack $ show err
-        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

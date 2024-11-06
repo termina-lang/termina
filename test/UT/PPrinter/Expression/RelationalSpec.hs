@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.RelationalSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
 
 uint16Const1024 :: Expression SemanticAnn
 uint16Const1024 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
@@ -80,12 +76,6 @@ logicalAndExpr = BinOp LogicalAnd var0EqVar1 var0LTEConstant boolExprSemAnn
 logicalOrConst, logicalOrExpr :: Expression SemanticAnn
 logicalOrConst = BinOp LogicalOr falseBool trueBool boolExprSemAnn
 logicalOrExpr = BinOp LogicalOr var1LTConstant var0LTEConstant boolExprSemAnn
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

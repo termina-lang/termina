@@ -2,17 +2,10 @@ module UT.PPrinter.FunctionSpec (spec) where
 
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
+import Data.Text
 import qualified Data.Map as M
 import Semantic.Types
-import UT.PPrinter.Expression.Common
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.Function
-import Generator.CodeGen.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
+import UT.PPrinter.Common
 
 tmDescriptorTS :: TerminaType
 tmDescriptorTS = TStruct "TMDescriptor"
@@ -124,24 +117,6 @@ function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1"
     struct1Declaration, 
     struct0Assignment0,
     returnStructField0] stmtSemAnn) [] unitSemAnn
-
-renderFunctionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
-renderFunctionDecl opts decl = 
-  case runExcept . genBBAnnASTElement $ decl of
-    Left err -> pack $ show err
-    Right bbAST -> 
-      case runReader (runExceptT (genFunctionDecl bbAST)) opts of
-        Left err -> pack $ show err
-        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
-
-renderFunction :: AnnASTElement SemanticAnn -> Text
-renderFunction func = 
-  case runExcept . genBBAnnASTElement $ func of
-    Left err -> pack $ show err
-    Right bbAST -> 
-      case runReader (runExceptT (genFunction bbAST)) M.empty of
-        Left err -> pack $ show err
-        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

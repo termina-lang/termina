@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.ReferenceSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
+import Data.Text
 import Semantic.Types
-import Control.Monad.Except
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -50,12 +46,6 @@ derefpVar0, derefpArray0, derefpArray1 :: Expression SemanticAnn
 derefpVar0 = AccessObject (Dereference pVar0 (objSemAnn Mutable TUInt16)) -- | *p_var0 |
 derefpArray0 = AccessObject (Dereference pArray0 arrayObjAnn) -- | *p_array0 |
 derefpArray1 = AccessObject (Dereference pArray1 twoDymArrayObjAnn) -- | *p_array1 |
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
  
 spec :: Spec
 spec = do

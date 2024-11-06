@@ -7,14 +7,8 @@ import Semantic.Types
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.TypeDefinition
-import Generator.CodeGen.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
 
+import UT.PPrinter.Common
 
 {- | Struct type with a single field.
 In Termina's concrete sytax:
@@ -73,16 +67,6 @@ alignedStruct = TypeDefinition
     FieldDefinition "field2" (TArray TUInt32 (K (TInteger 10 DecRepr)))
   ] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) undefined
 
-{- | Aligned Struct type.
-In Termina's concrete sytax:
-#[packed]
-#[aligned(16)]
-struct id0 {
-    field0 : u8;
-    field1 : u16;
-    field2 : [u16; 10 : u32];
-};
--}
 packedAndAlignedStruct :: AnnASTElement SemanticAnn
 packedAndAlignedStruct = TypeDefinition
   (Struct "id0" [
@@ -93,15 +77,6 @@ packedAndAlignedStruct = TypeDefinition
       Modifier "packed" Nothing,
       Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))
     ]) undefined
-
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
-renderTypeDefinitionDecl opts decl = 
-  case runExcept . genBBAnnASTElement $ decl of
-    Left err -> pack $ show err
-    Right bbDecl ->
-      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) opts of
-        Left err -> pack $ show err
-        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

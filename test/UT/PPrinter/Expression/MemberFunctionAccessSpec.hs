@@ -1,17 +1,11 @@
 module UT.PPrinter.Expression.MemberFunctionAccessSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
-import Control.Monad.Reader
-import Generator.CodeGen.Statement
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
+import Data.Text
 import Semantic.Types
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
-import Prettyprinter
 
 self, tmChannel, tmPool, bar0, bar1 :: Object SemanticAnn
 self = Variable "self" (refGlobalResourceSemAnn "Resource")
@@ -37,15 +31,6 @@ tmChannelSendStmt, selfFoo0Stmt, tmPoolAllocStmt :: Statement SemanticAnn
 tmChannelSendStmt = SingleExpStmt tmChannelsend stmtSemAnn
 selfFoo0Stmt = SingleExpStmt selfFoo0 stmtSemAnn
 tmPoolAllocStmt = SingleExpStmt tmPoolAlloc stmtSemAnn
-
-renderStatement :: Statement SemanticAnn -> Text
-renderStatement stmt = 
-  case runExcept (genBBlocks [] [stmt]) of
-    Left err -> pack $ show err
-    Right bBlocks ->
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) empty of
-        Left err -> pack $ show err
-        Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

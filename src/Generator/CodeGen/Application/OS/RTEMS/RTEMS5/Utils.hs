@@ -74,10 +74,10 @@ genVariantForPort ::
     -- | Name of the task class
     Identifier
     -- | Name of the port
-    -> Identifier -> CSourceGenerator Identifier
+    -> Identifier -> CGenerator Identifier
 genVariantForPort taskCls port = return $ namefy $ taskCls <::> port
 
-genVariantsForTaskPorts :: TPClass SemanticAnn -> CSourceGenerator [CFileItem]
+genVariantsForTaskPorts :: TPClass SemanticAnn -> CGenerator [CFileItem]
 genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
     genDefineVariantsForPorts ports
     where
@@ -88,14 +88,14 @@ genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
                             ClassField (FieldDefinition prt (TInPort {})) _ -> prt : acc
                             _ -> acc ) [] members
 
-        genDefineVariantsForPorts :: [Identifier] -> CSourceGenerator [CFileItem]
+        genDefineVariantsForPorts :: [Identifier] -> CGenerator [CFileItem]
         genDefineVariantsForPorts [] = return []
         genDefineVariantsForPorts (port : xs) = do
             this_variant <- genVariantForPort classId port
             rest <- genDefineVariantsForPorts' xs 1
             return $ pre_cr (_define this_variant (Just [show (0 :: Integer)])) : rest
 
-        genDefineVariantsForPorts' :: [Identifier] -> Integer -> CSourceGenerator [CFileItem]
+        genDefineVariantsForPorts' :: [Identifier] -> Integer -> CGenerator [CFileItem]
         genDefineVariantsForPorts' [] _ = return []
         genDefineVariantsForPorts' (port : xs) value = do
             rest <- genDefineVariantsForPorts' xs (value + 1)
@@ -104,7 +104,7 @@ genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
 
 genVariantsForTaskPorts def = throwError $ InternalError $ "Definition not a class: " ++ show def
 
-genPoolMemoryArea :: Bool -> TPPool a -> CSourceGenerator CFileItem
+genPoolMemoryArea :: Bool -> TPPool a -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     cSize <- genArraySize size
     cType <- genType noqual ts
@@ -114,34 +114,34 @@ genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     else
         return $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
 
-genPoolMemoryAreas :: [TPPool a] -> CSourceGenerator [CFileItem]
+genPoolMemoryAreas :: [TPPool a] -> CGenerator [CFileItem]
 genPoolMemoryAreas [] = return []
 genPoolMemoryAreas (obj : objs) = do
     memArea <- genPoolMemoryArea True obj
     rest <- mapM (genPoolMemoryArea False) objs
     return $ memArea : rest
 
-genAtomicDeclaration :: Bool -> TPAtomic a -> CSourceGenerator CFileItem
+genAtomicDeclaration :: Bool -> TPAtomic a -> CGenerator CFileItem
 genAtomicDeclaration before (TPAtomic identifier ts _ _) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 
-genAtomicDeclarations :: [TPAtomic a] -> CSourceGenerator [CFileItem]
+genAtomicDeclarations :: [TPAtomic a] -> CGenerator [CFileItem]
 genAtomicDeclarations [] = return []
 genAtomicDeclarations (obj : objs) = do
     decl <- genAtomicDeclaration True obj
     rest <- mapM (genAtomicDeclaration False) objs
     return $ decl : rest
 
-genAtomicArrayDeclaration :: Bool -> TPAtomicArray a -> CSourceGenerator CFileItem
+genAtomicArrayDeclaration :: Bool -> TPAtomicArray a -> CGenerator CFileItem
 genAtomicArrayDeclaration before (TPAtomicArray identifier ts size _ _) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cSize <- genArraySize size
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt
 
-genAtomicArrayDeclarations :: [TPAtomicArray a] -> CSourceGenerator [CFileItem]
+genAtomicArrayDeclarations :: [TPAtomicArray a] -> CGenerator [CFileItem]
 genAtomicArrayDeclarations [] = return []
 genAtomicArrayDeclarations (obj : objs) = do
     decl <- genAtomicArrayDeclaration True obj

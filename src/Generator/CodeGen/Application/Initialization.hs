@@ -12,8 +12,9 @@ import Modules.Modules
 import qualified Data.Map as M
 import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
+import Command.Configuration
 
-genInitializeObj :: Bool -> Global SemanticAnn -> CSourceGenerator [CCompoundBlockItem]
+genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
     let cObj = CVar identifier (CTTypeDef identifier noqual)
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
@@ -28,7 +29,7 @@ genInitializeObj before (Emitter identifier _ (Just expr) _ _) = do
     fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
 genInitializeObj _ _ = return []
 
-genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CSourceGenerator CFile
+genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile
 genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, objs) <- globals])
     let cStmtAnn = internalAnn (CStatementAnn True False)
@@ -48,12 +49,12 @@ genInitFile mName prjprogs = do
 
         includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
 
-        genItems :: [Global SemanticAnn] -> CSourceGenerator [CCompoundBlockItem]
+        genItems :: [Global SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genItems [] = return []
         genItems (obj:objs) = do
             items <- genInitializeObj True obj
             rest <- concat <$> mapM (genInitializeObj False) objs
             return $ items ++ rest
 
-runGenInitFile :: FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) M.empty
+runGenInitFile :: TerminaConfig -> FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
+runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty M.empty params)

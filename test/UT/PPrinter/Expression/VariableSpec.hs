@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.VariableSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
+import Data.Text
 import Semantic.Types
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
-import Control.Monad.Except
 
 arrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
 arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
@@ -26,12 +22,6 @@ boxVar0, boxArray1, boxArray2 :: Object SemanticAnn
 boxVar0 = Variable "box_var0" boxUInt16SemAnn
 boxArray1 = Variable "box_array1" boxTwoDymArrayObjAnn
 boxArray2 = Variable "box_array2" boxThreeDymArrayObjAnn
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

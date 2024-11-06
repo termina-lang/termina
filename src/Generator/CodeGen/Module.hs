@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
+import Command.Configuration
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -27,13 +28,13 @@ genModuleDefineLabel mn =
 genInclude :: QualifiedName -> Bool -> CFileItem
 genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn before) Internal)
 
-genHeaderASTElement :: AnnASTElement SemanticAnn -> CHeaderGenerator [CFileItem]
+genHeaderASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
 genHeaderASTElement glb@(GlobalDeclaration {}) = genGlobalDecl glb
 genHeaderASTElement func@(Function {}) = do
     genFunctionDecl func
 
-genSourceASTElement :: AnnASTElement SemanticAnn -> CSourceGenerator [CFileItem]
+genSourceASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genSourceASTElement typedef@(TypeDefinition (Class {}) _) = genClassDefinition typedef
 genSourceASTElement (TypeDefinition {}) = return []
 genSourceASTElement glb@(GlobalDeclaration {}) = genGlobal glb
@@ -47,7 +48,7 @@ genHeaderFile ::
     -- | Import list
     -> [QualifiedName]
     -> AnnotatedProgram SemanticAnn
-    -> CHeaderGenerator CFile
+    -> CGenerator CFile
 genHeaderFile includeOptionH mName imports program = do
     let defineLabel = genModuleDefineLabel mName
         includeList = map (`genInclude` False) imports
@@ -67,15 +68,18 @@ genSourceFile ::
     QualifiedName
     -- | Typed Termina program
     -> AnnotatedProgram SemanticAnn
-    -> CSourceGenerator CFile
+    -> CGenerator CFile
 genSourceFile mName program = do
     items <- concat <$> mapM genSourceASTElement program
     return $ CSourceFile mName $
         CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn True) Internal)
         : items
 
-runGenSourceFile :: QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
-runGenSourceFile mName program = runReader (runExceptT (genSourceFile mName program)) M.empty
+runGenSourceFile :: TerminaConfig -> QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
+runGenSourceFile config mName program = 
+    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty M.empty config) 
 
-runGenHeaderFile :: Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
-runGenHeaderFile includeOptionH mName imports program = runReader (runExceptT (genHeaderFile includeOptionH mName imports program))
+runGenHeaderFile :: TerminaConfig -> Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
+runGenHeaderFile config includeOptionH mName imports program opts = 
+    runReader (runExceptT (genHeaderFile includeOptionH mName imports program)) 
+        (CGeneratorEnv M.empty opts config)

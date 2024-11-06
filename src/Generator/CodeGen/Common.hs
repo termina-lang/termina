@@ -12,6 +12,7 @@ import Generator.LanguageC.AST
 import Data.Char
 import Numeric
 import Utils.Annotations
+import Command.Configuration
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -19,8 +20,13 @@ newtype CGeneratorError = InternalError String
 type Substitutions = Map Identifier CObject
 type OptionTypes = Map TerminaType (Set TerminaType)
 
-type CSourceGenerator = ExceptT CGeneratorError (Reader Substitutions)
-type CHeaderGenerator = ExceptT CGeneratorError (Reader OptionTypes)
+data CGeneratorEnv = CGeneratorEnv { 
+    substitutions :: Substitutions,
+    optionTypes :: OptionTypes,
+    configParams :: TerminaConfig
+  }
+
+type CGenerator = ExceptT CGeneratorError (Reader CGeneratorEnv)
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.
@@ -123,8 +129,8 @@ genOptionParameterStructName ts =
         genTypeSpecName TInt32 = return "int32"
         genTypeSpecName TInt64 = return "int64"
         genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
-        genTypeSpecName (TStruct name) = return name
-        genTypeSpecName (TEnum name) = return name
+        genTypeSpecName (TStruct ident) = return ident
+        genTypeSpecName (TEnum ident) = return ident
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
@@ -214,8 +220,8 @@ genOptionStructName ts =
         genTypeSpecName TInt64 = return "int64"
         genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
         genTypeSpecName (TGlobal _ clsIdentifier) = return clsIdentifier
-        genTypeSpecName (TStruct name) = return name
-        genTypeSpecName (TEnum name) = return name
+        genTypeSpecName (TStruct ident) = return ident
+        genTypeSpecName (TEnum ident) = return ident
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
         genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
@@ -297,9 +303,9 @@ genType _qual (TReference _ ts) = do
             ts' <- genType noqual ts
             return (CTPointer ts' constqual)
 genType _noqual TUnit = return (CTVoid noqual)
-genType qual (TEnum name) = return (CTTypeDef name qual)
-genType qual (TStruct name) = return (CTTypeDef name qual)
-genType qual (TInterface name) = return (CTTypeDef name qual)
+genType qual (TEnum ident) = return (CTTypeDef ident qual)
+genType qual (TStruct ident) = return (CTTypeDef ident qual)
+genType qual (TInterface ident) = return (CTTypeDef ident qual)
 
 genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
 genFunctionType ts tsParams = do

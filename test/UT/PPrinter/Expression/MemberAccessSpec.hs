@@ -1,15 +1,11 @@
 module UT.PPrinter.Expression.MemberAccessSpec (spec) where
 
+import UT.PPrinter.Common
+
 import Test.Hspec
 import Semantic.AST
-import Data.Text hiding (empty)
-import Data.Map
-import Control.Monad.Reader
-import Generator.CodeGen.Expression
-import Generator.LanguageC.Printer
-import UT.PPrinter.Expression.Common
+import Data.Text
 import Semantic.Types
-import Control.Monad.Except
 
 tmDescriptor0, tmDescriptor1 :: Object SemanticAnn
 tmDescriptor0 = Variable "tm_descriptor0" (structObjSemAnn Mutable "TMDescriptor")
@@ -27,12 +23,6 @@ tmDescriptor1field0 = AccessObject (MemberAccess unboxTMDescriptor1 "field0" (ob
 
 pTMDescriptor0field0 :: Expression SemanticAnn
 pTMDescriptor0field0 = AccessObject (DereferenceMemberAccess pTMDescriptor0 "field0" (objSemAnn Mutable TUInt32))
-
-renderExpression :: Expression SemanticAnn -> Text
-renderExpression expr = 
-  case runReader (runExceptT (genExpression expr)) empty of
-    Left err -> pack $ show err
-    Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do

@@ -6,15 +6,7 @@ import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
 
-import Prettyprinter
-import Control.Monad.Reader
-import Generator.LanguageC.Printer
-import Generator.CodeGen.TypeDefinition
-import Generator.CodeGen.Common
-import ControlFlow.BasicBlocks
-import Control.Monad.Except
-import UT.PPrinter.Expression.Common
-
+import UT.PPrinter.Common
 
 classWithOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
@@ -111,15 +103,6 @@ classWithAccessPortField = TypeDefinition
     ClassField (FieldDefinition "field1" (TAccessPort (TInterface "Interface1"))) undefined,
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
-
-renderTypeDefinitionDecl :: OptionTypes -> AnnASTElement SemanticAnn -> Text
-renderTypeDefinitionDecl opts decl = 
-  case runExcept . genBBAnnASTElement $ decl of
-    Left err -> pack $ show err
-    Right bbDecl ->
-      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) opts of
-        Left err -> pack $ show err
-        Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
 spec :: Spec
 spec = do
