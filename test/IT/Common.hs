@@ -27,7 +27,7 @@ renderHeader includeOptionH input = case parse (contents topLevel) "" input of
             let configParams = defaultConfig "test" TestPlatform in
             case runGenHeaderFile configParams includeOptionH "test" [] bbAST M.empty of
               Left err -> pack $ show err
-              Right cHeaderFile -> runCPrinter cHeaderFile
+              Right cHeaderFile -> runCPrinter False cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -42,11 +42,11 @@ renderSource input = case parse (contents topLevel) "" input of
             let configParams = defaultConfig "test" TestPlatform in
             case runGenSourceFile configParams "test" bbAST of
               Left err -> pack $ show err
-              Right cSourceFile -> runCPrinter cSourceFile
+              Right cSourceFile -> runCPrinter False cSourceFile
 
 renderOption :: OptionMap -> Text
 renderOption optionMap =
   let configParams = defaultConfig "test" TestPlatform in
   case runGenOptionHeaderFile configParams optionMap of
     Left err -> pack $ show err
-    Right cOptionsFile -> runCPrinter cOptionsFile
+    Right cOptionsFile -> runCPrinter False cOptionsFile
