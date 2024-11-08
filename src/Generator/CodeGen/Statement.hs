@@ -28,9 +28,9 @@ genEnumInitialization before level cObj expr = do
             let exprCAnn = buildGenericAnn ann
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
-                let cFieldObj = CField cObj this_variant cType
+                let cFieldObj = cObj @. this_variant @: cType
                 genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
-            let variantsFieldsObj = CField cObj variant enumFieldType
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType exprCAnn
             if before then
                 return $ pre_cr (variantsFieldsObj @= variantExpr |>> location ann) |>> location ann : concat cParams
@@ -196,14 +196,14 @@ genStructInitialization before level cObj expr = do
             genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CCompoundBlockItem
             genProcedureAssignment field (TGlobal ResourceClass resource) (ProcedureSeman procid ptys) = do
                 cPortFieldType <- genType noqual (TStruct resource)
-                let portFieldObj = CField cObj field cPortFieldType
+                let portFieldObj = cObj @. field @: cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
                 clsFunctionType <- genFunctionType TUnit ptys
                 let clsFunctionExpr = clsFunctionName @: clsFunctionType
                 if before then
-                    return $ pre_cr (portFieldObj @= clsFunctionExpr) |>> location ann
+                    return $ pre_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> location ann
                 else
-                    return $ no_cr (portFieldObj @= clsFunctionExpr) |>> location ann
+                    return $ no_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> location ann
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
@@ -216,7 +216,7 @@ genStructInitialization before level cObj expr = do
             genFieldAssignments before' (FieldAddressAssignment field addr (LocatedElement (ETy (SimpleType ts)) _):xs) = do
                 let cAddress = genInteger addr
                 cTs <- genType noqual ts
-                let fieldObj = CField cObj field cTs
+                let fieldObj = cObj @. field @: cTs
                 rest <- genFieldAssignments False xs
                 if before' then
                     return $ pre_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
@@ -237,9 +237,9 @@ genStructInitialization before level cObj expr = do
                 rest <- genFieldAssignments False xs
                 cProcedures <- mapM (genProcedureAssignment field rts) procedures
                 if before' then
-                    return $ pre_cr ((cObj @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+                    return $ pre_cr (((cObj @. field @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
-                    return $ no_cr ((cObj @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+                    return $ no_cr (((cObj @. field @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (LocatedElement (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
@@ -521,12 +521,12 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
         genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase this_variant params blk' ann') = do
-            let cObj' = CField cObj this_variant cParamsStructType
+            let cObj' = cObj @. this_variant @: cParamsStructType
             cParamTypes <- case getMatchCaseTypes (element ann') of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
-                    (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
+                    (\sym index cParamType -> (sym, cObj' @. namefy (show (index :: Integer)) @: cParamType)) params [0..] cParamTypes
             local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
         genAnonymousMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
 
@@ -543,7 +543,7 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
-                    (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
+                    (\sym index cParamType -> (sym, cObj' @. namefy (show (index :: Integer)) @: cParamType)) params [0..] cParamTypes
                 decl = var (namefy this_variant) cParamsStructType @:= cExpr @. this_variant @: cParamsStructType
             cBlk <- local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
             return $ pre_cr decl |>> location ann : cBlk

@@ -214,7 +214,7 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
             let cls = handlerClasses progArchitecture M.! classId
                 (_, targetAction) = sinkPorts cls M.! targetPort
                 classIdType = typeDef classId
-            return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void] @-> void $
+            return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void_ptr] @-> void $
                     trail_cr . block $ [
                         -- classId * self = &identifier;
                         pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
