@@ -165,7 +165,7 @@ instance PPrint CObject where
         pobj <- pprintPrec 26 obj
         pindex <- pprint index
         return $ parenPrec p 26 $ pobj <> brackets pindex
-    pprintPrec p (CObjCast obj ty _) = do
+    pprintPrec p (CObjCast obj ty) = do
         pexpr <- pprintPrec 25 obj
         ptype <- pprint ty
         return $ parenPrec p 25 $ parens ptype <> pexpr

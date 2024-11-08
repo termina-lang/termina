@@ -87,7 +87,7 @@ data SemanticElems
   deriving Show
 
 -- | Expression Semantic Annotations
-type SemanticAnn = Located SemanticElems
+type SemanticAnn = LocatedElement SemanticElems
 
 ----------------------------------------
 

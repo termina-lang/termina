@@ -1,4 +1,5 @@
 {-# Language KindSignatures #-}
+{-# Language FlexibleInstances #-}
 -- | Module describing a family of types equipped with annotations
 
 module Utils.Annotations where
@@ -9,25 +10,34 @@ import Text.Parsec.Pos
 
 data Location =
   Position SourcePos SourcePos -- ^ Source code start and end position
-  | Builtin -- ^ Builtin position for elements that are not in the source code
+  | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen
   deriving Show
 
-data Located a = Located {
-    -- | Located element
+data LocatedElement a = LocatedElement {
+    -- | LocatedElement element
     element :: a,
      -- | TFixedLocation on source code
     location :: Location
 } deriving Show
 
-locate :: Location -> a -> Located a
-locate = flip Located
+class Located a where
+  getLocation :: a -> Location
+  updateLocation :: a -> Location -> a
+
+instance Located (LocatedElement a) where
+  getLocation = location
+  updateLocation le loc = le { location = loc }
+
+locate :: Location -> a -> LocatedElement a
+locate = flip LocatedElement
 
 class Annotated (d :: Type -> Type) where
   getAnnotation :: d a -> a
+  updateAnnotation :: d a -> a -> d a
 
-data AnnotatedError a b = 
+data AnnotatedError a b =
     AnnotatedError a b
   deriving Show
 

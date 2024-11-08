@@ -2,6 +2,7 @@ module Generator.CodeGen.Statement where
 
 import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
+import Generator.LanguageC.Embedded
 import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
@@ -25,14 +26,16 @@ genEnumInitialization before level cObj expr = do
         -- \| This function can only be called with a field values assignments expressions
         (EnumVariantInitializer ts this_variant params ann) -> do
             let exprCAnn = buildGenericAnn ann
-            let declStmtAnn = buildStatementAnn ann before
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
                 let cFieldObj = CField cObj this_variant cType
                 genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
             let variantsFieldsObj = CField cObj variant enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType exprCAnn
-            return $ CSDo (CExprAssign variantsFieldsObj variantExpr enumFieldType exprCAnn) declStmtAnn : concat cParams
+            if before then
+                return $ pre_cr (variantsFieldsObj @= variantExpr |>> location ann) |>> location ann : concat cParams
+            else
+                return $ no_cr (variantsFieldsObj @= variantExpr |>> location ann) |>> location ann : concat cParams
         _ -> error "Incorrect expression"
 
 genOptionInitialization ::
@@ -44,22 +47,21 @@ genOptionInitialization ::
 genOptionInitialization before level cObj expr =
     case expr of
         (OptionVariantInitializer (Some e) ann) -> do
-            let exprCAnn = buildGenericAnn ann
-            let declStmtAnn = buildStatementAnn ann before
-
-            let cSomeVariantFieldObj = CField cObj optionSomeVariant enumFieldType
+            let cSomeVariantFieldObj = cObj @. optionSomeVariant @: enumFieldType
             fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj optionSomeField e
-            let variantsFieldsObj = CField cObj variant enumFieldType
-            let someVariantExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType exprCAnn
-            return $
-                CSDo (CExprAssign variantsFieldsObj someVariantExpr enumFieldType exprCAnn) declStmtAnn :
-                fieldInitalization
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
+            let someVariantExpr = optionSomeVariant @: enumFieldType |>> location ann
+            if before then
+                return $ pre_cr (variantsFieldsObj @= someVariantExpr |>> location ann) |>> location ann : fieldInitalization
+            else
+                return $ no_cr (variantsFieldsObj @= someVariantExpr |>> location ann) |>> location ann : fieldInitalization
         (OptionVariantInitializer None ann) -> do
-            let exprCAnn = buildGenericAnn ann
-            let declStmtAnn = buildStatementAnn ann before
-            let variantsFieldsObj = CField cObj variant enumFieldType
-            let noneVariantExpr = CExprValOf (CVar optionNoneVariant enumFieldType) enumFieldType exprCAnn
-            return [CSDo (CExprAssign variantsFieldsObj noneVariantExpr enumFieldType exprCAnn) declStmtAnn]
+            let variantsFieldsObj = cObj @. variant @: enumFieldType 
+            let noneVariantExpr = optionNoneVariant @: enumFieldType |>> location ann
+            if before then
+                return [pre_cr (variantsFieldsObj @= noneVariantExpr |>> location ann) |>> location ann]
+            else
+                return [no_cr (variantsFieldsObj @= noneVariantExpr |>> location ann) |>> location ann]
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
 genArrayInitialization ::
@@ -76,17 +78,17 @@ genArrayInitialization before level cObj expr = do
         (ArrayInitializer expr' size ann) -> do
             cSize <- genArraySizeExpr size ann
             let iterator = namefy $ "i" ++ show level
-                cIteratorExpr = CExprValOf (CVar iterator (CTSizeT noqual)) (CTSizeT noqual) exprCAnn
-                exprCAnn = buildGenericAnn ann
-                initExpr = Right $ CDecl
-                            (CTypeSpec (CTSizeT noqual)) (Just iterator)
-                            (Just (CExprConstant  (CIntConst (CInteger 0 CDecRepr)) (CTSizeT noqual) exprCAnn))
-                condExpr = Just $ CExprBinaryOp COpLt cIteratorExpr cSize (CTBool noqual) exprCAnn
-                incrExpr = Just $ CExprAssign (CVar iterator (CTSizeT noqual)) (CExprBinaryOp COpAdd cIteratorExpr (CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn
+                cIteratorExpr = iterator @: size_t |>> location ann
+                initDecl = var iterator size_t @:= dec 0 @: size_t
+                condExpr = cIteratorExpr @< cSize |>> location ann
+                incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> location ann
                 cObjType = getCObjType cObj
             cObjArrayItemType <- getCArrayItemType cObjType
-            arrayInit <- genArrayInitialization False (level + 1) (CIndexOf cObj cIteratorExpr cObjArrayItemType) expr'
-            return [CSFor initExpr condExpr incrExpr (CSCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann before)]
+            arrayInit <- genArrayInitialization False (level + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
+            if before then 
+                return [pre_cr $ _for_let initDecl condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+            else 
+                return [no_cr $ _for_let initDecl condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
         (ArrayExprListInitializer exprs _ann) ->
             genArrayItemsInitialization before level 0 exprs
         (StructInitializer {}) -> genStructInitialization False level cObj expr
@@ -102,11 +104,10 @@ genArrayInitialization before level cObj expr = do
         genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CGenerator [CStatement]
         genArrayItemsInitialization _before _level _idx [] = return []
         genArrayItemsInitialization before' level' idx (x:xs) = do
-            let ann = getAnnotation x
             rest <- genArrayItemsInitialization False level' (idx + 1) xs
             let cObjType = getCObjType cObj
             cObjArrayItemType <- getCArrayItemType cObjType
-            current <- genArrayInitialization before' level' (CIndexOf cObj (CExprConstant (CIntConst (CInteger idx CDecRepr)) (CTSizeT noqual) (buildGenericAnn ann)) cObjArrayItemType) x
+            current <- genArrayInitialization before' level' (cObj @$$ (CInteger idx CDecRepr @: size_t) @: cObjArrayItemType) x
             return $ current ++ rest
 
         genArrayInitializationFromExpression :: Integer ->
@@ -120,20 +121,24 @@ genArrayInitialization before level cObj expr = do
                 -- | If the initializer is an array, we must iterate
                 (TArray ts' (K s)) -> do
                     let iterator = namefy $ "i" ++ show lvl
-                        cIteratorExpr = CExprValOf (CVar iterator (CTSizeT noqual)) (CTSizeT noqual) exprCAnn
+                        cIteratorExpr = iterator @: size_t |>> location ann
                         exprCAnn = buildGenericAnn ann
-                        initExpr = Right $ CDecl
-                            (CTypeSpec (CTSizeT noqual)) (Just iterator)
-                            (Just (CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTSizeT noqual) exprCAnn))
-                        cSize = genInteger s
-                        condExpr = Just $ CExprBinaryOp COpLt cIteratorExpr (CExprConstant (CIntConst cSize) (CTSizeT noqual) exprCAnn) (CTBool noqual) exprCAnn
-                        incrExpr = Just $ CExprAssign (CVar iterator (CTSizeT noqual)) (CExprBinaryOp COpAdd cIteratorExpr (CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn) (CTSizeT noqual) exprCAnn
+                        initExpr = var iterator size_t @:= dec 0 @: size_t
+                        cSize = genInteger s @: size_t
+                        condExpr = cIteratorExpr @< cSize |>> location ann
+                        incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> location ann
                     cTs' <- genType noqual ts'
                     rhsCObject <- unboxObject rhsCExpr
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndexOf lhsCObj cIteratorExpr cTs') (CExprValOf (CIndexOf rhsCObject cIteratorExpr cTs') cTs' exprCAnn) ts' ann
-                    return [CSFor initExpr condExpr incrExpr (CSCompound (CBlockStmt <$> arrayInit) (buildCompoundAnn ann False False)) (buildStatementAnn ann (before && lvl == 0))]
-                _ -> let cType = getCObjType lhsCObj in
-                    return [CSDo (CExprAssign lhsCObj rhsCExpr cType (buildGenericAnn ann)) (buildStatementAnn ann (before && lvl == 0))]
+                    if before && lvl == 0then
+                        return [pre_cr $ _for_let initExpr condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                    else
+                        return [no_cr $ _for_let initExpr condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                _ ->  
+                    if before && lvl == 0 then
+                        return [pre_cr (lhsCObj @= rhsCExpr) |>> location ann]
+                    else
+                        return [no_cr (lhsCObj @= rhsCExpr) |>> location ann]
 
 
 genFieldInitialization ::
@@ -148,7 +153,7 @@ genFieldInitialization ::
     -> CGenerator [CStatement]
 genFieldInitialization before level cObj field expr = do
     cExprType <- getExprType expr >>= genType noqual
-    let cFieldObj = CField cObj field cExprType
+    let cFieldObj = cObj @. field @: cExprType
     case expr of
         StructInitializer {} ->
             genStructInitialization before level cFieldObj expr
@@ -166,10 +171,11 @@ genFieldInitialization before level cObj field expr = do
             case exprType of
                 TArray _ _ -> genArrayInitialization before level cFieldObj expr
                 _ -> do
-                    let exprCAnn = buildGenericAnn ann
-                        declStmtAnn = buildStatementAnn ann before
                     cExpr <- genExpression expr
-                    return [CSDo (CExprAssign cFieldObj cExpr cExprType exprCAnn) declStmtAnn]
+                    if before then
+                        return [pre_cr (cFieldObj @= cExpr) |>> location ann]
+                    else
+                        return [no_cr (cFieldObj @= cExpr) |>> location ann]
 
 genStructInitialization ::
     -- | Prepend a line to the initialization expression 
@@ -189,14 +195,15 @@ genStructInitialization before level cObj expr = do
 
             genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CStatement
             genProcedureAssignment field (TGlobal ResourceClass resource) (ProcedureSeman procid ptys) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before
-                cPortFieldType <- genType noqual (TStruct resource)
+                let cPortFieldType = struct resource
                 let portFieldObj = CField cObj field cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
                 clsFunctionType <- genFunctionType TUnit ptys
-                let clsFunctionExpr = CExprValOf (CVar clsFunctionName clsFunctionType) clsFunctionType exprCAnn
-                return $ CSDo (CExprAssign portFieldObj clsFunctionExpr clsFunctionType exprCAnn) declStmtAnn
+                let clsFunctionExpr = clsFunctionName @: clsFunctionType
+                if before then
+                    return $ pre_cr (portFieldObj @= clsFunctionExpr) |>> location ann
+                else
+                    return $ no_cr (portFieldObj @= clsFunctionExpr) |>> location ann
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
@@ -206,47 +213,50 @@ genStructInitialization before level cObj expr = do
                 fieldInit <- genFieldInitialization before' level cObj field expr'
                 rest <- genFieldAssignments False xs
                 return $ fieldInit ++ rest
-            genFieldAssignments before' (FieldAddressAssignment field addr (Located (ETy (SimpleType ts)) _):xs) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before'
-                    cAddress = genInteger addr
+            genFieldAssignments before' (FieldAddressAssignment field addr (LocatedElement (ETy (SimpleType ts)) _):xs) = do
+                let cAddress = genInteger addr
                 cTs <- genType noqual ts
                 let fieldObj = CField cObj field cTs
                 rest <- genFieldAssignments False xs
-                return $ CSDo (CExprAssign fieldObj (CExprCast (CExprConstant (CIntConst cAddress) cTs exprCAnn) cTs exprCAnn) cTs exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel (Located (ETy (PortConnection (OutPConnTy _))) _) : xs) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before'
+                if before' then
+                    return $ pre_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
+                else
+                    return $ no_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
+            genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel (LocatedElement (ETy (PortConnection (OutPConnTy _))) _) : xs) = do
                 let cMsgQueue = CTTypeDef msgQueue noqual
                 let cPtrMsgQueue = CTPointer cMsgQueue noqual
-                let channelExpr = CExprAddrOf (CVar channel cMsgQueue) cPtrMsgQueue exprCAnn
-                    fieldObj = CField cObj field cPtrMsgQueue
+                let channelExpr = addrOf (channel @: cMsgQueue)
                 rest <- genFieldAssignments False xs
-                return $ CSDo (CExprAssign fieldObj channelExpr cPtrMsgQueue exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (Located (ETy (PortConnection (APConnTy rts procedures))) _) : xs) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before'
-                let thatFieldObj = CField cObj thatField (CTPointer (CTVoid noqual) noqual)
-                    cResourceType = CTTypeDef resource noqual
-                    resourceExpr = CExprAddrOf (CVar resource cResourceType) (CTPointer cResourceType noqual) exprCAnn
+                if before' then
+                    return $ pre_cr (cObj @. field @: cPtrMsgQueue @= channelExpr) : rest
+                else
+                    return $ no_cr (cObj @. field @: cPtrMsgQueue @= channelExpr) : rest
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (LocatedElement (ETy (PortConnection (APConnTy rts procedures))) _) : xs) = do
+                let cResourceType = CTTypeDef resource noqual
+                    resourceExpr = addrOf (resource @: cResourceType)
                 rest <- genFieldAssignments False xs
                 cProcedures <- mapM (genProcedureAssignment field rts) procedures
-                return $ CSDo (CExprAssign thatFieldObj resourceExpr (CTPointer cResourceType noqual) exprCAnn) declStmtAnn : (cProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before'
+                if before' then
+                    return $ pre_cr ((cObj @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+                else
+                    return $ no_cr ((cObj @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (LocatedElement (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
-                let portFieldObj = CField cObj field cTs
-                return $ CSDo (CExprAssign portFieldObj (CExprValOf (CVar res cTs) cTs exprCAnn) cTs exprCAnn) declStmtAnn : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (Located (ETy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
-                let exprCAnn = buildGenericAnn ann
-                    declStmtAnn = buildStatementAnn ann before'
+                let portFieldObj = cObj @. field @: cTs
+                if before' then
+                    return $ pre_cr (portFieldObj @= (res @: cTs)) : rest
+                else
+                    return $ no_cr (portFieldObj @= (res @: cTs)) : rest
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (LocatedElement (ETy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual ts
-                let portFieldObj = CField cObj field (CTPointer cTs noqual)
+                let portFieldObj = cObj @. field @: ptr cTs
                     cResourceType = CTTypeDef res noqual
-                return $ CSDo (CExprAssign portFieldObj (CExprAddrOf (CVar res cResourceType) cResourceType exprCAnn) (CTPointer cResourceType noqual) exprCAnn) declStmtAnn : rest
+                if before' then
+                    return $ pre_cr (portFieldObj @= addrOf (res @: cResourceType)) : rest
+                else
+                    return $ no_cr (portFieldObj @= addrOf (res @: cResourceType)) : rest
             genFieldAssignments before' (_ : xs) = genFieldAssignments before' xs
 
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
@@ -254,9 +264,8 @@ genStructInitialization before level cObj expr = do
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBlocks (RegularBlock stmts) = concat <$> mapM genStatement stmts
 genBlocks (ProcedureCall obj ident args ann) = do
-    let cAnn = buildGenericAnn ann
-    (cFuncType, cRetType) <- case ann of
-        Located (ETy (AppType pts ts)) _ -> do
+    (cFuncType, _) <- case ann of
+        LocatedElement (ETy (AppType pts ts)) _ -> do
             cFuncType <- genFunctionType ts pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
@@ -269,52 +278,47 @@ genBlocks (ProcedureCall obj ident args ann) = do
     typeObj <- getObjType obj
     case typeObj of
         TAccessPort (TInterface iface) ->
-            let thatFieldCType = CTPointer (CTStruct CStructTag iface noqual) noqual in
-            return $ CBlockStmt <$>
-                [CSDo (CExprCall (CExprValOf (CField cObj ident cFuncType) cFuncType cAnn)
-                      (CExprValOf (CField cObj thatField thatFieldCType) thatFieldCType cAnn : cArgs) cRetType cAnn) (buildStatementAnn ann True)]
+            let thatFieldCType = ptr (struct iface) in
+            return 
+                [pre_cr ((cObj @. ident @: cFuncType) @@
+                      ((cObj @. thatField @: thatFieldCType) : cArgs) |>> location ann) |>> location ann]
         _ -> throwError $ InternalError $ "Invalid object type: " ++ show typeObj
 genBlocks (AllocBox obj arg ann) = do
-    let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    methodCallExpr <- genPoolMethodCallExpr "alloc" cObjExpr cArg cAnn
-    return $ CBlockStmt <$> [CSDo methodCallExpr (buildStatementAnn ann True)]
+    methodCallExpr <- genPoolMethodCallExpr "alloc" cObjExpr cArg (buildGenericAnn ann)
+    return [pre_cr methodCallExpr |>> location ann]
 genBlocks (FreeBox obj arg ann) = do
-    let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    methodCallExpr <- genPoolMethodCallExpr "free" cObjExpr cArg cAnn
-    return $ CBlockStmt <$> [CSDo methodCallExpr (buildStatementAnn ann True)]
+    methodCallExpr <- genPoolMethodCallExpr "free" cObjExpr cArg (buildGenericAnn ann)
+    return [pre_cr methodCallExpr |>> location ann]
 genBlocks (AtomicLoad obj arg ann) = do
-    let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
     case arg of
         ReferenceExpression _ refObj _ -> do
             cRefObj <- genObject refObj
-            let cRefObjType = getCObjType cRefObj
-            mCall <- genAtomicMethodCall "load" cObjExpr [cArg] cAnn
-            return $ CBlockStmt <$> [CSDo (CExprAssign cRefObj mCall cRefObjType cAnn) (buildStatementAnn ann True)]
+            mCall <- genAtomicMethodCall "load" cObjExpr [cArg] (buildGenericAnn ann)
+            return [pre_cr (cRefObj @= mCall) |>> location ann]
         _ -> throwError $ InternalError $ "invalid params for atomic load: " ++ show arg
 genBlocks (AtomicStore obj arg ann) = do
-    let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    methodCallExpr <- genAtomicMethodCall "store" cObjExpr [cArg] cAnn
-    return $ CBlockStmt <$> [CSDo methodCallExpr (buildStatementAnn ann True)]
+    methodCallExpr <- genAtomicMethodCall "store" cObjExpr [cArg] (buildGenericAnn ann)
+    return [pre_cr methodCallExpr |>> location ann]
 genBlocks (AtomicArrayLoad obj idx arg ann) = do
     let cAnn = buildGenericAnn ann
     -- Generate the C code for the object
@@ -326,9 +330,8 @@ genBlocks (AtomicArrayLoad obj idx arg ann) = do
             cIndexedObj <- genIndexOf cObj cIdx
             cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
             cRefObj <- genObject refObj
-            let cRefObjType = getCObjType cRefObj
             mCall <- genAtomicMethodCall "load" cRefIndexedObj [cArg] cAnn
-            return $ CBlockStmt <$> [CSDo (CExprAssign cRefObj mCall cRefObjType cAnn) (buildStatementAnn ann True)]
+            return [pre_cr (cRefObj @= mCall) |>> location ann]
         _ -> throwError $ InternalError $ "invalid params for atomic load_index: " ++ show arg
 genBlocks (AtomicArrayStore obj idx arg ann) = do
     let cAnn = buildGenericAnn ann
@@ -339,7 +342,7 @@ genBlocks (AtomicArrayStore obj idx arg ann) = do
     cIndexedObj <- genIndexOf cObj cIdx
     cRefIndexedObj <- genAddrOf cIndexedObj noqual cAnn
     mCall <- genAtomicMethodCall "store" cRefIndexedObj [cArg] cAnn
-    return $ CBlockStmt <$> [CSDo mCall (buildStatementAnn ann True)]
+    return [pre_cr mCall |>> location ann]
 genBlocks (SendMessage obj arg ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
@@ -349,17 +352,17 @@ genBlocks (SendMessage obj arg ann) = do
         -- | If the argument is an access object, we can use it directly
         (AccessObject {}) -> do
             mCall <- genMsgQueueSendCall cObj cArg cAnn
-            return $ CBlockStmt <$> [CSDo mCall (buildStatementAnn ann True)]
+            return [pre_cr mCall |>> location ann]
         -- | If it is not an object, must store it in a temporary variable
         _ -> do
             let cArgType = getCExprType cArg
-                cTmpDecl = CDecl (CTypeSpec cArgType) (Just (namefy "msg")) (Just cArg)
-                cTmp = CExprValOf (CVar (namefy "msg") cArgType) cArgType cAnn
+                cTmp = "msg" @: cArgType
             mCall <- genMsgQueueSendCall cObj cTmp cAnn
             return $ CBlockStmt <$> [
-                    CSCompound [
-                        CBlockDecl cTmpDecl (buildDeclarationAnn ann False), CBlockStmt $ CSDo mCall (buildStatementAnn ann False)
-                    ] (buildCompoundAnn ann True False)
+                    block [
+                        no_cr $ var "msg" cArgType @:= cArg |>> location ann,
+                        no_cr mCall
+                    ]
                 ]
 genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr

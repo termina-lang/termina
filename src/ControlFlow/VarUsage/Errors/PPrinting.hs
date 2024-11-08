@@ -11,7 +11,6 @@ import Text.Parsec.Pos
 import qualified Data.Map as M
 import Utils.Annotations
 import Utils.Errors
-import ControlFlow.VarUsage.Types
 
 ppError :: M.Map FilePath TL.Text ->
     VarUsageError -> IO ()

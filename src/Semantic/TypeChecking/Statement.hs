@@ -119,7 +119,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
   case type_matchE of
     TEnum t -> getGlobalTypeDef ann t >>=
         \case {
-          Located (Enum _ident flsDef _mods) _ -> do
+          LocatedElement (Enum _ident flsDef _mods) _ -> do
             let ord_flsDef = Data.List.sort (variantIdentifier <$> flsDef)
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
@@ -221,7 +221,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
         TGlobal _ dident -> getGlobalTypeDef ann dident >>=
           \case{
             -- This case corresponds to a call to an inner method or viewer from the self object.
-            Located (Class _ _identTy cls _provides _mods) _ ->
+            LocatedElement (Class _ _identTy cls _provides _mods) _ ->
               case findClassViewerOrMethod ident cls of
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->

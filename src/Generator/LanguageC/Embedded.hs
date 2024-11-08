@@ -2,7 +2,26 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Generator.LanguageC.Embedded where
+module Generator.LanguageC.Embedded (
+    (@:), (@$$), (@.),
+    (@=), (@:=), (@@),
+    (@&&), (@||), (@!=),
+    (@==), (|>>), (@->),
+    (@>), (@<), (@>=), (@<=),
+    (@+), (@-), (@*), (@/), (@%),
+    cast, addrOf, deref, ptr,
+    void, void_ptr, size_t, typeDef,
+    uint8_t, uint16_t, uint32_t, uint64_t,
+    int8_t, int16_t, int32_t, int64_t,
+    dec, indent, trail_cr, pre_cr, no_cr,
+    block, var, struct, _const,
+    function, static_function,
+    global, static_global,
+    _if, _if_else, _break, _switch, _case, 
+    _for, _for_let, _default, _return,
+    _sizeOfType, _sizeOfExpr,
+    _define, _include, _ifdef, _ifndef, _endif
+  ) where
 
 
 import Generator.CodeGen.Common
@@ -19,6 +38,45 @@ instance TypeElement Ident CExpression where
     (@:) ident cType =
         let cAnn = internalAnn CGenericAnn in
         CExprValOf (CVar ident cType) cType cAnn
+
+instance TypeElement CObject CExpression where
+    (@:) cObj cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprValOf cObj cType cAnn
+
+data ObjIndex =
+    ObjIndex CObject CExpression
+    deriving Show
+
+(@$$) :: CObject -> CExpression -> ObjIndex
+(@$$) = ObjIndex
+
+instance TypeElement ObjIndex CObject where
+    (@:) (ObjIndex obj index) = CIndexOf obj index
+
+data BinOp =
+    BinOp CExpression CBinaryOp CExpression
+    deriving Show
+
+(@+) :: CExpression -> CExpression -> BinOp
+(@+) l = BinOp l COpAdd
+
+(@-) :: CExpression -> CExpression -> BinOp
+(@-) l = BinOp l COpSub
+
+(@*) :: CExpression -> CExpression -> BinOp
+(@*) l = BinOp l COpMul
+
+(@/) :: CExpression -> CExpression -> BinOp
+(@/) l = BinOp l COpDiv
+
+(@%) :: CExpression -> CExpression -> BinOp
+(@%) l = BinOp l COpMod
+
+instance TypeElement BinOp CExpression where
+    (@:) (BinOp l op r) cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprBinaryOp op l r cType cAnn
 
 data ObjField =
     ObjField CObject Ident
@@ -39,6 +97,11 @@ instance TypeElement CInteger CExpression where
     (@:) cInteger cType =
         let cAnn = internalAnn CGenericAnn in
         CExprConstant (CIntConst cInteger) cType cAnn
+
+instance TypeElement Char CExpression where
+    (@:) char cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprConstant (CCharConst (CChar char)) cType cAnn
 
 addrOf :: CObject -> CExpression
 addrOf obj =
@@ -72,9 +135,7 @@ instance Cast CExpression where
         CExprCast expr cType cAnn
 
 instance Cast CObject where
-    cast cType obj =
-        let cAnn = internalAnn CGenericAnn in
-        CObjCast obj cType cAnn
+    cast = flip CObjCast
 
 void, void_ptr :: CType
 void = CTVoid noqual
@@ -136,6 +197,16 @@ int16_t = CTInt IntSize16 Signed noqual
 int32_t = CTInt IntSize32 Signed noqual
 int64_t = CTInt IntSize64 Signed noqual
 
+(@&&) :: CExpression -> CExpression -> CExpression
+(@&&) lexpr rexpr = 
+    let cAnn = internalAnn CGenericAnn in
+    CExprSeqAnd lexpr rexpr (CTBool noqual) cAnn
+
+(@||) :: CExpression -> CExpression -> CExpression
+(@||) lexpr rexpr = 
+    let cAnn = internalAnn CGenericAnn in
+    CExprSeqOr lexpr rexpr (CTBool noqual) cAnn
+
 (@=) :: CObject -> CExpression -> CExpression
 (@=) obj expr =
     let cAnn = internalAnn CGenericAnn
@@ -170,8 +241,32 @@ instance TypeElement Decimal CExpression where
 (@==) l r =
     CExprBinaryOp COpEq l r (CTBool noqual) (internalAnn CGenericAnn)
 
+(@>) :: CExpression -> CExpression -> CExpression
+(@>) l r =
+    CExprBinaryOp COpGt l r (CTBool noqual) (internalAnn CGenericAnn)
+
+(@<) :: CExpression -> CExpression -> CExpression
+(@<) l r =
+    CExprBinaryOp COpLt l r (CTBool noqual) (internalAnn CGenericAnn)
+
+(@>=) :: CExpression -> CExpression -> CExpression
+(@>=) l r =
+    CExprBinaryOp COpGe l r (CTBool noqual) (internalAnn CGenericAnn)
+
+(@<=) :: CExpression -> CExpression -> CExpression
+(@<=) l r =
+    CExprBinaryOp COpLe l r (CTBool noqual) (internalAnn CGenericAnn)
+
+(|>>) :: (Located a) => a -> Location -> a
+(|>>) = updateLocation
+
 infix 1 @=
 infix 1 @:=
+infix 5 @+
+infix 5 @-
+infix 6 @*
+infix 6 @/
+infix 6 @%
 infix 7 @!=
 infix 7 @==
 
@@ -179,54 +274,54 @@ class Indentation a where
     indent :: a -> a
 
 instance Indentation CCompoundBlockItem where
-    indent (CBlockStmt (CSCase expr stmt (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSCase expr stmt (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSDefault stmt (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSDefault stmt (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSDo expr (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSDo expr (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSReturn maybeExpr (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSReturn maybeExpr (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSSwitch expr stmt (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSSwitch expr stmt (Located (CStatementAnn pre True) loc)
-    indent (CBlockStmt (CSBreak (Located (CStatementAnn pre _) loc))) =
-        CBlockStmt $ CSBreak (Located (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSCase expr stmt (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSDefault stmt (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSDo expr (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSReturn maybeExpr (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSSwitch expr stmt (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSBreak (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn pre True) loc)
     indent stmt = stmt
 
 instance Indentation CStatement where
-    indent (CSCase expr stmt (Located (CStatementAnn pre _) loc)) =
-        CSCase expr stmt (Located (CStatementAnn pre True) loc)
-    indent (CSDefault stmt (Located (CStatementAnn pre _) loc)) =
-        CSDefault stmt (Located (CStatementAnn pre True) loc)
-    indent (CSDo expr (Located (CStatementAnn pre _) loc)) =
-        CSDo expr (Located (CStatementAnn pre True) loc)
-    indent (CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn pre _) loc)) =
-        CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn pre True) loc)
-    indent (CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn pre _) loc)) =
-        CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn pre True) loc)
-    indent (CSReturn maybeExpr (Located (CStatementAnn pre _) loc)) =
-        CSReturn maybeExpr (Located (CStatementAnn pre True) loc)
-    indent (CSSwitch expr stmt (Located (CStatementAnn pre _) loc)) =
-        CSSwitch expr stmt (Located (CStatementAnn pre True) loc)
-    indent (CSBreak (Located (CStatementAnn pre _) loc)) =
-        CSBreak (Located (CStatementAnn pre True) loc)
+    indent (CSCase expr stmt (LocatedElement (CStatementAnn pre _) loc)) =
+        CSCase expr stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSDefault stmt (LocatedElement (CStatementAnn pre _) loc)) =
+        CSDefault stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSDo expr (LocatedElement (CStatementAnn pre _) loc)) =
+        CSDo expr (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre _) loc)) =
+        CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre _) loc)) =
+        CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSReturn maybeExpr (LocatedElement (CStatementAnn pre _) loc)) =
+        CSReturn maybeExpr (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSSwitch expr stmt (LocatedElement (CStatementAnn pre _) loc)) =
+        CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSBreak (LocatedElement (CStatementAnn pre _) loc)) =
+        CSBreak (LocatedElement (CStatementAnn pre True) loc)
     indent stmt = stmt
 
 class Trailing a where
     trail_cr :: a -> a
 
 instance Trailing CCompoundBlockItem where
-    trail_cr (CBlockStmt (CSCompound stmts (Located (CCompoundAnn pre _) loc))) =
-        CBlockStmt $ CSCompound stmts (Located (CCompoundAnn pre True) loc)
+    trail_cr (CBlockStmt (CSCompound stmts (LocatedElement (CCompoundAnn pre _) loc))) =
+        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn pre True) loc)
     trail_cr stmt = error $ "Invalid statement for trailing CR: " ++ show stmt
 
 instance Trailing CStatement where
-    trail_cr (CSCompound stmts (Located (CCompoundAnn pre _) loc)) =
-        CSCompound stmts (Located (CCompoundAnn pre True) loc)
+    trail_cr (CSCompound stmts (LocatedElement (CCompoundAnn pre _) loc)) =
+        CSCompound stmts (LocatedElement (CCompoundAnn pre True) loc)
     trail_cr stmt = error $ "Invalid statement for trailing CR: " ++ show stmt
 
 class Alignment a b where
@@ -235,45 +330,45 @@ class Alignment a b where
 
 instance Alignment CStatement CCompoundBlockItem where
     pre_cr CSSkip = CBlockStmt CSSkip
-    pre_cr (CSCase expr stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSCase expr stmt (Located (CStatementAnn True ind) loc)
-    pre_cr (CSDefault stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDefault stmt (Located (CStatementAnn True ind) loc)
-    pre_cr (CSDo expr (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDo expr (Located (CStatementAnn True ind) loc)
-    pre_cr (CSCompound stmts (Located (CCompoundAnn _ ind) loc)) =
-        CBlockStmt $ CSCompound stmts (Located (CCompoundAnn True ind) loc)
-    pre_cr (CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn True ind) loc)
-    pre_cr (CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn True ind) loc)
-    pre_cr (CSReturn maybeExpr (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSReturn maybeExpr (Located (CStatementAnn True ind) loc)
-    pre_cr (CSSwitch expr stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSSwitch expr stmt (Located (CStatementAnn True ind) loc)
-    pre_cr (CSBreak (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSBreak (Located (CStatementAnn True ind) loc)
+    pre_cr (CSCase expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSDefault stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSDo expr (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSCompound stmts (LocatedElement (CCompoundAnn _ ind) loc)) =
+        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn True ind) loc)
+    pre_cr (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSReturn maybeExpr (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSSwitch expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn True ind) loc)
     pre_cr stmt = error $ "pre_cr: invalid annotation: " ++ show stmt
 
     no_cr CSSkip = CBlockStmt CSSkip
-    no_cr (CSCase expr stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSCase expr stmt (Located (CStatementAnn False ind) loc)
-    no_cr (CSDefault stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDefault stmt (Located (CStatementAnn False ind) loc)
-    no_cr (CSDo expr (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSDo expr (Located (CStatementAnn False ind) loc)
-    no_cr (CSCompound stmts (Located (CCompoundAnn _ ind) loc)) =
-        CBlockStmt $ CSCompound stmts (Located (CCompoundAnn False ind) loc)
-    no_cr (CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (Located (CStatementAnn False ind) loc)
-    no_cr (CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (Located (CStatementAnn False ind) loc)
-    no_cr (CSReturn maybeExpr (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSReturn maybeExpr (Located (CStatementAnn False ind) loc)
-    no_cr (CSSwitch expr stmt (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSSwitch expr stmt (Located (CStatementAnn False ind) loc)
-    no_cr (CSBreak (Located (CStatementAnn _ ind) loc)) =
-        CBlockStmt $ CSBreak (Located (CStatementAnn False ind) loc)
+    no_cr (CSCase expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSCase expr stmt (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSDefault stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSDefault stmt (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSDo expr (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSDo expr (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSCompound stmts (LocatedElement (CCompoundAnn _ ind) loc)) =
+        CBlockStmt $ CSCompound stmts (LocatedElement (CCompoundAnn False ind) loc)
+    no_cr (CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSIfThenElse expr stmt maybeStmt (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSReturn maybeExpr (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSReturn maybeExpr (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSSwitch expr stmt (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSBreak (LocatedElement (CStatementAnn False ind) loc)
     no_cr stmt = error $ "no_cr: invalid annotation: " ++ show stmt
 
 instance Alignment CExpression CCompoundBlockItem where
@@ -283,6 +378,18 @@ instance Alignment CExpression CCompoundBlockItem where
 instance Alignment CExpression CStatement where
     pre_cr expr = CSDo expr (internalAnn (CStatementAnn True False))
     no_cr expr = CSDo expr (internalAnn (CStatementAnn False False))
+
+instance Alignment ForLoop CStatement where
+    pre_cr (ForLoop expr1 expr2 expr3 stmt) =
+        CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn True False))
+    no_cr (ForLoop expr1 expr2 expr3 stmt) =
+        CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn False False))
+
+instance Alignment ForLoop CCompoundBlockItem where
+    pre_cr (ForLoop expr1 expr2 expr3 stmt) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn True False))
+    no_cr (ForLoop expr1 expr2 expr3 stmt) =
+        CBlockStmt $ CSFor expr1 expr2 expr3 stmt (internalAnn (CStatementAnn False False))
 
 _if :: CExpression -> CStatement -> CStatement
 _if expr stmt1 =
@@ -321,23 +428,26 @@ _return expr =
     let cAnn = internalAnn (CStatementAnn False False) in
     CSReturn expr cAnn
 
-_for :: Maybe CExpression -> Maybe CExpression -> Maybe CExpression -> CStatement -> CStatement
-_for expr1 expr2 expr3 stmt =
-    let cAnn = internalAnn (CStatementAnn False False) in
-    CSFor (Left expr1) expr2 expr3 stmt cAnn
+data ForLoop =
+    ForLoop (Either (Maybe CExpression) CDeclaration)
+      (Maybe CExpression)
+      (Maybe CExpression)
+      CStatement
+    deriving Show
+
+_for :: Maybe CExpression -> Maybe CExpression -> Maybe CExpression -> CStatement -> ForLoop
+_for expr1 = ForLoop (Left expr1)
 
 class ForDeclaration a where
-    _for_let :: a -> CExpression -> CExpression -> CStatement -> CStatement
+    _for_let :: a -> CExpression -> CExpression -> CStatement -> ForLoop
 
 instance ForDeclaration Declaration where
-    _for_let (Declaration ident ts) expr2 expr3 stmt =
-        let cAnn = internalAnn (CStatementAnn False False) in
-        CSFor (Right (CDecl ts (Just ident) Nothing)) (Just expr2) (Just expr3) stmt cAnn
+    _for_let (Declaration ident ts) expr2 expr3 =
+        ForLoop (Right (CDecl ts (Just ident) Nothing)) (Just expr2) (Just expr3) 
 
 instance ForDeclaration CDeclaration where
-    _for_let decl expr2 expr3 stmt =
-        let cAnn = internalAnn (CStatementAnn False False) in
-        CSFor (Right decl) (Just expr2) (Just expr3) stmt cAnn
+    _for_let decl expr2 expr3 =
+        ForLoop (Right decl) (Just expr2) (Just expr3) 
 
 data Declaration =
     Declaration Ident CTerminaType
@@ -397,51 +507,51 @@ instance TypeElement Ident Declaration where
         (CFunction cType ident (map (\(Declaration paramId ts) -> CDecl ts (Just paramId) Nothing) decls) stmt) declStmt
 
 instance Alignment CFileItem CFileItem where
-    pre_cr (CFunctionDef storage (CFunction cType ident decls stmt) (Located _ loc)) = 
-        CFunctionDef storage (CFunction cType ident decls stmt) (Located (CDeclarationAnn True) loc)
-    pre_cr (CPPDirective (CPPInclude system path) (Located _ loc)) =
-        CPPDirective (CPPInclude system path) (Located (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPDefine ident maybeValues) (Located _ loc)) =
-        CPPDirective (CPPDefine ident maybeValues) (Located (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPIfDef ident) (Located _ loc)) =
-        CPPDirective (CPPIfDef ident) (Located (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective (CPPIfNDef ident) (Located _ loc)) =
-        CPPDirective (CPPIfNDef ident) (Located (CPPDirectiveAnn True) loc)
-    pre_cr (CPPDirective CPPEndif (Located _ loc)) =
-        CPPDirective CPPEndif (Located (CPPDirectiveAnn True) loc)
-    pre_cr (CExtDecl (CEDVariable storage decl) (Located _ loc)) =
-        CExtDecl (CEDVariable storage decl) (Located (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDFunction cType ident decls) (Located _ loc)) =
-        CExtDecl (CEDFunction cType ident decls) (Located (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDEnum maybeIdent enum) (Located _ loc)) =
-        CExtDecl (CEDEnum maybeIdent enum) (Located (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (Located _ loc)) =
-        CExtDecl (CEDStructUnion maybeIdent structUnion) (Located (CDeclarationAnn True) loc)
-    pre_cr (CExtDecl (CEDTypeDef ident cType) (Located _ loc)) =
-        CExtDecl (CEDTypeDef ident cType) (Located (CDeclarationAnn True) loc)
+    pre_cr (CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement _ loc)) = 
+        CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CPPDirective (CPPInclude system path) (LocatedElement _ loc)) =
+        CPPDirective (CPPInclude system path) (LocatedElement (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPDefine ident maybeValues) (LocatedElement _ loc)) =
+        CPPDirective (CPPDefine ident maybeValues) (LocatedElement (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPIfDef ident) (LocatedElement _ loc)) =
+        CPPDirective (CPPIfDef ident) (LocatedElement (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective (CPPIfNDef ident) (LocatedElement _ loc)) =
+        CPPDirective (CPPIfNDef ident) (LocatedElement (CPPDirectiveAnn True) loc)
+    pre_cr (CPPDirective CPPEndif (LocatedElement _ loc)) =
+        CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) loc)
+    pre_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
+        CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDFunction cType ident decls) (LocatedElement _ loc)) =
+        CExtDecl (CEDFunction cType ident decls) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =
+        CExtDecl (CEDEnum maybeIdent enum) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement _ loc)) =
+        CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement (CDeclarationAnn True) loc)
+    pre_cr (CExtDecl (CEDTypeDef ident cType) (LocatedElement _ loc)) =
+        CExtDecl (CEDTypeDef ident cType) (LocatedElement (CDeclarationAnn True) loc)
 
-    no_cr (CFunctionDef storage (CFunction cType ident decls stmt) (Located _ loc)) = 
-        CFunctionDef storage (CFunction cType ident decls stmt) (Located (CDeclarationAnn False) loc)
-    no_cr (CPPDirective (CPPInclude system path) (Located _ loc)) =
-        CPPDirective (CPPInclude system path) (Located (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPDefine ident maybeValues) (Located _ loc)) =
-        CPPDirective (CPPDefine ident maybeValues) (Located (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPIfDef ident) (Located _ loc)) =
-        CPPDirective (CPPIfDef ident) (Located (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective (CPPIfNDef ident) (Located _ loc)) =
-        CPPDirective (CPPIfNDef ident) (Located (CPPDirectiveAnn False) loc)
-    no_cr (CPPDirective CPPEndif (Located _ loc)) =
-        CPPDirective CPPEndif (Located (CPPDirectiveAnn False) loc)
-    no_cr (CExtDecl (CEDVariable storage decl) (Located _ loc)) =
-        CExtDecl (CEDVariable storage decl) (Located (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDFunction cType ident decls) (Located _ loc)) =
-        CExtDecl (CEDFunction cType ident decls) (Located (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDEnum maybeIdent enum) (Located _ loc)) =
-        CExtDecl (CEDEnum maybeIdent enum) (Located (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (Located _ loc)) =
-        CExtDecl (CEDStructUnion maybeIdent structUnion) (Located (CDeclarationAnn False) loc)
-    no_cr (CExtDecl (CEDTypeDef ident cType) (Located _ loc)) =
-        CExtDecl (CEDTypeDef ident cType) (Located (CDeclarationAnn False) loc)
+    no_cr (CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement _ loc)) = 
+        CFunctionDef storage (CFunction cType ident decls stmt) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CPPDirective (CPPInclude system path) (LocatedElement _ loc)) =
+        CPPDirective (CPPInclude system path) (LocatedElement (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPDefine ident maybeValues) (LocatedElement _ loc)) =
+        CPPDirective (CPPDefine ident maybeValues) (LocatedElement (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPIfDef ident) (LocatedElement _ loc)) =
+        CPPDirective (CPPIfDef ident) (LocatedElement (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective (CPPIfNDef ident) (LocatedElement _ loc)) =
+        CPPDirective (CPPIfNDef ident) (LocatedElement (CPPDirectiveAnn False) loc)
+    no_cr (CPPDirective CPPEndif (LocatedElement _ loc)) =
+        CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn False) loc)
+    no_cr (CExtDecl (CEDVariable storage decl) (LocatedElement _ loc)) =
+        CExtDecl (CEDVariable storage decl) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDFunction cType ident decls) (LocatedElement _ loc)) =
+        CExtDecl (CEDFunction cType ident decls) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDEnum maybeIdent enum) (LocatedElement _ loc)) =
+        CExtDecl (CEDEnum maybeIdent enum) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement _ loc)) =
+        CExtDecl (CEDStructUnion maybeIdent structUnion) (LocatedElement (CDeclarationAnn False) loc)
+    no_cr (CExtDecl (CEDTypeDef ident cType) (LocatedElement _ loc)) =
+        CExtDecl (CEDTypeDef ident cType) (LocatedElement (CDeclarationAnn False) loc)
     
 _include :: Bool -> FilePath -> CFileItem
 _include system filePath =
@@ -462,3 +572,6 @@ _ifndef ident =
 _endif :: CFileItem
 _endif =
     CPPDirective CPPEndif (internalAnn (CPPDirectiveAnn False))
+
+struct :: Ident -> CType
+struct ident = CTStruct CStructTag ident noqual

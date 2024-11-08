@@ -67,7 +67,7 @@ matchOption1 :: Statement SemanticAnn
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnn
-getInteger = FunctionCall "get_integer" [] (Located (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
+getInteger = FunctionCall "get_integer" [] (LocatedElement (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
 
 matchOption2 :: Statement SemanticAnn
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn

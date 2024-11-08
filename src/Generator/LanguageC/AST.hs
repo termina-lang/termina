@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Generator.LanguageC.AST where
 
 import Prettyprinter
@@ -202,7 +203,7 @@ data CObject' a =
     | CField (CObject' a) Ident CType
     | CDeref (CObject' a) CType -- ^ pointer dereference (unary *)
     | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
-    | CObjCast (CObject' a) CType a
+    | CObjCast (CObject' a) CType
     deriving Show
 
 data CExpression' a =
@@ -221,6 +222,37 @@ data CExpression' a =
     | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
     | CExprCall (CExpression' a) [CExpression' a] CType a
     deriving Show
+
+instance Annotated CExpression' where
+  getAnnotation (CExprConstant _ _ a) = a
+  getAnnotation (CExprValOf _ _ a) = a
+  getAnnotation (CExprAddrOf _ _ a) = a
+  getAnnotation (CExprUnaryOp _ _ _ a) = a
+  getAnnotation (CExprBinaryOp _ _ _ _ a) = a
+  getAnnotation (CExprCast _ _ a) = a
+  getAnnotation (CExprSeqAnd _ _ _ a) = a
+  getAnnotation (CExprSeqOr _ _ _ a) = a
+  getAnnotation (CExprSizeOfType _ _ a) = a
+  getAnnotation (CExprSizeOfExpr _ _ a) = a
+  getAnnotation (CExprAlignOfType _ _ a) = a
+  getAnnotation (CExprAssign _ _ _ a) = a
+  getAnnotation (CExprComma _ _ _ a) = a
+  getAnnotation (CExprCall _ _ _ a) = a
+
+  updateAnnotation (CExprConstant c t _) = CExprConstant c t
+  updateAnnotation (CExprValOf o t _) = CExprValOf o t
+  updateAnnotation (CExprAddrOf o t _) = CExprAddrOf o t
+  updateAnnotation (CExprUnaryOp op e t _) = CExprUnaryOp op e t
+  updateAnnotation (CExprBinaryOp op e1 e2 t _) = CExprBinaryOp op e1 e2 t
+  updateAnnotation (CExprCast e t _) = CExprCast e t
+  updateAnnotation (CExprSeqAnd e1 e2 t _) = CExprSeqAnd e1 e2 t
+  updateAnnotation (CExprSeqOr e1 e2 t _) = CExprSeqOr e1 e2 t
+  updateAnnotation (CExprSizeOfType t1 t2 _) = CExprSizeOfType t1 t2
+  updateAnnotation (CExprSizeOfExpr e t _) = CExprSizeOfExpr e t
+  updateAnnotation (CExprAlignOfType t1 t2 _) = CExprAlignOfType t1 t2
+  updateAnnotation (CExprAssign o e t _) = CExprAssign o e t
+  updateAnnotation (CExprComma e1 e2 t _) = CExprComma e1 e2 t
+  updateAnnotation (CExprCall e es t _) = CExprCall e es t
 
 getCExprType :: CExpression' a -> CType
 getCExprType (CExprConstant _ t _) = t
@@ -243,7 +275,7 @@ getCObjType (CVar _ t) = t
 getCObjType (CField _ _ t) = t
 getCObjType (CDeref _ t) = t
 getCObjType (CIndexOf _ _ t) = t
-getCObjType (CObjCast _ t _) = t
+getCObjType (CObjCast _ t) = t
 
 data CCompoundBlockItem' a
   = CBlockStmt (CStatement' a)     -- ^ A statement
@@ -265,6 +297,29 @@ data CStatement' a =
    | CSSwitch (CExpression' a) (CStatement' a) a -- ^ switch statement
    | CSBreak a -- ^ break statement
     deriving Show
+
+instance Annotated CStatement' where 
+  getAnnotation CSSkip = error "CSSkip has no annotation"
+  getAnnotation (CSCase _ _ a) = a
+  getAnnotation (CSDefault _ a) = a
+  getAnnotation (CSDo _ a) = a
+  getAnnotation (CSCompound _ a) = a
+  getAnnotation (CSIfThenElse _ _ _ a) = a
+  getAnnotation (CSFor _ _ _ _ a) = a
+  getAnnotation (CSReturn _ a) = a
+  getAnnotation (CSSwitch _ _ a) = a
+  getAnnotation (CSBreak a) = a
+
+  updateAnnotation CSSkip = const CSSkip
+  updateAnnotation (CSCase e s _) = CSCase e s
+  updateAnnotation (CSDefault s _) = CSDefault s
+  updateAnnotation (CSDo e _) = CSDo e
+  updateAnnotation (CSCompound ss _) = CSCompound ss
+  updateAnnotation (CSIfThenElse e s1 s2 _) = CSIfThenElse e s1 s2
+  updateAnnotation (CSFor e1 e2 e3 s _) = CSFor e1 e2 e3 s
+  updateAnnotation (CSReturn e _) = CSReturn e
+  updateAnnotation (CSSwitch e s _) = CSSwitch e s
+  updateAnnotation (CSBreak _) = CSBreak
 
 instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
@@ -312,7 +367,7 @@ data CItemAnn =
       Bool -- ^ Add new line before directive
     deriving Show
 
-type CAnns = Located CItemAnn
+type CAnns = LocatedElement CItemAnn
 
 itemAnnotation :: CAnns -> CItemAnn
 itemAnnotation = element
@@ -330,3 +385,18 @@ type CTerminaType = CTerminaType' CAnns
 type CAttribute = CAttribute' CAnns
 type CStructureUnion = CStructureUnion' CAnns
 type CEnum = CEnum' CAnns
+
+instance Located (CExpression' CAnns) where
+  getLocation = getLocation . getAnnotation 
+  updateLocation e loc = updateAnnotation e (updateLocation (getAnnotation e) loc)
+
+instance Located (CStatement' CAnns) where
+  getLocation = getLocation . getAnnotation
+  updateLocation e loc = updateAnnotation e (updateLocation (getAnnotation e) loc)
+
+instance Located (CCompoundBlockItem' CAnns) where
+  getLocation (CBlockStmt stmt) = getLocation stmt -- ^ A statement
+  getLocation (CBlockDecl _ ann) = getLocation ann
+
+  updateLocation (CBlockStmt stmt) loc = CBlockStmt (updateLocation stmt loc)
+  updateLocation (CBlockDecl decl ann) loc = CBlockDecl decl (updateLocation ann loc)

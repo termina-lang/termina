@@ -9,6 +9,7 @@ import Data.Maybe
 import Data.Map
 import Generator.CodeGen.Common
 import Utils.Annotations
+import Generator.LanguageC.Embedded
 
 
 cBinOp :: Op -> CBinaryOp
@@ -37,7 +38,7 @@ genObject o@(Variable identifier _ann) = do
     -- Obtain the substitutions map
     subs <- asks substitutions
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (CVar identifier cType) (Data.Map.lookup identifier subs)
+    let ident = fromMaybe (identifier @: cType) (Data.Map.lookup identifier subs)
     -- Return the C identifier
     return ident
 genObject o@(ArrayIndexExpression obj index _ann) = do
@@ -48,29 +49,27 @@ genObject o@(ArrayIndexExpression obj index _ann) = do
     -- Generate the C code for the index
     cIndex <- genExpression index
     -- Return the C code for the array index expression
-    return $ CIndexOf cExpr cIndex ctype
+    return $ cExpr @$$ cIndex @: ctype
 genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
     ctype <- getObjType o >>= genType noqual
-    return $ CField cObj identifier ctype
+    return $ cObj @. identifier @: ctype
 genObject o@(DereferenceMemberAccess obj identifier _ann) = do
     cObj <- genObject obj
     ctype <- getObjType o >>= genType noqual
-    return $ CField cObj identifier ctype
-genObject o@(Dereference obj _ann) = do
+    return $ cObj @. identifier @: ctype
+genObject (Dereference obj _ann) = do
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
         -- | A dereference to an array is printed as the name of the array
         (TReference _ (TArray _ _)) -> return cObj
         _ -> do
-            ctype <- getObjType o >>= genType noqual
-            return $ CDeref cObj ctype
+            return $ deref cObj
 -- | If the expression is a box subtype treated as its base type, we need to
 -- check if it is an array
-genObject o@(Unbox obj ann) = do
-    let cAnn = buildGenericAnn ann
-    let dataFieldCType = CTPointer (CTInt IntSize8 Unsigned noqual) noqual
+genObject o@(Unbox obj _ann) = do
+    let dataFieldCType = ptr uint8_t
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
@@ -78,12 +77,11 @@ genObject o@(Unbox obj ann) = do
         (TBoxSubtype ty@(TArray _ _)) -> do
             -- We must obtain the declaration specifier of the array
             ctype <- genType noqual ty
-            return $ CObjCast (CField cObj "data" dataFieldCType) ctype cAnn
+            return $ cast ctype ((cObj @. "data") @: dataFieldCType)
             -- | Else, we print the derefence to the data
         (TBoxSubtype ty) -> do
             ctype <- genType noqual ty
-            let cptrtype = CTPointer ctype noqual
-            return $ CDeref (CObjCast (CField cObj "data" dataFieldCType) cptrtype cAnn) ctype
+            return $ deref (cast (ptr ctype) (cObj @. "data" @: dataFieldCType))
         -- | An unbox can only be applied to a box subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
@@ -98,8 +96,8 @@ genMemberFunctionAccess ::
 genMemberFunctionAccess obj ident args ann = do
     let cAnn = buildGenericAnn ann
     -- | Obtain the function type
-    (cFuncType, cRetType) <- case ann of
-        Located (ETy (AppType pts ts)) _ -> do
+    (cFuncType, _) <- case ann of
+        LocatedElement (ETy (AppType pts ts)) _ -> do
             cFuncType <- genFunctionType ts pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
@@ -116,41 +114,41 @@ genMemberFunctionAccess obj ident args ann = do
             case ts of
                 -- | If the left hand size is a class:
                 (TGlobal _ classId) ->
-                    return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> location ann
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
         (TGlobal _ classId) ->
             case obj of
                 (Dereference _ _) ->
-                    let selfCType = CTPointer (CTStruct CStructTag classId noqual) noqual in
+                    let selfCType = ptr (struct classId) in
                     -- | If we are here, it means that we are dereferencing the self object
-                    return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (CExprValOf (CVar "self" selfCType) selfCType cAnn : cArgs) cRetType cAnn
+                    return $ ((classId <::> ident) @: cFuncType) @@ ("self" @: selfCType : cArgs) |>> location ann 
                     -- | If the left hand size is a class:
                 _ -> 
-                    return $ CExprCall (CExprValOf (CVar (classId <::> ident) cFuncType) cFuncType cAnn) (cObjExpr : cArgs) cRetType cAnn
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> location ann
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
 
 genExpression :: Expression SemanticAnn -> CGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
-    cObjType <- getObjType obj
-    case cObjType of
+    objType <- getObjType obj
+    case objType of
         (TFixedLocation _) -> do
-            return $ CExprValOf (CDeref cObj (getCObjType cObj)) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
+            return $ deref cObj |>> location (getAnnotation obj)
         _ -> 
-            return $ CExprValOf cObj (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
+            return $ cObj @: getCObjType cObj |>> location (getAnnotation obj)
 genExpression (BinOp op left right ann) = 
     let cAnn = buildGenericAnn ann in
     case op of
         LogicalAnd -> do
             cLeft <- genExpression left
             cRight <- genExpression right
-            return $ CExprSeqAnd cLeft cRight (CTBool noqual) cAnn
+            return $ cLeft @&& cRight |>> location cAnn
         LogicalOr -> do
             cLeft <- genExpression left
             cRight <- genExpression right
-            return $ CExprSeqOr cLeft cRight (CTBool noqual) cAnn
+            return $ cLeft @|| cRight |>> location cAnn
         _ -> do
             -- | We need to check if the left and right expressions are binary operations
             -- If they are, we need to cast them to ensure that the resulting value
@@ -162,7 +160,7 @@ genExpression (BinOp op left right ann) =
                         let leftExprType = getCExprType leftExpr
                         case leftExprType of
                             CTBool _ -> return leftExpr
-                            _ -> return $ CExprCast leftExpr leftExprType cAnn
+                            _ -> return $ cast leftExprType leftExpr |>> location ann
                     _ -> return leftExpr)
             cRight <- (do
                 rightExpr <- genExpression right
@@ -171,27 +169,24 @@ genExpression (BinOp op left right ann) =
                         let rightExprType = getCExprType rightExpr
                         case rightExprType of
                             CTBool _ -> return rightExpr
-                            _ -> return $ CExprCast rightExpr rightExprType cAnn
+                            _ -> return $ cast rightExprType rightExpr |>> location ann
                     _ -> genExpression right)
             return $ CExprBinaryOp (cBinOp op) cLeft cRight (getCExprType cLeft) cAnn
 
 genExpression e@(Constant c ann) = do
-    let cAnn = buildGenericAnn ann 
     cType <- getExprType e >>= genType noqual
     case c of
         (I i _) -> 
             let cInteger = genInteger i in
-            return $ CExprConstant (CIntConst cInteger) cType cAnn
-        (B True) -> return $ CExprConstant (CIntConst (CInteger 1 CDecRepr)) cType cAnn
-        (B False) -> return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) cType cAnn
-        (C char) -> return $ CExprConstant (CCharConst (CChar char)) cType cAnn
+            return $ cInteger @: cType |>> location ann
+        (B True) -> return $ dec 1 @: cType |>> location ann
+        (B False) -> return $ dec 0 @: cType |>> location ann
+        (C char) -> return $ char @: cType |>> location ann
 genExpression (Casting expr ts ann) = do
-    let cAnn = buildGenericAnn ann 
     cType <- genType noqual ts
     cExpr <- genExpression expr
-    return $ CExprCast cExpr cType cAnn
+    return $ cast cType cExpr |>> location ann
 genExpression (ReferenceExpression _ obj ann) = do
-    let cAnn = buildGenericAnn ann 
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
@@ -199,58 +194,49 @@ genExpression (ReferenceExpression _ obj ann) = do
         (TBoxSubtype ty@(TArray {})) -> do
             -- We must obtain the declaration specifier of the array
             cType <- genType noqual ty
-            let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
-            return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) cType cAnn
+            return $ cast cType (cObj @. "data" @: void_ptr) |>> location ann
             -- | Else, we print the address to the data
         (TBoxSubtype ty) -> do
             cType <- genType noqual ty
-            let ptrToVoidCType = CTPointer (CTVoid noqual) noqual
-                ptrTy = CTPointer cType noqual
-            return $ CExprCast (CExprValOf (CField cObj "data" ptrToVoidCType) ptrToVoidCType cAnn) ptrTy cAnn
-        (TArray {}) -> return $ CExprValOf cObj (getCObjType cObj) cAnn
-        ty -> do
-            cType <- genType noqual ty
-            return $ CExprAddrOf cObj (CTPointer cType noqual) cAnn
+            return $ cast (ptr cType) (cObj @. "data" @: void_ptr) |>> location ann
+        (TArray {}) -> return $ cObj @: getCObjType cObj |>> location ann
+        _ -> do
+            return $ addrOf cObj |>> location ann
 genExpression e@(FunctionCall name args ann) = do
-    let cAnn = buildGenericAnn ann
     cRetType <- getExprType e >>= genType noqual
     cArgs <- mapM genExpression args
     let cFunctionType = CTFunction cRetType . fmap getCExprType $ cArgs
     -- Obtain the substitutions map
     subs <- asks substitutions
     -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (CVar name cFunctionType) (Data.Map.lookup name subs)
-    return $ CExprCall (CExprValOf ident (getCObjType ident) cAnn) cArgs cFunctionType cAnn
+    let ident = fromMaybe (name @: cFunctionType) (Data.Map.lookup name subs)
+    return $ (ident @: getCObjType ident) @@ cArgs |>> location ann
 genExpression (MemberFunctionCall obj ident args ann) = do
     genMemberFunctionAccess obj ident args ann
 genExpression (DerefMemberFunctionCall obj ident args ann) =
     genMemberFunctionAccess obj ident args ann
 genExpression (IsEnumVariantExpression obj enum this_variant ann) = do
-    let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-
-    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
-    let rightExpr = CExprValOf (CVar (enum <::> this_variant) enumFieldType) enumFieldType cAnn
-    return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
+    let leftExpr = cObj @. variant @: enumFieldType |>> location ann
+    let rightExpr = (enum <::> this_variant) @: enumFieldType |>> location ann
+    return $ leftExpr @== rightExpr |>> location ann
 genExpression (IsOptionVariantExpression obj NoneLabel ann) = do
-    let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
-    let rightExpr = CExprValOf (CVar optionNoneVariant enumFieldType) enumFieldType cAnn
-    return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
+    let leftExpr = cObj @. variant @: enumFieldType |>> location ann
+    let rightExpr = optionNoneVariant @: enumFieldType |>> location ann
+    return $ leftExpr @== rightExpr |>> location ann
 genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
-    let cAnn = buildGenericAnn ann 
     cObj <- genObject obj
-    let leftExpr = CExprValOf (CField cObj variant enumFieldType) enumFieldType cAnn
-    let rightExpr = CExprValOf (CVar optionSomeVariant enumFieldType) enumFieldType cAnn
-    return $ CExprBinaryOp COpEq leftExpr rightExpr (CTBool noqual) cAnn
-genExpression (ArraySliceExpression _ak obj lower _rb _ann) = do
+    let leftExpr = cObj @. variant @: enumFieldType |>> location ann
+    let rightExpr = optionSomeVariant @: enumFieldType |>> location ann
+    return $ leftExpr @== rightExpr |>> location ann
+genExpression (ArraySliceExpression _ak obj lower _rb ann) = do
     cObjType <- getObjType obj
     case cObjType of
         (TArray ty _) -> do
             cObj <- genObject obj
             cLower <- genExpression lower
             cType <- genType noqual ty
-            return $ CExprAddrOf (CIndexOf cObj cLower cType) (getCObjType cObj) (buildGenericAnn (getAnnotation obj))
+            return $ addrOf (cObj @$$ cLower @: cType) |>> location ann
         _ -> throwError $ InternalError $ "Unsupported object. Not an array: " ++ show obj
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o

@@ -211,3 +211,5 @@ type SemanticErrors = AnnotatedError Error Location
 
 instance Annotated (AnnotatedError Error) where
   getAnnotation (AnnotatedError _err ann) = ann
+
+  updateAnnotation (AnnotatedError err _) = AnnotatedError err

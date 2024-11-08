@@ -19,7 +19,7 @@ genOptionPathName :: FilePath
 genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
 
 genSimpleOptionDefinition :: TerminaType -> CGenerator [CFileItem]
-genSimpleOptionDefinition = genOptionStruct (Located (STy SimpleStmtType) Internal)
+genSimpleOptionDefinition = genOptionStruct (LocatedElement (STy SimpleStmtType) Internal)
 
 genOptionHeaderFile :: CGenerator CFile
 genOptionHeaderFile = do
@@ -28,12 +28,12 @@ genOptionHeaderFile = do
     items <- concat <$> mapM genSimpleOptionDefinition (concatMap S.toList (M.elems optionMap))
     return $ CHeaderFile genOptionPathName $
         [
-            CPPDirective (CPPIfNDef defineLabel) (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
         ++ items ++ [
-            CPPDirective CPPEndif (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
 
 runGenOptionHeaderFile :: TerminaConfig -> OptionTypes -> Either CGeneratorError CFile

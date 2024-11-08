@@ -46,7 +46,7 @@ import Data.Bifunctor
 
 -- Here we actually only need Global
 typeElement :: AnnASTElement ParserAnn 
-  -> SemanticMonad (SAST.AnnASTElement SemanticAnn, Located (GEntry SemanticAnn))
+  -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
   -- Check the return type 
@@ -58,11 +58,11 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
                 (typeBlock mty bret)
   mds_ty <- mapM (typeModifier anns) mds_ts
   let functionSeman = FunctionSeman (map paramType ps_ty) (fromMaybe TUnit mty)
-  return (Function ident ps_ty mty typedBret mds_ty (Located (FTy functionSeman) anns), Located (GFun functionSeman) anns)
+  return (Function ident ps_ty mty typedBret mds_ty (LocatedElement (FTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef
-  return (TypeDefinition typed_tydef (Located TTy ann), Located (GType (semanticTypeDef typed_tydef)) ann)
+  return (TypeDefinition typed_tydef (LocatedElement TTy ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
 
 semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
 semanticTypeDef (Struct i f m)  = Struct i f m
@@ -71,7 +71,7 @@ semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMemb
 semanticTypeDef (Interface i cls m) = Interface i cls m
 
 -- Adding Global elements to the environment.
-addElement :: SAST.AnnASTElement SemanticAnn -> Located (GEntry SemanticAnn) -> SemanticMonad ()
+addElement :: SAST.AnnASTElement SemanticAnn -> LocatedElement (GEntry SemanticAnn) -> SemanticMonad ()
 addElement (Function ident _ _ _ _ _) el =
   insertGlobal ident el (EUsedFunName ident)
 addElement (GlobalDeclaration glb) el =

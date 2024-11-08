@@ -13,10 +13,14 @@ data MVars
   | Moved Location
   deriving (Show)
 
-getLocation :: MVars -> Location
-getLocation (Defined loc) = loc
-getLocation (Allocated loc) = loc
-getLocation (Moved loc) = loc
+instance Located MVars where
+  getLocation (Defined loc) = loc
+  getLocation (Allocated loc) = loc
+  getLocation (Moved loc) = loc
+
+  updateLocation (Defined _) loc = Defined loc
+  updateLocation (Allocated _) loc = Allocated loc
+  updateLocation (Moved _) loc = Moved loc
 
 sameState :: MVars -> MVars -> Bool
 sameState (Defined _) (Defined _) = True

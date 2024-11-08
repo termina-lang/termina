@@ -73,7 +73,7 @@ genAttribute (Modifier name (Just expr)) = do
 
         genConst :: (MonadError CGeneratorError m) => Const -> m CExpression
         genConst c = do
-            let cAnn = Located CGenericAnn Internal
+            let cAnn = LocatedElement CGenericAnn Internal
             case c of
                 (I i _) -> 
                     let cInteger = genInteger i in

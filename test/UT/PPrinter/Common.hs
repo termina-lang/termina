@@ -19,16 +19,16 @@ import Generator.CodeGen.Function
 import Prettyprinter
 
 objSemAnn :: AccessKind -> TerminaType -> SemanticAnn
-objSemAnn ak ts = Located (ETy (ObjectType ak ts)) Internal
+objSemAnn ak ts = LocatedElement (ETy (ObjectType ak ts)) Internal
 
 stmtSemAnn :: SemanticAnn
-stmtSemAnn = Located (STy SimpleStmtType) Internal
+stmtSemAnn = LocatedElement (STy SimpleStmtType) Internal
 
 simpleTySemAnn :: TerminaType -> SemanticAnn
-simpleTySemAnn ts = Located (ETy (SimpleType ts)) Internal
+simpleTySemAnn ts = LocatedElement (ETy (SimpleType ts)) Internal
 
 matchCaseSemAnn :: [TerminaType] -> SemanticAnn
-matchCaseSemAnn ts = Located (STy (MatchCaseStmtType ts)) Internal
+matchCaseSemAnn ts = LocatedElement (STy (MatchCaseStmtType ts)) Internal
 
 unitSemAnn :: SemanticAnn
 unitSemAnn = simpleTySemAnn TUnit
@@ -169,7 +169,7 @@ msgQueueSemAnn :: TerminaType -> SemanticAnn
 msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
 funSemAnn :: [TerminaType] -> TerminaType -> SemanticAnn
-funSemAnn params ts = Located (ETy (AppType params ts)) Internal
+funSemAnn params ts = LocatedElement (ETy (AppType params ts)) Internal
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

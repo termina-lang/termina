@@ -33,7 +33,7 @@ getMemberFieldType loc obj_ty ident =
     TStruct dident -> getGlobalTypeDef loc dident >>=
       \case{
         -- Either a struct
-        (Located (Struct _identTy fields _mods) strLoc) ->
+        (LocatedElement (Struct _identTy fields _mods) strLoc) ->
             let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError loc (EMemberAccessUnknownField (dident, strLoc) ident))
@@ -44,7 +44,7 @@ getMemberFieldType loc obj_ty ident =
     TGlobal _ dident -> getGlobalTypeDef loc dident >>=
       \case {
         -- Or a class
-        Located (Class _clsKind _identTy cls _implements _mods) clsLoc ->
+        LocatedElement (Class _clsKind _identTy cls _implements _mods) clsLoc ->
           -- TODO Class access?
           -- Find |ident| field in the class.
           case findClassField ident cls of
@@ -125,7 +125,7 @@ typeMemberFunctionCall ann obj_ty ident args =
     TGlobal _clsKind dident -> getGlobalTypeDef ann dident >>=
       \case{
         -- This case corresponds to a call to an inner method or viewer from the self object.
-        Located (Class _ _identTy cls _provides _mods) _ ->
+        LocatedElement (Class _ _identTy cls _provides _mods) _ ->
           case findClassProcedure ident cls of
             Just _ -> throwError $ annotateError ann EInvalidProcedureCallInsideMemberFunction
             Nothing ->
@@ -146,7 +146,7 @@ typeMemberFunctionCall ann obj_ty ident args =
       }
     TAccessPort (TInterface dident) -> getGlobalTypeDef ann dident >>=
       \case{
-        Located (Interface _identTy cls _mods) _ ->
+        LocatedElement (Interface _identTy cls _mods) _ ->
           case findInterfaceProcedure ident cls of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
             Just (ps, anns) -> do
@@ -329,7 +329,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
       getGlobalTypeDef pann id_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
-    Located (Struct _ ty_fs _mods) strLoc  ->
+    LocatedElement (Struct _ ty_fs _mods) strLoc  ->
       SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, strLoc) typeObj ty_fs fs
         <*> pure (buildExpAnn pann (TStruct id_ty));
@@ -346,7 +346,7 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
       getGlobalTypeDef pann id_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
-    Located (Class clsKind _ident members _provides _mods) clsLoc ->
+    LocatedElement (Class clsKind _ident members _provides _mods) clsLoc ->
       let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
         SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
@@ -358,7 +358,7 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
   -- | Enum Variant
   getEnumTy pann id_ty
   >>= \case {
-    Located (Enum enumId ty_vs _mods) loc ->
+    LocatedElement (Enum enumId ty_vs _mods) loc ->
       case Data.List.find ((variant ==) . variantIdentifier) ty_vs of
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound enumId variant)
         Just (EnumVariant _ ps) ->
@@ -712,7 +712,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
-  Located lhs_ty _ <- case obj_ty of
+  LocatedElement lhs_ty _ <- case obj_ty of
     TEnum lhs_id -> do
       unless (lhs_id == id_ty) (throwError $ annotateError pann (EIsVariantEnumTypeMismatch lhs_id id_ty))
       getEnumTy pann id_ty
@@ -765,13 +765,13 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection I
     case fty of
       TSinkPort ty action  ->
         case gentry of
-          Located  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
+          LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
             checkEmitterDataType loc clsId ty
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError loc $ ESinkPortConnectionInvalidGlobal sid
       TInPort ty action  ->
         case gentry of
-          Located (GGlob cts@(TMsgQueue ty' _)) _ -> do
+          LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
             catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
           _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
@@ -785,7 +785,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection O
     case fty of
       TOutPort ty ->
         case gentry of
-          Located (GGlob cts@(TMsgQueue ty' _)) _ -> do
+          LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
             catchMismatch pann (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
@@ -799,19 +799,19 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
     case fty of
       TAccessPort (TAllocator ty) ->
         case gentry of
-          Located (GGlob (TPool ty' s)) _ -> do
+          LocatedElement (GGlob (TPool ty' s)) _ -> do
             catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
-          Located (GGlob (TAtomic ty')) _ -> do
+          LocatedElement (GGlob (TAtomic ty')) _ -> do
             catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError loc $ EAtomicAccessPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicArrayAccess ty s) ->
         case gentry of
-          Located (GGlob (TAtomicArray ty' s')) _ -> do
+          LocatedElement (GGlob (TAtomicArray ty' s')) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
@@ -819,14 +819,14 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
       TAccessPort (TInterface iface) ->
         getGlobalTypeDef loc iface >>=
           \case {
-            Located (Interface _ members _) _ ->
+            LocatedElement (Interface _ members _) _ ->
               -- Check that the resource provides the interface
               case gentry of
-                Located (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
+                LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
                   let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members] in
                   getGlobalTypeDef loc clsId >>=
                   \case {
-                      Located (Class _ _ _ provides _) _ ->
+                      LocatedElement (Class _ _ _ provides _) _ ->
                         case Data.List.find (iface ==) provides of
                           Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                           _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface

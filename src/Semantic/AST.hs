@@ -81,6 +81,13 @@ instance Annotated (Object' ty) where
   getAnnotation (DereferenceMemberAccess _ _ a) = a
   getAnnotation (Unbox _ a)                   = a
 
+  updateAnnotation (Variable n _) = Variable n
+  updateAnnotation (ArrayIndexExpression obj e _) = ArrayIndexExpression obj e
+  updateAnnotation (MemberAccess obj n _) = MemberAccess obj n
+  updateAnnotation (Dereference obj _) = Dereference obj
+  updateAnnotation (DereferenceMemberAccess obj n _) = DereferenceMemberAccess obj n
+  updateAnnotation (Unbox obj _) = Unbox obj
+
 instance (Annotated obj) => Annotated (Expression' ty obj) where
   getAnnotation (AccessObject obj)                = getAnnotation obj
   getAnnotation (Constant _ a)                    = a
@@ -98,7 +105,23 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
   getAnnotation (IsOptionVariantExpression _ _ a) = a
   getAnnotation (ArraySliceExpression _ _ _ _ a)    = a
-----------------------------------------
+
+  updateAnnotation (AccessObject obj) = AccessObject . updateAnnotation obj
+  updateAnnotation (Constant c _) = Constant c
+  updateAnnotation (BinOp op e1 e2 _) = BinOp op e1 e2
+  updateAnnotation (ReferenceExpression ak obj _) = ReferenceExpression ak obj
+  updateAnnotation (Casting e ty _) = Casting e ty
+  updateAnnotation (FunctionCall f es _) = FunctionCall f es
+  updateAnnotation (StructInitializer fs _) = StructInitializer fs
+  updateAnnotation (EnumVariantInitializer id1 id2 es _) = EnumVariantInitializer id1 id2 es
+  updateAnnotation (ArrayInitializer e s _) = ArrayInitializer e s
+  updateAnnotation (ArrayExprListInitializer es _) = ArrayExprListInitializer es
+  updateAnnotation (OptionVariantInitializer ov _) = OptionVariantInitializer ov
+  updateAnnotation (MemberFunctionCall obj f es _) = MemberFunctionCall obj f es
+  updateAnnotation (DerefMemberFunctionCall obj f es _) = DerefMemberFunctionCall obj f es
+  updateAnnotation (IsEnumVariantExpression obj id1 id2 _) = IsEnumVariantExpression obj id1 id2
+  updateAnnotation (IsOptionVariantExpression obj v _) = IsOptionVariantExpression obj v
+  updateAnnotation (ArraySliceExpression ak obj e1 e2 _) = ArraySliceExpression ak obj e1 e2
 
 
 data MatchCase' ty expr obj a = MatchCase

@@ -161,12 +161,12 @@ getGlobDeclModules progArchitecture =
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
 getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m TerminaType
-getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
-getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
-getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
 getObjType _ = throwError $ annotateError Internal EUnboxingObject
 
 -- | This function returns the type of an expression. The type is extracted from the
@@ -175,18 +175,18 @@ getObjType _ = throwError $ annotateError Internal EUnboxingObject
 -- function will throw an error.
 getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m TerminaType
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (BinOp _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ReferenceExpression _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (Casting _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (FunctionCall _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (MemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (DerefMemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (StructInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (Constant _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (OptionVariantInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (FunctionCall _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (StructInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
 getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 
 -- | This function returns the name of a port. The function assumes that the object is

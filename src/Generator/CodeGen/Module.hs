@@ -26,7 +26,7 @@ genModuleDefineLabel mn =
     unpack $ pack "__" <> intercalate (pack "__") (map (toUpper . replace (pack ".") (pack "_")) filePath) <> pack "__"
 
 genInclude :: QualifiedName -> Bool -> CFileItem
-genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn before) Internal)
+genInclude mName before = CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn before) Internal)
 
 genHeaderASTElement :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genHeaderASTElement typedef@(TypeDefinition {}) = genTypeDefinitionDecl typedef
@@ -55,12 +55,12 @@ genHeaderFile includeOptionH mName imports program = do
     items <- concat <$> mapM genHeaderASTElement program
     return $ CHeaderFile mName $
         [
-            CPPDirective (CPPIfNDef defineLabel) (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (Located (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (Located (CPPDirectiveAnn True) Internal)
-        ] ++ ([CPPDirective (CPPInclude False "option.h") (Located (CPPDirectiveAnn True) Internal) | includeOptionH])
+            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
+            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+        ] ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
         ++ includeList ++ items ++ [
-            CPPDirective CPPEndif (Located (CPPDirectiveAnn True) Internal)
+            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
 
 genSourceFile ::
@@ -72,7 +72,7 @@ genSourceFile ::
 genSourceFile mName program = do
     items <- concat <$> mapM genSourceASTElement program
     return $ CSourceFile mName $
-        CPPDirective (CPPInclude False (mName <.> "h")) (Located (CPPDirectiveAnn True) Internal)
+        CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
         : items
 
 runGenSourceFile :: TerminaConfig -> QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile

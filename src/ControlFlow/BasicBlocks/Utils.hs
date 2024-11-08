@@ -20,12 +20,12 @@ import ControlFlow.BasicBlocks.Errors
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
 getObjType :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m TerminaType
-getObjType (SAST.Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (SAST.ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
-getObjType (SAST.MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (SAST.Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (SAST.Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
-getObjType (SAST.DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (SAST.Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (SAST.ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (SAST.MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (SAST.Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (SAST.Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (SAST.DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 -- | This function returns the type of an expression. The type is extracted from the
@@ -34,18 +34,18 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 -- function will throw an error.
 getExprType :: (MonadError BBGeneratorError m) => SAST.Expression SemanticAnn -> m TerminaType
 getExprType (SAST.AccessObject obj) = getObjType obj
-getExprType (SAST.Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.BinOp _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.ReferenceExpression _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.Casting _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.FunctionCall _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (SAST.MemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (SAST.DerefMemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (SAST.StructInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.Constant _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.OptionVariantInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.BinOp _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.ReferenceExpression _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.Casting _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.FunctionCall _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (SAST.MemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (SAST.DerefMemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (SAST.StructInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.EnumVariantInitializer _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.ArrayInitializer _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.ArrayExprListInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | This function returns the name of a port. The function assumes that the object is

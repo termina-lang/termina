@@ -280,7 +280,7 @@ genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 emptyTerminaProgArch :: TerminaProgArch SemanticAnn
 emptyTerminaProgArch = TerminaProgArch {
   emitters = M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (Located (GTy (TGlobal EmitterClass "SystemInit")) Internal))
+    ("system_init", TPSystemInitEmitter "system_init" (LocatedElement (GTy (TGlobal EmitterClass "SystemInit")) Internal))
   ],
   emitterTargets = M.empty,
   taskClasses = M.empty,

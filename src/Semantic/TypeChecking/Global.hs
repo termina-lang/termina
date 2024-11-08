@@ -21,7 +21,7 @@ import Parser.Types
 import Semantic.TypeChecking.Expression
 import Semantic.TypeChecking.Check
 
-typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, Located (GEntry SemanticAnn))
+typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeGlobal (Task ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
@@ -34,7 +34,7 @@ typeGlobal (Task ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Task ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Task ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidTaskType ty)
 typeGlobal (Handler ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
@@ -48,7 +48,7 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Handler ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidHandlerType ty)
 typeGlobal (Resource ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
@@ -63,7 +63,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Memory pools 
     TPool {} -> do
       exprty <-
@@ -71,7 +71,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Just _ -> throwError $ annotateError anns EInvalidPoolInitialization
           Nothing   -> return Nothing
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Atomic variables 
     TAtomic {} -> do
       exprty <-
@@ -79,7 +79,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Atomic arrays
     TAtomicArray {} -> do
       exprty <-
@@ -87,7 +87,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Just expr -> Just <$> typeAssignmentExpression ty typeGlobalObject expr
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidResourceType ty)
 typeGlobal (Emitter ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
@@ -101,7 +101,7 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Emitter ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidEmitterType ty)
 typeGlobal (Channel ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
@@ -115,7 +115,7 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> return Nothing
       tyMods <- mapM (typeModifier anns) mods
-      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), Located (GGlob ty) anns)
+      return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidChannelType ty)
 typeGlobal (Const ident ts expr mods anns) = do
   ty <- typeTypeSpecifier anns ts
@@ -123,4 +123,4 @@ typeGlobal (Const ident ts expr mods anns) = do
   typed_expr <- typeConstExpression ty expr
   value <- evalConstExpression ty expr
   tyMods <- mapM (typeModifier anns) mods
-  return (SAST.Const ident ty typed_expr tyMods (buildGlobalAnn anns ty), Located (GConst ty value) anns)
+  return (SAST.Const ident ty typed_expr tyMods (buildGlobalAnn anns ty), LocatedElement (GConst ty value) anns)

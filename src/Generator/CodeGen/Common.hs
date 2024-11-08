@@ -152,32 +152,32 @@ optionSomeField = "__0"
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
 getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TerminaType
-getObjType (Variable _ (Located (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (ArrayIndexExpression _ _ (Located (ETy (ObjectType _ ts)) _))    = return ts
-getObjType (MemberAccess _ _ (Located (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (Dereference _ (Located (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (Unbox _ (Located (ETy (ObjectType _ ts)) _))                     = return ts
-getObjType (DereferenceMemberAccess _ _ (Located (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType]
-getParameterTypes (FunctionCall _ _ (Located (ETy (AppType params _)) _)) = return params
+getParameterTypes (FunctionCall _ _ (LocatedElement (ETy (AppType params _)) _)) = return params
 getParameterTypes ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
 
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TerminaType
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (BinOp _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ReferenceExpression _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (Casting _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (FunctionCall _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (MemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (DerefMemberFunctionCall _ _ _ (Located (ETy (AppType _ ts)) _)) = return ts
-getExprType (StructInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (EnumVariantInitializer _ _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayInitializer _ _ (Located (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayExprListInitializer _ (Located (ETy (SimpleType ts)) _)) = return ts
+getExprType (Constant _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (OptionVariantInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (FunctionCall _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
+getExprType (StructInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
@@ -235,8 +235,8 @@ getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
 getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
 getArraySize :: Size -> CExpression
-getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT noqual) (Located CGenericAnn Internal)
-getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (Located CGenericAnn Internal)
+getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT noqual) (LocatedElement CGenericAnn Internal)
+getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (LocatedElement CGenericAnn Internal)
 
 -- | Translate type annotation to C type
 genType :: (MonadError CGeneratorError m) => CQualifier -> TerminaType -> m CType
@@ -390,22 +390,22 @@ genArraySize :: (MonadError CGeneratorError m) => Size -> m CExpression
 genArraySize s = return $ getArraySize s
 
 internalAnn :: CItemAnn -> CAnns
-internalAnn = flip Located Internal
+internalAnn = flip LocatedElement Internal
 
 buildGenericAnn :: SemanticAnn -> CAnns
-buildGenericAnn ann = Located CGenericAnn (location ann)
+buildGenericAnn ann = LocatedElement CGenericAnn (location ann)
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn ann before = Located (CStatementAnn before False) (location ann)
+buildStatementAnn ann before = LocatedElement (CStatementAnn before False) (location ann)
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn ann before = Located (CDeclarationAnn before) (location ann)
+buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before) (location ann)
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn ann before trailing = Located (CCompoundAnn before trailing) (location ann)
+buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing) (location ann)
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn ann before = Located (CPPDirectiveAnn before) (location ann)
+buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before) (location ann)
 
 printIntegerLiteral :: TInteger -> String
 printIntegerLiteral (TInteger i DecRepr) = show i
