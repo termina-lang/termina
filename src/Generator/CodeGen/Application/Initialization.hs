@@ -17,16 +17,16 @@ import Command.Configuration
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
     let cObj = CVar identifier (CTTypeDef identifier noqual)
-    fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
+    genStructInitialization before 0 cObj expr
 genInitializeObj before (Task identifier _ (Just expr) _ _) = do
     let cObj = CVar identifier (CTTypeDef identifier noqual)
-    fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
+    genStructInitialization before 0 cObj expr
 genInitializeObj before (Handler identifier _ (Just expr) _ _) = do
     let cObj = CVar identifier (CTTypeDef identifier noqual)
-    fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
+    genStructInitialization before 0 cObj expr
 genInitializeObj before (Emitter identifier _ (Just expr) _ _) = do
     let cObj = CVar identifier (CTTypeDef identifier noqual)
-    fmap CBlockStmt <$> genStructInitialization before 0 cObj expr
+    genStructInitialization before 0 cObj expr
 genInitializeObj _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile

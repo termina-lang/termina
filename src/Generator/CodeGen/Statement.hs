@@ -20,7 +20,7 @@ genEnumInitialization ::
     CObject ->
     -- |  The initialization expression
     Expression SemanticAnn ->
-    CGenerator [CStatement]
+    CGenerator [CCompoundBlockItem]
 genEnumInitialization before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
@@ -43,7 +43,7 @@ genOptionInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CGenerator [CStatement]
+    -> CGenerator [CCompoundBlockItem]
 genOptionInitialization before level cObj expr =
     case expr of
         (OptionVariantInitializer (Some e) ann) -> do
@@ -72,7 +72,7 @@ genArrayInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CGenerator [CStatement]
+    -> CGenerator [CCompoundBlockItem]
 genArrayInitialization before level cObj expr = do
     case expr of
         (ArrayInitializer expr' size ann) -> do
@@ -86,9 +86,9 @@ genArrayInitialization before level cObj expr = do
             cObjArrayItemType <- getCArrayItemType cObjType
             arrayInit <- genArrayInitialization False (level + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
             if before then 
-                return [pre_cr $ _for_let initDecl condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                return [pre_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
             else 
-                return [no_cr $ _for_let initDecl condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                return [no_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
         (ArrayExprListInitializer exprs _ann) ->
             genArrayItemsInitialization before level 0 exprs
         (StructInitializer {}) -> genStructInitialization False level cObj expr
@@ -101,7 +101,7 @@ genArrayInitialization before level cObj expr = do
             genArrayInitializationFromExpression level cObj cExpr exprType ann
     where
 
-        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CGenerator [CStatement]
+        genArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genArrayItemsInitialization _before _level _idx [] = return []
         genArrayItemsInitialization before' level' idx (x:xs) = do
             rest <- genArrayItemsInitialization False level' (idx + 1) xs
@@ -115,7 +115,7 @@ genArrayInitialization before level cObj expr = do
             CExpression ->
             TerminaType ->
             SemanticAnn ->
-            CGenerator [CStatement]
+            CGenerator [CCompoundBlockItem]
         genArrayInitializationFromExpression lvl lhsCObj rhsCExpr ts ann = do
             case ts of
                 -- | If the initializer is an array, we must iterate
@@ -131,9 +131,9 @@ genArrayInitialization before level cObj expr = do
                     rhsCObject <- unboxObject rhsCExpr
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndexOf lhsCObj cIteratorExpr cTs') (CExprValOf (CIndexOf rhsCObject cIteratorExpr cTs') cTs' exprCAnn) ts' ann
                     if before && lvl == 0then
-                        return [pre_cr $ _for_let initExpr condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                        return [pre_cr $ _for_let initExpr condExpr incrExpr (block arrayInit)]
                     else
-                        return [no_cr $ _for_let initExpr condExpr incrExpr (block (CBlockStmt <$> arrayInit))]
+                        return [no_cr $ _for_let initExpr condExpr incrExpr (block arrayInit)]
                 _ ->  
                     if before && lvl == 0 then
                         return [pre_cr (lhsCObj @= rhsCExpr) |>> location ann]
@@ -150,7 +150,7 @@ genFieldInitialization ::
     -> CObject
     -> Identifier
     -> Expression SemanticAnn
-    -> CGenerator [CStatement]
+    -> CGenerator [CCompoundBlockItem]
 genFieldInitialization before level cObj field expr = do
     cExprType <- getExprType expr >>= genType noqual
     let cFieldObj = cObj @. field @: cExprType
@@ -185,7 +185,7 @@ genStructInitialization ::
     -> Integer
     -> CObject
     -> Expression SemanticAnn
-    -> CGenerator [CStatement]
+    -> CGenerator [CCompoundBlockItem]
 genStructInitialization before level cObj expr = do
   case expr of
     -- \| This function can only be called with a field values assignments expressions
@@ -193,9 +193,9 @@ genStructInitialization before level cObj expr = do
 
         where
 
-            genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CStatement
+            genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CCompoundBlockItem
             genProcedureAssignment field (TGlobal ResourceClass resource) (ProcedureSeman procid ptys) = do
-                let cPortFieldType = struct resource
+                cPortFieldType <- genType noqual (TStruct resource)
                 let portFieldObj = CField cObj field cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
                 clsFunctionType <- genFunctionType TUnit ptys
@@ -207,7 +207,7 @@ genStructInitialization before level cObj expr = do
             genProcedureAssignment f i p = error $ "Invalid procedure assignment: " ++ show (f, i, p)
                 -- throwError $ InternalError "Unsupported procedure assignment"
 
-            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CGenerator [CStatement]
+            genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CGenerator [CCompoundBlockItem]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment field expr' _: xs) = do
                 fieldInit <- genFieldInitialization before' level cObj field expr'
@@ -277,11 +277,11 @@ genBlocks (ProcedureCall obj ident args ann) = do
     -- | Obtain the type of the object
     typeObj <- getObjType obj
     case typeObj of
-        TAccessPort (TInterface iface) ->
-            let thatFieldCType = ptr (struct iface) in
+        TAccessPort (TInterface iface) -> do
+            structType <- genType noqual (TStruct iface)
             return 
                 [pre_cr ((cObj @. ident @: cFuncType) @@
-                      ((cObj @. thatField @: thatFieldCType) : cArgs) |>> location ann) |>> location ann]
+                      ((cObj @. thatField @: ptr structType) : cArgs) |>> location ann) |>> location ann]
         _ -> throwError $ InternalError $ "Invalid object type: " ++ show typeObj
 genBlocks (AllocBox obj arg ann) = do
     -- Generate the C code for the object
@@ -358,8 +358,8 @@ genBlocks (SendMessage obj arg ann) = do
             let cArgType = getCExprType cArg
                 cTmp = "msg" @: cArgType
             mCall <- genMsgQueueSendCall cObj cTmp cAnn
-            return $ CBlockStmt <$> [
-                    block [
+            return [
+                    no_cr $ block [
                         no_cr $ var "msg" cArgType @:= cArg |>> location ann,
                         no_cr mCall
                     ]
@@ -370,54 +370,46 @@ genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
     cElseBlk <-
         (case elseBlk of
             Nothing -> return Nothing
-            Just elseBlk' ->
-                mapM genBlocks (blockBody elseBlk') >>= (return . Just) . flip CSCompound (buildCompoundAnn ann False True) . concat)
-    cAlts <- genAlternatives cElseBlk elifsBlks
-
-    return $ CBlockStmt <$>
-        [CSIfThenElse cExpr (CSCompound cIfBlk (buildCompoundAnn ann False True)) cAlts (buildStatementAnn ann True)]
+            Just elseBlk' -> do
+                blks <- concat <$> mapM genBlocks (blockBody elseBlk')
+                return . Just $ (trail_cr . block $ blks) |>> location ann)
+    mAlts <- genAlternatives cElseBlk elifsBlks
+    case mAlts of
+        Nothing -> return [pre_cr $ _if cExpr (trail_cr . block $ cIfBlk) |>> location ann]
+        Just cAlts -> return [pre_cr $ _if_else cExpr (trail_cr . block $ cIfBlk) cAlts |>> location ann]
 
     where
+
         genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnn] -> CGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
-            prev' <- genAlternatives prev xs
             cExpr' <- genExpression expr'
             cBlk <- concat <$> mapM genBlocks (blockBody blk)
-            return $ Just (CSIfThenElse cExpr' (CSCompound cBlk (buildCompoundAnn ann' False True)) prev' (buildStatementAnn ann' False))
+            mPrev <- genAlternatives prev xs
+            case mPrev of
+                Nothing -> return . Just $ _if cExpr' (trail_cr . block $ cBlk) |>> location ann'
+                Just prev' -> return . Just $ _if_else cExpr' (trail_cr . block $ cBlk) prev' |>> location ann'
+
 genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body ann) = do
-    let exprCAnn = buildGenericAnn ann
     initExpr <- genExpression initValue
     endExpr <- genExpression endValue
     cIteratorType <- genType noqual iteratorTS
-    let cIteratorObj = CVar iterator cIteratorType
-        cIteratorExpr = CExprValOf cIteratorObj cIteratorType exprCAnn
+    let cIteratorExpr = iterator @: cIteratorType |>> location ann
     condExpr <-
         case breakCond of
-            Nothing -> return $ CExprBinaryOp COpLt cIteratorExpr endExpr (CTBool noqual) exprCAnn
+            Nothing -> return $ cIteratorExpr @< endExpr |>> location ann
             Just break' -> do
                     cBreak <- genExpression break'
-                    return $ CExprSeqAnd
-                        (CExprBinaryOp COpLt cIteratorExpr endExpr (CTBool noqual) exprCAnn) cBreak (CTBool noqual) exprCAnn
+                    return $ (cIteratorExpr @< endExpr |>> location ann) @&& cBreak |>> location ann
+
     cBody <- concat <$> mapM genBlocks (blockBody body)
-    return $ CBlockStmt <$>
-        [CSFor
-            -- | Initialization expression
-            (Right $ CDecl (CTypeSpec cIteratorType) (Just iterator) (Just initExpr))
-            -- | Condition expression 
-            (Just condExpr)
-            -- | Increment expression
-            (Just $ CExprAssign cIteratorObj
-                (CExprBinaryOp COpAdd
-                    cIteratorExpr
-                    (CExprConstant (CIntConst (CInteger 1 CDecRepr)) cIteratorType exprCAnn)
-                    cIteratorType exprCAnn)
-                cIteratorType exprCAnn)
-            -- | Body
-            (CSCompound cBody (buildCompoundAnn ann False True))
-            (buildStatementAnn ann True)]
+    return 
+        [pre_cr $ _for_let 
+            (var iterator cIteratorType @:= initExpr)
+            condExpr
+            (iterator @: cIteratorType @= (cIteratorExpr @+ dec 1 @: cIteratorType) @: cIteratorType |>> location ann) 
+            ((trail_cr . block $ cBody) |>> location ann)]
 genBlocks match@(MatchBlock expr matchCases ann) = do
-    let exprCAnn = buildGenericAnn ann
     exprType <- getExprType expr
     (casePrefix, structName, genParamsStructName) <-
         case exprType of
@@ -444,37 +436,43 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
                     cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    rest <- genMatchCases cObj casePrefix genParamsStructName genMatchCase xs
+                    mRest <- genMatchCases cObj casePrefix genParamsStructName genMatchCase xs
                     cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cObj m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
                     -- platform dependent
-                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) exprCAnn
-                        cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) exprCAnn
-                    return [CBlockStmt $ CSIfThenElse
-                        (CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) (buildGenericAnn ann'))
-                        cBlk rest (buildStatementAnn ann' True)]
+                    let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> location ann
+                        cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> location ann
+                    case mRest of 
+                        Nothing ->
+                            return [pre_cr $ _if (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann') cBlk]
+                        Just rest ->
+                            return [pre_cr $ _if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann') cBlk rest]
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         _ -> do
             cExpr <- genExpression expr
             cType <- genType noqual (TStruct structName)
-            let decl = CDecl (CTypeSpec cType) (Just (namefy "match")) (Just cExpr)
-                cObj' = CVar (namefy "match") cType
+            let decl = var (namefy "match") cType @:= cExpr |>> location ann
+                cObj' = namefy "match" @: cType
             case matchCases of
                 [m@(MatchCase identifier _ _ _)] -> do
                     paramsStructName <- genParamsStructName identifier
                     paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
                     cBlk <- genAnonymousMatchCase paramsStructTypeSpec cObj' m
-                    return [CBlockStmt $ CSCompound (CBlockDecl decl (buildDeclarationAnn ann True) : cBlk) (buildCompoundAnn ann True True)]
+                    return [no_cr $ (trail_cr . block) (pre_cr decl : cBlk) |>> location ann]
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
                     paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    rest <- genMatchCases cObj' casePrefix genParamsStructName genAnonymousMatchCase xs
-                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genAnonymousMatchCase paramsStructTypeSpec cObj' m
-                    let cEnumVariantsFieldExpr = CExprValOf (CField cObj' variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
-                        cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) (buildGenericAnn ann')
-                    return [CBlockStmt $ CSCompound (CBlockDecl decl  (buildDeclarationAnn ann True) : [CBlockStmt $ CSIfThenElse
-                        (CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) (buildGenericAnn ann'))
-                        cBlk rest (buildStatementAnn ann' True)]) (buildCompoundAnn ann True True)]
+                    mRest <- genMatchCases cObj' casePrefix genParamsStructName genAnonymousMatchCase xs
+                    cBlk <- trail_cr . block <$> genAnonymousMatchCase paramsStructTypeSpec cObj' m
+                    let cEnumVariantsFieldExpr = cObj' @. variant @: uint32_t |>> location ann'
+                        cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> location ann'
+                    case mRest of 
+                        Nothing -> return 
+                            [pre_cr $ (trail_cr . block) (pre_cr decl : [pre_cr $ 
+                                _if (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann') cBlk |>> location ann'])]
+                        Just rest -> return
+                            [pre_cr $ (trail_cr . block) (pre_cr decl : [pre_cr $ 
+                                _if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann') cBlk rest |>> location ann'])]
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
 
     where
@@ -501,17 +499,20 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             paramsStructName <- genParamsStructName identifier
             cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
             cBlk <- genCase cTs cObj m
-            return $ Just (CSCompound cBlk (buildCompoundAnn ann' False True))
+            return $ Just ((trail_cr . block) cBlk |>> location ann')
         genMatchCases cObj casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
-            let cAnn = buildGenericAnn ann'
-                cEnumVariantsFieldExpr = CExprValOf (CField cObj variant (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
-                cCasePrefixIdentExpr = CExprValOf (CVar (casePrefix identifier) (CTInt IntSize32 Unsigned noqual)) (CTInt IntSize32 Unsigned noqual) cAnn
-                cExpr' = CExprBinaryOp COpEq cEnumVariantsFieldExpr cCasePrefixIdentExpr (CTBool noqual) cAnn
+            let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> location ann'
+                cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> location ann'
+                cExpr' = cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann'
             paramsStructName <- genParamsStructName identifier
             cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-            cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genCase cTs cObj m
-            rest <- genMatchCases cObj casePrefix genParamsStructName genCase xs
-            return $ Just (CSIfThenElse cExpr' cBlk rest (buildStatementAnn ann' False))
+            cBlk <- trail_cr . block  <$> genCase cTs cObj m
+            mRest <- genMatchCases cObj casePrefix genParamsStructName genCase xs
+            case mRest of
+                Nothing ->
+                    return . Just $ _if cExpr' (cBlk |>> location ann') |>> location ann'
+                Just rest ->
+                    return . Just $ _if_else cExpr' (cBlk |>> location ann') rest |>> location ann'
 
         genAnonymousMatchCase ::
             CTerminaType
@@ -536,83 +537,74 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -> CGenerator [CCompoundBlockItem]
         genMatchCase _ _ (MatchCase _ [] blk' _) = do
             concat <$> mapM genBlocks (blockBody blk')
-        genMatchCase cTs@(CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
-            let cAnn = buildGenericAnn ann'
-                cObj' = CVar (namefy this_variant) cParamsStructType
+        genMatchCase (CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
+            let cObj' = CVar (namefy this_variant) cParamsStructType
             cParamTypes <- case getMatchCaseTypes (element ann') of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
             let newKeyVals = fromList $ zipWith3
                     (\sym index cParamType -> (sym, CField cObj' (namefy (show (index :: Integer))) cParamType)) params [0..] cParamTypes
-                decl = CDecl cTs (Just (namefy this_variant))
-                    (Just $ CExprValOf (CField cExpr this_variant cParamsStructType) cParamsStructType cAnn)
+                decl = var (namefy this_variant) cParamsStructType @:= cExpr @. this_variant @: cParamsStructType
             cBlk <- local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
-            return $ CBlockDecl decl (buildDeclarationAnn ann True) : cBlk
+            return $ pre_cr decl |>> location ann : cBlk
         genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
-genBlocks (ReturnBlock (Just expr) ann) = do
-    let cAnn = buildStatementAnn ann True
-    cExpr <- genExpression expr
-    return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
-genBlocks (ReturnBlock Nothing ann) = do
-    let cAnn = buildStatementAnn ann True
-    return [CBlockStmt $ CSReturn Nothing cAnn]
+
+genBlocks (ReturnBlock mExpr ann) = 
+    case mExpr of
+        Nothing ->
+            return [pre_cr (_return Nothing) |>> location ann]
+        Just expr -> do
+            cExpr <- genExpression expr
+            return [pre_cr (_return (Just cExpr)) |>> location ann]
 genBlocks (ContinueBlock expr ann) = do
-    let cAnn = buildStatementAnn ann True
     cExpr <- genExpression expr
-    return [CBlockStmt $ CSReturn (Just cExpr) cAnn]
+    return [pre_cr (_return (Just cExpr)) |>> location ann]
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do
     typeObj <- getObjType obj
-    cType <- genType noqual typeObj
     cObj <- genObject obj
     case typeObj of
-        TArray _ _ -> fmap CBlockStmt <$> genArrayInitialization True 0 cObj expr
+        TArray _ _ -> genArrayInitialization True 0 cObj expr
         (TFixedLocation _) -> do
             let ann = getAnnotation obj
-            return $ CBlockStmt <$> [CSDo (CExprAddrOf cObj cType (buildGenericAnn ann)) (buildStatementAnn ann True)]
+            return [pre_cr (addrOf cObj |>> location ann) |>> location ann]
         _ -> case expr of
-            (StructInitializer {}) -> fmap CBlockStmt <$> genStructInitialization True 0 cObj expr
-            (OptionVariantInitializer {}) -> fmap CBlockStmt <$> genOptionInitialization True 0 cObj expr
-            (EnumVariantInitializer {}) -> fmap CBlockStmt <$> genEnumInitialization True 0 cObj expr
+            (StructInitializer {}) -> genStructInitialization True 0 cObj expr
+            (OptionVariantInitializer {}) -> genOptionInitialization True 0 cObj expr
+            (EnumVariantInitializer {}) -> genEnumInitialization True 0 cObj expr
             _ -> do
                 cExpr <- genExpression expr
                 let ann = getAnnotation expr
-                return $ CBlockStmt <$>
-                    [CSDo (CExprAssign cObj cExpr cType (buildGenericAnn ann)) (buildStatementAnn ann True)]
+                return [pre_cr (cObj @= cExpr |>> location ann) |>> location ann]
 genStatement (Declaration identifier _ ts expr ann) = do
   cType <- genType noqual ts
   let cObj = CVar identifier cType
   case ts of
     TArray _ _ -> do
-        let declStmt = buildDeclarationAnn ann True
-        arrayInitialization <- fmap CBlockStmt <$> genArrayInitialization False 0 cObj expr
+        arrayInitialization <- genArrayInitialization False 0 cObj expr
         return $
-            CBlockDecl (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+            pre_cr (var identifier cType) |>> location ann
             : arrayInitialization
     _ -> case expr of
         (StructInitializer {}) -> do
-            let declStmt = buildDeclarationAnn ann True
-            structInitialization <- fmap CBlockStmt <$> genStructInitialization False 0 cObj expr
+            structInitialization <- genStructInitialization False 0 cObj expr
             return $
-                CBlockDecl (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+                pre_cr (var identifier cType) |>> location ann
                 : structInitialization
         (OptionVariantInitializer {}) -> do
-            let declStmt = buildDeclarationAnn ann True
-            optionInitialization <- fmap CBlockStmt <$> genOptionInitialization False 0 cObj expr
+            optionInitialization <- genOptionInitialization False 0 cObj expr
             return $
-                CBlockDecl (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+                pre_cr (var identifier cType) |>> location ann
                 : optionInitialization
         (EnumVariantInitializer {}) -> do
-            let declStmt = buildDeclarationAnn ann True
-            enumInitialization <- fmap CBlockStmt <$> genEnumInitialization False 0 cObj expr
+            enumInitialization <- genEnumInitialization False 0 cObj expr
             return $
-                CBlockDecl (CDecl (CTypeSpec cType) (Just identifier) Nothing) declStmt
+                pre_cr (var identifier cType) |>> location ann
                 : enumInitialization
         _ -> do
-            let declStmt = buildDeclarationAnn ann True
             cExpr <- genExpression expr
-            return $ flip CBlockDecl declStmt <$> [CDecl (CTypeSpec cType) (Just identifier) (Just cExpr)]
+            return [pre_cr $ var identifier cType @:= cExpr |>> location ann]
 genStatement (SingleExpStmt expr ann) = do
     cExpr <- genExpression expr
-    return [CBlockStmt $ CSDo cExpr (buildStatementAnn ann True)]
+    return [pre_cr cExpr |>> location ann]
