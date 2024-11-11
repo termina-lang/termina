@@ -36,8 +36,6 @@ dependencies:
 - directory
 - containers
 - mtl
-# File Paths
-- paths
 # Error messages pretty printer
 - errata
 - optparse-applicative
