@@ -16,7 +16,7 @@ import qualified Data.Map as M
 import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
-import Command.Configuration
+import Configuration.Configuration
 
 
 genModuleDefineLabel :: QualifiedName -> String

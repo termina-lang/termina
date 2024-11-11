@@ -21,8 +21,8 @@ import Semantic.Errors.PPrinting (ppError)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Semantic.Monad
 import Core.AST
-import Command.Configuration (defaultConfig)
-import Generator.Platform.Configuration
+import Configuration.Configuration (defaultConfig)
+import Configuration.Platform
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =

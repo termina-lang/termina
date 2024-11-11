@@ -12,7 +12,7 @@ import Modules.Modules
 import qualified Data.Map as M
 import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
-import Command.Configuration
+import Configuration.Configuration
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do

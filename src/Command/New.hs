@@ -4,14 +4,14 @@ module Command.New (
 
 import Options.Applicative
 import Control.Monad
-import Command.Configuration
+import Configuration.Configuration
 import Command.Utils
 import System.FilePath
 import System.Exit
 import System.Directory
 import qualified Data.Text as T
 import Data.Char
-import Generator.Platform.Configuration
+import Configuration.Platform
 
 -- | Data type for the "new" command arguments
 data NewCmdArgs =

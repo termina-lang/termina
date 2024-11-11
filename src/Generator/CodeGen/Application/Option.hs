@@ -5,7 +5,7 @@ module Generator.CodeGen.Application.Option where
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
 import Control.Monad.Reader
-import System.Path
+import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import Semantic.Types
 import qualified Data.Set as S
@@ -13,10 +13,10 @@ import qualified Data.Map as M
 import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 import Control.Monad.Except
-import Command.Configuration
+import Configuration.Configuration
 
 genOptionPathName :: FilePath
-genOptionPathName = toUnrootedFilePath (fragment "option" <.> FileExt "h")
+genOptionPathName = "option" <.> "h"
 
 genSimpleOptionDefinition :: TerminaType -> CGenerator [CFileItem]
 genSimpleOptionDefinition = genOptionStruct (LocatedElement (STy SimpleStmtType) Internal)

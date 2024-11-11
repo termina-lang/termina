@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike.Glue where
+module Generator.CodeGen.Application.Platform.RTEMS5LEON3TSIM.Glue where
 
 import Generator.LanguageC.AST
 import qualified Data.Map as M

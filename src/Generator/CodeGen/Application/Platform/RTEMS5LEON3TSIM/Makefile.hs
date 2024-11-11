@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-} 
 
-module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike.Makefile where
+module Generator.CodeGen.Application.Platform.RTEMS5LEON3TSIM.Makefile where
 import Command.Types
 import Generator.Makefile.AST
 import qualified Data.Map as M

@@ -7,9 +7,9 @@ import Semantic.Monad
 import Text.Parsec
 import qualified Data.Map as M
 import ControlFlow.BasicBlocks
-import Command.Configuration
+import Configuration.Configuration
 import Generator.Option
-import Generator.Platform.Configuration
+import Configuration.Platform
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option

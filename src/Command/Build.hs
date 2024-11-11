@@ -4,7 +4,7 @@ module Command.Build (
     buildCmdArgsParser, buildCommand, BuildCmdArgs
 ) where
 
-import Command.Configuration
+import Configuration.Configuration
 import Command.Utils
 import Command.Types
 
@@ -40,7 +40,7 @@ import ControlFlow.Architecture.Checks
 import Core.AST
 import Generator.Environment
 import Generator.Platform
-import Generator.Platform.Configuration
+import Configuration.Platform
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =

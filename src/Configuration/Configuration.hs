@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Command.Configuration (
+module Configuration.Configuration (
     TerminaConfig(..),
     ProjectProfile(..),
     loadConfig,
@@ -15,7 +15,7 @@ import Data.Yaml
 
 import System.FilePath
 import System.Exit
-import Generator.Platform.Configuration
+import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
 

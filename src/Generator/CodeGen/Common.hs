@@ -12,7 +12,7 @@ import Generator.LanguageC.AST
 import Data.Char
 import Numeric
 import Utils.Annotations
-import Command.Configuration
+import Configuration.Configuration
 
 newtype CGeneratorError = InternalError String
     deriving (Show)

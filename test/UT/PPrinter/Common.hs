@@ -5,8 +5,8 @@ import Semantic.Types
 import Control.Monad.Reader
 import Control.Monad.Except
 import Generator.CodeGen.Expression
-import Command.Configuration
-import Generator.Platform.Configuration
+import Configuration.Configuration
+import Configuration.Platform
 import Generator.Utils
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer

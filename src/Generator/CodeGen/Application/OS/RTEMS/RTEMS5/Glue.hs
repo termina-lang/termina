@@ -24,8 +24,8 @@ import ControlFlow.Architecture.Utils (getConnectedEmitters, getClassMembers)
 import ControlFlow.Architecture
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
-import Command.Configuration
 import Generator.Utils
+import Configuration.Configuration
 
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do

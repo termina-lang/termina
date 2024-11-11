@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Generator.Platform.RTEMS5NoelSpike where
+module Configuration.Platform.RTEMS5LEON3TSIM where
 import Data.Yaml
 
 data ProjectBuilder = None | Make deriving (Eq, Show)
@@ -14,7 +14,7 @@ instance ToJSON ProjectBuilder where
     toJSON None = String "none"
     toJSON Make = String "make"
 
-data RTEMS5NoelSpikeFlags = RTEMS5NoelSpikeFlags {
+data RTEMS5LEON3TSIMFlags = RTEMS5LEON3TSIMFlags {
     enableIrq1 :: !Bool,
     enableIrq2 :: !Bool,
     enableIrq3 :: !Bool,
@@ -22,8 +22,8 @@ data RTEMS5NoelSpikeFlags = RTEMS5NoelSpikeFlags {
     builder :: !ProjectBuilder
 } deriving (Eq, Show)
 
-defaultRTEMS5NoelSpikeFlags :: RTEMS5NoelSpikeFlags
-defaultRTEMS5NoelSpikeFlags = RTEMS5NoelSpikeFlags {
+defaultRTEMS5LEON3TSIMFlags :: RTEMS5LEON3TSIMFlags
+defaultRTEMS5LEON3TSIMFlags = RTEMS5LEON3TSIMFlags {
     enableIrq1 = False,
     enableIrq2 = False,
     enableIrq3 = False,
@@ -31,9 +31,9 @@ defaultRTEMS5NoelSpikeFlags = RTEMS5NoelSpikeFlags {
     builder = None
 }
 
-instance FromJSON RTEMS5NoelSpikeFlags where
+instance FromJSON RTEMS5LEON3TSIMFlags where
   parseJSON (Object o) =
-    RTEMS5NoelSpikeFlags <$>
+    RTEMS5LEON3TSIMFlags <$>
     o .:? "enable-irq-1" .!= False <*>
     o .:? "enable-irq-2" .!= False <*>
     o .:? "enable-irq-3" .!= False <*>
@@ -41,18 +41,18 @@ instance FromJSON RTEMS5NoelSpikeFlags where
     o .:? "builder" .!= None
   parseJSON _ = fail "Expected configuration object"
 
-instance ToJSON RTEMS5NoelSpikeFlags where
+instance ToJSON RTEMS5LEON3TSIMFlags where
     toJSON (
-        RTEMS5NoelSpikeFlags 
-            flagsRTEMSNoelSpikeEnableIrq1
-            flagsRTEMSNoelSpikeEnableIrq2
-            flagsRTEMSNoelSpikeEnableIrq3
-            flagsRTEMSNoelSpikeEnableIrq4
-            flagsRTEMSNoelSpikeBuilder
+        RTEMS5LEON3TSIMFlags 
+            flagsRTEMS5LEON3TSIMEnableIrq1
+            flagsRTEMS5LEON3TSIMEnableIrq2
+            flagsRTEMS5LEON3TSIMEnableIrq3
+            flagsRTEMS5LEON3TSIMEnableIrq4
+            flagsRTEMS5LEON3TSIMBuilder
         ) = object [
-            "enable-irq-1" .= flagsRTEMSNoelSpikeEnableIrq1,
-            "enable-irq-2" .= flagsRTEMSNoelSpikeEnableIrq2,
-            "enable-irq-3" .= flagsRTEMSNoelSpikeEnableIrq3,
-            "enable-irq-4" .= flagsRTEMSNoelSpikeEnableIrq4,
-            "builder" .= flagsRTEMSNoelSpikeBuilder
+            "enable-irq-1" .= flagsRTEMS5LEON3TSIMEnableIrq1,
+            "enable-irq-2" .= flagsRTEMS5LEON3TSIMEnableIrq2,
+            "enable-irq-3" .= flagsRTEMS5LEON3TSIMEnableIrq3,
+            "enable-irq-4" .= flagsRTEMS5LEON3TSIMEnableIrq4,
+            "builder" .= flagsRTEMS5LEON3TSIMBuilder
         ]
