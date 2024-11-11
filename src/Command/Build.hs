@@ -15,7 +15,6 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Semantic.AST as SAST
 
-import Generator.Platform ( checkPlatform )
 import System.FilePath
 import System.Exit
 import System.Directory
@@ -31,7 +30,6 @@ import Data.List (foldl')
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
-import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike (runGenMainFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import qualified Semantic.Errors.PPrinting as SE
@@ -41,6 +39,8 @@ import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
 import Core.AST
 import Generator.Environment
+import Generator.Platform
+import Generator.Platform.Configuration
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -132,7 +132,7 @@ typeModules parsedProject =
       let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
-          -- | Create the source files map. This map will be used to obtainn the source files that
+          -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap = 
@@ -163,7 +163,7 @@ optionMapModules = M.partitionWithKey
     optionMapModule :: OptionMap -> TypedModule -> OptionMap
     optionMapModule prevMap typedModule = runMapOptionsAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
 
-printModules ::
+genModules ::
   TerminaConfig
   -- | Whether to include the option.h file or not
   -> Bool
@@ -171,7 +171,7 @@ printModules ::
   -> OptionMap
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-printModules params includeOptionH definedTypesOptionMap =
+genModules params includeOptionH definedTypesOptionMap =
   mapM_ printModule . M.elems
 
   where
@@ -183,35 +183,32 @@ printModules params includeOptionH definedTypesOptionMap =
           tAST = basicBlocksAST . metadata $ bbModule
       case runGenSourceFile params (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
-        Right cSourceFile -> TIO.writeFile sourceFile $ runCPrinter (build params == Debug) cSourceFile
+        Right cSourceFile -> do
+          createDirectoryIfMissing True (takeDirectory sourceFile)
+          TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
       case runGenHeaderFile params includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
-        Right cHeaderFile -> TIO.writeFile (destinationPath </> "include" </> qualifiedName bbModule <.> "h") $ runCPrinter (build params == Debug) cHeaderFile
+        Right cHeaderFile -> do
+          let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
+          createDirectoryIfMissing True (takeDirectory headerFile)
+          TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
 
-printInitFile :: TerminaConfig -> BasicBlocksProject -> IO ()
-printInitFile params bbProject = do
+genInitFile :: TerminaConfig -> BasicBlocksProject -> IO ()
+genInitFile params bbProject = do
   let destinationPath = outputFolder params
       initFilePath = destinationPath </> "init" <.> "c"
       projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
   case runGenInitFile params initFilePath projectModules of
     Left err -> die . errorMessage $ show err
-    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (build params == Debug) cInitFile
+    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (profile params == Debug) cInitFile
 
-printMainFile :: TerminaConfig -> TerminaProgArch SemanticAnn -> IO ()
-printMainFile params progArchitecture = do
-  let destinationPath = outputFolder params
-      mainFilePath = destinationPath </> "main" <.> "c"
-  case runGenMainFile params mainFilePath progArchitecture of
-    Left err -> die . errorMessage $ show err
-    Right cMainFile -> TIO.writeFile mainFilePath $ runCPrinter (build params == Debug) cMainFile
-
-printOptionHeaderFile :: TerminaConfig -> OptionMap -> IO ()
-printOptionHeaderFile params basicTypesOptionMap = do
+genOptionHeaderFile :: TerminaConfig -> OptionMap -> IO ()
+genOptionHeaderFile params basicTypesOptionMap = do
   let destinationPath = outputFolder params
       optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
   case runGenOptionHeaderFile params basicTypesOptionMap of
     Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter (build params == Debug) cOptionsFile
+    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter (profile params == Debug) cOptionsFile
 
 genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture bbProject initialTerminaProgram orderedDependencies = do
@@ -343,8 +340,8 @@ buildCommand (BuildCmdArgs chatty) = do
     warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    printModules configParams (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
-    printInitFile configParams bbProject
-    printMainFile configParams programArchitecture
-    printOptionHeaderFile configParams basicTypesOptionMap
+    genModules configParams (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
+    genInitFile configParams bbProject
+    genPlatformCode plt configParams bbProject programArchitecture
+    genOptionHeaderFile configParams basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

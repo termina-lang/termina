@@ -5,15 +5,11 @@ module Generator.LanguageC.Printer where
 import Generator.LanguageC.AST
 import Prettyprinter
 import Data.Text (Text)
-import Prettyprinter.Render.Terminal
 import Control.Monad.Reader
 import Utils.Annotations
 import Text.Parsec.Pos
 
-type DocStyle = Doc AnsiStyle
-
-render :: DocStyle -> Text
-render = renderStrict . layoutSmart defaultLayoutOptions
+import Generator.Utils
 
 data CPrinterConfig = CPrinterConfig
   { printDebugLines :: Bool,
@@ -43,14 +39,14 @@ binPrec COpAnd = 15
 binPrec COpXor = 14
 binPrec COpOr  = 13
 
-class PPrint a where
+class CPrint a where
     pprint :: a -> CPrinter
     pprintPrec :: Integer -> a -> CPrinter
 
     pprint = pprintPrec 0
     pprintPrec _ = pprint
 
-instance PPrint CQualifier where
+instance CPrint CQualifier where
     pprint (CQualifier True False False) = 
         return $ pretty "volatile"
     pprint (CQualifier False True False) =
@@ -78,7 +74,7 @@ pprintCTInt size signedness = do
             Unsigned -> pretty "u"
     return $ ssignedness <> pretty "int" <> ssize <> pretty "_t"
 
-instance PPrint CConstant where
+instance CPrint CConstant where
     pprint (CIntConst i) = return $ pretty i
     pprint (CCharConst c) = return $ pretty c
     pprint (CStrConst s) = return $ pretty s
@@ -98,7 +94,7 @@ pprintCTArray arrayTy  =
             return $ brackets psize <> pty
         _ -> return emptyDoc
 
-instance PPrint CType where
+instance CPrint CType where
     pprint (CTVoid (CQualifier False False False)) = return $ pretty "void"
     pprint (CTVoid qual) = do
         pqual <- pprint qual
@@ -151,7 +147,7 @@ instance PPrint CType where
         return $ pqual <+> pretty ident
     pprint ty@(CTFunction {}) = error $ "Printing function types is not supported: " ++ show ty
 
-instance PPrint CObject where
+instance CPrint CObject where
     pprintPrec _ (CVar ident _) = return $ pretty ident
     pprintPrec p (CField expr ident _) = do
         pexpr <- pprintPrec 26 expr
@@ -170,7 +166,7 @@ instance PPrint CObject where
         ptype <- pprint ty
         return $ parenPrec p 25 $ parens ptype <> pexpr
 
-instance PPrint CExpression where
+instance CPrint CExpression where
     pprintPrec _ (CExprConstant c _ _) = pprint c
     pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj
     pprintPrec p (CExprAddrOf obj _ _) = do
@@ -265,13 +261,13 @@ pprintCAttributeList attrs = do
     pattrs <- mapM pprint attrs
     return $ pretty "__attribute__" <> parens (parens (hsep (punctuate comma pattrs)))
 
-instance PPrint CAttribute where
+instance CPrint CAttribute where
     pprint (CAttr attrName []) = return $ pretty attrName
     pprint (CAttr attrName attrParams) = do
         pattrParams <- mapM (pprintPrec 25) attrParams
         return $ pretty attrName <> parens (hsep (punctuate comma pattrParams))
 
-instance PPrint CStructureUnion where
+instance CPrint CStructureUnion where
     pprint (CStruct tag mid decls attrs) = do
         pdecls <- mapM pprint decls
         case mid of
@@ -300,7 +296,7 @@ instance PPrint CStructureUnion where
                             indentTab $ vsep (map (<> semi) pdecls),
                             pretty "}" <+> pattrs] 
 
-instance PPrint CEnum where
+instance CPrint CEnum where
 
     pprint (CEnum mid decls attrs) = do
         pdecls <- mapM p decls
@@ -337,7 +333,7 @@ instance PPrint CEnum where
             p (ident', Nothing) = return $ pretty ident'
 
 
-instance PPrint CDeclaration where
+instance CPrint CDeclaration where
     pprint (CDecl (CTypeSpec ty) (Just ident) Nothing)  = pprintCTypeDecl ident ty
     pprint (CDecl (CTypeSpec ty) (Just ident) (Just expr)) = do
         pty <- pprint ty
@@ -353,7 +349,7 @@ instance PPrint CDeclaration where
         return $ penum <+> pretty ident
     pprint _ = error "Invalid declaration"
 
-instance PPrint CStatement where
+instance CPrint CStatement where
     pprint CSSkip = return emptyDoc
     pprint s@(CSCase expr stat ann) = do
         case itemAnnotation ann of
@@ -461,7 +457,7 @@ instance PPrint CStatement where
                     $ pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
 
-instance PPrint CCompoundBlockItem where
+instance CPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat
     pprint (CBlockDecl decl ann) = do
         case itemAnnotation ann of 
@@ -471,7 +467,7 @@ instance PPrint CCompoundBlockItem where
                 return $ prependLine before . addDebugLine debugLines (location ann) $ pdecl <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
 
-instance PPrint CPreprocessorDirective where
+instance CPrint CPreprocessorDirective where
     pprint (CPPDefine ident Nothing) =
         return $ pretty "#define" <+> pretty ident
     pprint (CPPDefine ident (Just [])) =
@@ -496,14 +492,14 @@ instance PPrint CPreprocessorDirective where
     pprint CPPEndif =
         return $ pretty "#endif"
 
-instance PPrint CFunction where
+instance CPrint CFunction where
     pprint (CFunction ty ident params body) = do
         pty <- pprint ty
         pparams <- mapM pprint params
         pbody <- pprint body
         return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
 
-instance PPrint CExternalDeclaration where
+instance CPrint CExternalDeclaration where
     pprint (CEDVariable stspec decl) = do
         pdecl <- pprint decl
         return $ pretty stspec <+> pdecl <> semi
@@ -527,7 +523,7 @@ instance PPrint CExternalDeclaration where
         pty <- pprint ty
         return $ pretty "typedef" <+> pty <+> pretty ident <> semi
 
-instance PPrint CFileItem where
+instance CPrint CFileItem where
     pprint (CExtDecl decl ann) = 
         case itemAnnotation ann of 
             CDeclarationAnn before -> do
@@ -554,7 +550,7 @@ instance PPrint CFileItem where
             _ -> error $ "Invalid annotation: " ++ show ann
     pprint (CFunctionDef {}) = error "Invalid function definition"
 
-instance PPrint CFile where
+instance CPrint CFile where
     pprint (CHeaderFile _path items) = do
         pItems <- mapM pprint items
         return $ vsep pItems <> line

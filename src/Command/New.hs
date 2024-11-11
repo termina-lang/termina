@@ -6,12 +6,12 @@ import Options.Applicative
 import Control.Monad
 import Command.Configuration
 import Command.Utils
-import Generator.Platform
 import System.FilePath
 import System.Exit
 import System.Directory
 import qualified Data.Text as T
 import Data.Char
+import Generator.Platform.Configuration
 
 -- | Data type for the "new" command arguments
 data NewCmdArgs =

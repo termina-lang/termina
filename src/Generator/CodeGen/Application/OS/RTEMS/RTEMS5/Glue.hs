@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 
-module Generator.CodeGen.Application.Platform.RTEMS5NoelSpike where
+module Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Glue where
 
 import Generator.LanguageC.AST
 import ControlFlow.BasicBlocks.AST
@@ -25,6 +25,7 @@ import ControlFlow.Architecture
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
 import Command.Configuration
+import Generator.Utils
 
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do

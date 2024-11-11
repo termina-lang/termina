@@ -9,7 +9,7 @@ import qualified Data.Map as M
 import ControlFlow.BasicBlocks
 import Command.Configuration
 import Generator.Option
-import Generator.Platform
+import Generator.Platform.Configuration
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option

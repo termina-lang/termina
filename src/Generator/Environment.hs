@@ -1,6 +1,5 @@
 module Generator.Environment where
 import Command.Configuration
-import Generator.Platform
 import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
@@ -8,6 +7,7 @@ import ControlFlow.Architecture.Types
 import qualified Data.Map as M
 import ControlFlow.Architecture
 import Generator.Platform.RTEMS5NoelSpike
+import Generator.Platform.Configuration
 
 getPlatformInitialGlobalEnv :: TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
 getPlatformInitialGlobalEnv config RTEMS5NoelSpike = 

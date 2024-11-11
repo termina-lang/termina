@@ -2,29 +2,29 @@
 
 module Command.Configuration (
     TerminaConfig(..),
-    ProjectBuild(..),
+    ProjectProfile(..),
     loadConfig,
     serializeConfig,
     defaultConfig
 ) where
 
 import Command.Utils
-import Generator.Platform
 
 import qualified Data.Text as T
 import Data.Yaml
 
 import System.FilePath
 import System.Exit
+import Generator.Platform.Configuration
 
-data ProjectBuild = Debug | Release deriving (Eq, Show)
+data ProjectProfile = Debug | Release deriving (Eq, Show)
 
-instance FromJSON ProjectBuild where
+instance FromJSON ProjectProfile where
     parseJSON (String "debug") = return Debug
     parseJSON (String "release") = return Release
-    parseJSON _ = fail "Expected build type"
+    parseJSON _ = fail "Expected profile type"
   
-instance ToJSON ProjectBuild where
+instance ToJSON ProjectProfile where
     toJSON Debug = String "debug"
     toJSON Release = String "release"
 
@@ -37,7 +37,7 @@ data TerminaConfig =
     appFilename :: !FilePath,
     sourceModulesFolder :: !FilePath,
     outputFolder :: !FilePath,
-    build :: !ProjectBuild,
+    profile :: !ProjectProfile,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
 
@@ -51,7 +51,7 @@ instance FromJSON TerminaConfig where
     o .:   "app-file"       <*>
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
-    o .:?  "build" .!= Release <*>         
+    o .:?  "profile" .!= Release <*>         
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
@@ -73,7 +73,7 @@ instance ToJSON TerminaConfig where
             "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
             "output-folder" .= prjOutputFolder,
-            "build" .= prjBuild,
+            "profile" .= prjBuild,
             "platform-flags" .= prjPlatformFlags
         ]
 
@@ -98,6 +98,6 @@ defaultConfig projectName plt = TerminaConfig {
     appFilename = "app",
     sourceModulesFolder = "src",
     outputFolder = "output",
-    build = Release,
+    profile = Release,
     platformFlags = defaultPlatformFlags
 }

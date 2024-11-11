@@ -22,7 +22,7 @@ import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Semantic.Monad
 import Core.AST
 import Command.Configuration (defaultConfig)
-import Generator.Platform
+import Generator.Platform.Configuration
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =

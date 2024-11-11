@@ -29,10 +29,10 @@ errorMessage msg = "\x1b[31merror\x1b[0m: " ++ msg
 -- | Debug message formatter
 -- Prints debug messages in the form "debug: <message>"
 debugMessage :: String -> String
-debugMessage msg = "\x1b[32mdebug\x1b[0m: " ++ msg
+debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 
 warnMessage :: String -> String
-warnMessage msg = "\x1b[33mwarning\x1b[0m: " ++ msg
+warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
 getModuleImports :: PAST.TerminaModule ParserAnn -> IO [FilePath]
 getModuleImports = mapM (buildModuleName . moduleIdentifier) . modules

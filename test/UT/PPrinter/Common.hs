@@ -6,7 +6,8 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Generator.CodeGen.Expression
 import Command.Configuration
-import Generator.Platform
+import Generator.Platform.Configuration
+import Generator.Utils
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
 import qualified Data.Map as M
