@@ -101,7 +101,7 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
                     ]
         Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
             Just (TPTask {}) -> do
-                return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: void] @-> void $
+                return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: ptr uint32_t] @-> void $
                     block [
                         -- rtems_status_code status = RTEMS_SUCCESSFUL;
                         pre_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code,
