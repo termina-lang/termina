@@ -383,17 +383,14 @@ instance CPrint CStatement where
                     Nothing -> return emptyDoc
                     Just estat -> do
                         palt <- pprint estat
-                        return $ pretty " else" <+> palt
-                if debugLines then
-                    return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                        pretty "if" <+> parens pexpr
-                        <> line <> pstat
-                        <> line <> pestat
-                else
-                    return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                        pretty "if" <+> parens pexpr
-                        <+> pstat
-                        <> pestat
+                        if debugLines then
+                            return $ pretty " else" <> line <> palt
+                        else
+                            return $ pretty " else" <+> palt
+                return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
+                    pretty "if" <+> parens pexpr
+                    <+> pstat
+                    <> pestat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSSwitch expr stat ann) = do
         case itemAnnotation ann of

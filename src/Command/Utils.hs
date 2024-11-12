@@ -22,12 +22,12 @@ import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
 import qualified ControlFlow.VarUsage.Errors.PPrinting as VUErrors
 
 -- | Error message formatter
--- Prints error messages in the form "error: <message>"
+-- Prints error messages in the form "[error] <message>"
 errorMessage :: String -> String
-errorMessage msg = "\x1b[31merror\x1b[0m: " ++ msg
+errorMessage msg = "\x1b[31m[error]\x1b[0m: " ++ msg
 
 -- | Debug message formatter
--- Prints debug messages in the form "debug: <message>"
+-- Prints debug messages in the form "[debug] <message>"
 debugMessage :: String -> String
 debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 
