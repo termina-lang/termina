@@ -30,7 +30,7 @@ genMakefile params bbProject progArchitecture =
                 MVariable "R" [MSubstitution "shell pwd"],
                 MVariable "MKDIR" [MFragment "mkdir"],
                 MVariable "PROJECT_NAME" [MFragment . T.unpack . name $ params],
-                MVariable "CC" [MFragment "/opt/rtems-noel-1.0.4/bin/riscv-rtems5-gcc"],
+                MVariable "CC" [MFragment "/opt/rcc-1.3.2-gcc/bin/sparc-gaisler-rtems5-gcc"],
                 MVariable "CFLAGS" [
                     MFragment "-I/opt/rcc-1.3.2-gcc/sparc-gaisler-rtems5/leon3/lib/include",
                     MFragment "-I$R/include",
