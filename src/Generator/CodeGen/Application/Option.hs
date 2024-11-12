@@ -37,4 +37,4 @@ genOptionHeaderFile = do
         ]
 
 runGenOptionHeaderFile :: TerminaConfig -> OptionTypes -> Either CGeneratorError CFile
-runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv M.empty opts config)
+runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv opts config)

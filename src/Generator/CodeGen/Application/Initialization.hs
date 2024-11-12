@@ -58,4 +58,4 @@ genInitFile mName prjprogs = do
             return $ items ++ rest
 
 runGenInitFile :: TerminaConfig -> FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty M.empty params)
+runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty params)

@@ -9,8 +9,6 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
 import Utils.Annotations
-import Data.Map (fromList, union)
-import Control.Monad.Reader
 import Semantic.Monad (getMatchCaseTypes)
 import Generator.CodeGen.Application.Types
 
@@ -439,14 +437,14 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
                 -- | If there is only one case, we do not need to check the variant
                 [m@(MatchCase identifier _ _ _)] -> do
                     paramsStructName <- genParamsStructName identifier
-                    cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    genMatchCase cTs cObj m
+                    cTy <- genType noqual (TStruct paramsStructName)
+                    genMatchCase cObj cTy m
                 -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
-                    cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    mRest <- genMatchCases cObj casePrefix genParamsStructName genMatchCase xs
-                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cTs cObj m
+                    cTy <- genType noqual (TStruct paramsStructName)
+                    mRest <- genMatchCases cObj casePrefix genParamsStructName xs
+                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
                     -- | TODO: The size of the enum field has been hardcoded, it should be
                     -- platform dependent
                     let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> location ann
@@ -465,14 +463,14 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             case matchCases of
                 [m@(MatchCase identifier _ _ _)] -> do
                     paramsStructName <- genParamsStructName identifier
-                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    cBlk <- genAnonymousMatchCase paramsStructTypeSpec cObj' m
+                    paramsStructType <- genType noqual (TStruct paramsStructName)
+                    cBlk <- genMatchCase cObj' paramsStructType m
                     return [no_cr $ (trail_cr . block) (pre_cr decl : cBlk) |>> location ann]
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     paramsStructName <- genParamsStructName identifier
-                    paramsStructTypeSpec <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-                    mRest <- genMatchCases cObj' casePrefix genParamsStructName genAnonymousMatchCase xs
-                    cBlk <- trail_cr . block <$> genAnonymousMatchCase paramsStructTypeSpec cObj' m
+                    paramsStructType <- genType noqual (TStruct paramsStructName)
+                    mRest <- genMatchCases cObj' casePrefix genParamsStructName xs
+                    cBlk <- trail_cr . block <$> genMatchCase cObj' paramsStructType m
                     let cEnumVariantsFieldExpr = cObj' @. variant @: uint32_t |>> location ann'
                         cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> location ann'
                     case mRest of 
@@ -493,70 +491,55 @@ genBlocks match@(MatchBlock expr matchCases ann) = do
             -> (Identifier -> Identifier)
             -- | A function to get the parameter struct name 
             -> (Identifier -> CGenerator Identifier)
-            -- | A function to generate a match case (inside the monad)
-            -> (CTerminaType
-                -> CObject
-                -> MatchCase SemanticAnn
-                -> CGenerator [CCompoundBlockItem])
             -- | The list of remaining match cases
             -> [MatchCase SemanticAnn]
             -> CGenerator (Maybe CStatement)
         -- | This should never happen
-        genMatchCases _ _ _ _ [] = return Nothing
+        genMatchCases _ _ _ [] = return Nothing
         -- | The last one does not need to check the variant
-        genMatchCases cObj _ genParamsStructName genCase [m@(MatchCase identifier _ _ ann')] = do
+        genMatchCases cObj _ genParamsStructName [m@(MatchCase identifier _ _ ann')] = do
             paramsStructName <- genParamsStructName identifier
-            cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-            cBlk <- genCase cTs cObj m
+            cTs <- genType noqual (TStruct paramsStructName)
+            cBlk <- genMatchCase cObj cTs m
             return $ Just ((trail_cr . block) cBlk |>> location ann')
-        genMatchCases cObj casePrefix genParamsStructName genCase (m@(MatchCase identifier _ _ ann') : xs) = do
+        genMatchCases cObj casePrefix genParamsStructName (m@(MatchCase identifier _ _ ann') : xs) = do
             let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> location ann'
                 cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> location ann'
                 cExpr' = cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> location ann'
             paramsStructName <- genParamsStructName identifier
-            cTs <- CTypeSpec <$> genType noqual (TStruct paramsStructName)
-            cBlk <- trail_cr . block  <$> genCase cTs cObj m
-            mRest <- genMatchCases cObj casePrefix genParamsStructName genCase xs
+            cTs <- genType noqual (TStruct paramsStructName)
+            cBlk <- trail_cr . block  <$> genMatchCase cObj cTs m
+            mRest <- genMatchCases cObj casePrefix genParamsStructName xs
             case mRest of
                 Nothing ->
                     return . Just $ _if cExpr' (cBlk |>> location ann') |>> location ann'
                 Just rest ->
                     return . Just $ _if_else cExpr' (cBlk |>> location ann') rest |>> location ann'
 
-        genAnonymousMatchCase ::
-            CTerminaType
-            -> CObject
-            -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genAnonymousMatchCase _ _ (MatchCase _ [] blk' _) = do
-            concat <$> mapM genBlocks (blockBody blk')
-        genAnonymousMatchCase (CTypeSpec cParamsStructType) cObj (MatchCase this_variant params blk' ann') = do
-            let cObj' = cObj @. this_variant @: cParamsStructType
-            cParamTypes <- case getMatchCaseTypes (element ann') of
-                Just ts -> traverse (genType noqual) ts
-                Nothing -> throwError $ InternalError "Match case without types"
-            let newKeyVals = fromList $ zipWith3
-                    (\sym index cParamType -> (sym, cObj' @. namefy (show (index :: Integer)) @: cParamType)) params [0..] cParamTypes
-            local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
-        genAnonymousMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
-
         genMatchCase ::
-            CTerminaType
-            -> CObject
+            CObject -> CType
             -> MatchCase SemanticAnn
             -> CGenerator [CCompoundBlockItem]
-        genMatchCase _ _ (MatchCase _ [] blk' _) = do
-            concat <$> mapM genBlocks (blockBody blk')
-        genMatchCase (CTypeSpec cParamsStructType) cExpr (MatchCase this_variant params blk' ann') = do
-            let cObj' = CVar (namefy this_variant) cParamsStructType
+        genMatchCase cObj cParamsStructType c@(MatchCase _ _ blk' _) = do
+            decls <- genMatchCaseParams cObj cParamsStructType c
+            cBlk <- concat <$> mapM genBlocks (blockBody blk')
+            return $ decls ++ cBlk
+
+        genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ ann') = do
             cParamTypes <- case getMatchCaseTypes (element ann') of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
-            let newKeyVals = fromList $ zipWith3
-                    (\sym index cParamType -> (sym, cObj' @. namefy (show (index :: Integer)) @: cParamType)) params [0..] cParamTypes
-                decl = var (namefy this_variant) cParamsStructType @:= cExpr @. this_variant @: cParamsStructType
-            cBlk <- local (\e -> e{substitutions = newKeyVals `union` substitutions e}) $ concat <$> mapM genBlocks (blockBody blk')
-            return $ pre_cr decl |>> location ann : cBlk
-        genMatchCase _ _ _ = throwError $ InternalError "Invalid match case"
+            case params of
+                [] -> return []
+                [param] -> 
+                    return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> location ann]
+                (p : xp) -> do
+                    let rest = zipWith3
+                            (\sym index cParamType -> 
+                                no_cr $ var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) xp [1..] (tail cParamTypes)
+                    return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> location ann : rest
+
 
 genBlocks (ReturnBlock mExpr ann) = 
     case mExpr of

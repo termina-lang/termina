@@ -117,9 +117,9 @@ spec = do
               "\n"  ++
               "    if (alloc_msg.__variant == Some) {\n"  ++
               "        \n" ++
-              "        __option_box_params_t __Some = alloc_msg.Some;\n" ++
+              "        __termina_box_t msg = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        __termina_pool__free(self->message_pool, __Some.__0);\n" ++
+              "        __termina_pool__free(self->message_pool, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n"  ++

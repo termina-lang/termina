@@ -4,9 +4,6 @@ import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
-import Control.Monad.Reader
-import Data.Maybe
-import Data.Map
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
@@ -35,12 +32,8 @@ cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 genObject :: Object SemanticAnn -> CGenerator CObject
 genObject o@(Variable identifier _ann) = do
     cType <- getObjType o >>= genType noqual
-    -- Obtain the substitutions map
-    subs <- asks substitutions
-    -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (identifier @: cType) (Data.Map.lookup identifier subs)
     -- Return the C identifier
-    return ident
+    return (identifier @: cType)
 genObject o@(ArrayIndexExpression obj index _ann) = do
     -- Generate the C code for the object
     cExpr <- genObject obj
@@ -206,11 +199,7 @@ genExpression e@(FunctionCall name args ann) = do
     cRetType <- getExprType e >>= genType noqual
     cArgs <- mapM genExpression args
     let cFunctionType = CTFunction cRetType . fmap getCExprType $ cArgs
-    -- Obtain the substitutions map
-    subs <- asks substitutions
-    -- If the identifier is in the substitutions map, use the substituted identifier
-    let ident = fromMaybe (name @: cFunctionType) (Data.Map.lookup name subs)
-    return $ (ident @: getCObjType ident) @@ cArgs |>> location ann
+    return $ (name @: cFunctionType) @@ cArgs |>> location ann
 genExpression (MemberFunctionCall obj ident args ann) = do
     genMemberFunctionAccess obj ident args ann
 genExpression (DerefMemberFunctionCall obj ident args ann) =

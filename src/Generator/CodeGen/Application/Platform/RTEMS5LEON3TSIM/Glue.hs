@@ -355,4 +355,4 @@ genMainFile mName progArchitecture = do
         dependenciesMap = getResDependencies progArchitecture
 
 runGenMainFile :: TerminaConfig -> QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
-runGenMainFile config mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) (CGeneratorEnv M.empty M.empty config)
+runGenMainFile config mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) (CGeneratorEnv M.empty config)

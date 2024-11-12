@@ -109,9 +109,9 @@ spec = do
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
-              "        __option_box_params_t __Some = option0.Some;\n" ++
+              "        __termina_box_t value = option0.Some.__0;\n" ++
               "\n" ++
-              "        foo = *(uint32_t *)__Some.__0.data;\n" ++
+              "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
@@ -158,9 +158,9 @@ spec = do
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
-              "        __option_box_params_t __Some = option0.Some;\n" ++
+              "        __termina_box_t value = option0.Some.__0;\n" ++
               "\n" ++
-              "        foo = *(uint32_t *)__Some.__0.data;\n" ++
+              "        foo = *(uint32_t *)value.data;\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
@@ -230,15 +230,16 @@ spec = do
               "\n" ++
               "    } else if (msg.__variant == Message__Out) {\n" ++
               "        \n" ++
-              "        __enum_Message__Out_params_t __Out = msg.Out;\n" ++
+              "        uint32_t result = msg.Out.__0;\n" ++
               "\n" ++
-              "        ret = __Out.__0;\n" ++
+              "        ret = result;\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        __enum_Message__In_params_t __In = msg.In;\n" ++
+              "        uint32_t param0 = msg.In.__0;\n" ++
+              "        uint32_t param1 = msg.In.__1;\n" ++
               "\n" ++
-              "        ret = __In.__0 + __In.__1;\n" ++
+              "        ret = param0 + param1;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

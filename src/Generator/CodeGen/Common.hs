@@ -21,7 +21,6 @@ type Substitutions = Map Identifier CObject
 type OptionTypes = Map TerminaType (Set TerminaType)
 
 data CGeneratorEnv = CGeneratorEnv { 
-    substitutions :: Substitutions,
     optionTypes :: OptionTypes,
     configParams :: TerminaConfig
   }
