@@ -13,30 +13,31 @@ import qualified Data.Map as M
 import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
+import Generator.LanguageC.Embedded
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
-    let cObj = CVar identifier (CTTypeDef identifier noqual)
+    let cObj = identifier @: typeDef identifier
     genStructInitialization before 0 cObj expr
 genInitializeObj before (Task identifier _ (Just expr) _ _) = do
-    let cObj = CVar identifier (CTTypeDef identifier noqual)
+    let cObj = identifier @: typeDef identifier
     genStructInitialization before 0 cObj expr
 genInitializeObj before (Handler identifier _ (Just expr) _ _) = do
-    let cObj = CVar identifier (CTTypeDef identifier noqual)
+    let cObj = identifier @: typeDef identifier
     genStructInitialization before 0 cObj expr
 genInitializeObj before (Emitter identifier _ (Just expr) _ _) = do
-    let cObj = CVar identifier (CTTypeDef identifier noqual)
+    let cObj = identifier @: typeDef identifier
     genStructInitialization before 0 cObj expr
 genInitializeObj _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile
 genInitFile mName prjprogs = do
     items <- genItems (concat [objs | (_, objs) <- globals])
-    let cStmtAnn = internalAnn (CStatementAnn True False)
-        cReturn = [CBlockStmt $ CSReturn Nothing cStmtAnn]
-        initFunction = [CFunctionDef Nothing (CFunction (CTVoid noqual) initFunctionName []
-            (CSCompound (items ++ cReturn) (internalAnn (CCompoundAnn False True))))
-            (internalAnn (CDeclarationAnn True))]
+    let initFunction = [
+                pre_cr $ function initFunctionName [] @-> void $ 
+                    trail_cr . block $
+                        items ++ [pre_cr (_return Nothing)]
+            ]
     return $ CSourceFile mName (includeTermina : includes ++ initFunction)
 
     where

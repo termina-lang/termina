@@ -12,6 +12,7 @@ import Utils.Annotations
 import Data.Map (fromList, union)
 import Control.Monad.Reader
 import Semantic.Monad (getMatchCaseTypes)
+import Generator.CodeGen.Application.Types
 
 genEnumInitialization ::
     -- | Prepend a line to the initialization expression 
@@ -224,8 +225,8 @@ genStructInitialization before level cObj expr = do
                 else
                     return $ no_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
             genFieldAssignments before' (FieldPortConnection OutboundPortConnection field channel (LocatedElement (ETy (PortConnection (OutPConnTy _))) _) : xs) = do
-                let cMsgQueue = CTTypeDef msgQueue noqual
-                let cPtrMsgQueue = CTPointer cMsgQueue noqual
+                let cMsgQueue = typeDef msgQueue 
+                let cPtrMsgQueue = ptr cMsgQueue
                 let channelExpr = addrOf (channel @: cMsgQueue)
                 rest <- genFieldAssignments False xs
                 if before' then
@@ -233,7 +234,7 @@ genStructInitialization before level cObj expr = do
                 else
                     return $ no_cr (cObj @. field @: cPtrMsgQueue @= channelExpr) : rest
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (LocatedElement (ETy (PortConnection (APConnTy rts procedures))) _) : xs) = do
-                let cResourceType = CTTypeDef resource noqual
+                let cResourceType = typeDef resource
                     resourceExpr = addrOf (resource @: cResourceType)
                 rest <- genFieldAssignments False xs
                 cProcedures <- mapM (genProcedureAssignment field rts) procedures
@@ -241,6 +242,13 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (((cObj @. field @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. field @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection field resource (LocatedElement (ETy (PortConnection (APPoolConnTy {}))) _) : xs) = do
+                let resourceExpr = addrOf (resource @: __termina_pool_t)
+                rest <- genFieldAssignments False xs
+                if before' then
+                    return $ pre_cr ((cObj @. field @: ptr __termina_pool_t) @= resourceExpr) : rest
+                else
+                    return $ no_cr ((cObj @. field @: ptr __termina_pool_t) @= resourceExpr) : rest
             genFieldAssignments before' (FieldPortConnection AccessPortConnection field res (LocatedElement (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
