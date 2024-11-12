@@ -10,6 +10,7 @@ module Extras.TopSort where
 import qualified Extras.Set as S
 import qualified Data.Map.Strict as M  -- We interpret map as graphs.
 
+import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Except
 

@@ -13,6 +13,7 @@ import ControlFlow.BasicBlocks.AST
 import ControlFlow.VarUsage.Errors.Errors
 import ControlFlow.VarUsage.Types
 
+import Control.Monad
 import qualified Control.Monad.State as ST
 import Control.Monad.Except as E
 

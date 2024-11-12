@@ -3,6 +3,7 @@ module ControlFlow.Architecture (
 ) where
 
 import ControlFlow.Architecture.Types
+import Control.Monad
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors.Errors
 import qualified Control.Monad.State.Strict as ST

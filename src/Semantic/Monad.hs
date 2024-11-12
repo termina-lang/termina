@@ -22,6 +22,8 @@ import Semantic.Types
 import Core.Utils
 
 -- Monads
+import Control.Monad
+import Control.Monad.Trans
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser

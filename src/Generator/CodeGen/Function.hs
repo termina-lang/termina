@@ -5,6 +5,7 @@ module Generator.CodeGen.Function where
 import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Semantic.Types
+import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement

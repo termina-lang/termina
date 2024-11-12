@@ -3,6 +3,7 @@ import Utils.Annotations
 import Parser.AST as PAST
 import qualified Semantic.AST as SAST
 import Semantic.Monad
+import Control.Monad
 import Control.Monad.Except
 import Semantic.Errors.Errors
 import Core.Utils

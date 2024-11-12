@@ -13,7 +13,7 @@ import qualified Semantic.AST as SAST
 -- Internal modules to the semantic phase.
 -- Interpretation of types
 import Semantic.Types
--- Error module
+import Control.Monad
 import Control.Monad.Except
 import Semantic.Errors.Errors
 -- Semantic Monad

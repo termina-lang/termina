@@ -5,6 +5,7 @@
 module Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils where
 
 import ControlFlow.BasicBlocks.AST
+import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import ControlFlow.Architecture.Types

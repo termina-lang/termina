@@ -3,6 +3,7 @@ module ControlFlow.BasicBlocks.Checks.ExitPaths where
 import ControlFlow.BasicBlocks.Checks.ExitPaths.Types
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
+import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
 import Utils.Annotations

@@ -3,6 +3,7 @@ module ControlFlow.Architecture.Checks.BoxSources (
 ) where
 
 
+import Control.Monad
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors.Errors
 import Control.Monad.Reader

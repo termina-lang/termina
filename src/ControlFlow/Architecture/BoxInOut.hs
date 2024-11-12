@@ -3,6 +3,7 @@ module ControlFlow.Architecture.BoxInOut where
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.Architecture.Types
 
+import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 import Control.Monad.Except
 
