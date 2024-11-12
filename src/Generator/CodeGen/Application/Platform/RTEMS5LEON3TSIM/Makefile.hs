@@ -105,7 +105,7 @@ genMakefile params bbProject progArchitecture =
                 ]
             ]
         
-        targetRule = MRule target (["$R" </> "init" <.> "o", binaryFolder </> "main" <.> "o"] ++ 
+        targetRule = MRule target ([binaryFolder </> "init" <.> "o", binaryFolder </> "main" <.> "o"] ++ 
                     map (\m ->
                         let objPath = if qualifiedName m == appFile then
                                 appFilename params <.> "o"
