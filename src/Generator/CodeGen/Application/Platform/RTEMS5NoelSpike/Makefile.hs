@@ -35,8 +35,8 @@ genMakefile params bbProject progArchitecture =
                     MFragment "-I/opt/rtems-noel-1.0.4/kernel/riscv-rtems5/noel32im/lib/include",
                     MFragment "-I$R/include",
                     MFragment "-I/opt/termina/api",
-                    MFragment "-I/opt/termina/os/rtems_noel/include",
-                    MFragment "-I/opt/termina/platform/rtems_noel_spike/include",
+                    MFragment "-I/opt/termina/os/rtems5/include",
+                    MFragment "-I/opt/termina/platform/rtems5_noel_spike/include",
                     MFragment "-O0",
                     MFragment "-g3",
                     MFragment "-Wall",
@@ -123,7 +123,7 @@ genMakefile params bbProject progArchitecture =
                 ],
                 MakeCommand True [
                     MSubstitution "CC",
-                    MFragment "-L/opt/termina/lib/rtems_noel_spike",
+                    MFragment "-L/opt/termina/lib/rtems5_noel_spike",
                     MFragment "--pipe",
                     MFragment "-march=rv32im",
                     MFragment "-mabi=ilp32",
@@ -132,7 +132,7 @@ genMakefile params bbProject progArchitecture =
                     MFragment "-qrtems",
                     MFragment "-Wl,--gc-sections",
                     MFragment "-o $@ $^",
-                    MFragment "-ltermina_rtems_noel_spike"
+                    MFragment "-ltermina_rtems5_noel_spike"
                 ]
             ]
         

@@ -32,20 +32,15 @@ genMakefile params bbProject progArchitecture =
                 MVariable "PROJECT_NAME" [MFragment . T.unpack . name $ params],
                 MVariable "CC" [MFragment "/opt/rtems-noel-1.0.4/bin/riscv-rtems5-gcc"],
                 MVariable "CFLAGS" [
-                    MFragment "-I/opt/rtems-noel-1.0.4/kernel/riscv-rtems5/noel32im/lib/include",
+                    MFragment "-I/opt/rcc-1.3.2-gcc/sparc-gaisler-rtems5/leon3/lib/include",
                     MFragment "-I$R/include",
                     MFragment "-I/opt/termina/api",
-                    MFragment "-I/opt/termina/os/rtems_noel/include",
-                    MFragment "-I/opt/termina/platform/rtems_noel_spike/include",
-                    MFragment "-O0",
-                    MFragment "-g3",
-                    MFragment "-Wall",
-                    MFragment "--pipe",
-                    MFragment "-march=rv32im",
-                    MFragment "-mabi=ilp32",
-                    MFragment "-B/opt/rtems-noel-1.0.4/kernel/riscv-rtems5/spike32im/lib/",
-                    MFragment "-specs bsp_specs",
-                    MFragment "-qrtems"
+                    MFragment "-I/opt/termina/os/rtems5/include",
+                    MFragment "-I/opt/termina/platform/rtems5_leon3_tsim/include",
+                    MFragment "-fmessage-length=0",
+                    MFragment "-mcpu=leon3",
+                    MFragment "-qbsp=leon3",
+                    MFragment "-g3"
                 ]
             ]
 
@@ -123,16 +118,11 @@ genMakefile params bbProject progArchitecture =
                 ],
                 MakeCommand True [
                     MSubstitution "CC",
-                    MFragment "-L/opt/termina/lib/rtems_noel_spike",
-                    MFragment "--pipe",
-                    MFragment "-march=rv32im",
-                    MFragment "-mabi=ilp32",
-                    MFragment "-B/opt/rtems-noel-1.0.4/kernel/riscv-rtems5/spike32im/lib/",
-                    MFragment "-specs bsp_specs",
-                    MFragment "-qrtems",
-                    MFragment "-Wl,--gc-sections",
+                    MFragment "-L/opt/termina/lib/rtems5_leon3_tsim",
+                    MFragment "-mcpu=leon3",
+                    MFragment "-qbsp=leon3",
                     MFragment "-o $@ $^",
-                    MFragment "-ltermina_rtems_noel_spike"
+                    MFragment "-ltermina_rtems5_leon3_tsim"
                 ]
             ]
         
