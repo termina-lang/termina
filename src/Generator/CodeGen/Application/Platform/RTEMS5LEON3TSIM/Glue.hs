@@ -75,7 +75,7 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
             let cls = handlerClasses progArchitecture M.! classId
                 (_, targetAction) = sinkPorts cls M.! targetPort
                 classIdType = typeDef classId
-            return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: ptr (typeDef "unsigned int")] @-> void $
+            return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: uint32_t] @-> void $
                     trail_cr . block $ [
                         -- classId * self = &identifier;
                         pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
@@ -101,7 +101,7 @@ genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
                     ]
         Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
             Just (TPTask {}) -> do
-                return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: ptr (typeDef "unsigned int")] @-> void $
+                return $ pre_cr $ function (namefy "rtems_isr" <::> interrupt) ["_ignored" @: uint32_t] @-> void $
                     block [
                         -- rtems_status_code status = RTEMS_SUCCESSFUL;
                         pre_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code,
