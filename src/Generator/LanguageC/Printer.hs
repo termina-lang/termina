@@ -336,10 +336,9 @@ instance CPrint CEnum where
 instance CPrint CDeclaration where
     pprint (CDecl (CTypeSpec ty) (Just ident) Nothing)  = pprintCTypeDecl ident ty
     pprint (CDecl (CTypeSpec ty) (Just ident) (Just expr)) = do
-        debugLines <- asks printDebugLines
         pty <- pprint ty
         pexpr <- pprint expr
-        return . addDebugLine debugLines (location . getAnnotation $ expr) $ pty <+> pretty ident <+> pretty "=" <+> pexpr
+        return $ pty <+> pretty ident <+> pretty "=" <+> pexpr
     pprint (CDecl (CTSStructUnion stu) Nothing Nothing) = pprint stu
     pprint (CDecl (CTSStructUnion stu) (Just ident) Nothing) = do
         pstruct <- pprint stu
