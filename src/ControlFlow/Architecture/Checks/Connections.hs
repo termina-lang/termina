@@ -1,5 +1,6 @@
 module ControlFlow.Architecture.Checks.Connections where
 
+import Control.Monad
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors.Errors
 import Control.Monad.Reader
