@@ -1650,6 +1650,12 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid channel type."))
+    EEmitterClassNotInstantiable ident ->
+        let title = "\x1b[31merror [SE-169]\x1b[0m: emitter class is not instantiable."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Applications cannot instantiate event emitters of class \x1b[31m" <> T.pack ident <> "\x1b[0m."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

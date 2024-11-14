@@ -60,7 +60,8 @@ loadSingleModule filePath = do
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
-    let result = runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
+    let config = defaultConfig "test" TestPlatform
+        result = runTypeChecking (makeInitialGlobalEnv config []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in
@@ -76,8 +77,8 @@ typeSingleModule parsedModule = do
 printSourceModule :: Bool -> BasicBlocksModule -> IO ()
 printSourceModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
-        configParams = defaultConfig "test" TestPlatform
-    case runGenSourceFile configParams (qualifiedName bbModule) tAST of
+        config = defaultConfig "test" TestPlatform
+    case runGenSourceFile config (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 

@@ -29,6 +29,8 @@ import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser
 import Utils.Monad
 
+import Configuration.Configuration
+
 ----------------------------------------
 
 getResultingType :: SemanticElems -> Maybe TerminaType
@@ -145,14 +147,21 @@ stdlibGlobalEnv =
   [("Result", LocatedElement (GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])) Internal),
    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32, FieldDefinition "tv_usec" TUInt32] [])) Internal),
    ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
-   ("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
-   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal),
    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal")) (buildExpAnn Internal (TStruct "TimeVal"))] [] [])) Internal),
    ("clock_get_uptime", LocatedElement (GFun (FunctionSeman [TReference Mutable (TStruct "TimeVal")] TUnit)) Internal),
    ("delay_in", LocatedElement (GFun (FunctionSeman [TReference Immutable (TStruct "TimeVal")] TUnit)) Internal)]
 
-makeInitialGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
-makeInitialGlobalEnv pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
+sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+sysInitGlobalEnv =
+  [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
+   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
+
+makeInitialGlobalEnv :: TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
+makeInitialGlobalEnv config pltEnvironment = 
+  if (enableSystemInit config) then 
+    ExprST (fromList (stdlibGlobalEnv ++ sysInitGlobalEnv ++ pltEnvironment)) empty
+  else
+    ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 
@@ -511,10 +520,10 @@ typeTypeSpecifier loc (TSDefinedType ident []) = do
   -- Check that the type was defined
   (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
   case glbTypeDef of 
-    Struct name _ _ -> return $ TStruct name
-    Enum name _ _ -> return $ TEnum name
-    Class clsKind name _ _ _ -> return $ TGlobal clsKind name 
-    Interface name _ _ -> return $ TInterface name
+    Struct s _ _ -> return $ TStruct s
+    Enum e _ _ -> return $ TEnum e
+    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
+    Interface i _ _ -> return $ TInterface i
 typeTypeSpecifier loc (TSDefinedType "Allocator" [TypeParamTypeSpec ts]) = 
   TAllocator <$> typeTypeSpecifier loc ts
 typeTypeSpecifier loc (TSDefinedType "AtomicAccess" [TypeParamTypeSpec ts]) =

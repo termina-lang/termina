@@ -13,9 +13,9 @@ import Utils.Annotations
 import Core.AST
 import qualified Data.Map as M
 
-type BoxCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
+type BoxSourcesCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
-checkNextSource :: Location -> BoxCheckMonad () -> BoxCheckMonad ()
+checkNextSource :: Location -> BoxSourcesCheckMonad () -> BoxSourcesCheckMonad ()
 checkNextSource loc = withExceptT (\case {
         AnnotatedError (EMismatchedBoxSource expectedSource actualSource traceLocations) lastLocation ->
             AnnotatedError (EMismatchedBoxSource expectedSource actualSource (loc : traceLocations)) lastLocation;
@@ -28,7 +28,7 @@ checkBoxSourceProcedureCallResource ::
     -> Identifier -- ^ The name of the access port
     -> Identifier -- ^ The name of the procedure
     -> Integer -- ^ The number of the argument
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceProcedureCallResource expectedSource resource calledPort calledProc calledArgNum = do
     progArchitecture <- ask
     let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
@@ -41,7 +41,7 @@ checkBoxSourceProcedureCallHandler ::
     -> Identifier -- ^ The name of the access port
     -> Identifier -- ^ The name of the procedure
     -> Integer -- ^ The number of the argument
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceProcedureCallHandler expectedSource handler calledPort calledProc calledArgNum = do
     progArchitecture <- ask
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
@@ -54,7 +54,7 @@ checkBoxSourceProcedureCallTask ::
     -> Identifier -- ^ The name of the access port
     -> Identifier -- ^ The name of the procedure
     -> Integer -- ^ The number of the argument
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceProcedureCallTask expectedSource task calledPort calledProc calledArgNum = do
     progArchitecture <- ask
     let taskCls = taskClasses progArchitecture M.! taskClass task
@@ -67,7 +67,7 @@ checkBoxProcedureCall ::
     -> Identifier -- ^ The name of the access port of the calling element
     -> Identifier -- ^ The name of the procedure being called
     -> Integer -- ^ The number of the argument
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxProcedureCall expectedSource elemnt accessPt procId argNum = do
     progArchitecture <- ask
     -- | Check if the element is a task
@@ -85,7 +85,7 @@ checkBoxProcedureCall expectedSource elemnt accessPt procId argNum = do
                         -- must be either a task, a handler or a resource
                         Nothing -> throwError $ annotateError Internal EUnboxingProcedureCall
 
-checkBoxSourceTaskSend :: Identifier -> TPTask SemanticAnn -> Identifier -> BoxCheckMonad ()
+checkBoxSourceTaskSend :: Identifier -> TPTask SemanticAnn -> Identifier -> BoxSourcesCheckMonad ()
 checkBoxSourceTaskSend expectedSource task outPt = do
     progArchitecture <- ask
     let taskCls = taskClasses progArchitecture M.! taskClass task
@@ -94,7 +94,7 @@ checkBoxSourceTaskSend expectedSource task outPt = do
             mapM_ (uncurry (checkTaskSourceInBox expectedSource task)) sources
         Nothing -> throwError $ annotateError Internal EUnboxingTask
 
-checkBoxSourceHandlerSend :: Identifier -> TPHandler SemanticAnn -> Identifier -> BoxCheckMonad ()
+checkBoxSourceHandlerSend :: Identifier -> TPHandler SemanticAnn -> Identifier -> BoxSourcesCheckMonad ()
 checkBoxSourceHandlerSend expectedSource handler outPt = do
     progArchitecture <- ask
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
@@ -103,7 +103,7 @@ checkBoxSourceHandlerSend expectedSource handler outPt = do
             mapM_ (uncurry (checkHandlerSourceInBox expectedSource handler)) sources
         Nothing -> throwError $ annotateError Internal EUnboxingHandler
 
-getBoxSourceSend :: Identifier -> (Identifier, Identifier, SemanticAnn) -> BoxCheckMonad ()
+getBoxSourceSend :: Identifier -> (Identifier, Identifier, SemanticAnn) -> BoxSourcesCheckMonad ()
 getBoxSourceSend expectedSource (source, outPort, _ann) = do
     progArchitecture <- ask
     -- | Check if the element is a task
@@ -117,7 +117,7 @@ getBoxSourceSend expectedSource (source, outPort, _ann) = do
 getBoxSourceChannel ::
     Identifier -- ^ Expected source of the box
     -> TPChannel SemanticAnn -- ^ The channel from which the box is being received
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 getBoxSourceChannel expectedSource (TPMsgQueue channelId (TBoxSubtype _) _ _ _) = do
     -- | First we need to get check if the current channel has been already visited
     progArchitecture <- ask
@@ -132,7 +132,7 @@ checkResourceSourceInBox ::
     -> TPResource SemanticAnn -- ^ The name of the resource
     -> SemanticAnn
     -> InBox SemanticAnn
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkResourceSourceInBox expectedSource resource prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -159,7 +159,7 @@ checkResourceSourceInBox _ _ _ _ = throwError $ annotateError Internal EUnboxing
 checkTaskSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPTask SemanticAnn
-    -> SemanticAnn -> InBox SemanticAnn -> BoxCheckMonad ()
+    -> SemanticAnn -> InBox SemanticAnn -> BoxSourcesCheckMonad ()
 checkTaskSourceInBox expectedSource task prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -186,7 +186,7 @@ checkHandlerSourceInBox ::
     Identifier -- ^ Expected source of the box
     -> TPHandler SemanticAnn
     -> SemanticAnn -> InBox SemanticAnn
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkHandlerSourceInBox expectedSource handler prevAnn (InBoxAlloc port ann) =
     -- We reached a terminal allocator port. Now we only have to get the
     -- allocator source and we are done
@@ -202,7 +202,7 @@ checkBoxSourceResourceFree ::
     Identifier -- ^ Expected source of the box
     -> TPResource SemanticAnn
     -> Identifier -- ^ The name of the port connected to the allocator where the box is to be freed
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceResourceFree expectedSource resource outPt = do
     progArchitecture <- ask
     let resourceCls = resourceClasses progArchitecture M.! resourceClass resource
@@ -213,7 +213,7 @@ checkBoxSourceTaskFree ::
     Identifier -- ^ Expected source of the box
     -> TPTask SemanticAnn
     -> Identifier -- ^ The name of the port connected to the allocator where the box is to be freed
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceTaskFree expectedSource task calledPort = do
     progArchitecture <- ask
     let taskCls = taskClasses progArchitecture M.! taskClass task
@@ -226,7 +226,7 @@ checkBoxSourceHandlerFree ::
     Identifier -- ^ Expected source of the box
     -> TPHandler SemanticAnn
     -> Identifier -- ^ The name of the port connected to the allocator where the box is to be freed
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceHandlerFree expectedSource handler calledPort = do
     progArchitecture <- ask
     let handlerCls = handlerClasses progArchitecture M.! handlerClass handler
@@ -239,7 +239,7 @@ checkBoxSourceFree ::
     Identifier -- ^ Expected source of the box
     -> Identifier -- ^ The name of the element (task, handler or resource)
     -> Identifier -- ^ The name of the access port
-    -> BoxCheckMonad ()
+    -> BoxSourcesCheckMonad ()
 checkBoxSourceFree expectedSource elemnt accessPt = do
     progArchitecture <- ask
     -- | Check if the element is a task
@@ -258,7 +258,7 @@ checkBoxSourceFree expectedSource elemnt accessPt = do
                         Nothing -> throwError $ annotateError Internal EUnboxingFree
 
 
-checkBoxSource :: TPPool SemanticAnn -> BoxCheckMonad ()
+checkBoxSource :: TPPool SemanticAnn -> BoxSourcesCheckMonad ()
 checkBoxSource (TPPool poolName _ _ _ _) = do
     progArchitecture <- ask
     case M.lookup poolName (resourceSources progArchitecture) of
@@ -268,7 +268,7 @@ checkBoxSource (TPPool poolName _ _ _ _) = do
         -- | This means that the resource is not connected to anything (this shouuld not happen)
         Nothing -> throwError $ annotateError Internal EUnboxingPool
 
-checkBoxSources :: BoxCheckMonad ()
+checkBoxSources :: BoxSourcesCheckMonad ()
 checkBoxSources = do
     progArchitecture <- ask
     mapM_ checkBoxSource (M.elems (pools progArchitecture))

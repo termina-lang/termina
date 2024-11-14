@@ -20,6 +20,7 @@ import Semantic.Monad
 import Parser.Types
 import Semantic.TypeChecking.Expression
 import Semantic.TypeChecking.Check
+import Core.Utils
 
 typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeGlobal (Task ident ts mexpr mods anns) = do
@@ -93,7 +94,8 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns ts
   checkTerminaType anns ty
   case ty of
-    TGlobal EmitterClass _ -> do
+    TGlobal EmitterClass clsId -> do
+      unless (emitterInstTy clsId) (throwError $ annotateError anns (EEmitterClassNotInstantiable clsId))
       exprty <-
         case mexpr of
           -- If it has an initial value great

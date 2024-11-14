@@ -205,6 +205,7 @@ data Error
   | EInvalidResourceType TerminaType -- ^ Invalid resource type (SE-166)
   | EInvalidEmitterType TerminaType -- ^ Invalid emitter type (SE-167)
   | EInvalidChannelType TerminaType -- ^ Invalid channel type (SE-168)
+  | EEmitterClassNotInstantiable Identifier -- ^ Emitter class not instantiable (SE-169)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location

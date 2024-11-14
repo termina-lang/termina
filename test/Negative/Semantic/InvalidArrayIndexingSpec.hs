@@ -1,23 +1,9 @@
 module Negative.Semantic.InvalidArrayIndexingSpec (spec) where
 
 import Test.Hspec
-
-import Text.Parsec
-import Parser.Parsing
-
-import Semantic.TypeChecking
-import Semantic.Monad
-import Semantic.Errors.Errors
 import Semantic.AST
-import Utils.Annotations
-
-runNegativeTest :: String -> Maybe Error
-runNegativeTest input = case parse (contents topLevel) "" input of
-  Left err -> error $ "Parser Error: " ++ show err
-  Right ast -> 
-    case runTypeChecking (makeInitialGlobalEnv []) (typeTerminaModule ast) of
-      Left err -> Just $ getError err
-      Right _ -> Nothing
+import Semantic.Errors.Errors
+import Negative.Common
 
 test0:: String
 test0 = "function test0() {\n" ++

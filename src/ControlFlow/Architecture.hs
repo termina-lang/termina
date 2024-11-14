@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import Modules.Modules
 import ControlFlow.Architecture.BoxInOut
 import ControlFlow.Architecture.Forwarding
+import Configuration.Configuration
 
 type ArchitectureMonad = ExceptT ArchitectureError (ST.State (TerminaProgArch SemanticAnn))
 
@@ -278,11 +279,11 @@ genArchElement _ (Function {}) = return ()
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
 genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 
-emptyTerminaProgArch :: TerminaProgArch SemanticAnn
-emptyTerminaProgArch = TerminaProgArch {
-  emitters = M.fromList [
+emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
+emptyTerminaProgArch config = TerminaProgArch {
+  emitters = if enableSystemInit config then M.fromList [
     ("system_init", TPSystemInitEmitter "system_init" (LocatedElement (GTy (TGlobal EmitterClass "SystemInit")) Internal))
-  ],
+  ] else M.empty,
   emitterTargets = M.empty,
   taskClasses = M.empty,
   tasks = M.empty,

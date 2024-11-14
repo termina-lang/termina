@@ -24,6 +24,11 @@ data Error =
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
     | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-003)
+    | EDisconnectedEmitter Identifier -- ^ Disconnected emitter (AE-004)
+    | EChannelWithoutSources Identifier -- ^ Channel without sources (AE-005)
+    | EChannelWithoutTarget Identifier -- ^ Channel without target (AE-006)
+    | EUnusedResource Identifier -- ^ Unused resource (AE-007)
+    | EUnusedPool Identifier -- ^ Unused pool (AE-008)
     deriving Show
 
 type ArchitectureError = AnnotatedError Error Location

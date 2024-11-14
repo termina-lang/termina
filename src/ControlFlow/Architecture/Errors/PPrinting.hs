@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import Utils.Annotations
 import Utils.Errors
 import ControlFlow.BasicBlocks.AST
+import qualified Data.Text.IO as TIO
 
 ppError :: M.Map FilePath TL.Text ->
     ArchitectureError -> IO ()
@@ -54,6 +55,41 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                 "\x1b[0m but the box is being allocated from \x1b[31m" <> T.pack actualSource <>
                 "\x1b[0m.")) >>
         printBoxTrace expectedSource (reverse boxTrace)
+    EDisconnectedEmitter emitter ->
+        let title = "\x1b[31merror [AE-004]\x1b[0m: Disconnected emitter" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Emitter \x1b[31m" <> T.pack emitter <>
+                "\x1b[0m is not connected to any sink port. " <>
+                "All event sources must be connected to a target.")) 
+    EChannelWithoutSources channel ->
+        let title = "\x1b[31merror [AE-005]\x1b[0m: Channel without sources" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Channel \x1b[31m" <> T.pack channel <>
+                "\x1b[0m is not connected to any outbound port. " <>
+                "All channels must have at least one source.")) 
+    EChannelWithoutTarget channel -> 
+        let title = "\x1b[31merror [AE-006]\x1b[0m: Channel without target" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Channel \x1b[31m" <> T.pack channel <>
+                "\x1b[0m is not connected to any inbound port. " <>
+                "All channels must be connected to a target.")) 
+    EUnusedResource resId ->
+        let title = "\x1b[31merror [AE-007]\x1b[0m: Unused resource" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Resource \x1b[31m" <> T.pack resId <>
+                "\x1b[0m is not being used by any element. " <>
+                "All resources must be connected to at least one access port."))
+    EUnusedPool poolId ->
+        let title = "\x1b[31merror [AE-008]\x1b[0m: Unused pool" in
+        printSimpleError
+            sourceLines title fileName pos
+            (Just ("Pool \x1b[31m" <> T.pack poolId <>
+                "\x1b[0m is not being used by any element. " <>
+                "All pools must be connected to at least one access port."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 
 
@@ -96,4 +132,9 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
                     traceSourceLines title traceFileName tracePos Nothing >> printBoxTrace' expectedSource xr
         printBoxTrace' _ _ = error "Internal error: invalid error position"
 -- | Print the error as is
+ppError _ (AnnotatedError (EDisconnectedEmitter emitterId) Internal) =
+    TIO.putStrLn "\x1b[31merror [AE-004]\x1b[0m: Disconnected emitter" >>
+    TIO.putStrLn ("Emitter \x1b[31m" <> T.pack emitterId <>
+        "\x1b[0m is not connected to any sink port. " <>
+        "All event sources must be connected to a target.")
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

@@ -232,32 +232,49 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
           AE.ppError sourceFilesMap err >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
-warnDisconnectedEmitters :: TerminaProgArch SemanticAnn -> IO ()
-warnDisconnectedEmitters tp =
-    let disconnectedEmitters = getDisconnectedEmitters tp in
-    unless (null disconnectedEmitters) $
-      putStrLn . warnMessage $ "The following emitters are not connected to any task or handler: " ++ show disconnectedEmitters
+checkEmitterConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkEmitterConnections bbProject progArchitecture = 
+  let result = runCheckEmitterConnections progArchitecture in
+  case result of
+    Left err -> 
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      AE.ppError sourceFilesMap err >> exitFailure
+    Right _ -> return ()
 
-checkDisconnectedChannels :: TerminaProgArch SemanticAnn -> IO ()
-checkDisconnectedChannels tp = do
-    let noSourceChannels = getChannelsWithoutInputs tp
-    unless (null noSourceChannels) $
-      (putStrLn . errorMessage $ "The following channels do not have any message sources connected to them: " ++ show noSourceChannels) >> exitFailure
-    let noTargetChannels = getChannelsWithoutTargets tp
-    unless (null noTargetChannels) $
-      (putStrLn . errorMessage $ "The following channels do not have a message sink connected to them: " ++ show noTargetChannels) >> exitFailure
-  
-checkUnusedResources :: TerminaProgArch SemanticAnn -> IO ()
-checkUnusedResources tp = do
-    let unusedResources = getUnusedResources tp
-    unless (null unusedResources) $
-      (putStrLn . errorMessage $ "The following resources are not used: " ++ show unusedResources) >> exitFailure
+checkChannelConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkChannelConnections bbProject progArchitecture = 
+  let result = runCheckChannelConnections progArchitecture in
+  case result of
+    Left err -> 
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      AE.ppError sourceFilesMap err >> exitFailure
+    Right _ -> return ()
 
-checkUnusedPools :: TerminaProgArch SemanticAnn -> IO ()
-checkUnusedPools tp = do
-    let unusedPools = getUnusedPools tp
-    unless (null unusedPools) $
-      (putStrLn . errorMessage $ "The following pools are not used: " ++ show unusedPools) >> exitFailure
+checkResourceUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkResourceUsage bbProject progArchitecture = 
+  let result = runCheckResourceUsage progArchitecture in
+  case result of
+    Left err -> 
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      AE.ppError sourceFilesMap err >> exitFailure
+    Right _ -> return ()
+
+checkPoolUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+checkPoolUsage bbProject progArchitecture = 
+  let result = runCheckPoolUsage progArchitecture in
+  case result of
+    Left err -> 
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      AE.ppError sourceFilesMap err >> exitFailure
+    Right _ -> return ()
 
 genBasicBlocks :: TypedProject -> IO BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule
@@ -284,28 +301,28 @@ buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
-    configParams <- loadConfig
+    config <- loadConfig
     -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform configParams) ++ "\"") return $ checkPlatform (platform configParams)
+    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     -- | Check that the files are in place
-    existSourceFolder <- doesDirectoryExist (sourceModulesFolder configParams)
-    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder configParams ++ "\" does not exist")
-    existAppFolder <- doesDirectoryExist (appFolder configParams)
-    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder configParams ++ "\" does not exist")
+    existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
+    unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
+    existAppFolder <- doesDirectoryExist (appFolder config)
+    unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder config ++ "\" does not exist")
     -- | Create output header and source folder if it does not exist
-    let outputSrcFolder = outputFolder configParams </> "src"
-    let outputIncludeFolder = outputFolder configParams </> "include"
+    let outputSrcFolder = outputFolder config </> "src"
+    let outputIncludeFolder = outputFolder config </> "include"
     when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
     createDirectoryIfMissing True outputSrcFolder
     when chatty (putStrLn . debugMessage $ "Creating output include folder (if missing): \"" ++ outputIncludeFolder ++ "\"")
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
-    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder configParams </> appFilename configParams <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule (appFilename configParams) (appFolder configParams)
+    when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
+    appModule <- loadTerminaModule (appFilename config) (appFolder config)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
-    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder configParams)
+    parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
     -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
@@ -317,7 +334,7 @@ buildCommand (BuildCmdArgs chatty) = do
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
     -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv (getPlatformInitialGlobalEnv configParams plt)
+    let initialGlobalEnv = makeInitialGlobalEnv config (getPlatformInitialGlobalEnv config plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
@@ -332,16 +349,16 @@ buildCommand (BuildCmdArgs chatty) = do
     useDefCheckModules bbProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram configParams plt) orderedDependencies 
-    checkDisconnectedChannels programArchitecture
-    checkUnusedResources programArchitecture
-    checkUnusedPools programArchitecture
+    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies 
+    checkEmitterConnections bbProject programArchitecture
+    checkChannelConnections bbProject programArchitecture
+    checkResourceUsage bbProject programArchitecture
+    checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
-    warnDisconnectedEmitters programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    genModules configParams (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
-    genInitFile configParams bbProject
-    genPlatformCode plt configParams bbProject programArchitecture
-    genOptionHeaderFile configParams basicTypesOptionMap
+    genModules config (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
+    genInitFile config bbProject
+    genPlatformCode plt config bbProject programArchitecture
+    genOptionHeaderFile config basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

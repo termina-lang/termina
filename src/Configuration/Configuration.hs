@@ -3,18 +3,12 @@
 module Configuration.Configuration (
     TerminaConfig(..),
     ProjectProfile(..),
-    loadConfig,
-    serializeConfig,
     defaultConfig
 ) where
-
-import Command.Utils
 
 import qualified Data.Text as T
 import Data.Yaml
 
-import System.FilePath
-import System.Exit
 import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
@@ -38,6 +32,7 @@ data TerminaConfig =
     sourceModulesFolder :: !FilePath,
     outputFolder :: !FilePath,
     profile :: !ProjectProfile,
+    enableSystemInit :: !Bool,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
 
@@ -52,6 +47,7 @@ instance FromJSON TerminaConfig where
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
     o .:?  "profile" .!= Release <*>         
+    o .:?  "enable-system-init" .!= False <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
@@ -64,31 +60,27 @@ instance ToJSON TerminaConfig where
             prjAppFilename 
             prjSourceModulesFolder 
             prjOutputFolder
-            prjBuild
+            prjProfile
+            prjEnableSystemInit
             prjPlatformFlags
-        ) = object [
+        ) = object $ [
             "name" .= prjName,
             "platform" .= prjPlatform,
             "app-folder" .= prjAppFolder,
             "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
-            "output-folder" .= prjOutputFolder,
-            "profile" .= prjBuild,
-            "platform-flags" .= prjPlatformFlags
-        ]
-
--- | Load "termina.yaml" configuration file
-loadConfig :: IO TerminaConfig
-loadConfig = do
-    config <- decodeFileEither "termina.yaml"
-    case config of
-        Left (InvalidYaml (Just (YamlException err))) -> die . errorMessage $ err
-        Left err -> die . errorMessage $ show err
-        Right c -> return c
-
-serializeConfig :: FilePath -> TerminaConfig -> IO ()
-serializeConfig filePath config = do
-    encodeFile (filePath </> "termina" <.> "yaml") config
+            "output-folder" .= prjOutputFolder
+        ]   -- We only serialize the profile if it is different from the default value
+            <> case prjProfile of
+                Debug -> ["profile" .= prjProfile]
+                _ -> []
+            -- We only serialize the enable-system-init flag if it is different from the default value
+            <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
+            -- We only serialize the platform flags corresponding to the selected platform
+            <> case prjPlatform of
+                "rtems5-noel-spike" -> ["platform-flags" .= object ["rtems5-noel-spike" .= rtems5_noel_spike prjPlatformFlags]]
+                "rtems5-leon3-tsim" -> ["platform-flags" .= object ["rtems5-leon3-tsim" .= rtems5_leon3_tsim prjPlatformFlags]]
+                _ -> []
 
 defaultConfig :: String -> Platform -> TerminaConfig
 defaultConfig projectName plt = TerminaConfig {
@@ -99,5 +91,6 @@ defaultConfig projectName plt = TerminaConfig {
     sourceModulesFolder = "src",
     outputFolder = "output",
     profile = Release,
+    enableSystemInit = False,
     platformFlags = defaultPlatformFlags
 }

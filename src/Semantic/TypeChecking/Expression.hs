@@ -760,7 +760,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldAddressAssignmen
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry loc sid >>=
+    getGlobalEntry pann sid >>=
     \gentry ->
     case fty of
       TSinkPort ty action  ->
@@ -780,7 +780,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection I
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry loc sid >>=
+    getGlobalEntry pann sid >>=
     \gentry ->
     case fty of
       TOutPort ty ->
@@ -794,7 +794,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection O
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
-    getGlobalEntry loc sid >>=
+    getGlobalEntry pann sid >>=
     \gentry ->
     case fty of
       TAccessPort (TAllocator ty) ->

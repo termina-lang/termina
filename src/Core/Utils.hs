@@ -344,6 +344,10 @@ sameTy  tyspecl (TFixedLocation tyspecr) = sameTy tyspecl tyspecr
 --
 sameTy  _ _ = False
 
+emitterInstTy :: Identifier -> Bool
+emitterInstTy "PeriodicTimer" = True
+emitterInstTy _ = False
+
 findClassField :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (ty, a)
 findClassField i
   =

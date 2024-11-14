@@ -20,6 +20,8 @@ import ControlFlow.VarUsage (runUDAnnotatedProgram)
 import ControlFlow.BasicBlocks.Checks.ExitPaths
 import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
 import qualified ControlFlow.VarUsage.Errors.PPrinting as VUErrors
+import Configuration.Configuration
+import Data.Yaml
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -78,3 +80,16 @@ checkBasicBlocksPaths bbModule = do
             let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
             EPErrors.ppError sourceFilesMap err >> exitFailure
         Right _ -> return ()
+
+-- | Load "termina.yaml" configuration file
+loadConfig :: IO TerminaConfig
+loadConfig = do
+    config <- decodeFileEither "termina.yaml"
+    case config of
+        Left (InvalidYaml (Just (YamlException err))) -> die . errorMessage $ err
+        Left err -> die . errorMessage $ show err
+        Right c -> return c
+
+serializeConfig :: FilePath -> TerminaConfig -> IO ()
+serializeConfig filePath config = do
+    encodeFile (filePath </> "termina" <.> "yaml") config

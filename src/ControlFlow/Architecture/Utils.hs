@@ -13,10 +13,10 @@ import ControlFlow.Architecture.Errors.Errors
 import Semantic.Types
 import Utils.Annotations
 
-getEmmiterIdentifier :: TPEmitter a -> Identifier
-getEmmiterIdentifier (TPInterruptEmittter ident _) = ident
-getEmmiterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
-getEmmiterIdentifier (TPSystemInitEmitter ident _) = ident
+getEmitterIdentifier :: TPEmitter a -> Identifier
+getEmitterIdentifier (TPInterruptEmittter ident _) = ident
+getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
+getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 
 getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
 getInputPorts = foldl' (\acc member -> 
@@ -61,7 +61,7 @@ getClassMembers _ = error "Internal error: getClassMembers called with the non-c
 
 getConnectedEmitters :: TerminaProgArch a -> [TPEmitter a]
 getConnectedEmitters tp = 
-  filter (\emitter -> M.member (getEmmiterIdentifier emitter) (emitterTargets tp)) $ M.elems (emitters tp)
+  filter (\emitter -> M.member (getEmitterIdentifier emitter) (emitterTargets tp)) $ M.elems (emitters tp)
 
 getResDependencies :: TerminaProgArch a -> M.Map Identifier (S.Set Identifier)
 getResDependencies progArchitecture = 

@@ -5,6 +5,7 @@ import ControlFlow.BasicBlocks.AST
 import Modules.Modules
 import qualified Data.Set as S
 import qualified Data.Map as M
+import Utils.Annotations
 
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
@@ -87,6 +88,10 @@ data TPTask a = TPTask {
     
 } deriving Show
 
+instance Annotated TPTask where
+  getAnnotation = taskAnns
+  updateAnnotation t a = t { taskAnns = a }
+
 data TPEmitter a = 
   TPInterruptEmittter 
     Identifier -- ^ emitter identifier
@@ -99,6 +104,15 @@ data TPEmitter a =
     Identifier -- ^ emitter identifier
     a -- ^ annotations
   deriving Show
+
+instance Annotated TPEmitter where
+  getAnnotation (TPInterruptEmittter _ a) = a
+  getAnnotation (TPPeriodicTimerEmitter _ _ a) = a
+  getAnnotation (TPSystemInitEmitter _ a) = a
+
+  updateAnnotation (TPInterruptEmittter i _) = TPInterruptEmittter i
+  updateAnnotation (TPPeriodicTimerEmitter i m _) = TPPeriodicTimerEmitter i m
+  updateAnnotation (TPSystemInitEmitter i _) = TPSystemInitEmitter i
 
 data TPResource a = TPResource {
 
@@ -119,6 +133,10 @@ data TPResource a = TPResource {
     resourceAnns :: a -- ^ annotations
 
 } deriving Show
+
+instance Annotated TPResource where
+  getAnnotation = resourceAnns
+  updateAnnotation r a = r { resourceAnns = a }
 
 data TPHandler a = TPHandler {
     
@@ -157,12 +175,20 @@ data TPHandler a = TPHandler {
 
 } deriving Show
 
+instance Annotated TPHandler where
+  getAnnotation = handlerAnns
+  updateAnnotation h a = h { handlerAnns = a }
+
 data TPAtomic a = TPAtomic 
     Identifier -- ^ atomic identifier
     TerminaType -- ^ data type specifier
     QualifiedName -- ^ module that instantiates the atomic
     a -- ^ annontations
   deriving Show
+
+instance Annotated TPAtomic where
+  getAnnotation (TPAtomic _ _ _ a) = a
+  updateAnnotation (TPAtomic i t m _) = TPAtomic i t m
 
 data TPAtomicArray a = TPAtomicArray 
     Identifier -- ^ atomic array identifier
@@ -172,6 +198,10 @@ data TPAtomicArray a = TPAtomicArray
     a -- ^ annontations
   deriving Show
 
+instance Annotated TPAtomicArray where
+  getAnnotation (TPAtomicArray _ _ _ _ a) = a
+  updateAnnotation (TPAtomicArray i t s m _) = TPAtomicArray i t s m
+
 data TPChannel a = TPMsgQueue
     Identifier -- ^ message queue identifier
     TerminaType -- ^ data type specifier
@@ -179,6 +209,10 @@ data TPChannel a = TPMsgQueue
     QualifiedName -- ^ module that instantiates the message queue
     a -- ^ annontations
    deriving Show
+  
+instance Annotated TPChannel where
+  getAnnotation (TPMsgQueue _ _ _ _ a) = a
+  updateAnnotation (TPMsgQueue i t s m _) = TPMsgQueue i t s m
 
 data TPPool a = TPPool 
     Identifier -- ^ pool identifier
@@ -187,6 +221,10 @@ data TPPool a = TPPool
     QualifiedName -- ^ module that instantiates the pool
     a -- ^ annontations
    deriving Show
+
+instance Annotated TPPool where
+  getAnnotation (TPPool _ _ _ _ a) = a
+  updateAnnotation (TPPool i t s m _) = TPPool i t s m
 
 data TerminaProgArch a = TerminaProgArch {
 

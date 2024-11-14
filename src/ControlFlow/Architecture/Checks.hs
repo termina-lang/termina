@@ -1,35 +1,37 @@
 module ControlFlow.Architecture.Checks (
-    getDisconnectedEmitters,
-    getChannelsWithoutInputs,
-    getChannelsWithoutTargets,
-    getUnusedResources,
-    getUnusedPools,
+    runCheckPoolUsage,
+    runCheckResourceUsage,
+    runCheckChannelConnections,
+    runCheckEmitterConnections,
     runCheckBoxSources
 ) where
-import qualified Data.Map as M
-import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Utils
 import Control.Monad.Reader
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors.Errors
 import ControlFlow.Architecture.Checks.BoxSources
+import ControlFlow.Architecture.Checks.Connections
 
-getDisconnectedEmitters :: TerminaProgArch SemanticAnn -> [Identifier]
-getDisconnectedEmitters tp = M.keys . M.filter ((`M.notMember` emitterTargets tp) . getEmmiterIdentifier) . emitters $ tp
+runCheckPoolUsage :: 
+    TerminaProgArch SemanticAnn 
+    -> Either ArchitectureError ()
+runCheckPoolUsage = runReader (runExceptT checkPoolUsage)
 
-getChannelsWithoutInputs :: TerminaProgArch SemanticAnn -> [Identifier]
-getChannelsWithoutInputs tp = M.keys . M.filter ((`M.notMember` channelSources tp) . (\(TPMsgQueue ident _ _ _ _) -> ident )) . channels $ tp
+runCheckResourceUsage :: 
+    TerminaProgArch SemanticAnn 
+    -> Either ArchitectureError ()
+runCheckResourceUsage = runReader (runExceptT checkResourceUsage)
 
-getChannelsWithoutTargets :: TerminaProgArch SemanticAnn -> [Identifier]
-getChannelsWithoutTargets tp = M.keys . M.filter ((`M.notMember` channelTargets tp) . (\(TPMsgQueue ident _ _ _ _) -> ident )) . channels $ tp
+runCheckChannelConnections ::
+    TerminaProgArch SemanticAnn
+    -> Either ArchitectureError ()
+runCheckChannelConnections = runReader (runExceptT checkChannelConnections)
 
-getUnusedResources :: TerminaProgArch SemanticAnn -> [Identifier]
-getUnusedResources tp = M.keys . M.filter ((`M.notMember` resourceSources tp) . resourceName) . resources $ tp
-
-getUnusedPools :: TerminaProgArch SemanticAnn -> [Identifier]
-getUnusedPools tp = M.keys . M.filter ((`M.notMember` resourceSources tp) . (\(TPPool ident _ _ _ _) -> ident)) . pools $ tp
+runCheckEmitterConnections :: 
+    TerminaProgArch SemanticAnn 
+    -> Either ArchitectureError ()
+runCheckEmitterConnections = runReader (runExceptT checkEmitterConnections)
 
 runCheckBoxSources :: 
     TerminaProgArch SemanticAnn 
