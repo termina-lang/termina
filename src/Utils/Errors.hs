@@ -48,6 +48,7 @@ instance ShowText Op where
     showText LogicalOr = "||"
 
 instance ShowText TypeParameter where
+    showText (TypeParamIdentifier ident) = T.pack ident
     showText (TypeParamTypeSpec ts) = showText ts
     showText (TypeParamSize size) = showText size
 

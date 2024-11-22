@@ -193,7 +193,8 @@ hexadecimal = Tok.lexeme lexer $
 
 typeParamParser :: Parser TypeParameter
 typeParamParser = do
-  TypeParamTypeSpec <$> typeSpecifierParser
+  TypeParamIdentifier <$> identifierParser
+  <|> TypeParamTypeSpec <$> typeSpecifierParser
   <|> TypeParamSize <$> sizeParser
 
 

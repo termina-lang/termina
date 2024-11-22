@@ -72,7 +72,9 @@ type Identifier = String
 type Address = TInteger
 
 data TypeParameter =
-  TypeParamTypeSpec TypeSpecifier
+  -- | Identifier that might be a defined type or a constant
+  TypeParamIdentifier Identifier
+  | TypeParamTypeSpec TypeSpecifier
   | TypeParamSize Size
   deriving (Show, Ord, Eq)
 

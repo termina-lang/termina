@@ -21,7 +21,7 @@ import Semantic.Errors.PPrinting (ppError)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Semantic.Monad
 import Core.AST
-import Configuration.Configuration (defaultConfig)
+import Configuration.Configuration 
 import Configuration.Platform
 
 -- | Data type for the "try" command arguments
@@ -60,7 +60,7 @@ loadSingleModule filePath = do
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
-    let config = defaultConfig "test" TestPlatform
+    let config = (\c -> c{ enableSystemInit = True }) $ defaultConfig "test" TestPlatform
         result = runTypeChecking (makeInitialGlobalEnv config []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->
