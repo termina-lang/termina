@@ -388,8 +388,10 @@ typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pa
   case expectedType of
     TArray ts arrsize -> do
       typed_exprs <- mapM (\e ->
-        catchMismatch (getAnnotation e)
-          (EArrayExprListInitializerExprTypeMismatch ts) (typeExpression (Just ts) typeObj e)) exprs
+        catchError (typeAssignmentExpression ts typeObj e) (\err -> case getError err of
+          EMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
+          EAssignmentExprMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
+          _ -> throwError err)) exprs
       size_value <- getIntSize pann arrsize
       unless (length typed_exprs == fromIntegral size_value)
         (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))

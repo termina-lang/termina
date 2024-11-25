@@ -91,9 +91,9 @@ genArrayInitialization before level cObj expr = do
                 return [no_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
         (ArrayExprListInitializer exprs _ann) ->
             genArrayItemsInitialization before level 0 exprs
-        (StructInitializer {}) -> genStructInitialization False level cObj expr
-        (OptionVariantInitializer {}) -> genOptionInitialization False level cObj expr
-        (EnumVariantInitializer {}) -> genEnumInitialization False level cObj expr
+        (StructInitializer {}) -> genStructInitialization before level cObj expr
+        (OptionVariantInitializer {}) -> genOptionInitialization before level cObj expr
+        (EnumVariantInitializer {}) -> genEnumInitialization before level cObj expr
         _ -> do
             cExpr <- genExpression expr
             exprType <- getExprType expr
@@ -130,7 +130,7 @@ genArrayInitialization before level cObj expr = do
                     cTs' <- genType noqual ts'
                     rhsCObject <- unboxObject rhsCExpr
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndexOf lhsCObj cIteratorExpr cTs') (CExprValOf (CIndexOf rhsCObject cIteratorExpr cTs') cTs' exprCAnn) ts' ann
-                    if before && lvl == 0then
+                    if before && lvl == 0 then
                         return [pre_cr $ _for_let initExpr condExpr incrExpr (block arrayInit)]
                     else
                         return [no_cr $ _for_let initExpr condExpr incrExpr (block arrayInit)]
