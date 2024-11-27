@@ -696,7 +696,7 @@ typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
   ((ps, typed_args), fty) <- typeMemberFunctionCall ann obj_ty ident args
-  maybe (return ()) (sameTyOrError ann fty) expectedType
+  maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
   return $ SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
 typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
@@ -708,7 +708,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
       ((ps, typed_args), fty) <- typeMemberFunctionCall ann rTy ident args
-      maybe (return ()) (sameTyOrError ann fty) expectedType
+      maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do

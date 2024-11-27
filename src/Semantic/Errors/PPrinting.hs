@@ -1656,6 +1656,13 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
             printSimpleError
                 sourceLines title fileName pos
                 (Just ("Applications cannot instantiate event emitters of class \x1b[31m" <> T.pack ident <> "\x1b[0m."))
+    ESingleExpressionTypeNotUnit ty ->
+        let title = "\x1b[31merror [SE-170]\x1b[0m: single expression type is not unit."
+        in
+            printSimpleError
+                sourceLines title fileName pos
+                (Just ("Expressions used in single-expression statements must have type \x1b[31m" <> showText TUnit <> 
+                       "\x1b[0m but the expression has type \x1b[31m" <> showText ty <> "\x1b[0m. Return values of functions cannot be ignored."))
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e

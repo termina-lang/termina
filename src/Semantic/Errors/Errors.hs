@@ -206,6 +206,7 @@ data Error
   | EInvalidEmitterType TerminaType -- ^ Invalid emitter type (SE-167)
   | EInvalidChannelType TerminaType -- ^ Invalid channel type (SE-168)
   | EEmitterClassNotInstantiable Identifier -- ^ Emitter class not instantiable (SE-169)
+  | ESingleExpressionTypeNotUnit TerminaType -- ^ Single expression type not unit (SE-170)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
