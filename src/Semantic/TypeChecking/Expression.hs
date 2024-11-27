@@ -863,4 +863,7 @@ typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds 
     checkSortedFields [] es _ = tError (EFieldValueAssignmentUnknownFields tyDef (fmap getFid es))
     checkSortedFields ms [] _ = tError (EFieldValueAssignmentMissingFields tyDef (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
-      typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)
+      if fieldIdentifier d == getFid a then
+        typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)
+      else
+        throwError $ annotateError faLoc (EFieldValueAssignmentMissingFields tyDef [fieldIdentifier d])
