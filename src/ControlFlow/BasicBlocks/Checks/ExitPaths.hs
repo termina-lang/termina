@@ -60,6 +60,23 @@ checkBlockPaths loc stmts = do
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (location ann) EEInvalidReturn
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (location ann) EEInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (location ann) EEInvalidContinue
+                (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
+                    checkBlockPaths loc (reverse (blockBody ifBlocks)) >> 
+                    mapM_
+                        (\(ElseIf _ elifBlocks ann') -> 
+                            checkBlockPaths (location ann') (reverse (blockBody elifBlocks))) elseIfBlocks >>
+                    checkBlockPaths loc (reverse (blockBody elseBlocks)) >>
+                    checkBlockPaths loc xb
+                (IfElseBlock _ ifBlocks _ _ _ : xb) ->
+                    checkBlockPaths loc (reverse (blockBody ifBlocks)) >>
+                    checkBlockPaths loc xb
+                (MatchBlock _ cases _ : xb) ->
+                    mapM_
+                        (\(MatchCase _ _ blocks ann) -> 
+                            checkBlockPaths (location ann) (reverse (blockBody blocks))) cases >>
+                    checkBlockPaths loc xb
+                (ForLoopBlock _ _ _ _ _ loopBlocks ann : xb) ->
+                    checkBlockPaths (location ann) (reverse (blockBody loopBlocks)) >> checkBlockPaths loc xb
                 (_ : xb) -> checkBlockPaths loc xb
         _ -> throwError $ annotateError Internal EEInvalidCheckState
 
