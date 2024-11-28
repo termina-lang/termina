@@ -998,7 +998,7 @@ interfaceProcedureParser = do
   reserved "procedure"
   name <- identifierParser
   params <- parens procedureParamsParser
-  reservedOp ";"
+  _ <- semi
   InterfaceProcedure name params . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
@@ -1083,24 +1083,20 @@ moduleIdentifierParser = sepBy1 firstCapital dot
       <$> (lower <?> "Module paths begin with a lowercase letter.")
       <*> (many (lower <|> char '_' <|> digit) <?> "Module names only accept lowercase letters or underscores.")
 
-singleModule :: Parser ([Modifier], [String])
-singleModule = do
-  modifiers <- many modifierParser
-  moduleIdent <- moduleIdentifierParser
-  return (modifiers, moduleIdent)
-
-moduleInclusionParser :: Parser Module
-moduleInclusionParser = do
+moduleImportParser :: Parser (ModuleImport ParserAnn)
+moduleImportParser = do
+  startPos <- getPosition
   reserved "import"
-  (m, ident) <- singleModule
+  ident <- moduleIdentifierParser
+  endPos <- getPosition
   _ <- semi
-  return $ ModInclusion ident m
+  return $ ModuleImport ident (Position startPos endPos)
 
 contents :: Parser a -> Parser a
 contents p = wspcs *> p <* eof
 
 terminaModuleParser :: Parser (TerminaModule ParserAnn)
-terminaModuleParser = wspcs *> (Termina <$> many moduleInclusionParser <*> contents topLevel)
+terminaModuleParser = wspcs *> (Termina <$> many moduleImportParser <*> contents topLevel)
 
 -- | Simple function to test parsers
 strParse :: String -> Either ParseError (AnnotatedProgram ParserAnn)

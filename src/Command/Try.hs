@@ -55,8 +55,8 @@ loadSingleModule filePath = do
     case runParser terminaModuleParser () filePath (TL.unpack src_code) of
         Left err -> die . errorMessage $ "Parsing error: " ++ show err
         Right term -> do
-            imports <- getModuleImports term
-            return $ TerminaModuleData noExtension filePath imports src_code (ParsingData . frags $ term)
+            -- Imported modules are ignored
+            return $ TerminaModuleData noExtension filePath [] src_code (ParsingData . frags $ term)
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do

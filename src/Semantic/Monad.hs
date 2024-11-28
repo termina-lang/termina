@@ -158,7 +158,7 @@ sysInitGlobalEnv =
 
 makeInitialGlobalEnv :: TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
 makeInitialGlobalEnv config pltEnvironment = 
-  if (enableSystemInit config) then 
+  if enableSystemInit config then 
     ExprST (fromList (stdlibGlobalEnv ++ sysInitGlobalEnv ++ pltEnvironment)) empty
   else
     ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty

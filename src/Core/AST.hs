@@ -50,14 +50,12 @@ instance Annotated (AnnASTElement' ty blk expr) where
   updateAnnotation (GlobalDeclaration glb) = GlobalDeclaration . updateAnnotation glb
   updateAnnotation (TypeDefinition t _) = TypeDefinition t
 
-data Module' ty pf = ModInclusion
+data ModuleImport' pf a = ModuleImport
   { moduleIdentifier ::  pf  -- Filepath!
-  , moduleMods :: [Modifier' ty]
+  , moduleAnn :: a
   }
-  deriving Show
+  deriving (Functor, Show)
 
-instance Functor (Module' ty) where
-  fmap f m = m{moduleIdentifier = f (moduleIdentifier m)}
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
@@ -339,7 +337,7 @@ data Const' ty = B Bool | I TInteger (Maybe ty) | C Char
 -- Termina Programs definitions
 
 data TerminaModule' ty blk expr pf a = Termina
-  { modules :: [Module' ty pf]
+  { modules :: [ModuleImport' pf a]
   , frags :: [AnnASTElement' ty blk expr a] }
   deriving Show
 

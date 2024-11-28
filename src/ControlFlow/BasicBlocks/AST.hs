@@ -151,5 +151,5 @@ type Statement = Statement' TerminaType Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
 
-type Module = Module' QualifiedName
+type ModuleImport = ModuleImport' QualifiedName
 type TerminaModule = TerminaModule' TerminaType Block Expression QualifiedName 

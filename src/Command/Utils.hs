@@ -22,6 +22,11 @@ import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
 import qualified ControlFlow.VarUsage.Errors.PPrinting as VUErrors
 import Configuration.Configuration
 import Data.Yaml
+import System.Directory
+import qualified Command.Errors.PPrinting as CE
+import Command.Errors.Errors (Error(EImportedFileNotFound))
+import Utils.Annotations
+import qualified Data.Text.Lazy as TL
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -36,11 +41,27 @@ debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
-getModuleImports :: PAST.TerminaModule ParserAnn -> IO [FilePath]
-getModuleImports = mapM (buildModuleName . moduleIdentifier) . modules
+getModuleImports :: FilePath -> FilePath -> TL.Text -> PAST.TerminaModule ParserAnn -> IO [FilePath]
+getModuleImports filePath srcPath src_code m = 
+    mapM buildAndTest (modules m)
+
+    where
+
+        modulePath = filePath <.> "fin"
+
+        buildAndTest :: PAST.ModuleImport ParserAnn -> IO FilePath
+        buildAndTest (ModuleImport modName ann) = do
+            qname <- buildModuleName modName
+            let importedPath = srcPath </> qname <.> "fin"
+            exists <- doesFileExist importedPath
+            if exists
+                then return qname
+                else
+                    let sourceFilesMap = M.fromList [(modulePath, src_code)] in
+                    CE.ppError sourceFilesMap (annotateError ann (EImportedFileNotFound importedPath)) >> exitFailure
 
 buildModuleName :: [String] -> IO QualifiedName
-buildModuleName [] = error . errorMessage $ "Internal parsing error: empty module name"
+buildModuleName [] = die . errorMessage $ "Internal parsing error: empty module name"
 buildModuleName [x] = die . errorMessage $ "Inalid module name \"" ++ show x ++ "\": modules cannot be at the root of the source folder"
 buildModuleName fs = buildModuleName' fs
 

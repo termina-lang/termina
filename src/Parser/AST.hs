@@ -222,5 +222,5 @@ type Statement = Statement' TypeSpecifier Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' TypeSpecifier Block Expression a]
 
-type Module = Module' TypeSpecifier [String]
+type ModuleImport = ModuleImport' [String]
 type TerminaModule = TerminaModule' TypeSpecifier Block Expression [String]

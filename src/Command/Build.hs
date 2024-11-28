@@ -10,6 +10,7 @@ import Command.Types
 
 import qualified Options.Applicative as O
 import Control.Monad
+import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
@@ -57,12 +58,13 @@ buildCmdArgsParser = BuildCmdArgs
 
 -- | Load Termina file 
 loadTerminaModule ::
-  -- | Path of the file to load
   FilePath
+  -- | Path of the file to load
+  -> FilePath
   -- | Path of the source folder that stores the imported modules
   -> FilePath
   -> IO ParsedModule
-loadTerminaModule filePath root = do
+loadTerminaModule root filePath srcPath = do
   let fullP = root </> filePath <.> "fin"
   -- read it
   src_code <- TLIO.readFile fullP
@@ -70,7 +72,7 @@ loadTerminaModule filePath root = do
   case runParser terminaModuleParser () fullP (TL.unpack src_code) of
     Left err -> die . errorMessage $ "Parsing error: " ++ show err
     Right term -> do
-      imports <- getModuleImports term
+      imports <- getModuleImports filePath srcPath src_code term
       return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
 
 -- | Load the modules of the project
@@ -98,7 +100,7 @@ loadModules imported srcPath = do
     then loadModules' fsLoaded fss
     -- Import and load it.
     else do
-      loadedModule <- loadTerminaModule fs srcPath
+      loadedModule <- loadTerminaModule srcPath fs srcPath
       let deps = importedModules loadedModule
       loadModules'
         (M.insert fs loadedModule fsLoaded)
@@ -319,7 +321,7 @@ buildCommand (BuildCmdArgs chatty) = do
     createDirectoryIfMissing True outputIncludeFolder
     -- | Load the main application module
     when chatty (putStrLn . debugMessage $ "Loading application's main module: \"" ++ appFolder config </> appFilename config <.> "fin" ++ "\"")
-    appModule <- loadTerminaModule (appFilename config) (appFolder config)
+    appModule <- loadTerminaModule (appFilename config) (appFolder config) (sourceModulesFolder config)
     -- | Load the project
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
@@ -329,7 +331,9 @@ buildCommand (BuildCmdArgs chatty) = do
     let projectDependencies = M.map importedModules parsedProject
     orderedDependencies <-
       either
-        (die . errorMessage . ("Detecte cycle between project source files: " ++) . show)
+        (\files ->
+          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map T.pack files) in
+          TIO.putStrLn msg >> exitFailure)
         return
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
