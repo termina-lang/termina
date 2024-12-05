@@ -97,7 +97,7 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    int8_t __0;\n" ++
-            "    char __1[35][20];\n" ++
+            "    char __1[35U][20U];\n" ++
             "} __enum_id0__variant3_params_t;\n" ++
             "\n" ++
             "typedef struct {\n" ++

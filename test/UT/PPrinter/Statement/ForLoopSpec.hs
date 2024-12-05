@@ -38,7 +38,7 @@ spec = do
     it "Prints a for loop statement without break condition" $ do
       renderStatement forLoop0 `shouldBe`
         pack (
-          "\nfor (size_t i = 0; i < 10; i = i + 1) {\n" ++
+          "\nfor (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
           "    \n" ++
           "    total = total + array0[i];\n" ++
           "\n" ++
@@ -46,7 +46,7 @@ spec = do
     it "Prints a for loop statement with break condition" $ do
       renderStatement forLoop1 `shouldBe`
         pack (
-          "\nfor (size_t i = 0; i < 10 && i != 5; i = i + 1) {\n" ++
+          "\nfor (size_t i = 0U; i < 10U && i != 5U; i = i + 1U) {\n" ++
           "    \n" ++
           "    total = total + array0[i];\n" ++
           "\n" ++

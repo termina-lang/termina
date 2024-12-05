@@ -62,27 +62,27 @@ spec = do
               "\n" ++ 
               "void test0() {\n" ++
               "    \n" ++
-              "    uint16_t foo = 0;\n" ++ 
+              "    uint16_t foo = 0U;\n" ++ 
               "\n" ++
-              "    foo = foo + 1024;\n" ++
+              "    foo = foo + 1024U;\n" ++
               "\n" ++
-              "    foo = 1024 + foo;\n" ++ 
+              "    foo = 1024U + foo;\n" ++ 
               "\n" ++
-              "    foo = foo - 1024;\n" ++ 
+              "    foo = foo - 1024U;\n" ++ 
               "\n" ++
-              "    foo = 1024 - foo;\n" ++
+              "    foo = 1024U - foo;\n" ++
               "\n" ++
-              "    foo = foo * 1024;\n" ++
+              "    foo = foo * 1024U;\n" ++
               "\n" ++
-              "    foo = 1024 * foo;\n" ++
+              "    foo = 1024U * foo;\n" ++
               "\n" ++
-              "    foo = foo / 1024;\n" ++
+              "    foo = foo / 1024U;\n" ++
               "\n" ++
-              "    foo = 1024 / foo;\n" ++
+              "    foo = 1024U / foo;\n" ++
               "\n" ++
-              "    foo = foo % 1024;\n" ++
+              "    foo = foo % 1024U;\n" ++
               "\n" ++
-              "    foo = 1024 % foo;\n" ++
+              "    foo = 1024U % foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -117,25 +117,25 @@ spec = do
              "\n" ++
              "    __termina_resource__lock(&self->__resource);\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024 + *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U + *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data - 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data - 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024 - *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U - *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data * 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data * 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024 * *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U * *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data / 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data / 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024 / *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U / *(uint16_t *)foo.data;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024;\n" ++
+             "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024U;\n" ++
              "\n" ++
-             "    *(uint16_t *)foo.data = 1024 % *(uint16_t *)foo.data;\n" ++
+             "    *(uint16_t *)foo.data = 1024U % *(uint16_t *)foo.data;\n" ++
              "\n" ++
               "    __termina_resource__unlock(&self->__resource);\n" ++
              "\n" ++

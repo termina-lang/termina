@@ -167,6 +167,42 @@ instance CPrint CObject where
         return $ parenPrec p 25 $ parens ptype <> pexpr
 
 instance CPrint CExpression where
+    pprintPrec _ (CExprConstant i@(CIntConst (CInteger value _)) ty _) =
+        case ty of
+            -- | According to MISRA-C rule 7.5, small integer variants of
+            -- minimum integer size macros cannot be used. This is because
+            -- certain compilers do not add the U suffix properly when literals
+            -- are unsigned. Here we are assuming that the integer size is 32
+            -- bits, and that the small integer sizes are 8 and 16 bits.
+            CTInt IntSize64 Unsigned _ -> do
+                val <- pprint i
+                return $ pretty "UINT64_C" <> parens val
+            CTInt IntSize128 Unsigned _ -> do
+                val <- pprint i
+                return $ pretty "UINT128_C" <> parens val
+            CTInt _ Unsigned _ -> do
+                val <- pprint i
+                return $ val <> pretty "U"
+            CTInt IntSize64 Signed _ ->
+                -- | Negative values cannot be expressed in hexadecimal format
+                if value < 0 then return $ pretty "-" <> pretty "INT64_C" <> parens (pretty (abs value))
+                else do
+                    val <- pprint i
+                    return $ pretty "INT64_C" <> parens val
+            CTInt IntSize128 Signed _ -> 
+                -- | Negative values cannot be expressed in hexadecimal format
+                if value < 0 then return $ pretty "-" <> pretty "INT128_C" <> parens (pretty (abs value))
+                else do
+                    val <- pprint i
+                    return $ pretty "INT128_C" <> parens val
+            CTInt _ Signed _ -> 
+                if value < 0 then return $ pretty "-" <> parens (pretty (abs value) <> pretty "L")
+                else return $ pretty value <> pretty "L"
+            -- | Until C23, we do not have a specific suffix for size_t integer
+            -- literals.  We should parameterize the suffix to be used for
+            -- size_t literals depending on the platform
+            CTSizeT _ -> return $ pretty value <> pretty "U"
+            _ -> pprint i
     pprintPrec _ (CExprConstant c _ _) = pprint c
     pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj
     pprintPrec p (CExprAddrOf obj _ _) = do

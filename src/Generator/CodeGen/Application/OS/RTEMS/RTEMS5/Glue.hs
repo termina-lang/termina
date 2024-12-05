@@ -159,9 +159,9 @@ genTaskClassCode tskCls = do
                     pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: rtems_task_argument),
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
                     no_cr $ var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code,
-                    -- uint32_t next_msg = 0;
+                    -- uint32_t next_msg = 0U;
                     no_cr $ var "next_msg" uint32_t @:= dec 0 @: uint32_t,
-                    -- size_t size = 0;
+                    -- size_t size = 0U;
                     no_cr $ var "size" size_t @:= dec 0 @: size_t,
                     -- Result result;
                     pre_cr $ var "result" (typeDef "Result"),

@@ -108,7 +108,7 @@ spec = do
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
-              "    self->interval = self->interval + 1;\n" ++
+              "    self->interval = self->interval + 1U;\n" ++
               "\n" ++
               "    __option_box_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
@@ -126,7 +126,7 @@ spec = do
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    _Bool check = CHousekeeping__check_interval(self, 10);\n" ++
+              "    _Bool check = CHousekeeping__check_interval(self, 10U);\n" ++
               "\n" ++
               "    if (check == 0) {\n" ++
               "        \n" ++

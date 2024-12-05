@@ -105,7 +105,7 @@ spec = do
               "\n" ++
               "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    uint32_t foo = 0;\n" ++
+              "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
@@ -115,7 +115,7 @@ spec = do
               "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        foo = 0;\n" ++
+              "        foo = 0U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -154,7 +154,7 @@ spec = do
               "\n" ++
               "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    uint32_t foo = 0;\n" ++
+              "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
               "        \n" ++
@@ -213,20 +213,20 @@ spec = do
               "\n" ++ 
               "uint32_t match_test1() {\n" ++
               "    \n" ++
-              "    uint32_t ret = 0;\n" ++
+              "    uint32_t ret = 0U;\n" ++
               "\n" ++
               "    Message msg;\n" ++
               "    msg.__variant = Message__In;\n" ++
-              "    msg.In.__0 = 10;\n" ++
-              "    msg.In.__1 = 10;\n" ++
+              "    msg.In.__0 = 10U;\n" ++
+              "    msg.In.__1 = 10U;\n" ++
               "\n" ++
               "    if (msg.__variant == Message__Stop) {\n" ++
               "        \n" ++
-              "        ret = 0;\n" ++
+              "        ret = 0U;\n" ++
               "\n" ++
               "    } else if (msg.__variant == Message__Reset) {\n" ++
               "        \n" ++
-              "        ret = 1;\n" ++
+              "        ret = 1U;\n" ++
               "\n" ++
               "    } else if (msg.__variant == Message__Out) {\n" ++
               "        \n" ++

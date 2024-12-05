@@ -28,9 +28,9 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void add_one(uint32_t input[5]);\n" ++
+              "void add_one(uint32_t input[5U]);\n" ++
               "\n" ++
-              "void slice_test0(uint32_t array0[5][10]);\n" ++
+              "void slice_test0(uint32_t array0[5U][10U]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function slice_test0" $ do
@@ -38,11 +38,11 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void add_one(uint32_t input[5]) {\n" ++
+              "void add_one(uint32_t input[5U]) {\n" ++
               "    \n" ++
-              "    for (size_t i = 0; i < 5; i = i + 1) {\n" ++
+              "    for (size_t i = 0U; i < 5U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        input[i] = input[i] + 1;\n" ++
+              "        input[i] = input[i] + 1U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -50,9 +50,9 @@ spec = do
               "\n" ++
               "}\n" ++
               "\n" ++
-              "void slice_test0(uint32_t array0[5][10]) {\n" ++
+              "void slice_test0(uint32_t array0[5U][10U]) {\n" ++
               "    \n" ++
-              "    add_one(&array0[0][0]);\n" ++
+              "    add_one(&array0[0U][0U]);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -61,9 +61,9 @@ spec = do
               "\n" ++ 
               "void assignment_test0() {\n" ++
               "    \n" ++
-              "    uint32_t foo0 = 0;\n" ++
+              "    uint32_t foo0 = 0U;\n" ++
               "\n" ++
-              "    uint32_t foo1 = 0;\n" ++
+              "    uint32_t foo1 = 0U;\n" ++
               "\n" ++
               "    foo1 = foo0;\n" ++
               "\n" ++
@@ -143,7 +143,7 @@ spec = do
               "\n" ++
               "    __termina_resource__lock(&self->__resource);\n" ++
               "\n" ++
-              "    uint32_t foo = 0;\n" ++
+              "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    *(uint32_t *)box_var0.data = foo;\n" ++
               "\n" ++

@@ -128,7 +128,7 @@ spec = do
           "                        __option_box_t param1);\n" ++
           "\n" ++
           "void Class0__procedure1(void * const __this, uint8_t param0,\n" ++
-          "                        uint8_t param1[32]);")
+          "                        uint8_t param1[32U]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypeDefinitionDecl M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
@@ -143,7 +143,7 @@ spec = do
             "\ntypedef struct {\n" ++
             "    __termina_resource_t __resource;\n" ++
             "    uint8_t field0;\n" ++
-            "    uint64_t field1[24];\n" ++
+            "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(void * const __this);")
@@ -153,7 +153,7 @@ spec = do
             "\ntypedef struct {\n" ++
             "    __termina_resource_t __resource;\n" ++
             "    uint8_t field0;\n" ++
-            "    uint64_t field1[24];\n" ++
+            "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(void * const __this);")
@@ -164,10 +164,10 @@ spec = do
             "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "    TMDescriptor field2[32];\n" ++
+            "    TMDescriptor field2[32U];\n" ++
             "} __attribute__((packed)) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16]);")
+            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16U]);")
     it "Prints an aligned class" $ do
       renderTypeDefinitionDecl M.empty alignedClass `shouldBe`
         pack (
@@ -175,8 +175,8 @@ spec = do
             "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "    TMDescriptor field2[32];\n" ++
-            "} __attribute__((aligned(16))) Class0;\n" ++
+            "    TMDescriptor field2[32U];\n" ++
+            "} __attribute__((aligned(16U))) Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(void * const __this);")
     it "Prints a packed & aligned class" $ do
@@ -186,8 +186,8 @@ spec = do
             "    __termina_resource_t __resource;\n" ++
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
-            "    TMDescriptor field2[32];\n" ++
-            "} __attribute__((packed, aligned(16))) Class0;\n" ++
+            "    TMDescriptor field2[32U];\n" ++
+            "} __attribute__((packed, aligned(16U))) Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(void * const __this);")
     it "Prints a class with a fixed location field" $ do

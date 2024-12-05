@@ -41,19 +41,19 @@ spec = do
               "\n" ++ 
               "void casting_test0() {\n" ++
               "    \n" ++
-              "    uint8_t bar_u8 = 0;\n" ++
+              "    uint8_t bar_u8 = 0U;\n" ++
               "\n" ++
-              "    uint16_t bar_u16 = 0;\n" ++
+              "    uint16_t bar_u16 = 0U;\n" ++
               "\n" ++
-              "    uint32_t bar_u32 = 0;\n" ++
+              "    uint32_t bar_u32 = 0U;\n" ++
               "\n" ++
-              "    int8_t bar_i8 = 0;\n" ++
+              "    int8_t bar_i8 = 0L;\n" ++
               "\n" ++
-              "    int16_t bar_i16 = 0;\n" ++
+              "    int16_t bar_i16 = 0L;\n" ++
               "\n" ++
-              "    int32_t bar_i32 = 0;\n" ++
+              "    int32_t bar_i32 = 0L;\n" ++
               "\n" ++
-              "    bar_u8 = (uint8_t)0xFFFF0000;\n" ++
+              "    bar_u8 = (uint8_t)0xFFFF0000U;\n" ++
               "\n" ++
               "    bar_u16 = (uint16_t)bar_u8;\n" ++
               "\n" ++

@@ -72,9 +72,9 @@ spec = do
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
-              "    uint32_t local = 0;\n" ++
+              "    uint32_t local = 0U;\n" ++
               "\n" ++
-              "    atomic_store(self->interval, 32);\n" ++
+              "    atomic_store(self->interval, 32U);\n" ++
               "\n" ++
               "    local = atomic_load(self->interval);\n" ++
               "\n" ++
@@ -109,11 +109,11 @@ spec = do
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
-              "    uint32_t local = 0;\n" ++
+              "    uint32_t local = 0U;\n" ++
               "\n" ++
-              "    atomic_store(&self->interval[0], 32);\n" ++
+              "    atomic_store(&self->interval[0U], 32U);\n" ++
               "\n" ++
-              "    local = atomic_load(&self->interval[1]);\n" ++
+              "    local = atomic_load(&self->interval[1U]);\n" ++
               "\n" ++
               "    return ret;\n" ++
               "\n" ++

@@ -44,25 +44,25 @@ spec = do
               "\n" ++ 
               "void array_test0() {\n" ++
               "    \n" ++
-              "    size_t foo = 0;\n" ++
+              "    size_t foo = 0U;\n" ++
               "\n" ++
-              "    uint32_t array0[10];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        array0[__i0] = 0;\n" ++
+              "    uint32_t array0[10U];\n" ++
+              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+              "        array0[__i0] = 0U;\n" ++
               "    }\n" ++
               "\n" ++
-              "    int64_t array1[10][5];\n" ++
-              "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-              "        for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-              "            array1[__i0][__i1] = 0;\n" ++
+              "    int64_t array1[10U][5U];\n" ++
+              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+              "        for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
+              "            array1[__i0][__i1] = INT64_C(0);\n" ++
               "        }\n" ++
               "    }\n" ++
               "\n" ++
-              "    array0[3] = 10;\n" ++
+              "    array0[3U] = 10U;\n" ++
               "\n" ++
-              "    array0[foo] = 1024;\n" ++
+              "    array0[foo] = 1024U;\n" ++
               "\n" ++
-              "    array1[3][4] = 1024;\n" ++
+              "    array1[3U][4U] = INT64_C(1024);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -74,7 +74,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void array_test1(uint32_t p_array0[10]);\n" ++
+              "void array_test1(uint32_t p_array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function array_test1" $ do
@@ -82,13 +82,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void array_test1(uint32_t p_array0[10]) {\n" ++
+              "void array_test1(uint32_t p_array0[10U]) {\n" ++
               "    \n" ++
-              "    uint32_t foo = 0;\n" ++
+              "    uint32_t foo = 0U;\n" ++
               "\n" ++
-              "    p_array0[3] = 10;\n" ++
+              "    p_array0[3U] = 10U;\n" ++
               "\n" ++
-              "    p_array0[(size_t)foo] = 1024;\n" ++
+              "    p_array0[(size_t)foo] = 1024U;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

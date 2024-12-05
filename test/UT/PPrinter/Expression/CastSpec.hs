@@ -32,10 +32,10 @@ spec = do
   describe "Pretty printing casting expressions" $ do
     it "Prints the expression ((0xFFFF0000 : u32) as u8)" $ do
       renderExpression castUInt32toUInt8 `shouldBe`
-        pack "(uint8_t)0xFFFF0000"
+        pack "(uint8_t)0xFFFF0000U"
     it "Prints the expression ((0xFFFF0000 : u32) as u16)" $ do
       renderExpression castUInt32toUInt16 `shouldBe`
-        pack "(uint16_t)0xFFFF0000"
+        pack "(uint16_t)0xFFFF0000U"
     it "Prints the expression (var0 as u8)" $ do
       renderExpression castVar0toUInt8 `shouldBe`
         pack "(uint8_t)var0"

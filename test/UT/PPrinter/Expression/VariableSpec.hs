@@ -46,7 +46,7 @@ spec = do
         pack "box_array1"
     it "Prints the unboxed variable box_array1 : 'box [[i64; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Unbox boxArray1 twoDymArrayObjAnn)) `shouldBe`
-        pack "(int64_t (*)[5])box_array1.data"
+        pack "(int64_t (*)[5U])box_array1.data"
     it "Prints the unboxed variable box_array2 : [[[char; 40 : u32]; 5 : u32]; 10 : u32]" $ do
       renderExpression (AccessObject (Unbox boxArray2 boxThreeDymArrayObjAnn)) `shouldBe`
-        pack "(char (*)[5][40])box_array2.data"
+        pack "(char (*)[5U][40U])box_array2.data"

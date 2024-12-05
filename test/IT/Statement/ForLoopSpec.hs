@@ -35,7 +35,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "uint16_t for_loop_test0(const uint16_t array0[10]);\n" ++
+              "uint16_t for_loop_test0(const uint16_t array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function for_loop_test0_test0" $ do
@@ -43,11 +43,11 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint16_t for_loop_test0(const uint16_t array0[10]) {\n" ++
+              "uint16_t for_loop_test0(const uint16_t array0[10U]) {\n" ++
               "    \n" ++
-              "    uint16_t total = 0;\n" ++
+              "    uint16_t total = 0U;\n" ++
               "\n" ++
-              "    for (size_t i = 0; i < 10; i = i + 1) {\n" ++
+              "    for (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
               "        \n" ++
               "        total = total + array0[i];\n" ++
               "\n" ++
@@ -63,7 +63,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "_Bool for_loop_test1(const uint16_t array0[10]);\n" ++
+              "_Bool for_loop_test1(const uint16_t array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test1" $ do
@@ -71,13 +71,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "_Bool for_loop_test1(const uint16_t array0[10]) {\n" ++
+              "_Bool for_loop_test1(const uint16_t array0[10U]) {\n" ++
               "    \n" ++
               "    _Bool found = 0;\n" ++
               "\n" ++
-              "    for (size_t i = 0; i < 10 && found == 0; i = i + 1) {\n" ++
+              "    for (size_t i = 0U; i < 10U && found == 0; i = i + 1U) {\n" ++
               "        \n" ++
-              "        if (array0[i] == 1024) {\n" ++
+              "        if (array0[i] == 1024U) {\n" ++
               "            \n" ++
               "            found = 1;\n" ++
               "\n" ++

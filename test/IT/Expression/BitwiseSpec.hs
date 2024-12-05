@@ -42,29 +42,29 @@ spec = do
               "\n" ++ 
               "void bitwise_test0(uint16_t foo) {\n" ++
               "    \n" ++
-              "    uint8_t bar8 = 0;\n" ++ 
+              "    uint8_t bar8 = 0U;\n" ++ 
               "\n" ++
-              "    uint16_t bar16 = 0;\n" ++ 
+              "    uint16_t bar16 = 0U;\n" ++ 
               "\n" ++
-              "    bar16 = foo << 8;\n" ++
+              "    bar16 = foo << 8U;\n" ++
               "\n" ++
-              "    bar8 = 8 << foo;\n" ++ 
+              "    bar8 = 8U << foo;\n" ++ 
               "\n" ++
-              "    bar16 = foo >> 8;\n" ++ 
+              "    bar16 = foo >> 8U;\n" ++ 
               "\n" ++
-              "    bar8 = 8 << foo;\n" ++
+              "    bar8 = 8U << foo;\n" ++
               "\n" ++
-              "    bar16 = foo & 1024;\n" ++
+              "    bar16 = foo & 1024U;\n" ++
               "\n" ++
-              "    bar16 = 1024 & foo;\n" ++
+              "    bar16 = 1024U & foo;\n" ++
               "\n" ++
-              "    bar16 = foo | 1024;\n" ++
+              "    bar16 = foo | 1024U;\n" ++
               "\n" ++
-              "    bar16 = 1024 | foo;\n" ++
+              "    bar16 = 1024U | foo;\n" ++
               "\n" ++
-              "    bar16 = foo ^ 1024;\n" ++
+              "    bar16 = foo ^ 1024U;\n" ++
               "\n" ++
-              "    bar16 = 1024 ^ foo;\n" ++
+              "    bar16 = 1024U ^ foo;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

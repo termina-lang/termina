@@ -67,7 +67,7 @@ spec = do
         pack "(uint32_t *)box_array0.data"
     it "Prints the expression: &box_array1" $ do
       renderExpression refBoxArray1expr `shouldBe`
-        pack "(int64_t (*)[5])box_array1.data"
+        pack "(int64_t (*)[5U])box_array1.data"
   describe "Pretty printing dereference expressions" $ do
     it "Prints the expression: *p_var0" $ do
       renderExpression derefpVar0 `shouldBe`

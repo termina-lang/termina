@@ -73,10 +73,10 @@ spec = do
     it "Prints a single if statement" $ do
       renderStatement singleIf `shouldBe`
         pack (
-          "\nif (foo0 == 0) {\n" ++
+          "\nif (foo0 == 0U) {\n" ++
           "    \n" ++
-          "    uint32_t array1[10];\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    uint32_t array1[10U];\n" ++
+          "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
@@ -88,10 +88,10 @@ spec = do
     it "Prints an if-else statement" $ do
       renderStatement ifElse `shouldBe`
         pack (
-          "\nif (foo0 != 4294901760) {\n" ++
+          "\nif (foo0 != 4294901760U) {\n" ++
           "    \n" ++
-          "    uint32_t array1[10];\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    uint32_t array1[10U];\n" ++
+          "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
@@ -108,10 +108,10 @@ spec = do
     it "Prints an if-else-if-else statement" $ do
       renderStatement ifElseIf `shouldBe`
         pack (
-          "\nif (foo0 != 4294901760) {\n" ++
+          "\nif (foo0 != 4294901760U) {\n" ++
           "    \n" ++
-          "    uint32_t array1[10];\n" ++
-          "    for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "    uint32_t array1[10U];\n" ++
+          "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
@@ -119,9 +119,9 @@ spec = do
           "    option0.__variant = Some;\n" ++
           "    option0.Some.__0 = box_var0;\n" ++
           "\n" ++
-          "} else if (foo0 == 0) {\n" ++
+          "} else if (foo0 == 0U) {\n" ++
           "    \n" ++
-          "    foo0 = 0;\n" ++
+          "    foo0 = 0U;\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++

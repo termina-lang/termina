@@ -46,27 +46,27 @@ spec = do
               "    \n" ++
               "    _Bool res = 0;\n" ++
               "\n" ++
-              "    res = foo == 1024;\n" ++
+              "    res = foo == 1024U;\n" ++
               "\n" ++
-              "    res = 1024 == foo;\n" ++
+              "    res = 1024U == foo;\n" ++
               "\n" ++
-              "    res = foo != 1024;\n" ++
+              "    res = foo != 1024U;\n" ++
               "\n" ++
-              "    res = 1024 != foo;\n" ++ 
+              "    res = 1024U != foo;\n" ++ 
               "\n" ++
-              "    res = foo > 1024;\n" ++
+              "    res = foo > 1024U;\n" ++
               "\n" ++
-              "    res = 1024 > foo;\n" ++
+              "    res = 1024U > foo;\n" ++
               "\n" ++
-              "    res = foo >= 1024;\n" ++
+              "    res = foo >= 1024U;\n" ++
               "\n" ++
-              "    res = 1024 >= foo;\n" ++
+              "    res = 1024U >= foo;\n" ++
               "\n" ++
-              "    res = foo < 1024;\n" ++
+              "    res = foo < 1024U;\n" ++
               "\n" ++
-              "    res = 1024 < foo;\n" ++
+              "    res = 1024U < foo;\n" ++
               "\n" ++
-              "    res = foo <= 1024;\n" ++
+              "    res = foo <= 1024U;\n" ++
               "\n" ++
               "    res = 1 && 0;\n" ++
               "\n" ++

@@ -57,22 +57,22 @@ spec = do
   describe "Pretty printing array index expressions" $ do
     it "Prints the expression: array[0x08 : u8]" $ do
       renderExpression array0IndexConstant `shouldBe`
-        pack "array0[8]"
+        pack "array0[8U]"
     it "Prints the expression: array[var0]" $ do
       renderExpression array0IndexVar0 `shouldBe`
         pack "array0[var0]"
     it "Prints the expression: array1[3 : u32][4 : u32]" $ do
       renderExpression array1IndexExpression `shouldBe`
-        pack "array1[3][4]"
+        pack "array1[3U][4U]"
     it "Prints the expression: box_array0[0x08 : u8]" $ do
       renderExpression boxArray0IndexConstant `shouldBe`
-        pack "((uint32_t *)box_array0.data)[8]"
+        pack "((uint32_t *)box_array0.data)[8U]"
     it "Prints the expression: box_array0[var0]" $ do
       renderExpression boxArray0IndexVar0 `shouldBe`
         pack "((uint32_t *)box_array0.data)[var0]"
     it "Prints the expression: *array0[3 : u32]" $ do
       renderExpression derefpArray0IndexConstant `shouldBe`
-        pack "p_array0[3]"
+        pack "p_array0[3U]"
     it "Prints the expression: *array0[var0]" $ do
       renderExpression derefpArray0IndexVar0 `shouldBe`
         pack "p_array0[var0]" 

@@ -80,114 +80,114 @@ logicalOrExpr = BinOp LogicalOr var1LTConstant var0LTEConstant boolExprSemAnn
 spec :: Spec
 spec = do
   describe "Pretty printing equality expressions" $ do
-    it "Prints the expression: var0 == 1024 : u16" $ do
+    it "Prints the expression: var0 == 1024U : u16" $ do
       renderExpression var0EqConstant `shouldBe`
-        pack "var0 == 1024"
-    it "Prints the expression: var1 == 1024 : u16 (var1 : 'box u16)" $ do
+        pack "var0 == 1024U"
+    it "Prints the expression: var1 == 1024U : u16 (var1 : 'box u16)" $ do
       renderExpression var1EqConstant `shouldBe`
-        pack "*(uint16_t *)var1.data == 1024"
+        pack "*(uint16_t *)var1.data == 1024U"
     it "Prints the expression: 1024 : u16 == var0" $ do
       renderExpression constantEqVar0 `shouldBe`
-        pack "1024 == var0"
+        pack "1024U == var0"
     it "Prints the expression: 1024 : u16 == var1 (var1 : 'box u16)" $ do
       renderExpression constantEqVar1 `shouldBe`
-        pack "1024 == *(uint16_t *)var1.data"
+        pack "1024U == *(uint16_t *)var1.data"
     it "Prints the expression: var0 == var1 (var1 : 'box u16)" $ do
       renderExpression var0EqVar1 `shouldBe`
         pack "var0 == *(uint16_t *)var1.data"
   describe "Pretty printing not-equality expressions" $ do
-    it "Prints the expression: var0 != 1024 : u16" $ do
+    it "Prints the expression: var0 != 1024U : u16" $ do
       renderExpression var0NeqConstant `shouldBe`
-        pack "var0 != 1024"
-    it "Prints the expression: var1 != 1024 : u16" $ do
+        pack "var0 != 1024U"
+    it "Prints the expression: var1 != 1024U : u16" $ do
       renderExpression var1NeqConstant `shouldBe`
-        pack "*(uint16_t *)var1.data != 1024"
+        pack "*(uint16_t *)var1.data != 1024U"
     it "Prints the expression: 1024 : u16 != var0" $ do
       renderExpression constantNeqVar0 `shouldBe`
-        pack "1024 != var0"
+        pack "1024U != var0"
     it "Prints the expression: 1024 : u16 != var1" $ do
       renderExpression constantNeqVar1 `shouldBe`
-        pack "1024 != *(uint16_t *)var1.data"
+        pack "1024U != *(uint16_t *)var1.data"
     it "Prints the expression: var0 != var1 : u16" $ do
       renderExpression var0NeqVar1 `shouldBe`
         pack "var0 != *(uint16_t *)var1.data"
   describe "Pretty printing greater than expressions" $ do
-    it "Prints the expression: var0 > 1024 : u16" $ do
+    it "Prints the expression: var0 > 1024U : u16" $ do
       renderExpression var0GTConstant `shouldBe`
-        pack "var0 > 1024"
-    it "Prints the expression: var1 > 1024 : u16 (var1 : 'box u16)" $ do
+        pack "var0 > 1024U"
+    it "Prints the expression: var1 > 1024U : u16 (var1 : 'box u16)" $ do
       renderExpression var1GTConstant `shouldBe`
-        pack "*(uint16_t *)var1.data > 1024"
+        pack "*(uint16_t *)var1.data > 1024U"
     it "Prints the expression: 1024 : u16 > var0" $ do
       renderExpression constantGTVar0 `shouldBe`
-        pack "1024 > var0"
+        pack "1024U > var0"
     it "Prints the expression: 1024 : u16 > var1 (var1 : 'box u16)" $ do
       renderExpression constantGTVar1 `shouldBe`
-        pack "1024 > *(uint16_t *)var1.data"
+        pack "1024U > *(uint16_t *)var1.data"
     it "Prints the expression: var0 > var1 : u16 (var1 : 'box u16)" $ do
       renderExpression var0GTVar1 `shouldBe`
         pack "var0 > *(uint16_t *)var1.data"
   describe "Pretty printing greater than or equal expressions" $ do
-    it "Prints the expression: var0 >= 1024 : u16" $ do
+    it "Prints the expression: var0 >= 1024U : u16" $ do
       renderExpression var0GTEConstant `shouldBe`
-        pack "var0 >= 1024"
-    it "Prints the expression: var1 >= 1024 : u16 (var1 : 'box u16)" $ do
+        pack "var0 >= 1024U"
+    it "Prints the expression: var1 >= 1024U : u16 (var1 : 'box u16)" $ do
       renderExpression var1GTEConstant `shouldBe`
-        pack "*(uint16_t *)var1.data >= 1024"
+        pack "*(uint16_t *)var1.data >= 1024U"
     it "Prints the expression: 1024 : u16 >= var0" $ do
       renderExpression constantGTEVar0 `shouldBe`
-        pack "1024 >= var0"
+        pack "1024U >= var0"
     it "Prints the expression: 1024 : u16 >= var1 (var1 : 'box u16)" $ do
       renderExpression constantGTEVar1 `shouldBe`
-        pack "1024 >= *(uint16_t *)var1.data"
+        pack "1024U >= *(uint16_t *)var1.data"
     it "Prints the expression: var0 >= var1 : u16 (var1 : 'box u16)" $ do
       renderExpression var0GTEVar1 `shouldBe`
         pack "var0 >= *(uint16_t *)var1.data"
   describe "Pretty printing less than expressions" $ do
-    it "Prints the expression: var0 < 1024 : u16" $ do
+    it "Prints the expression: var0 < 1024U : u16" $ do
       renderExpression var0LTConstant `shouldBe`
-        pack "var0 < 1024"
-    it "Prints the expression: var1 < 1024 : u16 (var1 : 'box u16)" $ do
+        pack "var0 < 1024U"
+    it "Prints the expression: var1 < 1024U : u16 (var1 : 'box u16)" $ do
       renderExpression var1LTConstant `shouldBe`
-        pack "*(uint16_t *)var1.data < 1024"
+        pack "*(uint16_t *)var1.data < 1024U"
     it "Prints the expression: 1024 : u16 < var0" $ do
       renderExpression constantLTVar0 `shouldBe`
-        pack "1024 < var0"
+        pack "1024U < var0"
     it "Prints the expression: 1024 : u16 < var1 (var1 : 'box u16)" $ do
       renderExpression constantLTVar1 `shouldBe`
-        pack "1024 < *(uint16_t *)var1.data"
+        pack "1024U < *(uint16_t *)var1.data"
     it "Prints the expression: var0 < var1 : u16 (var1 : 'box u16)" $ do
       renderExpression var0LTVar1 `shouldBe`
         pack "var0 < *(uint16_t *)var1.data"
   describe "Pretty printing less than expressions" $ do
-    it "Prints the expression: var0 < 1024 : u16" $ do
+    it "Prints the expression: var0 < 1024U : u16" $ do
       renderExpression var0LTConstant `shouldBe`
-        pack "var0 < 1024"
-    it "Prints the expression: var1 < 1024 : u16 (var1 : 'box u16)" $ do
+        pack "var0 < 1024U"
+    it "Prints the expression: var1 < 1024U : u16 (var1 : 'box u16)" $ do
       renderExpression var1LTConstant `shouldBe`
-        pack "*(uint16_t *)var1.data < 1024"
+        pack "*(uint16_t *)var1.data < 1024U"
     it "Prints the expression: 1024 : u16 < var0" $ do
       renderExpression constantLTVar0 `shouldBe`
-        pack "1024 < var0"
+        pack "1024U < var0"
     it "Prints the expression: 1024 : u16 < var1 (var1 : 'box u16)" $ do
       renderExpression constantLTVar1 `shouldBe`
-        pack "1024 < *(uint16_t *)var1.data"
+        pack "1024U < *(uint16_t *)var1.data"
     it "Prints the expression: var0 < var1 : u16 (var1 : 'box u16)" $ do
       renderExpression var0LTVar1 `shouldBe`
         pack "var0 < *(uint16_t *)var1.data"
   describe "Pretty printing less than or equal expressions" $ do
-    it "Prints the expression: var0 <= 1024 : u16" $ do
+    it "Prints the expression: var0 <= 1024U : u16" $ do
       renderExpression var0LTEConstant `shouldBe`
-        pack "var0 <= 1024"
-    it "Prints the expression: var1 <= 1024 : u16" $ do
+        pack "var0 <= 1024U"
+    it "Prints the expression: var1 <= 1024U : u16" $ do
       renderExpression var1LTEConstant `shouldBe`
-        pack "*(uint16_t *)var1.data <= 1024"
+        pack "*(uint16_t *)var1.data <= 1024U"
     it "Prints the expression: 1024 : u16 <= var0" $ do
       renderExpression constantLTEVar0 `shouldBe`
-        pack "1024 <= var0"
+        pack "1024U <= var0"
     it "Prints the expression: 1024 : u16 <= var1" $ do
       renderExpression constantLTEVar1 `shouldBe`
-        pack "1024 <= *(uint16_t *)var1.data"
+        pack "1024U <= *(uint16_t *)var1.data"
     it "Prints the expression: var0 <= var1 : u16" $ do
       renderExpression var0LTEVar1 `shouldBe`
         pack "var0 <= *(uint16_t *)var1.data"
@@ -197,11 +197,11 @@ spec = do
         pack "1 && 0"
     it "Prints the expression: var0 == var1 && var4 != var5" $ do
       renderExpression logicalAndExpr `shouldBe`
-        pack "var0 == *(uint16_t *)var1.data && var0 <= 1024"
+        pack "var0 == *(uint16_t *)var1.data && var0 <= 1024U"
   describe "Pretty printing logical or expressions" $ do
     it "Prints the expression: false || true" $ do
       renderExpression logicalOrConst `shouldBe`
         pack "0 || 1"
-    it "Prints the expression: var1 < 1024 || var2 == var3" $ do
+    it "Prints the expression: var1 < 1024U || var2 == var3" $ do
       renderExpression logicalOrExpr `shouldBe`
-        pack "*(uint16_t *)var1.data < 1024 || var0 <= 1024"
+        pack "*(uint16_t *)var1.data < 1024U || var0 <= 1024U"

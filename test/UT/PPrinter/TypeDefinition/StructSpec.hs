@@ -109,7 +109,7 @@ spec = do
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "    uint32_t field2[10];\n" ++
+            "    uint32_t field2[10U];\n" ++
             "} __attribute__((packed)) id0;")
     it "Prints an aligned struct" $ do
       renderTypeDefinitionDecl M.empty alignedStruct `shouldBe`
@@ -117,13 +117,13 @@ spec = do
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "    uint32_t field2[10];\n" ++
-            "} __attribute__((aligned(16))) id0;")
+            "    uint32_t field2[10U];\n" ++
+            "} __attribute__((aligned(16U))) id0;")
     it "Prints a packet & aligned struct" $ do
       renderTypeDefinitionDecl M.empty packedAndAlignedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "    uint32_t field2[10];\n" ++
-            "} __attribute__((packed, aligned(16))) id0;")
+            "    uint32_t field2[10U];\n" ++
+            "} __attribute__((packed, aligned(16U))) id0;")

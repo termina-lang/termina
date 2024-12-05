@@ -57,7 +57,7 @@ matchCaseNone = MatchCase "None" [] (Block [constToFoo1] stmtSemAnn) (matchCaseS
 --     foo1 = param0;
 --   }
 --   None => {
---     foo1 = 0;
+--     foo1 = 0U;
 --   }
 -- }
 matchOption0 :: Statement SemanticAnn 
@@ -86,7 +86,7 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    foo1 = 0;\n" ++
+          "    foo1 = 0U;\n" ++
           "\n" ++
           "}")
     it "Prints a match option array statement" $ do
@@ -94,13 +94,13 @@ spec = do
         pack (
           "\nif (option_var.__variant == None) {\n" ++
           "    \n" ++
-          "    foo1 = 0;\n" ++
+          "    foo1 = 0U;\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++
           "    __termina_box_t param1 = option_var.Some.__0;\n" ++
           "\n" ++
-          "    foo1 = ((uint32_t *)param1.data)[8];\n" ++
+          "    foo1 = ((uint32_t *)param1.data)[8U];\n" ++
           "\n" ++
           "}")
     it "Prints a match option statement with a complex expression" $ do
@@ -118,7 +118,7 @@ spec = do
           "\n" ++
           "    } else {\n" ++
           "        \n" ++
-          "        foo1 = 0;\n" ++
+          "        foo1 = 0U;\n" ++
           "\n" ++
           "    }\n" ++
           "\n" ++

@@ -99,7 +99,7 @@ spec = do
         pack "\nuint32_t foo1 = foo0;"
     it "Prints the statement var foo2 : u32 = 0 : u32;" $ do
       renderStatement foo2 `shouldBe`
-        pack "\nuint32_t foo2 = 0;"
+        pack "\nuint32_t foo2 = 0U;"
   describe "Pretty printing option variable declarations" $ do
     it "Prints the statement var option0 : TOption <'box u32> = Some(box_var0);" $ do
       renderStatement option0 `shouldBe`
@@ -123,19 +123,19 @@ spec = do
         pack (
           "\nMessage enum1;\n" ++
           "enum1.__variant = Message__In;\n" ++
-          "enum1.In.__0 = 0;\n" ++
-          "enum1.In.__1 = 0;")
+          "enum1.In.__0 = 0U;\n" ++
+          "enum1.In.__1 = 0U;")
   describe "Pretty printing struct variable declarations" $ do
-    it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor;" $ do
+    it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000U} : StructA} : TMDescriptor;" $ do
       renderStatement struct0 `shouldBe`
         pack (
         "\nTMDescriptor struct0;\n" ++
-        "struct0.field0 = 0;\n" ++
-        "struct0.field1.field_a = 0;\n" ++
-        "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-        "    struct0.field1.field_b[__i0] = 0;\n" ++
+        "struct0.field0 = 0U;\n" ++
+        "struct0.field1.field_a = 0U;\n" ++
+        "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+        "    struct0.field1.field_b[__i0] = 0U;\n" ++
         "}\n" ++
-        "struct0.field1.field_c = 4294901760;")
+        "struct0.field1.field_c = 4294901760U;")
     it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
       renderStatement struct1 `shouldBe`
         pack "\nTMDescriptor struct1 = struct0;"
@@ -143,45 +143,45 @@ spec = do
     it "Prints the statement var array1 : [u32; 10 : u32] = array0;" $ do
       renderStatement array1 `shouldBe`
         pack (
-          "\nuint32_t array1[10];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
+          "\nuint32_t array1[10U];\n" ++
+          "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "    array1[__i0] = array0[__i0];\n" ++
           "}")
     it "Prints the statement var array2 : [[u32; 5 : u32]; 10 : u32] = array0;" $ do
       renderStatement array2 `shouldBe`
         pack (
-          "\nint64_t array2[10][5];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
+          "\nint64_t array2[10U][5U];\n" ++
+          "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+          "    for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
           "        array2[__i0][__i1] = array1[__i0][__i1];\n" ++
           "    }\n" ++
           "}")
     it "Prints the statement var array3 : [u32; 10 : u32] = [0 : u32; 10 : u32];" $ do
       renderStatement array3 `shouldBe`
         pack (
-          "\nuint32_t array3[10];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    array3[__i0] = 0;\n" ++
+          "\nuint32_t array3[10U];\n" ++
+          "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+          "    array3[__i0] = 0U;\n" ++
           "}")
     it "Prints the statement var array4 : [[u32; 5 : u32]; 10 : u32] = [[0 : u32; 5 : u32]; 10 : u32];" $ do
       renderStatement array4 `shouldBe`
         pack (
-          "\nint64_t array4[10][5];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    for (size_t __i1 = 0; __i1 < 5; __i1 = __i1 + 1) {\n" ++
-          "        array4[__i0][__i1] = 0;\n" ++
+          "\nint64_t array4[10U][5U];\n" ++
+          "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+          "    for (size_t __i1 = 0U; __i1 < 5U; __i1 = __i1 + 1U) {\n" ++
+          "        array4[__i0][__i1] = 0U;\n" ++
           "    }\n" ++
           "}")
     it ("Prints the statement var array6 : [TMDescriptor; 20 : u32] = " ++
-        "[{field0 = 0 : u32; field1 = {field_a = 0; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
+        "[{field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
       renderStatement array5 `shouldBe`
         pack (
-          "\nTMDescriptor array5[20];\n" ++
-          "for (size_t __i0 = 0; __i0 < 10; __i0 = __i0 + 1) {\n" ++
-          "    array5[__i0].field0 = 0;\n" ++
-          "    array5[__i0].field1.field_a = 0;\n" ++
-          "    for (size_t __i1 = 0; __i1 < 10; __i1 = __i1 + 1) {\n" ++
-          "        array5[__i0].field1.field_b[__i1] = 0;\n" ++
+          "\nTMDescriptor array5[20U];\n" ++
+          "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
+          "    array5[__i0].field0 = 0U;\n" ++
+          "    array5[__i0].field1.field_a = 0U;\n" ++
+          "    for (size_t __i1 = 0U; __i1 < 10U; __i1 = __i1 + 1U) {\n" ++
+          "        array5[__i0].field1.field_b[__i1] = 0U;\n" ++
           "    }\n" ++
-          "    array5[__i0].field1.field_c = 4294901760;\n" ++
+          "    array5[__i0].field1.field_c = 4294901760U;\n" ++
           "}")

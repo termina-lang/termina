@@ -66,48 +66,48 @@ var0BitwiseXorVar1 = BinOp BitwiseXor var0 unboxVar1 uint16ExprSemAnn
 spec :: Spec
 spec = do
   describe "Pretty printing variable expression" $ do
-    it "Prints the expression: var0 << 0x8 : u8" $ do
+    it "Prints the expression: var0 << 0x8U : u8" $ do
       renderExpression var0LeftShiftConstant `shouldBe`
-        pack "var0 << 0x8"
-    it "Prints the expression: var1 << 0x8 : u8" $ do
+        pack "var0 << 0x8U"
+    it "Prints the expression: var1 << 0x8U : u8" $ do
       renderExpression var1LeftShiftConstant `shouldBe`
-        pack "*(uint16_t *)var1.data << 0x8"
+        pack "*(uint16_t *)var1.data << 0x8U"
     it "Prints the expression: 8 : u8 << var0" $ do
       renderExpression constantLeftShiftVar0 `shouldBe`
-        pack "0x8 << var0"
+        pack "0x8U << var0"
     it "Prints the expression: 8 : u8 << var1" $ do
       renderExpression constantLeftShiftVar1 `shouldBe`
-        pack "0x8 << *(uint16_t *)var1.data"
+        pack "0x8U << *(uint16_t *)var1.data"
     it "Prints the expression: var0 << var1 : u16" $ do
       renderExpression var0LeftShiftVar1 `shouldBe`
         pack "var0 << *(uint16_t *)var1.data"
-    it "Prints the expression: var0 << var1 << 0x8 : u8" $ do
+    it "Prints the expression: var0 << var1 << 0x8U : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 0x8"
-    it "Prints the expression: var0 >> 0x8 : u8" $ do
+        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 0x8U"
+    it "Prints the expression: var0 >> 0x8U : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
-        pack "var0 >> 0x8"
-    it "Prints the expression: 0x8 >> var0" $ do
+        pack "var0 >> 0x8U"
+    it "Prints the expression: 0x8U >> var0" $ do
       renderExpression constantRightShiftVar0 `shouldBe`
-        pack "0x8 >> var0"
+        pack "0x8U >> var0"
     it "Prints the expression: var0 & 1024 : u16" $ do
       renderExpression var0BitwiseAndConstant `shouldBe`
-        pack "var0 & 1024"
+        pack "var0 & 1024U"
     it "Prints the expression: 1024 : u16 & var0" $ do
       renderExpression constantBitwiseAndVar0 `shouldBe`
-        pack "1024 & var0"
+        pack "1024U & var0"
     it "Prints the expression: var0 & var1 : u16" $ do
       renderExpression var0BitwiseAndVar1 `shouldBe`
         pack "var0 & *(uint16_t *)var1.data"
     it "Prints the expression: var1 | 1024 : u16" $ do
       renderExpression var1BitwiseOrconstant `shouldBe`
-        pack "*(uint16_t *)var1.data | 1024"
+        pack "*(uint16_t *)var1.data | 1024U"
     it "Prints the expression: var0 | var1 : u16" $ do
       renderExpression var0BitwiseOrVar1 `shouldBe`
         pack "var0 | *(uint16_t *)var1.data"
     it "Prints the expression: var1 ^ 1024 : u16" $ do
       renderExpression var1BitwiseXorconstant `shouldBe`
-        pack "*(uint16_t *)var1.data ^ 1024"
+        pack "*(uint16_t *)var1.data ^ 1024U"
     it "Prints the expression: var0 ^ var1 : u16" $ do
       renderExpression var0BitwiseXorVar1 `shouldBe`
         pack "var0 ^ *(uint16_t *)var1.data"
