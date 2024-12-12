@@ -40,6 +40,8 @@ dependencies:
 - errata
 - optparse-applicative
 - yaml
+- lens
+- lsp
 
 ghc-options:
 - -Wall
