@@ -13,21 +13,39 @@ import qualified Data.Text as T
 import Control.Monad.State
 
 import qualified Language.LSP.Protocol.Lens as J
+import Configuration.Platform (checkPlatform)
+import Configuration.Configuration (TerminaConfig(..))
+import LSP.Logging
+import System.Directory (doesDirectoryExist)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do
+    infoM "Loading termina.yaml..."
     cfg <- loadConfig
     case cfg of
       Left err -> 
-        liftLSP $ 
-          sendNotification SMethod_WindowShowMessage 
-            (ShowMessageParams MessageType_Error $ "Error when parsing termina.yaml: " <> T.pack (show err))
+        errorM $ "Error when parsing termina.yaml: " <> T.pack (show err)
       Right config -> do
-        liftLSP $
-          sendNotification SMethod_WindowShowMessage
-            (ShowMessageParams MessageType_Info "Loaded termina.yaml")
-        put (ServerState (Just config))
-        return ()
+        -- We have loaded the configuration file. Then we must check that the platform is OK
+        -- Decode the selected platform field
+        infoM "Loaded termina.yaml"
+        case checkPlatform (platform config) of
+          Nothing ->
+            errorM $ "Unsupported platform: \"" <> T.pack (show (platform config)) <> "\""
+          Just _plt -> do
+            -- The platform is OK
+            -- Then we have to check the folder's structure
+            existSourceFolder <- liftIO $ doesDirectoryExist (sourceModulesFolder config)
+            existAppFolder <- liftIO $ doesDirectoryExist (appFolder config)
+            if not existSourceFolder then
+              errorM ("Source folder \"" <> T.pack (sourceModulesFolder config) <> "\" does not exist")
+            else if not existAppFolder then
+              errorM ("Application folder \"" <> T.pack (appFolder config) <> "\" does not exist")
+            else
+              -- At this point, no files have been loaded into the VFS, so we must read all
+              -- the files directly from the file system.
+              put (ServerState (Just config))
+
 
 handlers :: Handlers HandlerM
 handlers =
@@ -37,16 +55,8 @@ handlers =
         return ()
       , notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
         let fileURI = msg ^. J.params . J.textDocument . J.uri
-        liftLSP $
-              sendNotification SMethod_WindowShowMessage
-                (ShowMessageParams MessageType_Info $ T.pack ("File changed: " ++ show (uriToFilePath fileURI)))
-    , requestHandler SMethod_TextDocumentHover $ \req responder -> do
-        let TRequestMessage _ _ _ (HoverParams _doc pos _workDone) = req
-            Position _l _c' = pos
-            rsp = Hover (InL ms) (Just range)
-            ms = mkMarkdown "Hello world"
-            range = Range pos pos
-        responder (Right $ InL rsp)
+        sendNotification SMethod_WindowShowMessage
+            (ShowMessageParams MessageType_Info $ T.pack ("File changed: " ++ show (uriToFilePath fileURI)))
     ]
 
 

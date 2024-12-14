@@ -21,5 +21,5 @@ lspCmdArgsParser = LSPCmdArgs
 -- | Command handler for the "lsp" command
 lspCommand :: LSPCmdArgs -> IO ()
 lspCommand (LSPCmdArgs chatty) = do
-  when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
+  when chatty (putStrLn . debugMessage $ "Starting language server")
   lspRunServer

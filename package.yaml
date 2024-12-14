@@ -42,6 +42,7 @@ dependencies:
 - yaml
 - lens
 - lsp
+- co-log-core
 
 ghc-options:
 - -Wall
