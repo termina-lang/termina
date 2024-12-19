@@ -22,12 +22,6 @@ data Error
 
 type ParsingErrors = AnnotatedError Error Location
 
-instance Annotated (AnnotatedError Error) where
-
-  getAnnotation (AnnotatedError _err ann) = ann
-
-  updateAnnotation (AnnotatedError err _) = AnnotatedError err
-
 instance ErrorMessage ParsingErrors where
 
     errorIdent (AnnotatedError (EParsingError _err) _pos) = "PE-001"

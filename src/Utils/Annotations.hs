@@ -41,6 +41,11 @@ data AnnotatedError a b =
     AnnotatedError a b
   deriving Show
 
+instance Annotated (AnnotatedError a) where
+  getAnnotation (AnnotatedError _err ann) = ann
+
+  updateAnnotation (AnnotatedError err _) = AnnotatedError err
+  
 getError :: AnnotatedError a b -> a
 getError (AnnotatedError err _ann) = err
 
