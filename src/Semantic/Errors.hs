@@ -1,11 +1,17 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- | Module Encapsulating Semantic Errors
 
-module Semantic.Errors.Errors where
+module Semantic.Errors where
 
 -- Termina AST
 import Semantic.AST
 import Utils.Annotations
+import Utils.Errors
+import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Language.LSP.Protocol.Types as LSP
+import Text.Parsec
 
 ----------------------------------------
 -- Type checker error handling
@@ -215,3 +221,39 @@ instance Annotated (AnnotatedError Error) where
   getAnnotation (AnnotatedError _err ann) = ann
 
   updateAnnotation (AnnotatedError err _) = AnnotatedError err
+
+instance ErrorMessage SemanticErrors where
+
+    errorIdent (AnnotatedError (EInvalidArrayIndexing _ts) _pos) = "SE-001"
+    errorIdent (AnnotatedError (ENotNamedObject _ident) _pos) = "SE-002"
+    errorIdent _ = "Unkonwn"
+
+    errorTitle (AnnotatedError (EInvalidArrayIndexing _ts) _pos) = "invalid array indexing"
+    errorTitle _ = "Unknown"
+
+    toText e@(AnnotatedError (EInvalidArrayIndexing ts) pos@(Position start _end)) files =
+        let fileName = sourceName start
+            sourceLines = files M.! fileName
+            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
+        in
+            pprintSimpleError
+                sourceLines title fileName pos
+                (Just ("You are trying to index an object of type \x1b[31m" <> showText ts <> "\x1b[0m.")) 
+    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
+    
+    toDiagnostic e@(AnnotatedError (EInvalidArrayIndexing _ts) pos) _files =
+        LSP.Diagnostic (loc2Range pos)
+            (Just LSP.DiagnosticSeverity_Error)
+            Nothing Nothing Nothing
+            text (Just []) Nothing Nothing
+        
+        where 
+            text = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
+    toDiagnostic _ _files = 
+        LSP.Diagnostic 
+            emptyRange
+            (Just LSP.DiagnosticSeverity_Error)
+            Nothing Nothing Nothing
+            text (Just []) Nothing Nothing
+        where 
+            text = T.pack "\x1b[31mUknown\x1b[0m."

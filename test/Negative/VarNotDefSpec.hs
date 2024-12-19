@@ -1,7 +1,7 @@
 module Negative.VarNotDefSpec (spec) where
 
 import Test.Hspec
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Negative.Common
 
 test0 :: String

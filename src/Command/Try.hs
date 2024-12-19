@@ -9,20 +9,19 @@ import Modules.Modules
 import Command.Types
 import System.FilePath
 import System.Exit
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as TLIO
-import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
-import Semantic.Errors.PPrinting (ppError)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Semantic.Monad
 import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
+import Utils.Errors
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -50,9 +49,9 @@ loadSingleModule ::
 loadSingleModule filePath = do
     let noExtension = dropExtension filePath
     -- read it
-    src_code <- TLIO.readFile filePath
+    src_code <- TIO.readFile filePath
     -- parse it
-    case runParser terminaModuleParser () filePath (TL.unpack src_code) of
+    case runParser terminaModuleParser () filePath (T.unpack src_code) of
         Left err -> die . errorMessage $ "Parsing error: " ++ show err
         Right term -> do
             -- Imported modules are ignored
@@ -65,7 +64,7 @@ typeSingleModule parsedModule = do
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in
-            ppError sourceFilesMap err >> exitFailure
+            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         (Right (typedProgram, _)) -> 
             return $ TerminaModuleData
                     (qualifiedName parsedModule)
@@ -98,17 +97,24 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
     -- | Type check the module
     typedModule <- typeSingleModule terminaModule
     -- | Generate basic blocks
-    bbModule <- genBasicBlocksModule typedModule
-    -- | Check basic blocks paths
-    checkBasicBlocksPaths bbModule
-    -- | Check variable usage (if enabled)
-    unless noUsageChecking (useDefCheckModule bbModule)
-    if printHeader then
-        -- | Print the resulting header file into the standard output
-        printHeaderModule debugBuild bbModule
-    else
-        -- | Print the resulting source file into the standard output
-        printSourceModule debugBuild bbModule
+    case genBasicBlocksModule typedModule of
+        Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+        Right bbModule -> do
+            maybe (return ()) 
+                (\err -> TIO.putStrLn (toText err M.empty) >> exitFailure) 
+                $ basicBlockPathsCheckModule bbModule
+            -- | Check variable usage (if enabled)
+            unless noUsageChecking (
+                    maybe (return ()) 
+                        (\err -> TIO.putStrLn (toText err M.empty) >> exitFailure) 
+                        $ useDefCheckModule bbModule
+                )
+            if printHeader then
+                -- | Print the resulting header file into the standard output
+                printHeaderModule debugBuild bbModule
+            else
+                -- | Print the resulting source file into the standard output
+                printSourceModule debugBuild bbModule
 
 
 

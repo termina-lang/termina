@@ -7,9 +7,7 @@ import Control.Lens ((^.))
 import Language.LSP.Server
 import Language.LSP.Protocol.Message
 import LSP.Monad
-import LSP.Config
 import Language.LSP.Protocol.Types
-import qualified Data.Text as T
 import Control.Monad.State
 
 import qualified Language.LSP.Protocol.Lens as J
@@ -17,6 +15,8 @@ import Configuration.Platform (checkPlatform)
 import Configuration.Configuration (TerminaConfig(..))
 import LSP.Logging
 import System.Directory (doesDirectoryExist)
+import qualified Data.Text as T
+import Command.Utils (loadConfig)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do

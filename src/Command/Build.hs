@@ -11,9 +11,7 @@ import Command.Types
 import qualified Options.Applicative as O
 import Control.Monad
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy.IO as TLIO
 import qualified Semantic.AST as SAST
 
 import System.FilePath
@@ -21,7 +19,7 @@ import System.Exit
 import System.Directory
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
-import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 import Extras.TopSort
 import Semantic.Types (SemanticAnn)
 import Semantic.Monad (Environment, makeInitialGlobalEnv)
@@ -33,8 +31,6 @@ import Generator.LanguageC.Printer (runCPrinter)
 import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.CodeGen.Application.Option (runGenOptionHeaderFile)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
-import qualified Semantic.Errors.PPrinting as SE
-import qualified ControlFlow.Architecture.Errors.PPrinting as AE
 import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
@@ -42,6 +38,7 @@ import Core.AST
 import Generator.Environment
 import Generator.Platform
 import Configuration.Platform
+import Utils.Errors
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -67,13 +64,16 @@ loadTerminaModule ::
 loadTerminaModule root filePath srcPath = do
   let fullP = root </> filePath <.> "fin"
   -- read it
-  src_code <- TLIO.readFile fullP
+  src_code <- TIO.readFile fullP
   -- parse it
-  case runParser terminaModuleParser () fullP (TL.unpack src_code) of
+  case runParser terminaModuleParser () fullP (T.unpack src_code) of
     Left err -> die . errorMessage $ "Parsing error: " ++ show err
     Right term -> do
-      imports <- getModuleImports filePath srcPath src_code term
-      return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
+      mimports <- getModuleImports srcPath term
+      case mimports of
+        Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+        Right imports ->
+          return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
 
 -- | Load the modules of the project
 loadModules
@@ -140,7 +140,7 @@ typeModules parsedProject =
           let sourceFilesMap = 
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                     M.empty parsedProject in
-          SE.ppError sourceFilesMap err >> exitFailure
+          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         (Right (typedProgram, newState)) -> do
           let typedModule =
                 TerminaModuleData
@@ -150,9 +150,6 @@ typeModules parsedProject =
                   (sourcecode parsedModule)
                   (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
-
-useDefCheckModules :: BasicBlocksProject -> IO ()
-useDefCheckModules = mapM_ useDefCheckModule . M.elems
 
 optionMapModules :: TypedProject -> (OptionMap, OptionMap)
 optionMapModules = M.partitionWithKey
@@ -231,7 +228,7 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
           let sourceFilesMap = 
                 M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                     M.empty bbProject in
-          AE.ppError sourceFilesMap err >> exitFailure
+          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
 checkEmitterConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -242,7 +239,7 @@ checkEmitterConnections bbProject progArchitecture =
       let sourceFilesMap = 
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
-      AE.ppError sourceFilesMap err >> exitFailure
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkChannelConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -253,7 +250,7 @@ checkChannelConnections bbProject progArchitecture =
       let sourceFilesMap = 
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
-      AE.ppError sourceFilesMap err >> exitFailure
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkResourceUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -264,7 +261,7 @@ checkResourceUsage bbProject progArchitecture =
       let sourceFilesMap = 
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
-      AE.ppError sourceFilesMap err >> exitFailure
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkPoolUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
@@ -275,14 +272,8 @@ checkPoolUsage bbProject progArchitecture =
       let sourceFilesMap = 
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
-      AE.ppError sourceFilesMap err >> exitFailure
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
-
-genBasicBlocks :: TypedProject -> IO BasicBlocksProject
-genBasicBlocks = mapM genBasicBlocksModule
-
-checkProjectBasicBlocksPaths :: BasicBlocksProject -> IO ()
-checkProjectBasicBlocksPaths = mapM_ checkBasicBlocksPaths . M.elems
 
 checkProjectBoxSources :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
 checkProjectBoxSources bbProject progArchitecture = 
@@ -295,7 +286,7 @@ checkProjectBoxSources bbProject progArchitecture =
       let sourceFilesMap = 
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
-      AE.ppError sourceFilesMap err >> exitFailure
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 -- | Command handler for the "build" command
@@ -303,7 +294,9 @@ buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
-    config <- loadConfig
+    config <- loadConfig >>= either (
+            \err -> TIO.putStrLn (T.pack $ show err) >> exitFailure
+          ) return
     -- | Decode the selected platform field
     plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
@@ -345,12 +338,29 @@ buildCommand (BuildCmdArgs chatty) = do
     let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
-    bbProject <- genBasicBlocks typedProject
+    bbProject <- 
+      either
+        (\err -> 
+          TIO.putStrLn (toText err M.empty) >> exitFailure)
+        return
+        $ genBasicBlocks typedProject
     when chatty (putStrLn . debugMessage $ "Checking basic blocks paths")
-    checkProjectBasicBlocksPaths bbProject
+    case basicBlockPathsCheckModules bbProject of
+      Nothing -> return ()
+      Just err -> 
+        let sourceFilesMap = 
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+              M.empty bbProject in
+        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
-    useDefCheckModules bbProject
+    case useDefCheckModules bbProject of
+      Nothing -> return ()
+      Just err -> 
+        let sourceFilesMap = 
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+              M.empty bbProject in
+        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies 

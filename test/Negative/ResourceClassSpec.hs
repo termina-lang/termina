@@ -2,7 +2,7 @@ module Negative.ResourceClassSpec (spec) where
 
 import Test.Hspec
 import Semantic.AST
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Utils.Annotations
 import Negative.Common
 

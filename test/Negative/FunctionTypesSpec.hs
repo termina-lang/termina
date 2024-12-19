@@ -2,7 +2,7 @@ module Negative.FunctionTypesSpec (spec) where
 
 import Test.Hspec
 import Semantic.AST
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Negative.Common
 
 test0 :: String

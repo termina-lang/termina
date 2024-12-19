@@ -13,7 +13,7 @@ statement and build our sets and maps backwards.
 --}
 
 import ControlFlow.VarUsage.Computation
-import ControlFlow.VarUsage.Errors.Errors
+import ControlFlow.VarUsage.Errors
 
 import Utils.Annotations
 

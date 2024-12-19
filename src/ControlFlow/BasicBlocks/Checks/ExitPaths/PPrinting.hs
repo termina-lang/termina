@@ -1,16 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting where
 
-import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors
-
-import qualified Data.Text.Lazy as TL
-import Text.Parsec.Pos
-import qualified Data.Map as M
-import Utils.Annotations
-import Utils.Errors
-
+{--
 ppError :: M.Map FilePath TL.Text ->
     PathsCheckError -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
@@ -105,3 +97,4 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
+--}

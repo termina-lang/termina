@@ -5,7 +5,7 @@ module ControlFlow.Architecture.Checks.BoxSources (
 
 import Control.Monad
 import Control.Monad.Except
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 import Control.Monad.Reader
 import ControlFlow.Architecture.Types
 import Semantic.Types

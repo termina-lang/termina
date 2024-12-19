@@ -5,7 +5,7 @@ import Parser.Parsing
 
 import Semantic.TypeChecking
 import Semantic.Monad
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Utils.Annotations
 import Configuration.Platform
 import Configuration.Configuration

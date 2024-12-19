@@ -9,7 +9,7 @@ import Modules.Modules
 import qualified Data.Set as S
 import Data.List (group, sort, foldl')
 import Control.Monad.Except
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 import Semantic.Types
 import Utils.Annotations
 

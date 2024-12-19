@@ -1,14 +1,13 @@
 -- | Semantic Error Printing
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
-module Semantic.Errors.PPrinting where
+module Semantic.Errors.Messages where
 
-import Semantic.Errors.Errors
+{-- import Semantic.Errors
 
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as TLIO
 import Text.Parsec.Pos
 import Errata
 import Errata.Styles
@@ -16,11 +15,16 @@ import Semantic.AST
 import qualified Data.Map as M
 import Utils.Annotations
 import Utils.Errors
+import qualified Language.LSP.Protocol.Types as LSP
+import Data.Maybe
 
 
+--}
+    
 
 -- useful prettyprinter doc
 -- https://hackage.haskell.org/package/prettyprinter-1.7.1/docs/Prettyprinter.html
+{--
 ppError :: M.Map FilePath TL.Text ->
     SemanticErrors -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
@@ -28,18 +32,12 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
       sourceLines = toModuleAST M.! fileName
   in
   case e of
-    (EInvalidArrayIndexing ts) -> 
-        let title = "\x1b[31merror [SE-001]\x1b[0m: invalid array indexing."
-        in
-            printSimpleError
-                sourceLines title fileName pos
-                (Just ("You are trying to index an object of type \x1b[31m" <> showText ts <> "\x1b[0m.")) 
     (ENotNamedObject ident) ->
         let title = "\x1b[31merror [SE-002]\x1b[0m: Object not found."
         in
             printSimpleError
                 sourceLines title fileName pos
-                (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared"))
+                (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")) 
     (ENotConstant ident) ->
         let
             title = "\x1b[31merror [SE-003]\x1b[0m: invalid use of a non-constant object."
@@ -1666,3 +1664,4 @@ ppError toModuleAST (AnnotatedError e pos@(Position start end)) =
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
+--}

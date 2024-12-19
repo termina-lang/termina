@@ -5,7 +5,7 @@ module ControlFlow.Architecture (
 import ControlFlow.Architecture.Types
 import Control.Monad
 import Control.Monad.Except
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 import qualified Control.Monad.State.Strict as ST
 import ControlFlow.BasicBlocks.AST
 import Data.Maybe

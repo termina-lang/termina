@@ -3,9 +3,6 @@ module Command.Utils  where
 import Command.Types
 
 import System.FilePath
-import System.Exit
-
-import qualified Data.Map.Strict as M
 
 import qualified Parser.AST as PAST
 import Core.AST
@@ -18,15 +15,17 @@ import Modules.Modules
 
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
 import ControlFlow.BasicBlocks.Checks.ExitPaths
-import qualified ControlFlow.BasicBlocks.Checks.ExitPaths.PPrinting as EPErrors
-import qualified ControlFlow.VarUsage.Errors.PPrinting as VUErrors
 import Configuration.Configuration
 import Data.Yaml
 import System.Directory
-import qualified Command.Errors.PPrinting as CE
-import Command.Errors.Errors (Error(EImportedFileNotFound))
 import Utils.Annotations
-import qualified Data.Text.Lazy as TL
+import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors (PathsCheckError)
+import ControlFlow.VarUsage.Errors (VarUsageError)
+import ControlFlow.BasicBlocks.Errors (BBGeneratorError)
+import Parser.Errors
+import Control.Monad.IO.Class
+import Data.Functor ((<&>))
+import qualified Data.Map as M
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -41,51 +40,60 @@ debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
-getModuleImports :: FilePath -> FilePath -> TL.Text -> PAST.TerminaModule ParserAnn -> IO [FilePath]
-getModuleImports filePath srcPath src_code m = 
-    mapM buildAndTest (modules m)
-
+getModuleImports :: (MonadIO m) => FilePath -> PAST.TerminaModule ParserAnn -> m (Either ParsingErrors [FilePath])
+getModuleImports srcPath m =
+    mapM buildAndTest (modules m) <&> sequence
     where
 
-        modulePath = filePath <.> "fin"
-
-        buildAndTest :: PAST.ModuleImport ParserAnn -> IO FilePath
+        buildAndTest :: (MonadIO m) => PAST.ModuleImport ParserAnn -> m (Either ParsingErrors FilePath)
         buildAndTest (ModuleImport modName ann) = do
-            qname <- buildModuleName modName
-            let importedPath = srcPath </> qname <.> "fin"
-            exists <- doesFileExist importedPath
-            if exists
-                then return qname
-                else
-                    let sourceFilesMap = M.fromList [(modulePath, src_code)] in
-                    CE.ppError sourceFilesMap (annotateError ann (EImportedFileNotFound importedPath)) >> exitFailure
+            let mname = buildModuleName ann modName
+            case mname of
+                Left err -> return $ Left err
+                Right qname -> do
+                    let importedPath = srcPath </> qname <.> "fin"
+                    exists <- liftIO $ doesFileExist importedPath
+                    if exists
+                        then return $ Right importedPath
+                        else
+                            return $ Left (annotateError ann (EImportedFileNotFound importedPath))
 
-buildModuleName :: [String] -> IO QualifiedName
-buildModuleName [] = die . errorMessage $ "Internal parsing error: empty module name"
-buildModuleName [x] = die . errorMessage $ "Inalid module name \"" ++ show x ++ "\": modules cannot be at the root of the source folder"
-buildModuleName fs = buildModuleName' fs
+buildModuleName :: Location -> [String] -> Either ParsingErrors QualifiedName
+buildModuleName loc [] = Left $ annotateError loc EEmptyModuleName
+buildModuleName loc [x] = Left $ annotateError loc (EInvalidModuleName x)
+buildModuleName loc fs = buildModuleName' fs
 
   where
 
-    buildModuleName' :: [String] -> IO QualifiedName
-    buildModuleName' [] = error . errorMessage $ "Internal parsing error: empty module name"
-    buildModuleName' [x] = pure x
+    buildModuleName' :: [String] -> Either ParsingErrors QualifiedName
+    buildModuleName' [] = Left $ annotateError loc EEmptyModuleName
+    buildModuleName' [x] = Right x
     buildModuleName' (x:xs) = (x </>) <$> buildModuleName' xs
 
-useDefCheckModule :: BasicBlocksModule -> IO ()
-useDefCheckModule bbModule =
-    let result = runUDAnnotatedProgram . basicBlocksAST . metadata $ bbModule in
-    case result of
-    Nothing -> return ()
-    Just err -> 
-        let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
-        VUErrors.ppError sourceFilesMap err >> exitFailure
+useDefCheckModules :: BasicBlocksProject -> Maybe VarUsageError
+useDefCheckModules = check . M.elems
 
-genBasicBlocksModule :: TypedModule -> IO BasicBlocksModule
+    where
+    
+        check [] = Nothing
+        check [x] = useDefCheckModule x
+        check (x:xs) =
+            case useDefCheckModule x of
+                Nothing -> check xs
+                Just err -> Just err
+
+useDefCheckModule :: BasicBlocksModule -> Maybe VarUsageError
+useDefCheckModule =
+    runUDAnnotatedProgram . basicBlocksAST . metadata
+
+genBasicBlocks :: TypedProject -> Either BBGeneratorError BasicBlocksProject
+genBasicBlocks = mapM genBasicBlocksModule
+
+genBasicBlocksModule :: TypedModule -> Either BBGeneratorError BasicBlocksModule
 genBasicBlocksModule typedModule = do
     let result = runGenBBModule . typedAST . metadata $ typedModule
     case result of
-        Left err -> die . errorMessage $ show err
+        Left err -> Left err
         Right bbAST -> pure $ TerminaModuleData
             (qualifiedName typedModule)
             (fullPath typedModule)
@@ -93,24 +101,30 @@ genBasicBlocksModule typedModule = do
             (sourcecode typedModule)
             (BasicBlockData bbAST)
 
-checkBasicBlocksPaths :: BasicBlocksModule -> IO ()
-checkBasicBlocksPaths bbModule = do
+basicBlockPathsCheckModules :: BasicBlocksProject -> Maybe PathsCheckError
+basicBlockPathsCheckModules = check . M.elems
+
+    where
+    
+        check [] = Nothing
+        check [x] = basicBlockPathsCheckModule x
+        check (x:xs) =
+            case basicBlockPathsCheckModule x of
+                Nothing -> check xs
+                Just err -> Just err
+
+basicBlockPathsCheckModule :: BasicBlocksModule -> Maybe PathsCheckError
+basicBlockPathsCheckModule bbModule = do
     let result = runCheckExitPaths . basicBlocksAST . metadata $ bbModule
     case result of
-        Left err -> 
-            let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
-            EPErrors.ppError sourceFilesMap err >> exitFailure
-        Right _ -> return ()
+        Left err -> Just err
+        Right _ -> Nothing
 
 -- | Load "termina.yaml" configuration file
-loadConfig :: IO TerminaConfig
-loadConfig = do
-    config <- decodeFileEither "termina.yaml"
-    case config of
-        Left (InvalidYaml (Just (YamlException err))) -> die . errorMessage $ err
-        Left err -> die . errorMessage $ show err
-        Right c -> return c
+loadConfig :: (MonadIO m) => m (Either ParseException TerminaConfig)
+loadConfig =
+    liftIO $ decodeFileEither "termina.yaml"
 
-serializeConfig :: FilePath -> TerminaConfig -> IO ()
+serializeConfig :: (MonadIO m) => FilePath -> TerminaConfig -> m ()
 serializeConfig filePath config = do
-    encodeFile (filePath </> "termina" <.> "yaml") config
+    liftIO $ encodeFile (filePath </> "termina" <.> "yaml") config

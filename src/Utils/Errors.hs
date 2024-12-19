@@ -3,8 +3,6 @@
 module Utils.Errors where
 
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.IO as TLIO
 import Errata
 import Errata.Styles
 
@@ -12,6 +10,9 @@ import Semantic.AST
 import Numeric
 import Utils.Annotations
 import Text.Parsec.Pos
+import qualified Language.LSP.Protocol.Types as LSP
+import qualified Data.Map as M
+import qualified Data.Text.Lazy as TL
 
 class ShowText a where
     showText :: a -> T.Text
@@ -132,11 +133,39 @@ instance ShowText (TypeDef' ty blk a) where
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
     showText (Interface ident _ _) = T.pack $ "interface " <> ident
 
-printSimpleError :: TL.Text -> T.Text -> String -> Location -> Maybe T.Text -> IO ()
-printSimpleError sourceLines errorMessage fileName (Position start end) msg = 
-    TLIO.putStrLn $ prettyErrors 
-        sourceLines
-        [genSimpleErrata]
+class ErrorMessage a where
+
+    -- | Error identifier 
+    errorIdent :: a -> T.Text
+
+    -- | Error title
+    errorTitle :: a -> T.Text
+
+    -- | Generates a message from a given error.
+    toText :: 
+        a -- ^ The error
+        -> M.Map FilePath T.Text -- ^ Map of the project's source files to their contents
+        -> T.Text
+
+    -- | Generates an LSP diagnostic from a given error
+    toDiagnostic :: 
+        a -- ^ The error
+        -> M.Map FilePath T.Text -- ^ Map of the project's source files to their contents
+        -> LSP.Diagnostic
+    
+emptyRange :: LSP.Range
+emptyRange = LSP.Range (LSP.Position 0 0) (LSP.Position 0 0)
+
+loc2Range :: Location -> LSP.Range
+loc2Range (Position start end) = 
+    LSP.Range 
+        (LSP.Position (fromIntegral (sourceLine start) - 1) (fromIntegral (sourceColumn start) - 1))
+        (LSP.Position (fromIntegral (sourceLine end) - 1) (fromIntegral (sourceColumn end) - 1))
+loc2Range _ = emptyRange
+
+pprintSimpleError :: T.Text -> T.Text -> String -> Location -> Maybe T.Text -> T.Text
+pprintSimpleError sourceLines errorMessage fileName (Position start end) msg = 
+    TL.toStrict $ prettyErrors sourceLines [genSimpleErrata]
     
     where
 
@@ -147,7 +176,7 @@ printSimpleError sourceLines errorMessage fileName (Position start end) msg =
             if startLine == endLine then 
                 sourceColumn end 
             else 
-                fromIntegral $ TL.length (TL.lines sourceLines !! (startLine - 1)) + 1
+                T.length (T.lines sourceLines !! (startLine - 1)) + 1
 
         genSimpleBlock :: Errata.Block
         genSimpleBlock = Errata.Block
@@ -162,4 +191,4 @@ printSimpleError sourceLines errorMessage fileName (Position start end) msg =
             (Just errorMessage)
             [genSimpleBlock]
             msg
-printSimpleError _ _ _ _ _ = error "Internal error: invalid error position"
+pprintSimpleError _ _ _ _ _ = error "Internal error: invalid error position"

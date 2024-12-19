@@ -17,7 +17,7 @@ import Utils.Annotations
 import Core.AST as CAST
 import Semantic.AST
 
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Semantic.Types
 import Core.Utils
 

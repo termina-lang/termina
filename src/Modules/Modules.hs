@@ -3,7 +3,7 @@
 module Modules.Modules where
 
 -- Containers
-import qualified Data.Text.Lazy as TL
+import qualified Data.Text as T
 
 type QualifiedName = FilePath
 
@@ -19,7 +19,7 @@ data TerminaModuleData a = TerminaModuleData {
   -- | List of imported modules
   importedModules :: ![QualifiedName],
   -- | Source code
-  sourcecode :: TL.Text,
+  sourcecode :: T.Text,
   -- | Module meta-data (e.g. parsed AST)
   metadata :: a
 } deriving (Show)

@@ -9,7 +9,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import ControlFlow.Architecture.Utils
 import Control.Monad.Except
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 
 type ActionForwardingMonad = ExceptT ArchitectureError (ST.State ActionForwardingMap)
 

@@ -1,17 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module ControlFlow.VarUsage.Errors.PPrinting where
 
-import ControlFlow.VarUsage.Errors.Errors
-
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import Text.Parsec.Pos
-import qualified Data.Map as M
-import Utils.Annotations
-import Utils.Errors
-
+{--
 ppError :: M.Map FilePath TL.Text ->
     VarUsageError -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
@@ -161,3 +152,4 @@ ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
     _ -> putStrLn $ show pos ++ ": " ++ show e
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
+--}

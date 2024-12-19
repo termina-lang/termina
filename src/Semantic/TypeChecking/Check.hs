@@ -5,7 +5,7 @@ import qualified Semantic.AST as SAST
 import Semantic.Monad
 import Control.Monad
 import Control.Monad.Except
-import Semantic.Errors.Errors
+import Semantic.Errors
 import Core.Utils
 import qualified Core.AST as CAST
 import qualified Data.List

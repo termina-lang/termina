@@ -1,19 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module ControlFlow.Architecture.Errors.PPrinting where
 
-import ControlFlow.Architecture.Errors.Errors
-
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import Text.Parsec.Pos
-import qualified Data.Map as M
-import Utils.Annotations
-import Utils.Errors
-import ControlFlow.BasicBlocks.AST
-import qualified Data.Text.IO as TIO
-
+{--
 ppError :: M.Map FilePath TL.Text ->
     ArchitectureError -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position startPos _endPos)) =
@@ -138,3 +127,4 @@ ppError _ (AnnotatedError (EDisconnectedEmitter emitterId) Internal) =
         "\x1b[0m is not connected to any sink port. " <>
         "All event sources must be connected to a target.")
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
+--}

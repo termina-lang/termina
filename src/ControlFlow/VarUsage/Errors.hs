@@ -1,11 +1,18 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- | Module With Errors
 
-module ControlFlow.VarUsage.Errors.Errors where
+module ControlFlow.VarUsage.Errors where
 
 import Core.AST (Identifier)
 
 import Utils.Annotations
 import ControlFlow.VarUsage.Types
+import Utils.Errors
+import qualified Data.Text as T
+import Text.Parsec
+import qualified Data.Map as M
+import qualified Language.LSP.Protocol.Types as LSP
 
 data Error
   = ESetMaxBound -- ^ The set has reached its maximum bound (Internal)  
@@ -39,3 +46,40 @@ data Error
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
+
+instance ErrorMessage VarUsageError where
+
+    errorIdent (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "VE-001"
+    errorIdent (AnnotatedError (ENotUsed _ident) _pos) = "VE-002"
+    errorIdent (AnnotatedError e _pos) = T.pack $ show e
+
+    errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using a variable that is ignored"
+    errorTitle _ = "Unknown"
+
+    toText e@(AnnotatedError (EUsedIgnoredParameter ident) pos@(Position start _end)) files =
+        let fileName = sourceName start
+            sourceLines = files M.! fileName
+            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
+        in
+            pprintSimpleError
+                sourceLines title fileName pos
+                (Just ("Parameter \x1b[31m" <> T.pack ident <>
+                    "\x1b[0m is ignored and should not be used."))
+    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
+    
+    toDiagnostic e@(AnnotatedError (EUsedIgnoredParameter _ident) pos) _files =
+        LSP.Diagnostic (loc2Range pos)
+            (Just LSP.DiagnosticSeverity_Error)
+            Nothing Nothing Nothing
+            text (Just []) Nothing Nothing
+        
+        where 
+            text = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
+    toDiagnostic _ _files = 
+        LSP.Diagnostic 
+            emptyRange
+            (Just LSP.DiagnosticSeverity_Error)
+            Nothing Nothing Nothing
+            text (Just []) Nothing Nothing
+        where 
+            text = T.pack "\x1b[31mUknown\x1b[0m."

@@ -13,7 +13,7 @@ import Semantic.Types
 import Control.Monad
 -- Error module
 import Control.Monad.Except
-import Semantic.Errors.Errors
+import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 

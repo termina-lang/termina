@@ -7,7 +7,7 @@ import Core.Utils
 import Semantic.Utils
 
 -- Top Sort
-import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 
 -- Termina Semantic AST
 import qualified Semantic.AST as SAST
@@ -18,7 +18,7 @@ import qualified Semantic.AST as SAST
 import Semantic.Types
 import Control.Monad
 import Control.Monad.Except
-import Semantic.Errors.Errors
+import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 

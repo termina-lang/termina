@@ -2,20 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Command.Errors.PPrinting where
+module Parser.Errors.PPrinting where
 
-import Command.Errors.Errors
-
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import Text.Parsec.Pos
-import qualified Data.Map as M
-import Utils.Annotations
-    ( AnnotatedError(AnnotatedError), Location(Position) )
-import Utils.Errors
-
-ppError :: M.Map FilePath TL.Text ->
-    CommandErrors -> IO ()
+{--
+ppError :: M.Map FilePath T.Text ->
+    ParsingErrors -> IO ()
 ppError toModuleAST (AnnotatedError e pos@(Position start _end)) =
   let fileName = sourceName start
       sourceLines = toModuleAST M.! fileName
@@ -29,3 +20,4 @@ ppError toModuleAST (AnnotatedError e pos@(Position start _end)) =
                 (Just ("Imported file invalid or not found: " <> T.pack (show qname)))
 -- | Print the error as is
 ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
+--}

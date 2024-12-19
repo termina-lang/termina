@@ -8,7 +8,7 @@ import qualified Control.Monad.State.Strict as ST
 import Control.Monad.Except
 
 import qualified Data.Map as M
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 import Semantic.Types
 import ControlFlow.Architecture.Utils
 import Utils.Annotations

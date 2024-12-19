@@ -15,7 +15,7 @@ import qualified Semantic.AST as SAST
 import Semantic.Types
 import Control.Monad
 import Control.Monad.Except
-import Semantic.Errors.Errors
+import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 

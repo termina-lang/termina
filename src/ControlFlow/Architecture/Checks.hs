@@ -9,7 +9,7 @@ import Semantic.Types
 import ControlFlow.Architecture.Types
 import Control.Monad.Reader
 import Control.Monad.Except
-import ControlFlow.Architecture.Errors.Errors
+import ControlFlow.Architecture.Errors
 import ControlFlow.Architecture.Checks.BoxSources
 import ControlFlow.Architecture.Checks.Connections
 

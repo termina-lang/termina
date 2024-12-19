@@ -10,7 +10,7 @@ module ControlFlow.VarUsage.Computation (
 
 import ControlFlow.BasicBlocks.AST 
 
-import ControlFlow.VarUsage.Errors.Errors
+import ControlFlow.VarUsage.Errors
 import ControlFlow.VarUsage.Types
 
 import Control.Monad
@@ -21,7 +21,7 @@ import Control.Monad.Except as E
 -- contain. They do not fail if the limit is rechead.
 -- Sets
 -- Maps
-import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 import Utils.Annotations ( Location(Internal), annotateError )
 import qualified Data.Set as S
 
