@@ -110,7 +110,10 @@ typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt 
     <*> addLocalImmutObjs anns [(it_id, it_ty)] (typeBlock retTy body_stmt)
     <*> return (buildStmtAnn anns)
 typeStatement _retTy (SingleExpStmt expr anns) = do
-  typed_expr <- catchMismatch anns ESingleExpressionTypeNotUnit (typeExpression (Just TUnit) typeRHSObject expr)
+  typed_expr <- catchError (typeExpression (Just TUnit) typeRHSObject expr) (
+    \err -> case getError err of
+      EMismatch ty _ -> throwError $ annotateError anns (ESingleExpressionTypeNotUnit ty)
+      _ -> throwError err)
   return $ SAST.SingleExpStmt typed_expr (buildStmtAnn anns)
 typeStatement retTy (MatchStmt matchE cases ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
