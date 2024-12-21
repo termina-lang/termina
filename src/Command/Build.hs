@@ -18,6 +18,7 @@ import System.FilePath
 import System.Exit
 import System.Directory
 import Parser.Parsing (terminaModuleParser)
+import Parser.Errors
 import Text.Parsec (runParser)
 import qualified Data.Map as M
 import Extras.TopSort
@@ -39,6 +40,8 @@ import Generator.Environment
 import Generator.Platform
 import Configuration.Platform
 import Utils.Errors
+import Utils.Annotations
+import Text.Parsec.Error
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -67,11 +70,17 @@ loadTerminaModule root filePath srcPath = do
   src_code <- TIO.readFile fullP
   -- parse it
   case runParser terminaModuleParser () fullP (T.unpack src_code) of
-    Left err -> die . errorMessage $ "Parsing error: " ++ show err
+    Left err -> 
+      let pErr = annotateError (Position (errorPos err) (errorPos err)) (EParseError err)
+          fileMap = M.singleton fullP src_code
+      in
+      TIO.putStrLn (toText pErr fileMap) >> exitFailure
     Right term -> do
       mimports <- getModuleImports srcPath term
       case mimports of
-        Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+        Left err -> 
+          let fileMap = M.singleton fullP src_code in
+          TIO.putStrLn (toText err fileMap) >> exitFailure
         Right imports ->
           return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
 

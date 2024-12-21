@@ -394,19 +394,6 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "SE-170"
     errorIdent _ = "Internal"
 
-{--
-ppError :: M.Map FilePath TL.Text ->
-    SemanticErrors -> IO ()
-ppError files (AnnotatedError e pos@(Position start end)) =
-  let fileName = sourceName start
-      sourceLines = files M.! fileName
-  in
-  case e of
-    _ -> putStrLn $ show pos ++ ": " ++ show e
--- | Print the error as is
-ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
---}
-
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
     errorTitle (AnnotatedError (ENotNamedObject _ident) _pos) = "object not found"
     errorTitle (AnnotatedError (ENotConstant _ident) _pos) = "invalid use of a non-constant object"
@@ -577,7 +564,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
     errorTitle (AnnotatedError (EInvalidChannelType _ty) _pos) = "invalid channel type"
     errorTitle (AnnotatedError (EEmitterClassNotInstantiable _ident) _pos) = "emitter class is not instantiable"
     errorTitle (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "single expression type is not unit"
-    errorTitle (AnnotatedError err _pos) = T.pack $ show err
+    errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
         let fileName = sourceName start
@@ -858,7 +845,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             (Just ("Procedure \x1b[31m" <> T.pack procId <>
                                 "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
                                 "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             procSourceLines "The interface of the procedure is defined here:" procFileName
                             procPos Nothing
@@ -871,7 +858,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             (Just ("Procedure \x1b[31m" <> T.pack procId <>
                                 "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <>
                                 "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             procSourceLines "The interface of the procedure is defined here:" procFileName
                             procPos Nothing
@@ -882,7 +869,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                         pprintSimpleError
                             sourceLines title fileName pos
                             (Just ("Parameter is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
+                                "\x1b[0m but you are defining it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             procSourceLines
                                 ("The procedure \x1b[31m" <> T.pack procId <>
@@ -999,7 +986,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple actions.")) <>
+                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple actions.\n")) <>
                         pprintSimpleError
                             actSourceLines "Another action is defined here:" actFileName
                             prevActPos Nothing
@@ -1014,7 +1001,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple sink ports.")) <>
+                            (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines multiple sink ports.\n")) <>
                         pprintSimpleError
                             portSourceLines "Another sink port is defined here:" portFileName
                             prevPortPos Nothing
@@ -1072,7 +1059,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             sourceLines title fileName pos
                             (Just ("Function \x1b[31m" <> T.pack funcId <>
                                 "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
@@ -1084,7 +1071,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             sourceLines title fileName pos
                             (Just ("Function \x1b[31m" <> T.pack funcId <>
                                 "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
@@ -1096,7 +1083,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             sourceLines title fileName pos
                             (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <> "\x1b[0m of function \x1b[31m" <> T.pack funcId <>
                                 "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
+                                "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
@@ -1212,10 +1199,10 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                         (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
                 EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <>
-                                "\x1b[0m but the array has size \x1b[31m" <> showText actualSize <> "\x1b[0m."))
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> showText expectedSize <>
+                            "\x1b[0m but the array has size \x1b[31m" <> showText actualSize <> "\x1b[0m."))
                 EConstantWithoutKnownType c ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -1309,7 +1296,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type.")) <>
+                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a type.\n")) <>
                         pprintSimpleError
                             globalSourceLines "The global object is defined here:" globalFileName
                             globalPos Nothing
@@ -1327,7 +1314,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.")) <>
+                            (Just ("The symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already defined.\n")) <>
                         pprintSimpleError
                             symbolSourceLines "The symbol was previoulsy defined here:" symbolFileName
                             symbolPos Nothing
@@ -1353,7 +1340,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             sourceLines title fileName pos
                             (Just ("Action \x1b[31m" <> T.pack ident <>
                                 "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             actSourceLines "The action is defined here:" actFileName
                             actionPos Nothing
@@ -1364,7 +1351,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                         pprintSimpleError
                             sourceLines title fileName pos
                             (Just ("Action \x1b[31m" <> T.pack ident <>
-                                "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.")) <>
+                                "\x1b[0m requires \x1b[31mone\x1b[0m parameter but you are providing \x1b[31mnone\x1b[0m.\n")) <>
                         pprintSimpleError
                             actSourceLines "The action is defined here:" actFileName
                             actionPos Nothing
@@ -1386,7 +1373,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             (Just ("Enum variant \x1b[31m" <> T.pack variant <>
                                 "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
                                 "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             enumSourceLines "The enum is defined here:" enumFileName
                             enumPos Nothing
@@ -1399,7 +1386,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             (Just ("Enum variant \x1b[31m" <> T.pack variant <>
                                 "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
                                 "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             enumSourceLines "The enum is defined here:" enumFileName
                             enumPos Nothing
@@ -1413,7 +1400,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                                 "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <>
                                 "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
                                 "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
+                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             enumSourceLines "The enum is defined here:" enumFileName
                             enumPos Nothing
@@ -1427,7 +1414,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a function.")) <>
+                            (Just ("The global object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a function.\n")) <>
                         pprintSimpleError
                             globalSourceLines "The global object is defined here:" globalFileName
                             globalPos Nothing
@@ -1503,7 +1490,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             sourceLines title fileName pos
                             (Just ("Member function \x1b[31m" <> T.pack funcId <>
                                 "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.")) <>
+                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show argNumber) <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
@@ -1528,7 +1515,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                             (Just ("Argument \x1b[31m#" <> T.pack (show argNumber) <>
                                 "\x1b[0m of member function \x1b[31m" <> T.pack funcId <>
                                 "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
+                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
@@ -1587,7 +1574,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                                 recordSourceLines = files M.! recordFileName
                             in
                             pprintSimpleError
-                                recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
                                 recordPos Nothing
                         _ -> ""
                 EFieldValueAssignmentUnknownFields (record, recordPos) [field] ->
@@ -1615,7 +1602,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                                 recordSourceLines = files M.! recordFileName
                             in
                             pprintSimpleError
-                                recordSourceLines ("The type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
+                                recordSourceLines ("\nThe type \x1b[31m" <> showText record <> "\x1b[0m is defined here:") recordFileName
                                 recordPos Nothing
                         _ -> ""
                 EFieldNotFixedLocation fieldName ty ->
@@ -1657,7 +1644,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                         pprintSimpleError
                             sourceLines title fileName pos
                             (Just ("Field \x1b[31m" <> T.pack field <>
-                                "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.")) <>
+                                "\x1b[0m is not a field of the type \x1b[31m" <> T.pack recordId <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             recordSourceLines ("The type \x1b[31m" <> T.pack recordId <> "\x1b[0m is defined here:") recordFileName
                             recordPos Nothing
@@ -1679,7 +1666,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The type cannot be defined because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) <>
+                            (Just ("The type cannot be defined because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
                         pprintSimpleError
                             prevSourceLines "The symbol is previously used here:" prevFileName
                             prevPos Nothing
@@ -1689,7 +1676,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The global object cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) <>
+                            (Just ("The global object cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
                         pprintSimpleError
                             prevSourceLines "The symbol is previously used here:" prevFileName
                             prevPos Nothing
@@ -1699,7 +1686,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("The function cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.")) <>
+                            (Just ("The function cannot be declared because the symbol \x1b[31m" <> T.pack ident <> "\x1b[0m is already in use.\n")) <>
                         pprintSimpleError
                             prevSourceLines "The symbol is previously used here:" prevFileName
                             prevPos Nothing
@@ -1782,7 +1769,7 @@ ppError _ (AnnotatedError e pos) = putStrLn $ show pos ++ ": " ++ show e
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
-                            (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the match statement.")) <>
+                            (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is duplicated in the match statement.\n")) <>
                         pprintSimpleError
                             prevSourceLines "The variant is previously used here:" prevFileName
                             prevCase Nothing

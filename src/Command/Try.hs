@@ -22,6 +22,9 @@ import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
 import Utils.Errors
+import Parser.Errors
+import Utils.Annotations
+import Text.Parsec.Error
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -52,7 +55,11 @@ loadSingleModule filePath = do
     src_code <- TIO.readFile filePath
     -- parse it
     case runParser terminaModuleParser () filePath (T.unpack src_code) of
-        Left err -> die . errorMessage $ "Parsing error: " ++ show err
+        Left err -> 
+            let pErr = annotateError (Position (errorPos err) (errorPos err)) (EParseError err)
+                fileMap = M.singleton filePath src_code
+            in
+            TIO.putStrLn (toText pErr fileMap) >> exitFailure
         Right term -> do
             -- Imported modules are ignored
             return $ TerminaModuleData noExtension filePath [] src_code (ParsingData . frags $ term)

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE InstanceSigs #-}
 module ControlFlow.Architecture.Errors (
     ArchitectureError, Error(..)
 ) where
@@ -42,27 +43,135 @@ type ArchitectureError = AnnotatedError Error Location
 
 instance ErrorMessage ArchitectureError where
 
+    errorIdent :: ArchitectureError -> T.Text
     errorIdent (AnnotatedError (EDuplicatedEmitterConnection _ident _prev) _pos) = "AE-001"
-    errorIdent (AnnotatedError e _pos) = T.pack $ show e
+    errorIdent (AnnotatedError (EDuplicatedChannelConnection _channel _prev) _pos) = "AE-002"
+    errorIdent (AnnotatedError (EMismatchedBoxSource _expectedSource _actualSource _boxTrace) _pos) = "AE-003"
+    errorIdent (AnnotatedError (EDisconnectedEmitter _emitter) _pos) = "AE-004"
+    errorIdent (AnnotatedError (EChannelWithoutSources _channel) _pos) = "AE-005"
+    errorIdent (AnnotatedError (EChannelWithoutTarget _channel) _pos) = "AE-006"
+    errorIdent (AnnotatedError (EUnusedResource _ident) _pos) = "AE-007"
+    errorIdent (AnnotatedError (EUnusedPool _ident) _pos) = "AE-008"
+    errorIdent (AnnotatedError _err _pos) = "Internal"
 
     errorTitle (AnnotatedError (EDuplicatedEmitterConnection _ident _prev) _pos) = "duplicated emitter connection"
-    errorTitle _ = "Unknown"
+    errorTitle (AnnotatedError (EDuplicatedChannelConnection _channel _prev) _pos) = "duplicated channel connection"
+    errorTitle (AnnotatedError (EMismatchedBoxSource _expectedSource _actualSource _boxTrace) _pos) = "mismatched box source"
+    errorTitle (AnnotatedError (EDisconnectedEmitter _emitter) _pos) = "disconnected emitter"
+    errorTitle (AnnotatedError (EChannelWithoutSources _channel) _pos) = "channel without sources"
+    errorTitle (AnnotatedError (EChannelWithoutTarget _channel) _pos) = "channel without target"
+    errorTitle (AnnotatedError (EUnusedResource _ident) _pos) = "unused resource"
+    errorTitle (AnnotatedError (EUnusedPool _ident) _pos) = "unused pool"
+    errorTitle (AnnotatedError _err _pos) = "internal error"
 
-    toText e@(AnnotatedError (EDuplicatedEmitterConnection emitter procPos@(Position procStart _procEnd)) pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-            procFileName = sourceName procStart
-            procSourceLines = files M.! procFileName
         in
-            pprintSimpleError
-                sourceLines title fileName pos
-                (Just ("Emitter \x1b[31m" <> T.pack emitter <>
-                    "\x1b[0m is already connected to a sink port. " <>
-                    "Only one target is allowed per event source.")) <>
-            pprintSimpleError
-                procSourceLines "The previous connection was done here:" procFileName
-                procPos Nothing
+        case err of
+            EDuplicatedEmitterConnection emitter prevPos@(Position prevStart _prevEnd) ->
+                let prevFileName = sourceName prevStart
+                    prevSourceLines = files M.! prevFileName
+                in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Emitter \x1b[31m" <> T.pack emitter <>
+                            "\x1b[0m is already connected to a sink port. " <>
+                            "Only one target is allowed per event source.\n")) <>
+                    pprintSimpleError
+                        prevSourceLines "The previous connection was done here:" prevFileName
+                        prevPos Nothing
+            EDuplicatedChannelConnection channel prevPos@(Position procStart _procEnd) ->
+                let prevFileName = sourceName procStart
+                    prevSourceLines = files M.! prevFileName
+                in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Channel \x1b[31m" <> T.pack channel <>
+                            "\x1b[0m is already connected to an input port. " <>
+                            "Only one target is allowed per channel.\n")) <>
+                    pprintSimpleError
+                        prevSourceLines "The previous connection was done here:" prevFileName
+                        prevPos Nothing
+            EMismatchedBoxSource expectedSource actualSource boxTrace ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Expected allocation from \x1b[31m" <> T.pack expectedSource <>
+                        "\x1b[0m but the box is being allocated from \x1b[31m" <> T.pack actualSource <>
+                        "\x1b[0m.")) <>
+                printBoxTrace expectedSource (reverse boxTrace)
+            EDisconnectedEmitter emitter ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Emitter \x1b[31m" <> T.pack emitter <>
+                        "\x1b[0m is not connected to any sink port. " <>
+                        "All event sources must be connected to a target.")) 
+            EChannelWithoutSources channel ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Channel \x1b[31m" <> T.pack channel <>
+                        "\x1b[0m is not connected to any outbound port. " <>
+                        "All channels must have at least one source.")) 
+            EChannelWithoutTarget channel -> 
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Channel \x1b[31m" <> T.pack channel <>
+                        "\x1b[0m is not connected to any inbound port. " <>
+                        "All channels must be connected to a target.")) 
+            EUnusedResource ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Resource \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m is not being used by any element. " <>
+                        "All resources must be connected to at least one access port."))
+            EUnusedPool poolId ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Pool \x1b[31m" <> T.pack poolId <>
+                        "\x1b[0m is not being used by any element. " <>
+                        "All pools must be connected to at least one access port."))
+            _ -> T.pack $ show pos ++ ": " ++ show e
+
+            where
+
+                -- | Prints a trace of box allocations 
+                printBoxTrace :: Identifier -> [Location] -> T.Text
+                printBoxTrace _ [] = ""
+                printBoxTrace expectedSource [tracePos@(Position traceStartPos _)] =
+                    let title = "\nThe box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
+                        traceFileName = sourceName traceStartPos
+                        traceSourceLines = files M.! traceFileName
+                    in
+                        pprintSimpleError 
+                            traceSourceLines title traceFileName tracePos Nothing
+                printBoxTrace expectedSource (tracePos@(Position traceStartPos _) : xr) =
+                    let title = "\nThe box is first moved here:"
+                        traceFileName = sourceName traceStartPos
+                        traceSourceLines = files M.! traceFileName
+                    in
+                        pprintSimpleError
+                            traceSourceLines title traceFileName tracePos Nothing <> printBoxTrace' expectedSource xr
+                printBoxTrace _ _ = error "Internal error: invalid error position"
+
+                printBoxTrace' :: Identifier -> [Location] -> T.Text
+                printBoxTrace' _ [] = ""
+                printBoxTrace' expectedSource [tracePos@(Position traceStartPos _)] =
+                    let title = "\nFinally, box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
+                        traceFileName = sourceName traceStartPos
+                        traceSourceLines = files M.! traceFileName
+                    in
+                        pprintSimpleError 
+                            traceSourceLines title traceFileName tracePos Nothing
+                printBoxTrace' expectedSource (tracePos@(Position traceStartPos _) : xr) =
+                    let title = "\nThe box is moved again here:"
+                        traceFileName = sourceName traceStartPos
+                        traceSourceLines = files M.! traceFileName
+                    in
+                        pprintSimpleError
+                            traceSourceLines title traceFileName tracePos Nothing <> printBoxTrace' expectedSource xr
+                printBoxTrace' _ _ = error "Internal error: invalid error position"
+                
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
     toDiagnostic e@(AnnotatedError (EDuplicatedEmitterConnection _ident _prev) pos) _files =
