@@ -29,20 +29,20 @@ data Error
   | EUnboxingOptionMap -- ^ Error when trying to unbox an option map (Internal)
   | EUnboxingVariableMap -- ^ Error when trying to unbox a variable map (Internal)
   | EDefinedTwice -- ^ Variable defined twice (Internal)
-  | EOptionBoxUsedInBadContext -- ^ TOption-box used in bad context (Internal)
+  | EOptionBoxUsedInBadContext -- ^ Option-box used in bad context (Internal)
   | EUsedIgnoredParameter Identifier -- ^ Using a variable that is ignored (VE-001)
   | ENotUsed Identifier -- ^ Variable is not used (VE-002)
   | EBoxNotMoved Identifier -- ^ Box variable is not moved (VE-003)
   | EBoxMovedTwice Identifier Location -- ^ Box variable is moved twice (VE-004)
-  | EOptionBoxMovedTwice Identifier Location -- ^ TOption-box variable is moved twice (VE-005)
-  | EDifferentOptionBoxUse Identifier MVars (MVars, Location) -- ^ TOption-box final state mismatch (VE-006)
-  | EDifferentNewOptionBoxUse Identifier MVars -- ^ TOption-box used in conditional branch (VE-007)
-  | EMissingOptionBox Identifier MVars -- ^ TOption-box unused in a branch but used previously (VE-008)
+  | EOptionBoxMovedTwice Identifier Location -- ^ Option-box variable is moved twice (VE-005)
+  | EDifferentOptionBoxUse Identifier MVars (MVars, Location) -- ^ Option-box final state mismatch (VE-006)
+  | EDifferentNewOptionBoxUse Identifier MVars -- ^ Option-box used in conditional branch (VE-007)
+  | EMissingOptionBox Identifier MVars -- ^ Option-box unused in a branch but used previously (VE-008)
   | EMissingBoxMove Identifier Location -- ^ Box variable is not always moved (VE-009)
   | EBoxMoveConditionalBranch Identifier -- ^ Box variable moved in conditional branch (VE-010)
-  | EAllocNotMoved Identifier -- ^ TOption-box allocated but not moved (VE-011)
-  | EAllocTwice Identifier Location -- ^ TOption-box allocated twice (VE-012)
-  | EMovedWithoutAlloc Identifier Location -- ^ TOption-box moved but not allocated (VE-013)
+  | EAllocNotMoved Identifier -- ^ Option-box allocated but not moved (VE-011)
+  | EAllocTwice Identifier Location -- ^ Option-box allocated twice (VE-012)
+  | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (VE-013)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -119,7 +119,7 @@ instance ErrorMessage VarUsageError where
                 in
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                        (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                             "\x1b[0m is moved twice.\n")) <>
                     pprintSimpleError
                         moveSourceLines "The previous move was done here:" moveFileName
@@ -141,7 +141,7 @@ instance ErrorMessage VarUsageError where
             EDifferentNewOptionBoxUse ident rval ->
                 pprintSimpleError
                     sourceLines title fileName pos
-                    (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                    (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m has been \x1b[31m" <> showText rval <>
                         "\x1b[0m in a branch that may not be executed or inside a loop.\n" <> 
                         "This shall cause the final state to be inconsistent."))
@@ -154,7 +154,7 @@ instance ErrorMessage VarUsageError where
                 in
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                        (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                             "\x1b[0m is not used on this branch.\n" <>
                             "The final state of the option-box variables must be the same so that the resulting state is consistent.\n")) <>
                     pprintSimpleError
@@ -181,7 +181,7 @@ instance ErrorMessage VarUsageError where
             EAllocNotMoved ident ->
                 pprintSimpleError
                     sourceLines title fileName pos
-                    (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                    (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is allocated but not moved."))
             EAllocTwice ident prevAlloc@(Position allocStart _allocEnd) ->
                 let allocFileName = sourceName allocStart
@@ -189,7 +189,7 @@ instance ErrorMessage VarUsageError where
                 in
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                        (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                             "\x1b[0m is allocated twice.\n")) <>
                     pprintSimpleError
                         allocSourceLines "The previous allocation was done here:" allocFileName
@@ -200,7 +200,7 @@ instance ErrorMessage VarUsageError where
                 in
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("TOption-box variable \x1b[31m" <> T.pack ident <>
+                        (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                             "\x1b[0m is moved but not allocated.\n")) <>
                     pprintSimpleError
                         moveSourceLines "The variable was moved here:" moveFileName

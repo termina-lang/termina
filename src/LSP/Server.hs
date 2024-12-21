@@ -19,7 +19,7 @@ import System.IO (stdin, stdout)
 lspRunServer :: IO ()
 lspRunServer = do
 
-  st <- MVar.newMVar (ServerState Nothing)
+  st <- MVar.newMVar (ServerState Nothing mempty)
 
   void $ runServerWithHandles logger logger stdin stdout $
     ServerDefinition

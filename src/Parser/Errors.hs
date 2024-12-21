@@ -62,11 +62,19 @@ instance ErrorMessage ParsingErrors where
                 _ -> T.pack $ show pos ++ ": " ++ show e
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
-    toDiagnostic _ _files = 
-        LSP.Diagnostic 
-            emptyRange
+    toDiagnostic e@(AnnotatedError err pos) _files = 
+        let text = T.pack "[" <> errorIdent e <> "]: " <> errorTitle e <> "." 
+            msg = 
+                case err of
+                    EParseError pErr -> 
+                        let errorMsgs = showErrorMessages "or" "Unknown parse error"
+                                "Expecting" "Unexpected" "end of input"
+                                (errorMessages pErr)
+                        in
+                        text <> "\n" <> T.pack errorMsgs
+                    _ -> text
+        in
+        LSP.Diagnostic (loc2Range pos)
             (Just LSP.DiagnosticSeverity_Error)
             Nothing Nothing Nothing
-            text (Just []) Nothing Nothing
-        where 
-            text = T.pack "\x1b[31mUknown\x1b[0m."
+            msg (Just []) Nothing Nothing

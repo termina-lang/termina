@@ -43,6 +43,7 @@ dependencies:
 - lens
 - lsp
 - co-log-core
+- sorted-list
 
 ghc-options:
 - -Wall

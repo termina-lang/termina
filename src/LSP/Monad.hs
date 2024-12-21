@@ -8,9 +8,15 @@ import Configuration.Configuration
 import Control.Monad.State
 import Control.Concurrent.MVar
 import Control.Monad.Reader
+import qualified Data.Map as M
+import Language.LSP.Protocol.Types (NormalizedUri)
+import LSP.Modules 
 
-newtype ServerState = 
-  ServerState (Maybe TerminaConfig)
+data ServerState = 
+  ServerState {
+    config :: Maybe TerminaConfig,
+    project_modules :: M.Map NormalizedUri TerminaStoredModule
+  } 
 
 type HandlerM = LspT () (ReaderT (MVar ServerState) IO)
 
