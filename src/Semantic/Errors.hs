@@ -190,7 +190,7 @@ data Error
   | EStructDefNotUniqueField [Identifier] -- ^ Repeated field in struct definition (SE-142)
   | EEnumDefNotUniqueVariant [Identifier] -- ^ Repeated variant in enum definition (SE-143)
   | EInterfaceNotUniqueProcedure [Identifier] -- ^ Repeated procedure in interface definition (SE-144)
-  | EClassLoop [Identifier] -- ^ Loop between member function calls in class definition (SE-145)
+  | EClassLoop [(Identifier, Location)] -- ^ Loop between member function calls in class definition (SE-145)
   | EDereferenceInvalidType TerminaType -- ^ Invalid dereference type (SE-146)
   | EMatchInvalidType TerminaType -- ^ Invalid match type (SE-147)
   | EMatchCaseDuplicate Identifier Location -- ^ Duplicate case in match statement (SE-148)
@@ -1750,11 +1750,11 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Procedures \x1b[31m" <> T.intercalate ", " (map T.pack procNames) <>
                             "\x1b[0m are duplicated in the interface definition."))
-                EClassLoop members ->
+                EClassLoop ((currentCall, _) : xs) ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The member functions \x1b[31m" <> T.intercalate " -> " (map T.pack members) <>
-                            "\x1b[0m form a recursive calling loop in the class definition."))
+                        (Just "A recursive calling loop has been detected in the class definition.") <> 
+                        printCallTrace currentCall xs
                 EDereferenceInvalidType ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -1883,6 +1883,29 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Expressions used in single-expression statements must have type \x1b[31m" <> showText TUnit <> 
                             "\x1b[0m but the expression has type \x1b[31m" <> showText ty <> "\x1b[0m. Return values of functions cannot be ignored."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
+        where
+
+            -- | Prints a trace of member function calls
+            printCallTrace :: Identifier -> [(Identifier, Location)] -> T.Text
+            printCallTrace _ [] = ""
+            printCallTrace currentCall [(finalCall, tracePos@(Position traceStartPos _))] =
+                let title = "\nFinally, member function \x1b[31m" <> T.pack currentCall <> 
+                        "\x1b[0m calls \x1b[31m" <> T.pack finalCall <> "\x1b[0m again here:"
+                    traceFileName = sourceName traceStartPos
+                    traceSourceLines = files M.! traceFileName
+                in
+                    pprintSimpleError 
+                        traceSourceLines title traceFileName tracePos Nothing
+            printCallTrace currentCall ((nextCall, tracePos@(Position traceStartPos _)) : xr) =
+                let title = "\nMember function \x1b[31m" <> T.pack currentCall <> 
+                        "\x1b[0m calls \x1b[31m" <> T.pack nextCall <> "\x1b[0m here:"
+                    traceFileName = sourceName traceStartPos
+                    traceSourceLines = files M.! traceFileName
+                in
+                    pprintSimpleError
+                        traceSourceLines title traceFileName tracePos Nothing <> printCallTrace nextCall xr
+            printCallTrace _ _ = error "Internal error: invalid error position"
+
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
     toDiagnostic e@(AnnotatedError (EInvalidArrayIndexing _ts) pos) _files =

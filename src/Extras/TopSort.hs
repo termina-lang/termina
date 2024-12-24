@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 -- | Small toy implementation of top sort.
 -- Instead of using other implementations, we fail when a cycle is detected.
 -- There are several implementations, but we use a DFS.
@@ -14,56 +15,54 @@ import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Except
 
-data TopSt a
+data TopSt k e
   = St
   -- Temporary marked set
-  { getTemp :: S.Set a
+  { getTemp :: M.Map k e
   -- Permanent marked set
-  , getPerm :: S.Set a
-  , res :: [a]
+  , getPerm :: S.Set k
+  , res :: [k]
   }
 
-emptyTopS :: TopSt a
-emptyTopS = St S.empty S.empty []
+class (Ord k) => TopSortKey k e where
+  topSortKey :: e -> k
+
+emptyTopS :: TopSt k e
+emptyTopS = St M.empty S.empty []
+
+addTemp :: (TopSortKey k e) => k -> e -> TopSt k e -> TopSt k e
+addTemp k e st = st{getTemp = M.insert k e (getTemp st)}
 
 -- Add to temp and perm sets
-addTemp, addPerm :: Ord a => a -> TopSt a -> Maybe (TopSt a)
-addTemp a sets =
-  (\s -> sets{getTemp = s}) <$> S.insert a (getTemp sets)
-  -- maybe (error "TopSort Max Bound -addTemp-")
-  -- sets{getTemp = S.insert a (getTemp sets)}
+addPerm :: TopSortKey k e => k -> TopSt k e -> Maybe (TopSt k e)
 addPerm a sets =
   -- maybe (error "TopSort Max Bound -addPerm-")
   (\s -> sets{getPerm = s}) <$> S.insert a (getPerm sets)
 
-addL :: a -> TopSt a -> TopSt a
+addL :: k -> TopSt k e -> TopSt k e
 addL a st = st{res=a : res st}
 
 -- Remove or nothing.
-rmTemp :: Ord a => a -> TopSt a -> TopSt a
-rmTemp a st = st{getTemp = S.delete a (getTemp st)}
+rmTemp :: TopSortKey k e => k -> TopSt k e -> TopSt k e
+rmTemp a st = st{getTemp = M.delete a (getTemp st)}
 
-data TopSortError a
-  = ELoop [a] -- ^ Loop Error fund.
-  | ENotFound a (Maybe a) -- ^ Internal error.
+data TopSortError e
+  = ELoop [e] -- ^ Loop Error fund.
+  | ENotFound e (Maybe e) -- ^ Internal error.
   | MaxBound
   deriving Show
 
 -- Monad to compute.
 -- Error TopSortError and State TopSt
-type TopSort a = ExceptT (TopSortError a) (State (TopSt a))
+type TopSort k e = ExceptT (TopSortError e) (State (TopSt k e))
 
 -- Adj map
-type Graph a = M.Map a [a]
+-- k == keys
+-- e == elements
+type Graph k e = M.Map k [e]
 
-lmodify :: (s -> s) -> ExceptT e (State s) ()
-lmodify = lift . modify
-
-lmodifyE :: (TopSt a -> Maybe (TopSt a)) -> TopSort a ()
-lmodifyE m = getE >>= maybe (throwError MaxBound) putE . m
-  where
-    getE = lift get
-    putE = lift . put
+modifyE :: (TopSt k e -> Maybe (TopSt k e)) -> TopSort k e ()
+modifyE m = get >>= maybe (throwError MaxBound) put . m
 
 -------------------------------------------------
 -- Note [0]
@@ -73,54 +72,51 @@ lmodifyE m = getE >>= maybe (throwError MaxBound) putE . m
 -------------------------------------------------
 -- | Main function giving a solution to all contraints or a loop.
 topSort
-  :: (Ord a)
+  :: (TopSortKey k e)
   -- | Takes a dependency graph
-  => Graph a
+  => Graph k e
   -- Returns either a loop between elements [0] or an ordered list of them.
-  -> Either (TopSortError a) [a]
+  -> Either (TopSortError e) [k]
 topSort graph = evalState (runExceptT (computation >> gets (reverse . res))) emptyTopS
   where
-    nodes = M.keys graph
-    computation = topSortInternal graph nodes
+    computation = topSortInternal graph
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: (Ord a) => [(a, [a])] -> Either (TopSortError a) [a]
+topSortFromDepList :: (TopSortKey k e) => [(k, [e])] -> Either (TopSortError e) [k]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
-  :: Ord a
+  :: TopSortKey k e
   -- Graph
-  => Graph a
-  -- Nodes
-  -> [a]
+  => Graph k e
   -- Result
-  -> TopSort a ()
+  -> TopSort k e ()
 topSortInternal graph =
   mapM_
-   (\a ->
+   (\(k, es) ->
     get >>= \sets ->
-    if S.member a (getPerm sets) || S.member a (getTemp sets)
+    if S.member k (getPerm sets) || M.member k (getTemp sets)
     then -- skip if marked
       return ()
     else -- if a is unmarked
-        visit graph Nothing a
-   )
+        mapM_ (visit graph Nothing) es
+   ) $ M.toList graph
 
-visit :: Ord a => Graph a -> Maybe a -> a -> TopSort a ()
+visit :: TopSortKey k e => Graph k e -> Maybe e -> e -> TopSort k e ()
 visit graph parent src
   = gets getPerm >>= \permSet ->
-  if S.member src permSet
+  if S.member (topSortKey src) permSet
   then return ()
   else
     do
       tempSet <- gets getTemp
-      when (S.member src tempSet) (throwError (ELoop (S.toList tempSet ++ [src])))
+      when (M.member (topSortKey src) tempSet) (throwError (ELoop (M.elems tempSet ++ [src])))
       -- temp mark |src|
-      lmodifyE (addTemp src)
+      modify (addTemp (topSortKey src) src)
       --
-      case M.lookup src graph of
+      case M.lookup (topSortKey src) graph of
           Nothing -> throwError (ENotFound src parent)
           Just adj_src -> mapM_ (visit graph (Just src)) adj_src
-      lmodify (rmTemp src)
-      lmodifyE (addPerm src)
-      lmodify (addL src)
+      modify (rmTemp (topSortKey src))
+      modifyE (addPerm (topSortKey src))
+      modify (addL (topSortKey src))

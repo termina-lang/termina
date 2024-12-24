@@ -151,18 +151,21 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     -- Dependencies emplying the assumption.
     let dependenciesMap =
           foldr (selfDepClass objIsSelf) M.empty elements
-    let dependencies = fmap M.keys dependenciesMap
+    let dependencies = fmap (
+          M.foldrWithKey (\k v acc -> SelfDep k (getAnnotation v) : acc)
+          []) dependenciesMap
+      
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
     mds_ty <- mapM (typeModifier ann) mds_ts
     -- Sort and see if there is a loop
     topSortOrder <- case topSort dependencies of
             -- Tell the user a loop is in the room
-            Left (ELoop loop) -> throwError (annotateError ann (EClassLoop loop))
-            Left (ENotFound dep parent) ->
+            Left (ELoop loop) -> throwError (annotateError ann (EClassLoop ((\(SelfDep member loc) -> (member, loc)) <$> loop)))
+            Left (ENotFound (SelfDep dep _) parent) ->
               case parent of
                 Nothing -> error "Internal TopSort Error. This should not happen"
-                Just parentId -> do
+                Just (SelfDep parentId _) -> do
                   let parentDepsMap = fromJust $ M.lookup parentId dependenciesMap
                   case fromJust $ M.lookup dep parentDepsMap of
                     (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))

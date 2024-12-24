@@ -86,7 +86,7 @@ loadTerminaModule root filePath srcPath = do
 
 -- | Load the modules of the project
 loadModules
-  :: [QualifiedName]
+  :: [ModuleDependency]
   -> FilePath
   -> IO ParsedProject
 loadModules imported srcPath = do
@@ -99,25 +99,25 @@ loadModules imported srcPath = do
 
   loadModules' :: ParsedProject
     -- Modules to load
-    -> [FilePath]
+    -> [ModuleDependency]
     -> IO ParsedProject
   loadModules' fsLoaded [] = pure fsLoaded
-  loadModules' fsLoaded (fs:fss) =
-    if M.member fs fsLoaded
+  loadModules' fsLoaded ((ModuleDependency qname _):fss) =
+    if M.member qname fsLoaded
     -- Nothing to do, skip to the next one. It could be the case of a module
     -- imported from several files.
     then loadModules' fsLoaded fss
     -- Import and load it.
     else do
-      loadedModule <- loadTerminaModule srcPath fs srcPath
+      loadedModule <- loadTerminaModule srcPath qname srcPath
       let deps = importedModules loadedModule
       loadModules'
-        (M.insert fs loadedModule fsLoaded)
+        (M.insert qname loadedModule fsLoaded)
         (fss ++ deps)
 
 sortProjectDepsOrLoop
   :: ProjectDependencies
-  -> Either [QualifiedName] [QualifiedName]
+  -> Either [ModuleDependency] [QualifiedName]
 sortProjectDepsOrLoop = topErrorInternal . M.toList
   where
     topErrorInternal projectDependencies =
@@ -189,12 +189,13 @@ genModules params includeOptionH definedTypesOptionMap =
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
+          moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenSourceFile params (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
-      case runGenHeaderFile params includeOptionH (qualifiedName bbModule) (importedModules bbModule) tAST definedTypesOptionMap of
+      case runGenHeaderFile params includeOptionH (qualifiedName bbModule) moduleDeps tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
@@ -334,7 +335,7 @@ buildCommand (BuildCmdArgs chatty) = do
     orderedDependencies <-
       either
         (\files ->
-          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map T.pack files) in
+          let msg = "\x1b[31m[error]\x1b[0m: Detected cycle between project source files: " <> T.intercalate " -> " (map (T.pack . show) files) in
           TIO.putStrLn msg >> exitFailure)
         return
         $ sortProjectDepsOrLoop projectDependencies

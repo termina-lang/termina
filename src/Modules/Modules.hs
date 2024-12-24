@@ -1,11 +1,21 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -- | Module about Modules!
 
 module Modules.Modules where
 
 -- Containers
 import qualified Data.Text as T
+import Utils.Annotations
+import Extras.TopSort
 
 type QualifiedName = FilePath
+
+data ModuleDependency = ModuleDependency QualifiedName Location
+  deriving Show
+
+instance TopSortKey QualifiedName ModuleDependency where
+  topSortKey (ModuleDependency qname _) = qname
 
 -- | Data type used to represented a loaded module
 -- | It contains the module's name, the list of imported modules, the source code
@@ -17,7 +27,7 @@ data TerminaModuleData a = TerminaModuleData {
   -- This is the full path where the module's source file is located
   fullPath :: !FilePath,
   -- | List of imported modules
-  importedModules :: ![QualifiedName],
+  importedModules :: [ModuleDependency],
   -- | Source code
   sourcecode :: T.Text,
   -- | Module meta-data (e.g. parsed AST)

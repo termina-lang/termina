@@ -92,7 +92,8 @@ printHeaderModule :: Bool -> BasicBlocksModule -> IO ()
 printHeaderModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         configParams = defaultConfig "test" TestPlatform
-    case runGenHeaderFile configParams False (qualifiedName bbModule) (importedModules bbModule) tAST M.empty of
+        moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
+    case runGenHeaderFile configParams False (qualifiedName bbModule) moduleDeps tAST M.empty of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 

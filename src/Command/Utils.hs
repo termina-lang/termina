@@ -40,12 +40,12 @@ debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
-getModuleImports :: (MonadIO m) => FilePath -> PAST.TerminaModule ParserAnn -> m (Either ParsingErrors [FilePath])
+getModuleImports :: (MonadIO m) => FilePath -> PAST.TerminaModule ParserAnn -> m (Either ParsingErrors [ModuleDependency])
 getModuleImports srcPath m =
     mapM buildAndTest (modules m) <&> sequence
     where
 
-        buildAndTest :: (MonadIO m) => PAST.ModuleImport ParserAnn -> m (Either ParsingErrors FilePath)
+        buildAndTest :: (MonadIO m) => PAST.ModuleImport ParserAnn -> m (Either ParsingErrors ModuleDependency)
         buildAndTest (ModuleImport modName ann) = do
             let mname = buildModuleName ann modName
             case mname of
@@ -54,7 +54,7 @@ getModuleImports srcPath m =
                     let importedPath = srcPath </> qname <.> "fin"
                     exists <- liftIO $ doesFileExist importedPath
                     if exists
-                        then return $ Right importedPath
+                        then return $ Right (ModuleDependency importedPath ann)
                         else
                             return $ Left (annotateError ann (EImportedFileNotFound importedPath))
 

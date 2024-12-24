@@ -20,6 +20,7 @@ data Error
     | EParseError ParseError 
     | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
     | EImportedFileNotFound QualifiedName -- ^ Imported file not found (PE-003)
+    | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
   deriving Show
 
 type ParsingErrors = AnnotatedError Error Location
@@ -27,13 +28,15 @@ type ParsingErrors = AnnotatedError Error Location
 instance ErrorMessage ParsingErrors where
 
     errorIdent (AnnotatedError (EParseError _err) _pos) = "PE-001"
-    errorIdent (AnnotatedError ( EInvalidModuleName _qname) _pos) = "PE-002"
+    errorIdent (AnnotatedError (EInvalidModuleName _qname) _pos) = "PE-002"
     errorIdent (AnnotatedError (EImportedFileNotFound _qname) _pos) = "PE-003"
+    errorIdent (AnnotatedError (EImportedFilesLoop _imports) _pos) = "PE-004"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EParseError _err) _pos) = "parsing error"
     errorTitle (AnnotatedError (EInvalidModuleName _qname) _pos) = "invalid module name"
     errorTitle (AnnotatedError (EImportedFileNotFound _qname) _pos) = "imported file not found"
+    errorTitle (AnnotatedError (EImportedFilesLoop _imports) _pos) = "cycle between project source files"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start _end)) files =
@@ -59,7 +62,34 @@ instance ErrorMessage ParsingErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Imported file invalid or not found: " <> T.pack (show qname)))
+                EImportedFilesLoop (ModuleDependency currentModule _ : xs) ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "A recursive module import loop has been detected.") <> 
+                        printImportTrace currentModule xs
                 _ -> T.pack $ show pos ++ ": " ++ show e
+        where
+
+            -- | Prints a trace of imports
+            printImportTrace :: QualifiedName -> [ModuleDependency] -> T.Text
+            printImportTrace _ [] = ""
+            printImportTrace currentFile [ModuleDependency finalCall tracePos@(Position traceStartPos _)] =
+                let title = "\nFinally, module \x1b[31m" <> T.pack currentFile <> 
+                        "\x1b[0m imports module \x1b[31m" <> T.pack finalCall <> "\x1b[0m again here:"
+                    traceFileName = sourceName traceStartPos
+                    traceSourceLines = files M.! traceFileName
+                in
+                    pprintSimpleError 
+                        traceSourceLines title traceFileName tracePos Nothing
+            printImportTrace currentFile (ModuleDependency nextCall tracePos@(Position traceStartPos _) : xr) =
+                let title = "\nModule \x1b[31m" <> T.pack currentFile <> 
+                        "\x1b[0m imports module \x1b[31m" <> T.pack nextCall <> "\x1b[0m here:"
+                    traceFileName = sourceName traceStartPos
+                    traceSourceLines = files M.! traceFileName
+                in
+                    pprintSimpleError
+                        traceSourceLines title traceFileName tracePos Nothing <> printImportTrace nextCall xr
+            printImportTrace _ _ = error "Internal error: invalid error position"
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
     toDiagnostic e@(AnnotatedError err pos) _files = 

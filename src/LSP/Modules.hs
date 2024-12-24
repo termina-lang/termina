@@ -1,6 +1,6 @@
 module LSP.Modules where
 
-import Modules.Modules (QualifiedName)
+import Modules.Modules (ModuleDependency)
 import qualified Data.Text as T
 import Command.Types (SemanticData, ParsingData)
 import qualified Language.LSP.Protocol.Types as LSP
@@ -13,7 +13,7 @@ data TerminaStoredModule = TerminaStoredModule {
   -- This is the full path where the module's source file is located
   fullPath :: !FilePath,
   -- | List of imported modules
-  importedModules :: ![QualifiedName],
+  importedModules :: [ModuleDependency],
   -- | Source code
   sourcecode :: T.Text,
 

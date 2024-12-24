@@ -1,8 +1,12 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Semantic.Utils where
     
 import Core.AST
 import Parser.AST
 import qualified Data.Map as M
+import Extras.TopSort
 
 -- Helper to detect invocations to 'self'
 objIsSelf :: Object a -> Bool
@@ -20,6 +24,13 @@ objIsSelf _ = False
 -- breaking something else.
 
 type SelfInvocation a = M.Map Identifier (Expression a)
+
+data SelfDep a = SelfDep Identifier a
+  deriving Show
+
+instance TopSortKey Identifier (SelfDep a) where
+  topSortKey (SelfDep ident _) = ident
+
 type SelfDepMap a = M.Map Identifier (SelfInvocation a)
 
 selfInv :: (Object a -> Bool) -> Expression a -> SelfInvocation a -> SelfInvocation a

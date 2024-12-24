@@ -47,7 +47,7 @@ genMakefile params bbProject progArchitecture =
         moduleRules = map (\m -> 
             let sourceFile = qualifiedName m <.> "c"
                 headerFile = qualifiedName m <.> "h"
-                moduleDeps = importedModules m in
+                moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules m in
             MRule (binaryFolder </> sourceFile -<.> "o") ([srcFolder </> sourceFile, includeFolder </> headerFile] ++ map (\n -> includeFolder </> n -<.> "h") moduleDeps) [
                 MakeCommand True [
                         MFragment "echo",

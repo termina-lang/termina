@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Command.Types where
 
 import qualified Data.Map as M
@@ -29,4 +31,5 @@ type BasicBlocksModule = TerminaModuleData BasicBlocksData
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule
 type BasicBlocksProject = M.Map QualifiedName BasicBlocksModule
-type ProjectDependencies = M.Map QualifiedName [QualifiedName]
+
+type ProjectDependencies = M.Map QualifiedName [ModuleDependency]
