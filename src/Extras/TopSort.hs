@@ -98,8 +98,10 @@ topSortInternal graph =
     if S.member k (getPerm sets) || M.member k (getTemp sets)
     then -- skip if marked
       return ()
-    else -- if a is unmarked
+    else do -- if a is unmarked
         mapM_ (visit graph Nothing) es
+        modifyE (addPerm k)
+        modify (addL k)
    ) $ M.toList graph
 
 visit :: TopSortKey k e => Graph k e -> Maybe e -> e -> TopSort k e ()

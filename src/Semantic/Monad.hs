@@ -156,12 +156,13 @@ sysInitGlobalEnv =
   [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
    ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
 
-makeInitialGlobalEnv :: TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
-makeInitialGlobalEnv config pltEnvironment = 
+makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
+makeInitialGlobalEnv (Just config) pltEnvironment = 
   if enableSystemInit config then 
     ExprST (fromList (stdlibGlobalEnv ++ sysInitGlobalEnv ++ pltEnvironment)) empty
   else
     ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
+makeInitialGlobalEnv Nothing pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 

@@ -14,13 +14,16 @@ import qualified Language.LSP.Protocol.Lens as J
 import Configuration.Platform (checkPlatform)
 import Configuration.Configuration (TerminaConfig(..))
 import LSP.Logging
-import System.Directory (doesDirectoryExist)
+import System.Directory (doesDirectoryExist, canonicalizePath)
 import qualified Data.Text as T
-import Command.Utils (loadConfig)
+import Command.Utils (loadConfig, sortProjectDepsOrLoop)
 import LSP.Utils
 import qualified Data.Map as M
 import System.FilePath
 import LSP.Modules
+import Semantic.Monad (makeInitialGlobalEnv)
+import Generator.Environment (getPlatformInitialGlobalEnv)
+import Data.Functor (void)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do
@@ -36,7 +39,7 @@ initializeHandler _req = do
         case checkPlatform (platform cfg) of
           Nothing ->
             errorM $ "Unsupported platform: \"" <> T.pack (show (platform cfg)) <> "\""
-          Just _plt -> do
+          Just plt -> do
             put $ ServerState (Just cfg) mempty 
             -- The platform is OK
             -- Then we have to check the folder's structure
@@ -49,19 +52,68 @@ initializeHandler _req = do
             else do
               -- At this point, no files have been loaded into the VFS, so we must read all
               -- the files directly from the file system.
-              let fullP = appFolder cfg </> appFilename cfg <.> "fin"
-              loadTerminaModule fullP (sourceModulesFolder cfg)
+              absPath <- liftIO $ canonicalizePath (appFolder cfg)
+              let fullP = absPath </> appFilename cfg <.> "fin"
+              mappModule <- loadTerminaModule fullP (Just (sourceModulesFolder cfg))
+              case mappModule of
+                Nothing -> return ()
+                Just appModule -> do
+                  -- Load the modules of the project
+                  loadModules (importedModules appModule) (sourceModulesFolder cfg)
+                  -- | Once all files have been loaded, we may proceed to type check them
+                  -- We need to first obtain the order in which the modules must be type checked
+                  parsedProject <- gets project_modules
+                  let projectDependencies = fmap importedModules parsedProject
+                  either
+                    (\_loop ->
+                      -- TODO: Generate diagnostics
+                      return ())
+                    (\orderedDependencies -> 
+                      let initialGlobalEnv = makeInitialGlobalEnv (Just cfg) (getPlatformInitialGlobalEnv cfg plt) in
+                      void $ typeModules initialGlobalEnv orderedDependencies)
+                    $ sortProjectDepsOrLoop projectDependencies 
+              return ()
 
 documentChange :: Handlers HandlerM
 documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
   let fileURI = msg ^. J.params . J.textDocument . J.uri
-  sendNotification SMethod_WindowShowMessage
-    (ShowMessageParams MessageType_Info $ T.pack ("File changed: " ++ show (uriToFilePath fileURI)))
+  case uriToFilePath fileURI of 
+    Nothing -> 
+      sendNotification SMethod_WindowShowMessage
+        (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
+    Just filePath -> do
+      modules <- gets project_modules
+      cfg <- gets config
+      if M.member filePath modules then do
+        _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
+        parsedProject <- gets project_modules
+        let projectDependencies = M.map importedModules parsedProject
+        either
+          (\_loop ->
+            -- TODO: Generate diagnostics
+            return ())
+          (\orderedDependencies -> do
+            let pltInitialGlbEnv = case cfg of
+                  Nothing -> []
+                  Just cfg' -> case checkPlatform (platform cfg') of 
+                    Nothing -> []
+                    Just plt -> getPlatformInitialGlobalEnv cfg' plt
+            let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv
+            void $ typeModules initialGlobalEnv orderedDependencies)
+          $ sortProjectDepsOrLoop projectDependencies
+        diags <- gets project_modules
+        mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 
+      else 
+        sendNotification SMethod_WindowShowMessage
+          (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ filePath))
+
+
+
 
 initialized :: Handlers HandlerM
 initialized = notificationHandler SMethod_Initialized $ \_msg -> do
   diags <- gets project_modules
-  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostic <$> diags))
+  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags))
 
 handlers :: Handlers HandlerM
 handlers =

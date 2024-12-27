@@ -21,7 +21,6 @@ import Parser.Parsing (terminaModuleParser)
 import Parser.Errors
 import Text.Parsec (runParser)
 import qualified Data.Map as M
-import Extras.TopSort
 import Semantic.Types (SemanticAnn)
 import Semantic.Monad (Environment, makeInitialGlobalEnv)
 import Modules.Modules
@@ -76,7 +75,7 @@ loadTerminaModule root filePath srcPath = do
       in
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
     Right term -> do
-      mimports <- getModuleImports srcPath term
+      mimports <- getModuleImports (Just srcPath) term
       case mimports of
         Left err -> 
           let fileMap = M.singleton fullP src_code in
@@ -114,21 +113,6 @@ loadModules imported srcPath = do
       loadModules'
         (M.insert qname loadedModule fsLoaded)
         (fss ++ deps)
-
-sortProjectDepsOrLoop
-  :: ProjectDependencies
-  -> Either [ModuleDependency] [QualifiedName]
-sortProjectDepsOrLoop = topErrorInternal . M.toList
-  where
-    topErrorInternal projectDependencies =
-      either
-        (
-          \case {
-            ELoop xs -> Left xs;
-            e -> error . errorMessage $ "Internal sorting Error: " ++ show e
-          }
-        )
-        Right $ topSortFromDepList projectDependencies
 
 typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
 typeModules parsedProject =
@@ -341,7 +325,7 @@ buildCommand (BuildCmdArgs chatty) = do
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
     -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv config (getPlatformInitialGlobalEnv config plt)
+    let initialGlobalEnv = makeInitialGlobalEnv (Just config) (getPlatformInitialGlobalEnv config plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")

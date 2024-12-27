@@ -92,7 +92,7 @@ instance ErrorMessage ParsingErrors where
             printImportTrace _ _ = error "Internal error: invalid error position"
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
-    toDiagnostic e@(AnnotatedError err pos) _files = 
+    toDiagnostics e@(AnnotatedError err pos) _files = 
         let text = T.pack "[" <> errorIdent e <> "]: " <> errorTitle e <> "." 
             msg = 
                 case err of
@@ -104,7 +104,7 @@ instance ErrorMessage ParsingErrors where
                         text <> "\n" <> T.pack errorMsgs
                     _ -> text
         in
-        LSP.Diagnostic (loc2Range pos)
+        [LSP.Diagnostic (loc2Range pos)
             (Just LSP.DiagnosticSeverity_Error)
             Nothing Nothing Nothing
-            msg (Just []) Nothing Nothing
+            msg (Just []) Nothing Nothing]

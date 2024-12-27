@@ -18,7 +18,7 @@ data TerminaStoredModule = TerminaStoredModule {
   sourcecode :: T.Text,
 
   -- | Module's error diagnostics
-  diagnostic :: Maybe LSP.Diagnostic,
+  diagnostics :: [LSP.Diagnostic],
   -- | Module's parsed AST
   parsing :: Maybe ParsingData,
   -- | Module's semantic AST

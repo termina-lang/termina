@@ -174,19 +174,11 @@ instance ErrorMessage ArchitectureError where
                 
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
-    toDiagnostic e@(AnnotatedError (EDuplicatedEmitterConnection _ident _prev) pos) _files =
-        LSP.Diagnostic (loc2Range pos)
+    toDiagnostics e@(AnnotatedError _ pos) _files =
+        [LSP.Diagnostic (loc2Range pos)
             (Just LSP.DiagnosticSeverity_Error)
             Nothing Nothing Nothing
-            text (Just []) Nothing Nothing
+            text (Just []) Nothing Nothing]
         
         where 
-            text = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-    toDiagnostic _ _files = 
-        LSP.Diagnostic 
-            emptyRange
-            (Just LSP.DiagnosticSeverity_Error)
-            Nothing Nothing Nothing
-            text (Just []) Nothing Nothing
-        where 
-            text = T.pack "\x1b[31mUknown\x1b[0m."
+            text = "error [" <> errorIdent e <> "]: " <> errorTitle e <> "."

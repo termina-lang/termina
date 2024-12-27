@@ -148,10 +148,10 @@ class ErrorMessage a where
         -> T.Text
 
     -- | Generates an LSP diagnostic from a given error
-    toDiagnostic :: 
+    toDiagnostics :: 
         a -- ^ The error
         -> M.Map FilePath T.Text -- ^ Map of the project's source files to their contents
-        -> LSP.Diagnostic
+        -> [LSP.Diagnostic]
     
 emptyRange :: LSP.Range
 emptyRange = LSP.Range (LSP.Position 0 0) (LSP.Position 0 0)

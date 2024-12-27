@@ -19,11 +19,11 @@ instance ErrorMessage BBGeneratorError where
 
     toText (InternalError msg) _files = T.pack $ show msg
     
-    toDiagnostic (InternalError msg) _files =
-        LSP.Diagnostic emptyRange
+    toDiagnostics (InternalError msg) _files =
+        [LSP.Diagnostic emptyRange
             (Just LSP.DiagnosticSeverity_Error)
             Nothing Nothing Nothing
-            text (Just []) Nothing Nothing
+            text (Just []) Nothing Nothing]
         
         where 
             text = T.pack $ show msg

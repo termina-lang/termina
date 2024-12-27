@@ -67,7 +67,7 @@ loadSingleModule filePath = do
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
     let config = (\c -> c{ enableSystemInit = True }) $ defaultConfig "test" TestPlatform
-        result = runTypeChecking (makeInitialGlobalEnv config []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
+        result = runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in
