@@ -15,6 +15,6 @@ runNegativeTest input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let config = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv config []) (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule ast) of
       Left err -> Just $ getError err
       Right _ -> Nothing

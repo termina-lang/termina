@@ -19,7 +19,7 @@ renderHeader includeOptionH input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv configParams []) (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of
@@ -34,7 +34,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv configParams []) (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of
