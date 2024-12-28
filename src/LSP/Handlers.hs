@@ -11,12 +11,12 @@ import Language.LSP.Protocol.Types
 import Control.Monad.State
 
 import qualified Language.LSP.Protocol.Lens as J
-import Configuration.Platform (checkPlatform)
-import Configuration.Configuration (TerminaConfig(..))
+import Configuration.Platform
+import Configuration.Configuration
 import LSP.Logging
-import System.Directory (doesDirectoryExist, canonicalizePath)
+import System.Directory
 import qualified Data.Text as T
-import Command.Utils (loadConfig, sortProjectDepsOrLoop)
+import Command.Utils
 import LSP.Utils
 import qualified Data.Map as M
 import System.FilePath
@@ -74,6 +74,27 @@ initializeHandler _req = do
                     $ sortProjectDepsOrLoop projectDependencies 
               return ()
 
+typeProject :: HandlerM ()
+typeProject = do
+  parsedProject <- gets project_modules
+  cfg <- gets config
+  let projectDependencies = M.map importedModules parsedProject
+  either
+    (\_loop ->
+      -- TODO: Generate diagnostics
+      return ())
+    (\orderedDependencies -> do
+      let pltInitialGlbEnv = case cfg of
+            Nothing -> []
+            Just cfg' -> case checkPlatform (platform cfg') of 
+              Nothing -> []
+              Just plt -> getPlatformInitialGlobalEnv cfg' plt
+      let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv
+      void $ typeModules initialGlobalEnv orderedDependencies)
+    $ sortProjectDepsOrLoop projectDependencies
+  diags <- gets project_modules
+  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 
+
 documentChange :: Handlers HandlerM
 documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
   let fileURI = msg ^. J.params . J.textDocument . J.uri
@@ -86,34 +107,31 @@ documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
       cfg <- gets config
       if M.member filePath modules then do
         _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
-        parsedProject <- gets project_modules
-        let projectDependencies = M.map importedModules parsedProject
-        either
-          (\_loop ->
-            -- TODO: Generate diagnostics
-            return ())
-          (\orderedDependencies -> do
-            let pltInitialGlbEnv = case cfg of
-                  Nothing -> []
-                  Just cfg' -> case checkPlatform (platform cfg') of 
-                    Nothing -> []
-                    Just plt -> getPlatformInitialGlobalEnv cfg' plt
-            let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv
-            void $ typeModules initialGlobalEnv orderedDependencies)
-          $ sortProjectDepsOrLoop projectDependencies
-        diags <- gets project_modules
-        mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 
+        typeProject
       else 
         sendNotification SMethod_WindowShowMessage
           (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ filePath))
-
-
-
 
 initialized :: Handlers HandlerM
 initialized = notificationHandler SMethod_Initialized $ \_msg -> do
   diags <- gets project_modules
   mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags))
+
+didOpen :: Handlers HandlerM
+didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \msg -> do
+    let fileURI = msg ^. J.params . J.textDocument . J.uri
+    case uriToFilePath fileURI of 
+      Nothing -> 
+        sendNotification SMethod_WindowShowMessage
+          (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
+      Just filePath -> do
+        -- TODO: See if we can improve this. Now we load the module in all cases, so that we
+        -- ensure that, even if the module was not previously loaded, it is now present as part
+        -- of the project. Modules are loaded at the beginning, but only those that are
+        -- referenced (either directly or indirectly, by the main app module). 
+        cfg <- gets config
+        _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
+        typeProject
 
 handlers :: Handlers HandlerM
 handlers =

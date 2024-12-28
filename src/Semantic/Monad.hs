@@ -23,13 +23,13 @@ import Core.Utils
 
 -- Monads
 import Control.Monad
-import Control.Monad.Trans
 import Control.Monad.Except
 import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser
 import Utils.Monad
 
 import Configuration.Configuration
+import Control.Monad.State
 
 ----------------------------------------
 
@@ -167,17 +167,6 @@ makeInitialGlobalEnv Nothing pltEnvironment = ExprST (fromList (stdlibGlobalEnv 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 
 ----------------------------------------
-gets :: (Environment -> a) -> SemanticMonad a
-gets = lift . ST.gets
-
-get :: SemanticMonad Environment
-get = lift ST.get
-
-put :: Environment -> SemanticMonad ()
-put = lift . ST.put
-
-modify :: (Environment -> Environment) -> SemanticMonad ()
-modify = lift . ST.modify
 
 ----------------------------------------
 -- Monadic helpers.

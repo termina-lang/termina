@@ -162,15 +162,12 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     topSortOrder <- case topSort dependencies of
             -- Tell the user a loop is in the room
             Left (ELoop loop) -> throwError (annotateError ann (EClassLoop ((\(SelfDep member loc) -> (member, loc)) <$> loop)))
-            Left (ENotFound (SelfDep dep _) parent) ->
-              case parent of
-                Nothing -> error "Internal TopSort Error. This should not happen"
-                Just (SelfDep parentId _) -> do
-                  let parentDepsMap = fromJust $ M.lookup parentId dependenciesMap
-                  case fromJust $ M.lookup dep parentDepsMap of
-                    (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
-                    (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
-                    _ -> error "Internal TopSort Error. This should not happen"
+            Left (ENotFound (SelfDep dep _) parentId) -> do
+              let parentDepsMap = fromJust $ M.lookup parentId dependenciesMap
+              case fromJust $ M.lookup dep parentDepsMap of
+                (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
+                (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
+                _ -> error "Internal TopSort Error. This should not happen"
             Left e -> error $ "Internal TopSort Error" ++ show e
             -- Get the proper order of inclusion and get their definitions from names.
             Right order ->

@@ -46,15 +46,15 @@ addL a st = st{res=a : res st}
 rmTemp :: TopSortKey k e => k -> TopSt k e -> TopSt k e
 rmTemp a st = st{getTemp = M.delete a (getTemp st)}
 
-data TopSortError e
+data TopSortError k e
   = ELoop [e] -- ^ Loop Error fund.
-  | ENotFound e (Maybe e) -- ^ Internal error.
+  | ENotFound e k -- ^ Internal error.
   | MaxBound
   deriving Show
 
 -- Monad to compute.
 -- Error TopSortError and State TopSt
-type TopSort k e = ExceptT (TopSortError e) (State (TopSt k e))
+type TopSort k e = ExceptT (TopSortError k e) (State (TopSt k e))
 
 -- Adj map
 -- k == keys
@@ -76,13 +76,13 @@ topSort
   -- | Takes a dependency graph
   => Graph k e
   -- Returns either a loop between elements [0] or an ordered list of them.
-  -> Either (TopSortError e) [k]
+  -> Either (TopSortError k e) [k]
 topSort graph = evalState (runExceptT (computation >> gets (reverse . res))) emptyTopS
   where
     computation = topSortInternal graph
 
 -- | Straight topSort function from dependency list.
-topSortFromDepList :: (TopSortKey k e) => [(k, [e])] -> Either (TopSortError e) [k]
+topSortFromDepList :: (TopSortKey k e) => [(k, [e])] -> Either (TopSortError k e) [k]
 topSortFromDepList = topSort . M.fromList
 
 topSortInternal
@@ -99,12 +99,12 @@ topSortInternal graph =
     then -- skip if marked
       return ()
     else do -- if a is unmarked
-        mapM_ (visit graph Nothing) es
+        mapM_ (visit graph k) es
         modifyE (addPerm k)
         modify (addL k)
    ) $ M.toList graph
 
-visit :: TopSortKey k e => Graph k e -> Maybe e -> e -> TopSort k e ()
+visit :: TopSortKey k e => Graph k e -> k -> e -> TopSort k e ()
 visit graph parent src
   = gets getPerm >>= \permSet ->
   if S.member (topSortKey src) permSet
@@ -118,7 +118,7 @@ visit graph parent src
       --
       case M.lookup (topSortKey src) graph of
           Nothing -> throwError (ENotFound src parent)
-          Just adj_src -> mapM_ (visit graph (Just src)) adj_src
+          Just adj_src -> mapM_ (visit graph (topSortKey src)) adj_src
       modify (rmTemp (topSortKey src))
       modifyE (addPerm (topSortKey src))
       modify (addL (topSortKey src))
