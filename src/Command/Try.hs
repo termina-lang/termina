@@ -106,15 +106,21 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
     typedModule <- typeSingleModule terminaModule
     -- | Generate basic blocks
     case genBasicBlocksModule typedModule of
-        Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+        Left err -> 
+            let sourceFilesMap = M.fromList [(fullPath typedModule, sourcecode typedModule)] in
+            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right bbModule -> do
             maybe (return ()) 
-                (\err -> TIO.putStrLn (toText err M.empty) >> exitFailure) 
+                (\err -> 
+                    let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
+                    TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
                 $ basicBlockPathsCheckModule bbModule
             -- | Check variable usage (if enabled)
             unless noUsageChecking (
                     maybe (return ()) 
-                        (\err -> TIO.putStrLn (toText err M.empty) >> exitFailure) 
+                        (\err -> 
+                            let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
+                            TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
                         $ useDefCheckModule bbModule
                 )
             if printHeader then
