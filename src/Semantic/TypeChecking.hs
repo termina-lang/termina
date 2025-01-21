@@ -68,7 +68,7 @@ semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
 semanticTypeDef (Struct i f m)  = Struct i f m
 semanticTypeDef (Enum i e m)    = Enum i e m
 semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMember cls) ps m
-semanticTypeDef (Interface i cls m) = Interface i cls m
+semanticTypeDef (Interface kind i cls m) = Interface kind i cls m
 
 -- Adding Global elements to the environment.
 addElement :: SAST.AnnASTElement SemanticAnn -> LocatedElement (GEntry SemanticAnn) -> SemanticMonad ()

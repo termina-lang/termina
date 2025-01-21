@@ -100,7 +100,7 @@ classWithAccessPortField :: AnnASTElement SemanticAnn
 classWithAccessPortField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt32) undefined,
-    ClassField (FieldDefinition "field1" (TAccessPort (TInterface "Interface1"))) undefined,
+    ClassField (FieldDefinition "field1" (TAccessPort (TInterface RegularInterface "Interface1"))) undefined,
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 

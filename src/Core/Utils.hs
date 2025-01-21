@@ -170,7 +170,7 @@ allocTy :: TerminaType -> Bool
 allocTy = boxTy
 
 accessPortTy :: TerminaType -> Bool
-accessPortTy (TInterface _)          = True
+accessPortTy (TInterface _ _)        = True
 accessPortTy (TAllocator _)          = True
 accessPortTy (TAtomicAccess _)       = True
 accessPortTy (TAtomicArrayAccess {}) = True
@@ -267,10 +267,10 @@ memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons _ _      = False
 
 getTypeIdentifier :: TypeDef' ty blk a -> Identifier
-getTypeIdentifier (Struct ident _ _) = ident
-getTypeIdentifier (Enum ident _ _)   = ident
-getTypeIdentifier (Class _ ident _ _ _)  = ident
-getTypeIdentifier (Interface ident _ _) = ident
+getTypeIdentifier (Struct ident _ _)      = ident
+getTypeIdentifier (Enum ident _ _)        = ident
+getTypeIdentifier (Class _ ident _ _ _)   = ident
+getTypeIdentifier (Interface _ ident _ _) = ident
 
 getGlobalIdentifier :: Global' ty expr a -> Identifier
 getGlobalIdentifier (Task ident _ _ _ _)     = ident
@@ -334,7 +334,8 @@ sameTy  (TArray typespecl sizel) (TArray typespecr sizer) = sameTy typespecl typ
 sameTy  (TStruct idl) (TStruct idr) = idl == idr
 sameTy  (TEnum idl) (TEnum idr) = idl == idr
 sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
-sameTy  (TInterface idl) (TInterface idr) = idl == idr
+sameTy  (TInterface RegularInterface idl) (TInterface RegularInterface idr) = idl == idr
+sameTy  (TInterface SystemInterface idl) (TInterface SystemInterface idr) = idl == idr
 sameTy  (TAtomic tyl) (TAtomic tyr) = sameTy tyl tyr 
 sameTy  (TAtomicArray tyl sizel) (TAtomicArray tyr sizer) = sameTy tyl tyr && (sizel == sizer)
 -- TFixedLocation subtypes
@@ -423,7 +424,7 @@ tyDefName :: TypeDef' ty blk a -> Identifier
 tyDefName (Struct sId _ _ )= sId
 tyDefName (Enum sId _ _ )=   sId
 tyDefName (Class _ sId _ _ _ )=sId
-tyDefName (Interface sId _ _ )=sId
+tyDefName (Interface _ sId _ _ )=sId
 
 globalsName :: AnnASTElement' ty blk expr a -> Identifier
 globalsName (Function fId _ _ _ _ _) = fId

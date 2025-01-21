@@ -513,7 +513,8 @@ typeTypeSpecifier loc (TSDefinedType ident []) = do
     Struct s _ _ -> return $ TStruct s
     Enum e _ _ -> return $ TEnum e
     Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface i _ _ -> return $ TInterface i
+    Interface RegularInterface i _ _ -> return $ TInterface RegularInterface i
+    Interface SystemInterface i _ _ -> return $ TInterface SystemInterface i
 typeTypeSpecifier loc ts@(TSDefinedType "Allocator" [typeParam]) = 
   case typeParam of
     TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc (TSDefinedType ident [])

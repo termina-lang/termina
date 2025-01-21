@@ -103,7 +103,7 @@ data TerminaType
   | TBool | TChar
   | TStruct Identifier
   | TEnum Identifier
-  | TInterface Identifier
+  | TInterface InterfaceKind Identifier
   | TArray TerminaType Size
   | TOption TerminaType
   -- Built-in polymorphic types
@@ -240,8 +240,11 @@ data TypeDef' ty blk a
   = Struct Identifier [FieldDefinition' ty]  [Modifier' ty]
   | Enum Identifier [EnumVariant' ty] [Modifier' ty]
   | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty]
-  | Interface Identifier [InterfaceMember' ty a] [Modifier' ty]
+  | Interface InterfaceKind Identifier [InterfaceMember' ty a] [Modifier' ty]
   deriving (Show, Functor)
+
+data InterfaceKind = RegularInterface | SystemInterface
+  deriving (Show, Ord, Eq)
 
 data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass 
   deriving (Show, Ord, Eq)

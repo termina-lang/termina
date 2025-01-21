@@ -284,7 +284,7 @@ genBlocks (ProcedureCall obj ident args ann) = do
     -- | Obtain the type of the object
     typeObj <- getObjType obj
     case typeObj of
-        TAccessPort (TInterface iface) -> do
+        TAccessPort (TInterface RegularInterface iface) -> do
             structType <- genType noqual (TStruct iface)
             return 
                 [pre_cr ((cObj @. ident @: cFuncType) @@
@@ -551,6 +551,9 @@ genBlocks (ReturnBlock mExpr ann) =
 genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [pre_cr (_return (Just cExpr)) |>> location ann]
+
+-- | TODO: Support system calls
+genBlocks (SystemCallBlock {}) = return []
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do

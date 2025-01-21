@@ -144,9 +144,9 @@ typeMemberFunctionCall ann obj_ty ident args =
           ;
         _ -> throwError $ annotateError Internal EUnboxingClassType
       }
-    TAccessPort (TInterface dident) -> getGlobalTypeDef ann dident >>=
+    TAccessPort (TInterface RegularInterface dident) -> getGlobalTypeDef ann dident >>=
       \case{
-        LocatedElement (Interface _identTy cls _mods) _ ->
+        LocatedElement (Interface RegularInterface _identTy cls _mods) _ ->
           case findInterfaceProcedure ident cls of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
             Just (ps, anns) -> do
@@ -818,10 +818,10 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
-      TAccessPort (TInterface iface) ->
+      TAccessPort (TInterface RegularInterface iface) ->
         getGlobalTypeDef loc iface >>=
           \case {
-            LocatedElement (Interface _ members _) _ ->
+            LocatedElement (Interface RegularInterface _ members _) _ ->
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->

@@ -167,7 +167,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                     _ -> do
                         unionField <- genParameterUnion variantsWithParams
                         return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing [enumField, unionField] [])) cAnn
-genTypeDefinitionDecl (TypeDefinition (Interface identifier members _) ann) = do
+genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier members _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         cThatField = CDecl (CTypeSpec (CTPointer (CTVoid noqual) noqual)) (Just thatField) Nothing
     procedureFields <- mapM genInterfaceProcedureField members
