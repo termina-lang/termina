@@ -39,7 +39,7 @@ The main source of project documentation is the [Termina book](https://termina-l
 
 The current status of the project is as follows:
 
-- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by a Termina runtime that can be found in its repository.
+- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by a Termina runtime that can be found in its [repository](https://github.com/termina-lang/termina-runtime).
 - The transpiler incorporates a type checker and a fully functional semantic parser capable of detecting errors and generating meaningful error messages.
 - The transpiler implements a simple Language Server Protocol (LSP) server that can be used by different integrated development environments.
 
