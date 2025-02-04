@@ -2,6 +2,8 @@
 
 Termina is a domain-specific language for real-time embedded systems aimed at simplifying their implementation and reducing validation and verification costs.
 
+This repository contains the implementation of a transpiler from Termina to C. The generated code is supported on a runtime that in turn runs on a real-time operating system. 
+
 ## Main features
 
 Termina adheres to the following core principles:
