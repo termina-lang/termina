@@ -10,7 +10,7 @@ module Generator.LanguageC.Embedded (
     (@>), (@<), (@>=), (@<=),
     (@+), (@-), (@*), (@/), (@%),
     cast, addrOf, deref, ptr,
-    void, void_ptr, size_t, typeDef,
+    void, void_ptr, size_t, typeDef, char,
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
@@ -140,6 +140,9 @@ instance Cast CObject where
 void, void_ptr :: CType
 void = CTVoid noqual
 void_ptr = CTPointer (CTVoid noqual) noqual
+
+char :: CType
+char = CTChar noqual
 
 size_t :: CType
 size_t = CTSizeT noqual
