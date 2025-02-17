@@ -1028,7 +1028,7 @@ interfaceDefinitionParser = do
   procedures <- braces (many1 interfaceProcedureParser)
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Interface identifier procedures modifiers) (Position startPos endPos)
+  return $ TypeDefinition (Interface RegularInterface identifier procedures modifiers) (Position startPos endPos)
 
 classDefinitionParser :: Parser (AnnASTElement ParserAnn)
 classDefinitionParser = do

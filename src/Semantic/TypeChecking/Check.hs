@@ -171,7 +171,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   providedProcedures <- concat <$> foldM (\acc ifaceId ->
     catchError (getGlobalTypeDef anns ifaceId)
       (\_ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)) >>= \case {
-      (LocatedElement (Interface _ iface_prcs _) _) -> return $ map (, ifaceId) iface_prcs : acc;
+      (LocatedElement (Interface _ _ iface_prcs _) _) -> return $ map (, ifaceId) iface_prcs : acc;
       _ -> throwError $ annotateError anns (EGlobalNotInterface ifaceId)
     }) [] provides
   let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _, _) -> ifaceId) providedProcedures

@@ -280,7 +280,8 @@ genType _qual (TReference _ ts) = do
 genType _noqual TUnit = return (CTVoid noqual)
 genType qual (TEnum ident) = return (CTTypeDef ident qual)
 genType qual (TStruct ident) = return (CTTypeDef ident qual)
-genType qual (TInterface ident) = return (CTTypeDef ident qual)
+genType qual (TInterface RegularInterface ident) = return (CTTypeDef ident qual)
+genType _qual (TInterface SystemInterface _) = throwError $ InternalError "System interfaces shall not be translated to C types"
 
 genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
 genFunctionType ts tsParams = do

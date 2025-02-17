@@ -85,7 +85,7 @@ typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
   return (Enum ident evs_ty mds_ty)
-typeTypeDefinition ann (Interface ident cls mds_ts) = do
+typeTypeDefinition ann (Interface RegularInterface ident cls mds_ts) = do
   -- Check that the interface is not empty
   when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
   -- Check procedure names are unique
@@ -95,7 +95,7 @@ typeTypeDefinition ann (Interface ident cls mds_ts) = do
   -- Type the modifiers
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
-  return (Interface ident procedures mds_ty)
+  return (Interface RegularInterface ident procedures mds_ty)
 
   where
 
@@ -103,6 +103,7 @@ typeTypeDefinition ann (Interface ident cls mds_ts) = do
     typeInterfaceProcedure (InterfaceProcedure procId ps_ts annIP) = do
       ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
       return $ InterfaceProcedure procId ps_ty (buildExpAnn annIP TUnit)
+typeTypeDefinition _ (Interface SystemInterface ident _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes

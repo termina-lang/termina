@@ -9,7 +9,7 @@ import qualified Data.Map as M
 import UT.PPrinter.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
-interfaceWithOneProcedure = TypeDefinition (Interface "iface0" [
+interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" [
     InterfaceProcedure "procedure0" [
       Parameter "param0" TUInt8,
       Parameter "param1" TUInt16,

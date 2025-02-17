@@ -92,12 +92,12 @@ instance ShowText TerminaType where
     showText TChar = "char"
     showText (TStruct ident) = T.pack ident
     showText (TEnum ident) = T.pack ident
-    showText (TInterface ident) = T.pack ident
+    showText (TInterface _ ident) = T.pack ident
     showText (TGlobal _ ident) = T.pack ident
     showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TOption ts) = "Option<" <> showText ts <> ">"
     showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
-    showText (TPool ts size) = "TPool<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TPool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (TAllocator ts) = "Allocator<" <> showText ts <> ">"
     showText (TAtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
     showText (TAtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
@@ -131,7 +131,8 @@ instance ShowText (TypeDef' ty blk a) where
     showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
     showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
-    showText (Interface ident _ _) = T.pack $ "interface " <> ident
+    showText (Interface RegularInterface ident _ _) = T.pack $ "interface " <> ident
+    showText (Interface SystemInterface ident _ _) = T.pack $ "system interface " <> ident
 
 class ErrorMessage a where
 

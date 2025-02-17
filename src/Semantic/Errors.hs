@@ -46,6 +46,7 @@ data Error
   | EStructDefEmpty Identifier -- ^ Empty struct definition (Internal)
   | EEnumDefEmpty Identifier -- ^ Empty enum definition (Internal)
   | EInterfaceEmpty Identifier -- ^ Empty interface definition (Internal)
+  | ESystemInterfaceDefinition Identifier -- ^ System interface definition (Internal)
   | EInvalidArrayIndexing TerminaType -- ^ Invalid array indexing (SE-001)
   | ENotNamedObject Identifier -- ^ Object not found (SE-002)
   | ENotConstant Identifier -- ^ Invalid use of a non-constant object (SE-003)

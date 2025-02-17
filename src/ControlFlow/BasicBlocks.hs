@@ -232,7 +232,7 @@ genBBTypeDef (SAST.Enum name variants ann) = return $ Enum name variants ann
 genBBTypeDef (SAST.Class kind name members parents ann) = do
     bbMembers <- mapM genBBClassMember members
     return $ Class kind name bbMembers parents ann
-genBBTypeDef (SAST.Interface name members ann) = return $ Interface name members ann
+genBBTypeDef (SAST.Interface kind name members ann) = return $ Interface kind name members ann
 
 -- | This function translates the annotated AST elements from the semantic AST
 -- to the basic block AST.

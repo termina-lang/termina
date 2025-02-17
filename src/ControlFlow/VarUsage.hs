@@ -246,6 +246,8 @@ useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
 useDefBasicBlock (ReturnBlock e _ann) =
   maybe (return ()) useExpression e
 useDefBasicBlock (ContinueBlock e _ann) = useExpression e
+useDefBasicBlock (SystemCallBlock obj _ident args _ann) =
+  useObject obj >> mapM_ useArguments args
 
 -- General case, not when it is TOption Box
 useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()

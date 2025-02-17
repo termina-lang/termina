@@ -120,8 +120,14 @@ data BasicBlock' ty expr obj a =
     | ReturnBlock 
         (Maybe (expr a)) -- ^ return expression
         a
-    | ContinueBlock
+    | ContinueBlock
         (expr a)
+        a
+    -- | System call
+    | SystemCallBlock
+        (obj a) -- ^ access port
+        Identifier -- ^ name of the system call
+        [expr a] -- ^ list of arguments
         a
     deriving (Show, Functor)
 
