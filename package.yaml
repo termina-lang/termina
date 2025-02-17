@@ -7,8 +7,7 @@ maintainer:          "team@termina-lang.org"
 copyright:           "The Termina Project Contributors"
 
 extra-source-files:
-- README.org
-- CHANGELOG.md
+- README.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
