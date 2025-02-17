@@ -58,7 +58,6 @@ genTaskClassCode tskCls = do
                 _ -> acc
             ) [] members
 
-        -- TOOD: The current implementation does not work with vectors
         getMsgDataVariable :: Bool -> Identifier -> TerminaType -> CGenerator CCompoundBlockItem
         getMsgDataVariable before action dts = do
             cDataType <- genType noqual dts

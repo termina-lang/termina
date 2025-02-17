@@ -183,7 +183,11 @@ unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
 unboxObject (CExprValOf obj _ _) = return obj
 unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 
--- | Generates the name of the option struct type
+-- | Generates the name of the option struct type.
+-- This function is used to generate the name of the struct that represents the
+-- option type. The function assumes that the option type is well-typed and that
+-- the semantic annotation is correct. If the option type is not well-typed, the
+-- function will throw an internal error.
 genOptionStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
 genOptionStructName TBool = return $ namefy "option_bool_t"
 genOptionStructName TChar = return $ namefy "option_char_t"
@@ -195,38 +199,10 @@ genOptionStructName TInt8 = return $ namefy "option_int8_t"
 genOptionStructName TInt16 = return $ namefy "option_int16_t"
 genOptionStructName TInt32 = return $ namefy "option_int32_t"
 genOptionStructName TInt64 = return $ namefy "option_int64_t"
-genOptionStructName ts@(TOption _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
 genOptionStructName (TBoxSubtype _) = return optionBox
-genOptionStructName ts =
-    case ts of
-        TArray {} -> do
-            tsName <- genTypeSpecName ts
-            tsDimension <- genDimensionOptionTS ts
-            return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_t"
-        _ -> do
-            tsName <- genTypeSpecName ts
-            return $ namefy $ "option_" <> tsName <> "_t"
-
-    where
-        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genTypeSpecName TUInt8 = return "uint8"
-        genTypeSpecName TUInt16 = return "uint16"
-        genTypeSpecName TUInt32 = return "uint32"
-        genTypeSpecName TUInt64 = return "uint64"
-        genTypeSpecName TInt8 = return "int8"
-        genTypeSpecName TInt16 = return "int16"
-        genTypeSpecName TInt32 = return "int32"
-        genTypeSpecName TInt64 = return "int64"
-        genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
-        genTypeSpecName (TGlobal _ clsIdentifier) = return clsIdentifier
-        genTypeSpecName (TStruct ident) = return ident
-        genTypeSpecName (TEnum ident) = return ident
-        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
-
-        genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genDimensionOptionTS (TArray ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
-        genDimensionOptionTS _ = return ""
-
+genOptionStructName (TStruct ident) = return $ namefy "option_" <> ident <> "_t" 
+genOptionStructName (TEnum ident) = return $ namefy "option_" <> ident <> "_t" 
+genOptionStructName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
 
 getCInteger :: TInteger -> CInteger
 getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
