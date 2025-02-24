@@ -237,3 +237,29 @@ getExprBoxName _ = throwError $ annotateError Internal EUnboxingBox
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann
 getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident idx
+
+getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
+getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
+    case emitter of
+        TPInterruptEmittter identifier _ -> 
+            case M.lookup identifier (emitterTargets progArchitecture) of
+                Just (entity, _port, _) -> 
+                    case M.lookup entity (tasks progArchitecture) of
+                        Just _ -> emitter : acc
+                        Nothing -> acc
+                Nothing -> acc
+        _ -> acc
+    ) [] (getConnectedEmitters progArchitecture)
+
+getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
+getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
+    case emitter of
+        TPPeriodicTimerEmitter identifier _ _ -> 
+            case M.lookup identifier (emitterTargets progArchitecture) of
+                Just (entity, _port, _) -> 
+                    case M.lookup entity (tasks progArchitecture) of
+                        Just _ -> emitter : acc
+                        Nothing -> acc
+                Nothing -> acc
+        _ -> acc
+    ) [] (getConnectedEmitters progArchitecture)

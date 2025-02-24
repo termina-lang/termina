@@ -22,6 +22,44 @@ import Generator.LanguageC.Embedded
 import ControlFlow.Architecture.Utils
 import System.FilePath
 
+-- | Function __rtems_app__install_emitters. This function is called from the Init task.
+-- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
+-- of the tasks and handlers.
+genInstallEmitters :: [TPEmitter a] -> CGenerator CFileItem
+genInstallEmitters progEmitters = do
+    installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
+    return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
+            [
+                "current" @: (_const . ptr $ _TimeVal)
+            ] @-> void $
+            trail_cr . block $ 
+                    -- rtems_status_code status = RTEMS_SUCCESSFUL;
+                pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : installEmitters
+
+    where
+
+        genRTEMSInstallEmitter :: TPEmitter a -> CGenerator CCompoundBlockItem
+        genRTEMSInstallEmitter (TPInterruptEmittter interrupt _) = do
+            return $
+                pre_cr $ _if (
+                        "RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
+                    $ trail_cr . block $ [
+                        pre_cr $ "status" @: rtems_status_code @= __rtems__install_isr @@
+                            [
+                                dec (emitterToArrayMap M.! interrupt) @: uint32_t,
+                                namefy ("rtems_isr" <::> interrupt) @: rtems_interrupt_handler
+                            ]
+                    ]
+        genRTEMSInstallEmitter (TPPeriodicTimerEmitter timer _ _) = do
+            let cExpr = CVar timer (CTTypeDef "PeriodicTimer" noqual)
+            armTimer <- genArmTimer cExpr timer
+            return $
+                pre_cr $ _if ("RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
+                    $ block $ 
+                        pre_cr (((timer @: _PeriodicTimer) @. "__timer" @: __termina_timer_t) @. "current" @: _TimeVal @=
+                            deref ("current" @: (_const . ptr $ _TimeVal))) : armTimer
+        genRTEMSInstallEmitter (TPSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
+
 genEmitter :: TerminaProgArch a -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genEmitter progArchitecture (TPInterruptEmittter interrupt _) = do
     let irqArray = emitterToArrayMap M.! interrupt
@@ -260,45 +298,6 @@ genEmitter progArchitecture (TPSystemInitEmitter systemInit _) = do
                             pre_cr $ _return Nothing
                         ]
             Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
-
-
--- | Function __rtems_app__install_emitters. This function is called from the Init task.
--- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
--- of the tasks and handlers.
-genInstallEmitters :: [TPEmitter a] -> CGenerator CFileItem
-genInstallEmitters progEmitters = do
-    installEmitters <- mapM genRTEMSInstallEmitter $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
-    return $ pre_cr $ static_function (namefy "rtems_app" <::> "install_emitters")
-            [
-                "current" @: (_const . ptr $ _TimeVal)
-            ] @-> void $
-            trail_cr . block $ 
-                    -- rtems_status_code status = RTEMS_SUCCESSFUL;
-                pre_cr (var "status" rtems_status_code @:= "RTEMS_SUCCESSFUL" @: rtems_status_code) : installEmitters
-
-    where
-
-        genRTEMSInstallEmitter :: TPEmitter a -> CGenerator CCompoundBlockItem
-        genRTEMSInstallEmitter (TPInterruptEmittter interrupt _) = do
-            return $
-                pre_cr $ _if (
-                        "RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
-                    $ trail_cr . block $ [
-                        pre_cr $ "status" @: rtems_status_code @= __rtems__install_isr @@
-                            [
-                                dec (emitterToArrayMap M.! interrupt) @: uint32_t,
-                                namefy ("rtems_isr" <::> interrupt) @: rtems_interrupt_handler
-                            ]
-                    ]
-        genRTEMSInstallEmitter (TPPeriodicTimerEmitter timer _ _) = do
-            let cExpr = CVar timer (CTTypeDef "PeriodicTimer" noqual)
-            armTimer <- genArmTimer cExpr timer
-            return $
-                pre_cr $ _if ("RTEMS_SUCCESSFUL" @: rtems_status_code @== "status" @: rtems_status_code)
-                    $ block $ 
-                        pre_cr (((timer @: _PeriodicTimer) @. "__timer" @: __termina_timer_t) @. "current" @: _TimeVal @=
-                            deref ("current" @: (_const . ptr $ _TimeVal))) : armTimer
-        genRTEMSInstallEmitter (TPSystemInitEmitter {}) = throwError $ InternalError "Initial event does not have to be installed"
 
 
 genMainFile :: QualifiedName 
