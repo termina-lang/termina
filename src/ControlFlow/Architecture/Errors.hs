@@ -27,6 +27,7 @@ data Error =
     | EUnboxingResource -- ^ Error when trying to unbox a resource (Internal)
     | EUnboxingPool -- ^ Error when trying to unbox a pool (Internal)
     | EUnboxingProcedureCall -- ^ Error when trying to unbox a procedure call (Internal)
+    | EUnboxingPeriodicEmitter -- ^ Error when trying to unbox a periodic emitter (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
     | EUnboxingFree -- ^ Error when trying to unbox a free (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)

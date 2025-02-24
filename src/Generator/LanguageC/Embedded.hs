@@ -9,8 +9,8 @@ module Generator.LanguageC.Embedded (
     (@==), (|>>), (@->),
     (@>), (@<), (@>=), (@<=),
     (@+), (@-), (@*), (@/), (@%),
-    cast, addrOf, deref, ptr,
-    void, void_ptr, size_t, typeDef,
+    cast, addrOf, deref, ptr, str,
+    void, void_ptr, size_t, typeDef, char,
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
@@ -99,9 +99,9 @@ instance TypeElement CInteger CExpression where
         CExprConstant (CIntConst cInteger) cType cAnn
 
 instance TypeElement Char CExpression where
-    (@:) char cType =
+    (@:) chr cType =
         let cAnn = internalAnn CGenericAnn in
-        CExprConstant (CCharConst (CChar char)) cType cAnn
+        CExprConstant (CCharConst (CChar chr)) cType cAnn
 
 addrOf :: CObject -> CExpression
 addrOf obj =
@@ -140,6 +140,9 @@ instance Cast CObject where
 void, void_ptr :: CType
 void = CTVoid noqual
 void_ptr = CTPointer (CTVoid noqual) noqual
+
+char :: CType
+char = CTChar noqual
 
 size_t :: CType
 size_t = CTSizeT noqual
@@ -225,13 +228,16 @@ int64_t = CTInt IntSize64 Signed noqual
 newtype Decimal = Decimal Integer
     deriving Show
 
-dec :: Integer -> Decimal
-dec = Decimal
+dec :: Integer -> CConstant
+dec value = CIntConst (CInteger value CDecRepr)
 
-instance TypeElement Decimal CExpression where
-    (@:) (Decimal value) cType =
+str :: String -> CConstant
+str = CStrConst . CString
+
+instance TypeElement CConstant CExpression where
+    (@:) constant cType =
         let cAnn = internalAnn CGenericAnn in
-        CExprConstant (CIntConst (CInteger value CDecRepr)) cType cAnn
+        CExprConstant constant cType cAnn
 
 (@!=) :: CExpression -> CExpression -> CExpression
 (@!=) l r =

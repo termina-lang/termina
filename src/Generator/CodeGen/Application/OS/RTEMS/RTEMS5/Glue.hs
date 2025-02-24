@@ -18,10 +18,10 @@ import Data.Text (unpack)
 import Generator.LanguageC.Printer
 import Semantic.Types
 import ControlFlow.Architecture.Types
-import ControlFlow.Architecture.Utils (getConnectedEmitters, getClassMembers)
 import Generator.CodeGen.Application.OS.RTEMS.RTEMS5.Utils
 import Generator.CodeGen.Application.OS.RTEMS.Utils
 import Generator.Utils
+import ControlFlow.Architecture.Utils
 
 genInterruptEmitterDeclaration :: Bool -> TPEmitter SemanticAnn -> CGenerator CFileItem
 genInterruptEmitterDeclaration before (TPInterruptEmittter identifier _ ) = do
@@ -289,32 +289,6 @@ genEnableProtection progArchitecture resLockingMap = do
                             no_cr $ rtems_shutdown_executive @@ [dec 1 @: uint32_t]
                         ]
                 ]
-
-getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
-getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
-    case emitter of
-        TPInterruptEmittter identifier _ -> 
-            case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _) -> 
-                    case M.lookup entity (tasks progArchitecture) of
-                        Just _ -> emitter : acc
-                        Nothing -> acc
-                Nothing -> acc
-        _ -> acc
-    ) [] (getConnectedEmitters progArchitecture)
-
-getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
-getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
-    case emitter of
-        TPPeriodicTimerEmitter identifier _ _ -> 
-            case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _) -> 
-                    case M.lookup entity (tasks progArchitecture) of
-                        Just _ -> emitter : acc
-                        Nothing -> acc
-                Nothing -> acc
-        _ -> acc
-    ) [] (getConnectedEmitters progArchitecture)
 
 -- | Function __rtems_app__init_globals. This function is called from the Init task.
 -- The function is called BEFORE the initialization of the tasks and handlers. The function disables

@@ -174,7 +174,7 @@ genExpression e@(Constant c ann) = do
             return $ cInteger @: cType |>> location ann
         (B True) -> return $ dec 1 @: cType |>> location ann
         (B False) -> return $ dec 0 @: cType |>> location ann
-        (C char) -> return $ char @: cType |>> location ann
+        (C chr) -> return $ chr @: cType |>> location ann
 genExpression (Casting expr ts ann) = do
     cType <- genType noqual ts
     cExpr <- genExpression expr
