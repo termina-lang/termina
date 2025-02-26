@@ -22,6 +22,7 @@ import Parser.Types
 import Semantic.TypeChecking.Expression
 import Semantic.TypeChecking.Check
 import Core.Utils
+import Semantic.Utils
 
 typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeGlobal (Task ident ts mexpr mods anns) = do

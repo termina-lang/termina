@@ -21,6 +21,7 @@ import Generator.CodeGen.Application.Platform.RTEMS5NoelSpike.Types
 import Generator.LanguageC.Embedded
 import ControlFlow.Architecture.Utils
 import System.FilePath
+import Generator.CodeGen.SystemCall
 
 -- | Function __rtems_app__install_emitters. This function is called from the Init task.
 -- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
@@ -355,4 +356,4 @@ genMainFile mName progArchitecture = do
         dependenciesMap = getResDependencies progArchitecture
 
 runGenMainFile :: TerminaConfig -> QualifiedName -> TerminaProgArch SemanticAnn -> Either CGeneratorError CFile
-runGenMainFile config mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) (CGeneratorEnv M.empty config)
+runGenMainFile config mainFilePath progArchitecture = runReader (runExceptT (genMainFile mainFilePath progArchitecture)) (CGeneratorEnv M.empty config syscallFunctionsMap)

@@ -101,8 +101,10 @@ genBBlocks acc (stmt : xs) =
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If the object is an access port of a user-defined interface type, we shall create
                         -- a new procedure call block
-                        TAccessPort (TInterface {}) -> 
+                        TAccessPort (TInterface RegularInterface _) -> 
                             genBBlocks (ProcedureCall obj funcName args ann' : acc) xs
+                        TAccessPort (TInterface SystemInterface _) -> 
+                            genBBlocks (SystemCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block
                         -- of the corresponding type (AllocBox or FreeBox)
                         TAccessPort (TAllocator _) -> do

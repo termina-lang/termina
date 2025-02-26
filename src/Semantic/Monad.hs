@@ -7,10 +7,6 @@
 module Semantic.Monad where
 
 import Data.Map as M
-import Data.Maybe
-
--- Debugging
--- import Debugging
 
 -- AST Info
 import Utils.Annotations
@@ -19,6 +15,7 @@ import Semantic.AST
 
 import Semantic.Errors
 import Semantic.Types
+import Semantic.Environment
 import Core.Utils
 
 -- Monads
@@ -28,153 +25,10 @@ import qualified Control.Monad.State.Strict as ST
 import qualified Parser.Types as Parser
 import Utils.Monad
 
-import Configuration.Configuration
 import Control.Monad.State
+import Semantic.Utils
 
-----------------------------------------
 
-getResultingType :: SemanticElems -> Maybe TerminaType
-getResultingType (ETy ty) = 
-  Just (
-    case ty of {
-      SimpleType t -> t; 
-      ObjectType _ t -> t; 
-      AppType _ t -> t;
-      PortConnection _ -> TUnit})
-getResultingType _        = Nothing
-
-getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TerminaType)
-getObjectSAnns (LocatedElement (ETy (ObjectType ak ty)) _) = Just (ak, ty)
-getObjectSAnns _                                    = Nothing
-
-getArgumentsType :: SemanticElems -> Maybe [TerminaType]
-getArgumentsType (ETy (AppType ts _)) = Just ts
-getArgumentsType _                    = Nothing
-
-getMatchCaseTypes :: SemanticElems -> Maybe [TerminaType]
-getMatchCaseTypes (STy (MatchCaseStmtType ts)) = Just ts
-getMatchCaseTypes _                           = Nothing
-
-isResultFromApp :: SemanticElems -> Bool
-isResultFromApp = isJust . getArgumentsType
-----------------------------------------
-
-buildExpAnn :: Location -> TerminaType -> SemanticAnn
-buildExpAnn loc = locate loc . ETy . SimpleType
-
-buildExpAnnObj :: Location -> AccessKind -> TerminaType -> SemanticAnn
-buildExpAnnObj loc ak = locate loc . ETy . ObjectType ak
-
-buildExpAnnApp :: Location -> [TerminaType] -> TerminaType -> SemanticAnn
-buildExpAnnApp loc tys = locate loc . ETy . AppType tys
-
--- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
-buildGlobalAnn :: Location -> TerminaType -> SemanticAnn
-buildGlobalAnn loc = locate loc . GTy 
-
-buildStructTypeAnn :: Location -> SemanticAnn
-buildStructTypeAnn = LocatedElement (TTy StructTy)
-
-buildEnumTypeAnn :: Location -> SemanticAnn
-buildEnumTypeAnn = LocatedElement (TTy EnumTy)
-
-buildClassTypeAnn :: Location -> ClassKind -> SemanticAnn
-buildClassTypeAnn loc clsKind = LocatedElement (TTy (ClsTy clsKind)) loc
-
-buildInterfaceTypeAnn :: Location -> InterfaceKind -> [ProcedureSeman] -> SemanticAnn
-buildInterfaceTypeAnn loc iKind procs = LocatedElement (TTy (InterfaceTy iKind procs)) loc
-
-buildStmtAnn :: Location -> SemanticAnn
-buildStmtAnn = LocatedElement (STy SimpleStmtType)
-
-buildStmtMatchCaseAnn :: Location -> [TerminaType] -> SemanticAnn
-buildStmtMatchCaseAnn loc ts = locate loc (STy (MatchCaseStmtType ts))
-
-buildOutPortConnAnn :: Location -> TerminaType -> SemanticAnn
-buildOutPortConnAnn loc ts = locate loc (ETy (PortConnection (OutPConnTy ts)))
-
-buildAccessPortConnAnn :: Location -> TerminaType -> [ProcedureSeman] -> SemanticAnn
-buildAccessPortConnAnn loc ts procs = locate loc (ETy (PortConnection (APConnTy ts procs)))
-
-buildPoolConnAnn :: Location -> TerminaType -> Size -> SemanticAnn
-buildPoolConnAnn loc ts s = locate loc (ETy (PortConnection (APPoolConnTy ts s)))
-
-buildAtomicConnAnn :: Location -> TerminaType -> SemanticAnn
-buildAtomicConnAnn loc ts = locate loc (ETy (PortConnection (APAtomicConnTy ts)))
-
-buildAtomicArrayConnAnn :: Location -> TerminaType -> Size -> SemanticAnn
-buildAtomicArrayConnAnn loc ts s = locate loc (ETy (PortConnection (APAtomicArrayConnTy ts s)))
-
-buildSinkPortConnAnn :: Location -> TerminaType -> Identifier -> SemanticAnn
-buildSinkPortConnAnn loc ts action = locate loc (ETy (PortConnection (SPConnTy ts action)))
-
-buildInPortConnAnn :: Location -> TerminaType -> Identifier -> SemanticAnn
-buildInPortConnAnn loc ts action = locate loc (ETy (PortConnection (InPConnTy ts action)))
-
-getSemanticAnn :: SemanticAnn -> SemanticElems
-getSemanticAnn = element
-
-forgetSemAnn :: SemanticAnn -> Location
-forgetSemAnn = location
-
-getTypeSemAnn :: SemanticAnn -> Maybe TerminaType
-getTypeSemAnn  = getResultingType . getSemanticAnn
-
-unboxExpType :: ExprSeman -> ExprSeman
-unboxExpType (SimpleType (TBoxSubtype ty)) = SimpleType ty
-unboxExpType (ObjectType ak (TBoxSubtype ty)) = ObjectType ak ty
-unboxExpType (AppType ts (TBoxSubtype ty)) = AppType ts ty
-unboxExpType _ = error "impossible 888+1"
-
-unboxTypeAnn :: SemanticAnn -> SemanticAnn
-unboxTypeAnn (LocatedElement (ETy en) p) = LocatedElement (ETy (unboxExpType en)) p
-unboxTypeAnn _                    = error "impossible 888"
-
-----------------------------------------
--- | Global env
--- It has global definitions
-type GlobalEnv = Map Identifier (LocatedElement (GEntry SemanticAnn))
-
--- | Local env
--- variables to their type
-type LocalEnv = Map Identifier (LocatedElement (AccessKind, TerminaType))
-
--- This may seem a bad decision, but each envornment represent something
--- different.
--- TODO We can use empty types to disable envirnoments and make Haskell do part
--- of our work.
-
--- | Environment required to type expression packed into just one type.
-data Environment
- = ExprST
- { global :: GlobalEnv
- , local  :: LocalEnv
- }
-
-getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
-getEntry = element
-
-stdlibGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-stdlibGlobalEnv =
-  [("Result", LocatedElement (GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])) Internal),
-   ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32, FieldDefinition "tv_usec" TUInt32] [])) Internal),
-   ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
-   ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal")) (buildExpAnn Internal (TStruct "TimeVal"))] [] [])) Internal),
-   ("clock_get_uptime", LocatedElement (GFun (FunctionSeman [TReference Mutable (TStruct "TimeVal")] TUnit)) Internal),
-   ("delay_in", LocatedElement (GFun (FunctionSeman [TReference Immutable (TStruct "TimeVal")] TUnit)) Internal)]
-
-sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-sysInitGlobalEnv =
-  [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
-   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
-
-makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
-makeInitialGlobalEnv (Just config) pltEnvironment = 
-  if enableSystemInit config then 
-    ExprST (fromList (stdlibGlobalEnv ++ sysInitGlobalEnv ++ pltEnvironment)) empty
-  else
-    ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
-makeInitialGlobalEnv Nothing pltEnvironment = ExprST (fromList (stdlibGlobalEnv ++ pltEnvironment)) empty
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 

@@ -17,12 +17,12 @@ import Configuration.Configuration
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-type Substitutions = Map Identifier CObject
 type OptionTypes = Map TerminaType (Set TerminaType)
 
 data CGeneratorEnv = CGeneratorEnv { 
     optionTypes :: OptionTypes,
-    configParams :: TerminaConfig
+    configParams :: TerminaConfig,
+    syscallsMap :: Map Identifier CExpression
   }
 
 type CGenerator = ExceptT CGeneratorError (Reader CGeneratorEnv)

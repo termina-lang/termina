@@ -4,6 +4,7 @@ import Data.Text hiding (empty)
 import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Monad
+import Semantic.Environment
 import Text.Parsec
 import qualified Data.Map as M
 import ControlFlow.BasicBlocks

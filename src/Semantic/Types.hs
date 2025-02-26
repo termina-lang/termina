@@ -6,6 +6,7 @@ module Semantic.Types where
 import Semantic.AST
 import Core.Utils
 import Utils.Annotations
+import Data.Maybe
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -143,3 +144,29 @@ subTypes (TBoxSubtype a) b              = sameTy a b
 subTypes a (TBoxSubtype b)              = sameTy a b
 -- Id \subseteq Subtypes
 subTypes a b                           = sameTy a b
+
+
+getResultingType :: SemanticElems -> Maybe TerminaType
+getResultingType (ETy ty) = 
+  Just (
+    case ty of {
+      SimpleType t -> t; 
+      ObjectType _ t -> t; 
+      AppType _ t -> t;
+      PortConnection _ -> TUnit})
+getResultingType _        = Nothing
+
+getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TerminaType)
+getObjectSAnns (LocatedElement (ETy (ObjectType ak ty)) _) = Just (ak, ty)
+getObjectSAnns _                                    = Nothing
+
+getArgumentsType :: SemanticElems -> Maybe [TerminaType]
+getArgumentsType (ETy (AppType ts _)) = Just ts
+getArgumentsType _                    = Nothing
+
+getMatchCaseTypes :: SemanticElems -> Maybe [TerminaType]
+getMatchCaseTypes (STy (MatchCaseStmtType ts)) = Just ts
+getMatchCaseTypes _                           = Nothing
+
+isResultFromApp :: SemanticElems -> Bool
+isResultFromApp = isJust . getArgumentsType

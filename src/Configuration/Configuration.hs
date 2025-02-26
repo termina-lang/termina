@@ -33,6 +33,7 @@ data TerminaConfig =
     outputFolder :: !FilePath,
     profile :: !ProjectProfile,
     enableSystemInit :: !Bool,
+    enableSystemPort :: !Bool,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
 
@@ -48,6 +49,7 @@ instance FromJSON TerminaConfig where
     o .:   "output-folder"  <*>
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
+    o .:?  "enable-system-port" .!= False <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
@@ -62,6 +64,7 @@ instance ToJSON TerminaConfig where
             prjOutputFolder
             prjProfile
             prjEnableSystemInit
+            prjEnableSystemPort
             prjPlatformFlags
         ) = object $ [
             "name" .= prjName,
@@ -76,6 +79,7 @@ instance ToJSON TerminaConfig where
                 _ -> []
             -- We only serialize the enable-system-init flag if it is different from the default value
             <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
+            <> if prjEnableSystemInit then ["enable-system-port" .= prjEnableSystemPort] else []
             -- We only serialize the platform flags corresponding to the selected platform
             <> case prjPlatform of
                 "rtems5-noel-spike" -> ["platform-flags" .= object ["rtems5-noel-spike" .= rtems5_noel_spike prjPlatformFlags]]
@@ -92,5 +96,6 @@ defaultConfig projectName plt = TerminaConfig {
     outputFolder = "output",
     profile = Release,
     enableSystemInit = False,
+    enableSystemPort = False,
     platformFlags = defaultPlatformFlags
 }

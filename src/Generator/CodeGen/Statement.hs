@@ -9,8 +9,9 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
 import Utils.Annotations
-import Semantic.Monad (getMatchCaseTypes)
 import Generator.CodeGen.Application.Types
+import Control.Monad.Reader
+import qualified Data.Map as M
 
 genEnumInitialization ::
     -- | Prepend a line to the initialization expression 
@@ -551,9 +552,17 @@ genBlocks (ReturnBlock mExpr ann) =
 genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [pre_cr (_return (Just cExpr)) |>> location ann]
-
 -- | TODO: Support system calls
-genBlocks (SystemCallBlock {}) = return []
+genBlocks (SystemCall _obj ident args ann) = do
+    -- Generate the C code for the parameters
+    cArgs <- mapM genExpression args
+    -- | Now we have to get the system calls map to obtain the name
+    -- of the function to call
+    syscalls <- asks syscallsMap
+    case M.lookup ident syscalls of
+        Nothing -> throwError $ InternalError $ "System call not found: " ++ show ident
+        Just syscall -> 
+            return [pre_cr (syscall @@ cArgs) |>> location ann]
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do

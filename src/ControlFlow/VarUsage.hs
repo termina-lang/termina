@@ -27,11 +27,11 @@ import qualified Control.Monad.State as ST
 -- AST to work with.
 import ControlFlow.BasicBlocks.AST
 -- We need to know the type of objects.
-import qualified Semantic.Monad as SM
 import Semantic.Types
 import ControlFlow.VarUsage.Types
 import Data.Bifunctor
 import qualified Data.Set as S
+import Semantic.Utils
 
 
 -- There are two types of arguments :
@@ -40,7 +40,7 @@ import qualified Data.Set as S
 useArguments :: Expression SemanticAnn -> UDM VarUsageError ()
 -- If we are giving a variable of type box T, we moving it out.
 useArguments e@(AccessObject (Variable ident ann))
-  = case SM.getTypeSemAnn ann of
+  = case getTypeSemAnn ann of
     Just (TBoxSubtype _) ->
       let loc = location ann in
       safeMoveBox ident loc
@@ -57,7 +57,7 @@ useObject (Variable ident ann)
         (\case {
             TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
             _ -> safeUseVariable ident
-        }) (SM.getTypeSemAnn ann)
+        }) (getTypeSemAnn ann)
 useObject (ArrayIndexExpression obj e _ann)
   = useObject obj >> useExpression e
 useObject (MemberAccess obj _i _ann)
@@ -75,7 +75,7 @@ useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 useFieldAssignment _ = return ()
 
 getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
-getObjType = maybe (throwError EUnboxingObjectType) return . SM.getObjectSAnns . getAnnotation
+getObjType = maybe (throwError EUnboxingObjectType) return . getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
@@ -206,7 +206,7 @@ useDefBasicBlock (MatchBlock e mcase ann) = do
           map (\c -> do
             blockSt <- useMCase c >> ST.get
             return (blockSt, location . matchAnnotation $ c)) mcase);
-    ) (SM.getResultingType $ SM.getSemanticAnn $ getAnnotation e)
+    ) (getResultingType $ getSemanticAnn $ getAnnotation e)
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
   useExpression e
@@ -246,7 +246,7 @@ useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
 useDefBasicBlock (ReturnBlock e _ann) =
   maybe (return ()) useExpression e
 useDefBasicBlock (ContinueBlock e _ann) = useExpression e
-useDefBasicBlock (SystemCallBlock obj _ident args _ann) =
+useDefBasicBlock (SystemCall obj _ident args _ann) =
   useObject obj >> mapM_ useArguments args
 
 -- General case, not when it is TOption Box

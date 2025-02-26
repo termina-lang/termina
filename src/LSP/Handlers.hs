@@ -21,9 +21,9 @@ import LSP.Utils
 import qualified Data.Map as M
 import System.FilePath
 import LSP.Modules
-import Semantic.Monad (makeInitialGlobalEnv)
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Data.Functor (void)
+import Semantic.Environment
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do

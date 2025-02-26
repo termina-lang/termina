@@ -85,15 +85,17 @@ typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
   return (Enum ident evs_ty mds_ty)
-typeTypeDefinition ann (Interface RegularInterface ident extends cls mds_ts) = do
+typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts) = do
   -- Check that the interface is not empty
-  when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
+  when (null members) (throwError $ annotateError ann (EInterfaceEmpty ident))
   -- Check that there are no repeated extended interfaces
   checkNoDuplicatedExtendedInterfaces extends
   -- Check procedure names are unique
-  checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) cls)
+  checkUniqueNames ann 
+    EInterfaceNotUniqueProcedure 
+      (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) members)
   -- Check that every procedure is well-defined
-  procedures <- mapM typeInterfaceProcedure cls
+  procedures <- mapM typeInterfaceProcedure members
   -- Check that the name of the procedures is not repeated in the extended interfaces
   checkNoDuplicatedExtendedProcedures extends
   -- Type the modifiers
@@ -108,13 +110,21 @@ typeTypeDefinition ann (Interface RegularInterface ident extends cls mds_ts) = d
       ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
       return $ InterfaceProcedure procId ps_ty (buildExpAnn annIP TUnit)
     
+    -- | Checks that the procedures incorporated from the extended interfaces
+    -- are not duplicated
     checkNoDuplicatedExtendedProcedures :: 
       [Identifier] -- Accumulator
       -> SemanticMonad ()
     checkNoDuplicatedExtendedProcedures [] = return ()
     checkNoDuplicatedExtendedProcedures ifaces = do
+      -- | Collect the procedures of the extended interfaces. This function
+      -- returns a map from the extended interfaces to their procedures.
+      -- The function has already checked that there are no duplicated
+      -- procedures in the extended interfaces.
       prevProcedures <- checkNoDuplicatedExtendedProcedures' M.empty ifaces
-      forM_ cls $ \(InterfaceProcedure procId _ procAnn) -> do
+      -- | Now we have to check that the procedures of the current interface
+      -- do not collide with the procedures of the extended interfaces.
+      forM_ members $ \(InterfaceProcedure procId _ procAnn) -> do
         forM_ (M.keys prevProcedures) $ \prevIface -> do
           let prevProcedueresMap = prevProcedures M.! prevIface
           case M.lookup procId prevProcedueresMap of
@@ -128,18 +138,19 @@ typeTypeDefinition ann (Interface RegularInterface ident extends cls mds_ts) = d
           -> [Identifier]
           -> SemanticMonad (M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn)))
         checkNoDuplicatedExtendedProcedures' acc [] = return acc
-        checkNoDuplicatedExtendedProcedures' acc (x:xs) = do
+        checkNoDuplicatedExtendedProcedures' acc (p:ps) = do
           -- Recursively check the rest of the interfaces
-          accxs <- checkNoDuplicatedExtendedProcedures' acc xs
-          -- Collect the procedures of the current extended interface
-          extendedProcsMap <- collectInterfaceProcedures ann x
+          accxs <- checkNoDuplicatedExtendedProcedures' acc ps
+          -- Collect the procedures of the current extended interface, including
+          -- the procedures of the extended interfaces of the current interface.
+          extendedProcsMap <- collectInterfaceProcedures ann p
           forM_ (M.keys extendedProcsMap) $ \extendedProc -> do
             forM_ (M.keys accxs) $ \prevIface -> do
               let prevProcsMap = accxs M.! prevIface
               case M.lookup extendedProc prevProcsMap of
                 Nothing -> return ()
-                Just _ -> throwError $ annotateError ann (EInterfaceDuplicatedExtendedProcedure x prevIface extendedProc)
-          return $ M.insert x extendedProcsMap accxs
+                Just _ -> throwError $ annotateError ann (EInterfaceDuplicatedExtendedProcedure p prevIface extendedProc)
+          return $ M.insert p extendedProcsMap accxs
     
     checkNoDuplicatedExtendedInterfaces :: 
       [Identifier] -- List of interfaces to check

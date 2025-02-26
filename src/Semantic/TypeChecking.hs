@@ -36,6 +36,8 @@ import Semantic.TypeChecking.TypeDefinition
 import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import qualified Data.Map as M
+import Semantic.Environment
+import Semantic.Utils
 
 ----------------------------------------
 -- Programs Semantic Analyzer

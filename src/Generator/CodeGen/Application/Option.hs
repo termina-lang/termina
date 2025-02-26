@@ -14,6 +14,7 @@ import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
+import Generator.CodeGen.SystemCall
 
 genOptionPathName :: FilePath
 genOptionPathName = "option" <.> "h"
@@ -37,4 +38,4 @@ genOptionHeaderFile = do
         ]
 
 runGenOptionHeaderFile :: TerminaConfig -> OptionTypes -> Either CGeneratorError CFile
-runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv opts config)
+runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv opts config syscallFunctionsMap)

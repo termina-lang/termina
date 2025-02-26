@@ -17,6 +17,7 @@ import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
+import Generator.CodeGen.SystemCall (syscallFunctionsMap)
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -77,9 +78,9 @@ genSourceFile mName program = do
 
 runGenSourceFile :: TerminaConfig -> QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
 runGenSourceFile config mName program = 
-    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config) 
+    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config syscallFunctionsMap) 
 
 runGenHeaderFile :: TerminaConfig -> Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
 runGenHeaderFile config includeOptionH mName imports program opts = 
     runReader (runExceptT (genHeaderFile includeOptionH mName imports program)) 
-        (CGeneratorEnv opts config)
+        (CGeneratorEnv opts config syscallFunctionsMap)

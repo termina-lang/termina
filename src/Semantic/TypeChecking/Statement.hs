@@ -30,6 +30,7 @@ import Utils.Monad
 import Semantic.TypeChecking.Expression
 import Semantic.TypeChecking.Check
 import qualified Data.Map as M
+import Semantic.Utils
 
 typeBlock :: Maybe TerminaType -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock rTy (Block stmts loc) = do

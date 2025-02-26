@@ -27,12 +27,12 @@ import qualified Language.LSP.Diagnostics as LSP
 import LSP.Modules
 import qualified Data.SortedList as SL
 import Modules.Modules (ModuleDependency (..), QualifiedName)
-import Semantic.Monad (Environment)
 import Semantic.TypeChecking
 import System.FilePath
 import Parser.Types
 import qualified Parser.AST as PAST
 import Modules.Utils
+import Semantic.Environment
 
 filePathToUri :: MonadIO m => FilePath -> m LSP.Uri
 filePathToUri = liftIO . (LSP.filePathToUri <$>) . canonicalizePath

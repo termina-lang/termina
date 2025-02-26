@@ -17,7 +17,6 @@ import Text.Parsec (runParser)
 import Generator.LanguageC.Printer (runCPrinter)
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
-import Semantic.Monad
 import Core.AST
 import Configuration.Configuration 
 import Configuration.Platform
@@ -25,6 +24,7 @@ import Utils.Errors
 import Parser.Errors
 import Utils.Annotations
 import Text.Parsec.Error
+import Semantic.Environment
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -66,7 +66,7 @@ loadSingleModule filePath = do
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
-    let config = (\c -> c{ enableSystemInit = True }) $ defaultConfig "test" TestPlatform
+    let config = (\c -> c{ enableSystemInit = True, enableSystemPort = True }) $ defaultConfig "test" TestPlatform
         result = runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->

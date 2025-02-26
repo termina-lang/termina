@@ -124,7 +124,7 @@ data BasicBlock' ty expr obj a =
         (expr a)
         a
     -- | System call
-    | SystemCallBlock
+    | SystemCall
         (obj a) -- ^ access port
         Identifier -- ^ name of the system call
         [expr a] -- ^ list of arguments

@@ -14,6 +14,7 @@ import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
 import Generator.LanguageC.Embedded
+import Generator.CodeGen.SystemCall
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
@@ -58,4 +59,4 @@ genInitFile mName prjprogs = do
             return $ items ++ rest
 
 runGenInitFile :: TerminaConfig -> FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty params)
+runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty params syscallFunctionsMap)

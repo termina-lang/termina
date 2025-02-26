@@ -22,7 +22,6 @@ import Parser.Errors
 import Text.Parsec (runParser)
 import qualified Data.Map as M
 import Semantic.Types (SemanticAnn)
-import Semantic.Monad (Environment, makeInitialGlobalEnv)
 import Modules.Modules
 import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
 import Data.List (foldl')
@@ -41,6 +40,7 @@ import Configuration.Platform
 import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
+import Semantic.Environment
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =

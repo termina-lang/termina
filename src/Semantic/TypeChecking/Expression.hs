@@ -26,6 +26,7 @@ import qualified Data.List  (find, sortOn)
 import Parser.Types
 import Semantic.TypeChecking.Check
 import qualified Data.Map as M
+import Semantic.Utils
 
 getMemberFieldType :: Location -> TerminaType -> Identifier -> SemanticMonad TerminaType
 getMemberFieldType loc obj_ty ident =
@@ -145,9 +146,9 @@ typeMemberFunctionCall ann obj_ty ident args =
           ;
         _ -> throwError $ annotateError Internal EUnboxingClassType
       }
-    TAccessPort (TInterface RegularInterface dident) -> getGlobalTypeDef ann dident >>=
+    TAccessPort (TInterface _ dident) -> getGlobalTypeDef ann dident >>=
       \case{
-        LocatedElement (Interface RegularInterface _identTy extends members _mods) _ -> (do
+        LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
           extendedProcedures <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
           case findInterfaceProcedure ident (members ++ extendedProcedures) of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)

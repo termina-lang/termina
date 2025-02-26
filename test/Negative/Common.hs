@@ -4,7 +4,7 @@ import Text.Parsec
 import Parser.Parsing
 
 import Semantic.TypeChecking
-import Semantic.Monad
+import Semantic.Environment
 import Semantic.Errors
 import Utils.Annotations
 import Configuration.Platform
