@@ -108,7 +108,7 @@ mapTypeDefOption (Enum _ variants _) =
 mapTypeDefOption (Class _ _ members _ _) =
   -- | Get the option types from the class members
   mapM_ mapClassMemberOption members
-mapTypeDefOption (Interface _ _ members _) =
+mapTypeDefOption (Interface _ _ _ members _) =
   -- | Get the option types from the class members
   mapM_ mapInterfaceProcedureOption members
 

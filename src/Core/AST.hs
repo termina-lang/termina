@@ -240,7 +240,7 @@ data TypeDef' ty blk a
   = Struct Identifier [FieldDefinition' ty]  [Modifier' ty]
   | Enum Identifier [EnumVariant' ty] [Modifier' ty]
   | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty]
-  | Interface InterfaceKind Identifier [InterfaceMember' ty a] [Modifier' ty]
+  | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty a] [Modifier' ty]
   deriving (Show, Functor)
 
 data InterfaceKind = RegularInterface | SystemInterface

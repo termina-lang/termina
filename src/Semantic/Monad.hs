@@ -72,6 +72,18 @@ buildExpAnnApp loc tys = locate loc . ETy . AppType tys
 buildGlobalAnn :: Location -> TerminaType -> SemanticAnn
 buildGlobalAnn loc = locate loc . GTy 
 
+buildStructTypeAnn :: Location -> SemanticAnn
+buildStructTypeAnn = LocatedElement (TTy StructTy)
+
+buildEnumTypeAnn :: Location -> SemanticAnn
+buildEnumTypeAnn = LocatedElement (TTy EnumTy)
+
+buildClassTypeAnn :: Location -> ClassKind -> SemanticAnn
+buildClassTypeAnn loc clsKind = LocatedElement (TTy (ClsTy clsKind)) loc
+
+buildInterfaceTypeAnn :: Location -> InterfaceKind -> [ProcedureSeman] -> SemanticAnn
+buildInterfaceTypeAnn loc iKind procs = LocatedElement (TTy (InterfaceTy iKind procs)) loc
+
 buildStmtAnn :: Location -> SemanticAnn
 buildStmtAnn = LocatedElement (STy SimpleStmtType)
 
@@ -513,8 +525,8 @@ typeTypeSpecifier loc (TSDefinedType ident []) = do
     Struct s _ _ -> return $ TStruct s
     Enum e _ _ -> return $ TEnum e
     Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface RegularInterface i _ _ -> return $ TInterface RegularInterface i
-    Interface SystemInterface i _ _ -> return $ TInterface SystemInterface i
+    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
+    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
 typeTypeSpecifier loc ts@(TSDefinedType "Allocator" [typeParam]) = 
   case typeParam of
     TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc (TSDefinedType ident [])

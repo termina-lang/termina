@@ -25,6 +25,7 @@ import qualified Data.List  (find, sortOn)
 -- import Control.Monad.State as ST
 import Parser.Types
 import Semantic.TypeChecking.Check
+import qualified Data.Map as M
 
 getMemberFieldType :: Location -> TerminaType -> Identifier -> SemanticMonad TerminaType
 getMemberFieldType loc obj_ty ident =
@@ -146,8 +147,9 @@ typeMemberFunctionCall ann obj_ty ident args =
       }
     TAccessPort (TInterface RegularInterface dident) -> getGlobalTypeDef ann dident >>=
       \case{
-        LocatedElement (Interface RegularInterface _identTy cls _mods) _ ->
-          case findInterfaceProcedure ident cls of
+        LocatedElement (Interface RegularInterface _identTy extends members _mods) _ -> (do
+          extendedProcedures <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
+          case findInterfaceProcedure ident (members ++ extendedProcedures) of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
             Just (ps, anns) -> do
               let (psLen , asLen) = (length ps, length args)
@@ -157,7 +159,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                 catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, location anns) idx)
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
-          ;
+        );
         _ -> throwError $ annotateError Internal EUnboxingInterface
       }
     TAccessPort (TAllocator ty_pool) ->
@@ -818,25 +820,30 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
-      TAccessPort (TInterface RegularInterface iface) ->
+      TAccessPort (TInterface RegularInterface iface) -> do
+        -- | Get the interface definition
         getGlobalTypeDef loc iface >>=
           \case {
-            LocatedElement (Interface RegularInterface _ members _) _ ->
+            LocatedElement (Interface RegularInterface _ extends members _) _ -> (do
+              -- Collect the procedures of the interface
+              extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures loc) extends
+              let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
-                  let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members] in
                   getGlobalTypeDef loc clsId >>=
                   \case {
-                      LocatedElement (Class _ _ _ provides _) _ ->
-                        case Data.List.find (iface ==) provides of
+                      LocatedElement (Class _ _ _ provides _) _ -> (do
+                        -- Collect the interfaces provided by the resource and their extended interfaces
+                        extendedProvides <- concat <$> mapM (collectExtendedInterfaces loc) provides;
+                        case Data.List.find (iface ==) (provides ++ extendedProvides) of
                           Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
                           _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface
-                        ;
+                      );
                       _ -> throwError $ annotateError Internal EUnboxingInterface
                   }
                 _ -> throwError $ annotateError loc $ EAccessPortConnectionInvalidGlobal sid
-              ;
+            );
             _ -> throwError $ annotateError Internal EUnboxingInterface
           }
       ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)

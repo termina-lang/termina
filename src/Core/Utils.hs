@@ -267,10 +267,10 @@ memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons _ _      = False
 
 getTypeIdentifier :: TypeDef' ty blk a -> Identifier
-getTypeIdentifier (Struct ident _ _)      = ident
-getTypeIdentifier (Enum ident _ _)        = ident
-getTypeIdentifier (Class _ ident _ _ _)   = ident
-getTypeIdentifier (Interface _ ident _ _) = ident
+getTypeIdentifier (Struct ident _ _)        = ident
+getTypeIdentifier (Enum ident _ _)          = ident
+getTypeIdentifier (Class _ ident _ _ _)     = ident
+getTypeIdentifier (Interface _ ident _ _ _) = ident
 
 getGlobalIdentifier :: Global' ty expr a -> Identifier
 getGlobalIdentifier (Task ident _ _ _ _)     = ident
@@ -410,23 +410,3 @@ className (ClassMethod mIdent _ _ _)      = mIdent
 className (ClassProcedure pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
 className (ClassAction aIdent _ _ _ _)    = aIdent
-----------------------------------------
-
-glbName :: Global' ty expr a -> Identifier
-glbName (Task tId _ _ _ _)     = tId
-glbName (Resource tId _ _ _ _) = tId
-glbName (Channel tId _ _ _ _)  = tId
-glbName (Emitter tId _ _ _ _) = tId
-glbName (Handler tId _ _ _ _)  = tId
-glbName (Const tId _ _ _ _)    = tId
-
-tyDefName :: TypeDef' ty blk a -> Identifier
-tyDefName (Struct sId _ _ )= sId
-tyDefName (Enum sId _ _ )=   sId
-tyDefName (Class _ sId _ _ _ )=sId
-tyDefName (Interface _ sId _ _ )=sId
-
-globalsName :: AnnASTElement' ty blk expr a -> Identifier
-globalsName (Function fId _ _ _ _ _) = fId
-globalsName (GlobalDeclaration glb)    = glbName glb
-globalsName (TypeDefinition tyDef _)   = tyDefName tyDef

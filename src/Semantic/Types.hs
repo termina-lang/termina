@@ -70,6 +70,13 @@ data ConnectionSeman =
     TerminaType
   deriving Show
 
+data TypeDefSeman =
+  StructTy
+  | EnumTy
+  | ClsTy ClassKind
+  | InterfaceTy InterfaceKind [ProcedureSeman]
+  deriving Show
+
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
@@ -81,7 +88,7 @@ data SemanticElems
   -- | Global objects
   | GTy TerminaType
   -- | Type definitions 
-  | TTy 
+  | TTy TypeDefSeman
   -- | Function type
   | FTy FunctionSeman
   deriving Show

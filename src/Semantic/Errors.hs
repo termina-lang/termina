@@ -216,7 +216,14 @@ data Error
   | EInvalidEmitterType TerminaType -- ^ Invalid emitter type (SE-167)
   | EInvalidChannelType TerminaType -- ^ Invalid channel type (SE-168)
   | EEmitterClassNotInstantiable Identifier -- ^ Emitter class not instantiable (SE-169)
-  | ESingleExpressionTypeNotUnit TerminaType -- ^ Single expression type not unit (SE-170)
+  | ESingleExpressionTypeNotUnit TerminaType -- ^ Single expression type not unit (SE-170)
+  | EInterfaceDuplicatedExtendedIface Identifier -- ^ Duplicated extended interface (SE-171)
+  | EInterfaceDuplicatedExtendedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in extended interfaces (SE-172)
+  | EInterfaceProcedurePreviouslyExtended Identifier Identifier -- ^ Procedure previously defined by an extended interface (SE-173)
+  | EInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface (SE-174)
+  | EResourceDuplicatedProvidedIface Identifier -- ^ Duplicated provided interface (SE-175)
+  | EResourceDuplicatedProvidedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in provided interfaces (SE-176)
+  | EResourceInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface (SE-177)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -393,6 +400,13 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInvalidChannelType _ty) _pos) = "SE-168"
     errorIdent (AnnotatedError (EEmitterClassNotInstantiable _ident) _pos) = "SE-169"
     errorIdent (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "SE-170"
+    errorIdent (AnnotatedError (EInterfaceDuplicatedExtendedIface _iface) _pos) = "SE-171"
+    errorIdent (AnnotatedError (EInterfaceDuplicatedExtendedProcedure _iface1 _iface2 _procId) _pos) = "SE-172"
+    errorIdent (AnnotatedError (EInterfaceProcedurePreviouslyExtended _procId _iface) _pos) = "SE-173"
+    errorIdent (AnnotatedError (EInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-174"
+    errorIdent (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "SE-175"
+    errorIdent (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "SE-176"
+    errorIdent (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-177"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -565,6 +579,13 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidChannelType _ty) _pos) = "invalid channel type"
     errorTitle (AnnotatedError (EEmitterClassNotInstantiable _ident) _pos) = "emitter class is not instantiable"
     errorTitle (AnnotatedError (ESingleExpressionTypeNotUnit _ty) _pos) = "single expression type is not unit"
+    errorTitle (AnnotatedError (EInterfaceDuplicatedExtendedIface _iface) _pos) = "interface extends the same interface multiple times"
+    errorTitle (AnnotatedError (EInterfaceDuplicatedExtendedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in extended interfaces"
+    errorTitle (AnnotatedError (EInterfaceProcedurePreviouslyExtended _iface _procId) _pos) = "interface procedure previously defined by an extended interface"
+    errorTitle (AnnotatedError (EInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
+    errorTitle (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "resource provides the same interface multiple times"
+    errorTitle (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in provided interfaces"
+    errorTitle (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -1883,6 +1904,36 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Expressions used in single-expression statements must have type \x1b[31m" <> showText TUnit <> 
                             "\x1b[0m but the expression has type \x1b[31m" <> showText ty <> "\x1b[0m. Return values of functions cannot be ignored."))
+                EInterfaceDuplicatedExtendedIface ifaceName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m is extended more than once."))
+                EInterfaceDuplicatedExtendedProcedure iface1 iface2 procName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is defined in extended interfaces \x1b[31m" <> T.pack iface1 <> 
+                            "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m.")) 
+                EInterfaceProcedurePreviouslyExtended procName ifaceName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is previously defined in interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m."))
+                EInterfacePreviouslyExtended iface1 iface2 -> 
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is already extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
+                EResourceDuplicatedProvidedIface ifaceName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Resource provides interface \x1b[31m" <> T.pack ifaceName <> "\x1b[0m more than once."))
+                EResourceDuplicatedProvidedProcedure iface1 iface2 procName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Procedure \x1b[31m" <> T.pack procName <> "\x1b[0m is provided in interfaces \x1b[31m" <> T.pack iface1 <> 
+                            "\x1b[0m and \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
+                EResourceInterfacePreviouslyExtended iface1 iface2 ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is previously extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

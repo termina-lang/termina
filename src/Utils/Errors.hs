@@ -131,8 +131,8 @@ instance ShowText (TypeDef' ty blk a) where
     showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
     showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
     showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
-    showText (Interface RegularInterface ident _ _) = T.pack $ "interface " <> ident
-    showText (Interface SystemInterface ident _ _) = T.pack $ "system interface " <> ident
+    showText (Interface RegularInterface ident _ _ _) = T.pack $ "interface " <> ident
+    showText (Interface SystemInterface ident _ _ _) = T.pack $ "system interface " <> ident
 
 class ErrorMessage a where
 

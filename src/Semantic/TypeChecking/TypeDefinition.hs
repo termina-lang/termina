@@ -34,7 +34,7 @@ import Parser.Types
 import Utils.Monad
 import Semantic.TypeChecking.Statement
 import Semantic.TypeChecking.Check
-import Semantic.TypeChecking.Expression (typeModifier)
+import Semantic.TypeChecking.Expression
 
 typeProcedureParameter :: Location -> Parameter -> SemanticMonad SAST.Parameter
 typeProcedureParameter loc (Parameter ident ts) = do
@@ -85,17 +85,21 @@ typeTypeDefinition ann (Enum ident evs_ts mds_ts) = do
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
   return (Enum ident evs_ty mds_ty)
-typeTypeDefinition ann (Interface RegularInterface ident cls mds_ts) = do
+typeTypeDefinition ann (Interface RegularInterface ident extends cls mds_ts) = do
   -- Check that the interface is not empty
   when (null cls) (throwError $ annotateError ann (EInterfaceEmpty ident))
+  -- Check that there are no repeated extended interfaces
+  checkNoDuplicatedExtendedInterfaces extends
   -- Check procedure names are unique
   checkUniqueNames ann EInterfaceNotUniqueProcedure (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) cls)
   -- Check that every procedure is well-defined
   procedures <- mapM typeInterfaceProcedure cls
+  -- Check that the name of the procedures is not repeated in the extended interfaces
+  checkNoDuplicatedExtendedProcedures extends
   -- Type the modifiers
   mds_ty <- mapM (typeModifier ann) mds_ts
   -- If everything is fine, return the same definition.
-  return (Interface RegularInterface ident procedures mds_ty)
+  return (Interface RegularInterface ident extends procedures mds_ty)
 
   where
 
@@ -103,7 +107,68 @@ typeTypeDefinition ann (Interface RegularInterface ident cls mds_ts) = do
     typeInterfaceProcedure (InterfaceProcedure procId ps_ts annIP) = do
       ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
       return $ InterfaceProcedure procId ps_ty (buildExpAnn annIP TUnit)
-typeTypeDefinition _ (Interface SystemInterface ident _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
+    
+    checkNoDuplicatedExtendedProcedures :: 
+      [Identifier] -- Accumulator
+      -> SemanticMonad ()
+    checkNoDuplicatedExtendedProcedures [] = return ()
+    checkNoDuplicatedExtendedProcedures ifaces = do
+      prevProcedures <- checkNoDuplicatedExtendedProcedures' M.empty ifaces
+      forM_ cls $ \(InterfaceProcedure procId _ procAnn) -> do
+        forM_ (M.keys prevProcedures) $ \prevIface -> do
+          let prevProcedueresMap = prevProcedures M.! prevIface
+          case M.lookup procId prevProcedueresMap of
+            Nothing -> return ()
+            Just _ -> throwError $ annotateError procAnn (EInterfaceProcedurePreviouslyExtended procId prevIface)
+
+      where 
+
+        checkNoDuplicatedExtendedProcedures' :: 
+          M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn))
+          -> [Identifier]
+          -> SemanticMonad (M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn)))
+        checkNoDuplicatedExtendedProcedures' acc [] = return acc
+        checkNoDuplicatedExtendedProcedures' acc (x:xs) = do
+          -- Recursively check the rest of the interfaces
+          accxs <- checkNoDuplicatedExtendedProcedures' acc xs
+          -- Collect the procedures of the current extended interface
+          extendedProcsMap <- collectInterfaceProcedures ann x
+          forM_ (M.keys extendedProcsMap) $ \extendedProc -> do
+            forM_ (M.keys accxs) $ \prevIface -> do
+              let prevProcsMap = accxs M.! prevIface
+              case M.lookup extendedProc prevProcsMap of
+                Nothing -> return ()
+                Just _ -> throwError $ annotateError ann (EInterfaceDuplicatedExtendedProcedure x prevIface extendedProc)
+          return $ M.insert x extendedProcsMap accxs
+    
+    checkNoDuplicatedExtendedInterfaces :: 
+      [Identifier] -- List of interfaces to check
+      -> SemanticMonad ()
+    checkNoDuplicatedExtendedInterfaces [] = return ()
+    checkNoDuplicatedExtendedInterfaces ifaces = 
+      void $ checkNoDuplicatedExtendedInterfaces' M.empty ifaces 
+      
+      where 
+
+        checkNoDuplicatedExtendedInterfaces' :: 
+          M.Map Identifier (Maybe Identifier)
+          -> [Identifier] -- List of interfaces to check
+          -> SemanticMonad (M.Map Identifier (Maybe Identifier))
+        checkNoDuplicatedExtendedInterfaces' acc [] = return acc
+        checkNoDuplicatedExtendedInterfaces' acc (x:xs) = do
+          accxs <- checkNoDuplicatedExtendedInterfaces' acc xs
+          case M.lookup x accxs of
+            Just (Just prevIface) -> throwError $ annotateError ann (EInterfacePreviouslyExtended x prevIface)
+            Just Nothing -> throwError $ annotateError ann (EInterfaceDuplicatedExtendedIface x)
+            Nothing -> do
+              extendedIfaces <- collectExtendedInterfaces ann x
+              foldM (\acc' extendedIface -> do
+                case M.lookup extendedIface acc' of
+                  Just (Just prevIface) -> throwError $ annotateError ann (EInterfacePreviouslyExtended extendedIface prevIface)
+                  Just Nothing -> throwError $ annotateError ann (EInterfacePreviouslyExtended x extendedIface)
+                  Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
+
+typeTypeDefinition _ (Interface SystemInterface ident _ _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
   -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes

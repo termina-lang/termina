@@ -8,9 +8,12 @@ import Control.Monad.Except
 import Semantic.Errors
 import Core.Utils
 import qualified Core.AST as CAST
-import qualified Data.List
+import qualified Data.List as L
 import Semantic.Types
 import Parser.Types
+import qualified Data.Set as S
+import qualified Data.Map as M
+
 
 checkConstant :: Location -> TerminaType -> SAST.Const -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
@@ -131,14 +134,12 @@ checkUniqueNames ann err is =
   if allUnique is then return ()
   else throwError $ annotateError ann (err (repeated is))
   where
-    -----------------------------------------
-    -- TODO Improve this two functions.
-    -- nub is O(n^2)
-    allUnique :: Eq a => [a] -> Bool
-    allUnique xs = Data.List.nub xs == xs
 
-    repeated :: Eq a => [a] -> [a]
-    repeated xs = Data.List.nub $ xs Data.List.\\ Data.List.nub xs
+    allUnique :: Ord a => [a] -> Bool
+    allUnique xs = length (S.fromList xs) == length xs
+
+    repeated :: Ord a => [a] -> [a]
+    repeated xs = S.toList (S.fromList xs) L.\\ xs
 
 -- | This function type checks the members of a class depending on its kind.
 checkClassKind :: Location -> Identifier -> ClassKind
@@ -150,6 +151,8 @@ checkClassKind :: Location -> Identifier -> ClassKind
 checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- A resource must provide at least one interface
   when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
+  -- Check that the provided interfaces are not duplicated
+  checkNoDuplicateProvidedInterfaces provides
   -- A resource must not have any actions
   case acts of
     [] -> return ()
@@ -168,14 +171,9 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
       _ -> return ();
     }) fs
   -- Check that all the procedures are provided
-  providedProcedures <- concat <$> foldM (\acc ifaceId ->
-    catchError (getGlobalTypeDef anns ifaceId)
-      (\_ -> throwError $ annotateError anns (EInterfaceNotFound ifaceId)) >>= \case {
-      (LocatedElement (Interface _ _ iface_prcs _) _) -> return $ map (, ifaceId) iface_prcs : acc;
-      _ -> throwError $ annotateError anns (EGlobalNotInterface ifaceId)
-    }) [] provides
-  let sorted_provided = Data.List.sortOn (\(InterfaceProcedure ifaceId _ _, _) -> ifaceId) providedProcedures
-  let sorted_prcs = Data.List.sortOn (
+  providedProcedures <- getProvidedProcedures provides
+  let sorted_provided = L.sortOn (\(InterfaceProcedure procId _ _, _) -> procId) providedProcedures
+  let sorted_prcs = L.sortOn (
         \case {
           (ClassProcedure prcId _ _ _) -> prcId;
           _ -> error "internal error: checkClassKind"
@@ -190,7 +188,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
     checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
     checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
-      unless (prcId == prcId') (throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId')) >> do
+      unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
       let psLen = length ps
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, location pann) (fromIntegral psLen')))
@@ -200,6 +198,62 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
         unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, location pann) ty'))) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
+
+    getProvidedProcedures :: 
+      [Identifier] -- Accumulator
+      -> SemanticMonad [(SAST.InterfaceMember SemanticAnn, Identifier)]
+    getProvidedProcedures ifaces = do
+      providedProceduresPerIfaceMap <- getProvidedProcedures' M.empty ifaces
+      foldM (\acc ifaceId -> do
+        let proceduresMap = providedProceduresPerIfaceMap M.! ifaceId
+        return $ map (, ifaceId) (M.elems proceduresMap) ++ acc) [] (M.keys providedProceduresPerIfaceMap)
+
+      where 
+
+        getProvidedProcedures' :: 
+          M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn))
+          -> [Identifier]
+          -> SemanticMonad (M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn)))
+        getProvidedProcedures' acc [] = return acc
+        getProvidedProcedures' acc (x:xs) = do
+          -- Recursively check the rest of the interfaces
+          accxs <- getProvidedProcedures' acc xs
+          -- Collect the procedures of the current extended interface
+          providedProcsMap <- collectInterfaceProcedures anns x
+          forM_ (M.keys providedProcsMap) $ \providedProc -> do
+            forM_ (M.keys accxs) $ \prevIface -> do
+              let prevProcsMap = accxs M.! prevIface
+              case M.lookup providedProc prevProcsMap of
+                Nothing -> return ()
+                Just _ -> throwError $ annotateError anns (EResourceDuplicatedProvidedProcedure x prevIface providedProc)
+          return $ M.insert x providedProcsMap accxs
+    
+    checkNoDuplicateProvidedInterfaces :: 
+      [Identifier] -- List of interfaces to check
+      -> SemanticMonad ()
+    checkNoDuplicateProvidedInterfaces [] = return ()
+    checkNoDuplicateProvidedInterfaces ifaces = 
+      void $ checkNoDuplicateProvidedInterfaces' M.empty ifaces 
+      
+      where 
+
+        checkNoDuplicateProvidedInterfaces' :: 
+          M.Map Identifier (Maybe Identifier)
+          -> [Identifier] -- List of interfaces to check
+          -> SemanticMonad (M.Map Identifier (Maybe Identifier))
+        checkNoDuplicateProvidedInterfaces' acc [] = return acc
+        checkNoDuplicateProvidedInterfaces' acc (x:xs) = do
+          accxs <- checkNoDuplicateProvidedInterfaces' acc xs
+          case M.lookup x accxs of
+            Just (Just prevIface) -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x prevIface)
+            Just Nothing -> throwError $ annotateError anns (EResourceDuplicatedProvidedIface x)
+            Nothing -> do
+              extendedIfaces <- collectExtendedInterfaces anns x
+              foldM (\acc' extendedIface -> do
+                case M.lookup extendedIface acc' of
+                  Just (Just prevIface) -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended extendedIface prevIface)
+                  Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
+                  Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
 checkClassKind anns clsId TaskClass (_fs, prcs, acts) provides = do
   -- A task must not provide any interface
@@ -256,3 +310,35 @@ checkEmitterDataType loc "PeriodicTimer" ty =
 checkEmitterDataType loc "SystemInit" ty =
   unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidSystemInitEmitterType ty))
 checkEmitterDataType _ _ _ = throwError $ annotateError Internal EUnboxingEmittterClass
+
+collectExtendedInterfaces :: Location -> Identifier -> SemanticMonad [Identifier]
+collectExtendedInterfaces loc ident = do
+  catchError (getGlobalTypeDef loc ident)
+    -- If the interface does not exist, we throw an error.
+    (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
+        -- If the global type is an interface, we return the procedures.
+        (LocatedElement (Interface _ _ extends _ _) _) -> (do
+          -- If the interface is well-typed, this should not fail:
+          extendedTree <- concat <$> mapM (collectExtendedInterfaces loc) extends
+          return $ extends ++ extendedTree);
+        -- If the global type is not an interface, we throw an error.
+        _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
+    }
+
+collectInterfaceProcedures :: Location -> Identifier -> SemanticMonad (M.Map Identifier (SAST.InterfaceMember SemanticAnn))
+collectInterfaceProcedures loc ident = do
+  catchError (getGlobalTypeDef loc ident)
+    -- If the interface does not exist, we throw an error.
+    (\_ -> throwError $ annotateError loc (EInterfaceNotFound ident)) >>= \case {
+        -- If the global type is an interface, we return the procedures.
+        (LocatedElement (Interface _ _ extends iface_prcs _) _) -> (do
+          -- If the interface is well-typed, this should not fail:
+          extededProcs <- mapM (collectInterfaceProcedures loc) extends
+          procs <- mapM (\procedure@(InterfaceProcedure procId _ _) -> do
+              return (procId, procedure)
+            ) iface_prcs
+          return (M.fromList procs `M.union` M.unions extededProcs));
+        -- If the global type is not an interface, we throw an error.
+        _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
+    }
+

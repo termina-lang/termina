@@ -35,6 +35,7 @@ import Semantic.TypeChecking.Global
 import Semantic.TypeChecking.TypeDefinition
 import Semantic.TypeChecking.Expression
 import Data.Bifunctor
+import qualified Data.Map as M
 
 ----------------------------------------
 -- Programs Semantic Analyzer
@@ -45,7 +46,7 @@ import Data.Bifunctor
 -- TODO Check ident is not defined?
 
 -- Here we actually only need Global
-typeElement :: AnnASTElement ParserAnn 
+typeElement :: AnnASTElement ParserAnn
   -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
@@ -62,13 +63,20 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef
-  return (TypeDefinition typed_tydef (LocatedElement TTy ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+  case typed_tydef of
+    Struct {} -> return (TypeDefinition typed_tydef (buildStructTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    Enum {} -> return (TypeDefinition typed_tydef (buildEnumTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    (Class clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildClassTypeAnn ann clsKind), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    (Interface iKind _ extends members _) -> do
+      extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
+      let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members ++ extendedMembers]
+      return (TypeDefinition typed_tydef (buildInterfaceTypeAnn ann iKind procs), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
 
 semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
 semanticTypeDef (Struct i f m)  = Struct i f m
 semanticTypeDef (Enum i e m)    = Enum i e m
 semanticTypeDef (Class kind i cls ps m) = Class kind i (Data.List.map kClassMember cls) ps m
-semanticTypeDef (Interface kind i cls m) = Interface kind i cls m
+semanticTypeDef (Interface kind i extends cls m) = Interface kind i extends cls m
 
 -- Adding Global elements to the environment.
 addElement :: SAST.AnnASTElement SemanticAnn -> LocatedElement (GEntry SemanticAnn) -> SemanticMonad ()

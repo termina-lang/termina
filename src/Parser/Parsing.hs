@@ -52,8 +52,8 @@ lexer = Tok.makeTokenParser langDef
              ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
              ["triggers"]
-      ++ -- Provide
-             ["provides"]
+      ++ -- Provide/extend
+             ["provides", "extends"]
       ++ -- Constants
              ["true", "false"]
       ++ -- Modules
@@ -1025,10 +1025,11 @@ interfaceDefinitionParser = do
   startPos <- getPosition
   reserved "interface"
   identifier <- identifierParser
+  extends <- option [] (reserved "extends" >> sepBy identifierParser comma)
   procedures <- braces (many1 interfaceProcedureParser)
   endPos <- getPosition
   _ <- semi
-  return $ TypeDefinition (Interface RegularInterface identifier procedures modifiers) (Position startPos endPos)
+  return $ TypeDefinition (Interface RegularInterface identifier extends procedures modifiers) (Position startPos endPos)
 
 classDefinitionParser :: Parser (AnnASTElement ParserAnn)
 classDefinitionParser = do

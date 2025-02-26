@@ -6,11 +6,13 @@ import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
 
+import Utils.Annotations
+
 import UT.PPrinter.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
-interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" [
-    InterfaceProcedure "procedure0" [
+interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" [] [
+    InterfaceProcedure "procedure0"[
       Parameter "param0" TUInt8,
       Parameter "param1" TUInt16,
       Parameter "param2" TUInt32,
@@ -20,7 +22,18 @@ interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" 
       Parameter "param6" TInt32,
       Parameter "param7" TInt64
     ] undefined
-  ] []) undefined
+  ] []) (LocatedElement (TTy (InterfaceTy RegularInterface [
+    ProcedureSeman "procedure0" [
+      TUInt8,
+      TUInt16,
+      TUInt32,
+      TUInt64,
+      TInt8,
+      TInt16,
+      TInt32,
+      TInt64
+    ]
+  ])) undefined)
 
 spec :: Spec
 spec = do
