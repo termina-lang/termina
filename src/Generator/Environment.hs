@@ -47,3 +47,10 @@ getPlatformInitialProgram config RTEMS5LEON3TSIM =
         [("irq_4", TPInterruptEmittter "irq_4" (LocatedElement (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3TSIM.Config.enableIrq4 platformConfig]
     }
 getPlatformInitialProgram config TestPlatform = emptyTerminaProgArch config
+
+getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
+getPlatformInterruptMap RTEMS5NoelSpike = 
+    M.fromList [("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
+getPlatformInterruptMap RTEMS5LEON3TSIM =
+    M.fromList [("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4)]
+getPlatformInterruptMap TestPlatform = M.empty

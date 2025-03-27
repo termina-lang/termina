@@ -58,5 +58,11 @@ genInitFile mName prjprogs = do
             rest <- concat <$> mapM (genInitializeObj False) objs
             return $ items ++ rest
 
-runGenInitFile :: TerminaConfig -> FilePath -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile params initFilePath prjprogs = runReader (runExceptT (genInitFile initFilePath prjprogs)) (CGeneratorEnv M.empty params syscallFunctionsMap)
+runGenInitFile :: 
+    TerminaConfig 
+    -> M.Map Identifier Integer
+    -> FilePath 
+    -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
+runGenInitFile config irqMap initFilePath prjprogs = 
+    runReader (runExceptT (genInitFile initFilePath prjprogs)) 
+        (CGeneratorEnv M.empty config syscallFunctionsMap irqMap)

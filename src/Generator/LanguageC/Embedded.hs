@@ -14,7 +14,7 @@ module Generator.LanguageC.Embedded (
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
     dec, indent, trail_cr, pre_cr, no_cr,
-    block, var, struct, _const,
+    block, var, field, struct, _const,
     function, static_function,
     global, static_global,
     _if, _if_else, _break, _switch, _case, 
@@ -462,6 +462,9 @@ data Declaration =
 var :: Ident -> CType -> Declaration
 var ident cType = Declaration ident (CTypeSpec cType)
 
+field :: Ident -> CType -> CDeclaration
+field ident cType = CDecl (CTypeSpec cType) (Just ident) Nothing
+
 instance Alignment Declaration CCompoundBlockItem where
     pre_cr (Declaration ident ts) =
         let declAnn = internalAnn (CDeclarationAnn True) in
@@ -579,5 +582,7 @@ _endif :: CFileItem
 _endif =
     CPPDirective CPPEndif (internalAnn (CPPDirectiveAnn False))
 
-struct :: Ident -> CType
-struct ident = CTStruct CStructTag ident noqual
+struct :: Ident 
+    -> [CDeclaration]  -- member declarations
+    -> [CAttribute] -> CFileItem
+struct ident flds attrs = CExtDecl (CEDStructUnion (Just ident) (CStruct CStructTag Nothing flds attrs)) (internalAnn (CDeclarationAnn False))

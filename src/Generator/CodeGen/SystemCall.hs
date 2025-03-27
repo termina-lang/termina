@@ -5,7 +5,7 @@ import Core.AST
 import Generator.CodeGen.Common
 import Generator.LanguageC.AST
 import Generator.LanguageC.Embedded
-import Generator.CodeGen.Application.Types
+import Generator.CodeGen.Types
 
 -- | Map of syscall functions
 -- | The key is the name of the function as defined in the system interface.

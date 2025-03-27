@@ -25,6 +25,7 @@ import Parser.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
+import Generator.Environment (getPlatformInterruptMap)
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -84,7 +85,7 @@ printSourceModule :: Bool -> BasicBlocksModule -> IO ()
 printSourceModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         config = defaultConfig "test" TestPlatform
-    case runGenSourceFile config (qualifiedName bbModule) tAST of
+    case runGenSourceFile config (getPlatformInterruptMap TestPlatform) (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 
@@ -93,7 +94,7 @@ printHeaderModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-    case runGenHeaderFile configParams False (qualifiedName bbModule) moduleDeps tAST M.empty of
+    case runGenHeaderFile configParams (getPlatformInterruptMap TestPlatform) False (qualifiedName bbModule) moduleDeps tAST M.empty of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 

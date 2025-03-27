@@ -64,6 +64,8 @@ lexer = Tok.makeTokenParser langDef
              ["as"]
       ++ -- is variant operator
              ["is"]
+      ++ -- system-wide reserved names
+             ["termina", "option", "config"]
 
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"

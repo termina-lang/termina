@@ -157,13 +157,14 @@ optionMapModules = M.partitionWithKey
 
 genModules ::
   TerminaConfig
+  -> Platform
   -- | Whether to include the option.h file or not
   -> Bool
   -- | The map with the option types to generate from defined types 
   -> OptionMap
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-genModules params includeOptionH definedTypesOptionMap =
+genModules params plt includeOptionH definedTypesOptionMap =
   mapM_ printModule . M.elems
 
   where
@@ -174,32 +175,32 @@ genModules params includeOptionH definedTypesOptionMap =
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-      case runGenSourceFile params (qualifiedName bbModule) tAST of
+      case runGenSourceFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
-      case runGenHeaderFile params includeOptionH (qualifiedName bbModule) moduleDeps tAST definedTypesOptionMap of
+      case runGenHeaderFile params (getPlatformInterruptMap plt) includeOptionH (qualifiedName bbModule) moduleDeps tAST definedTypesOptionMap of
         Left err -> die . errorMessage $ show err
         Right cHeaderFile -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
           createDirectoryIfMissing True (takeDirectory headerFile)
           TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
 
-genInitFile :: TerminaConfig -> BasicBlocksProject -> IO ()
-genInitFile params bbProject = do
+genInitFile :: TerminaConfig -> Platform -> BasicBlocksProject -> IO ()
+genInitFile params plt bbProject = do
   let destinationPath = outputFolder params
       initFilePath = destinationPath </> "init" <.> "c"
       projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-  case runGenInitFile params initFilePath projectModules of
+  case runGenInitFile params (getPlatformInterruptMap plt) initFilePath projectModules of
     Left err -> die . errorMessage $ show err
     Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (profile params == Debug) cInitFile
 
-genOptionHeaderFile :: TerminaConfig -> OptionMap -> IO ()
-genOptionHeaderFile params basicTypesOptionMap = do
+genOptionHeaderFile :: TerminaConfig -> Platform -> OptionMap -> IO ()
+genOptionHeaderFile params plt basicTypesOptionMap = do
   let destinationPath = outputFolder params
       optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
-  case runGenOptionHeaderFile params basicTypesOptionMap of
+  case runGenOptionHeaderFile params (getPlatformInterruptMap plt) basicTypesOptionMap of
     Left err -> die . errorMessage $ show err
     Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter (profile params == Debug) cOptionsFile
 
@@ -365,8 +366,8 @@ buildCommand (BuildCmdArgs chatty) = do
     checkProjectBoxSources bbProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    genModules config (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
-    genInitFile config bbProject
-    genPlatformCode plt config bbProject programArchitecture
-    genOptionHeaderFile config basicTypesOptionMap
+    genModules config plt (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
+    genInitFile config plt bbProject
+    genPlatformCode config plt bbProject programArchitecture
+    genOptionHeaderFile config plt basicTypesOptionMap
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

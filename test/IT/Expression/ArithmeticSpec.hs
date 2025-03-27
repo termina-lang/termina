@@ -100,7 +100,7 @@ spec = do
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__test1(void * const __this, __termina_box_t foo);\n" ++
@@ -114,8 +114,6 @@ spec = do
              "void id0__test1(void * const __this, __termina_box_t foo) {\n" ++
              "    \n" ++
              "    id0 * self = (id0 *)__this;\n" ++
-             "\n" ++
-             "    __termina_resource__lock(&self->__resource);\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data + 1024U;\n" ++
              "\n" ++
@@ -136,8 +134,6 @@ spec = do
              "    *(uint16_t *)foo.data = *(uint16_t *)foo.data % 1024U;\n" ++
              "\n" ++
              "    *(uint16_t *)foo.data = 1024U % *(uint16_t *)foo.data;\n" ++
-             "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
              "\n" ++
              "    return;\n" ++
              "\n" ++

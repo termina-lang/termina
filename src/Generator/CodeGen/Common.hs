@@ -22,7 +22,8 @@ type OptionTypes = Map TerminaType (Set TerminaType)
 data CGeneratorEnv = CGeneratorEnv { 
     optionTypes :: OptionTypes,
     configParams :: TerminaConfig,
-    syscallsMap :: Map Identifier CExpression
+    syscallsMap :: Map Identifier CExpression,
+    interruptsMap :: Map Identifier Integer
   }
 
 type CGenerator = ExceptT CGeneratorError (Reader CGeneratorEnv)
@@ -36,16 +37,20 @@ namefy = ("__" <>)
 (<::>) id0 id1 = id0 <> "__" <> id1
 
 -- | Termina's pretty builtin types
-pool, msgQueue, optionBox, boxStruct, taskID, resourceID, sinkPort, inPort, outPort :: Identifier
-pool = namefy "termina_pool_t"
-msgQueue = namefy "termina_msg_queue_t"
+optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
 optionBox = namefy "option_box_t"
 boxStruct = namefy "termina_box_t"
-taskID = namefy "termina_task_t"
-resourceID = namefy "termina_resource_t"
-sinkPort = namefy "termina_sink_port_t"
-inPort = namefy "termina_in_port_t"
-outPort = namefy "termina_out_port_t"
+sinkPort = namefy "termina_id_t"
+inPort = namefy "termina_id_t"
+outPort = namefy "termina_id_t"
+
+terminaID :: Identifier
+terminaID = namefy "termina_id_t"
+
+pool, msgQueue, periodicTimer :: Identifier
+pool = namefy "termina_pool_t"
+msgQueue = namefy "termina_msg_queue_t"
+periodicTimer = namefy "termina_periodic_timer_t"
 
 poolMethodName :: Identifier -> Identifier
 poolMethodName mName = namefy "termina_pool" <::> mName
@@ -63,21 +68,15 @@ resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"
 resourceUnlock = namefy "termina_resource" <::> "unlock"
 
-cResourceIDType, cResourceLockFuncType, cResourceUnlockFuncType :: CType
-cResourceIDType = CTTypeDef resourceID noqual
-cResourceLockFuncType = CTFunction (CTVoid noqual) [CTPointer (CTTypeDef resourceID noqual) noqual]
-cResourceUnlockFuncType = CTFunction (CTVoid noqual) [CTPointer (CTTypeDef resourceID noqual) noqual]
-
-
 thatField, thisParam, selfParam :: Identifier
 thatField = "__that"
 thisParam = "__this"
 selfParam = "self"
 
-resourceClassIDField, taskClassIDField, timerField :: Identifier
-resourceClassIDField = "__resource"
-taskClassIDField = "__task"
-timerField = "__timer"
+mutexIDField, taskMsgQueueIDField, timerField :: Identifier
+mutexIDField = "__mutex_id"
+taskMsgQueueIDField = "__task_msg_queue_id"
+timerField = "__timer_id"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
@@ -387,23 +386,6 @@ printIntegerLiteral :: TInteger -> String
 printIntegerLiteral (TInteger i DecRepr) = show i
 printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
 printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
-
-{--
-printTypedInteger :: TerminaType -> TInteger -> String
-printTypedInteger ts ti =
-    case ts of
-        TUInt8 -> "UINT8_C(" <> printIntegerLiteral ti <> ")"
-        TUInt16 -> "UINT16_C(" <> printIntegerLiteral ti <> ")"
-        TUInt32 -> "UINT32_C(" <> printIntegerLiteral ti <> ")"
-        TUInt64 -> "UINT64_C(" <> printIntegerLiteral ti <> ")"
-        TInt8 -> "INT8_C(" <> printIntegerLiteral ti <> ")"
-        TInt16 -> "INT16_C(" <> printIntegerLiteral ti <> ")"
-        TInt32 -> "INT32_C(" <> printIntegerLiteral ti <> ")"
-        TInt64 -> "INT64_C(" <> printIntegerLiteral ti <> ")"
-        -- | No correct way to do this for the time being
-        TUSize -> printIntegerLiteral ti
-        _ -> error "Invalid type specifier: " <> show ts
---}
 
 printLiteral :: Const -> String
 printLiteral (I ti _) = printIntegerLiteral ti

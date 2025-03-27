@@ -397,6 +397,13 @@ instance Located (CStatement' CAnns) where
 instance Located (CCompoundBlockItem' CAnns) where
   getLocation (CBlockStmt stmt) = getLocation stmt -- ^ A statement
   getLocation (CBlockDecl _ ann) = getLocation ann
-
   updateLocation (CBlockStmt stmt) loc = CBlockStmt (updateLocation stmt loc)
   updateLocation (CBlockDecl decl ann) loc = CBlockDecl decl (updateLocation ann loc)
+
+instance Located (CFileItem' CAnns) where
+  getLocation (CExtDecl _ ann) = getLocation ann
+  getLocation (CFunctionDef _ _ ann) = getLocation ann
+  getLocation (CPPDirective _ ann) = getLocation ann
+  updateLocation (CExtDecl decl ann) loc = CExtDecl decl (updateLocation ann loc)
+  updateLocation (CFunctionDef spec f ann) loc = CFunctionDef spec f (updateLocation ann loc)
+  updateLocation (CPPDirective dir ann) loc = CPPDirective dir (updateLocation ann loc)

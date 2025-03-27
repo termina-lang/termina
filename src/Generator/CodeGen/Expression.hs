@@ -113,7 +113,7 @@ genMemberFunctionAccess obj ident args ann = do
         (TGlobal _ classId) ->
             case obj of
                 (Dereference _ _) ->
-                    let selfCType = ptr (struct classId) in
+                    let selfCType = ptr (typeDef classId) in
                     -- | If we are here, it means that we are dereferencing the self object
                     return $ ((classId <::> ident) @: cFuncType) @@ ("self" @: selfCType : cArgs) |>> location ann 
                     -- | If the left hand size is a class:

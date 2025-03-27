@@ -50,9 +50,11 @@ spec = do
               "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_task_t __task;\n" ++
-              "    __termina_sink_port_t data_in;\n" ++
+              "    __termina_id_t __task_msg_queue_id;\n" ++
+              "    __termina_id_t data_in;\n" ++
               "} CHousekeeping;\n" ++
+              "\n" ++   
+              "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++   
               "Result CHousekeeping__action0(CHousekeeping * const self, uint32_t _data);\n" ++
               "\n" ++

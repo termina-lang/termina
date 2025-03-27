@@ -111,7 +111,7 @@ spec = do
       renderTypeDefinitionDecl M.empty classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_resource_t __resource;\n" ++
+          "    __termina_id_t __mutex_id;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(void * const __this, uint8_t param0, uint16_t param1,\n" ++
@@ -121,7 +121,7 @@ spec = do
       renderTypeDefinitionDecl M.empty classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_resource_t __resource;\n" ++
+          "    __termina_id_t __mutex_id;\n" ++
           "} Class0;\n" ++
           "\n" ++
           "void Class0__procedure0(void * const __this, uint8_t param0,\n" ++
@@ -133,7 +133,7 @@ spec = do
       renderTypeDefinitionDecl M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(void * const __this);")
@@ -141,7 +141,7 @@ spec = do
       renderTypeDefinitionDecl M.empty noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
@@ -151,7 +151,7 @@ spec = do
       renderTypeDefinitionDecl M.empty classWithOneProcedureAndTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
@@ -161,7 +161,7 @@ spec = do
       renderTypeDefinitionDecl M.empty packedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
@@ -172,7 +172,7 @@ spec = do
       renderTypeDefinitionDecl M.empty alignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
@@ -183,7 +183,7 @@ spec = do
       renderTypeDefinitionDecl M.empty packedAndAlignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
@@ -194,7 +194,7 @@ spec = do
       renderTypeDefinitionDecl M.empty classWithFixedLocationField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
             "} Class0;\n" ++
@@ -204,7 +204,7 @@ spec = do
       renderTypeDefinitionDecl M.empty classWithAccessPortField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_resource_t __resource;\n" ++
+            "    __termina_id_t __mutex_id;\n" ++
             "    uint32_t field0;\n" ++
             "    Interface1 field1;\n" ++
             "} Class0;\n" ++

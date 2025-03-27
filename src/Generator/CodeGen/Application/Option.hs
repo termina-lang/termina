@@ -37,5 +37,11 @@ genOptionHeaderFile = do
             CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
 
-runGenOptionHeaderFile :: TerminaConfig -> OptionTypes -> Either CGeneratorError CFile
-runGenOptionHeaderFile config opts = runReader (runExceptT genOptionHeaderFile) (CGeneratorEnv opts config syscallFunctionsMap)
+runGenOptionHeaderFile :: 
+    TerminaConfig 
+    -> M.Map Identifier Integer
+    -> OptionTypes 
+    -> Either CGeneratorError CFile
+runGenOptionHeaderFile config irqMap opts = 
+    runReader (runExceptT genOptionHeaderFile) 
+        (CGeneratorEnv opts config syscallFunctionsMap irqMap)

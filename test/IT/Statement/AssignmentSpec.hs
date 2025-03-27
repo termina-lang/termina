@@ -83,7 +83,7 @@ spec = do
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__assignment_test1(void * const __this, __termina_box_t box_var0);\n" ++
@@ -98,15 +98,11 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    __option_box_t opt;\n" ++
               "    opt.__variant = None;\n" ++
               "\n" ++
               "    opt.__variant = Some;\n" ++
               "    opt.Some.__0 = box_var0;\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -124,7 +120,7 @@ spec = do
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__assignment_test2(void * const __this, __termina_box_t box_var0,\n" ++
@@ -141,8 +137,6 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    *(uint32_t *)box_var0.data = foo;\n" ++
@@ -150,8 +144,6 @@ spec = do
               "    foo = *(uint32_t *)box_var1.data;\n" ++
               "\n" ++
               "    *(uint32_t *)box_var1.data = *(uint32_t *)box_var0.data;\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

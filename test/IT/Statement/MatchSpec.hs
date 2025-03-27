@@ -88,7 +88,7 @@ spec = do
               "} test_iface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(void * const __this, __option_box_t option0);\n" ++
@@ -103,8 +103,6 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
@@ -118,8 +116,6 @@ spec = do
               "        foo = 0U;\n" ++
               "\n" ++
               "    }\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -137,7 +133,7 @@ spec = do
               "} test_iface;\n" ++
               "\n" ++              
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test1(void * const __this, __option_box_t option0);\n" ++
@@ -152,8 +148,6 @@ spec = do
               "    \n" ++
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
               "    if (option0.__variant == Some) {\n" ++
@@ -166,8 +160,6 @@ spec = do
               "        \n" ++
               "\n" ++
               "    }\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

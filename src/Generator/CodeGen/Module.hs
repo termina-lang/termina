@@ -76,11 +76,24 @@ genSourceFile mName program = do
         CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
         : items
 
-runGenSourceFile :: TerminaConfig -> QualifiedName -> AnnotatedProgram SemanticAnn -> Either CGeneratorError CFile
-runGenSourceFile config mName program = 
-    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config syscallFunctionsMap) 
+runGenSourceFile :: 
+    TerminaConfig 
+    -> M.Map Identifier Integer
+    -> QualifiedName 
+    -> AnnotatedProgram SemanticAnn 
+    -> Either CGeneratorError CFile
+runGenSourceFile config irqMap mName program = 
+    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config syscallFunctionsMap irqMap) 
 
-runGenHeaderFile :: TerminaConfig -> Bool -> QualifiedName -> [QualifiedName] -> AnnotatedProgram SemanticAnn -> OptionTypes -> Either CGeneratorError CFile
-runGenHeaderFile config includeOptionH mName imports program opts = 
+runGenHeaderFile :: 
+    TerminaConfig 
+    -> M.Map Identifier Integer
+    -> Bool 
+    -> QualifiedName 
+    -> [QualifiedName] 
+    -> AnnotatedProgram SemanticAnn 
+    -> OptionTypes 
+    -> Either CGeneratorError CFile
+runGenHeaderFile config irqMap includeOptionH mName imports program opts = 
     runReader (runExceptT (genHeaderFile includeOptionH mName imports program)) 
-        (CGeneratorEnv opts config syscallFunctionsMap)
+        (CGeneratorEnv opts config syscallFunctionsMap irqMap)

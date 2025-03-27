@@ -51,7 +51,7 @@ spec = do
               "} TMChannelInterface;\n" ++
               "\n" ++              
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
               "\n" ++
@@ -69,11 +69,7 @@ spec = do
               "    \n" ++
               "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    *packets = self->tm_sent_packets;\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
@@ -91,7 +87,7 @@ spec = do
               "} UARTDriverInterface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __termina_resource_t __resource;\n" ++
+              "    __termina_id_t __mutex_id;\n" ++
               "    volatile uint32_t * status;\n" ++
               "} UARTDriver;\n" ++
               "\n" ++
@@ -107,11 +103,7 @@ spec = do
               "    \n" ++
               "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
-              "    __termina_resource__lock(&self->__resource);\n" ++
-              "\n" ++
               "    *ret = *self->status;\n" ++
-              "\n" ++
-              "    __termina_resource__unlock(&self->__resource);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
