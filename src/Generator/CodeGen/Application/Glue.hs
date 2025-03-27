@@ -21,9 +21,9 @@ import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
 
--- | Function __termina_app__install_emitters. This function is called from the Init task.
--- The function installs the ISRs and the periodic timers. The function is called AFTER the initialization
--- of the tasks and handlers.
+-- | Function __termina_app__install_emitters. This function is called from the
+-- Init task.  The function installs the ISRs and the periodic timers. The
+-- function is called AFTER the initialization of the tasks and handlers.
 genInitEmitters :: TerminaProgArch a -> CGenerator CFileItem
 genInitEmitters progArchitecture = do
     let progEmitters = M.elems $ emitters progArchitecture
@@ -153,6 +153,10 @@ genInitEmitters progArchitecture = do
                     $ trail_cr . block $ interruptConnection
         genOSALEmitterInit _ = throwError $ InternalError "Invalid event emitter"
 
+-- | Function __termina_app__init_mutexes. This function is called from the
+-- Init task.  The function initializes the mutexes. The function is called AFTER
+-- the execution of the init handler (if any) and before the initialization of the
+-- resource locking mechanism.
 genInitMutexes :: M.Map Identifier OSALResourceLock -> CGenerator CFileItem
 genInitMutexes mutexes = do
     let mutexesList = M.toList mutexes
@@ -201,16 +205,17 @@ genInitMessageQueues queues = do
                             "status" @: (_const . ptr $ _Status)
                         ]
                 ]
-        genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ _ size _ _) = do
+        genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genArraySize size
+            cTs <- genType noqual ty
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: _Status) @. variant @: enumFieldType)
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
                             cSize,
-                            _sizeOfType __termina_id_t,
+                            _sizeOfType cTs,
                             "status" @: (_const . ptr $ _Status)
                         ]
                 ]
@@ -261,6 +266,7 @@ genMainFile mName progArchitecture = do
 --}
     initEmitters <- genInitEmitters progArchitecture
     initMutexes <- genInitMutexes mutexes
+    initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ channelMessageQueues)
 {--
     createTasks <- genCreateTasks progTasks
     initTask <- genInitTask connectedEmitters
@@ -275,7 +281,9 @@ genMainFile mName progArchitecture = do
         ] ++ cVariantsForTaskPorts ++ cMutexDefines ++ cTaskDefines ++ cMsgQueueDefines ++ cTimerDefines
         ++ cAtomicDeclarations ++ cAtomicArrayDeclarations 
         ++ cPoolMemoryAreas {-- ++ 
-        ++ cTaskClassesCode ++ cEmitters --} ++ [{--enableProtection, initGlobals,--} initEmitters, initMutexes {--, createTasks, initTask --}]
+        ++ cTaskClassesCode ++ cEmitters --} ++ 
+            [{--enableProtection, initGlobals,--} initEmitters, initMutexes, initMessageQueues
+            {--, createTasks, initTask --}]
         -- ++ appConfig
 --}
     where
