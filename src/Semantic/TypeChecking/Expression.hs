@@ -821,7 +821,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
-      TAccessPort (TInterface RegularInterface iface) -> do
+      TAccessPort ifaceTy@(TInterface RegularInterface iface) -> do
         -- | Get the interface definition
         getGlobalTypeDef loc iface >>=
           \case {
@@ -838,7 +838,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
                         -- Collect the interfaces provided by the resource and their extended interfaces
                         extendedProvides <- concat <$> mapM (collectExtendedInterfaces loc) provides;
                         case Data.List.find (iface ==) (provides ++ extendedProvides) of
-                          Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann rts procs)
+                          Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts procs)
                           _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface
                       );
                       _ -> throwError $ annotateError Internal EUnboxingInterface

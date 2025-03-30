@@ -11,11 +11,8 @@ import System.FilePath
 import System.Exit
 import Command.Utils
 import Generator.LanguageC.Printer
-import Generator.Makefile.Printer
 import Command.Types
 import Configuration.Platform
-import Configuration.Platform.RTEMS5NoelSpike as RTEMS5NoelSpike.Config
-import Configuration.Platform.RTEMS5LEON3TSIM as RTEMS5LEON3TSIM.Config
 import Generator.CodeGen.Application.Glue
 import Generator.Environment (getPlatformInterruptMap)
 

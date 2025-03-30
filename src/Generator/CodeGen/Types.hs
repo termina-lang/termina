@@ -14,11 +14,17 @@ _Result = typeDef "Result"
 _Status = typeDef "Status"
 
 __termina_id_t, __termina_pool_t, 
+    __termina_allocator_t,
     __termina_msg_queue_t, __termina_periodic_timer_t :: CType
 __termina_id_t = typeDef terminaID
 __termina_pool_t = typeDef pool
+__termina_allocator_t = typeDef allocator
 __termina_msg_queue_t = typeDef msgQueue
 __termina_periodic_timer_t = typeDef periodicTimer
+
+__termina_box_t, __option_box_t :: CType
+__termina_box_t = typeDef boxStruct
+__option_box_t = typeDef optionBox
 
 __termina_emitter_task_connection_t :: CType
 __termina_emitter_task_connection_t = typeDef "__termina_emitter_task_connection_t"
@@ -147,6 +153,27 @@ __termina_mutex_policy_t, __termina_task_prio_t :: CType
 __termina_mutex_policy_t = typeDef "__termina_mutex_policy_t"
 __termina_task_prio_t = typeDef "__termina_task_prio_t"
 
+__termina_task_entry_t :: CType
+__termina_task_entry_t = typeDef "__termina_task_entry_t"
+
+__termina_task__init :: CExpression
+__termina_task__init = "__termina_task__init" @:
+    CTFunction void
+        [
+            -- | const __termina_id_t task_id
+            _const __termina_id_t,
+            -- | const __termina_task_prio_t entry,
+            _const __termina_task_prio_t,
+            -- | const size_t stack_size,
+            _const size_t,
+            -- | const __termina_task_entry_t entry,
+            __termina_task_entry_t,
+            -- | void * arg,
+            ptr void,
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
 __termina_mutex__init :: CExpression
 __termina_mutex__init = "__termina_mutex__init" @:
     CTFunction void
@@ -190,3 +217,21 @@ __termina_msg_queue__recv = "__termina_msg_queue__recv" @:
 __termina_exec__shutdown :: CExpression
 __termina_exec__shutdown = "__termina_exec__shutdown" @:
     CTFunction void []
+
+__termina_pool__alloc :: CExpression
+__termina_pool__alloc = "__termina_pool__alloc" @:
+    CTFunction void
+        [
+            _const __termina_id_t,
+            -- | __option_box_t * const opt
+            _const . ptr $ __option_box_t
+        ]
+
+__termina_pool__free :: CExpression
+__termina_pool__free = "__termina_pool__free" @:
+    CTFunction void
+        [
+            _const __termina_id_t,
+            -- | void * const element
+            __termina_box_t
+        ]

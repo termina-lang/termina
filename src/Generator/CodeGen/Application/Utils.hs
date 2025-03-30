@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Types
 import qualified Data.Set as S
+import ControlFlow.Architecture.Utils
 
 -- | Data type used to represent a message queue in OSAL
 --  There are different types depending on the original source code element that
@@ -44,20 +45,6 @@ data OSALResourceLock =
     | OSALResourceLockIrq  -- ^ interrupt lock (disable and enable interrupts)
     | OSALResourceLockMutex TInteger -- ^ mutex lock with priority-ceiling protocol
     deriving Show
-
--- | Returns the value of the "priority" modifier, if present in the list of modifiers.
--- If not, it returns 255, which is the default value for the priority (the lowest).
-getPriority :: [Modifier] -> TInteger
-getPriority [] = TInteger 255 DecRepr
-getPriority ((Modifier "priority" (Just (I priority _))) : _) = priority
-getPriority (_ : modifiers) = getPriority modifiers
-
--- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
--- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
-getStackSize :: [Modifier] -> TInteger
-getStackSize [] = TInteger 4096 DecRepr
-getStackSize ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
-getStackSize (_ : modifiers) = getStackSize modifiers
 
 -- | This function generates the list of OSAL message queues that must be created
 -- from the list of tasks in the program architecture. For each task, a message queue
@@ -179,8 +166,8 @@ genResLockingMap progArchitecture = foldM (\acc (resId, resDeps) -> do
             case M.lookup ident (handlers progArchitecture) of
                 Just _ -> return OSALResourceLockIrq
                 Nothing -> case M.lookup ident (tasks progArchitecture) of
-                    Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
-                        getResLocking' (getPriority modifiers) ids
+                    Just tsk -> 
+                        getResLocking' (getPriority tsk) ids
                     Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"
 
         getResLocking' :: (MonadError CGeneratorError m) =>  TInteger -> [Identifier] -> m OSALResourceLock
@@ -192,8 +179,8 @@ genResLockingMap progArchitecture = foldM (\acc (resId, resDeps) -> do
             case M.lookup ident' (handlers progArchitecture) of
                 Just _ -> return OSALResourceLockIrq
                 Nothing -> case M.lookup ident' (tasks progArchitecture) of
-                    Just (TPTask _ _ _ _ _ _ modifiers _ _) -> 
-                        getResLocking' (min ceilPrio (getPriority modifiers)) ids'
+                    Just tsk -> 
+                        getResLocking' (min ceilPrio (getPriority tsk)) ids'
                     Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"
 
 genDefineMutexIdLabel :: Identifier -> CGenerator Identifier

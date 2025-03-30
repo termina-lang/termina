@@ -20,6 +20,40 @@ import Control.Monad.Except
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
+import Semantic.Utils
+import Control.Monad (forM)
+
+
+genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
+genInitTasks progArchitecture = do
+    let progTasks = M.elems $ tasks progArchitecture
+    initTasks <- mapM genOSALTaskInit progTasks
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_tasks") ["status" @: (_const . ptr $ _Status)] @-> void $
+            trail_cr . block $
+                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                : initTasks
+
+    where
+        genOSALTaskInit :: TPTask a -> CGenerator CCompoundBlockItem
+        genOSALTaskInit tsk = do
+            taskId <- genDefineTaskIdLabel (taskName tsk)
+            let tskName = taskName tsk
+                classId = taskClass tsk
+                taskPrio = getCInteger . getPriority $ tsk
+                taskStackSize = getCInteger . getStackSize $ tsk
+            cTaskFunctionName <- taskFunctionName classId
+            return $
+                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: _Status) @. variant @: enumFieldType)
+                    $ trail_cr . block $ [
+                        pre_cr $ __termina_task__init @@ [
+                            taskId @: __termina_id_t,
+                            taskPrio @: __termina_task_prio_t,
+                            taskStackSize @: size_t,
+                            cTaskFunctionName @: __termina_task_entry_t,
+                            addrOf (tskName @: typeDef classId),
+                            "status" @: (_const . ptr $ _Status)
+                        ]
+                ]
 
 -- | Function __termina_app__install_emitters. This function is called from the
 -- Init task.  The function installs the ISRs and the periodic timers. The
@@ -30,7 +64,7 @@ genInitEmitters progArchitecture = do
     initEmitter <- mapM genOSALEmitterInit $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_emitters") ["status" @: (_const . ptr $ _Status)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType) 
+                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
                 : initEmitter
 
     where
@@ -44,17 +78,17 @@ genInitEmitters progArchitecture = do
                 Just (entity, port, _) -> return (entity, port)
                 -- | If the interrupt emitter is not connected, throw an error
                 Nothing -> throwError $ InternalError $ "Periodic timer emitter not connected: " ++ show timer
-            case M.lookup targetEntity (handlers progArchitecture) of 
+            case M.lookup targetEntity (handlers progArchitecture) of
                 Just (TPHandler identifier classId _ _ _ _ _ _) -> do
                     let cls = handlerClasses progArchitecture M.! classId
-                        (_, targetAction) = sinkPorts cls M.! targetPort 
+                        (_, targetAction) = sinkPorts cls M.! targetPort
                     return [
                             pre_cr $ var "connection" __termina_periodic_timer_connection_t,
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType 
+                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                 @= "__TerminaEmitterConnectionType__Handler" @: enumFieldType,
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t 
+                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "object" @: ptr void @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t 
+                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_action" @: __termina_periodic_timer_action_t @= classId <::> targetAction @: __termina_periodic_timer_action_t,
                             pre_cr $ __termina_periodic_timer__init @@ [
                                 timerId @: __termina_id_t,
@@ -68,7 +102,7 @@ genInitEmitters progArchitecture = do
                         variantForPort <- genVariantForPort tskCls targetPort
                         return [
                                 pre_cr $ var "connection" __termina_periodic_timer_connection_t,
-                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType 
+                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                     @= "__TerminaEmitterConnectionType__Task" @: enumFieldType,
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "task_msgq_id" @: __termina_id_t @= namefy targetEntity <::> "msg_queue_id" @: __termina_id_t,
@@ -102,11 +136,11 @@ genInitEmitters progArchitecture = do
                         (_, targetAction) = sinkPorts cls M.! targetPort
                     return [
                             pre_cr $ var "connection" __termina_interrupt_connection_t,
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType 
+                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                 @= "__TerminaEmitterConnectionType__Handler" @: enumFieldType,
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t 
+                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
                                 @. "object" @: ptr void @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t 
+                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
                                 @. "handler_action" @: __termina_interrupt_action_t @= classId <::> targetAction @: __termina_interrupt_action_t,
                             pre_cr $ __termina_interrupt__init @@ [
                                 dec irqVector @: __termina_id_t,
@@ -119,7 +153,7 @@ genInitEmitters progArchitecture = do
                         variantForPort <- genVariantForPort tskCls targetPort
                         return [
                                 pre_cr $ var "connection" __termina_interrupt_connection_t,
-                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType 
+                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                     @= "__TerminaEmitterConnectionType__Task" @: enumFieldType,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "task_msgq_id" @: __termina_id_t @= namefy targetEntity <::> "msg_queue_id" @: __termina_id_t,
@@ -134,7 +168,7 @@ genInitEmitters progArchitecture = do
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
-        genEmitterConnection _ = throwError $ InternalError "Invalid event emitter"            
+        genEmitterConnection _ = throwError $ InternalError "Invalid event emitter"
 
         genOSALEmitterInit :: TPEmitter a -> CGenerator CCompoundBlockItem
         genOSALEmitterInit timer@(TPPeriodicTimerEmitter {}) = do
@@ -163,7 +197,7 @@ genInitMutexes mutexes = do
     initMutexes <- mapM genOSALMutexInit mutexesList
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ _Status)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType) 
+                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
                 : initMutexes
 
     where
@@ -187,7 +221,7 @@ genInitMessageQueues queues = do
     initMsgQueues <- mapM genOSALMsgQueueInit queues
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ _Status)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType) 
+                pre_cr ((("status" @: _Status) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
                 : initMsgQueues
 
     where
@@ -233,16 +267,166 @@ genInitMessageQueues queues = do
                         ]
                 ]
 
+genEnableProtection :: TerminaProgArch SemanticAnn -> M.Map Identifier OSALResourceLock -> CGenerator CFileItem
+genEnableProtection progArchitecture resLockingMap = do
+    -- Get the list of tasks and the list of handlers
+    let progTasks = M.elems $ tasks progArchitecture
+        progHandlers = M.elems $ handlers progArchitecture
+    taskProtections <- concat <$> forM progTasks genEnableProtectionTask
+    handlerProtections <- concat <$> forM progHandlers genEnableProtectionHandler
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "enable_protection") [] @-> void $
+            trail_cr . block $
+                taskProtections ++ handlerProtections
 
-genMainFile :: QualifiedName 
-    -> TerminaProgArch SemanticAnn 
+    where
+
+        genConnectResourceMutex ::
+            Identifier -- Task Identifier
+            -> Identifier -- Class Identifier
+            -> Identifier -- Port Identifier
+            -> SemanticAnn
+            -> CGenerator [CCompoundBlockItem]
+        genConnectResourceMutex taskId classId portId ann = do
+            let apConnectionAnn = unboxConnectionAnn ann
+            case apConnectionAnn of
+                APPoolConnTy {} -> do
+                    let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
+                        freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
+                    allocLock <- procedureMutexLock (namefy "termina_pool" <::> "alloc")
+                    freeLock <- procedureMutexLock (namefy "termina_pool" <::> "free")
+                    return [
+                            pre_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "alloc" @: ptr allocFunctionType
+                                    @= allocLock @: allocFunctionType,
+                            no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
+                                    @= freeLock @: freeFunctionType
+                        ]
+                APConnTy (TInterface RegularInterface iface)
+                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys) : pxs) -> do
+                    -- Generate last procedures without new lines
+                    procs <- forM pxs (\(ProcedureSeman procedureId ptys) -> do
+                        clsFunctionName <- genClassFunctionName resource procedureId
+                        procFunctionType <- genFunctionType TUnit ptys
+                        clsFunctionNameLock <- procedureMutexLock clsFunctionName
+                        return $
+                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType
+                        )
+                    -- Generate first procedure with a preceding new line
+                    clsFunctionName <- genClassFunctionName resource pr
+                    procFunctionType <- genFunctionType TUnit prtys
+                    clsFunctionNameLock <- procedureMutexLock clsFunctionName
+                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType) : procs
+                _ -> return []
+
+        genConnectResourceTaskLock :: 
+            Identifier -- Task Identifier
+            -> Identifier -- Class Identifier
+            -> Identifier -- Port Identifier
+            -> SemanticAnn
+            -> CGenerator [CCompoundBlockItem]
+        genConnectResourceTaskLock taskId classId portId ann = do
+            let apConnectionAnn = unboxConnectionAnn ann
+            case apConnectionAnn of
+                APPoolConnTy {} -> do
+                    let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
+                        freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
+                    allocLock <- procedureTaskLock (namefy "termina_pool" <::> "alloc")
+                    freeLock <- procedureTaskLock (namefy "termina_pool" <::> "free")
+                    return [
+                            pre_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "alloc" @: ptr allocFunctionType
+                                    @= allocLock @: allocFunctionType,
+                            no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
+                                    @= freeLock @: freeFunctionType
+                        ]
+                APConnTy (TInterface RegularInterface iface)
+                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys) : pxs) -> do
+                    -- Generate last procedures without new lines
+                    procs <- forM pxs (\(ProcedureSeman procedureId ptys) -> do
+                        clsFunctionName <- genClassFunctionName resource procedureId
+                        procFunctionType <- genFunctionType TUnit ptys
+                        clsFunctionNameLock <- procedureTaskLock clsFunctionName
+                        return $
+                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType
+                        )
+                    -- Generate first procedure with a preceding new line
+                    clsFunctionName <- genClassFunctionName resource pr
+                    procFunctionType <- genFunctionType TUnit prtys
+                    clsFunctionNameLock <- procedureTaskLock clsFunctionName
+                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType) : procs
+                _ -> return []
+        
+        genConnectResourceEventLock :: 
+            Identifier -- Handler Identifier
+            -> Identifier -- Class Identifier
+            -> Identifier -- Port Identifier
+            -> SemanticAnn
+            -> CGenerator [CCompoundBlockItem]
+        genConnectResourceEventLock taskId classId portId ann = do
+            let apConnectionAnn = unboxConnectionAnn ann
+            case apConnectionAnn of
+                APPoolConnTy {} -> do
+                    let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
+                        freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
+                    allocLock <- procedureEventLock (namefy "termina_pool" <::> "alloc")
+                    freeLock <- procedureEventLock (namefy "termina_pool" <::> "free")
+                    return [
+                            pre_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "alloc" @: ptr allocFunctionType
+                                    @= allocLock @: allocFunctionType,
+                            no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
+                                    @= freeLock @: freeFunctionType
+                        ]
+                APConnTy (TInterface RegularInterface iface)
+                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys) : pxs) -> do
+                    -- Generate last procedures without new lines
+                    procs <- forM pxs (\(ProcedureSeman procedureId ptys) -> do
+                        clsFunctionName <- genClassFunctionName resource procedureId
+                        procFunctionType <- genFunctionType TUnit ptys
+                        clsFunctionNameLock <- procedureEventLock clsFunctionName
+                        return $
+                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType
+                        )
+                    -- Generate first procedure with a preceding new line
+                    clsFunctionName <- genClassFunctionName resource pr
+                    procFunctionType <- genFunctionType TUnit prtys
+                    clsFunctionNameLock <- procedureEventLock clsFunctionName
+                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                @= clsFunctionNameLock @: procFunctionType) : procs
+                _ -> return []
+        
+        genEnableProtectionHandler :: TPHandler SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genEnableProtectionHandler hdlr = do
+            let taskId = handlerName hdlr
+                classId = handlerClass hdlr
+                apConnections = handlerAPConnections hdlr
+            concat <$> forM (M.toList apConnections) (\(portName, (targetResource, ann)) ->
+                case resLockingMap M.! targetResource of
+                    OSALResourceLockNone -> return []
+                    OSALResourceLockIrq -> genConnectResourceEventLock taskId classId portName ann
+                    OSALResourceLockMutex _ -> throwError $ InternalError $ "Handler " ++ show taskId 
+                            ++ " cannot connect to resource " ++ show targetResource ++ " with mutex locking. This is not allowed in Termina.")
+
+        genEnableProtectionTask :: TPTask SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genEnableProtectionTask tsk = do
+            let taskId = taskName tsk
+                classId = taskClass tsk
+                apConnections = taskAPConnections tsk
+            concat <$> forM (M.toList apConnections) (\(portName, (targetResource, ann)) ->
+                case resLockingMap M.! targetResource of
+                    OSALResourceLockNone -> return []
+                    OSALResourceLockIrq -> genConnectResourceTaskLock taskId classId portName ann
+                    OSALResourceLockMutex _ ->
+                        genConnectResourceMutex taskId classId portName ann)
+
+genMainFile :: QualifiedName
+    -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
 genMainFile mName progArchitecture = do
     let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
         externInitGlobals = CExtDecl (CEDFunction void (namefy $ "termina_app" <::> "init_globals") []) (internalAnn (CDeclarationAnn True))
-        interruptEmittersToTasks = getInterruptEmittersToTasks progArchitecture
-        connectedEmitters = getConnectedEmitters progArchitecture
-        progTasks = M.elems $ tasks progArchitecture
         periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
     taskMessageQueues <- getTasksMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
@@ -258,18 +442,15 @@ genMainFile mName progArchitecture = do
     cPoolMemoryAreas <- genPoolMemoryAreas (M.elems $ pools progArchitecture)
     cAtomicDeclarations <- genAtomicDeclarations (M.elems $ atomics progArchitecture)
     cAtomicArrayDeclarations <- genAtomicArrayDeclarations (M.elems $ atomicArrays progArchitecture)
-{--
-    cTaskClassesCode <- mapM genTaskClassCode (M.elems (taskClasses progArchitecture))
-    cEmitters <- mapM (genEmitter progArchitecture) connectedEmitters
-    enableProtection <- genEnableProtection progArchitecture resLockingMap 
-    initGlobals <- genInitGlobals progArchitecture
---}
+
+    initTasks <- genInitTasks progArchitecture
     initEmitters <- genInitEmitters progArchitecture
     initMutexes <- genInitMutexes mutexes
     initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ channelMessageQueues)
+
+    enableProtection <- genEnableProtection progArchitecture resLockingMap
+
 {--
-    createTasks <- genCreateTasks progTasks
-    initTask <- genInitTask connectedEmitters
     appConfig <- genAppConfig progArchitecture (taskMessageQueues ++ channelMessageQueues) mutexes
     --}
     return $ CSourceFile mName $ [
@@ -279,13 +460,11 @@ genMainFile mName progArchitecture = do
         ++ [
             externInitGlobals
         ] ++ cVariantsForTaskPorts ++ cMutexDefines ++ cTaskDefines ++ cMsgQueueDefines ++ cTimerDefines
-        ++ cAtomicDeclarations ++ cAtomicArrayDeclarations 
-        ++ cPoolMemoryAreas {-- ++ 
-        ++ cTaskClassesCode ++ cEmitters --} ++ 
-            [{--enableProtection, initGlobals,--} initEmitters, initMutexes, initMessageQueues
-            {--, createTasks, initTask --}]
+        ++ cAtomicDeclarations ++ cAtomicArrayDeclarations
+        ++ cPoolMemoryAreas
+        ++ [initTasks, initEmitters, initMutexes, initMessageQueues, enableProtection]
         -- ++ appConfig
---}
+
     where
         -- | List of modules that must be included
         incs = getGlobDeclModules progArchitecture
@@ -296,12 +475,12 @@ genMainFile mName progArchitecture = do
 
         dependenciesMap = getResDependencies progArchitecture
 
-runGenMainFile :: 
-    TerminaConfig 
+runGenMainFile ::
+    TerminaConfig
     -> M.Map Identifier Integer
-    -> QualifiedName 
-    -> TerminaProgArch SemanticAnn 
+    -> QualifiedName
+    -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
-runGenMainFile config irqMap mainFilePath progArchitecture = 
-    runReader (runExceptT (genMainFile mainFilePath progArchitecture)) 
+runGenMainFile config irqMap mainFilePath progArchitecture =
+    runReader (runExceptT (genMainFile mainFilePath progArchitecture))
         (CGeneratorEnv M.empty config syscallFunctionsMap irqMap)

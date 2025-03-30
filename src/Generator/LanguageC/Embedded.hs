@@ -86,12 +86,12 @@ data ObjField =
 (@.) = ObjField
 
 instance TypeElement ObjField CObject where
-    (@:) (ObjField obj field) = CField obj field
+    (@:) (ObjField obj fld) = CField obj fld
 
 instance TypeElement ObjField CExpression where
-    (@:) (ObjField obj field) cType =
+    (@:) (ObjField obj fld) cType =
         let cAnn = internalAnn CGenericAnn in
-        CExprValOf (CField obj field cType) cType cAnn
+        CExprValOf (CField obj fld cType) cType cAnn
 
 instance TypeElement CInteger CExpression where
     (@:) cInteger cType =

@@ -128,8 +128,8 @@ buildStmtMatchCaseAnn loc ts = locate loc (STy (MatchCaseStmtType ts))
 buildOutPortConnAnn :: Location -> TerminaType -> SemanticAnn
 buildOutPortConnAnn loc ts = locate loc (ETy (PortConnection (OutPConnTy ts)))
 
-buildAccessPortConnAnn :: Location -> TerminaType -> [ProcedureSeman] -> SemanticAnn
-buildAccessPortConnAnn loc ts procs = locate loc (ETy (PortConnection (APConnTy ts procs)))
+buildAccessPortConnAnn :: Location -> TerminaType -> TerminaType -> [ProcedureSeman] -> SemanticAnn
+buildAccessPortConnAnn loc ifaceTy ts procs = locate loc (ETy (PortConnection (APConnTy ifaceTy ts procs)))
 
 buildPoolConnAnn :: Location -> TerminaType -> Size -> SemanticAnn
 buildPoolConnAnn loc ts s = locate loc (ETy (PortConnection (APPoolConnTy ts s)))
@@ -164,3 +164,8 @@ unboxExpType _ = error "impossible 888+1"
 unboxTypeAnn :: SemanticAnn -> SemanticAnn
 unboxTypeAnn (LocatedElement (ETy en) p) = LocatedElement (ETy (unboxExpType en)) p
 unboxTypeAnn _                    = error "impossible 888"
+
+unboxConnectionAnn :: SemanticAnn -> ConnectionSeman
+unboxConnectionAnn (LocatedElement (ETy (PortConnection connAnn)) _) = connAnn
+unboxConnectionAnn _ = error "Invalid annotation"
+

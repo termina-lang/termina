@@ -195,7 +195,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             ClassField (FieldDefinition _ (TInPort {})) _ -> False;
             _ -> True}) fields
     cFields <- mapM genClassField fields'
-    cFunctions <- mapM genClassFunctionDeclaration functions
+    cFunctions <- concat <$> mapM genClassFunctionDeclaration functions
     let structFields = case clsKind of
             TaskClass ->
                 let cIDField = field taskMsgQueueIDField (typeDef terminaID) in
@@ -225,36 +225,45 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassField (ClassField fld _) = genFieldDeclaration fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
-        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CGenerator CFileItem
+        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CGenerator [CFileItem]
         genClassFunctionDeclaration (ClassViewer viewer params rts _ _) = do
             retType <- maybe (return void) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
             cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
-            return $ CExtDecl (CEDFunction retType clsFuncName (cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
+            return [CExtDecl (CEDFunction retType clsFuncName (cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration (ClassProcedure procedure params _ _) = do
             cParamDecls <- mapM genParameterDeclaration params
             cThisParam <- genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
-            return $ CExtDecl (CEDFunction (CTVoid noqual) clsFuncName (cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
+            mutexLockFunction <- procedureMutexLock clsFuncName
+            taskLockFunction <- procedureTaskLock clsFuncName
+            eventLockFunction <- procedureEventLock clsFuncName
+            return [
+                    CExtDecl (CEDFunction void clsFuncName (cThisParam : cParamDecls)) (buildDeclarationAnn ann True),
+                    CExtDecl (CEDFunction void mutexLockFunction (cThisParam : cParamDecls)) (buildDeclarationAnn ann False),
+                    CExtDecl (CEDFunction void taskLockFunction (cThisParam : cParamDecls)) (buildDeclarationAnn ann False),
+                    CExtDecl (CEDFunction void eventLockFunction (cThisParam : cParamDecls)) (buildDeclarationAnn ann False)
+                ]
         genClassFunctionDeclaration (ClassMethod method rts _ _) = do
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
             cSelfParam <- genSelfParam clsdef
-            return $ CExtDecl (CEDFunction retType clsFuncName [cSelfParam]) (buildDeclarationAnn ann True)
+            return [CExtDecl (CEDFunction retType clsFuncName [cSelfParam]) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration (ClassAction action param rts _ _) = do
             retType <- genType noqual rts
             cParamDecl <- genParameterDeclaration param
             cSelfParam <- genSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier action
-            return $ CExtDecl (CEDFunction retType clsFuncName [cSelfParam, cParamDecl]) (buildDeclarationAnn ann True)
+            return [CExtDecl (CEDFunction retType clsFuncName [cSelfParam, cParamDecl]) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
 genTaskClassCode :: AnnASTElement SemanticAnn -> CGenerator CFileItem
 genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _) = do
     cBody <- genBody
-    return $ pre_cr $ function (namefy classId <::> "termina_task")  [
+    cTaskFunctionName <- taskFunctionName classId
+    return $ pre_cr $ function cTaskFunctionName [
             "arg" @: ptr void
         ] @-> void $ trail_cr . block $
             cBody ++ [pre_cr (_return Nothing)]
@@ -395,7 +404,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
         genClassFunctionDefinition :: ClassMember SemanticAnn -> CGenerator CFileItem
         genClassFunctionDefinition (ClassViewer viewer parameters rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier viewer
-            cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
+            cRetType <- maybe (return void) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration parameters
             cSelfParam <- genConstSelfParam clsdef
             cBody <- foldM (\acc x -> do
@@ -438,7 +447,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
 
         genClassFunctionDefinition (ClassMethod method rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier method
-            cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
+            cRetType <- maybe (return void) (genType noqual) rts
             cSelfParam <- genSelfParam clsdef
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x

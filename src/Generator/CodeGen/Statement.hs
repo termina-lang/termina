@@ -4,7 +4,7 @@ import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Generator.LanguageC.Embedded
 import Semantic.Types
-import Control.Monad
+import Control.Monad ( zipWithM )
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
@@ -232,22 +232,29 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
                 else
                     return $ no_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (ETy (PortConnection (APConnTy rts procedures))) _) : xs) = do
-                let cResourceType = typeDef resource
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (ETy (PortConnection (APConnTy (TInterface _ iface) rts procedures))) _) : xs) = do
+                cResourceType <- genType noqual rts
+                let cInterfaceType = typeDef iface
                     resourceExpr = addrOf (resource @: cResourceType)
                 rest <- genFieldAssignments False xs
                 cProcedures <- mapM (genProcedureAssignment fid rts) procedures
                 if before' then
-                    return $ pre_cr (((cObj @. fid @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+                    return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
-                    return $ no_cr (((cObj @. fid @: cResourceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+                    return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (LocatedElement (ETy (PortConnection (APPoolConnTy {}))) _) : xs) = do
-                let resourceExpr = addrOf (resource @: __termina_pool_t)
                 rest <- genFieldAssignments False xs
+                let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
+                    freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
+                let resourceExpr = addrOf (resource @: __termina_pool_t)
+                    cPoolProcedures = [
+                            no_cr $ cObj @. fld @: __termina_allocator_t @. "alloc" @: ptr allocFunctionType @= __termina_pool__alloc,
+                            no_cr $ cObj @. fld @: __termina_allocator_t @. "free" @: ptr freeFunctionType @= __termina_pool__free
+                        ]
                 if before' then
-                    return $ pre_cr ((cObj @. fld @: ptr __termina_pool_t) @= resourceExpr) : rest
+                    return $ pre_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
                 else
-                    return $ no_cr ((cObj @. fld @: ptr __termina_pool_t) @= resourceExpr) : rest
+                    return $ no_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (LocatedElement (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
@@ -294,18 +301,16 @@ genBlocks (ProcedureCall obj ident args ann) = do
 genBlocks (AllocBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    methodCallExpr <- genPoolMethodCallExpr "alloc" cObjExpr cArg (buildGenericAnn ann)
+    methodCallExpr <- genPoolMethodCallExpr "alloc" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> location ann]
 genBlocks (FreeBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
-    let cObjExpr = cObj @: getCObjType cObj |>> location ann
     -- Generate the C code for the parameters
     cArg <- genExpression arg
-    methodCallExpr <- genPoolMethodCallExpr "free" cObjExpr cArg (buildGenericAnn ann)
+    methodCallExpr <- genPoolMethodCallExpr "free" cObj cArg (buildGenericAnn ann)
     return [pre_cr methodCallExpr |>> location ann]
 genBlocks (AtomicLoad obj arg ann) = do
     -- Generate the C code for the object

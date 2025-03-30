@@ -37,23 +37,20 @@ namefy = ("__" <>)
 (<::>) id0 id1 = id0 <> "__" <> id1
 
 -- | Termina's pretty builtin types
-optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
+optionBox, boxStruct, sinkPort, inPort :: Identifier
 optionBox = namefy "option_box_t"
 boxStruct = namefy "termina_box_t"
 sinkPort = namefy "termina_id_t"
 inPort = namefy "termina_id_t"
-outPort = namefy "termina_id_t"
 
 terminaID :: Identifier
 terminaID = namefy "termina_id_t"
 
-pool, msgQueue, periodicTimer :: Identifier
+pool, allocator, msgQueue, periodicTimer :: Identifier
 pool = namefy "termina_pool_t"
+allocator = namefy "termina_allocator_t"
 msgQueue = namefy "termina_msg_queue_t"
 periodicTimer = namefy "termina_periodic_timer_t"
-
-poolMethodName :: Identifier -> Identifier
-poolMethodName mName = namefy "termina_pool" <::> mName
 
 atomicMethodName :: Identifier -> Identifier
 atomicMethodName mName = "atomic_" <> mName
@@ -249,7 +246,7 @@ genType qual (TFixedLocation ts) = do
     ts' <- genType volatile ts
     return (CTPointer ts' qual)
 genType _qual (TAccessPort ts) =  genType noqual ts
-genType _qual (TAllocator _) = return (CTPointer (CTTypeDef pool noqual) noqual)
+genType _qual (TAllocator _) = return (CTTypeDef allocator noqual)
 genType _qual (TAtomic ts) = genType atomic ts
 genType _qual (TAtomicArray ts s) = do
     ts' <- genType atomic ts
@@ -262,7 +259,7 @@ genType _qual (TAtomicArrayAccess ts _) = do
     return (CTPointer ts' noqual)
 -- | Type of the ports
 genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
-genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)
+genType _qual (TOutPort {}) = return (CTPointer (CTTypeDef msgQueue noqual) noqual)
 genType _qual (TInPort {}) = return (CTTypeDef inPort noqual)
 genType qual (TReference Immutable ts) = do
     case ts of
@@ -303,15 +300,19 @@ genAddrOf obj qual cAnn =
         CTArray {} -> return $ CExprValOf obj cObjType cAnn
         ty -> return $ CExprAddrOf obj (CTPointer ty qual) cAnn
 
-genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CExpression -> CExpression -> CAnns ->  m CExpression
+genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CObject -> CExpression -> CAnns ->  m CExpression
 genPoolMethodCallExpr mName cObj cArg cAnn =
     case mName of
         "alloc" -> do
-            let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj, getCExprType cArg]
-            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) [cObj, cArg] (CTVoid noqual) cAnn
+            let cObjExpr = CExprValOf (CField cObj thatField (CTPointer (getCObjType cObj) noqual)) (CTPointer (getCObjType cObj) noqual) cAnn
+                cFuncType = CTFunction (CTVoid noqual) [getCExprType cObjExpr, getCExprType cArg]
+                cFunctionCall = CField cObj "alloc" cFuncType
+            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cObjExpr, cArg] (CTVoid noqual) cAnn
         "free" -> do
-            let cFuncType = CTFunction (CTVoid noqual) [getCExprType cObj]
-            return $ CExprCall (CExprValOf (CVar (poolMethodName mName) cFuncType) cFuncType cAnn) [cObj, cArg] (CTVoid noqual) cAnn
+            let cObjExpr = CExprValOf (CField cObj thatField (CTPointer (getCObjType cObj) noqual)) (CTPointer (getCObjType cObj) noqual) cAnn
+                cFuncType = CTFunction (CTVoid noqual) [getCExprType cObjExpr]
+                cFunctionCall = CField cObj "free" cFuncType
+            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cObjExpr, cArg] (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
 
 genMsgQueueSendCall :: (MonadError CGeneratorError m) => CObject -> CExpression -> CAnns -> m CExpression
@@ -397,3 +398,15 @@ printLiteral (C c) = "'" <> [c] <> "'"
 -- platform dependent
 enumFieldType :: CType
 enumFieldType = CTInt IntSize32 Unsigned noqual
+
+procedureMutexLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
+procedureMutexLock procedureId = return $ procedureId <::> "mutex_lock"
+
+procedureEventLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
+procedureEventLock procedureId = return $ procedureId <::> "event_lock"
+
+procedureTaskLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
+procedureTaskLock procedureId = return $ procedureId <::> "task_lock"
+
+taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
+taskFunctionName classId = return $ (namefy classId <::> "termina_task")

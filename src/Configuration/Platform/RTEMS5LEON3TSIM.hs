@@ -2,8 +2,6 @@
 
 module Configuration.Platform.RTEMS5LEON3TSIM where
 import Data.Yaml
-import qualified Data.Map as M
-import Core.AST (Identifier)
 
 data ProjectBuilder = None | Make deriving (Eq, Show)
 

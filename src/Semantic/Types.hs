@@ -37,7 +37,9 @@ data FunctionSeman = FunctionSeman [TerminaType] TerminaType
 data ConnectionSeman =
     -- | Access port connection
   APConnTy
-  -- | Type specifier of the connected resource
+  -- | type specifier of the ports interface
+    TerminaType
+  -- | type specifier of the connected resource
     TerminaType
     -- | List of procedures that can be called on the connected resource
     [ProcedureSeman]
