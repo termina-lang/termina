@@ -240,10 +240,19 @@ genDefineTimerId (timer : xmp) = do
             this_timer <- genDefineTimerIdLabel timer'
             return $ _define this_timer (Just [show value]) : rest
 
+genDefineTaskMsgQueueIdLabel :: Identifier -> CGenerator Identifier
+genDefineTaskMsgQueueIdLabel t = return $ namefy t <::> "task_msg_queue_id"
+
+genDefineChannelMsgQueueIdLabel :: Identifier -> CGenerator Identifier
+genDefineChannelMsgQueueIdLabel c = return $ namefy c <::> "channel_msg_queue_id"
+
+genDefineSinkMsgQueueIdLabel :: Identifier -> CGenerator Identifier
+genDefineSinkMsgQueueIdLabel p = return $ namefy p <::> "sink_msg_queue_id"
+
 genDefineMsgQueueIdLabel :: OSALMsgQueue -> CGenerator Identifier
-genDefineMsgQueueIdLabel (OSALTaskMsgQueue t _ _) = return $ namefy t <::> "msg_queue_id"
-genDefineMsgQueueIdLabel (OSALChannelMsgQueue c _ _ _ _) = return $ namefy c <::> "msg_queue_id"
-genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ p _ _) = return $ namefy t <::> p <::> "msg_queue_id"
+genDefineMsgQueueIdLabel (OSALTaskMsgQueue t _ _) = genDefineTaskMsgQueueIdLabel t
+genDefineMsgQueueIdLabel (OSALChannelMsgQueue c _ _ _ _) = genDefineChannelMsgQueueIdLabel c
+genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ _ _ _) = genDefineSinkMsgQueueIdLabel t
 
 genDefineMsgQueueId :: [OSALMsgQueue] -> CGenerator [CFileItem]
 genDefineMsgQueueId [] = return []

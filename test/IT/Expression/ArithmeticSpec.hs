@@ -104,6 +104,9 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__test1(void * const __this, __termina_box_t foo);\n" ++
+              "void id0__test1__mutex_lock(void * const __this, __termina_box_t foo);\n" ++
+              "void id0__test1__task_lock(void * const __this, __termina_box_t foo);\n" ++
+              "void id0__test1__event_lock(void * const __this, __termina_box_t foo);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function test1" $ do

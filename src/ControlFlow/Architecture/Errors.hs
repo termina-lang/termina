@@ -172,7 +172,23 @@ instance ErrorMessage ArchitectureError where
                         pprintSimpleError
                             traceSourceLines title traceFileName tracePos Nothing <> printBoxTrace' expectedSource xr
                 printBoxTrace' _ _ = error "Internal error: invalid error position"
-                
+
+    toText e@(AnnotatedError err Internal) _files =
+        let title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."             
+        in
+            -- | Check the errors are related to the internal resources/emitters
+            case err of
+                EDisconnectedEmitter emitter -> title <>
+                    "\nEmitter \x1b[31m" <> T.pack emitter <>
+                    "\x1b[0m is not connected to any sink port. " <>
+                    "All event sources must be connected to a target."
+
+                EUnusedResource ident -> title <> 
+                    "\nResource \x1b[31m" <> T.pack ident <>
+                    "\x1b[0m is not being used by any element. " <>
+                    "All resources must be connected to at least one access port."
+                _ -> title
+
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
     
     toDiagnostics e@(AnnotatedError _ pos) _files =

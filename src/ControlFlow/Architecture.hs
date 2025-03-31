@@ -193,7 +193,7 @@ genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _
   case initializer of
     Nothing -> ST.modify $ \tp ->
       tp {
-        resources = M.insert ident (TPResource ident rcls M.empty modName rann) (resources tp)
+        resources = M.insert ident (TPResource ident rcls M.empty (Just modName) rann) (resources tp)
       }
     Just (StructInitializer assignments _) -> do
       apConns <- foldM (\accps assignment -> do
@@ -205,7 +205,7 @@ genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _
         ) M.empty assignments
       ST.modify $ \tp ->
         tp {
-          resources = M.insert ident (TPResource ident rcls apConns modName rann) (resources tp)
+          resources = M.insert ident (TPResource ident rcls apConns (Just modName) rann) (resources tp)
         }
     -- | Resource initializer is not a struct initializer
     -- This should not happen, since the type checker must not allow initializing a
@@ -290,7 +290,9 @@ emptyTerminaProgArch config = TerminaProgArch {
   handlerClasses = M.empty,
   handlers = M.empty,
   resourceClasses = M.empty,
-  resources = M.empty,
+  resources = if enableSystemPort config then M.fromList [
+    ("system", TPResource "system" "System" M.empty Nothing (LocatedElement (GTy (TGlobal ResourceClass "System")) Internal))
+  ] else M.empty,
   pools = M.empty,
   atomics = M.empty,
   atomicArrays = M.empty,

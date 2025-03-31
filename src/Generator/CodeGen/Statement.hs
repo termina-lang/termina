@@ -232,7 +232,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
                 else
                     return $ no_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (ETy (PortConnection (APConnTy (TInterface _ iface) rts procedures))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (ETy (PortConnection (APConnTy (TInterface RegularInterface iface) rts procedures))) _) : xs) = do
                 cResourceType <- genType noqual rts
                 let cInterfaceType = typeDef iface
                     resourceExpr = addrOf (resource @: cResourceType)
@@ -242,6 +242,8 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
+            genFieldAssignments _ (FieldPortConnection AccessPortConnection _ _ (LocatedElement (ETy (PortConnection (APConnTy (TInterface SystemInterface _) _ _))) _) : xs) = do
+                genFieldAssignments False xs
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (LocatedElement (ETy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]

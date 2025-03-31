@@ -12,6 +12,7 @@ import Control.Monad.Except
 import ControlFlow.Architecture.Errors
 import Semantic.Types
 import Utils.Annotations
+import Data.Maybe (catMaybes)
 
 getEmitterIdentifier :: TPEmitter a -> Identifier
 getEmitterIdentifier (TPInterruptEmittter ident _) = ident
@@ -135,7 +136,12 @@ getResDependencies progArchitecture =
 
 getGlobDeclModules :: TerminaProgArch a -> [QualifiedName]
 getGlobDeclModules progArchitecture = 
-  map head . group . sort $ taskModules ++ handlerModules ++ resourceModules ++ poolModules ++ atomicModules ++ atomicArrayModules
+  map head . group . sort $ taskModules 
+    ++ handlerModules 
+    ++ catMaybes resourceModules
+    ++ poolModules 
+    ++ atomicModules 
+    ++ atomicArrayModules
   where
     taskModules = map taskModule $ M.elems (tasks progArchitecture)
     handlerModules = map handlerModule $ M.elems (handlers progArchitecture)

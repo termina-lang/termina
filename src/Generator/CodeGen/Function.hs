@@ -9,6 +9,8 @@ import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
+import Generator.LanguageC.Embedded
+import Utils.Annotations
 
 
 genFunctionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
@@ -21,11 +23,12 @@ genFunctionDecl item = throwError $ InternalError $ "Not a function: " ++ show i
 genFunction :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cRetType <- maybe (return (CTVoid noqual)) (genType noqual) rts
-    cParamDecls <- mapM genParameterDeclaration parameters
+    cParamDecls <- mapM (\(Parameter pid pty) -> do
+        cPty <- genType noqual pty
+        return $ pid @: cPty) parameters
     cBody <- foldM (\acc x -> do
         cStmt <- genBlocks x
         return $ acc ++ cStmt) [] stmts
-    return [ CFunctionDef Nothing (CFunction cRetType identifier cParamDecls
-        (CSCompound cBody (buildCompoundAnn ann False True)))
-        (buildDeclarationAnn ann True)]
+    return [ pre_cr $ function identifier cParamDecls @-> cRetType $
+                    ((trail_cr . block $ cBody) |>> location ann) |>> location ann]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item

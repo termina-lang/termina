@@ -37,11 +37,12 @@ namefy = ("__" <>)
 (<::>) id0 id1 = id0 <> "__" <> id1
 
 -- | Termina's pretty builtin types
-optionBox, boxStruct, sinkPort, inPort :: Identifier
+optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
 optionBox = namefy "option_box_t"
 boxStruct = namefy "termina_box_t"
 sinkPort = namefy "termina_id_t"
 inPort = namefy "termina_id_t"
+outPort = namefy "termina_out_port_t"
 
 terminaID :: Identifier
 terminaID = namefy "termina_id_t"
@@ -259,7 +260,7 @@ genType _qual (TAtomicArrayAccess ts _) = do
     return (CTPointer ts' noqual)
 -- | Type of the ports
 genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
-genType _qual (TOutPort {}) = return (CTPointer (CTTypeDef msgQueue noqual) noqual)
+genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)
 genType _qual (TInPort {}) = return (CTTypeDef inPort noqual)
 genType qual (TReference Immutable ts) = do
     case ts of
@@ -409,4 +410,4 @@ procedureTaskLock :: (MonadError CGeneratorError m) => Identifier -> m Identifie
 procedureTaskLock procedureId = return $ procedureId <::> "task_lock"
 
 taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-taskFunctionName classId = return $ (namefy classId <::> "termina_task")
+taskFunctionName classId = return $ namefy classId <::> "termina_task"

@@ -55,11 +55,38 @@ systemPortGlobalEnv =
       -- | procedure delay_in (&mut self, delay : &TimeVal)
       InterfaceProcedure "delay_in" [Parameter "delay" (TReference Immutable (TStruct "TimeVal"))] (buildExpAnn Internal TUnit)
     ] [])) Internal),
+    ("sys_print_buffer_size", LocatedElement (GConst TUSize (I (TInteger 256 DecRepr) Nothing)) Internal),
+    -- | SysPrint interface
+    ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
+      -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
+      InterfaceProcedure "print" [Parameter "str" (TReference Immutable (TArray TChar (V "sys_print_buffer_size")))] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println" [Parameter "str" (TReference Immutable (TArray TChar (V "sys_print_buffer_size")))] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_char" [Parameter "value" TChar] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_char" [Parameter "value" TChar] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_u8" [Parameter "value" TUInt8] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_u8" [Parameter "value" TUInt8] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_u16" [Parameter "value" TUInt16] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_u16" [Parameter "value" TUInt16] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_u32" [Parameter "value" TUInt32] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_u32" [Parameter "value" TUInt32] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_u64" [Parameter "value" TUInt64] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_u64" [Parameter "value" TUInt64] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_i8" [Parameter "value" TInt8] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_i8" [Parameter "value" TInt8] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_i16" [Parameter "value" TInt16] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_i16" [Parameter "value" TInt16] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_i32" [Parameter "value" TInt32] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_i32" [Parameter "value" TInt32] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_i64" [Parameter "value" TInt64] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_i64" [Parameter "value" TInt64] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print_usize" [Parameter "value" TUSize] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println_usize" [Parameter "value" TUSize] (buildExpAnn Internal TUnit)
+    ] [])) Internal),
     -- | SystemAPI interface. This interface extends all the system interfaces.
     -- We are currently assuming that there is a common implementation of the SystemAPI. In the future
     -- this approach could allow to have different implementations of the SystemAPI depending on the
     -- target platform.
-    ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal),
+    ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal),
     ("System", LocatedElement (GType (Class ResourceClass "System" [] ["SystemAPI"] [])) Internal),
     ("system", LocatedElement (GGlob (TGlobal ResourceClass "System")) Internal)
   ]

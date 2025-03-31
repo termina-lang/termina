@@ -103,8 +103,8 @@ __termina_pool__init = "__termina_pool__init" @:
             CTSizeT noqual
         ]
 
-__termina__clock_get_uptime :: CExpression
-__termina__clock_get_uptime = "__termina__clock_get_uptime" @:
+__termina_sys_time__clock_get_uptime :: CExpression
+__termina_sys_time__clock_get_uptime = "__termina_sys_time__clock_get_uptime" @:
     CTFunction void [
         -- | TimeVal * const current
         _const . ptr $ _TimeVal
@@ -235,3 +235,112 @@ __termina_pool__free = "__termina_pool__free" @:
             -- | void * const element
             __termina_box_t
         ]
+
+__termina_app__init_tasks :: CExpression
+__termina_app__init_tasks = "__termina_app__init_tasks" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_app__install_emitters :: CExpression
+__termina_app__install_emitters = "__termina_app__install_emitters" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_app__enable_protection :: CExpression
+__termina_app__enable_protection = "__termina_app__enable_protection" @:
+    CTFunction void []
+
+__termina_app__init_msg_queues :: CExpression
+__termina_app__init_msg_queues = "__termina_app__init_msg_queues" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_app__initial_event :: CExpression
+__termina_app__initial_event = "__termina_app__initial_event" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_app__init_emitters :: CExpression
+__termina_app__init_emitters = "__termina_app__init_emitters" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_app__init_mutexes :: CExpression
+__termina_app__init_mutexes = "__termina_app__init_mutexes" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_mutex__lock :: CExpression
+__termina_mutex__lock = "__termina_mutex__lock" @:
+    CTFunction void
+        [
+            -- | const __termina_id_t mutex_id
+            _const __termina_id_t,
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_mutex__unlock :: CExpression
+__termina_mutex__unlock = "__termina_mutex__unlock" @:
+    CTFunction void
+        [
+            -- | const __termina_id_t mutex_id
+            _const __termina_id_t,
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
+__termina_task_lock_t :: CType
+__termina_task_lock_t = typeDef "__termina_task_lock_t"
+
+__termina_task__lock :: CExpression
+__termina_task__lock = "__termina_task__lock" @:
+    CTFunction __termina_task_lock_t
+        []
+
+__termina_task__unlock :: CExpression
+__termina_task__unlock = "__termina_task__unlock" @:
+    CTFunction void
+        [
+            -- | const __termina_task_lock_t lock
+            _const __termina_task_lock_t
+        ]
+
+__termina_event_lock_t :: CType
+__termina_event_lock_t = typeDef "__termina_event_lock_t"
+
+__termina_event__lock :: CExpression
+__termina_event__lock = "__termina_event__lock" @:
+    CTFunction __termina_event_lock_t
+        []
+
+__termina_event__unlock :: CExpression
+__termina_event__unlock = "__termina_event__unlock" @:
+    CTFunction void
+        [
+            -- | const __termina_event_lock_t lock
+            _const __termina_event_lock_t
+        ]
+
+__termina_sys_time_t, __termina_sys_print_t :: CType
+__termina_sys_time_t = typeDef "__termina_sys_time_t"
+__termina_sys_print_t = typeDef "__termina_sys_print_t"
+

@@ -821,11 +821,11 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
             unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
-      TAccessPort ifaceTy@(TInterface RegularInterface iface) -> do
+      TAccessPort ifaceTy@(TInterface _ iface) -> do
         -- | Get the interface definition
         getGlobalTypeDef loc iface >>=
           \case {
-            LocatedElement (Interface RegularInterface _ extends members _) _ -> (do
+            LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
               extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures loc) extends
               let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members ++ extendedMembers]
