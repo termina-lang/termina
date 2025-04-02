@@ -23,9 +23,11 @@ getObjType :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m Te
 getObjType (SAST.Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (SAST.ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (SAST.MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (SAST.MemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _))     = return ts
 getObjType (SAST.Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (SAST.Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (SAST.DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (SAST.DereferenceMemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 -- | This function returns the type of an expression. The type is extracted from the

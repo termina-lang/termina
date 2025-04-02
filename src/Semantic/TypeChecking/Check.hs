@@ -162,7 +162,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- Check that the resource class does not define any in and out ports
   mapM_ (
     \case {
-      ClassField (FieldDefinition fs_id fs_ty) annCF ->
+      ClassField (FieldDefinition fs_id fs_ty annCF) ->
         case fs_ty of
           TInPort _ _ -> throwError $ annotateError (location annCF) (EResourceClassInPort (clsId, anns) fs_id)
           TOutPort _ -> throwError $ annotateError (location annCF) (EResourceClassOutPort (clsId, anns) fs_id)
@@ -290,7 +290,7 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
     checkHandlerPorts :: Maybe Location -> [SAST.ClassMember SemanticAnn] -> SemanticMonad ()
     checkHandlerPorts Nothing [] = throwError $ annotateError anns (EHandlerClassNoSinkPort clsId)
     checkHandlerPorts (Just _) [] = return ()
-    checkHandlerPorts prev ((ClassField (FieldDefinition fs_id fs_ty) annCF): xfs) =
+    checkHandlerPorts prev (ClassField (FieldDefinition fs_id fs_ty annCF): xfs) =
       case fs_ty of
         TSinkPort _ _ ->
           case prev of

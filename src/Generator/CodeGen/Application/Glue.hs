@@ -20,7 +20,6 @@ import Control.Monad.Except
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Semantic.AST
-import Semantic.Utils
 import Control.Monad (forM)
 import Data.List (find)
 

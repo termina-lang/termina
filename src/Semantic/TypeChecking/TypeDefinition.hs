@@ -35,6 +35,7 @@ import Utils.Monad
 import Semantic.TypeChecking.Statement
 import Semantic.TypeChecking.Check
 import Semantic.TypeChecking.Expression
+import qualified Data.Set as S
 
 typeProcedureParameter :: Location -> Parameter -> SemanticMonad SAST.Parameter
 typeProcedureParameter loc (Parameter ident ts) = do
@@ -57,6 +58,23 @@ typeActionParameter loc (Parameter ident ts) = do
   checkActionParameterType loc param
   return param
 
+typeClassFieldDefinition ::
+  S.Set Identifier
+  -> ClassMember ParserAnn
+  -> SemanticMonad (SAST.ClassMember SemanticAnn)
+typeClassFieldDefinition fldDependencies (ClassField (FieldDefinition fs_id fs_ts annCF)) = do
+  fs_ty <- typeTypeSpecifier annCF fs_ts
+  checkTerminaType annCF fs_ty
+  classFieldTyorFail annCF fs_ty
+  let fieldDef = SAST.FieldDefinition fs_id fs_ty
+  case fs_ty of
+    TAccessPort (TInterface _ iface) -> do
+      procedures <- collectInterfaceProcedures annCF iface
+      let usedProcedures = M.filterWithKey (\k _ -> S.member k fldDependencies) procedures
+      return $ SAST.ClassField (fieldDef (buildAccessPortFieldAnn annCF (M.elems usedProcedures)))
+    _ -> return $ SAST.ClassField (fieldDef (buildFieldAnn annCF))
+typeClassFieldDefinition _ _ = error "Internal Error: not a field"
+
 -- Type definition
 -- Here I am traversing lists serveral times, I prefer to be clear than
 -- proficient for the time being.
@@ -67,7 +85,7 @@ typeTypeDefinition ann (Struct ident fs_ts mds_ts) = do
   -- Check that the struct is not empty
   when (Prelude.null fs_ts) (throwError $ annotateError ann (EStructDefEmpty ident))
   -- Check that every field is well-defined
-  fs_ty <- mapM (typeFieldDefinition ann) fs_ts
+  fs_ty <- mapM typeFieldDefinition fs_ts
   -- Check field names are unique
   checkUniqueNames ann EStructDefNotUniqueField (Data.List.map fieldIdentifier fs_ty)
   -- Type the modifiers
@@ -91,8 +109,8 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   -- Check that there are no repeated extended interfaces
   checkNoDuplicatedExtendedInterfaces extends
   -- Check procedure names are unique
-  checkUniqueNames ann 
-    EInterfaceNotUniqueProcedure 
+  checkUniqueNames ann
+    EInterfaceNotUniqueProcedure
       (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) members)
   -- Check that every procedure is well-defined
   procedures <- mapM typeInterfaceProcedure members
@@ -109,10 +127,10 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
     typeInterfaceProcedure (InterfaceProcedure procId ps_ts annIP) = do
       ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
       return $ InterfaceProcedure procId ps_ty (buildExpAnn annIP TUnit)
-    
+
     -- | Checks that the procedures incorporated from the extended interfaces
     -- are not duplicated
-    checkNoDuplicatedExtendedProcedures :: 
+    checkNoDuplicatedExtendedProcedures ::
       [Identifier] -- Accumulator
       -> SemanticMonad ()
     checkNoDuplicatedExtendedProcedures [] = return ()
@@ -131,9 +149,9 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
             Nothing -> return ()
             Just _ -> throwError $ annotateError procAnn (EInterfaceProcedurePreviouslyExtended procId prevIface)
 
-      where 
+      where
 
-        checkNoDuplicatedExtendedProcedures' :: 
+        checkNoDuplicatedExtendedProcedures' ::
           M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn))
           -> [Identifier]
           -> SemanticMonad (M.Map Identifier (M.Map Identifier (SAST.InterfaceMember SemanticAnn)))
@@ -151,17 +169,17 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
                 Nothing -> return ()
                 Just _ -> throwError $ annotateError ann (EInterfaceDuplicatedExtendedProcedure p prevIface extendedProc)
           return $ M.insert p extendedProcsMap accxs
-    
-    checkNoDuplicatedExtendedInterfaces :: 
+
+    checkNoDuplicatedExtendedInterfaces ::
       [Identifier] -- List of interfaces to check
       -> SemanticMonad ()
     checkNoDuplicatedExtendedInterfaces [] = return ()
-    checkNoDuplicatedExtendedInterfaces ifaces = 
-      void $ checkNoDuplicatedExtendedInterfaces' M.empty ifaces 
-      
-      where 
+    checkNoDuplicatedExtendedInterfaces ifaces =
+      void $ checkNoDuplicatedExtendedInterfaces' M.empty ifaces
 
-        checkNoDuplicatedExtendedInterfaces' :: 
+      where
+
+        checkNoDuplicatedExtendedInterfaces' ::
           M.Map Identifier (Maybe Identifier)
           -> [Identifier] -- List of interfaces to check
           -> SemanticMonad (M.Map Identifier (Maybe Identifier))
@@ -190,13 +208,14 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     (\(fs, prcs, mths, vws, acts) cl ->
         case cl of
           -- ClassFields
-          ClassField (FieldDefinition fs_id fs_ts) annCF -> do
+          fld@(ClassField {})  ->
+              return (fld : fs, prcs, mths, vws, acts) {-- do
               fs_ty <- typeTypeSpecifier annCF fs_ts
               checkTerminaType annCF fs_ty
               classFieldTyorFail annCF fs_ty
               let fieldDef = SAST.FieldDefinition fs_id fs_ty
               let checkFs = SAST.ClassField fieldDef (buildExpAnn annCF fs_ty)
-              return (checkFs : fs, prcs, mths, vws, acts)
+              return (checkFs : fs, prcs, mths, vws, acts) --}
           -- Procedures
           prc@(ClassProcedure {}) ->
               return (fs, prc : prcs, mths, vws, acts)
@@ -210,7 +229,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               return (fs, prcs, mths, vws , action : acts)
         )
     ([],[],[],[],[]) members
-  >>= \(fls   -- Fields do not need type checking :shrug:
+  >>= \(fls   -- Fields
        , prcs -- Procedures.
        , mths -- Methods
        , vws  -- Viewers
@@ -218,7 +237,6 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
        -- introduce a semi-well formed type.
        ) ->
   do
-    checkClassKind ann ident kind (fls, prcs, acts) provides
   -- Now we can go function by function checking everything is well typed.
   ----------------------------------------
   -- Loop between methods, procedures and viewers.
@@ -227,11 +245,22 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     let elements = prcs ++ mths ++ vws ++ acts
     -- Dependencies emplying the assumption.
     let dependenciesMap =
-          foldr (selfDepClass objIsSelf) M.empty elements
+          foldr selfDepClass M.empty elements
     let dependencies = fmap (
           M.foldrWithKey (\k v acc -> SelfDep k (getAnnotation v) : acc)
           []) dependenciesMap
-      
+    let fldDependenciesMap = foldr fieldDepClass M.empty elements
+
+    ty_fls <- mapM (
+      \case { 
+        fld@(ClassField (FieldDefinition fid _ _)) -> 
+          (case M.lookup fid fldDependenciesMap of
+            Just s -> typeClassFieldDefinition s fld
+            Nothing -> typeClassFieldDefinition S.empty fld);
+        _ -> error "Internal Error: not a field";
+      }) fls
+    checkClassKind ann ident kind (ty_fls, prcs, acts) provides
+
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
     mds_ty <- mapM (typeModifier ann) mds_ts
@@ -262,7 +291,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
         let clsType = Class kind ident
                   -- Function |kClassMember| /erases/ body of methods.
                   -- When typing, we do not need them
-                  (Data.List.map kClassMember (fls ++ prevMembers))
+                  (Data.List.map kClassMember (ty_fls ++ prevMembers))
                   provides mds_ty in
         localScope $ do
           insertGlobalTy ann clsType
@@ -302,18 +331,18 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
     -- checked. The methods, procedures, viewers and actions are reverse-sorted
     -- to math the order of the topological sort (they are inserted in reverse
     -- order).
-    return (SAST.Class kind ident (fls ++ reverse fnChecked) provides mds_ty)
+    return (SAST.Class kind ident (ty_fls ++ reverse fnChecked) provides mds_ty)
 
 ----------------------------------------
 -- Field definition helpers.
-typeFieldDefinition :: Location -> FieldDefinition -> SemanticMonad SAST.FieldDefinition
-typeFieldDefinition loc (FieldDefinition ident ts) = do
+typeFieldDefinition :: FieldDefinition ParserAnn -> SemanticMonad (SAST.FieldDefinition SemanticAnn)
+typeFieldDefinition (FieldDefinition ident ts loc) = do
   -- First we check its type is well-defined
   ty <- typeTypeSpecifier loc ts
   checkTerminaType loc ty
   -- and that it is simply (see simple types).
   structFieldTyOrFail loc ty
-  return $ SAST.FieldDefinition ident ty
+  return $ SAST.FieldDefinition ident ty (buildFieldAnn loc)
 
 -- Enum Variant definition helpers.
 typeEnumVariant :: Location -> EnumVariant -> SemanticMonad SAST.EnumVariant

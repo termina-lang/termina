@@ -17,7 +17,7 @@ import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
-import Generator.CodeGen.SystemCall (syscallFunctionsMap)
+import Generator.CodeGen.SystemCall
 
 
 genModuleDefineLabel :: QualifiedName -> String

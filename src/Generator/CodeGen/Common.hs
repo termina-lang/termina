@@ -151,9 +151,11 @@ getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TerminaT
 getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (MemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _))     = return ts 
 getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType]
@@ -246,7 +248,8 @@ genType _qual (TMsgQueue _ _) = return (CTTypeDef msgQueue noqual)
 genType qual (TFixedLocation ts) = do
     ts' <- genType volatile ts
     return (CTPointer ts' qual)
-genType _qual (TAccessPort ts) =  genType noqual ts
+genType _qual (TAccessPort (TInterface _ _)) = throwError $ InternalError "Access ports shall not be translated to C types"
+genType _qual (TAccessPort ts) = genType noqual ts
 genType _qual (TAllocator _) = return (CTTypeDef allocator noqual)
 genType _qual (TAtomic ts) = genType atomic ts
 genType _qual (TAtomicArray ts s) = do

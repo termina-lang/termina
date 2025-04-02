@@ -37,7 +37,6 @@ import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import qualified Data.Map as M
 import Semantic.Environment
-import Semantic.Utils
 
 ----------------------------------------
 -- Programs Semantic Analyzer
@@ -61,7 +60,7 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
                 (typeBlock mty bret)
   mds_ty <- mapM (typeModifier anns) mds_ts
   let functionSeman = FunctionSeman (map paramType ps_ty) (fromMaybe TUnit mty)
-  return (Function ident ps_ty mty typedBret mds_ty (LocatedElement (FTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+  return (Function ident ps_ty mty typedBret mds_ty (LocatedElement (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef

@@ -237,7 +237,7 @@ instance Annotated (Global' ty expr) where
 
 -- Extremelly internal type definition
 data TypeDef' ty blk a
-  = Struct Identifier [FieldDefinition' ty]  [Modifier' ty]
+  = Struct Identifier [FieldDefinition' ty a]  [Modifier' ty]
   | Enum Identifier [EnumVariant' ty] [Modifier' ty]
   | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty]
   | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty a] [Modifier' ty]
@@ -266,8 +266,7 @@ data ClassMember' ty blk a
   = 
     -- | Fields. They form the state  of the object
     ClassField 
-      (FieldDefinition' ty) -- ^ the field
-      a -- ^ transpiler annotation
+      (FieldDefinition' ty a) -- ^ the field
     -- | Methods. Methods are internal functions that can access the
     -- state of the object and call other methods of the same class.
     | ClassMethod 
@@ -319,10 +318,11 @@ data FieldAssignment' expr a =
   | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
-data FieldDefinition' ty = FieldDefinition {
+data FieldDefinition' ty a = FieldDefinition {
   fieldIdentifier      :: Identifier
   , fieldTerminaType :: ty
-} deriving (Show)
+  , fieldAnnotation :: a
+} deriving (Show, Functor)
 
 data EnumVariant' ty = EnumVariant {
   variantIdentifier :: Identifier

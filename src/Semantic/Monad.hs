@@ -26,9 +26,6 @@ import qualified Parser.Types as Parser
 import Utils.Monad
 
 import Control.Monad.State
-import Semantic.Utils
-
-
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 

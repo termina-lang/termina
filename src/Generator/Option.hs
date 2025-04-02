@@ -69,7 +69,7 @@ mapClassMemberOption ::
   -- | The new element
   ClassMember a
   -> OptionTypesMonad ()
-mapClassMemberOption (ClassField field _) = insertOptionType (fieldTerminaType field)
+mapClassMemberOption (ClassField field) = insertOptionType (fieldTerminaType field)
 mapClassMemberOption (ClassMethod _ maybeRet blkRet _) =
   -- | Get the option types from the return type
   mapMaybeOption maybeRet >>
@@ -101,7 +101,7 @@ mapTypeDefOption ::
   -> OptionTypesMonad ()
 mapTypeDefOption (Struct _ fields _) =
   -- | Get the option types from the fields
-  mapM_ (\(FieldDefinition _ ts) -> insertOptionType ts) fields
+  mapM_ (\(FieldDefinition _ ts _) -> insertOptionType ts) fields
 mapTypeDefOption (Enum _ variants _) =
   -- | Get the option types from the fields
   mapM_ (\(EnumVariant _ tss) -> mapM_ insertOptionType tss) variants

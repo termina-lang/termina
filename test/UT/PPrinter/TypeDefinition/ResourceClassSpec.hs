@@ -5,6 +5,7 @@ import Semantic.AST
 import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
+import Utils.Annotations
 
 import UT.PPrinter.Common
 
@@ -42,25 +43,28 @@ noHandlerClassWithoutOneProcedureAndZeroFields = TypeDefinition (Class ResourceC
 classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndTwoFields = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt8) undefined,
-    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))) undefined,
+    ClassField (FieldDefinition "field0" TUInt8 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))
+      (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 
 noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnn
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt8) undefined,
-    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))) undefined,
+    ClassField (FieldDefinition "field0" TUInt8 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))
+      (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "no_handler" Nothing]) undefined
 
 packedClass :: AnnASTElement SemanticAnn
 packedClass = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt64) undefined,
-    ClassField (FieldDefinition "field1" TUInt16) undefined,
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" TUInt16 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+      (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [
       Parameter "param0" TChar,
       Parameter "param1" (TReference Mutable (TArray TUInt8 (K (TInteger 16 DecRepr))))
@@ -70,18 +74,20 @@ packedClass = TypeDefinition
 alignedClass :: AnnASTElement SemanticAnn
 alignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt64) undefined,
-    ClassField (FieldDefinition "field1" TUInt16) undefined,
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" TUInt16 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+      (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) undefined
 
 packedAndAlignedClass :: AnnASTElement SemanticAnn
 packedAndAlignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt64) undefined,
-    ClassField (FieldDefinition "field1" (TStruct "TCDescriptor")) undefined,
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))) undefined,
+    ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" (TStruct "TCDescriptor") (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+      (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [
       Modifier "packed" Nothing,
@@ -91,16 +97,17 @@ packedAndAlignedClass = TypeDefinition
 classWithFixedLocationField :: AnnASTElement SemanticAnn
 classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt32) undefined,
-    ClassField (FieldDefinition "field1" (TFixedLocation TUInt32)) undefined,
+    ClassField (FieldDefinition "field0" TUInt32 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" (TFixedLocation TUInt32) (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 
 classWithAccessPortField :: AnnASTElement SemanticAnn
 classWithAccessPortField = TypeDefinition
   (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt32) undefined,
-    ClassField (FieldDefinition "field1" (TAccessPort (TInterface RegularInterface "Interface1"))) undefined,
+    ClassField (FieldDefinition "field0" TUInt32 (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field1" (TAccessPort (TInterface RegularInterface "Interface1"))
+      (buildAccessPortFieldAnn Internal [InterfaceProcedure "test0" [] (buildExpAnn Internal TUnit)])),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 

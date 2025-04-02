@@ -353,10 +353,10 @@ findClassField :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (ty, a)
 findClassField i
   =
   fmap
-  (\case { ClassField (FieldDefinition _ t) a -> (t, a);
+  (\case { ClassField (FieldDefinition _ t a) -> (t, a);
            _ -> error "Impossible after find"})
   .
-  L.find (\case {ClassField (FieldDefinition ident _) _ -> ident == i;
+  L.find (\case {ClassField (FieldDefinition ident _ _) -> ident == i;
                  _ -> False;})
 
 findClassProcedure :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty], a)
@@ -405,8 +405,8 @@ findClassAction i
     _ -> False})
 
 className :: ClassMember' ty blk a -> Identifier
-className (ClassField e _)                = fieldIdentifier e
-className (ClassMethod mIdent _ _ _)      = mIdent
+className (ClassField e)                = fieldIdentifier e
+className (ClassMethod mIdent _ _ _)    = mIdent
 className (ClassProcedure pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
-className (ClassAction aIdent _ _ _ _)    = aIdent
+className (ClassAction aIdent _ _ _ _)  = aIdent

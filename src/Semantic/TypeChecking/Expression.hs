@@ -26,12 +26,11 @@ import qualified Data.List  (find, sortOn)
 import Parser.Types
 import Semantic.TypeChecking.Check
 import qualified Data.Map as M
-import Semantic.Utils
 
-getMemberFieldType :: Location -> TerminaType -> Identifier -> SemanticMonad TerminaType
-getMemberFieldType loc obj_ty ident =
+getMemberField :: Location -> TerminaType -> Identifier -> SemanticMonad (TerminaType, SemanticAnn)
+getMemberField loc obj_ty ident =
   case obj_ty of
-    TFixedLocation obj_ty' -> getMemberFieldType loc obj_ty' ident
+    TFixedLocation obj_ty' -> getMemberField loc obj_ty' ident
     TStruct dident -> getGlobalTypeDef loc dident >>=
       \case{
         -- Either a struct
@@ -39,7 +38,7 @@ getMemberFieldType loc obj_ty ident =
             let mfield = Data.List.find ((ident ==) . fieldIdentifier) fields in
               maybe
               (throwError $ annotateError loc (EMemberAccessUnknownField (dident, strLoc) ident))
-              (return . fieldTerminaType) mfield
+              (\fld -> return (fieldTerminaType fld, fieldAnnotation fld)) mfield
         ;
         _ -> throwError $ annotateError Internal EUnboxingStructType
       }
@@ -52,7 +51,7 @@ getMemberFieldType loc obj_ty ident =
           case findClassField ident cls of
             Nothing -> throwError $ annotateError loc (EMemberAccessUnknownField (dident, clsLoc) ident)
             -- type |t| and the type inside |a| should be the same, no?
-            Just (t , _a) -> return t
+            Just fld -> return fld
         ;
         -- Other types do not have members.
         _ -> throwError $ annotateError Internal EUnboxingClassType
@@ -94,8 +93,11 @@ typeObject _ (MemberAccess obj ident ann) = do
   (obj_ak', obj_ty') <- getObjType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
         maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
-  fts <- getMemberFieldType ann obj_ty ident
-  return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fts
+  ft <- getMemberField ann obj_ty ident
+  case ft of
+    (fty@(TAccessPort (TInterface _ _)), LocatedElement (FTy (AccessPortField members)) _) ->
+      return $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+    (fty, _) -> return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fty
 typeObject getVarTy (Dereference obj ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjType typed_obj
@@ -110,9 +112,12 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjType typed_obj
   case obj_ty of
-    TReference ak rTy ->
-      getMemberFieldType ann rTy ident >>=
-        \fts -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fts
+    TReference ak rTy -> do
+      ft <- getMemberField ann rTy ident
+      case ft of
+        (fty@(TAccessPort (TInterface _ _)), LocatedElement (FTy (AccessPortField members)) _) ->
+          return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+        (fty, _) -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fty
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 
 typeMemberFunctionCall ::
@@ -306,7 +311,7 @@ typeAssignmentExpression expected_type@(TAtomic ty) typeObj (StructInitializer f
     Nothing -> return ()
   -- | The type is ok. Now we have to check the field
   SAST.StructInitializer
-        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "value" ty] fs
+        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "value" ty (buildExpAnn Internal ty)] fs
         <*> pure (buildExpAnn pann expected_type)
 typeAssignmentExpression expected_type@(TAtomicArray ty size) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
@@ -319,7 +324,7 @@ typeAssignmentExpression expected_type@(TAtomicArray ty size) typeObj (StructIni
     Nothing -> return ()
   -- | The type is ok. Now we have to check the field
   SAST.StructInitializer
-        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "values" (TArray ty size)] fs
+        <$> typeFieldAssignments pann (expected_type, Builtin) typeObj [FieldDefinition "values" (TArray ty size) (buildExpAnn Internal (TArray ty size))] fs
         <*> pure (buildExpAnn pann expected_type)
 typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
@@ -350,7 +355,7 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
     LocatedElement (Class clsKind _ident members _provides _mods) clsLoc ->
-      let fields = [fld | (ClassField fld@(FieldDefinition {}) _) <- members] in
+      let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
         SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
@@ -747,22 +752,22 @@ typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateEr
 typeFieldAssignment
   :: Location -> (TerminaType, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
-  -> SAST.FieldDefinition
+  -> SAST.FieldDefinition SemanticAnn
   -> FieldAssignment ParserAnn
   -> SemanticMonad (SAST.FieldAssignment SemanticAnn)
-typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty) (FieldValueAssignment faid faexp pann) =
+typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty _) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
     flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldAddressAssignment faid addr pann) =
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
       TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
       ty -> throwError $ annotateError loc (EFieldNotFixedLocation fid ty)
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection InboundPortConnection pid sid pann) =
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -782,7 +787,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection I
           _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
       ty -> throwError $ annotateError loc (EFieldNotSinkOrInboundPort fid ty)
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection OutboundPortConnection pid sid pann) =
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -796,7 +801,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection O
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
       ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection AccessPortConnection pid sid pann) =
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -853,7 +858,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty) (FieldPortConnection A
 typeFieldAssignments
   :: Location -> (TerminaType, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
-  -> [SAST.FieldDefinition]
+  -> [SAST.FieldDefinition SemanticAnn]
   -> [FieldAssignment ParserAnn]
   -> SemanticMonad [SAST.FieldAssignment SemanticAnn]
 typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds sorted_fas []

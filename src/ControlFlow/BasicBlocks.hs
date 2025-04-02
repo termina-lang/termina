@@ -212,7 +212,7 @@ genBBBlock (SAST.Block stmts blkann) = do
 -- as a method, procedure, viewer or action, respectively. In these cases, the
 -- statements are grouped into basic blocks and a new return block is created.
 genBBClassMember :: SAST.ClassMember SemanticAnn -> BBGenerator (ClassMember SemanticAnn)
-genBBClassMember (ClassField field ann) = return $ ClassField field ann
+genBBClassMember (ClassField field) = return $ ClassField field
 genBBClassMember (ClassMethod name retType body ann) = do
     bRet <- genBBBlock body
     return $ ClassMethod name retType bRet ann

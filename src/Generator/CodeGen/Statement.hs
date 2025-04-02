@@ -223,7 +223,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
                 else
                     return $ no_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
-            genFieldAssignments before' (FieldPortConnection OutboundPortConnection fld channel (LocatedElement (ETy (PortConnection (OutPConnTy _))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection OutboundPortConnection fld channel (LocatedElement (STy (PortConnection (OutPConnTy _))) _) : xs) = do
                 let cMsgQueue = typeDef msgQueue 
                 let cPtrMsgQueue = ptr cMsgQueue
                 let channelExpr = addrOf (channel @: cMsgQueue)
@@ -232,7 +232,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
                 else
                     return $ no_cr (cObj @. fld @: cPtrMsgQueue @= channelExpr) : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (ETy (PortConnection (APConnTy (TInterface RegularInterface iface) rts procedures))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fid resource (LocatedElement (STy (PortConnection (APConnTy (TInterface RegularInterface iface) rts procedures))) _) : xs) = do
                 cResourceType <- genType noqual rts
                 let cInterfaceType = typeDef iface
                     resourceExpr = addrOf (resource @: cResourceType)
@@ -242,9 +242,9 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
-            genFieldAssignments _ (FieldPortConnection AccessPortConnection _ _ (LocatedElement (ETy (PortConnection (APConnTy (TInterface SystemInterface _) _ _))) _) : xs) = do
+            genFieldAssignments _ (FieldPortConnection AccessPortConnection _ _ (LocatedElement (STy (PortConnection (APConnTy (TInterface SystemInterface _) _ _))) _) : xs) = do
                 genFieldAssignments False xs
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (LocatedElement (ETy (PortConnection (APPoolConnTy {}))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (LocatedElement (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
                     freeFunctionType = CTFunction void [void_ptr, __termina_box_t]
@@ -257,7 +257,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
                 else
                     return $ no_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (LocatedElement (ETy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (LocatedElement (STy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
                 let portFieldObj = cObj @. fld @: cTs
@@ -265,7 +265,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (portFieldObj @= (res @: cTs)) : rest
                 else
                     return $ no_cr (portFieldObj @= (res @: cTs)) : rest
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (LocatedElement (ETy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (LocatedElement (STy (PortConnection (APAtomicConnTy ts))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual ts
                 let portFieldObj = cObj @. fld @: ptr cTs
@@ -288,18 +288,21 @@ genBlocks (ProcedureCall obj ident args ann) = do
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
     -- Generate the C code for the object
-    cObj <- genObject obj
+    typeObj <- getObjType obj
+    cObj <- case (obj, typeObj) of 
+        (MemberAccess obj' identifier _ann, TAccessPort (TInterface RegularInterface iface)) -> do
+            cObj' <- genObject obj'
+            return $ cObj' @. identifier @: CTTypeDef iface noqual
+        (DereferenceMemberAccess obj' identifier _ann, TAccessPort (TInterface RegularInterface iface)) -> do
+            cObj' <- genObject obj'
+            return $ cObj' @. identifier @: CTTypeDef iface noqual
+        _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
-    typeObj <- getObjType obj
-    case typeObj of
-        TAccessPort (TInterface RegularInterface iface) -> do
-            structType <- genType noqual (TStruct iface)
-            return 
-                [pre_cr ((cObj @. ident @: cFuncType) @@
-                      ((cObj @. thatField @: ptr structType) : cArgs) |>> location ann) |>> location ann]
-        _ -> throwError $ InternalError $ "Invalid object type: " ++ show typeObj
+    return 
+        [pre_cr ((cObj @. ident @: cFuncType) @@
+            ((cObj @. thatField @: ptr void) : cArgs) |>> location ann) |>> location ann]
 genBlocks (AllocBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj

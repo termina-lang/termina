@@ -22,7 +22,7 @@ getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
 getInputPorts = foldl' (\acc member -> 
   case member of
-    ClassField (FieldDefinition fid fty) _ -> 
+    ClassField (FieldDefinition fid fty _) -> 
       case fty of
         TInPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
@@ -32,7 +32,7 @@ getInputPorts = foldl' (\acc member ->
 getSinkPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
 getSinkPorts = foldl' (\acc member -> 
   case member of
-    ClassField (FieldDefinition fid fty) _ -> 
+    ClassField (FieldDefinition fid fty _) -> 
       case fty of
         TSinkPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
@@ -42,7 +42,7 @@ getSinkPorts = foldl' (\acc member ->
 getOutputPorts :: [ClassMember a] -> M.Map Identifier TerminaType
 getOutputPorts = foldl' (\acc member -> 
   case member of
-    ClassField (FieldDefinition fid fty) _ -> 
+    ClassField (FieldDefinition fid fty _) -> 
       case fty of
         TOutPort dataTy -> M.insert fid dataTy acc
         _ -> acc
@@ -53,7 +53,7 @@ getPortType :: Identifier -> [ClassMember a] -> TerminaType
 getPortType ident [] = error $ "Internal error: no port with identifier " ++ ident
 getPortType ident (member : members) =
   case member of
-    ClassField (FieldDefinition fid fty) _ | fid == ident -> fty
+    ClassField (FieldDefinition fid fty _) | fid == ident -> fty
     _ -> getPortType ident members
 
 getClassMembers :: TypeDef a -> [ClassMember a]
@@ -170,9 +170,11 @@ getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Termin
 getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (MemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _))     = return ts
 getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType _ = throwError $ annotateError Internal EUnboxingObject
 
 -- | This function returns the type of an expression. The type is extracted from the

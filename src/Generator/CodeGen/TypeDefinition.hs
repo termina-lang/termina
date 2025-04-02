@@ -23,22 +23,56 @@ filterStructModifiers = filter (\case
       Modifier "aligned" _ -> True
       _ -> False)
 
-genFieldDeclaration :: FieldDefinition -> CGenerator [CDeclaration]
-genFieldDeclaration (FieldDefinition identifier ts@(TFixedLocation {})) = do
+genFieldDeclaration :: FieldDefinition SemanticAnn -> CGenerator [CDeclaration]
+genFieldDeclaration (FieldDefinition identifier ts@(TFixedLocation {}) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAllocator {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAllocator {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicAccess {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicAccess {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAccess {}))) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAccess {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition _ (TAccessPort (TInterface SystemInterface _))) = do
-    return []
-genFieldDeclaration (FieldDefinition identifier ts) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
+    let cThatField = field thatField (ptr void) 
+    memberFields <- mapM genInterfaceProcedureField members
+    return [
+            CDecl 
+                (CTSStructUnion 
+                    (CStruct CStructTag Nothing (cThatField : memberFields) [])) 
+                (Just identifier) Nothing
+        ]
+    
+    where
+
+        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
+        genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
+            cParamTypes <- mapM (genType noqual . paramType) params
+            let cThisParamType = _const . ptr $ void
+                cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
+            return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
+genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
+    memberFields <- mapM genInterfaceProcedureField members
+    return [
+            CDecl 
+                (CTSStructUnion 
+                    (CStruct CStructTag Nothing memberFields [])) 
+                (Just identifier) Nothing
+        ]
+    
+    where
+
+        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
+        genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
+            cParamTypes <- mapM (genType noqual . paramType) params
+            let cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) cParamTypes) noqual
+            return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
+
+genFieldDeclaration (FieldDefinition _ (TAccessPort (TInterface _ _)) ann) = error $ "Invalid access port annotation" ++ show ann
+genFieldDeclaration (FieldDefinition identifier ts _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
 
@@ -100,11 +134,11 @@ genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) =
 classifyClassMembers :: (MonadError CGeneratorError m) => TypeDef SemanticAnn -> m ([ClassMember SemanticAnn], [ClassMember SemanticAnn])
 classifyClassMembers (Class clsKind _identifier members _provides _modifiers) =
     return $ foldr (\m (fields, funcs) -> case m of
-        fld@(ClassField fieldDef _) -> case clsKind of
+        fld@(ClassField fieldDef) -> case clsKind of
             TaskClass -> (fld : fields, funcs)
             _ -> case fieldDef of
-                (FieldDefinition _ (TSinkPort {})) -> (fields, funcs)
-                (FieldDefinition _ (TInPort {})) -> (fields, funcs)
+                (FieldDefinition _ (TSinkPort {}) _) -> (fields, funcs)
+                (FieldDefinition _ (TInPort {}) _) -> (fields, funcs)
                 _ -> (fld : fields, funcs)
         func -> (fields, func : funcs)) ([], []) members
 classifyClassMembers e = throwError $ InternalError $ "Not a class definition: " ++ show e
@@ -193,8 +227,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     fields' <- case clsKind of
         TaskClass -> return fields
         _ -> return $ filter (\case {
-            ClassField (FieldDefinition _ (TSinkPort {})) _ -> False;
-            ClassField (FieldDefinition _ (TInPort {})) _ -> False;
+            ClassField (FieldDefinition _ (TSinkPort {}) _) -> False;
+            ClassField (FieldDefinition _ (TInPort {}) _) -> False;
             _ -> True}) fields
     cFields <- concat <$> mapM genClassField fields'
     cFunctions <- concat <$> mapM genClassFunctionDeclaration functions
@@ -224,7 +258,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 ]) (buildDeclarationAnn ann True)
 
         genClassField :: ClassMember SemanticAnn -> CGenerator [CDeclaration]
-        genClassField (ClassField fld _) = genFieldDeclaration fld
+        genClassField (ClassField fld) = genFieldDeclaration fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
         genClassFunctionDeclaration :: ClassMember SemanticAnn -> CGenerator [CFileItem]
@@ -275,8 +309,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
         actions :: [(Identifier, TerminaType, Identifier)]
         actions = foldl (\acc member ->
             case member of
-                ClassField (FieldDefinition identifier (TSinkPort dts action)) _ -> (identifier, dts, action) : acc
-                ClassField (FieldDefinition identifier (TInPort dts action)) _ -> (identifier, dts, action) : acc
+                ClassField (FieldDefinition identifier (TSinkPort dts action) _) -> (identifier, dts, action) : acc
+                ClassField (FieldDefinition identifier (TInPort dts action) _) -> (identifier, dts, action) : acc
                 _ -> acc
             ) [] members
 

@@ -31,8 +31,6 @@ import Semantic.Types
 import ControlFlow.VarUsage.Types
 import Data.Bifunctor
 import qualified Data.Set as S
-import Semantic.Utils
-
 
 -- There are two types of arguments :
 -- + Moving out variables of type box T and TOption<box T>
@@ -326,8 +324,8 @@ checkOptionBoxStates lSt ((rSt, rloc):xs) = do
   checkOptionBoxStates nextSt xs
 
 useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
-useDefCMemb (ClassField fdef ann)
-  = defVariable (fieldIdentifier fdef) (location ann)
+useDefCMemb (ClassField fdef)
+  = defVariable (fieldIdentifier fdef) (location (fieldAnnotation fdef))
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
@@ -350,8 +348,8 @@ useDefTypeDef (Class _k _id members _provides _mods)
   where
     (muses,mdefs) = foldr (\m (u,d)->
                              case m of {
-                               ClassField (FieldDefinition _ (TSinkPort {})) _ -> (u, d);
-                               ClassField (FieldDefinition _ (TInPort {})) _ -> (u, d);
+                               ClassField (FieldDefinition _ (TSinkPort {}) _) -> (u, d);
+                               ClassField (FieldDefinition _ (TInPort {}) _) -> (u, d);
                                ClassField {} -> (u, m:d);
                                _             -> (m:u, d)
                                        }) ([],[]) members

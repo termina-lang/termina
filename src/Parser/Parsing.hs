@@ -932,13 +932,15 @@ globalDeclParser = do
 typeDefintionParser :: Parser (AnnASTElement ParserAnn)
 typeDefintionParser = structDefinitionParser <|> enumDefinitionParser <|> classDefinitionParser <|> interfaceDefinitionParser
 
-fieldDefinitionParser :: Parser FieldDefinition
+fieldDefinitionParser :: Parser (FieldDefinition ParserAnn)
 fieldDefinitionParser = do
+  startPos <- getPosition
   identifier <- identifierParser
   _ <- reservedOp ":"
   typeSpecifier <- typeSpecifierParser
+  endPos <- getPosition
   _ <- semi
-  return $ FieldDefinition identifier typeSpecifier
+  return $ FieldDefinition identifier typeSpecifier (Position startPos endPos)
 
 structDefinitionParser :: Parser (AnnASTElement ParserAnn)
 structDefinitionParser = do
@@ -959,7 +961,7 @@ classFieldDefinitionParser = do
   typeSpecifier <- typeSpecifierParser
   endPos <- getPosition
   _ <- semi
-  return $ ClassField (FieldDefinition identifier typeSpecifier) (Position startPos endPos)
+  return $ ClassField (FieldDefinition identifier typeSpecifier (Position startPos endPos))
 
 classMethodParser :: Parser (ClassMember ParserAnn)
 classMethodParser = do

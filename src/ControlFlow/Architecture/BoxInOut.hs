@@ -124,7 +124,7 @@ inOutBasicBlock _ = return ()
 inOutBasicBlocks :: Block SemanticAnn -> BoxInOutMonad ()
 inOutBasicBlocks (Block blocks _) = mapM_ inOutBasicBlock blocks
 
-inOutClassMember :: M.Map Identifier FieldDefinition -> ClassMember SemanticAnn -> BoxInOutMonad ()
+inOutClassMember :: M.Map Identifier (FieldDefinition SemanticAnn) -> ClassMember SemanticAnn -> BoxInOutMonad ()
 inOutClassMember _ (ClassField {}) = return ()
 inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
@@ -155,12 +155,12 @@ inOutClass (Class _ _ members _ _) = do
     let actionsToPorts = M.fromList $ 
             (map (
                 \case {
-                    ClassField field@(FieldDefinition _ (TInPort _ action)) _ -> (action, field);
-                    ClassField field@(FieldDefinition _ (TSinkPort _ action)) _ -> (action, field);
+                    ClassField field@(FieldDefinition _ (TInPort _ action) _) -> (action, field);
+                    ClassField field@(FieldDefinition _ (TSinkPort _ action) _) -> (action, field);
                     _ -> error "This should not happen"
                 }) . filter (\case {
-                ClassField (FieldDefinition _ (TInPort {})) _ -> True;
-                ClassField (FieldDefinition _ (TSinkPort {})) _ -> True;
+                ClassField (FieldDefinition _ (TInPort {}) _) -> True;
+                ClassField (FieldDefinition _ (TSinkPort {}) _) -> True;
                 _ -> False
              })) members
     mapM_ (inOutClassMember actionsToPorts) members

@@ -5,7 +5,6 @@ import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
 import Configuration.Configuration
-import Semantic.Utils
 
 ----------------------------------------
 -- | Global env
@@ -35,9 +34,9 @@ stdlibGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
 stdlibGlobalEnv =
   [
     ("Result", LocatedElement (GType (Enum "Result" [EnumVariant "Ok" [], EnumVariant "Error" []] [])) Internal),
-    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32, FieldDefinition "tv_usec" TUInt32] [])) Internal),
+    ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
-    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal")) (buildExpAnn Internal (TStruct "TimeVal"))] [] [])) Internal)
+    ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal)
   ]
 
 sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
