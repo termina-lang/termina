@@ -172,7 +172,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     }) fs
   -- Check that all the procedures are provided
   providedProcedures <- getProvidedProcedures provides
-  let sorted_provided = L.sortOn (\(InterfaceProcedure procId _ _, _) -> procId) providedProcedures
+  let sorted_provided = L.sortOn (\(InterfaceProcedure procId _ _ _, _) -> procId) providedProcedures
   let sorted_prcs = L.sortOn (
         \case {
           (ClassProcedure prcId _ _ _) -> prcId;
@@ -186,8 +186,8 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     checkSortedProcedures :: [(SAST.InterfaceMember SemanticAnn, Identifier)] -> [ClassMember ParserAnn] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
     checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
-    checkSortedProcedures ((InterfaceProcedure procId _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
-    checkSortedProcedures ((InterfaceProcedure prcId ps pann, ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
+    checkSortedProcedures ((InterfaceProcedure procId _ _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
+    checkSortedProcedures ((InterfaceProcedure prcId ps _ pann, ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
       let psLen = length ps
           psLen' = length ps'
@@ -334,7 +334,7 @@ collectInterfaceProcedures loc ident = do
         (LocatedElement (Interface _ _ extends iface_prcs _) _) -> (do
           -- If the interface is well-typed, this should not fail:
           extededProcs <- mapM (collectInterfaceProcedures loc) extends
-          procs <- mapM (\procedure@(InterfaceProcedure procId _ _) -> do
+          procs <- mapM (\procedure@(InterfaceProcedure procId _ _ _) -> do
               return (procId, procedure)
             ) iface_prcs
           return (M.fromList procs `M.union` M.unions extededProcs));

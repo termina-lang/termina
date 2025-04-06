@@ -14,7 +14,6 @@ import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
-import Generator.CodeGen.SystemCall
 
 genOptionPathName :: FilePath
 genOptionPathName = "option" <.> "h"
@@ -44,4 +43,4 @@ runGenOptionHeaderFile ::
     -> Either CGeneratorError CFile
 runGenOptionHeaderFile config irqMap opts = 
     runReader (runExceptT genOptionHeaderFile) 
-        (CGeneratorEnv opts config syscallFunctionsMap irqMap)
+        (CGeneratorEnv opts config irqMap)

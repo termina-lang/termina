@@ -103,8 +103,8 @@ __termina_pool__init = "__termina_pool__init" @:
             CTSizeT noqual
         ]
 
-__termina_sys_time__clock_get_uptime :: CExpression
-__termina_sys_time__clock_get_uptime = "__termina_sys_time__clock_get_uptime" @:
+_System__clock_get_uptime :: CExpression
+_System__clock_get_uptime = "System__clock_get_uptime" @:
     CTFunction void [
         -- | TimeVal * const current
         _const . ptr $ _TimeVal

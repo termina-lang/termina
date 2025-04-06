@@ -38,7 +38,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAcc
     return [field identifier cTs]
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
     let cThatField = field thatField (ptr void) 
-    memberFields <- mapM genInterfaceProcedureField members
+    memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
             CDecl 
                 (CTSStructUnion 
@@ -49,13 +49,13 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
+        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
             cParamTypes <- mapM (genType noqual . paramType) params
             let cThisParamType = _const . ptr $ void
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
-    memberFields <- mapM genInterfaceProcedureField members
+    memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
             CDecl 
                 (CTSStructUnion 
@@ -66,7 +66,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemI
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure params _) = do
+        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
             cParamTypes <- mapM (genType noqual . paramType) params
             let cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) cParamTypes) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
@@ -156,6 +156,11 @@ genConstSelfParam (TypeDefinition (Class _clsKind identifier _members _provides 
     return $ CDecl (CTypeSpec (CTPointer (CTTypeDef identifier constqual) constqual)) (Just selfParam) Nothing
 genConstSelfParam e = throwError $ InternalError $ "Not a class definition: " ++ show e
 
+genSelfCastStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
+genSelfCastStmt ann identifier = do
+    selfCType <- genType noqual (TStruct identifier)
+    let cExpr = cast (ptr selfCType) (thisParam @: ptr void) |>> location ann
+    return $ pre_cr $ var selfParam (ptr selfCType) @:= cExpr |>> location ann
 
 -- | TypeDef pretty printer.
 genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
@@ -215,7 +220,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _ex
         unboxInterfaceProcedures e = throwError . InternalError $ "Invalid interface annotation: " ++ show e
 
         genInterfaceProcedureField :: ProcedureSeman -> CGenerator CDeclaration
-        genInterfaceProcedureField (ProcedureSeman procedure params) = do
+        genInterfaceProcedureField (ProcedureSeman procedure params _modifiers) = do
             cParamTypes <- mapM (genType noqual) params
             let cThisParamType = _const . ptr $ void
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
@@ -289,9 +294,9 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassFunctionDeclaration (ClassAction action param rts _ _) = do
             retType <- genType noqual rts
             cParamDecl <- genParameterDeclaration param
-            cSelfParam <- genSelfParam clsdef
+            cThisParam <- genThisParam
             clsFuncName <- genClassFunctionName identifier action
-            return [CExtDecl (CEDFunction retType clsFuncName [cSelfParam, cParamDecl]) (buildDeclarationAnn ann True)]
+            return [CExtDecl (CEDFunction retType clsFuncName [cThisParam, cParamDecl]) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
@@ -409,7 +414,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: ptr void),
                     -- rtems_status_code status = RTEMS_SUCCESSFUL;
                     pre_cr $ var "status" _Status,
-                    no_cr $ "status" @: _Status @:= "Status__Successful" @: enumFieldType,
+                    no_cr $ "status" @: _Status @. variant @: enumFieldType @= "Status__Success" @: enumFieldType,
                     -- uint32_t next_msg = 0U;
                     pre_cr $ var "next_msg" uint32_t @:= dec 0 @: uint32_t,
                     -- size_t size = 0U;
@@ -453,8 +458,10 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             clsFuncName <- genClassFunctionName identifier procedure
             cThisParam <- genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            selfCastStmt <- genSelfCastStmt
-            cBody <- genProcedureStmts [selfCastStmt] stmts
+            selfCastStmt <- genSelfCastStmt ann identifier
+            cBody <- foldM (\acc x -> do
+                cStmt <- genBlocks x
+                return $ acc ++ cStmt) [selfCastStmt] stmts
             mutexLockProcedure <- genProcedureMutexLock
             taskLockProcedure <- genProcedureTaskLock
             eventLockProcedure <- genProcedureEventLock
@@ -464,29 +471,10 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
 
             where
 
-                selfVariable :: Identifier
-                selfVariable = "self"
-
-                genSelfCastStmt :: CGenerator CCompoundBlockItem
-                genSelfCastStmt = do
-                    selfCType <- genType noqual (TStruct identifier)
-                    let cExpr = cast (ptr selfCType) (thisParam @: ptr void) |>> location ann
-                    return $ pre_cr $ var selfVariable (ptr selfCType) @:= cExpr |>> location ann
-
-                genProcedureStmts :: [CCompoundBlockItem] -> [BasicBlock SemanticAnn] -> CGenerator [CCompoundBlockItem]
-                genProcedureStmts acc [ret@(ReturnBlock {})] = do
-                    cReturn <- genBlocks ret
-                    return $ acc ++ cReturn
-                genProcedureStmts _ [_] = throwError $ InternalError $ "Last block is not a statement: " ++ show procedure
-                genProcedureStmts _ [] = throwError $ InternalError $ "Empty procedure: " ++ show procedure
-                genProcedureStmts acc (x : xs) = do
-                    cStmt <- genBlocks x
-                    genProcedureStmts (acc ++ cStmt) xs
-                
                 genProcedureMutexLock :: CGenerator CFileItem
                 genProcedureMutexLock = do
                     selfCType <- genType noqual (TStruct identifier)
-                    selfCastStmt <- genSelfCastStmt
+                    selfCastStmt <- genSelfCastStmt ann identifier
                     cThisParam <- genThisParam
                     clsFuncName <- genClassFunctionName identifier procedure
                     cParamDecls <- mapM genParameterDeclaration parameters
@@ -499,16 +487,16 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                     let cBody = [
                                 selfCastStmt,
                                 pre_cr $ var "status" _Status,
-                                no_cr $ "status" @: _Status @:= "Status__Successful" @: enumFieldType,
+                                no_cr $ "status" @: _Status @. variant @: enumFieldType @= "Status__Success" @: enumFieldType,
                                 pre_cr $ __termina_mutex__lock @@
                                     [
-                                        (selfVariable @: ptr selfCType) @. mutexIDField @: __termina_id_t,
+                                        (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
                                         addrOf ("status" @: _Status)
                                     ],
                                 no_cr $ procedureFunction @@ ("self" @: ptr void : cParamExpressions),
                                 no_cr $ __termina_mutex__unlock @@
                                     [
-                                        (selfVariable @: ptr selfCType) @. mutexIDField @: __termina_id_t,
+                                        (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
                                         addrOf ("status" @: _Status)
                                     ]
                             ]
@@ -529,8 +517,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                             (ptr void : cParamTypes)
                     let cBody = [
                                 pre_cr $ var "lock" __termina_task_lock_t,
-                                pre_cr $ "lock" @: __termina_task_lock_t @=  __termina_task__lock @@ [],
-                                no_cr $ procedureFunction @@ ("self" @: ptr void : cParamExpressions),
+                                pre_cr $ "lock" @: __termina_task_lock_t @=  __termina_task__lock @@ [],
+                                no_cr $ procedureFunction @@ (thisParam @: ptr void : cParamExpressions),
                                 no_cr $ __termina_task__unlock @@
                                     [
                                         "lock" @: __termina_task_lock_t
@@ -553,8 +541,8 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                             (ptr void : cParamTypes)
                     let cBody = [
                                 pre_cr $ var "lock" __termina_event_lock_t,
-                                pre_cr $ "lock" @: __termina_event_lock_t @=  __termina_event__lock @@ [],
-                                no_cr $ procedureFunction @@ ("self" @: ptr void : cParamExpressions),
+                                pre_cr $ "lock" @: __termina_event_lock_t @=  __termina_event__lock @@ [],
+                                no_cr $ procedureFunction @@ (thisParam @: ptr void : cParamExpressions),
                                 no_cr $ __termina_event__unlock @@
                                     [
                                         "lock" @: __termina_event_lock_t
@@ -577,12 +565,13 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
         genClassFunctionDefinition (ClassAction action param rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             cRetType <- genType noqual rts
-            cSelfParam <- genSelfParam clsdef
+            cThisParam <- genThisParam
+            selfCastStmt <- genSelfCastStmt ann identifier
             cParam <- genParameterDeclaration param
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] stmts
-            return [CFunctionDef Nothing (CFunction cRetType clsFuncName [cSelfParam, cParam]
+                return $ acc ++ cStmt) [selfCastStmt] stmts
+            return [CFunctionDef Nothing (CFunction cRetType clsFuncName [cThisParam, cParam]
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)]
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member

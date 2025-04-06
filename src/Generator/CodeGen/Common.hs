@@ -22,7 +22,6 @@ type OptionTypes = Map TerminaType (Set TerminaType)
 data CGeneratorEnv = CGeneratorEnv { 
     optionTypes :: OptionTypes,
     configParams :: TerminaConfig,
-    syscallsMap :: Map Identifier CExpression,
     interruptsMap :: Map Identifier Integer
   }
 
@@ -60,7 +59,7 @@ poolMemoryArea :: Identifier -> Identifier
 poolMemoryArea identifier = namefy $ "pool_" <> identifier <> "_memory"
 
 msgQueueSendMethodName :: Identifier
-msgQueueSendMethodName = namefy "termina_msg_queue" <::> "send"
+msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
 
 resourceLock, resourceUnlock :: Identifier
 resourceLock = namefy "termina_resource" <::> "lock"

@@ -539,6 +539,9 @@ instance CPrint CFunction where
         return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
 
 instance CPrint CExternalDeclaration where
+    pprint (CEDVariable Nothing decl) = do
+        pdecl <- pprint decl
+        return $ pdecl <> semi
     pprint (CEDVariable stspec decl) = do
         pdecl <- pprint decl
         return $ pretty stspec <+> pdecl <> semi

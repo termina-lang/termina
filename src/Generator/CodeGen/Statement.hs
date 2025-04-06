@@ -10,8 +10,6 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
 import Utils.Annotations
 import Generator.CodeGen.Types
-import Control.Monad.Reader
-import qualified Data.Map as M
 
 genEnumInitialization ::
     -- | Prepend a line to the initialization expression 
@@ -195,7 +193,7 @@ genStructInitialization before level cObj expr = do
         where
 
             genProcedureAssignment :: Identifier -> TerminaType -> ProcedureSeman -> CGenerator CCompoundBlockItem
-            genProcedureAssignment fid (TGlobal ResourceClass resource) (ProcedureSeman procid ptys) = do
+            genProcedureAssignment fid (TGlobal ResourceClass resource) (ProcedureSeman procid ptys _modifiers) = do
                 cPortFieldType <- genType noqual (TStruct resource)
                 let portFieldObj = cObj @. fid @: cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
@@ -242,8 +240,10 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
                 else
                     return $ no_cr (((cObj @. fid @: cInterfaceType) @. thatField @: void_ptr) @= resourceExpr) : (cProcedures ++ rest)
-            genFieldAssignments _ (FieldPortConnection AccessPortConnection _ _ (LocatedElement (STy (PortConnection (APConnTy (TInterface SystemInterface _) _ _))) _) : xs) = do
-                genFieldAssignments False xs
+            genFieldAssignments _ (FieldPortConnection AccessPortConnection fid _ (LocatedElement (STy (PortConnection (APConnTy (TInterface SystemInterface _) rts procedures))) _) : xs) = do
+                rest <- genFieldAssignments False xs
+                cProcedures <- mapM (genProcedureAssignment fid rts) procedures
+                return (cProcedures ++ rest)
             genFieldAssignments before' (FieldPortConnection AccessPortConnection fld resource (LocatedElement (STy (PortConnection (APPoolConnTy {}))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
@@ -562,17 +562,28 @@ genBlocks (ReturnBlock mExpr ann) =
 genBlocks (ContinueBlock expr ann) = do
     cExpr <- genExpression expr
     return [pre_cr (_return (Just cExpr)) |>> location ann]
--- | TODO: Support system calls
-genBlocks (SystemCall _obj ident args ann) = do
+genBlocks (SystemCall obj ident args ann) = do
+    (cFuncType, _) <- case ann of
+        LocatedElement (ETy (AppType pts ts)) _ -> do
+            cFuncType <- genFunctionType ts pts
+            cRetType <- genType noqual ts
+            return (cFuncType, cRetType)
+        _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
+    -- Generate the C code for the object
+    typeObj <- getObjType obj
+    cObj <- case (obj, typeObj) of 
+        (MemberAccess obj' identifier _ann, TAccessPort (TInterface SystemInterface iface)) -> do
+            cObj' <- genObject obj'
+            return $ cObj' @. identifier @: CTTypeDef iface noqual
+        (DereferenceMemberAccess obj' identifier _ann, TAccessPort (TInterface SystemInterface iface)) -> do
+            cObj' <- genObject obj'
+            return $ cObj' @. identifier @: CTTypeDef iface noqual
+        _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
-    -- | Now we have to get the system calls map to obtain the name
-    -- of the function to call
-    syscalls <- asks syscallsMap
-    case M.lookup ident syscalls of
-        Nothing -> throwError $ InternalError $ "System call not found: " ++ show ident
-        Just syscall -> 
-            return [pre_cr (syscall @@ cArgs) |>> location ann]
+    -- | Obtain the type of the object
+    return 
+        [pre_cr ((cObj @. ident @: cFuncType) @@ cArgs |>> location ann) |>> location ann]
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr  _) = do

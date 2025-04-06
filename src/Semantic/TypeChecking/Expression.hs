@@ -16,6 +16,7 @@ import Control.Monad.Except
 import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
+import qualified Data.Map as M
 
 ----------------------------------------
 -- Libaries and stuff
@@ -25,7 +26,6 @@ import qualified Data.List  (find, sortOn)
 -- import Control.Monad.State as ST
 import Parser.Types
 import Semantic.TypeChecking.Check
-import qualified Data.Map as M
 
 getMemberField :: Location -> TerminaType -> Identifier -> SemanticMonad (TerminaType, SemanticAnn)
 getMemberField loc obj_ty ident =
@@ -142,7 +142,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                   -- Check that the number of parameters are OK
                   when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, location anns) (fromIntegral asLen)))
                   when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, location anns) (fromIntegral asLen)))
-                  typed_args <- zipWithM (\(p, idx) e -> 
+                  typed_args <- zipWithM (\(p, idx) e ->
                     catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, location anns) idx)
                       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
@@ -801,7 +801,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection
           _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
       ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection AccessPortConnection pid sid pann) =
+typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -833,7 +833,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection
             LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
               extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures loc) extends
-              let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members ++ extendedMembers]
+              let procs = [ProcedureSeman procid (map paramType params) [] | (InterfaceProcedure procid params _ _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
@@ -843,7 +843,12 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection
                         -- Collect the interfaces provided by the resource and their extended interfaces
                         extendedProvides <- concat <$> mapM (collectExtendedInterfaces loc) provides;
                         case Data.List.find (iface ==) (provides ++ extendedProvides) of
-                          Just _ -> return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts procs)
+                          Just _ ->
+                            case fann of
+                              (LocatedElement (FTy (AccessPortField usedProcs)) _) ->
+                                let filteredProcs = filter (\(ProcedureSeman procid _ _) -> M.member procid usedProcs) procs in
+                                return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts filteredProcs)
+                              _ -> error "Invalid annotation for field"
                           _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface
                       );
                       _ -> throwError $ annotateError Internal EUnboxingInterface

@@ -257,6 +257,7 @@ data InterfaceMember' ty a
     InterfaceProcedure
       Identifier -- ^ name of the procedure
       [Parameter' ty] -- ^ list of parameters (possibly empty)
+      [Modifier' ty] -- ^ list of possible modifiers
       a
   deriving (Show, Functor)
 

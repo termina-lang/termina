@@ -246,13 +246,13 @@ genDefineTaskMsgQueueIdLabel t = return $ namefy t <::> "task_msg_queue_id"
 genDefineChannelMsgQueueIdLabel :: Identifier -> CGenerator Identifier
 genDefineChannelMsgQueueIdLabel c = return $ namefy c <::> "channel_msg_queue_id"
 
-genDefineSinkMsgQueueIdLabel :: Identifier -> CGenerator Identifier
-genDefineSinkMsgQueueIdLabel p = return $ namefy p <::> "sink_msg_queue_id"
+genDefineSinkMsgQueueIdLabel :: Identifier -> Identifier -> CGenerator Identifier
+genDefineSinkMsgQueueIdLabel t p = return $ namefy t <::> p <::> "sink_msg_queue_id"
 
 genDefineMsgQueueIdLabel :: OSALMsgQueue -> CGenerator Identifier
 genDefineMsgQueueIdLabel (OSALTaskMsgQueue t _ _) = genDefineTaskMsgQueueIdLabel t
 genDefineMsgQueueIdLabel (OSALChannelMsgQueue c _ _ _ _) = genDefineChannelMsgQueueIdLabel c
-genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ _ _ _) = genDefineSinkMsgQueueIdLabel t
+genDefineMsgQueueIdLabel (OSALSinkPortMsgQueue t _ p _ _) = genDefineSinkMsgQueueIdLabel t p
 
 genDefineMsgQueueId :: [OSALMsgQueue] -> CGenerator [CFileItem]
 genDefineMsgQueueId [] = return []

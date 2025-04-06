@@ -61,7 +61,7 @@ mapInterfaceProcedureOption ::
   InterfaceMember a
   -- | The resulting map
   -> OptionTypesMonad ()
-mapInterfaceProcedureOption (InterfaceProcedure _ params _) =
+mapInterfaceProcedureOption (InterfaceProcedure _ params _ _) =
   -- | Get the option types from the parameters
   mapM_ mapParameterOption params
 

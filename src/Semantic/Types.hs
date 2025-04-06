@@ -7,6 +7,7 @@ import Semantic.AST
 import Core.Utils
 import Utils.Annotations
 import Data.Maybe
+import qualified Data.Map as M
 
 ----------------------------------------
 -- Semantic interpretation of types.
@@ -17,14 +18,14 @@ import Data.Maybe
 
 data FieldSeman
   = SimpleField 
-  | AccessPortField [InterfaceMember SemanticAnn]
+  | AccessPortField (M.Map Identifier (InterfaceMember SemanticAnn))
   deriving Show
 
 -- | Semantic type information
 data ExprSeman
   = SimpleType TerminaType
   | ObjectType AccessKind TerminaType
-  | AccessPortObjType [InterfaceMember SemanticAnn] TerminaType
+  | AccessPortObjType (M.Map Identifier (InterfaceMember SemanticAnn)) TerminaType
   | AppType [TerminaType] TerminaType
   deriving Show
 
@@ -34,7 +35,7 @@ data StmtSeman
     | PortConnection ConnectionSeman
   deriving Show
 
-data ProcedureSeman = ProcedureSeman Identifier [TerminaType]
+data ProcedureSeman = ProcedureSeman Identifier [TerminaType] [Modifier]
   deriving (Show)
 
 data FunctionSeman = FunctionSeman [TerminaType] TerminaType
@@ -185,7 +186,7 @@ isResultFromApp = isJust . getArgumentsType
 buildFieldAnn :: Location -> SemanticAnn
 buildFieldAnn loc = locate loc $ FTy SimpleField
 
-buildAccessPortFieldAnn :: Location -> [InterfaceMember SemanticAnn] -> SemanticAnn
+buildAccessPortFieldAnn :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
 buildAccessPortFieldAnn loc = locate loc . FTy . AccessPortField
 
 buildExpAnn :: Location -> TerminaType -> SemanticAnn
@@ -194,7 +195,7 @@ buildExpAnn loc = locate loc . ETy . SimpleType
 buildExpAnnObj :: Location -> AccessKind -> TerminaType -> SemanticAnn
 buildExpAnnObj loc ak = locate loc . ETy . ObjectType ak
 
-buildExpAnnAccessPortObj :: Location -> [InterfaceMember SemanticAnn] -> TerminaType -> SemanticAnn
+buildExpAnnAccessPortObj :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType -> SemanticAnn
 buildExpAnnAccessPortObj loc ifaces = locate loc . ETy . AccessPortObjType ifaces
 
 buildExpAnnApp :: Location -> [TerminaType] -> TerminaType -> SemanticAnn

@@ -4,55 +4,49 @@ module Configuration.Platform where
 
 import Data.Yaml
 import qualified Data.Text as T
-import Configuration.Platform.RTEMS5NoelSpike
-import Configuration.Platform.RTEMS5LEON3TSIM
+import Configuration.Platform.RTEMS5LEON3QEMU
 
 data Platform = 
-    RTEMS5NoelSpike
-    | RTEMS5LEON3TSIM
+    POSIXGCC
+    | RTEMS5LEON3QEMU
     | TestPlatform
     deriving Eq
 
-data PlatformFlags = PlatformFlags {
-    rtems5_noel_spike :: RTEMS5NoelSpikeFlags,
-    rtems5_leon3_tsim :: RTEMS5LEON3TSIMFlags
+newtype PlatformFlags = PlatformFlags {
+    rtems5_leon3_qemu :: RTEMS5LEON3QEMUFlags
 } deriving (Eq, Show)
 
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
-    rtems5_noel_spike = defaultRTEMS5NoelSpikeFlags,
-    rtems5_leon3_tsim = defaultRTEMS5LEON3TSIMFlags
+    rtems5_leon3_qemu = defaultRTEMS5LEON3QEMUFlags
 }
 
 instance FromJSON PlatformFlags where
   parseJSON (Object o) =
     PlatformFlags <$>
-    o .:? "rtems5-noel-spike" .!= defaultRTEMS5NoelSpikeFlags <*>
-    o .:? "rtems5-leon3-tsim" .!= defaultRTEMS5LEON3TSIMFlags
+    o .:? "rtems5-leon3-qemu" .!= defaultRTEMS5LEON3QEMUFlags
   parseJSON _ = fail "Expected configuration object"
 
 instance Show Platform where
-    show RTEMS5NoelSpike = "rtems5-noel-spike"
-    show RTEMS5LEON3TSIM = "rtems5-leon3-tsim"
+    show POSIXGCC = "posix-gcc"
+    show RTEMS5LEON3QEMU = "rtems5-leon3-qemu"
     show TestPlatform = "test-platform"
 
 instance ToJSON PlatformFlags where
     toJSON (
         PlatformFlags 
-            flagsRTEMSNoelSpike
-            flagsRTEMSLEON3TSIM
+            flagsRTEMSLEON3QEMU
         ) = object [
-            "rtems5-noel-spike" .= flagsRTEMSNoelSpike,
-            "rtems5-leon3-tsim" .= flagsRTEMSLEON3TSIM
+            "rtems5-leon3-qemu" .= flagsRTEMSLEON3QEMU
         ]
 
 checkPlatform :: T.Text -> Maybe Platform
-checkPlatform "rtems5-noel-spike" = Just RTEMS5NoelSpike
-checkPlatform "rtems5-leon3-tsim" = Just RTEMS5LEON3TSIM
+checkPlatform "posix-gcc" = Just POSIXGCC
+checkPlatform "rtems5-leon3-qemu" = Just RTEMS5LEON3QEMU
 checkPlatform _ = Nothing
 
 supportedPlatforms :: [(Platform, String)]
 supportedPlatforms = [
-        (RTEMS5NoelSpike, "RTEMS version 5 for NOEL-Spike simulator"),
-        (RTEMS5LEON3TSIM, "RTEMS version 5 for LEON3 TSIM simulator")
+        (POSIXGCC, "POSIX on GCC"),
+        (RTEMS5LEON3QEMU, "RTEMS version 5 for LEON3 QEMU simulator")
     ]

@@ -17,7 +17,6 @@ import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
-import Generator.CodeGen.SystemCall
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -83,7 +82,7 @@ runGenSourceFile ::
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
 runGenSourceFile config irqMap mName program = 
-    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config syscallFunctionsMap irqMap) 
+    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config irqMap) 
 
 runGenHeaderFile :: 
     TerminaConfig 
@@ -96,4 +95,4 @@ runGenHeaderFile ::
     -> Either CGeneratorError CFile
 runGenHeaderFile config irqMap includeOptionH mName imports program opts = 
     runReader (runExceptT (genHeaderFile includeOptionH mName imports program)) 
-        (CGeneratorEnv opts config syscallFunctionsMap irqMap)
+        (CGeneratorEnv opts config irqMap)

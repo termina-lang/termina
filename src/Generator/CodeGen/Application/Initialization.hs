@@ -14,7 +14,6 @@ import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
 import Generator.LanguageC.Embedded
-import Generator.CodeGen.SystemCall
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
@@ -65,4 +64,4 @@ runGenInitFile ::
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
 runGenInitFile config irqMap initFilePath prjprogs = 
     runReader (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv M.empty config syscallFunctionsMap irqMap)
+        (CGeneratorEnv M.empty config irqMap)

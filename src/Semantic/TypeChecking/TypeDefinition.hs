@@ -71,7 +71,7 @@ typeClassFieldDefinition fldDependencies (ClassField (FieldDefinition fs_id fs_t
     TAccessPort (TInterface _ iface) -> do
       procedures <- collectInterfaceProcedures annCF iface
       let usedProcedures = M.filterWithKey (\k _ -> S.member k fldDependencies) procedures
-      return $ SAST.ClassField (fieldDef (buildAccessPortFieldAnn annCF (M.elems usedProcedures)))
+      return $ SAST.ClassField (fieldDef (buildAccessPortFieldAnn annCF usedProcedures))
     _ -> return $ SAST.ClassField (fieldDef (buildFieldAnn annCF))
 typeClassFieldDefinition _ _ = error "Internal Error: not a field"
 
@@ -111,7 +111,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   -- Check procedure names are unique
   checkUniqueNames ann
     EInterfaceNotUniqueProcedure
-      (Data.List.map (\case InterfaceProcedure ifaceId _ _ -> ifaceId) members)
+      (Data.List.map (\case InterfaceProcedure ifaceId _ _ _ -> ifaceId) members)
   -- Check that every procedure is well-defined
   procedures <- mapM typeInterfaceProcedure members
   -- Check that the name of the procedures is not repeated in the extended interfaces
@@ -124,9 +124,10 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   where
 
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
-    typeInterfaceProcedure (InterfaceProcedure procId ps_ts annIP) = do
+    typeInterfaceProcedure (InterfaceProcedure procId ps_ts mds_ts' annIP) = do
       ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
-      return $ InterfaceProcedure procId ps_ty (buildExpAnn annIP TUnit)
+      mds_ty' <- mapM (typeModifier ann) mds_ts'
+      return $ InterfaceProcedure procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
 
     -- | Checks that the procedures incorporated from the extended interfaces
     -- are not duplicated
@@ -142,7 +143,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
       prevProcedures <- checkNoDuplicatedExtendedProcedures' M.empty ifaces
       -- | Now we have to check that the procedures of the current interface
       -- do not collide with the procedures of the extended interfaces.
-      forM_ members $ \(InterfaceProcedure procId _ procAnn) -> do
+      forM_ members $ \(InterfaceProcedure procId _ _ procAnn) -> do
         forM_ (M.keys prevProcedures) $ \prevIface -> do
           let prevProcedueresMap = prevProcedures M.! prevIface
           case M.lookup procId prevProcedueresMap of

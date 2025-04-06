@@ -145,7 +145,7 @@ spec = do
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++  
               "    Status status;\n" ++
-              "    Status status = Status__Successful;\n" ++
+              "    status.__variant = Status__Success;\n" ++
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   

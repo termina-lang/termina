@@ -371,9 +371,9 @@ findClassProcedure i
 findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe ([ty], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ ps a -> (map paramType ps, a)})
+  (\case {InterfaceProcedure _ ps _ a -> (map paramType ps, a)})
   .
-  L.find (\case{InterfaceProcedure ident _ _ -> (ident == i)})
+  L.find (\case{InterfaceProcedure ident _ _ _ -> (ident == i)})
 
 findClassViewerOrMethod :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty], Maybe ty, a)
 findClassViewerOrMethod i

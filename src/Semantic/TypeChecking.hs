@@ -70,7 +70,7 @@ typeElement (TypeDefinition tydef ann) = do
     (Class clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildClassTypeAnn ann clsKind), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
     (Interface iKind _ extends members _) -> do
       extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
-      let procs = [ProcedureSeman procid (map paramType params) | (InterfaceProcedure procid params _) <- members ++ extendedMembers]
+      let procs = [ProcedureSeman procid (map paramType params) modifiers | (InterfaceProcedure procid params modifiers _) <- members ++ extendedMembers]
       return (TypeDefinition typed_tydef (buildInterfaceTypeAnn ann iKind procs), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
 
 semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn

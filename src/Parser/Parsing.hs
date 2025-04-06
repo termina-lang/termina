@@ -1003,7 +1003,9 @@ interfaceProcedureParser = do
   name <- identifierParser
   params <- parens procedureParamsParser
   _ <- semi
-  InterfaceProcedure name params . Position startPos <$> getPosition
+  -- | TODO: See if we allow modifiers in interface procedures to be set
+  -- by the programmers
+  InterfaceProcedure name params [] . Position startPos <$> getPosition
   where
     procedureParamsParser :: Parser [Parameter]
     procedureParamsParser =

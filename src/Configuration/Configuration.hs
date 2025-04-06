@@ -3,6 +3,7 @@
 module Configuration.Configuration (
     TerminaConfig(..),
     ProjectProfile(..),
+    ProjectBuilder(..),
     defaultConfig
 ) where
 
@@ -22,6 +23,17 @@ instance ToJSON ProjectProfile where
     toJSON Debug = String "debug"
     toJSON Release = String "release"
 
+data ProjectBuilder = None | Make deriving (Eq, Show)
+
+instance FromJSON ProjectBuilder where
+    parseJSON (String "none") = return None
+    parseJSON (String "make") = return Make
+    parseJSON _ = fail "Expected builder type"
+
+instance ToJSON ProjectBuilder where
+    toJSON None = String "none"
+    toJSON Make = String "make"
+
 -- | Data type for the "termina.yaml" configuration file
 data TerminaConfig =
   TerminaConfig {
@@ -34,6 +46,7 @@ data TerminaConfig =
     profile :: !ProjectProfile,
     enableSystemInit :: !Bool,
     enableSystemPort :: !Bool,
+    builder :: !ProjectBuilder,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
 
@@ -50,6 +63,7 @@ instance FromJSON TerminaConfig where
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
+    o .:?  "builder" .!= None <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
@@ -65,6 +79,7 @@ instance ToJSON TerminaConfig where
             prjProfile
             prjEnableSystemInit
             prjEnableSystemPort
+            prjBuilder
             prjPlatformFlags
         ) = object $ [
             "name" .= prjName,
@@ -80,10 +95,10 @@ instance ToJSON TerminaConfig where
             -- We only serialize the enable-system-init flag if it is different from the default value
             <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
             <> if prjEnableSystemInit then ["enable-system-port" .= prjEnableSystemPort] else []
+            <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
             -- We only serialize the platform flags corresponding to the selected platform
             <> case prjPlatform of
-                "rtems5-noel-spike" -> ["platform-flags" .= object ["rtems5-noel-spike" .= rtems5_noel_spike prjPlatformFlags]]
-                "rtems5-leon3-tsim" -> ["platform-flags" .= object ["rtems5-leon3-tsim" .= rtems5_leon3_tsim prjPlatformFlags]]
+                "rtems5-leon3-qemu" -> ["platform-flags" .= object ["rtems5-leon3-qemu" .= rtems5_leon3_qemu prjPlatformFlags]]
                 _ -> []
 
 defaultConfig :: String -> Platform -> TerminaConfig
@@ -97,5 +112,6 @@ defaultConfig projectName plt = TerminaConfig {
     profile = Release,
     enableSystemInit = False,
     enableSystemPort = False,
+    builder = None,
     platformFlags = defaultPlatformFlags
 }

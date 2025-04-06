@@ -1,21 +1,30 @@
 module Generator.Makefile.AST where
 
-newtype Makefile = Makefile [MakeStatement]
+newtype Makefile = Makefile [MakeBlock]
+  deriving (Show)
+
+newtype MakeBlock = MakeBlock [MakeStatement]
+  deriving (Show)
+
+data MVariableType = 
+    MSimple
+    | MRecursive
+    | MAppend
   deriving (Show)
 
 data MakeStatement = 
-    MVariable FilePath [Fragment]
+    MVariable MVariableType FilePath [MFragment]
     | MRule FilePath [FilePath] [MakeCommand]
-    | MInclude FilePath
+    | MInclude Bool FilePath
   deriving (Show)
 
 data MakeCommand = 
   MakeCommand 
     Bool -- ^ Hidden command
-    [Fragment]
+    [MFragment]
   deriving (Show)
 
-data Fragment =
+data MFragment =
     MFragment String
-    | MSubstitution String
+    | MFunction String [MFragment]
   deriving (Show)
