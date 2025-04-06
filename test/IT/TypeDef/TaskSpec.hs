@@ -73,7 +73,7 @@ spec = do
               "typedef struct {\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
-              "    __termina_pool_t * message_pool;\n" ++
+              "    __termina_allocator_t message_pool;\n" ++
               "    uint32_t interval;\n" ++
               "} CHousekeeping;\n" ++
               "\n" ++   
@@ -82,7 +82,7 @@ spec = do
               "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
@@ -105,8 +105,10 @@ spec = do
               "\n" ++
               "}\n" ++ 
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
               "    \n" ++
+              "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
+              "\n" ++
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
@@ -115,13 +117,13 @@ spec = do
               "    __option_box_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
-              "    __termina_pool__alloc(self->message_pool, &alloc_msg);\n"  ++
+              "    (self->message_pool.alloc)(self->message_pool.__that, &alloc_msg);\n"  ++
               "\n"  ++
               "    if (alloc_msg.__variant == Some) {\n"  ++
               "        \n" ++
               "        __termina_box_t msg = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        __termina_pool__free(self->message_pool, msg);\n" ++
+              "        (self->message_pool.free)(self->message_pool.__that, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n"  ++

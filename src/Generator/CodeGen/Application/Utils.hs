@@ -221,6 +221,25 @@ genDefineTaskId (task : xs) = do
             this_task <- genDefineTaskIdLabel t
             return $ _define this_task (Just [show value]) : rest
 
+genDefinePoolIdLabel :: Identifier -> CGenerator Identifier
+genDefinePoolIdLabel p = return $ namefy p <::> "pool_id"
+
+genDefinePoolId :: [Identifier] -> CGenerator [CFileItem]
+genDefinePoolId [] = return []
+genDefinePoolId (pl : xs) = do
+    this_pool <- genDefinePoolIdLabel pl
+    rest <- genDefinePoolId' xs 1
+    return $ pre_cr (_define this_pool (Just [show (0 :: Integer)])) : rest
+
+    where
+
+        genDefinePoolId' :: [Identifier] -> Integer -> CGenerator [CFileItem]
+        genDefinePoolId' [] _ = return []
+        genDefinePoolId' (p : xp) value = do
+            rest <- genDefinePoolId' xp (value + 1)
+            this_pool <- genDefinePoolIdLabel p
+            return $ _define this_pool (Just [show value]) : rest
+
 genDefineTimerIdLabel :: Identifier -> CGenerator Identifier
 genDefineTimerIdLabel t = return $ namefy t <::> "timer_id"
 

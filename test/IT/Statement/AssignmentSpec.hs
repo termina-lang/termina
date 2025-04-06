@@ -87,6 +87,12 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__assignment_test1(void * const __this, __termina_box_t box_var0);\n" ++
+              "void id0__assignment_test1__mutex_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0);\n" ++
+              "void id0__assignment_test1__task_lock(void * const __this,\n" ++
+              "                                      __termina_box_t box_var0);\n" ++
+              "void id0__assignment_test1__event_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test1" $ do
@@ -106,7 +112,43 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")  
+              "}\n" ++
+              "\n" ++  
+              "void id0__assignment_test1__mutex_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0) {\n" ++
+              "    \n" ++ 
+              "    id0 * self = (id0 *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    id0__assignment_test1(self, box_var0);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__assignment_test1__task_lock(void * const __this,\n" ++
+              "                                      __termina_box_t box_var0) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    id0__assignment_test1(__this, box_var0);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__assignment_test1__event_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    id0__assignment_test1(__this, box_var0);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n")
     it "Prints declaration of function assignment_test2" $ do
      renderHeader False test2 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
@@ -125,6 +167,15 @@ spec = do
               "\n" ++
               "void id0__assignment_test2(void * const __this, __termina_box_t box_var0,\n" ++
               "                           __termina_box_t box_var1);\n" ++
+              "void id0__assignment_test2__mutex_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0,\n" ++
+              "                                       __termina_box_t box_var1);\n" ++
+              "void id0__assignment_test2__task_lock(void * const __this,\n" ++
+              "                                      __termina_box_t box_var0,\n" ++
+              "                                      __termina_box_t box_var1);\n" ++
+              "void id0__assignment_test2__event_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0,\n" ++
+              "                                       __termina_box_t box_var1);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of function assignment_test2" $ do
@@ -147,4 +198,43 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")  
+              "}\n" ++ 
+              "\n" ++  
+              "void id0__assignment_test2__mutex_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0,\n" ++
+              "                                       __termina_box_t box_var1) {\n" ++
+              "    \n" ++ 
+              "    id0 * self = (id0 *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    id0__assignment_test2(self, box_var0, box_var1);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__assignment_test2__task_lock(void * const __this,\n" ++
+              "                                      __termina_box_t box_var0,\n" ++
+              "                                      __termina_box_t box_var1) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    id0__assignment_test2(__this, box_var0, box_var1);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__assignment_test2__event_lock(void * const __this,\n" ++
+              "                                       __termina_box_t box_var0,\n" ++
+              "                                       __termina_box_t box_var1) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    id0__assignment_test2(__this, box_var0, box_var1);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n")

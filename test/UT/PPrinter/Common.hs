@@ -17,7 +17,6 @@ import ControlFlow.BasicBlocks
 import Generator.CodeGen.Statement
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Function
-import Generator.CodeGen.SystemCall
 import Generator.Environment
 
 import Prettyprinter
@@ -178,7 +177,7 @@ funSemAnn params ts = LocatedElement (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runReader (runExceptT (genExpression expr)) (CGeneratorEnv M.empty config syscallFunctionsMap M.empty) of
+  case runReader (runExceptT (genExpression expr)) (CGeneratorEnv M.empty config M.empty) of
     Left err -> pack $ show err
     Right cExpr -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -189,7 +188,7 @@ renderStatement stmt =
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv M.empty config syscallFunctionsMap irqMap) of
+      case runReader (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv M.empty config irqMap) of
         Left err -> pack $ show err
         Right cStmts -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -200,7 +199,7 @@ renderTypeDefinitionDecl opts decl =
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv opts config syscallFunctionsMap irqMap) of
+      case runReader (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv opts config irqMap) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -211,7 +210,7 @@ renderFunctionDecl opts decl =
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runReader (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv opts config syscallFunctionsMap irqMap) of
+      case runReader (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv opts config irqMap) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -222,6 +221,6 @@ renderFunction func =
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runReader (runExceptT (genFunction bbAST)) (CGeneratorEnv M.empty config syscallFunctionsMap irqMap) of
+      case runReader (runExceptT (genFunction bbAST)) (CGeneratorEnv M.empty config irqMap) of
         Left err -> pack $ show err
         Right cDecls -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)

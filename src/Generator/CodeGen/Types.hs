@@ -280,6 +280,14 @@ __termina_app__init_emitters = "__termina_app__init_emitters" @:
             _const . ptr $ _Status
         ]
 
+__termina_app__init_pools :: CExpression
+__termina_app__init_pools = "__termina_app__init_pools" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
+
 __termina_app__init_mutexes :: CExpression
 __termina_app__init_mutexes = "__termina_app__init_mutexes" @:
     CTFunction void

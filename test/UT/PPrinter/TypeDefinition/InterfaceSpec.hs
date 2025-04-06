@@ -21,7 +21,7 @@ interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" 
       Parameter "param5" TInt16,
       Parameter "param6" TInt32,
       Parameter "param7" TInt64
-    ] undefined
+    ] [] undefined
   ] []) (LocatedElement (TTy (InterfaceTy RegularInterface [
     ProcedureSeman "procedure0" [
       TUInt8,
@@ -32,7 +32,7 @@ interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" 
       TInt16,
       TInt32,
       TInt64
-    ]
+    ] []
   ])) undefined)
 
 spec :: Spec

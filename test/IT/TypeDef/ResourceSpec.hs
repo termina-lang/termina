@@ -57,6 +57,12 @@ spec = do
               "\n" ++
               "void TMChannel__get_tm_sent_packets(void * const __this,\n" ++
               "                                    uint32_t * const packets);\n" ++
+              "void TMChannel__get_tm_sent_packets__mutex_lock(void * const __this,\n" ++
+              "                                                uint32_t * const packets);\n" ++
+              "void TMChannel__get_tm_sent_packets__task_lock(void * const __this,\n" ++
+              "                                               uint32_t * const packets);\n" ++
+              "void TMChannel__get_tm_sent_packets__event_lock(void * const __this,\n" ++
+              "                                                uint32_t * const packets);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class TMChannel without no_handler" $ do
@@ -73,6 +79,42 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
+              "}\n" ++
+              "\n" ++  
+              "void TMChannel__get_tm_sent_packets__mutex_lock(void * const __this,\n" ++
+              "                                                uint32_t * const packets) {\n" ++
+              "    \n" ++ 
+              "    TMChannel * self = (TMChannel *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    TMChannel__get_tm_sent_packets(self, packets);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void TMChannel__get_tm_sent_packets__task_lock(void * const __this,\n" ++
+              "                                               uint32_t * const packets) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    TMChannel__get_tm_sent_packets(__this, packets);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void TMChannel__get_tm_sent_packets__event_lock(void * const __this,\n" ++
+              "                                                uint32_t * const packets) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    TMChannel__get_tm_sent_packets(__this, packets);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
               "}\n")
     it "Prints declaration of class UARTDriver" $ do
       renderHeader False test1 `shouldBe`
@@ -92,6 +134,12 @@ spec = do
               "} UARTDriver;\n" ++
               "\n" ++
               "void UARTDriver__get_status(void * const __this, uint32_t * const ret);\n" ++
+              "void UARTDriver__get_status__mutex_lock(void * const __this,\n" ++
+              "                                        uint32_t * const ret);\n" ++
+              "void UARTDriver__get_status__task_lock(void * const __this,\n" ++
+              "                                       uint32_t * const ret);\n" ++
+              "void UARTDriver__get_status__event_lock(void * const __this,\n" ++
+              "                                        uint32_t * const ret);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class UARTDriver" $ do
@@ -107,4 +155,40 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
-              "}\n")
+              "}\n" ++
+              "\n" ++
+              "void UARTDriver__get_status__mutex_lock(void * const __this,\n" ++
+              "                                        uint32_t * const ret) {\n" ++
+              "    \n" ++ 
+              "    UARTDriver * self = (UARTDriver *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    UARTDriver__get_status(self, ret);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void UARTDriver__get_status__task_lock(void * const __this,\n" ++
+              "                                       uint32_t * const ret) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    UARTDriver__get_status(__this, ret);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void UARTDriver__get_status__event_lock(void * const __this,\n" ++
+              "                                        uint32_t * const ret) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    UARTDriver__get_status(__this, ret);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n");

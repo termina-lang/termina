@@ -140,4 +140,37 @@ spec = do
              "\n" ++
              "    return;\n" ++
              "\n" ++
+             "}\n" ++
+             "\n" ++  
+             "void id0__test1__mutex_lock(void * const __this, __termina_box_t foo) {\n" ++
+             "    \n" ++ 
+             "    id0 * self = (id0 *)__this;\n" ++
+             "\n" ++
+             "    Status status;\n" ++
+             "    status.__variant = Status__Success;\n" ++
+             "\n" ++
+             "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+             "    id0__test1(self, foo);\n" ++
+             "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+             "\n" ++  
+             "}\n" ++
+             "\n" ++  
+             "void id0__test1__task_lock(void * const __this, __termina_box_t foo) {\n" ++
+             "    \n" ++      
+             "    __termina_task_lock_t lock;\n" ++
+             "\n" ++   
+             "    lock = __termina_task__lock();\n" ++
+             "    id0__test1(__this, foo);\n" ++
+             "    __termina_task__unlock(lock);\n" ++
+             "\n" ++  
+             "}\n" ++
+             "\n" ++  
+             "void id0__test1__event_lock(void * const __this, __termina_box_t foo) {\n" ++
+             "    \n" ++      
+             "    __termina_event_lock_t lock;\n" ++
+             "\n" ++   
+             "    lock = __termina_event__lock();\n" ++
+             "    id0__test1(__this, foo);\n" ++
+             "    __termina_event__unlock(lock);\n" ++
+             "\n" ++  
              "}\n")

@@ -92,6 +92,9 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test0(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test0__mutex_lock(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test0__task_lock(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test0__event_lock(void * const __this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of procedure match_test0" $ do
@@ -119,6 +122,39 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test0__mutex_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++ 
+              "    id0 * self = (id0 *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    id0__match_test0(self, option0);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test0__task_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    id0__match_test0(__this, option0);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test0__event_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    id0__match_test0(__this, option0);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
               "}\n")
     it "Prints declaration of procedure match_test1" $ do
       renderHeader False test1 `shouldBe`
@@ -137,6 +173,9 @@ spec = do
               "} id0;\n" ++
               "\n" ++
               "void id0__match_test1(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test1__mutex_lock(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test1__task_lock(void * const __this, __option_box_t option0);\n" ++
+              "void id0__match_test1__event_lock(void * const __this, __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of procedure match_test1" $ do
@@ -163,6 +202,39 @@ spec = do
               "\n" ++
               "    return;\n" ++
               "\n" ++
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test1__mutex_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++ 
+              "    id0 * self = (id0 *)__this;\n" ++
+              "\n" ++
+              "    Status status;\n" ++
+              "    status.__variant = Status__Success;\n" ++
+              "\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    id0__match_test1(self, option0);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test1__task_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++      
+              "    __termina_task_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_task__lock();\n" ++
+              "    id0__match_test1(__this, option0);\n" ++
+              "    __termina_task__unlock(lock);\n" ++
+              "\n" ++  
+              "}\n" ++
+              "\n" ++  
+              "void id0__match_test1__event_lock(void * const __this, __option_box_t option0) {\n" ++
+              "    \n" ++      
+              "    __termina_event_lock_t lock;\n" ++
+              "\n" ++   
+              "    lock = __termina_event__lock();\n" ++
+              "    id0__match_test1(__this, option0);\n" ++
+              "    __termina_event__unlock(lock);\n" ++
+              "\n" ++  
               "}\n")
     it "Prints declaration of function match_test2" $ do
       renderHeader False test2 `shouldBe`

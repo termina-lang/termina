@@ -61,7 +61,7 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -69,8 +69,10 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
               "    \n" ++
+              "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
+              "\n" ++
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
@@ -89,7 +91,7 @@ spec = do
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++  
               "    Status status;\n" ++
-              "    Status status = Status__Success;\n" ++
+              "    status.__variant = Status__Success;\n" ++
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   
@@ -160,7 +162,7 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current);\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -168,8 +170,10 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(CHousekeeping * const self, TimeVal current) {\n" ++
+              "Result CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
               "    \n" ++
+              "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
+              "\n" ++
               "    Result ret;\n" ++
               "    ret.__variant = Result__Ok;\n" ++
               "\n" ++
@@ -188,7 +192,7 @@ spec = do
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++  
               "    Status status;\n" ++
-              "    Status status = Status__Success;\n" ++
+              "    status.__variant = Status__Success;\n" ++
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   

@@ -36,6 +36,7 @@ genInitTasks progArchitecture = do
         genOSALTaskInit :: TPTask a -> CGenerator CCompoundBlockItem
         genOSALTaskInit tsk = do
             taskId <- genDefineTaskIdLabel (taskName tsk)
+            taskMsgQueueId <- genDefineTaskMsgQueueIdLabel (taskName tsk)
             let tskName = taskName tsk
                 classId = taskClass tsk
                 taskPrio = getCInteger . getPriority $ tsk
@@ -44,6 +45,8 @@ genInitTasks progArchitecture = do
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
                     $ trail_cr . block $ [
+                        pre_cr $ tskName @: typeDef classId @. namefy "task_msg_queue_id" @: __termina_id_t
+                            @= taskMsgQueueId @: __termina_id_t,
                         pre_cr $ __termina_task__init @@ [
                             taskId @: __termina_id_t,
                             taskPrio @: __termina_task_prio_t,
@@ -192,8 +195,8 @@ genInitEmitters progArchitecture = do
 -- Init task.  The function initializes the mutexes. The function is called AFTER
 -- the execution of the init handler (if any) and before the initialization of the
 -- resource locking mechanism.
-genInitMutexes :: M.Map Identifier OSALResourceLock -> CGenerator CFileItem
-genInitMutexes mutexes = do
+genInitMutexes :: TerminaProgArch SemanticAnn -> M.Map Identifier OSALResourceLock -> CGenerator CFileItem
+genInitMutexes progArchitecture mutexes = do
     let mutexesList = M.toList mutexes
     initMutexes <- mapM genOSALMutexInit mutexesList
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ _Status)] @-> void $
@@ -205,9 +208,16 @@ genInitMutexes mutexes = do
         genOSALMutexInit :: (Identifier, OSALResourceLock) -> CGenerator CCompoundBlockItem
         genOSALMutexInit (identifier, OSALResourceLockMutex ceilingPriority) = do
             mutexId <- genDefineMutexIdLabel identifier
+            resourceCls <- case M.lookup identifier (resources progArchitecture) of
+                Just (TPResource _ cls _ _ _) -> return cls
+                Nothing -> case M.lookup identifier (pools progArchitecture) of
+                    Just _ -> return pool
+                    _ -> throwError $ InternalError $ "Invalid resource: " ++ show identifier
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
                     $ trail_cr . block $ [
+                        pre_cr $ identifier @: typeDef resourceCls @. namefy "mutex_id" @: __termina_id_t
+                            @= mutexId @: __termina_id_t,
                         pre_cr $ __termina_mutex__init @@ [
                             mutexId @: __termina_id_t,
                             "__TerminaMutexPolicy__Ceiling" @: enumFieldType,
@@ -239,6 +249,35 @@ genChannelConnections progArchitecture = do
                         @= channelMsgQueueId @: __termina_id_t,
                     no_cr $ channelName @: __termina_msg_queue_t @. "port_id" @: __termina_id_t
                         @= portVariant @: __termina_id_t
+                ]
+
+genInitPools :: [TPPool a] -> CGenerator CFileItem
+genInitPools pls = do
+    initPools <- mapM genPoolInit pls
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ _Status)] @-> void $
+            trail_cr . block $
+                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                : initPools
+
+    where
+
+        genPoolInit :: TPPool a -> CGenerator CCompoundBlockItem
+        genPoolInit (TPPool identifier ts _ _ _) = do
+            cTs <- genType noqual ts
+            poolId <- genDefinePoolIdLabel identifier
+            return $
+                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                    $ trail_cr . block $ [
+                        pre_cr $ identifier @: __termina_pool_t @. namefy "pool_id" @: __termina_id_t
+                            @= poolId @: __termina_id_t,
+                        pre_cr $ __termina_pool__init @@
+                                [
+                                    addrOf (identifier @: ptr __termina_pool_t),
+                                    cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
+                                    _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
+                                    _sizeOfType cTs,
+                                    "status" @: (_const . ptr $ _Status)
+                                ]
                 ]
 
 genInitMessageQueues :: [OSALMsgQueue] -> CGenerator CFileItem
@@ -539,6 +578,12 @@ genAppInit progArchitecture = do
                 -- This function cannot fail, so we do not check the status.
                 pre_cr $ __termina_app__init_globals @@ [],
                 pre_cr $ __termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ _Status)]
+            ] ++
+            [
+                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                        $ trail_cr . block $ [ 
+                            pre_cr $ __termina_app__init_pools @@ ["status" @: (_const . ptr $ _Status)]
+                        ]
             ] ++ ([pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
                         $ trail_cr . block $ [
                             pre_cr $ __termina_app__initial_event @@ ["status" @: (_const . ptr $ _Status)]
@@ -582,7 +627,8 @@ genMainFile mName progArchitecture = do
 
     initTasks <- genInitTasks progArchitecture
     initEmitters <- genInitEmitters progArchitecture
-    initMutexes <- genInitMutexes mutexes
+    initPools <- genInitPools (M.elems $ pools progArchitecture)
+    initMutexes <- genInitMutexes progArchitecture mutexes
     initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ channelMessageQueues)
 
     channelConnections <- genChannelConnections progArchitecture
@@ -604,7 +650,7 @@ genMainFile mName progArchitecture = do
         ] 
         ++ cAtomicDeclarations ++ cAtomicArrayDeclarations
         ++ cPoolMemoryAreas
-        ++ [initTasks, initEmitters, initMutexes, initMessageQueues,
+        ++ [initTasks, initEmitters, initMutexes, initPools, initMessageQueues,
             enableProtection, channelConnections] ++ initialEventFunction
         ++ [appInit]
 
