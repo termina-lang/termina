@@ -41,8 +41,8 @@ genMakefile params bbProject =
         MakeBlock [
             MVariable MAppend "OBJS" [MFunction "patsubst"
                 [MFragment "%.c", MFragment "%.o", MFunction "patsubst"
-                    [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(SRCS)"]]]],
-            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(OSAL_SRCS)"]]]
+                    [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]],
+            MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]]
         ],
         MakeBlock [
             MVariable MAppend "CPPFLAGS" [MFunction "patsubst" [MFragment "%", MFragment "-I %", MFragment "$(INCLUDE_DIRS)"]]
@@ -71,9 +71,9 @@ genMakefile params bbProject =
                 MakeCommand False [MFragment "@echo Cleaning up"],
                 MakeCommand False [MFragment "@$(RM) $(OBJS) $(DEPS) $(TARGET)"]
             ],
-            MRule "dist-clean" [] [
+            MRule "dist-clean" ["clean"] [
                 MakeCommand False [MFragment "@echo Mr. Proper is cleaning up"],
-                MakeCommand False [MFragment "@$(RM) $(TARGET_DIR_NAME)"]
+                MakeCommand False [MFragment "@$(RM) -rf $(TARGET_DIR_NAME)"]
             ],
             MInclude False "$(DEPS)"
         ]

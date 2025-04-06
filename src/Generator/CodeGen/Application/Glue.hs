@@ -106,7 +106,7 @@ genInitEmitters progArchitecture = do
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                     @= "__TerminaEmitterConnectionType__Task" @: enumFieldType,
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
-                                    @. "task_msgq_id" @: __termina_id_t @= taskMsgQueueId @: __termina_id_t,
+                                    @. "task_msg_queue_id" @: __termina_id_t @= taskMsgQueueId @: __termina_id_t,
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_msgq_id" @: __termina_id_t @= sinkMsgQueueId @:  __termina_id_t,
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
@@ -157,7 +157,7 @@ genInitEmitters progArchitecture = do
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                     @= "__TerminaEmitterConnectionType__Task" @: enumFieldType,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
-                                    @. "task_msgq_id" @: __termina_id_t @= namefy targetEntity <::> "msg_queue_id" @: __termina_id_t,
+                                    @. "task_msg_queue_id" @: __termina_id_t @= namefy targetEntity <::> "msg_queue_id" @: __termina_id_t,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_msgq_id" @: __termina_id_t @= namefy targetEntity <::> targetPort  @:  __termina_id_t,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
