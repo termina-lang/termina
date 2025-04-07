@@ -46,7 +46,6 @@ getMemberField loc obj_ty ident =
       \case {
         -- Or a class
         LocatedElement (Class _clsKind _identTy cls _implements _mods) clsLoc ->
-          -- TODO Class access?
           -- Find |ident| field in the class.
           case findClassField ident cls of
             Nothing -> throwError $ annotateError loc (EMemberAccessUnknownField (dident, clsLoc) ident)
@@ -400,9 +399,12 @@ typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pa
           EMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           EAssignmentExprMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           _ -> throwError err)) exprs
+      {--
+      TODO: This should be done later, when we know in all cases the size of the array.
       size_value <- getIntSize pann arrsize
       unless (length typed_exprs == fromIntegral size_value)
         (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
+      --}
       return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts arrsize))
     ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
@@ -418,9 +420,12 @@ typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = 
 -- | TArray Initialization
   case expectedType of
     TArray TChar arrsize -> do
+      {--
+      -- TODO: This should be done later, when we know in all cases the size of the array.
       let stringSize = fromIntegral (length value)
-      arraySize <- getIntSize pann arrsize
-      unless (stringSize == arraySize) (throwError $ annotateError pann (EStringInitializerSizeMismatch arraySize stringSize))
+      size_value <- getIntSize pann arrsize
+      unless (stringSize == size_value) (throwError $ annotateError pann (EStringInitializerSizeMismatch size_value stringSize))
+      --}
       return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar arrsize))
     ty -> throwError $ annotateError pann (EStringInitializerNotArrayOfChars ty)
 typeAssignmentExpression expectedType typeObj expr = do

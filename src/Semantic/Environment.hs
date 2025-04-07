@@ -15,11 +15,6 @@ type GlobalEnv = M.Map Identifier (LocatedElement (GEntry SemanticAnn))
 -- variables to their type
 type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType))
 
--- This may seem a bad decision, but each envornment represent something
--- different.
--- TODO We can use empty types to disable envirnoments and make Haskell do part
--- of our work.
-
 -- | Environment required to type expression packed into just one type.
 data Environment
  = ExprST

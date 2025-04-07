@@ -219,6 +219,7 @@ typeSpecifierParser =
   <|> inPortParser
   <|> outPortParser
   <|> accessPortParser
+  <|> constSubtypeParser
   <|> (reserved "u8" >> return TSUInt8)
   <|> (reserved "u16" >> return TSUInt16)
   <|> (reserved "u32" >> return TSUInt32)
@@ -348,6 +349,9 @@ sinkPortParser = do
 
 accessPortParser :: Parser TypeSpecifier
 accessPortParser = reservedOp "access" >> TSAccessPort <$> typeSpecifierParser
+
+constSubtypeParser :: Parser TypeSpecifier
+constSubtypeParser = reservedOp "const" >> TSConstSubtype <$> typeSpecifierParser
 
 outPortParser :: Parser TypeSpecifier
 outPortParser = reservedOp "out" >> TSOutPort <$> typeSpecifierParser

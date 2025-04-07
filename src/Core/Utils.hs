@@ -98,6 +98,7 @@ parameterTy (TReference _ (TOption (TBoxSubtype _))) = False
 parameterTy (TReference {}) = True
 parameterTy (TOption (TBoxSubtype _)) = False
 parameterTy (TOption ty)      = optionTy ty
+parameterTy (TConstSubtype ty) = constTy ty
 parameterTy _                = False
 
 procedureParamTy :: TerminaType -> Bool
@@ -117,6 +118,7 @@ procedureParamTy (TEnum _)         = True
 procedureParamTy (TReference _ ty) = refTy ty
 procedureParamTy (TOption ty)      = optionTy ty
 procedureParamTy (TBoxSubtype ty)  = boxTy ty
+procedureParamTy (TConstSubtype ty) = constTy ty
 procedureParamTy _                 = False
 
 actionParamTy :: TerminaType -> Bool
@@ -134,6 +136,7 @@ actionParamTy TChar            = True
 actionParamTy (TStruct _)      = True
 actionParamTy (TEnum _)        = True
 actionParamTy (TBoxSubtype ty) = boxTy ty
+actionParamTy (TConstSubtype ty) = constTy ty
 actionParamTy _                = False
 
 classFieldTy :: TerminaType -> Bool
@@ -141,7 +144,7 @@ classFieldTy (TSinkPort {})    = True
 classFieldTy (TInPort {})      = True
 classFieldTy (TOutPort {})     = True
 classFieldTy (TAccessPort {})  = True
-classFieldTy (TFixedLocation _)     = True
+classFieldTy (TFixedLocation _) = True
 classFieldTy ty                = fieldTy ty
 
 fieldTy :: TerminaType -> Bool

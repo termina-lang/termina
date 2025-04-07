@@ -38,15 +38,6 @@ import Data.Bifunctor
 import qualified Data.Map as M
 import Semantic.Environment
 
-----------------------------------------
--- Programs Semantic Analyzer
--- For now all are kinda the same thing but eventually they should not :shrug:
-----------------------------------------
-
--- Keeping only type information
--- TODO Check ident is not defined?
-
--- Here we actually only need Global
 typeElement :: AnnASTElement ParserAnn
   -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do

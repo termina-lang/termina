@@ -80,6 +80,7 @@ data TypeSpecifier
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
   | TSBool | TSChar 
+  | TSConstSubtype TypeSpecifier
   | TSDefinedType Identifier [TypeParameter]
   | TSArray TypeSpecifier Size
   -- Non-primitive types

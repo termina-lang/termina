@@ -66,6 +66,7 @@ instance ShowText TypeSpecifier where
     showText TSUSize = "usize"
     showText TSBool = "bool"
     showText TSChar = "char"
+    showText (TSConstSubtype ts) = "const " <> showText ts
     showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TSBoxSubtype ts) = "box " <> showText ts
     showText (TSLocation ts) = "loc " <> showText ts

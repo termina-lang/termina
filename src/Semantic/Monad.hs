@@ -457,6 +457,8 @@ typeTypeSpecifier loc (TSInPort ty action) =
   TInPort <$> typeTypeSpecifier loc ty <*> pure action
 typeTypeSpecifier loc (TSOutPort ty) = 
   TOutPort <$> typeTypeSpecifier loc ty
+typeTypeSpecifier loc (TSConstSubtype ty) =
+  TConstSubtype <$> typeTypeSpecifier loc ty
 -- This is explicit just in case
 typeTypeSpecifier _ TSUInt8  = return TUInt8
 typeTypeSpecifier _ TSUInt16 = return TUInt16

@@ -201,10 +201,6 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
 typeTypeDefinition _ (Interface SystemInterface ident _ _ _ ) = throwError $ annotateError Internal (ESystemInterfaceDefinition ident)
 
 typeTypeDefinition ann (Class kind ident members provides mds_ts) =
-  -- See https://hackmd.io/@termina-lang/SkglB0mq3#Classes
-  -- check that it defines at least one method.
-  -- TODO: Check class well-formedness depending on its kind
-  -- TODO: Check the class procedures belong to a provided interface
   foldM
     (\(fs, prcs, mths, vws, acts) cl ->
         case cl of
