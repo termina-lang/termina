@@ -510,7 +510,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                 classIdType = typeDef classId
             return [
                     pre_cr $ var "current" _TimeVal,
-                    no_cr $ _System__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
+                    no_cr $ _SystemEntry__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                     -- Result result;
@@ -541,7 +541,7 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                 classIdType = typeDef classId
             return [
                     pre_cr $ var "current" _TimeVal,
-                    no_cr $ _System__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
+                    no_cr $ _SystemEntry__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
                     -- Result result;

@@ -291,7 +291,7 @@ emptyTerminaProgArch config = TerminaProgArch {
   handlers = M.empty,
   resourceClasses = M.empty,
   resources = if enableSystemPort config then M.fromList [
-    ("system", TPResource "system" "System" M.empty Nothing (LocatedElement (GTy (TGlobal ResourceClass "System")) Internal))
+    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty Nothing (LocatedElement (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
   ] else M.empty,
   pools = M.empty,
   atomics = M.empty,

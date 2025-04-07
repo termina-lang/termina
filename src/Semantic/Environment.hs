@@ -87,8 +87,8 @@ systemPortGlobalEnv =
     -- this approach could allow to have different implementations of the SystemAPI depending on the
     -- target platform.
     ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal),
-    ("System", LocatedElement (GType (Class ResourceClass "System" [] ["SystemAPI"] [])) Internal),
-    ("system", LocatedElement (GGlob (TGlobal ResourceClass "System")) Internal)
+    ("SystemEntry", LocatedElement (GType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] [])) Internal),
+    ("system", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
 makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
