@@ -215,6 +215,20 @@ boolTy :: TerminaType -> Bool
 boolTy TBool = True
 boolTy _    = False
 
+constTy :: TerminaType -> Bool
+constTy TUInt8           = True
+constTy TUInt16          = True
+constTy TUInt32          = True
+constTy TUInt64          = True
+constTy TInt8            = True
+constTy TInt16           = True
+constTy TInt32           = True
+constTy TInt64           = True
+constTy TUSize           = True
+constTy TBool            = True
+constTy TChar            = True
+constTy _                = False  
+
 -- | Predicate definining when a |TerminaType| is numeric.
 numTy :: TerminaType -> Bool
 numTy TUInt8  = True
@@ -325,6 +339,9 @@ sameTy  TUSize  TUSize = True
 sameTy  TBool  TBool = True
 sameTy  TUnit TUnit = True
 sameTy  TChar TChar = True
+sameTy  (TConstSubtype tyspecl) (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
+sameTy  (TConstSubtype tyspecl) tyspecr = sameTy tyspecl tyspecr
+sameTy  tyspecl (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TOption _) (TOption TUnit) = True
 sameTy  (TOption TUnit) (TOption _) = True
 sameTy  (TOption tyspecl) (TOption tyspecr) = sameTy tyspecl tyspecr

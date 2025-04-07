@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Utils.Errors where
 
@@ -79,6 +80,7 @@ instance ShowText TypeSpecifier where
 
 
 instance ShowText TerminaType where
+    showText :: TerminaType -> T.Text
     showText TUInt8 = "u8"
     showText TUInt16 = "u16"
     showText TUInt32 = "u32"
@@ -90,6 +92,7 @@ instance ShowText TerminaType where
     showText TUSize = "usize"
     showText TBool = "bool"
     showText TChar = "char"
+    showText (TConstSubtype ts) = "const " <> showText ts
     showText (TStruct ident) = T.pack ident
     showText (TEnum ident) = T.pack ident
     showText (TInterface _ ident) = T.pack ident

@@ -117,6 +117,7 @@ data TerminaType
   -- Non-primitive types
   | TReference AccessKind TerminaType
   | TBoxSubtype TerminaType
+  | TConstSubtype TerminaType
   -- | Fixed-location types
   | TFixedLocation TerminaType
   -- | Port types

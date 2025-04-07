@@ -102,6 +102,9 @@ checkTerminaType loc (TAtomicArray ty s) =
   checkTerminaType loc ty >>
   catchExpectedNum loc EAtomicArrayInvalidType (numTyOrFail loc ty) >>
   checkSize loc s
+checkTerminaType loc (TConstSubtype ty) =
+  checkTerminaType loc ty >>
+  constTyOrFail loc ty
 -- The rest of the types are always well defined, since they were
 -- constructed using the |typeTypeSpecifier| function.
 checkTerminaType _ _ = return ()

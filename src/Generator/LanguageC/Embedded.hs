@@ -2,6 +2,7 @@
 {-# HLINT ignore "Use camelCase" #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 module Generator.LanguageC.Embedded (
     (@:), (@$$), (@.),
     (@=), (@:=), (@@),
@@ -16,7 +17,7 @@ module Generator.LanguageC.Embedded (
     dec, indent, trail_cr, pre_cr, no_cr,
     block, var, field, struct, _const,
     function, static_function,
-    global, static_global,
+    global, static_global, extern,
     _if, _if_else, _break, _switch, _case, 
     _for, _for_let, _default, _return,
     _sizeOfType, _sizeOfExpr,
@@ -494,9 +495,33 @@ function, static_function :: Ident -> [Declaration] -> FunctionPrototype
 function = FunctionPrototype
 static_function = StaticFunctionPrototype
 
-global, static_global :: Ident -> CType -> CFileItem
-global ident cType = CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just ident) Nothing)) (internalAnn (CDeclarationAnn False))
-static_global ident cType = CExtDecl (CEDVariable (Just CStatic) (CDecl (CTypeSpec cType) (Just ident) Nothing)) (internalAnn (CDeclarationAnn False))
+class GlobalDecl a where
+    global :: a -> CFileItem
+    static_global :: a -> CFileItem
+    extern :: a -> CFileItem
+
+instance GlobalDecl Declaration where
+    global (Declaration ident ts) =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable Nothing (CDecl ts (Just ident) Nothing)) declAnn
+    static_global (Declaration ident ts) =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable (Just CStatic) (CDecl ts (Just ident) Nothing)) declAnn
+    extern (Declaration ident ts) =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable (Just CExtern) (CDecl ts (Just ident) Nothing)) declAnn
+
+instance GlobalDecl CDeclaration where
+    global :: CDeclaration -> CFileItem
+    global decl =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable Nothing decl) declAnn
+    static_global decl =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable (Just CStatic) decl) declAnn
+    extern decl =
+        let declAnn = internalAnn (CDeclarationAnn False) in
+        CExtDecl (CEDVariable (Just CExtern) decl) declAnn
 
 data Function = Function FunctionDeclaration CStatement
     deriving Show

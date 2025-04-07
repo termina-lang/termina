@@ -227,6 +227,7 @@ data Error
   | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer (SE-178)
   | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch (SE-179)
   | EStringInitializerNotArrayOfChars TerminaType -- ^ Assignment of a string array initializer to an invalid type (SE-180)
+  | EExpectedConstType TerminaType -- ^ Invalid type for constant (SE-181)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -413,6 +414,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
     errorIdent (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-179"
     errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
+    errorIdent (AnnotatedError (EExpectedConstType _ty) _pos) = "SE-181"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -595,6 +597,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
     errorTitle (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "string initializer size mismatch"
     errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
+    errorTitle (AnnotatedError (EExpectedConstType _ty) _pos) = "invalid type for constant"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -1959,6 +1962,11 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Invalid use of a string initializer.\n" <>
                             "You are trying to assign a string initializer to an object of type \x1b[31m" <>
                             showText ty <> "\x1b[0m."))
+                EExpectedConstType ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>
+                               "Only numeric types, boolean and character types are valid for constants."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

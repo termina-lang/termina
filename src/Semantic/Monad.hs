@@ -342,6 +342,9 @@ copyTyOrFail pann ty = unless (copyTy ty) (throwError (annotateError pann (EExpe
 numTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 numTyOrFail pann ty = unless (numTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
 
+constTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EExpectedConstType ty)))
+
 optionTyOrFail :: Location -> TerminaType -> SemanticMonad ()
 optionTyOrFail pann ty = unless (optionTy ty) (throwError (annotateError pann (EInvalidOptionType ty)))
 

@@ -121,7 +121,7 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
       return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidChannelType ty)
 typeGlobal (Const ident ts expr mods anns) = do
-  ty <- typeTypeSpecifier anns ts
+  ty <- TConstSubtype <$> typeTypeSpecifier anns ts
   checkTerminaType anns ty
   typed_expr <- typeConstExpression ty expr
   value <- evalConstExpression ty expr

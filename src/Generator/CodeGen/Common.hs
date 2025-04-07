@@ -241,6 +241,8 @@ genType _qual (TOption ts) = do
 -- Non-primitive types:
 -- | Box subtype
 genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
+-- | Const subtype
+genType _qual (TConstSubtype ty) = genType constqual ty
 -- | TPool type
 genType _qual (TPool _ _) = return (CTTypeDef pool noqual)
 genType _qual (TMsgQueue _ _) = return (CTTypeDef msgQueue noqual)

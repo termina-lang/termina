@@ -109,11 +109,11 @@ genPoolMemoryArea :: Bool -> TPPool a -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     cSize <- genArraySize size
     cType <- genType noqual ts
-    let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
+    let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
     if before then 
-        return $ pre_cr $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
+        return $ pre_cr $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
     else
-        return $ static_global (poolMemoryArea identifier) (CTArray uint8_t poolSize)
+        return $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
 
 genPoolMemoryAreas :: [TPPool a] -> CGenerator [CFileItem]
 genPoolMemoryAreas [] = return []
