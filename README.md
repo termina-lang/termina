@@ -2,7 +2,7 @@
 
 Termina is a domain-specific language for real-time embedded systems aimed at simplifying their implementation and reducing validation and verification costs.
 
-This repository contains the implementation of a transpiler from Termina to C. The generated code is supported on a [runtime](https://github.com/termina-lang/termina-runtime) that in turn runs on a real-time operating system. 
+This repository contains the implementation of a transpiler from Termina to C. The generated code is supported on an [operating system abstraction layer](https://github.com/termina-lang/termina-osal). This layer is responsible for adapting the generated code for different real-time operating systems.
 
 ## Main features
 
@@ -24,7 +24,7 @@ The main source of documentation of this project is the [Termina book](https://t
 
 The current status of the project is as follows:
 
-- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by a Termina runtime that can be found in its [repository](https://github.com/termina-lang/termina-runtime).
+- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by the Termina OSAL that can be found in its [repository](https://github.com/termina-lang/termina-osal).
 - The transpiler incorporates a type checker and a fully functional semantic parser capable of detecting errors and generating meaningful error messages.
 - The transpiler implements a simple Language Server Protocol (LSP) server that can be used by different integrated development environments.
 
