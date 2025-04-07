@@ -71,6 +71,7 @@ data Expression'
     [Expression' ty obj a] -- ^ list of expressions
     a
   | OptionVariantInitializer (OptionVariant (Expression' ty obj a)) a
+  | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
     (obj a) -- ^ Enum object
     Identifier -- ^ Enum identifier
@@ -109,6 +110,7 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   getAnnotation (ArrayInitializer _ _ a)          = a
   getAnnotation (ArrayExprListInitializer _ a)    = a
   getAnnotation (OptionVariantInitializer _ a)    = a
+  getAnnotation (StringInitializer _ a)           = a
   getAnnotation (MemberFunctionCall _ _ _ a)      = a
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
@@ -125,6 +127,7 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   updateAnnotation (ArrayInitializer e s _)       = ArrayInitializer e s
   updateAnnotation (ArrayExprListInitializer es _) = ArrayExprListInitializer es
   updateAnnotation (OptionVariantInitializer v _) = OptionVariantInitializer v
+  updateAnnotation (StringInitializer s _)        = StringInitializer s
   updateAnnotation (MemberFunctionCall obj f args _) = MemberFunctionCall obj f args
   updateAnnotation (DerefMemberFunctionCall obj f args _) = DerefMemberFunctionCall obj f args
   updateAnnotation (IsEnumVariantExpression obj e v _) = IsEnumVariantExpression obj e v

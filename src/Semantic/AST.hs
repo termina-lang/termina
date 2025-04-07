@@ -60,6 +60,7 @@ data Expression'
     [Expression' ty obj a] -- ^ list of expressions
     a
   | OptionVariantInitializer (OptionVariant (Expression' ty obj a)) a
+  | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
     (obj a) -- ^ Enum object
     Identifier -- ^ Enum identifier
@@ -105,6 +106,7 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
   getAnnotation (IsOptionVariantExpression _ _ a) = a
   getAnnotation (ArraySliceExpression _ _ _ _ a)    = a
+  getAnnotation (StringInitializer _ a) = a
 
   updateAnnotation (AccessObject obj) = AccessObject . updateAnnotation obj
   updateAnnotation (Constant c _) = Constant c
@@ -122,6 +124,7 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   updateAnnotation (IsEnumVariantExpression obj id1 id2 _) = IsEnumVariantExpression obj id1 id2
   updateAnnotation (IsOptionVariantExpression obj v _) = IsOptionVariantExpression obj v
   updateAnnotation (ArraySliceExpression ak obj e1 e2 _) = ArraySliceExpression ak obj e1 e2
+  updateAnnotation (StringInitializer s _) = StringInitializer s
 
 
 data MatchCase' ty expr obj a = MatchCase

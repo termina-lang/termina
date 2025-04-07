@@ -224,6 +224,9 @@ data Error
   | EResourceDuplicatedProvidedIface Identifier -- ^ Duplicated provided interface (SE-175)
   | EResourceDuplicatedProvidedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in provided interfaces (SE-176)
   | EResourceInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface (SE-177)
+  | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer (SE-178)
+  | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch (SE-179)
+  | EStringInitializerNotArrayOfChars TerminaType -- ^ Assignment of a string array initializer to an invalid type (SE-180)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -407,6 +410,9 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "SE-175"
     errorIdent (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "SE-176"
     errorIdent (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-177"
+    errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
+    errorIdent (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-179"
+    errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -586,6 +592,9 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EResourceDuplicatedProvidedIface _iface) _pos) = "resource provides the same interface multiple times"
     errorTitle (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in provided interfaces"
     errorTitle (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
+    errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
+    errorTitle (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "string initializer size mismatch"
+    errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -1934,6 +1943,22 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Interface \x1b[31m" <> T.pack iface1 <> "\x1b[0m is previously extended by interface \x1b[31m" <> T.pack iface2 <> "\x1b[0m."))
+                EStringInitializerInvalidUse ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just $ "You are trying to use a string initializer in an invalid context.\n" <>
+                                "String initializers can only be used to initialize arrays of characters.")
+                EStringInitializerSizeMismatch expectedSize initializerSize ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The size of the string initializer is \x1b[31m" <> T.pack (show initializerSize) <>
+                            "\x1b[0m but the array size is of \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
+                EStringInitializerNotArrayOfChars ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid use of a string initializer.\n" <>
+                            "You are trying to assign a string initializer to an object of type \x1b[31m" <>
+                            showText ty <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

@@ -456,6 +456,7 @@ expressionParser = try optionVariantExprParser
   <|> arrayInitializerParser
   <|> referenceExprParser
   <|> structInitializerParser
+  <|> stringInitializerParser
   <|> expressionParser'
 
 mutableReferenceExprParser :: Parser (Expression ParserAnn)
@@ -637,6 +638,12 @@ arrayInitializerParser = do
   size <- sizeParser
   _ <- reservedOp "]"
   ArrayInitializer value size . Position startPos <$> getPosition
+
+stringInitializerParser :: Parser (Expression ParserAnn)
+stringInitializerParser = do
+  startPos <- getPosition
+  value <- stringLit
+  StringInitializer value . Position startPos <$> getPosition
 
 arrayExprListInitializerParser :: Parser (Expression ParserAnn)
 arrayExprListInitializerParser = do

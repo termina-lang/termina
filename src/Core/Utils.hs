@@ -324,6 +324,7 @@ sameTy  TInt64  TInt64 = True
 sameTy  TUSize  TUSize = True
 sameTy  TBool  TBool = True
 sameTy  TUnit TUnit = True
+sameTy  TChar TChar = True
 sameTy  (TOption _) (TOption TUnit) = True
 sameTy  (TOption TUnit) (TOption _) = True
 sameTy  (TOption tyspecl) (TOption tyspecr) = sameTy tyspecl tyspecr

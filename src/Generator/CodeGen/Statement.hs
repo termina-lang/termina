@@ -37,6 +37,28 @@ genEnumInitialization before level cObj expr = do
                 return $ no_cr (variantsFieldsObj @= variantExpr |>> location ann) |>> location ann : concat cParams
         _ -> error "Incorrect expression"
 
+genStringInitialization ::
+    -- | Prepend a line to the initialization expression 
+    Bool
+    -> Integer
+    -> CObject
+    -> String 
+    -> CGenerator [CCompoundBlockItem]
+genStringInitialization before level cObj value = do
+    genStringItemsInitialization before level 0 value
+    
+    where 
+
+        genStringItemsInitialization :: Bool -> Integer -> Integer -> String -> CGenerator [CCompoundBlockItem]
+        genStringItemsInitialization _before _level _idx [] = return []
+        genStringItemsInitialization before' level' idx (x:xs) = do
+            rest <- genStringItemsInitialization False level' (idx + 1) xs
+            let current = cObj @$$ (dec idx @: size_t) @: char @= x @: char 
+            if before' then
+                return $ pre_cr current : rest
+            else
+                return $ no_cr current : rest
+
 genOptionInitialization ::
     Bool
     -> Integer
@@ -90,6 +112,8 @@ genArrayInitialization before level cObj expr = do
                 return [no_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
         (ArrayExprListInitializer exprs _ann) ->
             genArrayItemsInitialization before level 0 exprs
+        (StringInitializer value _ann) ->
+            genStringInitialization before level cObj value
         (StructInitializer {}) -> genStructInitialization before level cObj expr
         (OptionVariantInitializer {}) -> genOptionInitialization before level cObj expr
         (EnumVariantInitializer {}) -> genEnumInitialization before level cObj expr
@@ -160,6 +184,8 @@ genFieldInitialization before level cObj fid expr = do
             genOptionInitialization before level cFieldObj expr
         ArrayInitializer {} ->
             genArrayInitialization before level cFieldObj expr
+        StringInitializer value _ ->
+            genStringInitialization before level cFieldObj value
         ArrayExprListInitializer {} ->
             genArrayInitialization before level cFieldObj expr
         EnumVariantInitializer {} ->

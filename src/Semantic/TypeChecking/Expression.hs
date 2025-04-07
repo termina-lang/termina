@@ -414,6 +414,15 @@ typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp ann
           typed_e <- typeExpression (Just ts) typeObj e
           return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (TOption ts))
     _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
+typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = do
+-- | TArray Initialization
+  case expectedType of
+    TArray TChar arrsize -> do
+      let stringSize = fromIntegral (length value)
+      arraySize <- getIntSize pann arrsize
+      unless (stringSize == arraySize) (throwError $ annotateError pann (EStringInitializerSizeMismatch arraySize stringSize))
+      return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar arrsize))
+    ty -> throwError $ annotateError pann (EStringInitializerNotArrayOfChars ty)
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr
   typed_expr <- catchMismatch (getAnnotation expr) (EAssignmentExprMismatch expectedType) (typeExpression (Just expectedType) typeObj expr)
@@ -748,6 +757,7 @@ typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann
 typeExpression _ _ (ArrayExprListInitializer _ pann) = throwError $ annotateError pann EArrayExprListInitializerInvalidUse
 typeExpression _ _ (OptionVariantInitializer _ pann) = throwError $ annotateError pann EOptionVariantInitializerInvalidUse
 typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateError pann EEnumVariantInitializerInvalidUse
+typeExpression _ _ (StringInitializer _ pann) = throwError $ annotateError pann EStringInitializerInvalidUse
 
 typeFieldAssignment
   :: Location -> (TerminaType, Location)

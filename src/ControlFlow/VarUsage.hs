@@ -109,6 +109,8 @@ useExpression (OptionVariantInitializer opt _ann)
         Some e -> useExpression e
 useExpression (FunctionCall _ident args _ann)
   = mapM_ useArguments args
+useExpression (StringInitializer _str _a)
+  = return ()
 
 useDefBlockRet :: Block SemanticAnn -> UDM VarUsageError ()
 useDefBlockRet bret = useDefBasicBlocks (blockBody bret)

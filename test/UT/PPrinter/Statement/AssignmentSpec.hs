@@ -115,6 +115,12 @@ option0Assign, option1Assign :: Statement SemanticAnn
 option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32ExprSemAnn) stmtSemAnn
 option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
+str0 :: Object SemanticAnn
+str0 = Variable "str0" (objSemAnn Mutable (TArray TChar (K (TInteger 12 DecRepr))))
+
+str0Assign :: Statement SemanticAnn
+str0Assign = AssignmentStmt str0 (StringInitializer "Hello world!" (arrayExprSemAnn TUInt32 (K (TInteger 12 DecRepr)))) stmtSemAnn
+
 spec :: Spec
 spec = do
   describe "Pretty printing integer variable declarations" $ do
@@ -205,6 +211,21 @@ spec = do
           "    }\n" ++
           "    array6[__i0].field1.field_c = 4294901760U;\n" ++
           "}")
+    it "Prints the statement str = \"Hello world!\"" $ do
+      renderStatement str0Assign `shouldBe`
+        pack (
+          "\nstr0[0U] = 'H';\n" ++
+          "str0[1U] = 'e';\n" ++
+          "str0[2U] = 'l';\n" ++
+          "str0[3U] = 'l';\n" ++
+          "str0[4U] = 'o';\n" ++
+          "str0[5U] = ' ';\n" ++
+          "str0[6U] = 'w';\n" ++
+          "str0[7U] = 'o';\n" ++
+          "str0[8U] = 'r';\n" ++
+          "str0[9U] = 'l';\n" ++
+          "str0[10U] = 'd';\n" ++
+          "str0[11U] = '!';")
   describe "Pretty printing unbox assignments" $ do
     it "Prints the statement box_var0 = foo1" $ do
       renderStatement unboxVar0AssignFoo1 `shouldBe`
