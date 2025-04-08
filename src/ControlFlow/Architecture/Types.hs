@@ -10,6 +10,13 @@ import Utils.Annotations
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
 
+data TPClassMemberFunction a = TPClassMemberFunction
+    Identifier -- ^ name of the member function
+    [Parameter' TerminaType] -- ^ list of parameters (possibly empty)
+    (Maybe TerminaType) -- ^ return type of the membber function
+    (Block a) -- ^ statements block
+    a -- ^ annotations
+  deriving Show
 
 data TPClass a = TPClass {
 
@@ -20,8 +27,8 @@ data TPClass a = TPClass {
     -- It can be either a task, a handler, or a resource
     classKind :: ClassKind,
     
-    -- | Class type definition
-    classTypeDef :: TypeDef a,
+    -- | Class member functions
+    classMemberFunctions :: M.Map Identifier (TPClassMemberFunction a),
 
     -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
@@ -227,7 +234,41 @@ instance Annotated TPPool where
   getAnnotation (TPPool _ _ _ _ a) = a
   updateAnnotation (TPPool i t s m _) = TPPool i t s m
 
+data TPFunction a = TPFunction {
+
+    -- | Name of the function
+    functionName :: Identifier,
+
+    -- | Map of the output ports of the function
+    -- It maps the name of the port to the type of the data that is sent through
+    -- the port.
+    functionDefinition :: AnnASTElement a
+
+} deriving Show
+
+data TPGlobalConstant a = TPGlobalConstant {
+
+    -- | Name of the global constant
+    constantName :: Identifier,
+
+    -- | Type of the global constant
+    constantType :: TerminaType,
+
+    -- | Value of the global constant
+    constantValue :: Const,
+
+    -- | Annotations associated with the global constant
+    constantAnn :: a
+
+} deriving Show
+
 data TerminaProgArch a = TerminaProgArch {
+
+    -- | Map of all the functions in the program
+    functions :: Map Identifier (TPFunction a),
+
+    -- | Map of all the global constants in the program
+    globalConstants :: Map Identifier (TPGlobalConstant a),
 
     -- Map of all the event emitters in the program
     emitters :: Map Identifier (TPEmitter a),

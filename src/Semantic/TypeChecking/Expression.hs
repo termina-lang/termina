@@ -384,11 +384,13 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
 typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
 -- | TArray Initialization
   case expectedType of
-    TArray ts arrsize -> do
+    TArray ts _ -> do
       -- | We do not need to catch any error, since it will be correctly handler
       -- by the recursive call to |typeAssignmentExpression|
       typed_init <- typeAssignmentExpression ts typeObj iexp
-      unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
+      -- TODO: This should be done later, when we know in all cases the size of the array.
+      -- We should check the size of the array when we are performing the const propagation.
+      -- unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
       return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (TArray ts size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
@@ -400,7 +402,8 @@ typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pa
           EAssignmentExprMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           _ -> throwError err)) exprs
       {--
-      TODO: This should be done later, when we know in all cases the size of the array.
+      -- TODO: This should be done later, when we know in all cases the size of the array.
+      -- We should check the size of the array when we are performing the const propagation.
       size_value <- getIntSize pann arrsize
       unless (length typed_exprs == fromIntegral size_value)
         (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
@@ -419,14 +422,15 @@ typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp ann
 typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = do
 -- | TArray Initialization
   case expectedType of
-    TArray TChar arrsize -> do
+    TArray TChar _ -> do
       {--
       -- TODO: This should be done later, when we know in all cases the size of the array.
+      -- We should check the size of the array when we are performing the const propagation.
       let stringSize = fromIntegral (length value)
       size_value <- getIntSize pann arrsize
       unless (stringSize == size_value) (throwError $ annotateError pann (EStringInitializerSizeMismatch size_value stringSize))
       --}
-      return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar arrsize))
+      return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar (K (TInteger (fromIntegral $ length value) DecRepr))))
     ty -> throwError $ annotateError pann (EStringInitializerNotArrayOfChars ty)
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr

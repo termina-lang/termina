@@ -79,15 +79,11 @@ genVariantForPort ::
 genVariantForPort taskCls port = return $ namefy $ taskCls <::> port
 
 genVariantsForTaskPorts :: TPClass SemanticAnn -> CGenerator [CFileItem]
-genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
+genVariantsForTaskPorts tpClass@(TPClass classId _ _ _ _ _ _ _) =
     genDefineVariantsForPorts ports
     where
 
-        ports = foldr (\fld acc ->
-                        case fld of
-                            ClassField (FieldDefinition prt (TSinkPort {}) _) -> prt : acc
-                            ClassField (FieldDefinition prt (TInPort {}) _) -> prt : acc
-                            _ -> acc ) [] members
+        ports = M.keys (sinkPorts tpClass) ++ M.keys (inputPorts tpClass)
 
         genDefineVariantsForPorts :: [Identifier] -> CGenerator [CFileItem]
         genDefineVariantsForPorts [] = return []
@@ -102,8 +98,6 @@ genVariantsForTaskPorts (TPClass classId _ (Class _ _ members _ _) _ _ _ _ _) =
             rest <- genDefineVariantsForPorts' xs (value + 1)
             this_variant <- genVariantForPort classId port
             return $ _define this_variant (Just [show value]) : rest
-
-genVariantsForTaskPorts def = throwError $ InternalError $ "Definition not a class: " ++ show def
 
 genPoolMemoryArea :: Bool -> TPPool a -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do

@@ -30,6 +30,8 @@ data Error =
     | EUnboxingPeriodicEmitter -- ^ Error when trying to unbox a periodic emitter (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
     | EUnboxingFree -- ^ Error when trying to unbox a free (Internal)
+    | EUnboxingConstExpression -- ^ Invalid constant expression (Internal)
+    | EUnboxingConstExpressionValue -- ^ Error when trying to obtain the value of a constant expression (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
     | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-003)

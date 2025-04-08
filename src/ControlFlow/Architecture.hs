@@ -78,6 +78,7 @@ genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
       inPs = getInputPorts members
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
+      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
@@ -86,7 +87,7 @@ genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
     case runGetForwardingMap members of
       Left err -> throwError err
       Right m -> return m
-  let tskCls = TPClass ident TaskClass tydef inPs sinkPs outputPs outBoxMap forwardingMap
+  let tskCls = TPClass ident TaskClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
@@ -96,6 +97,7 @@ genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
       inPs = M.empty
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
+      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
@@ -104,29 +106,46 @@ genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
     case runGetForwardingMap members of
       Left err -> throwError err
       Right m -> return m
-  let hdlCls = TPClass ident HandlerClass tydef inPs sinkPs outputPs outBoxMap forwardingMap
+  let hdlCls = TPClass ident HandlerClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
 genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
-  let inPs = M.empty
+  let members = getClassMembers tydef
+      inPs = M.empty
       sinkPs = M.empty
       outputPs = M.empty
+      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
   -- | Resources do not have forwarding actions
-  let resCls = TPClass ident ResourceClass tydef inPs sinkPs outputPs outBoxMap M.empty
+  let resCls = TPClass ident ResourceClass memberFunctions inPs sinkPs outputPs outBoxMap M.empty
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
     }
 genArchTypeDef _ = return ()
 
+evalConstExpression :: Expression SemanticAnn -> ArchitectureMonad Const
+evalConstExpression (Constant value _ann) = do
+  return value 
+evalConstExpression (AccessObject (Variable identifier _ann)) = do
+  globals <- ST.gets globalConstants
+  case M.lookup identifier globals of
+    Just (TPGlobalConstant _ _ value _) -> return value
+    Nothing -> throwError $ annotateError Internal EUnboxingConstExpressionValue
+evalConstExpression _ = throwError $ annotateError Internal EUnboxingConstExpressionValue
+
 genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
-genArchGlobal _ (Const {}) = return ()
+genArchGlobal _ (Const identifier ty expr _ ann) = do
+  value <- evalConstExpression expr
+  ST.modify $ \tp ->
+    tp {
+      globalConstants = M.insert identifier (TPGlobalConstant identifier ty value ann) (globalConstants tp)
+    }
 genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
@@ -144,12 +163,12 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
     -- | Any other emitter class is not supported (this should not happen)
     _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
 genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitializer assignments _)) modifiers tann) = do
-  members <- ST.get >>= \tp -> return $ getClassMembers (classTypeDef $ fromJust (M.lookup tcls (taskClasses tp)))
+  tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup tcls (taskClasses tp))
   (inpConns, sinkConns, outpConns, apConns) <- foldM (\(inp, sink, outp, accp) assignment ->
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
-        case getPortType pname members of
-          TInPort {} -> do
+        case M.lookup pname (inputPorts tpClass) of
+          Just _ -> do
             connectedTargets <- channelTargets <$> ST.get
             -- | Check if the target channel is already connected to an in port
             case M.lookup target connectedTargets of
@@ -158,25 +177,27 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
-          TSinkPort {} -> do
-            connectedEmitters <- emitterTargets <$> ST.get
-            -- | Check if the target emmiter is already connected to a sink port
-            case M.lookup target connectedEmitters of
-              Nothing -> do
-                ST.modify $ \tp ->
-                  tp {
-                    emitterTargets = M.insert target (ident, pname, cann) connectedEmitters
-                  }
-                return (inp, M.insert pname (target, cann) sink, outp, accp)
-              Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
-          _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
+          Nothing -> 
+            case M.lookup pname (sinkPorts tpClass) of
+              Just _ -> do
+                connectedEmitters <- emitterTargets <$> ST.get
+                -- | Check if the target emmiter is already connected to a sink port
+                case M.lookup target connectedEmitters of
+                  Nothing -> do
+                    ST.modify $ \tp ->
+                      tp {
+                        emitterTargets = M.insert target (ident, pname, cann) connectedEmitters
+                      }
+                    return (inp, M.insert pname (target, cann) sink, outp, accp)
+                  Just (_, _, prevcann) ->
+                    throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
+              _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
-        case getPortType pname members of
-          TOutPort {} -> do
+        case M.lookup pname (outputPorts tpClass) of
+          Just _ -> do
             addChannelSource ident pname target cann
             return (inp, sink, M.insert pname (target, cann) outp, accp)
-          _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
+          Nothing -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann -> do
         addResourceSource target ident pname cann
         return (inp, sink, outp, M.insert pname (target, cann) accp)
@@ -228,15 +249,12 @@ genArchGlobal modName (Resource ident (TPool aty size) _ _ rann) =
     }
 genArchGlobal _ (Resource {}) = error "Internal error: invalid resource declaration"
 genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructInitializer assignments _)) modifiers hann) = do
-  members <- ST.get >>= \tp ->
-    case M.lookup hcls (handlerClasses tp) of
-      Nothing -> error $ "Handler class: " ++ hcls ++ " not found"
-      Just cls -> return $ getClassMembers (classTypeDef cls)
+  tpClass <- ST.get >>= \tp -> return $ fromJust (M.lookup hcls (handlerClasses tp))
   (sinkConn, outpConns, apConns) <- foldM (\(sink, outp, accp) assignment -> do
     case assignment of
       FieldPortConnection InboundPortConnection pname target cann ->
-        case getPortType pname members of
-          TSinkPort {} -> do
+        case M.lookup pname (sinkPorts tpClass) of
+          Just _ -> do
             connectedEmitters <- emitterTargets <$> ST.get
             -- | Check if the target emmiter is already connected to a sink port
             case M.lookup target connectedEmitters of
@@ -248,13 +266,13 @@ genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructIn
                 return (Just (pname, target, cann), outp, accp)
               Just (_, _, prevcann) ->
                 throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
-          _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
+          Nothing -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
-        case getPortType pname members of
-          TOutPort {} -> do
+        case M.lookup pname (outputPorts tpClass) of
+          Just _ -> do
             addChannelSource ident pname target cann
             return (sink, M.insert pname (target, cann) outp, accp)
-          _ -> error $ "Internal error: port " ++ pname ++ " is not an out port"
+          Nothing -> error $ "Internal error: port " ++ pname ++ " is not an out port"
       FieldPortConnection AccessPortConnection pname target cann  -> do
         addResourceSource target ident pname cann
         return (sink, outp, M.insert pname (target, cann) accp)
@@ -275,7 +293,11 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
-genArchElement _ (Function {}) = return ()
+genArchElement _ func@(Function identifier _ _ _ _ _) = 
+  ST.modify $ \tp ->
+    tp {
+      functions = M.insert identifier (TPFunction identifier func) (functions tp)
+    }
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
 genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 
@@ -284,6 +306,8 @@ emptyTerminaProgArch config = TerminaProgArch {
   emitters = if enableSystemInit config then M.fromList [
     ("system_init", TPSystemInitEmitter "system_init" (LocatedElement (GTy (TGlobal EmitterClass "SystemInit")) Internal))
   ] else M.empty,
+  functions = M.empty,
+  globalConstants = M.empty,
   emitterTargets = M.empty,
   taskClasses = M.empty,
   tasks = M.empty,

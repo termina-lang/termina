@@ -19,6 +19,20 @@ getEmitterIdentifier (TPInterruptEmittter ident _) = ident
 getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 
+getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPClassMemberFunction a)
+getMemberFunctions = foldl' (\acc member -> 
+  case member of
+    ClassMethod identifier mRetTy blk ann  -> 
+      M.insert identifier (TPClassMemberFunction identifier [] mRetTy blk ann)   acc
+    ClassProcedure identifier params blk ann -> 
+      M.insert identifier (TPClassMemberFunction identifier params Nothing blk ann) acc
+    ClassAction identifier param rty blk ann -> 
+      M.insert identifier (TPClassMemberFunction identifier [param] (Just rty) blk ann) acc
+    ClassViewer identifier params mRetTy blk ann -> 
+      M.insert identifier (TPClassMemberFunction identifier params mRetTy blk ann) acc
+    _ -> acc
+  ) M.empty
+
 getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
 getInputPorts = foldl' (\acc member -> 
   case member of
