@@ -35,7 +35,6 @@ import Semantic.TypeChecking.Global
 import Semantic.TypeChecking.TypeDefinition
 import Semantic.TypeChecking.Expression
 import Data.Bifunctor
-import qualified Data.Map as M
 import Semantic.Environment
 
 typeElement :: AnnASTElement ParserAnn
@@ -56,13 +55,11 @@ typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef
   case typed_tydef of
-    Struct {} -> return (TypeDefinition typed_tydef (buildStructTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    Enum {} -> return (TypeDefinition typed_tydef (buildEnumTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    (Class clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildClassTypeAnn ann clsKind), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
-    (Interface iKind _ extends members _) -> do
-      extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
-      let procs = [ProcedureSeman procid (map paramType params) modifiers | (InterfaceProcedure procid params modifiers _) <- members ++ extendedMembers]
-      return (TypeDefinition typed_tydef (buildInterfaceTypeAnn ann iKind procs), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    Struct {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    Enum {} -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    (Class _clsKind _ _ _ _) -> return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
+    (Interface {}) -> do
+      return (TypeDefinition typed_tydef (buildTypeAnn ann), LocatedElement (GType (semanticTypeDef typed_tydef)) ann)
 
 semanticTypeDef :: SAST.TypeDef SemanticAnn -> SemanTypeDef SemanticAnn
 semanticTypeDef (Struct i f m)  = Struct i f m

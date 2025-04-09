@@ -80,13 +80,6 @@ data ConnectionSeman =
     TerminaType
   deriving Show
 
-data TypeDefSeman =
-  StructTy
-  | EnumTy
-  | ClsTy ClassKind
-  | InterfaceTy InterfaceKind [ProcedureSeman]
-  deriving Show
-
 -- | Semantic elements
 -- we have three different semantic elements:
 data SemanticElems
@@ -100,7 +93,7 @@ data SemanticElems
   -- | Global objects
   | GTy TerminaType
   -- | Type definitions 
-  | TTy TypeDefSeman
+  | TTy 
   -- | Function type
   | FnTy FunctionSeman
   deriving Show
@@ -205,17 +198,8 @@ buildExpAnnApp loc tys = locate loc . ETy . AppType tys
 buildGlobalAnn :: Location -> TerminaType -> SemanticAnn
 buildGlobalAnn loc = locate loc . GTy 
 
-buildStructTypeAnn :: Location -> SemanticAnn
-buildStructTypeAnn = LocatedElement (TTy StructTy)
-
-buildEnumTypeAnn :: Location -> SemanticAnn
-buildEnumTypeAnn = LocatedElement (TTy EnumTy)
-
-buildClassTypeAnn :: Location -> ClassKind -> SemanticAnn
-buildClassTypeAnn loc clsKind = LocatedElement (TTy (ClsTy clsKind)) loc
-
-buildInterfaceTypeAnn :: Location -> InterfaceKind -> [ProcedureSeman] -> SemanticAnn
-buildInterfaceTypeAnn loc iKind procs = LocatedElement (TTy (InterfaceTy iKind procs)) loc
+buildTypeAnn :: Location -> SemanticAnn
+buildTypeAnn = LocatedElement TTy
 
 buildStmtAnn :: Location -> SemanticAnn
 buildStmtAnn = LocatedElement (STy SimpleStmtType)

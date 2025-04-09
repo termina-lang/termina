@@ -207,21 +207,16 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                     _ -> do
                         unionField <- genParameterUnion variantsWithParams
                         return $ pre_cr $ struct identifier [enumField, unionField] [] |>> location ann
-genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _extends _ _) ann) = do
+genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _extends procs _) ann) = do
     let cThatField = field thatField (ptr void)
-    procs <- unboxInterfaceProcedures (element ann)
     procedureFields <- mapM genInterfaceProcedureField procs
     return [pre_cr $ struct identifier (cThatField : procedureFields) [] |>> location ann]
 
     where
 
-        unboxInterfaceProcedures :: SemanticElems -> CGenerator [ProcedureSeman]
-        unboxInterfaceProcedures (TTy (InterfaceTy _ procs)) = return procs
-        unboxInterfaceProcedures e = throwError . InternalError $ "Invalid interface annotation: " ++ show e
-
-        genInterfaceProcedureField :: ProcedureSeman -> CGenerator CDeclaration
-        genInterfaceProcedureField (ProcedureSeman procedure params _modifiers) = do
-            cParamTypes <- mapM (genType noqual) params
+        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
+        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
+            cParamTypes <- mapM (genType noqual . paramType) params
             let cThisParamType = _const . ptr $ void
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
