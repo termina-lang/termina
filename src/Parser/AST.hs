@@ -18,21 +18,21 @@ import Core.AST
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
 -- |Object| should not be invoked directly.
-data Object' ty a
+data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
-  | ArrayIndexExpression (Object' ty a) (Expression' ty (Object' ty) a) a
+  | ArrayIndexExpression (Object a) (Expression a) a
   -- ^ TArray indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
-  | MemberAccess (Object' ty a) Identifier a
+  | MemberAccess (Object a) Identifier a
   -- ^ Data structure/Class access | eI.name |, same as before |ei :: exprI a| is an
   -- expression identifier.
-  | Dereference (Object' ty a) a
+  | Dereference (Object a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
-  | DereferenceMemberAccess (Object' ty a) Identifier a
+  | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
-  | ArraySlice (Object' ty a) (Expression' ty (Object' ty) a) (Expression' ty (Object' ty) a) a
+  | ArraySlice (Object a) (Expression a) (Expression a) a
   -- ^ TArray slicing | eI [ cEx .. cEy ]|,
   -- value |eI :: exprI a| is an identifier expression
   -- |cEx| is an expression for the lower bound
@@ -40,50 +40,48 @@ data Object' ty a
   deriving (Show, Functor)
 
   -- | First AST after parsing
-data Expression'
-    ty -- ^ typing information
-    obj -- ^ objects type
+data Expression
     a -- ^ Annotations
-  = AccessObject (obj a)
-  | Constant (Const' ty) a -- ^ | 24 : i8|
-  | BinOp Op (Expression' ty obj a) (Expression' ty obj a) a
-  | ReferenceExpression AccessKind (obj a) a
-  | Casting (Expression' ty obj a) ty a
+  = AccessObject (Object a)
+  | Constant (Const' TypeSpecifier) a -- ^ | 24 : i8|
+  | BinOp Op (Expression a) (Expression a) a
+  | ReferenceExpression AccessKind (Object a) a
+  | Casting (Expression a) TypeSpecifier a
   -- Invocation expressions
-  | FunctionCall Identifier [Expression' ty obj a] a
-  | MemberFunctionCall (obj a) Identifier [Expression' ty obj a] a
+  | FunctionCall Identifier [Expression a] a
+  | MemberFunctionCall (Object a) Identifier [Expression a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | DerefMemberFunctionCall (obj a) Identifier [Expression' ty obj a] a
+  | DerefMemberFunctionCall (Object a) Identifier [Expression a] a
   -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitializer (Expression' ty obj a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
-  | ArrayExprListInitializer [Expression' ty obj a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
+  | ArrayInitializer (Expression a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
+  | ArrayExprListInitializer [Expression a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
-    [FieldAssignment' (Expression' ty obj) a] -- ^ Initial value of each field identifier
-    (Maybe ty) -- ^ Structure type identifier
+    [FieldAssignment' Expression a] -- ^ Initial value of each field identifier
+    (Maybe TypeSpecifier) -- ^ Structure type identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantInitializer
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier
-    [Expression' ty obj a] -- ^ list of expressions
+    [Expression a] -- ^ list of expressions
     a
-  | OptionVariantInitializer (OptionVariant (Expression' ty obj a)) a
+  | OptionVariantInitializer (OptionVariant Expression a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
-    (obj a) -- ^ Enum object
+    (Object a) -- ^ Enum object
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
   | IsOptionVariantExpression
-    (obj a) -- ^ Opion object
+    (Object a) -- ^ Opion object
     OptionVariantLabel -- ^ Variant label
     a
   deriving (Show, Functor)
 
-instance Annotated (Object' ty) where
+instance Annotated Object where
   getAnnotation (Variable _ a)                  = a
   getAnnotation (ArrayIndexExpression _ _ a)    = a
   getAnnotation (MemberAccess _ _ a)            = a
@@ -98,7 +96,7 @@ instance Annotated (Object' ty) where
   updateAnnotation (DereferenceMemberAccess e n _) = DereferenceMemberAccess e n
   updateAnnotation (ArraySlice e cEx cEy _) = ArraySlice e cEx cEy
 
-instance (Annotated obj) => Annotated (Expression' ty obj) where
+instance Annotated Expression where
   getAnnotation (AccessObject obj)                = getAnnotation obj
   getAnnotation (Constant _ a)                    = a
   getAnnotation (BinOp _ _ _ a)                   = a
@@ -205,9 +203,6 @@ type Const = Const' TypeSpecifier
 type Modifier = Modifier' TypeSpecifier
 type FieldDefinition = FieldDefinition' TypeSpecifier
 type EnumVariant = EnumVariant' TypeSpecifier
-
-type Object = Object' TypeSpecifier
-type Expression = Expression' TypeSpecifier Object
 
 type Block = Block' TypeSpecifier Expression Object
 type AnnASTElement = AnnASTElement' TypeSpecifier Block Expression

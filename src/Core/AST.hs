@@ -162,7 +162,7 @@ data Op
   | LogicalOr
   deriving Show
 
-data OptionVariant expr = None | Some expr
+data OptionVariant expr a = None | Some (expr a)
   deriving (Show, Functor)
 
 data OptionVariantLabel = NoneLabel | SomeLabel

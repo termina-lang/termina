@@ -12,69 +12,67 @@ import Core.AST
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
 -- |Object| should not be invoked directly.
-data Object' ty a
+data Object a
   = Variable Identifier a
   -- ^ Plain identifier |v|
-  | ArrayIndexExpression (Object' ty a) (Expression' ty (Object' ty) a) a
+  | ArrayIndexExpression (Object a) (Expression a) a
   -- ^ TArray indexing | eI [ eIx ]|,
   -- value |eI :: exprI a| is an identifier expression, could be a name or a
   -- function call (depending on what |exprI| is)
-  | MemberAccess (Object' ty a) Identifier a
+  | MemberAccess (Object a) Identifier a
   -- ^ Data structure/Class access | eI.name |, same as before |ei :: exprI a| is an
   -- expression identifier.
-  | Dereference (Object' ty a) a
+  | Dereference (Object a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
-  | DereferenceMemberAccess (Object' ty a) Identifier a
+  | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
-  | Unbox (Object' ty a) a
+  | Unbox (Object a) a
   deriving (Show, Functor)
 
 -- | First AST after parsing
-data Expression'
-    ty -- ^ typing information
-    obj -- ^ objects type
+data Expression
     a -- ^ Annotations
-  = AccessObject (obj a)
-  | Constant (Const' ty) a -- ^ | 24 : i8|
-  | BinOp Op (Expression' ty obj a) (Expression' ty obj a) a
-  | ReferenceExpression AccessKind (obj a) a
-  | Casting (Expression' ty obj a) ty a
+  = AccessObject (Object a)
+  | Constant (Const' TerminaType) a -- ^ | 24 : i8|
+  | BinOp Op (Expression a) (Expression a) a
+  | ReferenceExpression AccessKind (Object a) a
+  | Casting (Expression a) TerminaType a
   -- Invocation expressions
-  | FunctionCall Identifier [Expression' ty obj a] a
-  | MemberFunctionCall (obj a) Identifier [Expression' ty obj a] a
+  | FunctionCall Identifier [Expression a] a
+  | MemberFunctionCall (Object a) Identifier [Expression a] a
   -- ^ Class method access | eI.name(x_{1}, ... , x_{n})|
-  | DerefMemberFunctionCall (obj a) Identifier [Expression' ty obj a] a
+  | DerefMemberFunctionCall (Object a) Identifier [Expression a] a
   -- ^ Dereference class method/viewer access | self->name(x_{1}, ... , x_{n})|
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitializer (Expression' ty obj a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
-  | ArrayExprListInitializer [Expression' ty obj a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
+  | ArrayInitializer (Expression a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
+  | ArrayExprListInitializer [Expression a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
-    [FieldAssignment' (Expression' ty obj) a] -- ^ Initial value of each field identifier
+    [FieldAssignment' Expression a] -- ^ Initial value of each field identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantInitializer
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier
-    [Expression' ty obj a] -- ^ list of expressions
+    [Expression a] -- ^ list of expressions
     a
-  | OptionVariantInitializer (OptionVariant (Expression' ty obj a)) a
+  | OptionVariantInitializer (OptionVariant Expression a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
-    (obj a) -- ^ Enum object
+    (Object a) -- ^ Enum object
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
   | IsOptionVariantExpression
-    (obj a) -- ^ Opion object
+    (Object a) -- ^ Opion object
     OptionVariantLabel -- ^ Variant label
     a
-  | ArraySliceExpression AccessKind (Object' ty a) (Expression' ty obj a) (Expression' ty obj a) a
+  | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
   -- ^ TArray slice. This is a reference to an slisce of an array.
   deriving (Show, Functor)
 
-instance Annotated (Object' ty) where
+instance Annotated Object where
   getAnnotation (Variable _ a)                = a
   getAnnotation (ArrayIndexExpression _ _ a) = a
   getAnnotation (MemberAccess _ _ a)          = a
@@ -89,7 +87,7 @@ instance Annotated (Object' ty) where
   updateAnnotation (DereferenceMemberAccess obj n _) = DereferenceMemberAccess obj n
   updateAnnotation (Unbox obj _) = Unbox obj
 
-instance (Annotated obj) => Annotated (Expression' ty obj) where
+instance Annotated Expression where
   getAnnotation (AccessObject obj)                = getAnnotation obj
   getAnnotation (Constant _ a)                    = a
   getAnnotation (BinOp _ _ _ a)                   = a
@@ -127,68 +125,68 @@ instance (Annotated obj) => Annotated (Expression' ty obj) where
   updateAnnotation (StringInitializer s _) = StringInitializer s
 
 
-data MatchCase' ty expr obj a = MatchCase
+data MatchCase a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars      :: [Identifier]
-  , matchBody       :: Block' ty expr obj a
+  , matchBody       :: Block a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
-data ElseIf' ty expr obj a = ElseIf
+data ElseIf a = ElseIf
   {
-    elseIfCond       :: expr a
-  , elseIfBody       :: Block' ty expr obj a
+    elseIfCond       :: Expression a
+  , elseIfBody       :: Block a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
-data Statement' ty expr obj a =
+data Statement a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    ty -- ^ type of the variable
-    (expr a) -- ^ initialization expression
+    TerminaType -- ^ type of the variable
+    (Expression a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (obj a) -- ^ left hand side of the assignment
-    (expr a) -- ^ assignment expression
+    (Object a) -- ^ left hand side of the assignment
+    (Expression a) -- ^ assignment expression
     a
   | IfElseStmt
-    (expr a) -- ^ conditional expression
-    (Block' ty expr obj a) -- ^ statements in the if block
-    [ElseIf' ty expr obj a] -- ^ list of else if blocks
-    (Maybe (Block' ty expr obj a)) -- ^ statements in the else block
+    (Expression a) -- ^ conditional expression
+    (Block a) -- ^ statements in the if block
+    [ElseIf a] -- ^ list of else if blocks
+    (Maybe (Block a)) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
-    ty -- ^ type of iterator variable
-    (expr a) -- ^ initial value of the iterator
-    (expr a) -- ^ final value of the iterator
-    (Maybe (expr a)) -- ^ break condition (optional)
-    (Block' ty expr obj a) -- ^ statements in the for loop
+    TerminaType -- ^ type of iterator variable
+    (Expression a) -- ^ initial value of the iterator
+    (Expression a) -- ^ final value of the iterator
+    (Maybe (Expression a)) -- ^ break condition (optional)
+    (Block a) -- ^ statements in the for loop
     a
   | MatchStmt
-    (expr a) -- ^ expression to match
-    [MatchCase' ty expr obj a] -- ^ list of match cases
+    (Expression a) -- ^ expression to match
+    [MatchCase a] -- ^ list of match cases
     a
   | SingleExpStmt
-    (expr a) -- ^ expression
+    (Expression a) -- ^ expression
     a
   | ReturnStmt
-    (Maybe (expr a)) -- ^ return expression
+    (Maybe (Expression a)) -- ^ return expression
     a
   | ContinueStmt
-    (expr a)
+    (Expression a)
     a
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-data Block' ty expr obj a
+data Block a
   = Block
   {
-    blockBody :: [Statement' ty expr obj a],
+    blockBody :: [Statement a],
     blockAnnotation :: a
   }
   deriving (Show, Functor)
@@ -200,10 +198,6 @@ type Modifier = Modifier' TerminaType
 type FieldDefinition = FieldDefinition' TerminaType
 type EnumVariant = EnumVariant' TerminaType
 
-type Object = Object' TerminaType
-type Expression = Expression' TerminaType Object
-
-type Block = Block' TerminaType Expression Object
 type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TerminaType Expression
@@ -212,9 +206,5 @@ type TypeDef = TypeDef' TerminaType Block
 
 type InterfaceMember = InterfaceMember' TerminaType
 type ClassMember = ClassMember' TerminaType Block
-
-type MatchCase = MatchCase' TerminaType Expression Object
-type ElseIf = ElseIf' TerminaType Expression Object
-type Statement = Statement' TerminaType Expression Object
 
 type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
