@@ -193,21 +193,21 @@ hexadecimal = Tok.lexeme lexer $
 -- Parser
 ----------------------------------------
 
-typeParamParser :: Parser TypeParameter
+typeParamParser :: Parser (TypeParameter ParserAnn) 
 typeParamParser = do
   TypeParamIdentifier <$> identifierParser
   <|> TypeParamTypeSpec <$> typeSpecifierParser
-  <|> TypeParamSize <$> sizeParser
+  <|> TypeParamSize <$> expressionTermParser
 
-
-definedTypeParser :: Parser TypeSpecifier
+--  (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi)  semi)
+definedTypeParser :: Parser (TypeSpecifier ParserAnn)
 definedTypeParser = do
   name <- identifierParser
-  typeParams <- option [] (angles (sepBy typeParamParser semi))
+  typeParams <- option [] (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi))
   return $ TSDefinedType name typeParams
 
 -- | Types
-typeSpecifierParser :: Parser TypeSpecifier
+typeSpecifierParser :: Parser (TypeSpecifier ParserAnn)
 typeSpecifierParser =
   definedTypeParser 
   <|> arrayParser
@@ -236,7 +236,7 @@ typeSpecifierParser =
 objectIdentifierParser :: Parser Identifier
 objectIdentifierParser = try ((char '_' >> identifierParser) <&> ('_' :)) <|> identifierParser
 
-parameterParser :: Parser Parameter
+parameterParser :: Parser (Parameter ParserAnn)
 parameterParser = do
   identifier <- objectIdentifierParser
   reservedOp ":"
@@ -310,7 +310,7 @@ structInitializerParser = do
 -- #[priority(5)] for a task
 -- #[packed] for a struct or union
 
-modifierParser :: Parser Modifier
+modifierParser :: Parser (Modifier ParserAnn)
 modifierParser = do
   _ <- reservedOp "#"
   _ <- reservedOp "["
@@ -319,44 +319,44 @@ modifierParser = do
   _ <- reservedOp "]"
   return $ Modifier identifier initializer
 
-arrayParser :: Parser TypeSpecifier
+arrayParser :: Parser (TypeSpecifier ParserAnn)
 arrayParser = do
   _ <- reservedOp "["
   typeSpecifier <- typeSpecifierParser
   _ <- semi
-  size <- sizeParser
+  size <- expressionParser
   _ <- reserved "]"
   return $ TSArray typeSpecifier size
 
-referenceParser :: Parser TypeSpecifier
+referenceParser :: Parser (TypeSpecifier ParserAnn)
 referenceParser = reservedOp "&" >> TSReference Immutable <$> typeSpecifierParser
 
-mutableReferenceParser :: Parser TypeSpecifier
+mutableReferenceParser :: Parser (TypeSpecifier ParserAnn)
 mutableReferenceParser = reservedOp "&mut" >> TSReference Mutable <$> typeSpecifierParser
 
-boxSubtypeParser :: Parser TypeSpecifier
+boxSubtypeParser :: Parser (TypeSpecifier ParserAnn)
 boxSubtypeParser = reserved "box" >> TSBoxSubtype <$> typeSpecifierParser
 
-locationSubtypeParser :: Parser TypeSpecifier
+locationSubtypeParser :: Parser (TypeSpecifier ParserAnn)
 locationSubtypeParser = reservedOp "loc" >> TSLocation <$> typeSpecifierParser
 
-sinkPortParser :: Parser TypeSpecifier
+sinkPortParser :: Parser (TypeSpecifier ParserAnn)
 sinkPortParser = do
   _ <- reserved "sink"
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
   TSSinkPort ts <$> identifierParser
 
-accessPortParser :: Parser TypeSpecifier
+accessPortParser :: Parser (TypeSpecifier ParserAnn)
 accessPortParser = reservedOp "access" >> TSAccessPort <$> typeSpecifierParser
 
-constSubtypeParser :: Parser TypeSpecifier
+constSubtypeParser :: Parser (TypeSpecifier ParserAnn)
 constSubtypeParser = reservedOp "const" >> TSConstSubtype <$> typeSpecifierParser
 
-outPortParser :: Parser TypeSpecifier
+outPortParser :: Parser (TypeSpecifier ParserAnn)
 outPortParser = reservedOp "out" >> TSOutPort <$> typeSpecifierParser
 
-inPortParser :: Parser TypeSpecifier
+inPortParser :: Parser (TypeSpecifier ParserAnn)
 inPortParser = do
   _ <- reserved "in"
   ts <- typeSpecifierParser
@@ -639,7 +639,7 @@ arrayInitializerParser = do
   _ <- reservedOp "["
   value <- expressionParser
   _ <- semi
-  size <- sizeParser
+  size <- expressionParser
   _ <- reservedOp "]"
   ArrayInitializer value size . Position startPos <$> getPosition
 
@@ -694,7 +694,7 @@ functionParser = do
   blockRet <- blockParser
   Function name params typeSpec blockRet modifiers . Position startPos <$> getPosition
 
-constLiteralParser :: Parser Const
+constLiteralParser :: Parser (Const ParserAnn)
 constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
   where
     parseLitInteger =
@@ -716,16 +716,6 @@ integerParser = try hexParser <|> decParser
   where
     hexParser = flip TInteger HexRepr <$> hexadecimal
     decParser = flip TInteger DecRepr <$> decimal
-
-sizeParser :: Parser Size
-sizeParser = constValueSizeParser <|> constSizeParser
-  where
-    constValueSizeParser = do
-      ks <- integerParser
-      optional (reservedOp ":" >> reserved "usize")
-      return $ K ks
-    constSizeParser = V <$> identifierParser
-
 
 mutableObjDeclarationParser :: Parser (Statement ParserAnn)
 mutableObjDeclarationParser = do
@@ -1003,7 +993,7 @@ classProcedureParser = do
   blockRet <- blockParser
   ClassProcedure name params blockRet . Position startPos <$> getPosition
   where
-    procedureParamsParser :: Parser [Parameter]
+    procedureParamsParser :: Parser [Parameter ParserAnn]
     procedureParamsParser =
       reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
 
@@ -1018,7 +1008,7 @@ interfaceProcedureParser = do
   -- by the programmers
   InterfaceProcedure name params [] . Position startPos <$> getPosition
   where
-    procedureParamsParser :: Parser [Parameter]
+    procedureParamsParser :: Parser [Parameter ParserAnn]
     procedureParamsParser =
       reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
 
@@ -1032,7 +1022,7 @@ classViewerParser = do
   blockRet <- blockParser
   ClassViewer name params typeSpec blockRet . Position startPos <$> getPosition
   where
-    viewerParamsParser :: Parser [Parameter]
+    viewerParamsParser :: Parser [Parameter ParserAnn]
     viewerParamsParser =
       reserved "&self" >> option [] (comma >> sepBy parameterParser comma)
 
@@ -1072,7 +1062,7 @@ classDefinitionParser = do
       <|> (reserved "resource" >> return ResourceClass)
       <|> (reserved "handler" >> return HandlerClass)
 
-variantDefinitionParser :: Parser EnumVariant
+variantDefinitionParser :: Parser (EnumVariant ParserAnn)
 variantDefinitionParser = identifierParser >>= \identifier ->
   try (parens (sepBy1 typeSpecifierParser comma) <&> EnumVariant identifier)
   <|> return (EnumVariant identifier [])

@@ -16,104 +16,110 @@ import qualified Data.Map as M
 
 ----------------------------------------
 
-data FieldSeman
+data FieldSeman a
   = SimpleField 
-  | AccessPortField (M.Map Identifier (InterfaceMember SemanticAnn))
-  deriving Show
+  | AccessPortField (M.Map Identifier (InterfaceMember a))
+  deriving (Show, Functor)
 
 -- | Semantic type information
-data ExprSeman
-  = SimpleType TerminaType
-  | ObjectType AccessKind TerminaType
-  | AccessPortObjType (M.Map Identifier (InterfaceMember SemanticAnn)) TerminaType
-  | AppType [TerminaType] TerminaType
-  deriving Show
+data ExprSeman a
+  = SimpleType (TerminaType a)
+  | ObjectType AccessKind (TerminaType a)
+  | AccessPortObjType (M.Map Identifier (InterfaceMember a)) (TerminaType a)
+  | AppType [TerminaType a] (TerminaType a)
+  deriving (Show, Functor)
 
-data StmtSeman
+data StmtSeman a
   = SimpleStmtType -- ^ Statement with no type
-    | MatchCaseStmtType [TerminaType] -- ^ Match case with types
-    | PortConnection ConnectionSeman
-  deriving Show
+    | MatchCaseStmtType [TerminaType a] -- ^ Match case with types
+    | PortConnection (ConnectionSeman a)
+  deriving (Show, Functor)
 
-data ProcedureSeman = ProcedureSeman Identifier [TerminaType] [Modifier]
-  deriving (Show)
+data ProcedureSeman a = ProcedureSeman Identifier [TerminaType a] [Modifier a]
+  deriving (Show, Functor)
 
-data FunctionSeman = FunctionSeman [TerminaType] TerminaType
-  deriving (Show)
+data FunctionSeman a = FunctionSeman [TerminaType a] (TerminaType a)
+  deriving (Show, Functor)
 
-data ConnectionSeman =
+data ConnectionSeman a =
     -- | Access port connection
   APConnTy
   -- | type specifier of the ports interface
-    TerminaType
+    (TerminaType a)
   -- | type specifier of the connected resource
-    TerminaType
+    (TerminaType a)
     -- | List of procedures that can be called on the connected resource
-    [ProcedureSeman]
+    [ProcedureSeman a]
   | APAtomicConnTy
     -- | Type specifier of the connected atomic
-    TerminaType
+    (TerminaType a)
   | APAtomicArrayConnTy
     -- | type specifier of the connected atomic array
-    TerminaType
+    (TerminaType a)
     -- | Size of the connected atomic array
-    Size
+    (Expression a)
   | APPoolConnTy
     -- | Type specifier of the connected pool
-    TerminaType
+    (TerminaType a)
     -- | Size of the connected pool
-    Size
+    (Expression a)
   -- | Sink port connection
   | SPConnTy
     -- | Type specifier of the connected event emitter
-    TerminaType
+    (TerminaType a)
     -- | Name of the action that will be triggered when the event emitter emits an event 
     Identifier 
   -- | In port connection
   | InPConnTy
     -- | Type specifier of the connected channel
-    TerminaType
+    (TerminaType a)
     -- | Name of the action that will be triggered when the channel receives a message
     Identifier
   | OutPConnTy
     -- | Type specifier of the connected channel
-    TerminaType
-  deriving Show
+    (TerminaType a)
+  deriving (Show, Functor)
 
 -- | Semantic elements
 -- we have three different semantic elements:
-data SemanticElems
+data SemanticElems a
   =
   -- | Expressions with their types
-  ETy ExprSeman
+  ETy (ExprSeman a)
   -- | Field types
-  | FTy FieldSeman
+  | FTy (FieldSeman a)
   -- | Statements 
-  | STy StmtSeman
+  | STy (StmtSeman a)
   -- | Global objects
-  | GTy TerminaType
+  | GTy (TerminaType a)
   -- | Type definitions 
   | TTy 
   -- | Function type
-  | FnTy FunctionSeman
+  | FnTy (FunctionSeman a)
   deriving Show
 
 -- | Expression Semantic Annotations
-type SemanticAnn = LocatedElement SemanticElems
+data SemanticAnn = 
+  SemanticAnn (SemanticElems SemanticAnn) Location
+  deriving Show
+
+instance Located SemanticAnn where
+  getLocation (SemanticAnn _ loc) = loc
+  updateLocation (SemanticAnn ann _) = SemanticAnn ann 
 
 ----------------------------------------
 
 -- | General global entities
 data GEntry a
-  = GFun FunctionSeman
+  = GFun (FunctionSeman a)
   -- ^ Functions
-  | GGlob TerminaType
+  | GGlob (TerminaType a)
   -- ^ Globals
-  | GConst TerminaType Const
+  | GConst (TerminaType a) (Expression a)
   -- ^ Constants
   | GType (SemanTypeDef a)
   -- ^ Types
-  deriving (Functor,Show)
+  deriving (Show, Functor)
 
 -- Simple TypeDef
 -- It only has type information.
@@ -137,12 +143,12 @@ kClassMember (ClassAction idx ps ty _blk ann) =
 ----------------------------------------
 -- Subtyping.
 -- This fuction says what types can be casted into others.
-casteableTys :: TerminaType -> TerminaType -> Bool
+casteableTys :: TerminaType a -> TerminaType a -> Bool
 casteableTys a b = numTy a && numTy b
 
 -- Relation between types
 -- we use to define (box A \subseteq A)
-subTypes :: TerminaType -> TerminaType -> Bool
+subTypes :: TerminaType a -> TerminaType a -> Bool
 subTypes (TBoxSubtype a) (TBoxSubtype b) = sameTy a b
 subTypes (TBoxSubtype a) b              = sameTy a b
 subTypes a (TBoxSubtype b)              = sameTy a b
@@ -150,7 +156,7 @@ subTypes a (TBoxSubtype b)              = sameTy a b
 subTypes a b                           = sameTy a b
 
 
-getResultingType :: SemanticElems -> Maybe TerminaType
+getResultingType :: SemanticElems a -> Maybe (TerminaType a)
 getResultingType (ETy ty) = 
   Just (
     case ty of {
@@ -160,93 +166,93 @@ getResultingType (ETy ty) =
       AccessPortObjType _ t -> t;})
 getResultingType _        = Nothing
 
-getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TerminaType)
-getObjectSAnns (LocatedElement (ETy (ObjectType ak ty)) _) = Just (ak, ty)
-getObjectSAnns (LocatedElement (ETy (AccessPortObjType _ ty)) _) = Just (Mutable, ty)
+getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TerminaType SemanticAnn)
+getObjectSAnns (SemanticAnn (ETy (ObjectType ak ty)) _) = Just (ak, ty)
+getObjectSAnns (SemanticAnn (ETy (AccessPortObjType _ ty)) _) = Just (Mutable, ty)
 getObjectSAnns _                                    = Nothing
 
-getArgumentsType :: SemanticElems -> Maybe [TerminaType]
+getArgumentsType :: SemanticElems a -> Maybe [TerminaType a]
 getArgumentsType (ETy (AppType ts _)) = Just ts
 getArgumentsType _                    = Nothing
 
-getMatchCaseTypes :: SemanticElems -> Maybe [TerminaType]
+getMatchCaseTypes :: SemanticElems a -> Maybe [TerminaType a]
 getMatchCaseTypes (STy (MatchCaseStmtType ts)) = Just ts
 getMatchCaseTypes _                           = Nothing
 
-isResultFromApp :: SemanticElems -> Bool
+isResultFromApp :: SemanticElems a -> Bool
 isResultFromApp = isJust . getArgumentsType
 
 buildFieldAnn :: Location -> SemanticAnn
-buildFieldAnn loc = locate loc $ FTy SimpleField
+buildFieldAnn = SemanticAnn (FTy SimpleField)
 
 buildAccessPortFieldAnn :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> SemanticAnn
-buildAccessPortFieldAnn loc = locate loc . FTy . AccessPortField
+buildAccessPortFieldAnn = flip $ SemanticAnn . FTy . AccessPortField
 
-buildExpAnn :: Location -> TerminaType -> SemanticAnn
-buildExpAnn loc = locate loc . ETy . SimpleType
+buildExpAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnn = flip $ SemanticAnn . ETy . SimpleType
 
-buildExpAnnObj :: Location -> AccessKind -> TerminaType -> SemanticAnn
-buildExpAnnObj loc ak = locate loc . ETy . ObjectType ak
+buildExpAnnObj :: Location -> AccessKind -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnObj loc ak ty = SemanticAnn (ETy (ObjectType ak ty)) loc
 
-buildExpAnnAccessPortObj :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType -> SemanticAnn
-buildExpAnnAccessPortObj loc ifaces = locate loc . ETy . AccessPortObjType ifaces
+buildExpAnnAccessPortObj :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnAccessPortObj loc ifaces pty = SemanticAnn (ETy (AccessPortObjType ifaces pty)) loc
 
-buildExpAnnApp :: Location -> [TerminaType] -> TerminaType -> SemanticAnn
-buildExpAnnApp loc tys = locate loc . ETy . AppType tys
+buildExpAnnApp :: Location -> [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnApp loc tys rty = SemanticAnn (ETy (AppType tys rty)) loc
 
 -- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
-buildGlobalAnn :: Location -> TerminaType -> SemanticAnn
-buildGlobalAnn loc = locate loc . GTy 
+buildGlobalAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildGlobalAnn = flip $ SemanticAnn . GTy 
 
 buildTypeAnn :: Location -> SemanticAnn
-buildTypeAnn = LocatedElement TTy
+buildTypeAnn = SemanticAnn TTy
 
 buildStmtAnn :: Location -> SemanticAnn
-buildStmtAnn = LocatedElement (STy SimpleStmtType)
+buildStmtAnn = SemanticAnn (STy SimpleStmtType)
 
-buildStmtMatchCaseAnn :: Location -> [TerminaType] -> SemanticAnn
-buildStmtMatchCaseAnn loc ts = locate loc (STy (MatchCaseStmtType ts))
+buildStmtMatchCaseAnn :: Location -> [TerminaType SemanticAnn] -> SemanticAnn
+buildStmtMatchCaseAnn loc ts = SemanticAnn (STy (MatchCaseStmtType ts)) loc
 
-buildOutPortConnAnn :: Location -> TerminaType -> SemanticAnn
-buildOutPortConnAnn loc ts = locate loc (STy (PortConnection (OutPConnTy ts)))
+buildOutPortConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildOutPortConnAnn loc ts = SemanticAnn (STy (PortConnection (OutPConnTy ts))) loc
 
-buildAccessPortConnAnn :: Location -> TerminaType -> TerminaType -> [ProcedureSeman] -> SemanticAnn
-buildAccessPortConnAnn loc ifaceTy ts procs = locate loc (STy (PortConnection (APConnTy ifaceTy ts procs)))
+buildAccessPortConnAnn :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> [ProcedureSeman SemanticAnn] -> SemanticAnn
+buildAccessPortConnAnn loc ifaceTy ts procs = SemanticAnn (STy (PortConnection (APConnTy ifaceTy ts procs))) loc
 
-buildPoolConnAnn :: Location -> TerminaType -> Size -> SemanticAnn
-buildPoolConnAnn loc ts s = locate loc (STy (PortConnection (APPoolConnTy ts s)))
+buildPoolConnAnn :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
+buildPoolConnAnn loc ts s = SemanticAnn (STy (PortConnection (APPoolConnTy ts s))) loc
 
-buildAtomicConnAnn :: Location -> TerminaType -> SemanticAnn
-buildAtomicConnAnn loc ts = locate loc (STy (PortConnection (APAtomicConnTy ts)))
+buildAtomicConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
+buildAtomicConnAnn loc ts = SemanticAnn (STy (PortConnection (APAtomicConnTy ts))) loc
 
-buildAtomicArrayConnAnn :: Location -> TerminaType -> Size -> SemanticAnn
-buildAtomicArrayConnAnn loc ts s = locate loc (STy (PortConnection (APAtomicArrayConnTy ts s)))
+buildAtomicArrayConnAnn :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
+buildAtomicArrayConnAnn loc ts s = SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts s))) loc
 
-buildSinkPortConnAnn :: Location -> TerminaType -> Identifier -> SemanticAnn
-buildSinkPortConnAnn loc ts action = locate loc (STy (PortConnection (SPConnTy ts action)))
+buildSinkPortConnAnn :: Location -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
+buildSinkPortConnAnn loc ts action = SemanticAnn (STy (PortConnection (SPConnTy ts action))) loc
 
-buildInPortConnAnn :: Location -> TerminaType -> Identifier -> SemanticAnn
-buildInPortConnAnn loc ts action = locate loc (STy (PortConnection (InPConnTy ts action)))
+buildInPortConnAnn :: Location -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
+buildInPortConnAnn loc ts action = SemanticAnn (STy (PortConnection (InPConnTy ts action))) loc
 
-getSemanticAnn :: SemanticAnn -> SemanticElems
-getSemanticAnn = element
+getSemanticAnn :: SemanticAnn -> SemanticElems SemanticAnn
+getSemanticAnn (SemanticAnn ann _loc) = ann
 
 forgetSemAnn :: SemanticAnn -> Location
-forgetSemAnn = location
+forgetSemAnn (SemanticAnn _ann loc) = loc
 
-getTypeSemAnn :: SemanticAnn -> Maybe TerminaType
+getTypeSemAnn :: SemanticAnn -> Maybe (TerminaType SemanticAnn)
 getTypeSemAnn  = getResultingType . getSemanticAnn
 
-unboxExpType :: ExprSeman -> ExprSeman
+unboxExpType :: ExprSeman SemanticAnn -> ExprSeman SemanticAnn
 unboxExpType (SimpleType (TBoxSubtype ty)) = SimpleType ty
 unboxExpType (ObjectType ak (TBoxSubtype ty)) = ObjectType ak ty
 unboxExpType (AppType ts (TBoxSubtype ty)) = AppType ts ty
 unboxExpType _ = error "impossible 888+1"
 
 unboxTypeAnn :: SemanticAnn -> SemanticAnn
-unboxTypeAnn (LocatedElement (ETy en) p) = LocatedElement (ETy (unboxExpType en)) p
+unboxTypeAnn (SemanticAnn (ETy en) p) = SemanticAnn (ETy (unboxExpType en)) p
 unboxTypeAnn _                    = error "impossible 888"
 
-unboxConnectionAnn :: SemanticAnn -> ConnectionSeman
-unboxConnectionAnn (LocatedElement (STy (PortConnection connAnn)) _) = connAnn
+unboxConnectionAnn :: SemanticAnn -> ConnectionSeman SemanticAnn
+unboxConnectionAnn (SemanticAnn (STy (PortConnection connAnn)) _) = connAnn
 unboxConnectionAnn _ = error "Invalid annotation"

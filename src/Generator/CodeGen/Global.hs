@@ -35,7 +35,7 @@ genGlobalDecl (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
 genGlobalDecl (GlobalDeclaration (Const identifier ts _expr _ ann)) = do
     cTs <- genType constqual ts
     return [
-            pre_cr $ extern (var identifier cTs) |>> location ann
+            pre_cr $ extern (var identifier cTs) |>> getLocation ann
         ]
 genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl
 
@@ -65,6 +65,6 @@ genGlobal (GlobalDeclaration (Const identifier ts expr _ ann)) = do
     cTs <- genType constqual ts
     cExpr <- genExpression expr
     return [
-            pre_cr . global $ identifier @: cTs @:= cExpr |>> location ann
+            pre_cr . global $ identifier @: cTs @:= cExpr |>> getLocation ann
         ]
 genGlobal decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl

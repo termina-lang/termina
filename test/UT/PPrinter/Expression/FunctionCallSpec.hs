@@ -29,14 +29,14 @@ dereferencepVar :: Object SemanticAnn
 dereferencepVar = Dereference pVar (objSemAnn Mutable TUInt16)
 
 array0, boxArray0 :: Object SemanticAnn
-array0 = Variable "array0" (arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr)))
-boxArray0 = Variable "boxArray0" (boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr)))
+array0 = Variable "array0" (arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10))
+boxArray0 = Variable "boxArray0" (boxArrayObjSemAnn TUInt32 (buildConstExprTUSize 10))
 
 pArray1 :: Expression SemanticAnn
-pArray1 = AccessObject (Variable "p_array1" (refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))))
+pArray1 = AccessObject (Variable "p_array1" (refArraySemAnn TUInt32 (buildConstExprTUSize 10)))
 
 referenceArray0 :: Expression SemanticAnn
-referenceArray0 = ReferenceExpression Mutable array0 (refArraySemAnn TUInt32 (K (TInteger 10 DecRepr)))
+referenceArray0 = ReferenceExpression Mutable array0 (refArraySemAnn TUInt32 (buildConstExprTUSize 10))
 
 uint16Const :: Expression SemanticAnn
 uint16Const = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
@@ -75,11 +75,11 @@ functionCallSingleDerefpVarPlusConstant = FunctionCall "foo" [dereferencepVarPlu
 functionCallSingleDerefpVarPlusDerefRefVar1 = FunctionCall "foo" [dereferencepVar2PlusVar1] (funSemAnn [TUInt16] TUnit)
 
 functionCallSingleBoxArray0, functionCallSinglepArray1 :: Expression SemanticAnn
-functionCallSingleBoxArray0 = FunctionCall "foo" [AccessObject boxArray0] (funSemAnn [TBoxSubtype (TArray TUInt32 (K (TInteger 10 DecRepr)))] TUnit)
-functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [TReference Mutable (TArray TUInt32 (K (TInteger 10 DecRepr)))] TUnit)
+functionCallSingleBoxArray0 = FunctionCall "foo" [AccessObject boxArray0] (funSemAnn [TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10))] TUnit)
+functionCallSinglepArray1 = FunctionCall "foo" [pArray1] (funSemAnn [TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10))] TUnit)
 
 functionCallSingleRefArray0 :: Expression SemanticAnn
-functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [TReference Mutable (TArray TUInt32 (K (TInteger 10 DecRepr)))] TUnit)
+functionCallSingleRefArray0 = FunctionCall "foo" [referenceArray0] (funSemAnn [TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10))] TUnit)
 
 call2Parameters, call3Parameters :: Expression SemanticAnn
 call2Parameters = FunctionCall "foo2" [var0PlusConstant, var0PlusVar1] (funSemAnn [TUInt16, TUInt16] TUInt16)
@@ -90,7 +90,7 @@ call3Parameters = FunctionCall "foo4"
     functionCallSingleVar0,
     call2Parameters
   ] (funSemAnn [
-      TBoxSubtype (TArray TUInt32 (K (TInteger 10 DecRepr))),
+      TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10)),
       TReference Mutable TUInt16,
       TUInt16,
       TUInt16

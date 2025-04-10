@@ -13,8 +13,8 @@ optionBoxUInt32ObjSemAnn :: SemanticAnn
 optionBoxUInt32ObjSemAnn = optionBoxObjSemAnn Mutable TUInt32
 
 arrayObjAnn, boxArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
-boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (buildConstExprTUSize 10)
 
 param0, param1 :: Object SemanticAnn
 param0 = Variable "param0" boxUInt32SemAnn
@@ -46,7 +46,7 @@ param1ToFoo1 :: Statement SemanticAnn
 param1ToFoo1 = AssignmentStmt foo1 array0IndexConstant stmtSemAnn
 
 matchCaseSome1 :: MatchCase SemanticAnn
-matchCaseSome1 = MatchCase "Some" ["param1"] (Block [param1ToFoo1] stmtSemAnn) (matchCaseSemAnn [TBoxSubtype (TArray TUInt32 (K (TInteger 10 DecRepr)))])
+matchCaseSome1 = MatchCase "Some" ["param1"] (Block [param1ToFoo1] stmtSemAnn) (matchCaseSemAnn [TBoxSubtype (TArray TUInt32 (buildConstExprTUSize 10))])
 
 matchCaseNone :: MatchCase SemanticAnn
 matchCaseNone = MatchCase "None" [] (Block [constToFoo1] stmtSemAnn) (matchCaseSemAnn [])
@@ -67,7 +67,7 @@ matchOption1 :: Statement SemanticAnn
 matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
 
 getInteger :: Expression SemanticAnn
-getInteger = FunctionCall "get_integer" [] (LocatedElement (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
+getInteger = FunctionCall "get_integer" [] (SemanticAnn (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
 
 matchOption2 :: Statement SemanticAnn
 matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn

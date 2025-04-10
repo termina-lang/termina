@@ -12,8 +12,8 @@ import Utils.Annotations
 
 data TPClassMemberFunction a = TPClassMemberFunction
     Identifier -- ^ name of the member function
-    [Parameter' TerminaType] -- ^ list of parameters (possibly empty)
-    (Maybe TerminaType) -- ^ return type of the membber function
+    [Parameter a] -- ^ list of parameters (possibly empty)
+    (Maybe (TerminaType a)) -- ^ return type of the membber function
     (Block a) -- ^ statements block
     a -- ^ annotations
   deriving Show
@@ -34,18 +34,18 @@ data TPClass a = TPClass {
     -- It maps the name of the port to the type of the data that is received by
     -- the port and the name of the action that is executed when a message is
     -- received from the port.
-    inputPorts :: Map Identifier (TerminaType, Identifier),
+    inputPorts :: Map Identifier (TerminaType a, Identifier),
 
     -- | Map of the sink ports of the task
     -- It maps the name of the port to the type of the data that is received by
     -- the port and the name of the action that is executed when an event is
     -- received from the port.
-    sinkPorts :: Map Identifier (TerminaType, Identifier),
+    sinkPorts :: Map Identifier (TerminaType a, Identifier),
 
     -- | Map of the output ports of the task
     -- It maps the name of the port to the type of the data that is sent through
     -- the port.
-    outputPorts :: Map Identifier TerminaType,
+    outputPorts :: Map Identifier (TerminaType a),
 
     -- | Map between the output ports that send a box and the port from which
     -- the box was originated.
@@ -86,7 +86,7 @@ data TPTask a = TPTask {
     taskAPConnections :: Map Identifier (Identifier, a),
 
     -- | List of the modifiers of the task
-    taskModifiers :: [Modifier],
+    taskModifiers :: [Modifier a],
 
     -- | Name of the module that instantiates the task
     taskModule :: QualifiedName,
@@ -173,7 +173,7 @@ data TPHandler a = TPHandler {
     handlerAPConnections :: Map Identifier (Identifier, a),
 
     -- | List of the modifiers of the handler
-    handlerModifiers :: [Modifier],
+    handlerModifiers :: [Modifier a],
 
     -- | Name of the module that instantiates the handler
     handlerModule :: QualifiedName,
@@ -189,7 +189,7 @@ instance Annotated TPHandler where
 
 data TPAtomic a = TPAtomic 
     Identifier -- ^ atomic identifier
-    TerminaType -- ^ data type specifier
+    (TerminaType a) -- ^ data type specifier
     QualifiedName -- ^ module that instantiates the atomic
     a -- ^ annontations
   deriving Show
@@ -200,8 +200,8 @@ instance Annotated TPAtomic where
 
 data TPAtomicArray a = TPAtomicArray 
     Identifier -- ^ atomic array identifier
-    TerminaType -- ^ data type specifier
-    Size -- ^ size of the array
+    (TerminaType a) -- ^ data type specifier
+    (Expression a) -- ^ size of the array
     QualifiedName -- ^ module that instantiates the atomic array
     a -- ^ annontations
   deriving Show
@@ -212,8 +212,8 @@ instance Annotated TPAtomicArray where
 
 data TPChannel a = TPMsgQueue
     Identifier -- ^ message queue identifier
-    TerminaType -- ^ data type specifier
-    Size -- ^ size of the message queue
+    (TerminaType a) -- ^ data type specifier
+    (Expression a) -- ^ size of the message queue
     QualifiedName -- ^ module that instantiates the message queue
     a -- ^ annontations
    deriving Show
@@ -224,8 +224,8 @@ instance Annotated TPChannel where
 
 data TPPool a = TPPool 
     Identifier -- ^ pool identifier
-    TerminaType -- ^ data type specifier
-    Size -- ^ size of the pool
+    (TerminaType a) -- ^ data type specifier
+    (Expression a) -- ^ size of the pool
     QualifiedName -- ^ module that instantiates the pool
     a -- ^ annontations
    deriving Show
@@ -252,10 +252,10 @@ data TPGlobalConstant a = TPGlobalConstant {
     constantName :: Identifier,
 
     -- | Type of the global constant
-    constantType :: TerminaType,
+    constantType :: TerminaType a,
 
     -- | Value of the global constant
-    constantValue :: Const,
+    constantValue :: Const a,
 
     -- | Annotations associated with the global constant
     constantAnn :: a

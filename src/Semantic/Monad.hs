@@ -54,7 +54,9 @@ getGlobalTypeDef loc tid  = gets global >>=
       LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotType (tid, entryLoc))
       }) . M.lookup tid
 
-getFunctionTy :: Location -> Identifier -> SemanticMonad ([TerminaType], TerminaType, Location)
+getFunctionTy :: Location 
+  -> Identifier 
+  -> SemanticMonad ([TerminaType SemanticAnn], TerminaType SemanticAnn, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
@@ -76,14 +78,16 @@ getEnumTy loc iden =
 
 -- | Add new *local* immutable objects and execute computation in the
 -- new local environment.
-addLocalImmutObjs :: Location -> [(Identifier, TerminaType)] -> SemanticMonad a -> SemanticMonad a
+addLocalImmutObjs :: Location 
+  -> [(Identifier, TerminaType SemanticAnn)] 
+  -> SemanticMonad a -> SemanticMonad a
 addLocalImmutObjs loc newVars ma  =
   localScope (addVariables newVars >> ma)
   where
     addVariables = mapM_ (uncurry (insertLocalImmutObj loc))
 
 -- | Insert mutable object (variable) in local scope.
-insertLocalMutObj :: Location -> Identifier -> TerminaType -> SemanticMonad ()
+insertLocalMutObj :: Location -> Identifier -> TerminaType SemanticAnn -> SemanticMonad ()
 insertLocalMutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
@@ -91,7 +95,7 @@ insertLocalMutObj loc ident ty = do
     Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
 
 -- | Insert immutable object (variable) in local scope.
-insertLocalImmutObj :: Location -> Identifier -> TerminaType -> SemanticMonad ()
+insertLocalImmutObj :: Location -> Identifier -> TerminaType SemanticAnn -> SemanticMonad ()
 insertLocalImmutObj loc ident ty = do
   prev <- whereIsDefined ident
   case prev of
@@ -104,7 +108,7 @@ insertGlobalTy loc tydef =
  where
    type_name = getTypeIdentifier tydef
 
-insertGlobalFun :: Location -> Identifier -> [TerminaType] -> TerminaType -> SemanticMonad ()
+insertGlobalFun :: Location -> Identifier -> [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticMonad ()
 insertGlobalFun loc ident ps rettype =
   insertGlobal ident (LocatedElement (GFun (FunctionSeman ps rettype)) loc) (EUsedFunName ident)
 
@@ -118,13 +122,13 @@ insertGlobal ident entry err =
   -- if b then throwError (annotateError (location entry) getError)
   -- else
 
-insertLocalVariables :: Location -> [(Identifier , TerminaType)] -> SemanticMonad ()
+insertLocalVariables :: Location -> [(Identifier , TerminaType SemanticAnn)] -> SemanticMonad ()
 insertLocalVariables loc = mapM_ (\case
   (ident, ty@(TBoxSubtype _)) -> insertLocalMutObj loc ident ty;
   (ident, ty) -> insertLocalImmutObj loc ident ty)
 
 -- | Get the type of a local (already) defined object. If it is not defined throw an error.
-getLocalObjTy :: Location -> Identifier -> SemanticMonad (AccessKind, TerminaType)
+getLocalObjTy :: Location -> Identifier -> SemanticMonad (AccessKind, TerminaType SemanticAnn)
 getLocalObjTy loc ident =
   gets local >>=
   -- | Get local objects map and check if |ident| is a member of that map
@@ -134,7 +138,7 @@ getLocalObjTy loc ident =
   }) . M.lookup ident
 
 -- | Get the Type of a defined read-only variable. If it is not defined throw an error.
-getConst :: Location -> Identifier -> SemanticMonad (TerminaType, Const)
+getConst :: Location -> Identifier -> SemanticMonad (TerminaType SemanticAnn, Expression SemanticAnn)
 getConst loc ident = do
     catchError (getGlobalEntry loc ident)
         (\errorGlobal ->
@@ -160,13 +164,6 @@ getConst loc ident = do
                     _ -> throwError $ annotateError loc (ENotConstant ident);
     });
 
-getIntSize :: Location -> Size -> SemanticMonad Integer
-getIntSize loc (CAST.V ident) = do
-  (ty, value) <- getConst loc ident
-  sameTyOrError loc TUSize ty
-  getIntConst value
-getIntSize _loc (CAST.K (TInteger value _)) = return value
-
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalEntry :: Location -> Identifier -> SemanticMonad (LocatedElement (GEntry SemanticAnn))
 getGlobalEntry loc ident =
@@ -178,7 +175,7 @@ getGlobalEntry loc ident =
 getLHSVarTy, getRHSVarTy, getGlobalVarTy ::
   Location
   -> Identifier
-  -> SemanticMonad (AccessKind, TerminaType)
+  -> SemanticMonad (AccessKind, TerminaType SemanticAnn)
 getLHSVarTy loc ident =
   -- | Try first local environment
   catchError (getLocalObjTy loc ident >>= (\(ak, ts) -> return (ak, ts)))
@@ -259,7 +256,7 @@ whereIsDefined ident = do
 
 -- | Checks if two type are the same numeric type.
 -- If they are not, it throws a mismatch error.
-sameTyOrError :: Location -> TerminaType -> TerminaType -> SemanticMonad ()
+sameTyOrError :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> SemanticMonad ()
 sameTyOrError loc t1 t2 =
   unless (sameTy t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
 
@@ -270,16 +267,15 @@ unBoxExp :: Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 unBoxExp (AccessObject obj) =  return $ AccessObject (unBox obj)
 unBoxExp _ = throwError $ annotateError Internal EUnboxingExpression
 
-mustBeTy :: TerminaType -> Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
+mustBeTy :: TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticMonad (Expression SemanticAnn)
 mustBeTy ty expression =
   getExprType expression >>=
   sameTyOrError loc ty
   >> return expression
   where
-    ann_exp = getAnnotation expression
-    loc = location ann_exp
+    SemanticAnn _ loc = getAnnotation expression
 
-getIntConst :: Const -> SemanticMonad Integer
+getIntConst :: Const a -> SemanticMonad Integer
 getIntConst (I (TInteger i _) _) = return i
 getIntConst _ = throwError $ annotateError Internal EUnboxingIntConst
 
@@ -287,7 +283,7 @@ catchMismatch ::
   -- | Location of the error
   Parser.ParserAnn 
   -- | Function to create the error
-  -> (TerminaType -> Error) 
+  -> (TerminaType SemanticAnn -> Error) 
   -- | Action to execute
   -> SemanticMonad a 
   -- | Action to execute
@@ -297,23 +293,23 @@ catchMismatch ann ferror action = catchError action (\err -> case getError err o
   _ -> throwError err)
 
 -- Helper function failing if a given |TerminaType| is not *simple* |simpleType|.
-arrayTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+arrayTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 arrayTyOrFail pann ty = unless (arrayTy ty) (throwError (annotateError pann (EInvalidArrayType ty)))
 
-msgTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+msgTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 msgTyOrFail pann ty = unless (msgTy ty) (throwError (annotateError pann (EInvalidMessageType ty)))
 
-structFieldTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+structFieldTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 structFieldTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann (EInvalidStructFieldType ty)))
 
-enumParamTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+enumParamTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 enumParamTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann (EInvalidEnumParameterType ty)))
 
 catchExpectedCopy ::
   -- | Location of the error
   Parser.ParserAnn
   -- | Function to create the error
-  -> (TerminaType -> Error)
+  -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
   -> SemanticMonad a
   -- | Action to execute
@@ -326,7 +322,7 @@ catchExpectedNum ::
   -- | Location of the error
   Parser.ParserAnn
   -- | Function to create the error
-  -> (TerminaType -> Error)
+  -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
   -> SemanticMonad a
   -- | Action to execute
@@ -336,150 +332,46 @@ catchExpectedNum ann ferror action = catchError action (\err -> case getError er
   _ -> throwError err)
 
 -- Helper function failing if a given |TerminaType| is not *copiable*.
-copyTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+copyTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 copyTyOrFail pann ty = unless (copyTy ty) (throwError (annotateError pann (EExpectedCopyType ty)))
 
-numTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+numTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 numTyOrFail pann ty = unless (numTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
 
-constTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+constTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EExpectedConstType ty)))
 
-optionTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+optionTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 optionTyOrFail pann ty = unless (optionTy ty) (throwError (annotateError pann (EInvalidOptionType ty)))
 
-refTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+refTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 refTyOrFail pann ty = unless (refTy ty) (throwError (annotateError pann (EInvalidReferenceType ty)))
 
-boxTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+boxTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 boxTyOrFail pann ty = unless (boxTy ty) (throwError (annotateError pann (EInvalidBoxType ty)))
 
-locTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+locTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 locTyOrFail pann ty = unless (locTy ty) (throwError (annotateError pann (EInvalidFixedLocationType ty)))
 
-declTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+declTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 declTyOrFail pann ty = unless (declTy ty) (throwError (annotateError pann (EInvalidDeclarationType ty)))
 
-accessPortTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+accessPortTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 accessPortTyOrFail pann ty = unless (accessPortTy ty) (throwError (annotateError pann (EInvalidAccessPortType ty)))
 
-allocTyOrFail :: Location -> TerminaType -> SemanticMonad ()
+allocTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 allocTyOrFail pann ty = unless (allocTy ty) (throwError (annotateError pann (EInvalidAllocatorType ty)))
 
 -- Helper function failing if a given |TerminaType| cannot be used to define a class field.
-classFieldTyorFail :: Location -> TerminaType -> SemanticMonad ()
+classFieldTyorFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 classFieldTyorFail pann ty = unless (classFieldTy ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
-
--- | Function that translates a |TypeSpecifier| into a |TerminaType|.
-typeTypeSpecifier :: Location -> TypeSpecifier -> SemanticMonad TerminaType
-typeTypeSpecifier loc (TSDefinedType ident []) = do
-  -- Check that the type was defined
-  (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
-  case glbTypeDef of 
-    Struct s _ _ -> return $ TStruct s
-    Enum e _ _ -> return $ TEnum e
-    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
-    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
-typeTypeSpecifier loc ts@(TSDefinedType "Allocator" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAllocator <$> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc ts@(TSDefinedType "AtomicAccess" [typeParam]) =
-  case typeParam of
-    TypeParamIdentifier ident -> TAtomicAccess <$> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAtomicAccess <$> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc ts@(TSDefinedType "AtomicArrayAccess" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident -> return $ V ident
-    TypeParamSize s -> return s
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TAtomicArrayAccess tyTypeParam tySizeParam
-typeTypeSpecifier loc ts@(TSDefinedType "Atomic" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TAtomic <$> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAtomic <$> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc ts@(TSDefinedType "AtomicArray" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident -> return $ V ident
-    TypeParamSize s -> return s
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TAtomicArray tyTypeParam tySizeParam
-typeTypeSpecifier loc ts@(TSDefinedType "Option" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TOption <$> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TOption <$> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc ts@(TSDefinedType "MsgQueue" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident -> return $ V ident
-    TypeParamSize s -> return s
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TMsgQueue tyTypeParam tySizeParam
-typeTypeSpecifier loc ts@(TSDefinedType "Pool" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc ts'
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident -> return $ V ident
-    TypeParamSize s -> return s
-    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TPool tyTypeParam tySizeParam
-typeTypeSpecifier loc (TSArray ts s) = 
-  TArray <$> typeTypeSpecifier loc ts <*> pure s
-typeTypeSpecifier loc (TSReference ak ts) = 
-  TReference ak <$> typeTypeSpecifier loc ts
-typeTypeSpecifier loc (TSBoxSubtype ts) = 
-  TBoxSubtype <$> typeTypeSpecifier loc ts
-typeTypeSpecifier loc (TSLocation ts) = 
-  TFixedLocation <$> typeTypeSpecifier loc ts
-typeTypeSpecifier loc (TSAccessPort ty) =
-  TAccessPort <$> typeTypeSpecifier loc ty
-typeTypeSpecifier loc (TSSinkPort ty action) =
-  TSinkPort <$> typeTypeSpecifier loc ty <*> pure action
-typeTypeSpecifier loc (TSInPort ty action) = 
-  TInPort <$> typeTypeSpecifier loc ty <*> pure action
-typeTypeSpecifier loc (TSOutPort ty) = 
-  TOutPort <$> typeTypeSpecifier loc ty
-typeTypeSpecifier loc (TSConstSubtype ty) =
-  TConstSubtype <$> typeTypeSpecifier loc ty
--- This is explicit just in case
-typeTypeSpecifier _ TSUInt8  = return TUInt8
-typeTypeSpecifier _ TSUInt16 = return TUInt16
-typeTypeSpecifier _ TSUInt32 = return TUInt32
-typeTypeSpecifier _ TSUInt64 = return TUInt64
-typeTypeSpecifier _ TSInt8   = return TInt8
-typeTypeSpecifier _ TSInt16  = return TInt16
-typeTypeSpecifier _ TSInt32  = return TInt32
-typeTypeSpecifier _ TSInt64  = return TInt64
-typeTypeSpecifier _ TSUSize  = return TUSize
-typeTypeSpecifier _ TSChar   = return TChar
-typeTypeSpecifier _ TSBool   = return TBool
-typeTypeSpecifier _ TSUnit   = return TUnit
-typeTypeSpecifier loc ts = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.
-getObjType :: Object SemanticAnn -> SemanticMonad (AccessKind, TerminaType)
+getObjType :: Object SemanticAnn -> SemanticMonad (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError $ annotateError Internal EUnboxingObject) return . getObjectSAnns . getAnnotation
 
-getExprType :: Expression SemanticAnn -> SemanticMonad TerminaType
+getExprType :: Expression SemanticAnn -> SemanticMonad (TerminaType SemanticAnn)
 getExprType
   = maybe (throwError $ annotateError Internal EUnboxingExpression) return
   . getResultingType . getSemanticAnn . getAnnotation

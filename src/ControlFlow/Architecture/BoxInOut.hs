@@ -143,7 +143,7 @@ inOutClassMember _ (ClassProcedure name params body _ann) = do
 
     where
 
-        addInParam :: Integer -> Parameter -> BoxInOutMonad ()
+        addInParam :: Integer -> Parameter a -> BoxInOutMonad ()
         addInParam argNum param = case paramType param of
             TBoxSubtype _ -> do
                 addBox (paramIdentifier param) (InBoxProcedureCall name argNum)

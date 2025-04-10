@@ -138,7 +138,7 @@ checkResourceSourceInBox expectedSource resource prevAnn (InBoxAlloc port ann) =
     -- allocator source and we are done
     case M.lookup port (resAPConnections resource) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
+            (throwError $ annotateError (getLocation ann) (EMismatchedBoxSource expectedSource actualSource [getLocation prevAnn]))
         -- | This should not happen, since all the ports of the resource
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingResource
@@ -149,7 +149,7 @@ checkResourceSourceInBox expectedSource resource prevAnn (InBoxProcedureCall pro
     -- see where do their boxes come from
     case M.lookup (resourceName resource) (resourceSources progArchitecture) of
         Just callers -> mapM_ (\(caller, accessPt, _) ->
-            checkNextSource (location prevAnn) (checkBoxProcedureCall expectedSource caller accessPt procName argNum)) callers
+            checkNextSource (getLocation prevAnn) (checkBoxProcedureCall expectedSource caller accessPt procName argNum)) callers
         -- | This means that the resource is not connected to anything (this shouuld not happen)
         Nothing -> throwError $ annotateError Internal EUnboxingResource
 -- | The rest of the cases should not happen, since resources do not have procedures
@@ -165,7 +165,7 @@ checkTaskSourceInBox expectedSource task prevAnn (InBoxAlloc port ann) =
     -- allocator source and we are done
     case M.lookup port (taskAPConnections task) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
+            (throwError $ annotateError (getLocation ann) (EMismatchedBoxSource expectedSource actualSource [getLocation prevAnn]))
         -- | This should not happen, since all the ports of the task
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingTask
@@ -177,7 +177,7 @@ checkTaskSourceInBox expectedSource task prevAnn (InBoxInput port) = do
     case M.lookup port (taskInputPortConns task) of
         Nothing -> throwError $ annotateError Internal EUnboxingTask
         Just (channel, _) -> case M.lookup channel (channels progArchitecture) of
-            Just nextChannel -> checkNextSource (location prevAnn) (getBoxSourceChannel expectedSource nextChannel)
+            Just nextChannel -> checkNextSource (getLocation prevAnn) (getBoxSourceChannel expectedSource nextChannel)
             Nothing -> throwError $ annotateError Internal EUnboxingTask
 -- | The rest of the cases should not happen, since tasks do not have procedures
 checkTaskSourceInBox _ _ _ _ = throwError $ annotateError Internal EUnboxingTask
@@ -192,7 +192,7 @@ checkHandlerSourceInBox expectedSource handler prevAnn (InBoxAlloc port ann) =
     -- allocator source and we are done
     case M.lookup port (handlerAPConnections handler) of
         Just (actualSource, _) -> unless (actualSource == expectedSource)
-            (throwError $ annotateError (location ann) (EMismatchedBoxSource expectedSource actualSource [location prevAnn]))
+            (throwError $ annotateError (getLocation ann) (EMismatchedBoxSource expectedSource actualSource [getLocation prevAnn]))
         -- | This should not happen, since all the ports of the handler
         -- must be connected to something
         Nothing -> throwError $ annotateError Internal EUnboxingHandler

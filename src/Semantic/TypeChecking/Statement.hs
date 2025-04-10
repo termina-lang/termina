@@ -31,17 +31,17 @@ import Semantic.TypeChecking.Expression
 import Semantic.TypeChecking.Check
 import qualified Data.Map as M
 
-typeBlock :: Maybe TerminaType -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
+typeBlock :: Maybe (SAST.TerminaType SemanticAnn) -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock rTy (Block stmts loc) = do
   compound <- mapM (typeStatement rTy) stmts
   return $ SAST.Block compound (buildStmtAnn loc)
 
 -- | Type checking statements. We should do something about Break
 -- Rules here are just environment control.
-typeStatement :: Maybe TerminaType -> Statement ParserAnn -> SemanticMonad (SAST.Statement SemanticAnn)
+typeStatement :: Maybe (SAST.TerminaType SemanticAnn) -> Statement ParserAnn -> SemanticMonad (SAST.Statement SemanticAnn)
 -- Declaration semantic analysis
 typeStatement _retTy (Declaration lhs_id lhs_ak lhs_ts expr anns) = do
-  lhs_type <- typeTypeSpecifier anns lhs_ts
+  lhs_type <- typeTypeSpecifier anns typeRHSObject lhs_ts
   -- Check type is alright
   checkTerminaType anns lhs_type
   -- Check if the type is a valid declaration type
@@ -93,12 +93,12 @@ typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns)
       )
 -- Here we could implement some abstract interpretation analysis
 typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt anns) = do
-  it_ty <- typeTypeSpecifier anns it_ts
+  it_ty <- typeTypeSpecifier anns typeRHSObject it_ts
   -- Check the iterator is of numeric type
   unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorInvalidType it_ty))
   -- Both boundaries should have the same numeric type
-  typed_fromexpr <- typeConstExpression it_ty from_expr
-  typed_toexpr <- typeConstExpression it_ty to_expr
+  typed_fromexpr <- typeExpression (Just (TConstSubtype it_ty)) typeRHSObject from_expr
+  typed_toexpr <- typeExpression (Just (TConstSubtype it_ty)) typeRHSObject to_expr
   SAST.ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr
     <$> (case mWhile of
               Nothing -> return Nothing
@@ -170,7 +170,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
       --
 
       typeMatchCase :: M.Map Identifier (MatchCase ParserAnn)
-        -> M.Map Identifier SAST.EnumVariant
+        -> M.Map Identifier (SAST.EnumVariant SemanticAnn)
         -> Identifier -> Identifier -> SemanticMonad (SAST.MatchCase SemanticAnn)
       typeMatchCase caseMap variantMap caseId vId =
         let (EnumVariant _ vData) = variantMap M.! vId in
@@ -216,10 +216,10 @@ typeStatement _rTy (ContinueStmt contE anns) =
 
     typeActionCall ::
       ParserAnn
-      -> TerminaType -- ^ type of the object
+      -> SAST.TerminaType SemanticAnn -- ^ type of the object
       -> Identifier -- ^ type of the member function to be called
       -> [Expression ParserAnn] -- ^ arguments
-      -> SemanticMonad (([TerminaType], [SAST.Expression SemanticAnn]), TerminaType)
+      -> SemanticMonad (([SAST.TerminaType SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
     typeActionCall ann obj_ty ident args =
       case obj_ty of
         TGlobal _ dident -> getGlobalTypeDef ann dident >>=
@@ -230,17 +230,17 @@ typeStatement _rTy (ContinueStmt contE anns) =
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
-                    Just (ts, rty, aann) -> do
+                    Just (ts, rty, SemanticAnn _ loc) -> do
                       case ts of
                         TUnit -> case args of
                           [] -> return (([], []), ts)
-                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], location aann) (fromIntegral (length args)))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
                         _ -> case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ts) typeRHSObject arg
                             return (([ts], [typed_arg]), rty)
-                          [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, location aann))
-                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [ts], location aann) (fromIntegral (length args)))
+                          [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [ts], loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound

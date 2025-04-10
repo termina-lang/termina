@@ -8,14 +8,14 @@ import Data.Text
 import Semantic.Types
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
-boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (buildConstExprTUSize 10)
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 10) (buildConstExprTUSize 10)
+boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 refArrayAnn, refTwoDymArrayAnn :: SemanticAnn
-refArrayAnn = refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))
-refTwoDymArrayAnn = refTwoDymArraySemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+refArrayAnn = refArraySemAnn TUInt32 (buildConstExprTUSize 10)
+refTwoDymArrayAnn = refTwoDymArraySemAnn TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 var0, array0, array1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable TUInt16)

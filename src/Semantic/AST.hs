@@ -33,10 +33,10 @@ data Object a
 data Expression
     a -- ^ Annotations
   = AccessObject (Object a)
-  | Constant (Const' TerminaType) a -- ^ | 24 : i8|
+  | Constant (Const a) a -- ^ | 24 : i8|
   | BinOp Op (Expression a) (Expression a) a
   | ReferenceExpression AccessKind (Object a) a
-  | Casting (Expression a) TerminaType a
+  | Casting (Expression a) (TerminaType a) a
   -- Invocation expressions
   | FunctionCall Identifier [Expression a] a
   | MemberFunctionCall (Object a) Identifier [Expression a] a
@@ -46,7 +46,7 @@ data Expression
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitializer (Expression a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
+  | ArrayInitializer (Expression a) (Expression a) a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
   | ArrayExprListInitializer [Expression a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
     [FieldAssignment' Expression a] -- ^ Initial value of each field identifier
@@ -145,7 +145,7 @@ data Statement a =
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TerminaType -- ^ type of the variable
+    (TerminaType a) -- ^ type of the variable
     (Expression a) -- ^ initialization expression
     a
   | AssignmentStmt
@@ -161,7 +161,7 @@ data Statement a =
   -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
-    TerminaType -- ^ type of iterator variable
+    (TerminaType a) -- ^ type of iterator variable
     (Expression a) -- ^ initial value of the iterator
     (Expression a) -- ^ final value of the iterator
     (Maybe (Expression a)) -- ^ break condition (optional)
@@ -192,6 +192,7 @@ data Block a
   deriving (Show, Functor)
 
 ----------------------------------------
+type TerminaType = TerminaType' Expression
 type Parameter = Parameter' TerminaType
 type Const = Const' TerminaType
 type Modifier = Modifier' TerminaType

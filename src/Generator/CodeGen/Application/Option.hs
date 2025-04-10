@@ -18,8 +18,8 @@ import Configuration.Configuration
 genOptionPathName :: FilePath
 genOptionPathName = "option" <.> "h"
 
-genSimpleOptionDefinition :: TerminaType -> CGenerator [CFileItem]
-genSimpleOptionDefinition = genOptionStruct (LocatedElement (STy SimpleStmtType) Internal)
+genSimpleOptionDefinition :: TerminaType SemanticAnn -> CGenerator [CFileItem]
+genSimpleOptionDefinition = genOptionStruct (SemanticAnn (STy SimpleStmtType) Internal)
 
 genOptionHeaderFile :: CGenerator CFile
 genOptionHeaderFile = do

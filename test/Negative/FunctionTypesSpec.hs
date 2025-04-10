@@ -3,7 +3,9 @@ module Negative.FunctionTypesSpec (spec) where
 import Test.Hspec
 import Semantic.AST
 import Semantic.Errors
+import Semantic.Types
 import Negative.Common
+import UT.PPrinter.Common
 
 test0 :: String
 test0 = "function foo(param0 : box u8) -> u8 {\n" ++
@@ -44,17 +46,17 @@ spec = do
     it "Defining a fixed size array parameter" $ do
       runNegativeTest test1
         `shouldSatisfy`
-          isEInvalidParameterType "param0" (TArray TUInt8 (K (TInteger 10 DecRepr)))
+          isEInvalidParameterType "param0" (TArray TUInt8 (buildConstExprTUSize 10))
     it "Defining a fixed size array return type" $ do
       runNegativeTest test2
         `shouldSatisfy`
-          isEInvalidReturnType (TArray TUInt8 (K (TInteger 10 DecRepr)))
+          isEInvalidReturnType (TArray TUInt8 (buildConstExprTUSize 10))
   
   where
-    isEInvalidParameterType :: Identifier -> TerminaType -> Maybe Error -> Bool
+    isEInvalidParameterType :: Identifier -> TerminaType SemanticAnn -> Maybe Error -> Bool
     isEInvalidParameterType ident ts = 
       \case Just (EInvalidParameterType (Parameter ident' ts')) -> ident == ident' && ts == ts'; _ -> False
     
-    isEInvalidReturnType :: TerminaType -> Maybe Error -> Bool
+    isEInvalidReturnType :: TerminaType SemanticAnn -> Maybe Error -> Bool
     isEInvalidReturnType ts = 
       \case Just (EInvalidReturnType ts') -> ts == ts'; _ -> False

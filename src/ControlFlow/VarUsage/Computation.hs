@@ -223,7 +223,7 @@ defVariable ident loc =
 -- Box variables have a special Use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- box.
-defArgumentsProc :: Parameter -> Location -> UDM VarUsageError ()
+defArgumentsProc :: Parameter a -> Location -> UDM VarUsageError ()
 defArgumentsProc ps loc
   = (case paramType ps of
         TBoxSubtype _ -> flip defBox loc

@@ -21,17 +21,20 @@ import Generator.Environment
 
 import Prettyprinter
 
-objSemAnn :: AccessKind -> TerminaType -> SemanticAnn
-objSemAnn ak ts = LocatedElement (ETy (ObjectType ak ts)) Internal
+objSemAnn :: AccessKind -> TerminaType SemanticAnn -> SemanticAnn
+objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) Internal
 
 stmtSemAnn :: SemanticAnn
-stmtSemAnn = LocatedElement (STy SimpleStmtType) Internal
+stmtSemAnn = SemanticAnn (STy SimpleStmtType) Internal
 
-simpleTySemAnn :: TerminaType -> SemanticAnn
-simpleTySemAnn ts = LocatedElement (ETy (SimpleType ts)) Internal
+simpleTySemAnn :: TerminaType SemanticAnn -> SemanticAnn
+simpleTySemAnn ts = SemanticAnn (ETy (SimpleType ts)) Internal
 
-matchCaseSemAnn :: [TerminaType] -> SemanticAnn
-matchCaseSemAnn ts = LocatedElement (STy (MatchCaseStmtType ts)) Internal
+matchCaseSemAnn :: [TerminaType SemanticAnn] -> SemanticAnn
+matchCaseSemAnn ts = SemanticAnn (STy (MatchCaseStmtType ts)) Internal
+
+buildConstExprTUSize :: Integer -> Expression SemanticAnn
+buildConstExprTUSize i = Constant (I (TInteger i DecRepr) Nothing) (buildExpAnn Internal TUSize)
 
 unitSemAnn :: SemanticAnn
 unitSemAnn = simpleTySemAnn TUnit
@@ -51,7 +54,7 @@ usizeExprSemAnn = simpleTySemAnn TUSize
 charExprSemAnn = simpleTySemAnn TChar
 boolExprSemAnn = simpleTySemAnn TBool
 
-boxTySemAnn :: TerminaType -> SemanticAnn
+boxTySemAnn :: TerminaType SemanticAnn -> SemanticAnn
 boxTySemAnn ts = objSemAnn Mutable (TBoxSubtype ts)
 
 boxUInt8SemAnn, boxUInt16SemAnn, boxUInt32SemAnn, boxUInt64SemAnn, boxInt8SemAnn,
@@ -67,13 +70,13 @@ boxInt64SemAnn = boxTySemAnn TInt64
 boxCharSemAnn = boxTySemAnn TChar
 boxBoolSemAnn = boxTySemAnn TBool
 
-optionBoxObjSemAnn :: AccessKind -> TerminaType -> SemanticAnn
+optionBoxObjSemAnn :: AccessKind -> TerminaType SemanticAnn -> SemanticAnn
 optionBoxObjSemAnn ak ts = objSemAnn ak (TOption (TBoxSubtype ts))
 
-optionBoxExprSemAnn :: TerminaType -> SemanticAnn
+optionBoxExprSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 optionBoxExprSemAnn ts = simpleTySemAnn (TOption (TBoxSubtype ts))
 
-refSemAnn :: TerminaType -> SemanticAnn
+refSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 refSemAnn ts = objSemAnn Immutable (TReference Mutable ts)
 
 refUInt8SemAnn, refUInt16SemAnn, refUInt32SemAnn, refUInt64SemAnn, refInt8SemAnn,
@@ -89,49 +92,49 @@ refInt64SemAnn = refSemAnn TInt64
 refCharSemAnn = refSemAnn TChar
 refBoolSemAnn = refSemAnn TBool
 
-arrayObjSemAnn :: AccessKind -> TerminaType -> Size -> SemanticAnn
+arrayObjSemAnn :: AccessKind -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 arrayObjSemAnn ak ts size = objSemAnn ak (TArray ts size)
 
-arrayExprSemAnn :: TerminaType -> Size -> SemanticAnn
+arrayExprSemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 arrayExprSemAnn ts size = simpleTySemAnn $ TArray ts size
 
-boxArrayObjSemAnn :: TerminaType -> Size -> SemanticAnn
+boxArrayObjSemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 boxArrayObjSemAnn ts size = objSemAnn Mutable (TBoxSubtype (TArray ts size))
 
-refArraySemAnn :: TerminaType -> Size -> SemanticAnn
+refArraySemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 refArraySemAnn ts size = objSemAnn Immutable (TReference Mutable (TArray ts size))
 
-refTwoDymArraySemAnn :: TerminaType -> Size -> Size -> SemanticAnn
+refTwoDymArraySemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 refTwoDymArraySemAnn ts size1 size2 = objSemAnn Immutable (TReference Mutable (TArray (TArray ts size1) size2))
 
-uint16VecObjSemAnn, uint32VecObjSemAnn :: AccessKind -> Size -> SemanticAnn
+uint16VecObjSemAnn, uint32VecObjSemAnn :: AccessKind -> Expression SemanticAnn -> SemanticAnn
 uint16VecObjSemAnn ak = arrayObjSemAnn ak TUInt16
 uint32VecObjSemAnn ak = arrayObjSemAnn ak TUInt32
 
-twoDymArrayObjSemAnn :: AccessKind -> TerminaType -> Size -> Size -> SemanticAnn
+twoDymArrayObjSemAnn :: AccessKind -> TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 twoDymArrayObjSemAnn ak ts size1 size2 = objSemAnn ak (TArray (TArray ts size1) size2)
 
-twoDymArrayExprSemAnn :: TerminaType -> Size -> Size -> SemanticAnn
+twoDymArrayExprSemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 twoDymArrayExprSemAnn ts size1 size2 = simpleTySemAnn (TArray (TArray ts size1) size2)
 
-uint16TwoDymVecObjSemAnn, uint32TwoDymVecObjSemAnn :: AccessKind -> Size -> Size -> SemanticAnn
+uint16TwoDymVecObjSemAnn, uint32TwoDymVecObjSemAnn :: AccessKind -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 uint16TwoDymVecObjSemAnn ak = twoDymArrayObjSemAnn ak TUInt16
 uint32TwoDymVecObjSemAnn ak = twoDymArrayObjSemAnn ak TUInt32
 
-boxTwoDymArrayObjSemAnn :: TerminaType -> Size -> Size -> SemanticAnn
+boxTwoDymArrayObjSemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 boxTwoDymArrayObjSemAnn ts size1 size2 = objSemAnn Mutable (TBoxSubtype (TArray (TArray ts size1) size2))
 
-boxThreeDymArrayObjSemAnn :: TerminaType -> Size -> Size -> Size -> SemanticAnn
+boxThreeDymArrayObjSemAnn :: TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 boxThreeDymArrayObjSemAnn ts size1 size2 size3 = objSemAnn Mutable (TBoxSubtype (TArray (TArray (TArray ts size1) size2) size3))
 
-uint16BoxTwoDymVecObjSemAnn, uint32BoxTwoDymVecObjSemAnn :: Size -> Size -> SemanticAnn
+uint16BoxTwoDymVecObjSemAnn, uint32BoxTwoDymVecObjSemAnn :: Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 uint16BoxTwoDymVecObjSemAnn = boxTwoDymArrayObjSemAnn TUInt16
 uint32BoxTwoDymVecObjSemAnn = boxTwoDymArrayObjSemAnn TUInt32
 
-threeDymArrayObjSemAnn :: AccessKind -> TerminaType -> Size -> Size -> Size -> SemanticAnn
+threeDymArrayObjSemAnn :: AccessKind -> TerminaType SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 threeDymArrayObjSemAnn ak ts size1 size2 size3 = objSemAnn ak (TArray (TArray (TArray ts size1) size2) size3)
 
-uint16ThreeDymVecObjSemAnn, uint32ThreeDymVecObjSemAnn :: AccessKind -> Size -> Size -> Size -> SemanticAnn
+uint16ThreeDymVecObjSemAnn, uint32ThreeDymVecObjSemAnn :: AccessKind -> Expression SemanticAnn -> Expression SemanticAnn -> Expression SemanticAnn -> SemanticAnn
 uint16ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt16
 uint32ThreeDymVecObjSemAnn ak = threeDymArrayObjSemAnn ak TUInt32
 
@@ -165,14 +168,14 @@ resourceObjSemAnn ak ident = objSemAnn ak (TGlobal ResourceClass ident)
 refEnumSemAnn :: Identifier -> SemanticAnn
 refEnumSemAnn ident = refSemAnn (TEnum ident)
 
-poolSemAnn :: TerminaType -> SemanticAnn
+poolSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 poolSemAnn ts = objSemAnn Mutable (TAccessPort (TAllocator ts))
 
-msgQueueSemAnn :: TerminaType -> SemanticAnn
+msgQueueSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
-funSemAnn :: [TerminaType] -> TerminaType -> SemanticAnn
-funSemAnn params ts = LocatedElement (ETy (AppType params ts)) Internal
+funSemAnn :: [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
+funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 

@@ -129,7 +129,7 @@ genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
     }
 genArchTypeDef _ = return ()
 
-evalConstExpression :: Expression SemanticAnn -> ArchitectureMonad Const
+evalConstExpression :: Expression SemanticAnn -> ArchitectureMonad (Const SemanticAnn)
 evalConstExpression (Constant value _ann) = do
   return value 
 evalConstExpression (AccessObject (Variable identifier _ann)) = do
@@ -176,7 +176,7 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
                 addChannelTarget target ident pname cann
                 return (M.insert pname (target, cann) inp, sink, outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (EDuplicatedChannelConnection target (location prevcann))
+                throwError $ annotateError (getLocation cann) (EDuplicatedChannelConnection target (getLocation prevcann))
           Nothing -> 
             case M.lookup pname (sinkPorts tpClass) of
               Just _ -> do
@@ -190,7 +190,7 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
                       }
                     return (inp, M.insert pname (target, cann) sink, outp, accp)
                   Just (_, _, prevcann) ->
-                    throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
+                    throwError $ annotateError (getLocation cann) (EDuplicatedEmitterConnection target (getLocation prevcann))
               _ -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case M.lookup pname (outputPorts tpClass) of
@@ -265,7 +265,7 @@ genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructIn
                   }
                 return (Just (pname, target, cann), outp, accp)
               Just (_, _, prevcann) ->
-                throwError $ annotateError (location cann) (EDuplicatedEmitterConnection target (location prevcann))
+                throwError $ annotateError (getLocation cann) (EDuplicatedEmitterConnection target (getLocation prevcann))
           Nothing -> error $ "Internal error: port " ++ pname ++ " is not a sink port or an in port"
       FieldPortConnection OutboundPortConnection pname target cann ->
         case M.lookup pname (outputPorts tpClass) of
@@ -304,7 +304,7 @@ genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
 emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
 emptyTerminaProgArch config = TerminaProgArch {
   emitters = if enableSystemInit config then M.fromList [
-    ("system_init", TPSystemInitEmitter "system_init" (LocatedElement (GTy (TGlobal EmitterClass "SystemInit")) Internal))
+    ("system_init", TPSystemInitEmitter "system_init" (SemanticAnn (GTy (TGlobal EmitterClass "SystemInit")) Internal))
   ] else M.empty,
   functions = M.empty,
   globalConstants = M.empty,
@@ -315,7 +315,7 @@ emptyTerminaProgArch config = TerminaProgArch {
   handlers = M.empty,
   resourceClasses = M.empty,
   resources = if enableSystemPort config then M.fromList [
-    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty Nothing (LocatedElement (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
+    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
   ] else M.empty,
   pools = M.empty,
   atomics = M.empty,

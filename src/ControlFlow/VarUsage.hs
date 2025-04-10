@@ -40,7 +40,7 @@ useArguments :: Expression SemanticAnn -> UDM VarUsageError ()
 useArguments e@(AccessObject (Variable ident ann))
   = case getTypeSemAnn ann of
     Just (TBoxSubtype _) ->
-      let loc = location ann in
+      let loc = getLocation ann in
       safeMoveBox ident loc
     _ -> useExpression e
 -- Box variables inside expressions are read as values.
@@ -49,7 +49,7 @@ useArguments e = useExpression e
 useObject :: Object SemanticAnn -> UDM VarUsageError ()
 useObject (Variable ident ann)
   =
-  let loc = location ann in
+  let loc = getLocation ann in
   maybe
         (throwError $ annotateError loc EUnboxingObjectType)
         (\case {
@@ -72,7 +72,7 @@ useFieldAssignment :: FieldAssignment SemanticAnn -> UDM VarUsageError ()
 useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 useFieldAssignment _ = return ()
 
-getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType)
+getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError EUnboxingObjectType) return . getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
@@ -118,7 +118,7 @@ useDefBlockRet bret = useDefBasicBlocks (blockBody bret)
 useDefStmt :: Statement SemanticAnn -> UDM VarUsageError ()
 useDefStmt (Declaration ident _accK tyS initE ann)
   -- variable def is defined
-  = let loc = location ann in
+  = let loc = getLocation ann in
   case tyS of
     -- Box are only declared on match statements
     TOption (TBoxSubtype _) -> defVariableOptionBox ident loc
@@ -131,7 +131,7 @@ useDefStmt (Declaration ident _accK tyS initE ann)
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e ann) = do
   -- | We need to check if the object is an option-box
-  obj_ty <- withLocation (location ann) (getObjType obj)
+  obj_ty <- withLocation (getLocation ann) (getObjType obj)
   case obj_ty of
     (_, TOption (TBoxSubtype _)) -> 
       -- | We are assigning to an option-box. This can only be done through a
@@ -139,20 +139,20 @@ useDefStmt (AssignmentStmt obj e ann) = do
       case e of 
         OptionVariantInitializer None _ -> 
           case obj of
-            Variable ident _ -> initializeOptionBox ident (location ann)
-            _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+            Variable ident _ -> initializeOptionBox ident (getLocation ann)
+            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
         OptionVariantInitializer (Some boxObjExpr) _ -> do
           -- | We need to move the box object 
           case boxObjExpr of
             AccessObject (Variable ident _) -> 
-              let loc = location ann in
+              let loc = getLocation ann in
               safeMoveBox ident loc
-            _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
           -- | And update the option-box as allocated
           case obj of
-            Variable ident _ -> allocOptionBox ident (location ann)
-            _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
-        _ -> throwError $ annotateError (location ann) EBadOptionBoxAssignExpression
+            Variable ident _ -> allocOptionBox ident (getLocation ann)
+            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
+        _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
     _ -> useObject obj >> useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
@@ -167,7 +167,7 @@ useDefBasicBlock :: BasicBlock SemanticAnn -> UDM VarUsageError ()
 useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse _ann)
   = do
   let blocks = bTrue : map elseIfBody elseIfs ++ maybeToList bFalse
-      bodiesWithLocs = map (\b -> (blockBody b, location (blockAnnotation b))) blocks
+      bodiesWithLocs = map (\b -> (blockBody b, getLocation (blockAnnotation b))) blocks
   prevSt <- ST.get
   -- All sets generated for all different branches.
   sets <- mapM (\(body, loc) -> do
@@ -185,27 +185,27 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block ann) = do
     prevSt <- ST.get
     -- What happens inside the body of a for, may not happen at all.
     loopSt <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody block) >> ST.get)
-    finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, location ann)]
+    finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
     maybe (return ()) useExpression mBrk
 useDefBasicBlock (MatchBlock e mcase ann) = do
   prevSt <- ST.get
-  sets <- maybe (throwError $ annotateError (location ann) EUnboxingExpressionType)
+  sets <- maybe (throwError $ annotateError (getLocation ann) EUnboxingExpressionType)
     (\case
         TOption (TBoxSubtype _) ->
             case mcase of
               [ml,mr] -> do
                 let (mSome, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
                 someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
-                  >> defBox (head (matchBVars mSome)) (location (matchAnnotation mSome)) >> ST.get)
+                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
                 noneBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
-                return [(someBlk, location . matchAnnotation $ mSome), (noneBlk, location . matchAnnotation $ mNone)]
+                return [(someBlk, getLocation . matchAnnotation $ mSome), (noneBlk, getLocation . matchAnnotation $ mNone)]
               _ -> throwError $ annotateError Internal EMalformedOptionBoxMatch;
         -- Otherwise, it is a simple use variable.
         _ -> runMultipleEncapsWithEmptyVars (
           map (\c -> do
             blockSt <- useMCase c >> ST.get
-            return (blockSt, location . matchAnnotation $ c)) mcase);
+            return (blockSt, getLocation . matchAnnotation $ c)) mcase);
     ) (getResultingType $ getSemanticAnn $ getAnnotation e)
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
@@ -213,9 +213,9 @@ useDefBasicBlock (MatchBlock e mcase ann) = do
 useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
   case arg of
     AccessObject input_obj@(Variable var _) -> do
-      input_obj_type <- withLocation (location ann) (getObjType input_obj)
+      input_obj_type <- withLocation (getLocation ann) (getObjType input_obj)
       case input_obj_type of
-        (_, TBoxSubtype _) -> let loc = location ann in
+        (_, TBoxSubtype _) -> let loc = getLocation ann in
           safeMoveBox var loc
         _ -> useObject input_obj
     _ -> useExpression arg
@@ -223,15 +223,15 @@ useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
   case arg of
     -- I don't think we can have expression computing variables here.
     ReferenceExpression Mutable (Variable avar _anni) _ann ->
-      allocOptionBox avar (location ann)
-    _ ->throwError $ annotateError (location ann) EBadAllocArg
+      allocOptionBox avar (getLocation ann)
+    _ ->throwError $ annotateError (getLocation ann) EBadAllocArg
 useDefBasicBlock (FreeBox obj arg ann)
   = useObject obj >>
   case arg of
     AccessObject (Variable var _anni) ->
-      let loc = location ann in
+      let loc = getLocation ann in
       safeMoveBox var loc
-    _ -> withLocation (location ann) (throwError EBadFreeArg)
+    _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
 useDefBasicBlock (ProcedureCall obj _ident args _ann)
   = useObject obj >> mapM_ useArguments args
 useDefBasicBlock (AtomicLoad obj e _ann)
@@ -253,7 +253,7 @@ useDefBasicBlock (SystemCall obj _ident args _ann) =
 useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
 useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBasicBlocks (blockBody blk)
-  >> mapM_ (`defVariable` location ann) bvars
+  >> mapM_ (`defVariable` getLocation ann) bvars
 
 checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
 checkUseVariableStates prevSt sets = do
@@ -327,19 +327,19 @@ checkOptionBoxStates lSt ((rSt, rloc):xs) = do
 
 useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
 useDefCMemb (ClassField fdef)
-  = defVariable (fieldIdentifier fdef) (location (fieldAnnotation fdef))
+  = defVariable (fieldIdentifier fdef) (getLocation (fieldAnnotation fdef))
 useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
   = useDefBlockRet blk
-  >> mapM_ (`defArgumentsProc` location ann) ps
+  >> mapM_ (`defArgumentsProc` getLocation ann) ps
   -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ ((`defVariable` location ann) . paramIdentifier) ps
+  >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
 useDefCMemb (ClassAction _ident p _tyret bret ann)
   = useDefBlockRet bret
-  >> mapM_ (`defArgumentsProc` location ann) [p]
+  >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 
 useDefTypeDef :: TypeDef SemanticAnn -> UDM VarUsageError ()
 useDefTypeDef (Class _k _id members _provides _mods)
@@ -363,7 +363,7 @@ useDefTypeDef (Enum {}) = return ()
 useDefFrag :: AnnASTElement SemanticAnn -> UDM VarUsageError ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
- >> mapM_ (`defArgumentsProc` location anns) ps
+ >> mapM_ (`defArgumentsProc` getLocation anns) ps
  -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})
   = return ()

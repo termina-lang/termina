@@ -8,12 +8,12 @@ import Data.Text
 import Semantic.Types
 
 arrayObjAnn, boxArrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
-boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+boxArrayObjAnn = boxArrayObjSemAnn TUInt32 (buildConstExprTUSize 10)
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 refArrayAnn :: SemanticAnn
-refArrayAnn = refSemAnn (TArray TUInt32 (K (TInteger 10 DecRepr)))
+refArrayAnn = refSemAnn (TArray TUInt32 (buildConstExprTUSize 10))
 
 var0, array0, array1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable TUInt16)
@@ -40,7 +40,7 @@ boxArray0IndexConstant = AccessObject (ArrayIndexExpression (Unbox boxArray0 arr
 boxArray0IndexVar0 = AccessObject (ArrayIndexExpression (Unbox boxArray0 arrayObjAnn) (AccessObject var0) (objSemAnn Mutable TUInt32))
 
 array1IndexFirstDym :: Object SemanticAnn
-array1IndexFirstDym = ArrayIndexExpression array1 usizeIndex3 (arrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)))
+array1IndexFirstDym = ArrayIndexExpression array1 usizeIndex3 (arrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5))
 
 array1IndexExpression :: Expression SemanticAnn
 array1IndexExpression = AccessObject (ArrayIndexExpression array1IndexFirstDym usizeIndex4 (objSemAnn Mutable TInt64))

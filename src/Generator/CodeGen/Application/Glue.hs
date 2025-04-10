@@ -21,6 +21,7 @@ import Generator.CodeGen.Types
 import Semantic.AST
 import Control.Monad (forM)
 import Data.List (find)
+import Generator.CodeGen.Expression
 
 
 genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
@@ -251,7 +252,7 @@ genChannelConnections progArchitecture = do
                         @= portVariant @: __termina_id_t
                 ]
 
-genInitPools :: [TPPool a] -> CGenerator CFileItem
+genInitPools :: [TPPool SemanticAnn] -> CGenerator CFileItem
 genInitPools pls = do
     initPools <- mapM genPoolInit pls
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ _Status)] @-> void $
@@ -261,7 +262,7 @@ genInitPools pls = do
 
     where
 
-        genPoolInit :: TPPool a -> CGenerator CCompoundBlockItem
+        genPoolInit :: TPPool SemanticAnn -> CGenerator CCompoundBlockItem
         genPoolInit (TPPool identifier ts _ _ _) = do
             cTs <- genType noqual ts
             poolId <- genDefinePoolIdLabel identifier
@@ -292,7 +293,7 @@ genInitMessageQueues queues = do
         genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator CCompoundBlockItem
         genOSALMsgQueueInit mq@(OSALTaskMsgQueue _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genArraySize size
+            cSize <- genExpression size
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
                     $ trail_cr . block $ [
@@ -305,7 +306,7 @@ genInitMessageQueues queues = do
                 ]
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genArraySize size
+            cSize <- genExpression size
             cTs <- genType noqual ty
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
@@ -319,7 +320,7 @@ genInitMessageQueues queues = do
                 ]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
-            cSize <- genArraySize size
+            cSize <- genExpression size
             return $
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
                     $ trail_cr . block $ [

@@ -8,7 +8,7 @@ import Data.Text
 import Semantic.Types
 
 arrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
 
 array0 :: Object SemanticAnn
 array0 = Variable "array0" arrayObjAnn

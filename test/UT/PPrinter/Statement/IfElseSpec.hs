@@ -7,17 +7,17 @@ import Semantic.AST
 import Data.Text
 import Semantic.Types
 
-optionBoxUInt32TS :: TerminaType
+optionBoxUInt32TS :: TerminaType SemanticAnn
 optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
 
-arrayTS :: TerminaType
-arrayTS = TArray TUInt32 (K (TInteger 10 DecRepr))
+arrayTS :: TerminaType SemanticAnn
+arrayTS = TArray TUInt32 (buildConstExprTUSize 10)
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 arrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
 
 array0 :: Expression SemanticAnn
 array0 = AccessObject (Variable "array0" arrayObjAnn)

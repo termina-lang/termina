@@ -16,8 +16,9 @@ import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
+import Generator.CodeGen.Expression
 
-filterStructModifiers :: [Modifier] -> [Modifier]
+filterStructModifiers :: [Modifier a] -> [Modifier a]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
       Modifier "aligned" _ -> True
@@ -36,7 +37,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicAccess {
 genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAccess {})) _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
-genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     let cThatField = field thatField (ptr void) 
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
@@ -54,7 +55,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
             let cThisParamType = _const . ptr $ void
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
             return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
-genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (LocatedElement (FTy (AccessPortField members)) _)) = do
+genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
             CDecl 
@@ -76,14 +77,14 @@ genFieldDeclaration (FieldDefinition identifier ts _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
 
-genOptionSomeParameterStruct :: SemanticAnn -> TerminaType ->  CGenerator CFileItem
+genOptionSomeParameterStruct :: SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
 genOptionSomeParameterStruct ann ts = do
     cTs <- genType noqual ts
     let fld = field optionSomeField cTs
     identifier <- genOptionParameterStructName ts
-    return $ pre_cr $ struct identifier [fld] [] |>> location ann
+    return $ pre_cr $ struct identifier [fld] [] |>> getLocation ann
 
-genOptionStruct :: SemanticAnn -> TerminaType -> CGenerator [CFileItem]
+genOptionStruct :: SemanticAnn -> TerminaType SemanticAnn -> CGenerator [CFileItem]
 genOptionStruct ann (TOption ts) = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
@@ -95,11 +96,11 @@ genOptionStruct ann (TOption ts) = do
     paramStruct <- genOptionSomeParameterStruct ann ts
     return [
             paramStruct,
-            pre_cr $ struct identifier [some, this_variant] [] |>> location ann
+            pre_cr $ struct identifier [some, this_variant] [] |>> getLocation ann
         ]
 genOptionStruct ts _ = throwError $ InternalError $ "Type not an option: " ++ show ts
 
-genAttribute :: Modifier -> CGenerator CAttribute
+genAttribute :: Modifier a -> CGenerator CAttribute
 genAttribute (Modifier name Nothing) = do
     return $ CAttr name []
 genAttribute (Modifier name (Just expr)) = do
@@ -108,7 +109,7 @@ genAttribute (Modifier name (Just expr)) = do
 
     where
 
-        genConst :: (MonadError CGeneratorError m) => Const -> m CExpression
+        genConst :: (MonadError CGeneratorError m) => Const a -> m CExpression
         genConst c = do
             let cAnn = LocatedElement CGenericAnn Internal
             case c of
@@ -119,14 +120,14 @@ genAttribute (Modifier name (Just expr)) = do
                 (B False) -> return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTBool noqual) cAnn
                 (C ch) -> return $ CExprConstant (CCharConst (CChar ch)) (CTChar noqual) cAnn
 
-genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant -> CGenerator CFileItem
+genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant SemanticAnn -> CGenerator CFileItem
 genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do
     let cAnn = buildDeclarationAnn ann True
     pParams <- zipWithM genEnumVariantParameter params [0..]
     paramsStructName <- genEnumParameterStructName identifier this_variant
     return $ CExtDecl (CEDStructUnion (Just paramsStructName) (CStruct CStructTag Nothing pParams [])) cAnn
     where
-        genEnumVariantParameter :: TerminaType -> Integer -> CGenerator CDeclaration
+        genEnumVariantParameter :: TerminaType SemanticAnn -> Integer -> CGenerator CDeclaration
         genEnumVariantParameter ts index = do
             cParamType <- genType noqual ts
             return $ CDecl (CTypeSpec cParamType) (Just (namefy $ show index)) Nothing
@@ -159,8 +160,8 @@ genConstSelfParam e = throwError $ InternalError $ "Not a class definition: " ++
 genSelfCastStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genSelfCastStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
-    let cExpr = cast (ptr selfCType) (thisParam @: ptr void) |>> location ann
-    return $ pre_cr $ var selfParam (ptr selfCType) @:= cExpr |>> location ann
+    let cExpr = cast (ptr selfCType) (thisParam @: ptr void) |>> getLocation ann
+    return $ pre_cr $ var selfParam (ptr selfCType) @:= cExpr |>> getLocation ann
 
 -- | TypeDef pretty printer.
 genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
@@ -184,33 +185,33 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
 
         where
 
-            genParameterUnionField :: EnumVariant -> CGenerator CDeclaration
+            genParameterUnionField :: EnumVariant SemanticAnn -> CGenerator CDeclaration
             genParameterUnionField (EnumVariant this_variant _) = do
                 paramsStructName <- genEnumParameterStructName identifier this_variant
                 paramsStructType <- genType noqual (TStruct paramsStructName)
                 return $ CDecl (CTypeSpec paramsStructType) (Just this_variant) Nothing
 
-            genParameterUnion :: [EnumVariant] -> CGenerator CDeclaration
+            genParameterUnion :: [EnumVariant SemanticAnn] -> CGenerator CDeclaration
             genParameterUnion variantsWithParams = do
                 pFields <- mapM genParameterUnionField variantsWithParams
                 return $ CDecl (CTSStructUnion (CStruct CUnionTag Nothing pFields [])) Nothing Nothing
 
-            genEnumStruct :: Identifier -> [EnumVariant] -> CGenerator CFileItem
+            genEnumStruct :: Identifier -> [EnumVariant SemanticAnn] -> CGenerator CFileItem
             genEnumStruct enumName variantsWithParams = do
                 enumType <- genType noqual (TStruct enumName)
                 let enumField = field variant enumType
                 case variantsWithParams of
-                    [] -> return $ pre_cr $ struct identifier [enumField] [] |>> location ann
+                    [] -> return $ pre_cr $ struct identifier [enumField] [] |>> getLocation ann
                     [v] -> do
                         unionField <- genParameterUnionField v
-                        return $ pre_cr $ struct identifier [enumField, unionField] [] |>> location ann
+                        return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
                     _ -> do
                         unionField <- genParameterUnion variantsWithParams
-                        return $ pre_cr $ struct identifier [enumField, unionField] [] |>> location ann
+                        return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
 genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _extends procs _) ann) = do
     let cThatField = field thatField (ptr void)
     procedureFields <- mapM genInterfaceProcedureField procs
-    return [pre_cr $ struct identifier (cThatField : procedureFields) [] |>> location ann]
+    return [pre_cr $ struct identifier (cThatField : procedureFields) [] |>> getLocation ann]
 
     where
 
@@ -243,10 +244,10 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     case clsKind of
         TaskClass -> do
             cTaskFunction <- genTaskFunctionDeclaration
-            return $ [pre_cr (struct identifier structFields structModifiers |>> location ann), cTaskFunction] 
+            return $ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction] 
                 ++ cFunctions
         _ -> 
-            return $ pre_cr (struct identifier structFields structModifiers |>> location ann) 
+            return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann) 
                 : cFunctions
 
     where
@@ -306,7 +307,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
 
     where
 
-        actions :: [(Identifier, TerminaType, Identifier)]
+        actions :: [(Identifier, TerminaType SemanticAnn, Identifier)]
         actions = foldl (\acc member ->
             case member of
                 ClassField (FieldDefinition identifier (TSinkPort dts action) _) -> (identifier, dts, action) : acc
@@ -314,7 +315,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                 _ -> acc
             ) [] members
 
-        getMsgDataVariable :: Bool -> Identifier -> TerminaType -> CGenerator CCompoundBlockItem
+        getMsgDataVariable :: Bool -> Identifier -> TerminaType SemanticAnn -> CGenerator CCompoundBlockItem
         getMsgDataVariable before action dts = do
             cDataType <- genType noqual dts
             if before then
@@ -322,14 +323,14 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             else
                 return $ no_cr $ var (action <::> "msg_data") cDataType
 
-        getMsgDataVariables :: [(Identifier, TerminaType, Identifier)] -> CGenerator [CCompoundBlockItem]
+        getMsgDataVariables :: [(Identifier, TerminaType SemanticAnn, Identifier)] -> CGenerator [CCompoundBlockItem]
         getMsgDataVariables [] = return []
         getMsgDataVariables ((_identifier, dts, action) : xs) = do
             decl <- getMsgDataVariable True action dts
             rest <- mapM (uncurry (getMsgDataVariable False) . (\(_, dts', action') -> (action', dts'))) xs
             return $ decl : rest
 
-        genCase :: (Identifier, TerminaType, Identifier) -> CGenerator [CCompoundBlockItem]
+        genCase :: (Identifier, TerminaType SemanticAnn, Identifier) -> CGenerator [CCompoundBlockItem]
         genCase (port, dts, action) = do
             this_variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action

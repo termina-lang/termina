@@ -31,7 +31,7 @@ classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined,
     ClassProcedure "procedure1" [
       Parameter "param0" TUInt8,
-      Parameter "param1" (TReference Mutable (TArray TUInt8 (K (TInteger 32 DecRepr))))
+      Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 32)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
 
@@ -44,7 +44,7 @@ classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndTwoFields = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt8 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))
+    ClassField (FieldDefinition "field1" (TArray TUInt64 (buildConstExprTUSize 24))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) undefined
@@ -53,7 +53,7 @@ noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnn
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt8 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field1" (TArray TUInt64 (K (TInteger 24 DecRepr)))
+    ClassField (FieldDefinition "field1" (TArray TUInt64 (buildConstExprTUSize 10))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "no_handler" Nothing]) undefined
@@ -63,11 +63,11 @@ packedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
     ClassField (FieldDefinition "field1" TUInt16 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [
       Parameter "param0" TChar,
-      Parameter "param1" (TReference Mutable (TArray TUInt8 (K (TInteger 16 DecRepr))))
+      Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 16)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "packed" Nothing]) undefined
 
@@ -76,7 +76,7 @@ alignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
     ClassField (FieldDefinition "field1" TUInt16 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) undefined
@@ -86,7 +86,7 @@ packedAndAlignedClass = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
     ClassField (FieldDefinition "field1" (TStruct "TCDescriptor") (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (K (TInteger 32 DecRepr)))
+    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [

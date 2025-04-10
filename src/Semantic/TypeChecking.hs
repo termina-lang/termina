@@ -42,15 +42,15 @@ typeElement :: AnnASTElement ParserAnn
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
   -- Check the return type 
-  mty <- maybe (return Nothing) (typeTypeSpecifier anns >=>
+  mty <- maybe (return Nothing) (typeTypeSpecifier anns typeGlobalObject >=>
       (\ty -> checkReturnType anns ty >> return (Just ty))) mts
   ps_ty <- forM ps_ts (typeParameter anns)
   typedBret <- addLocalImmutObjs anns
                 (fmap (\p -> (paramIdentifier p , paramType p)) ps_ty)
                 (typeBlock mty bret)
-  mds_ty <- mapM (typeModifier anns) mds_ts
+  mds_ty <- mapM (typeModifier anns typeGlobalObject) mds_ts
   let functionSeman = FunctionSeman (map paramType ps_ty) (fromMaybe TUnit mty)
-  return (Function ident ps_ty mty typedBret mds_ty (LocatedElement (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
+  return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do
   typed_tydef <- typeTypeDefinition ann tydef

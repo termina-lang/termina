@@ -43,10 +43,10 @@ data Object a
 data Expression
     a -- ^ Annotations
   = AccessObject (Object a)
-  | Constant (Const' TypeSpecifier) a -- ^ | 24 : i8|
+  | Constant (Const a) a -- ^ | 24 : i8|
   | BinOp Op (Expression a) (Expression a) a
   | ReferenceExpression AccessKind (Object a) a
-  | Casting (Expression a) TypeSpecifier a
+  | Casting (Expression a) (TypeSpecifier a) a
   -- Invocation expressions
   | FunctionCall Identifier [Expression a] a
   | MemberFunctionCall (Object a) Identifier [Expression a] a
@@ -56,11 +56,11 @@ data Expression
   --
   -- These four constructors cannot be used on regular (primitive?) expressions
   -- These two can only be used as the RHS of an assignment:
-  | ArrayInitializer (Expression a) Size a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
+  | ArrayInitializer (Expression a) (Expression a) a -- ^ TArray initializer, | (13 : i8) + (2 : i8)|
   | ArrayExprListInitializer [Expression a] a -- ^ TArray expression list initializer, | { 13 : i8, 2 : i8 } |
   | StructInitializer
     [FieldAssignment' Expression a] -- ^ Initial value of each field identifier
-    (Maybe TypeSpecifier) -- ^ Structure type identifier
+    (Maybe (TypeSpecifier a)) -- ^ Structure type identifier
     a
   -- These two can only be used as the RHS of an assignment or as a case of a match expression:
   | EnumVariantInitializer
@@ -131,80 +131,81 @@ instance Annotated Expression where
   updateAnnotation (IsEnumVariantExpression obj e v _) = IsEnumVariantExpression obj e v
   updateAnnotation (IsOptionVariantExpression obj v _) = IsOptionVariantExpression obj v
 
-data MatchCase' ty expr obj a = MatchCase
+data MatchCase a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars      :: [Identifier]
-  , matchBody       :: Block' ty expr obj a
+  , matchBody       :: Block a
   , matchAnnotation :: a
   } deriving (Show,Functor)
 
-data ElseIf' ty expr obj a = ElseIf
+data ElseIf a = ElseIf
   {
-    elseIfCond       :: expr a
-  , elseIfBody       :: Block' ty expr obj a
+    elseIfCond       :: Expression a
+  , elseIfBody       :: Block a
   , elseIfAnnotation :: a
   } deriving (Show, Functor)
 
-data Statement' ty expr obj a =
+data Statement a =
   -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    ty -- ^ type of the variable
-    (expr a) -- ^ initialization expression
+    (TypeSpecifier a) -- ^ type of the variable
+    (Expression a) -- ^ initialization expression
     a
   | AssignmentStmt
-    (obj a) -- ^ name of the variable
-    (expr a) -- ^ assignment expression
+    (Object a) -- ^ name of the variable
+    (Expression a) -- ^ assignment expression
     a
   | IfElseStmt
-    (expr a) -- ^ conditional expression
-    (Block' ty expr obj a) -- ^ statements in the if block
-    [ElseIf' ty expr obj a] -- ^ list of else if blocks
-    (Maybe (Block' ty expr obj a)) -- ^ statements in the else block
+    (Expression a) -- ^ conditional expression
+    (Block a) -- ^ statements in the if block
+    [ElseIf a] -- ^ list of else if blocks
+    (Maybe (Block a)) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
-    ty -- ^ type of iterator variable
-    (expr a) -- ^ initial value of the iterator
-    (expr a) -- ^ final value of the iterator
-    (Maybe (expr a)) -- ^ break condition (optional)
-    (Block' ty expr obj a) -- ^ statements in the for loop
+    (TypeSpecifier a) -- ^ type of iterator variable
+    (Expression a) -- ^ initial value of the iterator
+    (Expression a) -- ^ final value of the iterator
+    (Maybe (Expression a)) -- ^ break condition (optional)
+    (Block a) -- ^ statements in the for loop
     a
   | MatchStmt
-    (expr a) -- ^ expression to match
-    [MatchCase' ty expr obj a] -- ^ list of match cases
+    (Expression a) -- ^ expression to match
+    [MatchCase a] -- ^ list of match cases
     a
   | SingleExpStmt
-    (expr a) -- ^ expression
+    (Expression a) -- ^ expression
     a
   | ReturnStmt
-    (Maybe (expr a)) -- ^ return expression
+    (Maybe (Expression a)) -- ^ return expression
     a
   | ContinueStmt
-    (expr a)
+    (Expression a)
     a
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement
-data Block' ty expr obj a
+data Block a
   = Block
   {
-    blockBody :: [Statement' ty expr obj a],
+    blockBody :: [Statement a],
     blockAnnotation :: a
   }
   deriving (Show, Functor)
 
 ----------------------------------------
+type TypeParameter = TypeParameter' Expression
+type TypeSpecifier = TypeSpecifier' Expression
 type Parameter = Parameter' TypeSpecifier
 type Const = Const' TypeSpecifier
 type Modifier = Modifier' TypeSpecifier
 type FieldDefinition = FieldDefinition' TypeSpecifier
 type EnumVariant = EnumVariant' TypeSpecifier
 
-type Block = Block' TypeSpecifier Expression Object
 type AnnASTElement = AnnASTElement' TypeSpecifier Block Expression
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TypeSpecifier Expression
@@ -214,11 +215,7 @@ type TypeDef = TypeDef' TypeSpecifier Block
 type InterfaceMember = InterfaceMember' TypeSpecifier
 type ClassMember = ClassMember' TypeSpecifier Block
 
-type MatchCase = MatchCase' TypeSpecifier Expression Object
-type ElseIf = ElseIf' TypeSpecifier Expression Object
-type Statement = Statement' TypeSpecifier Expression Object
-
 type AnnotatedProgram a = [AnnASTElement' TypeSpecifier Block Expression a]
 
 type ModuleImport = ModuleImport' [String]
-type TerminaModule = TerminaModule' TypeSpecifier Block Expression [String]
+type TerminaModule a = TerminaModule' TypeSpecifier Block Expression [String] a

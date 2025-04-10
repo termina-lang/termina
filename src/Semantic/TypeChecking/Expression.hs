@@ -27,7 +27,10 @@ import qualified Data.List  (find, sortOn)
 import Parser.Types
 import Semantic.TypeChecking.Check
 
-getMemberField :: Location -> TerminaType -> Identifier -> SemanticMonad (TerminaType, SemanticAnn)
+getMemberField :: Location 
+  -> SAST.TerminaType SemanticAnn 
+  -> Identifier 
+  -> SemanticMonad (SAST.TerminaType SemanticAnn, SemanticAnn)
 getMemberField loc obj_ty ident =
   case obj_ty of
     TFixedLocation obj_ty' -> getMemberField loc obj_ty' ident
@@ -59,7 +62,7 @@ getMemberField loc obj_ty ident =
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
-  (ParserAnn -> Identifier -> SemanticMonad (AccessKind, TerminaType))
+  (ParserAnn -> Identifier -> SemanticMonad (AccessKind, SAST.TerminaType SemanticAnn))
   -- The object to type
   -> Object ParserAnn
   -> SemanticMonad (SAST.Object SemanticAnn)
@@ -94,7 +97,7 @@ typeObject _ (MemberAccess obj ident ann) = do
         maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
   ft <- getMemberField ann obj_ty ident
   case ft of
-    (fty@(TAccessPort (TInterface _ _)), LocatedElement (FTy (AccessPortField members)) _) ->
+    (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
       return $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
     (fty, _) -> return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fty
 typeObject getVarTy (Dereference obj ann) = do
@@ -114,17 +117,17 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
     TReference ak rTy -> do
       ft <- getMemberField ann rTy ident
       case ft of
-        (fty@(TAccessPort (TInterface _ _)), LocatedElement (FTy (AccessPortField members)) _) ->
+        (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
           return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
         (fty, _) -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fty
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 
 typeMemberFunctionCall ::
   ParserAnn
-  -> TerminaType -- ^ type of the object
+  -> SAST.TerminaType SemanticAnn -- ^ type of the object
   -> Identifier -- ^ type of the member function to be called
   -> [Expression ParserAnn] -- ^ arguments
-  -> SemanticMonad (([TerminaType], [SAST.Expression SemanticAnn]), TerminaType)
+  -> SemanticMonad (([SAST.TerminaType SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
 typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
@@ -139,10 +142,10 @@ typeMemberFunctionCall ann obj_ty ident args =
                 Just (ps, _, anns) -> do
                   let (psLen , asLen ) = (length ps, length args)
                   -- Check that the number of parameters are OK
-                  when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, location anns) (fromIntegral asLen)))
-                  when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, location anns) (fromIntegral asLen)))
+                  when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
+                  when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
                   typed_args <- zipWithM (\(p, idx) e ->
-                    catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, location anns) idx)
+                    catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
                       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
@@ -156,12 +159,12 @@ typeMemberFunctionCall ann obj_ty ident args =
           extendedProcedures <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
           case findInterfaceProcedure ident (members ++ extendedProcedures) of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
-            Just (ps, anns) -> do
+            Just (ps, SemanticAnn _ loc) -> do
               let (psLen , asLen) = (length ps, length args)
-              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, location anns) (fromIntegral asLen)))
-              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, location anns) (fromIntegral asLen)))
+              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, loc) (fromIntegral asLen)))
+              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
               typed_args <- zipWithM (\(p, idx) e ->
-                catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, location anns) idx)
+                catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
                   (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
         );
@@ -255,45 +258,138 @@ typeLHSObject = typeObject getLHSVarTy
 typeGlobalObject = typeObject getGlobalVarTy
 ----------------------------------------
 
-typeModifier :: Location -> Modifier -> SemanticMonad SAST.Modifier
-typeModifier _loc (Modifier ident Nothing) =
+typeModifier :: Location 
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> Modifier ParserAnn 
+  -> SemanticMonad (SAST.Modifier SemanticAnn)
+typeModifier _loc _typeObj (Modifier ident Nothing) =
   return $ SAST.Modifier ident Nothing
-typeModifier loc (Modifier ident (Just constant)) = do
-  typed_const <- typeConstant loc constant
+typeModifier loc typeObj (Modifier ident (Just constant)) = do
+  typed_const <- typeConstant loc typeObj constant
   return $ SAST.Modifier ident (Just typed_const)
 
-typeConstant :: Location -> Const -> SemanticMonad SAST.Const
-typeConstant _loc (I tInt Nothing) = return $ SAST.I tInt Nothing
-typeConstant loc (I tInt (Just ts)) = do
-  ty <- typeTypeSpecifier loc ts
+typeConstant :: Location 
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> Const ParserAnn
+  -> SemanticMonad (SAST.Const SemanticAnn)
+typeConstant _loc _typeObj (I tInt Nothing) = return $ SAST.I tInt Nothing
+typeConstant loc typeObj (I tInt (Just ts)) = do
+  ty <- typeTypeSpecifier loc typeObj ts
   return $ SAST.I tInt (Just ty)
-typeConstant _loc (B tBool) = return $ SAST.B tBool
-typeConstant _loc (C tChar) = return $ SAST.C tChar
+typeConstant _loc _typeObj (B tBool) = return $ SAST.B tBool
+typeConstant _loc _typeObj (C tChar) = return $ SAST.C tChar
 
-typeConstExpression :: TerminaType -> Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
-typeConstExpression expected_ty (Constant constant ann) = do
-  typed_const <- typeConstant ann constant
-  checkConstant ann expected_ty typed_const
-  return $ SAST.Constant typed_const (buildExpAnn ann expected_ty)
-typeConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
-  (ty, _value) <- getConst ann identifier
-  sameTyOrError ann expected_ty ty
-  return $ SAST.AccessObject (SAST.Variable identifier (buildExpAnnObj ann Immutable ty))
-typeConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
-
-evalConstExpression :: TerminaType -> Expression ParserAnn -> SemanticMonad SAST.Const
-evalConstExpression expected_ty (Constant constant ann) = do
-  typed_const <- typeConstant ann constant
-  checkConstant ann expected_ty typed_const
-  return typed_const
-evalConstExpression expected_ty (AccessObject (Variable identifier ann)) = do
-  (ty, value) <- getConst ann identifier
-  sameTyOrError ann expected_ty ty
-  return value
-evalConstExpression _ _ = throwError $ annotateError Internal EExpressionNotConstant
+-- | Function that translates a |TypeSpecifier| into a |TerminaType|.
+typeTypeSpecifier :: Location 
+  -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
+  -> PAST.TypeSpecifier ParserAnn 
+  -> SemanticMonad (SAST.TerminaType SemanticAnn)
+typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
+  -- Check that the type was defined
+  (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
+  case glbTypeDef of 
+    Struct s _ _ -> return $ TStruct s
+    Enum e _ _ -> return $ TEnum e
+    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
+    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
+    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Allocator" [typeParam]) = 
+  case typeParam of
+    TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TAllocator <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicAccess" [typeParam]) =
+  case typeParam of
+    TypeParamIdentifier ident -> TAtomicAccess <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TAtomicAccess <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArrayAccess" [typeParam, sizeParam]) = do
+  tyTypeParam <- case typeParam of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tySizeParam <- case sizeParam of
+    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TAtomicArrayAccess tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Atomic" [typeParam]) = 
+  case typeParam of
+    TypeParamIdentifier ident -> TAtomic <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TAtomic <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArray" [typeParam, sizeParam]) = do
+  tyTypeParam <- case typeParam of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tySizeParam <- case sizeParam of
+    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TAtomicArray tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Option" [typeParam]) = 
+  case typeParam of
+    TypeParamIdentifier ident -> TOption <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TOption <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "MsgQueue" [typeParam, sizeParam]) = do
+  tyTypeParam <- case typeParam of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tySizeParam <- case sizeParam of
+    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TMsgQueue tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Pool" [typeParam, sizeParam]) = do
+  tyTypeParam <- case typeParam of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tySizeParam <- case sizeParam of
+    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TPool tyTypeParam tySizeParam
+typeTypeSpecifier loc typeObj (TSArray ts s) = do
+  ty <- typeTypeSpecifier loc typeObj ts
+  arraySize <- typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  return $ TArray ty arraySize
+typeTypeSpecifier loc typeObj (TSReference ak ts) = 
+  TReference ak <$> typeTypeSpecifier loc typeObj ts
+typeTypeSpecifier loc typeObj (TSBoxSubtype ts) = 
+  TBoxSubtype <$> typeTypeSpecifier loc typeObj ts
+typeTypeSpecifier loc typeObj (TSLocation ts) = 
+  TFixedLocation <$> typeTypeSpecifier loc typeObj ts
+typeTypeSpecifier loc typeObj (TSAccessPort ty) =
+  TAccessPort <$> typeTypeSpecifier loc typeObj ty
+typeTypeSpecifier loc typeObj (TSSinkPort ty action) =
+  TSinkPort <$> typeTypeSpecifier loc typeObj ty <*> pure action
+typeTypeSpecifier loc typeObj (TSInPort ty action) = 
+  TInPort <$> typeTypeSpecifier loc typeObj ty <*> pure action
+typeTypeSpecifier loc typeObj (TSOutPort ty) = 
+  TOutPort <$> typeTypeSpecifier loc typeObj ty
+typeTypeSpecifier loc typeObj (TSConstSubtype ty) =
+  TConstSubtype <$> typeTypeSpecifier loc typeObj ty
+-- This is explicit just in case
+typeTypeSpecifier _ _ TSUInt8  = return TUInt8
+typeTypeSpecifier _ _ TSUInt16 = return TUInt16
+typeTypeSpecifier _ _ TSUInt32 = return TUInt32
+typeTypeSpecifier _ _ TSUInt64 = return TUInt64
+typeTypeSpecifier _ _ TSInt8   = return TInt8
+typeTypeSpecifier _ _ TSInt16  = return TInt16
+typeTypeSpecifier _ _ TSInt32  = return TInt32
+typeTypeSpecifier _ _ TSInt64  = return TInt64
+typeTypeSpecifier _ _ TSUSize  = return TUSize
+typeTypeSpecifier _ _ TSChar   = return TChar
+typeTypeSpecifier _ _ TSBool   = return TBool
+typeTypeSpecifier _ _ TSUnit   = return TUnit
+typeTypeSpecifier loc _ ts = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 
 typeAssignmentExpression ::
-  TerminaType ->
+  SAST.TerminaType SemanticAnn ->
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn)) ->
   Expression ParserAnn ->
   SemanticMonad (SAST.Expression SemanticAnn)
@@ -303,7 +399,7 @@ typeAssignmentExpression expected_type@(TAtomic ty) typeObj (StructInitializer f
   -- | Check field type
   case mts of
     (Just ts) -> do
-      init_ty <- typeTypeSpecifier pann ts
+      init_ty <- typeTypeSpecifier pann typeObj ts
       catchMismatch pann
         (EStructInitializerTypeMismatch expected_type)
         (sameTyOrError pann expected_type init_ty)
@@ -316,7 +412,7 @@ typeAssignmentExpression expected_type@(TAtomicArray ty size) typeObj (StructIni
   -- | Check field type
   case mts of
     (Just ts) -> do
-      init_ty <- typeTypeSpecifier pann ts
+      init_ty <- typeTypeSpecifier pann typeObj ts
       catchMismatch pann
         (EStructInitializerTypeMismatch expected_type)
         (sameTyOrError pann expected_type init_ty)
@@ -329,7 +425,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
   -- | Check field type
   case mts of
     (Just ts) -> do
-      init_ty <- typeTypeSpecifier pann ts
+      init_ty <- typeTypeSpecifier pann typeObj ts
       catchMismatch pann
         (EStructInitializerTypeMismatch expected_type)
         (sameTyOrError pann expected_type init_ty)
@@ -346,7 +442,7 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
   -- | Check field type
   case mts of
     (Just ts) -> do
-      init_ty <- typeTypeSpecifier pann ts
+      init_ty <- typeTypeSpecifier pann typeObj ts
       catchMismatch pann
         (EStructInitializerTypeMismatch expected_type)
         (sameTyOrError pann expected_type init_ty)
@@ -388,10 +484,11 @@ typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) 
       -- | We do not need to catch any error, since it will be correctly handler
       -- by the recursive call to |typeAssignmentExpression|
       typed_init <- typeAssignmentExpression ts typeObj iexp
+      typed_init_size <- typeExpression (Just (TConstSubtype TUSize)) typeObj size
       -- TODO: This should be done later, when we know in all cases the size of the array.
       -- We should check the size of the array when we are performing the const propagation.
       -- unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
-      return $ SAST.ArrayInitializer typed_init size (buildExpAnn pann (TArray ts size))
+      return $ SAST.ArrayInitializer typed_init typed_init_size (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
   case expectedType of
@@ -430,7 +527,10 @@ typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = 
       size_value <- getIntSize pann arrsize
       unless (stringSize == size_value) (throwError $ annotateError pann (EStringInitializerSizeMismatch size_value stringSize))
       --}
-      return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar (K (TInteger (fromIntegral $ length value) DecRepr))))
+      let typed_init_size = 
+            SAST.Constant (SAST.I (TInteger (fromIntegral $ length value) DecRepr) (Just (TConstSubtype TUSize)))
+                (buildExpAnn pann (TConstSubtype TUSize))
+      return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar typed_init_size))
     ty -> throwError $ annotateError pann (EStringInitializerNotArrayOfChars ty)
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr
@@ -446,7 +546,7 @@ typeAssignmentExpression expectedType typeObj expr = do
 -- constructions.
 typeExpression ::
   -- | Expected type of the expression
-  Maybe TerminaType ->
+  Maybe (SAST.TerminaType SemanticAnn) ->
   -- | Function used to type objects (depends on the scope)
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -- | Expression to type
@@ -479,30 +579,30 @@ typeExpression expectedType typeObj (AccessObject obj) = do
       (Nothing, _) ->
         return $ SAST.AccessObject typed_obj
 -- | Constant literals with an expected type.
-typeExpression (Just expectedType) _ (Constant c pann) = do
-  typed_c <- typeConstant pann c
+typeExpression (Just expectedType) typeObj (Constant c pann) = do
+  typed_c <- typeConstant pann typeObj c
   -- | Call the function that checks that the constant is of the expected type.
   checkConstant pann expectedType typed_c
   return $ SAST.Constant typed_c (buildExpAnn pann expectedType)
 -- | Integer literals without an expected type but with a known type.
-typeExpression Nothing _ (Constant c@(I _ (Just ts)) pann) = do
-  ty <- typeTypeSpecifier pann ts
-  typed_c <- typeConstant pann c
+typeExpression Nothing typeObj (Constant c@(I _ (Just ts)) pann) = do
+  ty <- typeTypeSpecifier pann typeObj ts
+  typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann ty)
 -- | Integer literals without an expected type and without a known type.
 -- This is an error, since we cannot infer the type of the constant.
 typeExpression Nothing _ (Constant (I tInt Nothing) pann) = do
   throwError $ annotateError pann $ EConstantWithoutKnownType (SAST.I tInt Nothing)
 -- | Boolean literals without an expected type.
-typeExpression Nothing _ (Constant c@(B {}) pann) = do
-  typed_c <- typeConstant pann c
+typeExpression Nothing typeObj (Constant c@(B {}) pann) = do
+  typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann TBool)
 -- | Character literals without an expected type.
-typeExpression Nothing _ (Constant c@(C {}) pann) = do
-  typed_c <- typeConstant pann c
+typeExpression Nothing typeObj (Constant c@(C {}) pann) = do
+  typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann TChar)
 typeExpression expectedType typeObj (Casting e nts pann) = do
-  nty <- typeTypeSpecifier pann nts
+  nty <- typeTypeSpecifier pann typeObj nts
   maybe (return ()) (sameTyOrError pann nty) expectedType
   -- | Casting Expressions.
   typed_exp <- typeExpression Nothing typeObj e
@@ -537,17 +637,17 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     -- | This helper function checks that the type of the lhs and the rhs is
     -- the same. It also applies a function to check that the type is valid.
     sameTypeExpressions ::
-      (TerminaType -> Bool)
+      (SAST.TerminaType SemanticAnn -> Bool)
       -- | Left hand side error constructor
-      -> (TerminaType -> Error)
+      -> (SAST.TerminaType SemanticAnn -> Error)
       -- | Right hand side error constructor
-      -> (TerminaType -> Error)
+      -> (SAST.TerminaType SemanticAnn -> Error)
       -- | Left hand side expression
       -> Expression ParserAnn
       -- | Right hand side expression
       -> Expression ParserAnn
       -- | Typed expressions
-      -> SemanticMonad (TerminaType, SAST.Expression SemanticAnn, SAST.Expression SemanticAnn)
+      -> SemanticMonad (SAST.TerminaType SemanticAnn, SAST.Expression SemanticAnn, SAST.Expression SemanticAnn)
     sameTypeExpressions isValid lerror rerror lnume rnume = do
       tyle <- catchError
         (typeExpression Nothing typeObj lnume)
@@ -769,7 +869,7 @@ typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateEr
 typeExpression _ _ (StringInitializer _ pann) = throwError $ annotateError pann EStringInitializerInvalidUse
 
 typeFieldAssignment
-  :: Location -> (TerminaType, Location)
+  :: Location -> (SAST.TerminaType SemanticAnn, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> SAST.FieldDefinition SemanticAnn
   -> FieldAssignment ParserAnn
@@ -840,9 +940,10 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
           _ -> throwError $ annotateError loc $ EAtomicAccessPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicArrayAccess ty s) ->
         case gentry of
-          LocatedElement (GGlob (TAtomicArray ty' s')) _ -> do
+          LocatedElement (GGlob (TAtomicArray ty' _)) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
-            unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
+            -- TODO: Check the size of the array
+            -- unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort ifaceTy@(TInterface _ iface) -> do
@@ -864,7 +965,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
                         case Data.List.find (iface ==) (provides ++ extendedProvides) of
                           Just _ ->
                             case fann of
-                              (LocatedElement (FTy (AccessPortField usedProcs)) _) ->
+                              (SemanticAnn (FTy (AccessPortField usedProcs)) _) ->
                                 let filteredProcs = filter (\(ProcedureSeman procid _ _) -> M.member procid usedProcs) procs in
                                 return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts filteredProcs)
                               _ -> error "Invalid annotation for field"
@@ -880,7 +981,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
 
 typeFieldAssignments
-  :: Location -> (TerminaType, Location)
+  :: Location -> (SAST.TerminaType SemanticAnn, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> [SAST.FieldDefinition SemanticAnn]
   -> [FieldAssignment ParserAnn]

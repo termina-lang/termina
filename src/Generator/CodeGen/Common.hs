@@ -17,7 +17,7 @@ import Configuration.Configuration
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-type OptionTypes = Map TerminaType (Set TerminaType)
+type OptionTypes = Map (TerminaType SemanticAnn) (Set (TerminaType SemanticAnn))
 
 data CGeneratorEnv = CGeneratorEnv { 
     optionTypes :: OptionTypes,
@@ -89,7 +89,7 @@ genClassFunctionName className functionName = return $ className <::> functionNa
 
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
-genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
+genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
 genOptionParameterStructName TBool = return $ namefy "option_bool_params_t"
 genOptionParameterStructName TChar = return $ namefy "option_char_params_t"
 genOptionParameterStructName TUInt8 = return $ namefy "option_uint8_params_t"
@@ -102,19 +102,13 @@ genOptionParameterStructName TInt32 = return $ namefy "option_int32_params_t"
 genOptionParameterStructName TInt64 = return $ namefy "option_int64_params_t"
 genOptionParameterStructName ts@(TOption _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
 genOptionParameterStructName (TBoxSubtype _) = return $ namefy "option_box_params_t"
-genOptionParameterStructName ts =
-    case ts of
-        TArray {} -> do
-            tsName <- genTypeSpecName ts
-            tsDimension <- genDimensionOptionTS ts
-            return $ namefy $ "option_" <> tsName <> "_" <> tsDimension <> "_params_t"
-        _ -> do
-            tsName <- genTypeSpecName ts
-            return $ namefy $ "option_" <> tsName <> "_params_t"
+genOptionParameterStructName ts = do
+    tsName <- genTypeSpecName ts
+    return $ namefy $ "option_" <> tsName <> "_params_t"
 
     where
 
-        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
+        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
         genTypeSpecName TUInt8 = return "uint8"
         genTypeSpecName TUInt16 = return "uint16"
         genTypeSpecName TUInt32 = return "uint32"
@@ -123,14 +117,9 @@ genOptionParameterStructName ts =
         genTypeSpecName TInt16 = return "int16"
         genTypeSpecName TInt32 = return "int32"
         genTypeSpecName TInt64 = return "int64"
-        genTypeSpecName (TArray ts' _) = genTypeSpecName ts'
         genTypeSpecName (TStruct ident) = return ident
         genTypeSpecName (TEnum ident) = return ident
         genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
-
-        genDimensionOptionTS :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
-        genDimensionOptionTS (TArray ts' (K (TInteger s _))) = (("_" <> show s) <>) <$> genDimensionOptionTS ts'
-        genDimensionOptionTS _ = return ""
 
 variant :: Identifier
 variant = namefy "variant"
@@ -146,35 +135,35 @@ optionSomeField = "__0"
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m TerminaType
-getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
-getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (MemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _))     = return ts 
-getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
-getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
-getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _)) = return ts
+getObjType :: (MonadError CGeneratorError m) => Object SemanticAnn -> m (TerminaType SemanticAnn)
+getObjType (Variable _ (SemanticAnn (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts 
+getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType]
-getParameterTypes (FunctionCall _ _ (LocatedElement (ETy (AppType params _)) _)) = return params
+getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType SemanticAnn]
+getParameterTypes (FunctionCall _ _ (SemanticAnn (ETy (AppType params _)) _)) = return params
 getParameterTypes ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
 
-getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m TerminaType
+getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (BinOp _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ReferenceExpression _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (Casting _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (FunctionCall _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (MemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (DerefMemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (StructInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (EnumVariantInitializer _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayInitializer _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayExprListInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (OptionVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (FunctionCall _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (StructInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
@@ -186,7 +175,7 @@ unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 -- option type. The function assumes that the option type is well-typed and that
 -- the semantic annotation is correct. If the option type is not well-typed, the
 -- function will throw an internal error.
-genOptionStructName :: (MonadError CGeneratorError m) => TerminaType -> m Identifier
+genOptionStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
 genOptionStructName TBool = return $ namefy "option_bool_t"
 genOptionStructName TChar = return $ namefy "option_char_t"
 genOptionStructName TUInt8 = return $ namefy "option_uint8_t"
@@ -207,88 +196,6 @@ getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
 getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
 getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
-getArraySize :: Size -> CExpression
-getArraySize (K tint) = CExprConstant (CIntConst (getCInteger tint)) (CTSizeT noqual) (LocatedElement CGenericAnn Internal)
-getArraySize (V ident) = CExprValOf (CVar ident (CTSizeT noqual)) (CTSizeT noqual) (LocatedElement CGenericAnn Internal)
-
--- | Translate type annotation to C type
-genType :: (MonadError CGeneratorError m) => CQualifier -> TerminaType -> m CType
--- |  Unsigned integer types
-genType qual TUInt8 = return (CTInt IntSize8 Unsigned qual)
-genType qual TUInt16 = return (CTInt IntSize16 Unsigned qual)
-genType qual TUInt32 = return (CTInt IntSize32 Unsigned qual)
-genType qual TUInt64 = return (CTInt IntSize64 Unsigned qual)
--- | Signed integer types
-genType qual TInt8 = return (CTInt IntSize8 Signed qual)
-genType qual TInt16 = return (CTInt IntSize16 Signed qual)
-genType qual TInt32 = return (CTInt IntSize32 Signed qual)
-genType qual TInt64 = return (CTInt IntSize64 Signed qual)
--- | Other primitive typess
-genType qual TUSize = return (CTSizeT qual)
-genType qual TBool = return (CTBool qual)
-genType qual TChar = return (CTChar qual)
--- | Primitive type
-genType qual (TGlobal _ clsIdentifier) = return (CTTypeDef clsIdentifier qual)
--- | TArray type
-genType qual (TArray ts' s) = do
-    ts <- genType qual ts'
-    return (CTArray ts (getArraySize s))
--- | Option types
-genType _qual (TOption (TBoxSubtype _)) = return (CTTypeDef optionBox noqual)
-genType _qual (TOption ts) = do
-    optName <- genOptionStructName ts
-    return (CTTypeDef optName noqual)
--- Non-primitive types:
--- | Box subtype
-genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
--- | Const subtype
-genType _qual (TConstSubtype ty) = genType constqual ty
--- | TPool type
-genType _qual (TPool _ _) = return (CTTypeDef pool noqual)
-genType _qual (TMsgQueue _ _) = return (CTTypeDef msgQueue noqual)
-genType qual (TFixedLocation ts) = do
-    ts' <- genType volatile ts
-    return (CTPointer ts' qual)
-genType _qual (TAccessPort (TInterface _ _)) = throwError $ InternalError "Access ports shall not be translated to C types"
-genType _qual (TAccessPort ts) = genType noqual ts
-genType _qual (TAllocator _) = return (CTTypeDef allocator noqual)
-genType _qual (TAtomic ts) = genType atomic ts
-genType _qual (TAtomicArray ts s) = do
-    ts' <- genType atomic ts
-    return (CTArray ts' (getArraySize s))
-genType _qual (TAtomicAccess ts) = do
-    ts' <- genType atomic ts
-    return (CTPointer ts' noqual)
-genType _qual (TAtomicArrayAccess ts _) = do
-    ts' <- genType atomic ts
-    return (CTPointer ts' noqual)
--- | Type of the ports
-genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
-genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)
-genType _qual (TInPort {}) = return (CTTypeDef inPort noqual)
-genType qual (TReference Immutable ts) = do
-    case ts of
-        TArray {} -> genType constqual ts
-        _ -> do
-            ts' <- genType qual{qual_const = True} ts
-            return (CTPointer ts' constqual)
-genType _qual (TReference _ ts) = do
-    case ts of
-        TArray {} -> genType noqual ts
-        _ -> do
-            ts' <- genType noqual ts
-            return (CTPointer ts' constqual)
-genType _noqual TUnit = return (CTVoid noqual)
-genType qual (TEnum ident) = return (CTTypeDef ident qual)
-genType qual (TStruct ident) = return (CTTypeDef ident qual)
-genType qual (TInterface RegularInterface ident) = return (CTTypeDef ident qual)
-genType _qual (TInterface SystemInterface _) = throwError $ InternalError "System interfaces shall not be translated to C types"
-
-genFunctionType :: (MonadError CGeneratorError m) => TerminaType -> [TerminaType] -> m CType
-genFunctionType ts tsParams = do
-    ts' <- genType noqual ts
-    tsParams' <- traverse (genType noqual) tsParams
-    return (CTFunction ts' tsParams')
 
 genIndexOf :: (MonadError CGeneratorError m) => CObject -> CExpression -> m CObject
 genIndexOf obj index = 
@@ -349,11 +256,6 @@ genAtomicMethodCall mName cObj cArgs cAnn =
             return $ CExprCall (CExprValOf (CVar (atomicMethodName mName) cFuncType) cFuncType cAnn) (cObj : cArgs) (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid atomic method name: " ++ mName
 
-genParameterDeclaration :: (MonadError CGeneratorError m) => Parameter -> m CDeclaration
-genParameterDeclaration (Parameter identifier ts) = do
-    cParamType <- genType noqual ts
-    return $ CDecl (CTypeSpec cParamType) (Just identifier) Nothing
-
 genInteger :: TInteger -> CInteger
 genInteger (TInteger i DecRepr) = CInteger i CDecRepr
 genInteger (TInteger i HexRepr) = CInteger i CHexRepr
@@ -363,37 +265,30 @@ getCArrayItemType :: (MonadError CGeneratorError m) => CType -> m CType
 getCArrayItemType (CTArray ty _) = return ty
 getCArrayItemType ty = throwError $ InternalError $ "invalid array type: " ++ show ty
 
-genArraySizeExpr :: (MonadError CGeneratorError m) => Size -> SemanticAnn -> m CExpression
-genArraySizeExpr (K s) ann = return $ CExprConstant (CIntConst (genInteger s)) (CTSizeT noqual) (buildGenericAnn ann)
-genArraySizeExpr (V v) ann = return $ CExprValOf (CVar v (CTSizeT noqual)) (CTSizeT noqual) (buildGenericAnn ann)
-
-genArraySize :: (MonadError CGeneratorError m) => Size -> m CExpression
-genArraySize s = return $ getArraySize s
-
 internalAnn :: CItemAnn -> CAnns
 internalAnn = flip LocatedElement Internal
 
 buildGenericAnn :: SemanticAnn -> CAnns
-buildGenericAnn ann = LocatedElement CGenericAnn (location ann)
+buildGenericAnn (SemanticAnn _ loc) = LocatedElement CGenericAnn loc
 
 buildStatementAnn :: SemanticAnn -> Bool -> CAnns
-buildStatementAnn ann before = LocatedElement (CStatementAnn before False) (location ann)
+buildStatementAnn (SemanticAnn _ loc) before = LocatedElement (CStatementAnn before False) loc
 
 buildDeclarationAnn :: SemanticAnn -> Bool -> CAnns
-buildDeclarationAnn ann before = LocatedElement (CDeclarationAnn before) (location ann)
+buildDeclarationAnn (SemanticAnn _ loc) before = LocatedElement (CDeclarationAnn before) loc
 
 buildCompoundAnn :: SemanticAnn -> Bool -> Bool -> CAnns
-buildCompoundAnn ann before trailing = LocatedElement (CCompoundAnn before trailing) (location ann)
+buildCompoundAnn (SemanticAnn _ loc) before trailing = LocatedElement (CCompoundAnn before trailing) loc
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
-buildCPPDirectiveAnn ann before = LocatedElement (CPPDirectiveAnn before) (location ann)
+buildCPPDirectiveAnn (SemanticAnn _ loc) before = LocatedElement (CPPDirectiveAnn before) loc
 
 printIntegerLiteral :: TInteger -> String
 printIntegerLiteral (TInteger i DecRepr) = show i
 printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
 printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
 
-printLiteral :: Const -> String
+printLiteral :: Const SemanticAnn -> String
 printLiteral (I ti _) = printIntegerLiteral ti
 printLiteral (B True) = "1"
 printLiteral (B False) = "0"

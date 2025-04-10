@@ -33,7 +33,7 @@ getMemberFunctions = foldl' (\acc member ->
     _ -> acc
   ) M.empty
 
-getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
+getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, Identifier)
 getInputPorts = foldl' (\acc member -> 
   case member of
     ClassField (FieldDefinition fid fty _) -> 
@@ -43,7 +43,7 @@ getInputPorts = foldl' (\acc member ->
     _ -> acc
   ) M.empty
 
-getSinkPorts :: [ClassMember a] -> M.Map Identifier (TerminaType, Identifier)
+getSinkPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, Identifier)
 getSinkPorts = foldl' (\acc member -> 
   case member of
     ClassField (FieldDefinition fid fty _) -> 
@@ -53,7 +53,7 @@ getSinkPorts = foldl' (\acc member ->
     _ -> acc
   ) M.empty
 
-getOutputPorts :: [ClassMember a] -> M.Map Identifier TerminaType
+getOutputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a)
 getOutputPorts = foldl' (\acc member -> 
   case member of
     ClassField (FieldDefinition fid fty _) -> 
@@ -63,7 +63,7 @@ getOutputPorts = foldl' (\acc member ->
     _ -> acc
   ) M.empty
 
-getPortType :: Identifier -> [ClassMember a] -> TerminaType
+getPortType :: Identifier -> [ClassMember a] -> TerminaType a
 getPortType ident [] = error $ "Internal error: no port with identifier " ++ ident
 getPortType ident (member : members) =
   case member of
@@ -180,35 +180,35 @@ getGlobDeclModules progArchitecture =
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
-getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m TerminaType
-getObjType (Variable _ (LocatedElement (ETy (ObjectType _ ts)) _))                  = return ts
-getObjType (ArrayIndexExpression _ _ (LocatedElement (ETy (ObjectType _ ts)) _))    = return ts
-getObjType (MemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (MemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _))     = return ts
-getObjType (Dereference _ (LocatedElement (ETy (ObjectType _ ts)) _))               = return ts
-getObjType (Unbox _ (LocatedElement (ETy (ObjectType _ ts)) _))                     = return ts
-getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (ObjectType _ ts)) _)) = return ts
-getObjType (DereferenceMemberAccess _ _ (LocatedElement (ETy (AccessPortObjType _ ts)) _)) = return ts
+getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m (TerminaType SemanticAnn)
+getObjType (Variable _ (SemanticAnn (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts
+getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType _ = throwError $ annotateError Internal EUnboxingObject
 
 -- | This function returns the type of an expression. The type is extracted from the
 -- expression's semantic annotation. The function assumes that the expression is well-typed
 -- and that the semantic annotation is correct. If the expression is not well-typed, the
 -- function will throw an error.
-getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m TerminaType
+getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
-getExprType (Constant _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (BinOp _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ReferenceExpression _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (Casting _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (FunctionCall _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (MemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (DerefMemberFunctionCall _ _ _ (LocatedElement (ETy (AppType _ ts)) _)) = return ts
-getExprType (StructInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (EnumVariantInitializer _ _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayInitializer _ _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
-getExprType (ArrayExprListInitializer _ (LocatedElement (ETy (SimpleType ts)) _)) = return ts
+getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (OptionVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (FunctionCall _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (StructInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 
 -- | This function returns the name of a port. The function assumes that the object is
@@ -293,7 +293,7 @@ getPriority = getPriority' . taskModifiers
 
   where
     
-    getPriority' :: [Modifier] -> TInteger
+    getPriority' :: [Modifier a] -> TInteger
     getPriority' [] = TInteger 255 DecRepr
     getPriority' ((Modifier "priority" (Just (I priority _))) : _) = priority
     getPriority' (_ : modifiers) = getPriority' modifiers
@@ -306,7 +306,7 @@ getStackSize = getStackSize' . taskModifiers
 
   where
     
-    getStackSize' :: [Modifier] -> TInteger
+    getStackSize' :: [Modifier a] -> TInteger
     getStackSize' [] = TInteger 4096 DecRepr
     getStackSize' ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
     getStackSize' (_ : modifiers) = getStackSize' modifiers

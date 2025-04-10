@@ -10,21 +10,21 @@ module ControlFlow.BasicBlocks.AST (
   EnumVariant,
   Parameter,
   Modifier,
-  Const
+  Const, TerminaType
 ) where
 
 import Core.AST
 import Semantic.AST (
-  Expression(..), 
-  Object(..), 
-  FieldDefinition, 
+  Expression(..),
+  Object(..),
+  FieldDefinition,
   InterfaceMember,
   EnumVariant,
-  Parameter, 
-  Expression, 
-  Object, 
-  Modifier, 
-  Const)
+  Parameter,
+  Expression,
+  Object,
+  Modifier,
+  Const, TerminaType)
 import Modules.Modules
 
 
@@ -48,7 +48,7 @@ data Statement a =
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
-    TerminaType -- ^ type of the variable
+    (TerminaType a) -- ^ type of the variable
     (Expression a) -- ^ initialization expression
     a
   | AssignmentStmt
@@ -70,7 +70,7 @@ data BasicBlock a =
     -- | For-loop basic block
     | ForLoopBlock 
         Identifier -- ^ name of the iterator variable
-        TerminaType -- ^ type of iterator variable
+        (TerminaType a) -- ^ type of iterator variable
         (Expression a) -- ^ initial value of the iterator
         (Expression a) -- ^ final value of the iterator
         (Maybe (Expression a)) -- ^ break condition (optional)

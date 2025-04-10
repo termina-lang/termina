@@ -22,7 +22,7 @@ interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" 
       Parameter "param6" TInt32,
       Parameter "param7" TInt64
     ] [] undefined
-  ] []) (LocatedElement TTy undefined)
+  ] []) (SemanticAnn TTy undefined)
 
 spec :: Spec
 spec = do

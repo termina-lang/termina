@@ -7,7 +7,7 @@ import Semantic.AST
 import Data.Text
 import Semantic.Types
 
-tmDescriptorTS :: TerminaType
+tmDescriptorTS :: TerminaType SemanticAnn
 tmDescriptorTS = TStruct "TMDescriptor"
 
 optionBoxUInt32ObjSemAnn :: SemanticAnn
@@ -17,16 +17,16 @@ optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 arrayObjAnn, arrayTMDescriptorObjAnn, twoDymArrayRowObjAnn, twoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
-arrayTMDescriptorObjAnn = arrayObjSemAnn Mutable tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowObjAnn = arrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+arrayTMDescriptorObjAnn = arrayObjSemAnn Mutable tmDescriptorTS (buildConstExprTUSize 20)
+twoDymArrayRowObjAnn = arrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5)
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayRowExprAnn, twoDymArrayExprAnn  :: SemanticAnn
-arrayExprAnn = arrayExprSemAnn TUInt32 (K (TInteger 10 DecRepr))
-arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (K (TInteger 20 DecRepr))
-twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (K (TInteger 5 DecRepr))
-twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayExprAnn = arrayExprSemAnn TUInt32 (buildConstExprTUSize 10)
+arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (buildConstExprTUSize 20)
+twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (buildConstExprTUSize 5)
+twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 array1, array2, array3, array4, array5, array6 :: Object SemanticAnn
 array1 = Variable "array1" arrayObjAnn
@@ -39,10 +39,10 @@ array6 = Variable "array6" arrayTMDescriptorObjAnn
 array1Assign, array2Assign, array3Assign, array4Assign, array5Assign, array6Assign :: Statement SemanticAnn
 array1Assign = AssignmentStmt array1 (AccessObject (Variable "array0" arrayObjAnn)) stmtSemAnn
 array2Assign = AssignmentStmt array2 (AccessObject (Variable "array1" twoDymArrayObjAnn)) stmtSemAnn
-array3Assign = AssignmentStmt array3 (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn
-array4Assign = AssignmentStmt array4 (ArrayInitializer (ArrayInitializer uint32Const0 (K (TInteger 5 DecRepr)) twoDymArrayRowExprAnn) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-array5Assign = AssignmentStmt array5 (ArrayInitializer (AccessObject (Variable "array_row" twoDymArrayRowObjAnn)) (K (TInteger 10 DecRepr)) twoDymArrayExprAnn) stmtSemAnn
-array6Assign = AssignmentStmt array6 (ArrayInitializer tmDescriptorFieldsInit0 (K (TInteger 10 DecRepr)) arrayTMDescriptorExprAnn) stmtSemAnn
+array3Assign = AssignmentStmt array3 (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn
+array4Assign = AssignmentStmt array4 (ArrayInitializer (ArrayInitializer uint32Const0 (buildConstExprTUSize 5) twoDymArrayRowExprAnn) (buildConstExprTUSize 10) twoDymArrayExprAnn) stmtSemAnn
+array5Assign = AssignmentStmt array5 (ArrayInitializer (AccessObject (Variable "array_row" twoDymArrayRowObjAnn)) (buildConstExprTUSize 10) twoDymArrayExprAnn) stmtSemAnn
+array6Assign = AssignmentStmt array6 (ArrayInitializer tmDescriptorFieldsInit0 (buildConstExprTUSize 10) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo1, foo2 :: Object SemanticAnn
 foo1 = Variable "foo1" (objSemAnn Mutable TUInt32)
@@ -71,7 +71,7 @@ structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 = 
     StructInitializer 
         [FieldValueAssignment "field_a" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 tmDescriptorFieldsInit0 :: Expression SemanticAnn
@@ -116,10 +116,10 @@ option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessOb
 option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
 str0 :: Object SemanticAnn
-str0 = Variable "str0" (objSemAnn Mutable (TArray TChar (K (TInteger 12 DecRepr))))
+str0 = Variable "str0" (objSemAnn Mutable (TArray TChar (buildConstExprTUSize 12)))
 
 str0Assign :: Statement SemanticAnn
-str0Assign = AssignmentStmt str0 (StringInitializer "Hello world!" (arrayExprSemAnn TUInt32 (K (TInteger 12 DecRepr)))) stmtSemAnn
+str0Assign = AssignmentStmt str0 (StringInitializer "Hello world!" (arrayExprSemAnn TUInt32 (buildConstExprTUSize 12))) stmtSemAnn
 
 spec :: Spec
 spec = do

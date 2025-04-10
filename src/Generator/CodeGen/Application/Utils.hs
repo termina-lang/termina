@@ -13,9 +13,11 @@ import Semantic.Types
 import Generator.LanguageC.AST
 import qualified Data.Map as M
 import Generator.LanguageC.Embedded
+import Generator.CodeGen.Expression
 import Generator.CodeGen.Types
 import qualified Data.Set as S
 import ControlFlow.Architecture.Utils
+import Utils.Annotations
 
 -- | Data type used to represent a message queue in OSAL
 --  There are different types depending on the original source code element that
@@ -24,19 +26,19 @@ data OSALMsgQueue =
     OSALTaskMsgQueue
       Identifier -- ^ task identifier
       Identifier -- ^ task class identifier
-      Size -- ^ message queue size
+      (Expression SemanticAnn) -- ^ message queue size
     | OSALChannelMsgQueue
       Identifier -- ^ name of the channel
-      TerminaType -- ^ type of the elements of the message queue
-      Size -- ^ message queue size
+      (TerminaType SemanticAnn) -- ^ type of the elements of the message queue
+      (Expression SemanticAnn) -- ^ message queue size
       Identifier -- ^ name of the task that will receive the messages
       Identifier -- ^ name of the port to wich the messages will be sent
     | OSALSinkPortMsgQueue
       Identifier -- ^ identifier of the receiving task
       Identifier -- ^ identifier of the class of the receiving task
       Identifier -- ^ identifier of the port that will receive the messages
-      TerminaType -- ^ type of the elements of the message queue
-      Size -- ^ message queue size
+      (TerminaType SemanticAnn) -- ^ type of the elements of the message queue
+      (Expression SemanticAnn) -- ^ message queue size
     deriving Show
 
 -- | Data type used to represent a resource lock in OSAL
@@ -52,11 +54,11 @@ data OSALResourceLock =
 getTasksMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> m [OSALMsgQueue]
 getTasksMessageQueues progArchitecture = return $ foldr (\glb acc ->
         case glb of
-            TPTask identifier classId _ sinkPConns _ _ _ _ _ -> OSALTaskMsgQueue identifier classId (K (TInteger 1 DecRepr)) :
+            TPTask identifier classId _ sinkPConns _ _ _ _ _ -> OSALTaskMsgQueue identifier classId (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize))) :
                 let tpClass = taskClasses progArchitecture M.! classId in
                 foldr (\portId acc' ->
                     let (ts, _) = sinkPorts tpClass M.! portId in
-                    OSALSinkPortMsgQueue identifier classId portId ts (K (TInteger 1 DecRepr)) : acc'
+                    OSALSinkPortMsgQueue identifier classId portId ts (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize))) : acc'
                 ) acc (M.keys sinkPConns)
     ) [] (tasks progArchitecture)
 
@@ -99,9 +101,9 @@ genVariantsForTaskPorts tpClass@(TPClass classId _ _ _ _ _ _ _) =
             this_variant <- genVariantForPort classId port
             return $ _define this_variant (Just [show value]) : rest
 
-genPoolMemoryArea :: Bool -> TPPool a -> CGenerator CFileItem
+genPoolMemoryArea :: Bool -> TPPool SemanticAnn -> CGenerator CFileItem
 genPoolMemoryArea before (TPPool identifier ts size _ _) = do
-    cSize <- genArraySize size
+    cSize <- genExpression size
     cType <- genType noqual ts
     let poolSize = __termina_pool__size @@ [_sizeOfType cType, cSize]
     if before then 
@@ -109,34 +111,34 @@ genPoolMemoryArea before (TPPool identifier ts size _ _) = do
     else
         return $ static_global (var (poolMemoryArea identifier) (CTArray uint8_t poolSize))
 
-genPoolMemoryAreas :: [TPPool a] -> CGenerator [CFileItem]
+genPoolMemoryAreas :: [TPPool SemanticAnn] -> CGenerator [CFileItem]
 genPoolMemoryAreas [] = return []
 genPoolMemoryAreas (obj : objs) = do
     memArea <- genPoolMemoryArea True obj
     rest <- mapM (genPoolMemoryArea False) objs
     return $ memArea : rest
 
-genAtomicDeclaration :: Bool -> TPAtomic a -> CGenerator CFileItem
+genAtomicDeclaration :: Bool -> TPAtomic SemanticAnn -> CGenerator CFileItem
 genAtomicDeclaration before (TPAtomic identifier ts _ _) = do
     let declStmt = internalAnn (CDeclarationAnn before)
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec cType) (Just identifier) Nothing)) declStmt
 
-genAtomicDeclarations :: [TPAtomic a] -> CGenerator [CFileItem]
+genAtomicDeclarations :: [TPAtomic SemanticAnn] -> CGenerator [CFileItem]
 genAtomicDeclarations [] = return []
 genAtomicDeclarations (obj : objs) = do
     decl <- genAtomicDeclaration True obj
     rest <- mapM (genAtomicDeclaration False) objs
     return $ decl : rest
 
-genAtomicArrayDeclaration :: Bool -> TPAtomicArray a -> CGenerator CFileItem
+genAtomicArrayDeclaration :: Bool -> TPAtomicArray SemanticAnn -> CGenerator CFileItem
 genAtomicArrayDeclaration before (TPAtomicArray identifier ts size _ _) = do
     let declStmt = internalAnn (CDeclarationAnn before)
-    cSize <- genArraySize size
+    cSize <- genExpression size
     cType <- genType atomic ts
     return $ CExtDecl (CEDVariable Nothing (CDecl (CTypeSpec (CTArray cType cSize)) (Just identifier) Nothing)) declStmt
 
-genAtomicArrayDeclarations :: [TPAtomicArray a] -> CGenerator [CFileItem]
+genAtomicArrayDeclarations :: [TPAtomicArray SemanticAnn] -> CGenerator [CFileItem]
 genAtomicArrayDeclarations [] = return []
 genAtomicArrayDeclarations (obj : objs) = do
     decl <- genAtomicArrayDeclaration True obj

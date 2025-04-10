@@ -9,14 +9,15 @@ import qualified Data.Set as S
 
 import Control.Monad
 import qualified Control.Monad.State.Strict as ST
+import Semantic.Types
 
-type OptionMap = M.Map TerminaType (S.Set TerminaType)
+type OptionMap = M.Map (TerminaType SemanticAnn) (S.Set (TerminaType SemanticAnn))
 
 type OptionTypesMonad = ST.State OptionMap
 
 insertOptionType ::
   -- | The new element
-  TerminaType
+  TerminaType SemanticAnn 
   -> OptionTypesMonad ()
 insertOptionType ts = do
   when (isNonBoxOption ts) $ ST.gets (M.lookup (rootType ts)) >>=
@@ -28,20 +29,20 @@ insertOptionType ts = do
 
 mapParameterOption ::
   -- | The new parameter
-  Parameter
+  Parameter SemanticAnn
   -> OptionTypesMonad ()
 mapParameterOption (Parameter _ ts) = insertOptionType ts
 
 mapMaybeOption ::
   -- | The new element
-  Maybe TerminaType
+  Maybe (TerminaType SemanticAnn)
   -> OptionTypesMonad ()
 mapMaybeOption (Just ts) = insertOptionType ts
 mapMaybeOption Nothing = return ()
 
 mapStatementOption ::
   -- | The new element
-  Statement a
+  Statement SemanticAnn
   -> OptionTypesMonad ()
 mapStatementOption (Declaration _ _ ts _ _) = insertOptionType ts
 mapStatementOption (IfElseStmt _ (Block stmts _) elseIfs elseBlk _) =
@@ -58,7 +59,7 @@ mapStatementOption _ = return ()
 
 mapInterfaceProcedureOption ::
   -- | The new element
-  InterfaceMember a
+  InterfaceMember SemanticAnn
   -- | The resulting map
   -> OptionTypesMonad ()
 mapInterfaceProcedureOption (InterfaceProcedure _ params _ _) =
@@ -67,7 +68,7 @@ mapInterfaceProcedureOption (InterfaceProcedure _ params _ _) =
 
 mapClassMemberOption ::
   -- | The new element
-  ClassMember a
+  ClassMember SemanticAnn
   -> OptionTypesMonad ()
 mapClassMemberOption (ClassField field) = insertOptionType (fieldTerminaType field)
 mapClassMemberOption (ClassMethod _ maybeRet blkRet _) =
@@ -97,7 +98,7 @@ mapClassMemberOption (ClassAction _ param ret blkRet _) =
 
 mapTypeDefOption ::
   -- | The new element
-  TypeDef a
+  TypeDef SemanticAnn
   -> OptionTypesMonad ()
 mapTypeDefOption (Struct _ fields _) =
   -- | Get the option types from the fields
@@ -114,7 +115,7 @@ mapTypeDefOption (Interface _ _ _ members _) =
 
 mapOptions ::
   -- | The new element
-  AnnASTElement a
+  AnnASTElement SemanticAnn
   -> OptionTypesMonad ()
 mapOptions (Function _ params maybeRet blkRet _ _) =
   -- | Get the option types from the parameters
@@ -133,7 +134,7 @@ mapOptions _ = return ()
 
 mapOptionsAnnotatedProgram ::
   -- | The annotated program
-  AnnotatedProgram a
+  AnnotatedProgram SemanticAnn
   -> OptionTypesMonad ()
 mapOptionsAnnotatedProgram = mapM_ mapOptions
 
@@ -141,6 +142,6 @@ runMapOptionsAnnotatedProgram ::
   -- | The initial state (i.e., the previous option map)
   OptionMap
   -- | The annotated program to map
-  -> AnnotatedProgram a
+  -> AnnotatedProgram SemanticAnn
   -> OptionMap
 runMapOptionsAnnotatedProgram = flip $ ST.execState . mapOptionsAnnotatedProgram

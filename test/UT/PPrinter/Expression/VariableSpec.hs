@@ -8,10 +8,10 @@ import Data.Text
 import Semantic.Types
 
 arrayObjAnn, twoDymArrayObjAnn, boxTwoDymArrayObjAnn, boxThreeDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
-boxThreeDymArrayObjAnn = boxThreeDymArrayObjSemAnn TChar (K (TInteger 40 DecRepr)) (K (TInteger 5 DecRepr)) (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
+boxTwoDymArrayObjAnn = boxTwoDymArrayObjSemAnn TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
+boxThreeDymArrayObjAnn = boxThreeDymArrayObjSemAnn TChar (buildConstExprTUSize 40) (buildConstExprTUSize 5) (buildConstExprTUSize 10)
 
 var0, array0, array1 :: Object SemanticAnn
 var0 = Variable "var0" (objSemAnn Mutable TUInt16)

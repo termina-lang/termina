@@ -16,6 +16,7 @@ import Generator.CodeGen.Application.Utils
 import Modules.Modules (QualifiedName)
 import Configuration.Configuration
 import Semantic.AST
+import Generator.CodeGen.Expression
 
 genConfigFile ::
     QualifiedName
@@ -71,7 +72,7 @@ genConfigFile mName progArchitecture = do
 
         genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
         genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
-            cSize <- genArraySize size
+            cSize <- genExpression size
             let cSizeOf = _sizeOfType uint32_t
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
@@ -82,7 +83,7 @@ genConfigFile mName progArchitecture = do
                     "    ) "
                 ]
         genMessagesForQueue (OSALChannelMsgQueue _ ts size _ _) = do
-            cSize <- genArraySize size
+            cSize <- genExpression size
             cTs <- genType noqual ts
             let cSizeOf = _sizeOfType cTs
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
@@ -94,7 +95,7 @@ genConfigFile mName progArchitecture = do
                     "    ) "
                 ]
         genMessagesForQueue (OSALSinkPortMsgQueue _ _ _ ts size) = do
-            cSize <- genArraySize size
+            cSize <- genExpression size
             cTs <- genType noqual ts
             let cSizeOf = _sizeOfType cTs
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)

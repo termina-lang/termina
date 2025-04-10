@@ -7,7 +7,7 @@ import qualified Data.Map as M
 import Semantic.Types
 import UT.PPrinter.Common
 
-tmDescriptorTS :: TerminaType
+tmDescriptorTS :: TerminaType SemanticAnn
 tmDescriptorTS = TStruct "TMDescriptor"
 
 constUInt32 :: Expression SemanticAnn
@@ -15,13 +15,13 @@ constUInt32 :: Expression SemanticAnn
 constUInt32 = Constant (I (TInteger 1024 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 arrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (K (TInteger 10 DecRepr))
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
 
 arrayExprAnn :: SemanticAnn
-arrayExprAnn = arrayExprSemAnn TUInt32 (K (TInteger 10 DecRepr))
+arrayExprAnn = arrayExprSemAnn TUInt32 (buildConstExprTUSize 10)
 
 refArrayAnn :: SemanticAnn
-refArrayAnn = refArraySemAnn TUInt32 (K (TInteger 10 DecRepr))
+refArrayAnn = refArraySemAnn TUInt32 (buildConstExprTUSize 10)
 
 tmDescriptorObjSemAnn :: SemanticAnn
 tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"
@@ -40,14 +40,14 @@ structAFieldsInit0 :: Expression SemanticAnn
 structAFieldsInit0 = 
     StructInitializer
         [FieldValueAssignment "field_a" uint32Const0 stmtSemAnn,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 structAFieldsInit1 :: Expression SemanticAnn
 structAFieldsInit1 = 
     StructInitializer
         [FieldValueAssignment "field_a" (AccessObject (Variable "param0" (objSemAnn Mutable TUInt32))) stmtSemAnn,
-         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (K (TInteger 10 DecRepr)) arrayExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn,
          FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
 
 structAFieldsInit3 :: Expression SemanticAnn
@@ -111,7 +111,7 @@ function2 = Function "function2" [Parameter "param0" TUInt32] (Just TUInt32)
     returnStructField0] stmtSemAnn) [] unitSemAnn
 
 function3 :: AnnASTElement SemanticAnn
-function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1" (TReference Mutable (TArray TUInt32 (K (TInteger 10 DecRepr))))] (Just TUInt32) 
+function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1" (TReference Mutable (TArray TUInt32 (buildConstExprTUSize 10)))] (Just TUInt32) 
   (Block [
     struct0Declaration2, 
     struct1Declaration, 

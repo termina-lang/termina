@@ -13,7 +13,7 @@ type GlobalEnv = M.Map Identifier (LocatedElement (GEntry SemanticAnn))
 
 -- | Local env
 -- variables to their type
-type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType))
+type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType SemanticAnn))
 
 -- | Environment required to type expression packed into just one type.
 data Environment
@@ -50,12 +50,12 @@ systemPortGlobalEnv =
       -- | procedure delay_in (&mut self, delay : &TimeVal)
       InterfaceProcedure "delay_in" [Parameter "delay" (TReference Immutable (TStruct "TimeVal"))] [Modifier "unprotected" Nothing] (buildExpAnn Internal TUnit)
     ] [])) Internal),
-    ("sys_print_buffer_size", LocatedElement (GConst TUSize (I (TInteger 256 DecRepr) Nothing)) Internal),
+    ("sys_print_buffer_size", LocatedElement (GConst (TConstSubtype TUSize) (Constant (I (TInteger 256 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize)))) Internal),
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure "print" [Parameter "str" (TReference Immutable (TArray TChar (V "sys_print_buffer_size")))] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure "println" [Parameter "str" (TReference Immutable (TArray TChar (V "sys_print_buffer_size")))] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "print" [Parameter "str" (TReference Immutable (TArray TChar (AccessObject (Variable "sys_print_buffer_size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))))] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure "println" [Parameter "str" (TReference Immutable (TArray TChar (AccessObject (Variable "sys_print_buffer_size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))))] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure "print_char" [Parameter "value" TChar] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure "println_char" [Parameter "value" TChar] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure "print_u8" [Parameter "value" TUInt8, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),

@@ -11,6 +11,7 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
 import Generator.LanguageC.Embedded
 import Utils.Annotations
+import Generator.CodeGen.Expression
 
 
 genFunctionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
@@ -30,5 +31,5 @@ genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
         cStmt <- genBlocks x
         return $ acc ++ cStmt) [] stmts
     return [ pre_cr $ function identifier cParamDecls @-> cRetType $
-                    ((trail_cr . block $ cBody) |>> location ann) |>> location ann]
+                    ((trail_cr . block $ cBody) |>> getLocation ann) |>> getLocation ann]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item
