@@ -146,6 +146,8 @@ instance Eq (TerminaType' expr a) where
   TInt64 == TInt64 = True
   TStruct ident == TStruct ident' = ident == ident'
   TEnum ident == TEnum ident' = ident == ident'
+  TBoxSubtype t == TBoxSubtype t' = t == t'
+  TConstSubtype t == TConstSubtype t' = t == t'
   _ == _ = False
 
 instance Ord (TerminaType' expr a) where
@@ -159,6 +161,8 @@ instance Ord (TerminaType' expr a) where
   TInt64 `compare` TInt64 = EQ
   TStruct ident `compare` TStruct ident' = ident `compare` ident'
   TEnum ident `compare` TEnum ident' = ident `compare` ident'
+  TBoxSubtype t `compare` TBoxSubtype t' = t `compare` t'
+  TConstSubtype t `compare` TConstSubtype t' = t `compare` t'
   _ `compare` _ = LT
 
 data AccessKind = Immutable | Mutable | Private
@@ -188,7 +192,7 @@ data Op
   | LogicalOr
   deriving Show
 
-data OptionVariant expr a = None | Some (expr a)
+data OptionVariant' expr a = None | Some (expr a)
   deriving (Show, Functor)
 
 data OptionVariantLabel = NoneLabel | SomeLabel

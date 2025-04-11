@@ -49,7 +49,7 @@ instance ShowText (PAST.TypeParameter a) where
     showText :: PAST.TypeParameter a -> T.Text
     showText (TypeParamIdentifier ident) = T.pack ident
     showText (TypeParamTypeSpec ts) = showText ts
-    showText (TypeParamSize _size) = "size"  -- TODO: showText size
+    showText (TypeParamSize size) = showText size
 
 instance ShowText (PAST.TypeSpecifier a) where
     showText TSUInt8 = "u8"
@@ -64,7 +64,7 @@ instance ShowText (PAST.TypeSpecifier a) where
     showText TSBool = "bool"
     showText TSChar = "char"
     showText (TSConstSubtype ts) = "const " <> showText ts
-    showText (TSArray ts _size) = "[" <> showText ts <> "; "  <> "size]" -- TODO: showText size <> "]"
+    showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TSBoxSubtype ts) = "box " <> showText ts
     showText (TSLocation ts) = "loc " <> showText ts
     showText (TSAccessPort ts) = "access " <> showText ts
@@ -75,6 +75,111 @@ instance ShowText (PAST.TypeSpecifier a) where
     showText (TSDefinedType ident []) = T.pack ident
     showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
     showText TSUnit = "()"
+
+instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
+    showText (FieldValueAssignment ident expr _) = 
+        T.pack ident <> " = " <> showText expr
+    showText (FieldAddressAssignment ident addr _) = 
+        T.pack ident <> " @ " <> showText addr
+    showText (FieldPortConnection InboundPortConnection ident glb _) = 
+        T.pack ident <> " <- " <> T.pack glb
+    showText (FieldPortConnection OutboundPortConnection ident glb _) =
+        T.pack ident <> " -> " <> T.pack glb
+    showText (FieldPortConnection AccessPortConnection ident glb _) =
+        T.pack ident <> " <-> " <> T.pack glb
+
+instance (ShowText (expr a)) => ShowText (OptionVariant' expr a) where
+    showText (Some e) = "Some(" <> showText e <> ")"
+    showText None = "None"
+
+instance ShowText OptionVariantLabel where
+    showText SomeLabel = "Some"
+    showText NoneLabel = "None"
+
+instance ShowText (PAST.Object a) where
+    showText (PAST.Variable ident _) = T.pack ident
+    showText (PAST.ArrayIndexExpression obj expr _) = 
+        showText obj <> "[" <> showText expr <> "]"
+    showText (PAST.MemberAccess obj ident _) = 
+        showText obj <> "." <> T.pack ident
+    showText (PAST.Dereference obj _) = "*" <> showText obj
+    showText (PAST.DereferenceMemberAccess obj ident _) = 
+        "*" <> showText obj <> "." <> T.pack ident
+    showText (PAST.ArraySlice obj expr1 expr2 _) = 
+        showText obj <> "[" <> showText expr1 <> ".." <> showText expr2 <> "]"
+
+instance ShowText (PAST.Expression a) where
+    showText (PAST.AccessObject obj) = showText obj
+    showText (PAST.Constant c _) = showText c
+    showText (PAST.BinOp op lhe rhe _) = showText lhe <> " " <> showText op <> " " <> showText rhe
+    showText (PAST.ReferenceExpression ak obj _) = "&" <> showText ak <> " " <> showText obj
+    showText (PAST.Casting e ty _) = "(" <> showText ty <> ") " <> showText e
+    showText (PAST.FunctionCall ident args _) = 
+        T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (PAST.MemberFunctionCall obj ident args _) =
+        showText obj <> "." <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (PAST.DerefMemberFunctionCall obj ident args _) = 
+        showText obj <> "->" <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (PAST.ArrayInitializer value size _) =
+        "[" <> showText value <> "; " <> showText size <> "]"
+    showText (PAST.ArrayExprListInitializer exprs _) = 
+        "{" <> T.intercalate ", " (map showText exprs) <> "}"
+    showText (PAST.StructInitializer fs Nothing _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "}"
+    showText (PAST.StructInitializer fs (Just ty) _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "} : " <> showText ty
+    showText (PAST.EnumVariantInitializer ident variant args _) = 
+        T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (PAST.OptionVariantInitializer ov _) = 
+        "Some(" <> showText ov <> ")"
+    showText (PAST.StringInitializer str _) = 
+        "\"" <> T.pack str <> "\""
+    showText (PAST.IsEnumVariantExpression obj ident variant _) = 
+        showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
+    showText (PAST.IsOptionVariantExpression obj variant _) = 
+        showText obj <> " is " <> showText variant
+
+instance ShowText (Object a) where
+    showText (Variable ident _) = T.pack ident
+    showText (ArrayIndexExpression obj expr _) = 
+        showText obj <> "[" <> showText expr <> "]"
+    showText (MemberAccess obj ident _) = 
+        showText obj <> "." <> T.pack ident
+    showText (Dereference obj _) = "*" <> showText obj
+    showText (DereferenceMemberAccess obj ident _) = 
+        "*" <> showText obj <> "." <> T.pack ident
+    showText (Unbox obj _) = "unbox " <> showText obj
+
+instance ShowText (Expression a) where
+    showText (AccessObject obj) = showText obj
+    showText (Constant c _) = showText c
+    showText (BinOp op lhe rhe _) = showText lhe <> " " <> showText op <> " " <> showText rhe
+    showText (ReferenceExpression ak obj _) = "&" <> showText ak <> " " <> showText obj
+    showText (Casting e ty _) = "(" <> showText ty <> ") " <> showText e
+    showText (FunctionCall ident args _) = 
+        T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (MemberFunctionCall obj ident args _) =
+        showText obj <> "." <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (DerefMemberFunctionCall obj ident args _) = 
+        showText obj <> "->" <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (ArrayInitializer value size _) =
+        "[" <> showText value <> "; " <> showText size <> "]"
+    showText (ArrayExprListInitializer exprs _) = 
+        "{" <> T.intercalate ", " (map showText exprs) <> "}"
+    showText (StructInitializer fs _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "}"
+    showText (EnumVariantInitializer ident variant args _) = 
+        T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (OptionVariantInitializer ov _) = 
+        "Some(" <> showText ov <> ")"
+    showText (StringInitializer str _) = 
+        "\"" <> T.pack str <> "\""
+    showText (IsEnumVariantExpression obj ident variant _) = 
+        showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
+    showText (IsOptionVariantExpression obj variant _) = 
+        showText obj <> " is " <> showText variant
+    showText (ArraySliceExpression ak obj lower upper _) = 
+         showText ak <> " " <> showText obj <> "[" <> showText lower <> ".." <> showText upper <> "]"
 
 
 instance ShowText (TerminaType a) where
@@ -95,15 +200,15 @@ instance ShowText (TerminaType a) where
     showText (TEnum ident) = T.pack ident
     showText (TInterface _ ident) = T.pack ident
     showText (TGlobal _ ident) = T.pack ident
-    showText (TArray ts _size) = "[" <> showText ts <> "; "  <> "size]" -- TODO: showText size <> "]"
+    showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TOption ts) = "Option<" <> showText ts <> ">"
-    showText (TMsgQueue ts _size) = "MsgQueue<" <> showText ts <> "; " <> "size>" -- TODO: showText size <> ">"
-    showText (TPool ts _size) = "Pool<" <> showText ts <> "; " <> "size>" -- TODO: showText size <> ">"
+    showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TPool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (TAllocator ts) = "Allocator<" <> showText ts <> ">"
     showText (TAtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
-    showText (TAtomicArrayAccess ts _size) = "AtomicArrayAccess<" <> showText ts <> "; " <> "size>" -- TODO: showText size <> ">"
+    showText (TAtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
     showText (TAtomic ts) = "Atomic<" <> showText ts <> ">"
-    showText (TAtomicArray ts _size) = "AtomicArray<" <> showText ts <> "; " <> "size>" -- TODO: showText size <> ">"
+    showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
     showText (TReference ak ts) = "&" <> showText ak <> showText ts
     showText (TBoxSubtype ts) = "box " <> showText ts
     showText (TFixedLocation ts) = "loc " <> showText ts
@@ -113,13 +218,14 @@ instance ShowText (TerminaType a) where
     showText (TOutPort ts) = "out " <> showText ts
     showText TUnit = "()"
 
-instance ShowText (Const a) where
-    showText (I (TInteger value DecRepr) Nothing) = T.pack $ show value
-    showText (I (TInteger value HexRepr) Nothing) = T.toUpper . T.pack $ "0x" <> showHex value ""
-    showText (I (TInteger value DecRepr) (Just ts)) = T.pack (show value) <> " : " <> showText ts
-    showText (I (TInteger value HexRepr) (Just ts)) = T.toUpper $ T.pack ("0x" <> showHex value "" <> " : ") <> showText ts
-    showText (I (TInteger value OctalRepr) Nothing) = T.pack ("0" <> showOct value "")
-    showText (I (TInteger value OctalRepr) (Just ts)) = T.pack ("0" <> showOct value "") <> " : " <> showText ts
+instance ShowText TInteger where
+    showText (TInteger value DecRepr) = T.pack $ show value
+    showText (TInteger value HexRepr) = T.toUpper . T.pack $ "0x" <> showHex value ""
+    showText (TInteger value OctalRepr) = T.pack ("0" <> showOct value "")
+
+instance (ShowText (ty a)) => ShowText (Const' ty a) where
+    showText (I i Nothing) = showText i
+    showText (I i (Just ts)) = showText i <> " : " <> showText ts
     showText (B True) = "true"
     showText (B False) = "false"
     showText (C c) = T.pack [c]

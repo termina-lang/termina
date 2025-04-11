@@ -93,9 +93,11 @@ typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns)
 -- Here we could implement some abstract interpretation analysis
 typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt anns) = do
   it_ty <- typeTypeSpecifier anns typeRHSObject it_ts
+  -- Check if the type of the iterator is a valid declaration type
+  declTyOrFail anns it_ty
   -- Check the iterator is of numeric type
   unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorInvalidType it_ty))
-  -- Both boundaries should have the same numeric type
+  -- Both boundaries should have the same numeric type and be a constant
   typed_fromexpr <- typeExpression (Just (TConstSubtype it_ty)) typeRHSObject from_expr
   typed_toexpr <- typeExpression (Just (TConstSubtype it_ty)) typeRHSObject to_expr
   SAST.ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr

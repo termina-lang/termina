@@ -68,7 +68,7 @@ data Expression
     Identifier -- ^ Variant identifier
     [Expression a] -- ^ list of expressions
     a
-  | OptionVariantInitializer (OptionVariant Expression a) a
+  | OptionVariantInitializer (OptionVariant a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
     (Object a) -- ^ Enum object
@@ -205,6 +205,7 @@ type Const = Const' TypeSpecifier
 type Modifier = Modifier' TypeSpecifier
 type FieldDefinition = FieldDefinition' TypeSpecifier
 type EnumVariant = EnumVariant' TypeSpecifier
+type OptionVariant = OptionVariant' Expression
 
 type AnnASTElement = AnnASTElement' TypeSpecifier Block Expression
 type FieldAssignment = FieldAssignment' Expression

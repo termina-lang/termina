@@ -42,7 +42,6 @@ data Error
   | EInvalidObjectDeclaration Identifier -- ^ Invalid object declaration (Internal)
   | EMalformedSlice -- ^ Malformed slice (Internal)
   | EMalformedClassTyping -- ^ Malformed class typing (Internal)
-  | EExpressionNotConstant -- ^ Expression not constant (Internal)
   | EContinueActionNotFound -- ^ Action not found in continue statement (Internal)
   | EMissingIdentifier -- ^ Missing identifier (Internal)
   | EMatchCaseInternalError -- ^ Internal error in match case (Internal)
@@ -50,187 +49,187 @@ data Error
   | EEnumDefEmpty Identifier -- ^ Empty enum definition (Internal)
   | EInterfaceEmpty Identifier -- ^ Empty interface definition (Internal)
   | ESystemInterfaceDefinition Identifier -- ^ System interface definition (Internal)
-  | EInvalidArrayIndexing (TerminaType SemanticAnn) -- ^ Invalid array indexing (SE-001)
-  | ENotNamedObject Identifier -- ^ Object not found (SE-002)
-  | ENotConstant -- ^ Invalid use of a non-constant object (SE-003)
-  | EAssignmentToImmutable -- ^ Assignment to immutable variable (SE-004)
-  | EIfElseNoOtherwise -- ^ Missing else clause (SE-005)
-  | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error (SE-006)
-  | EInvalidParameterType (Parameter SemanticAnn) -- ^ Invalid parameter type (SE-007)
-  | EInvalidReturnType (TerminaType SemanticAnn) -- ^ Invalid return type (SE-008)
-  | EProcedureCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in procedure call (SE-009)
-  | EProcedureCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in procedure call (SE-010)
-  | EProcedureCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure call (SE-011)
-  | EUnknownProcedure Identifier -- ^ Unknown procedure (SE-012)
-  | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface (SE-013)
-  | EResourceClassAction (Identifier, Location) Identifier -- ^ Resource class defines an action (SE-014)
-  | EResourceClassInPort (Identifier, Location) Identifier -- ^ Resource class defines an in port (SE-015)
-  | EResourceClassOutPort (Identifier, Location) Identifier -- ^ Resource class defines an out port (SE-016)
-  | EInterfaceNotFound Identifier -- ^ Interface not found (SE-017)
-  | EGlobalNotInterface Identifier -- ^ The type is not an interface (SE-018)
-  | EProcedureNotFromProvidedInterfaces (Identifier, Location) Identifier -- ^ Procedure not from provided interfaces (SE-019)
-  | EMissingProcedure Identifier Identifier -- ^ Missing procedure (SE-020)
-  | EProcedureExtraParams (Identifier, Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in procedure definition (SE-021)
-  | EProcedureMissingParams (Identifier, Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in procedure definition (SE-022)
-  | EProcedureParamTypeMismatch (Identifier, Identifier, TerminaType SemanticAnn, Location) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure definition (SE-023)
-  | ETaskClassProvides Identifier -- ^ Task class provides an interface (SE-024)
-  | ETaskClassProcedure (Identifier, Location) Identifier -- ^ Task class defines a procedure (SE-025)
-  | ETaskClassNoActions Identifier -- ^ Task class does not define any actions (SE-026)
-  | EHandlerClassProvides Identifier -- ^ Handler class provides an interface (SE-027)
-  | EHandlerClassProcedure (Identifier, Location) Identifier -- ^ Handler class defines a procedure (SE-028)
-  | EHandlerClassNoAction Identifier -- ^ Handler class does not define any actions (SE-029)
-  | EHandlerClassMultipleActions Identifier Location -- ^ Handler class defines multiple actions (SE-030)
-  | EHandlerClassNoSinkPort Identifier -- ^ Handler class does not define a sink port (SE-031)
-  | EHandlerClassMultipleSinkPorts Identifier Location -- ^ Handler class defines multiple sink ports (SE-032)
-  | EHandlerClassInPort (Identifier, Location) Identifier -- ^ Handler class defines an in port (SE-033)
-  | EIfElseIfCondNotBool (TerminaType SemanticAnn) -- ^ If-else-if condition is not a boolean (SE-034)
-  | EFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in function call (SE-035)
-  | EFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in function call (SE-036)
-  | EFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in function call (SE-037)
-  | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function (SE-038)
-  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object (SE-039)
-  | EMutableReferenceToPrivate -- ^ Mutable reference to immutable object (SE-040)
-  | EBinOpExpectedTypeLeft Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation expected type on the left (SE-041)
-  | EBinOpExpectedTypeRight Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation expected type on the right (SE-042)
-  | EBinOpTypeMismatch Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation type mismatch (SE-043)
-  | EBinOpExpectedTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not boolean (SE-044)
-  | EBinOpLeftTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the left (SE-045)
-  | EBinOpRightTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the right (SE-046)
-  | EBinOpExpectedTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not numeric (SE-047)
-  | EBinOpLeftTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the left (SE-048)
-  | EBinOpRightTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the right (SE-049)
-  | EBinOpRightTypeNotPos Op (TerminaType SemanticAnn) -- ^ Binary operation expected positive numeric type on the right (SE-050)
-  | EBinOpLeftTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the left (SE-051)
-  | EBinOpRightTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the right (SE-052)
-  | EAtomicAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic access interface (SE-053)
-  | EAtomicArrayAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic array access interface (SE-054)
-  | EAtomicInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic type (SE-055)
-  | EAtomicArrayInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic array type (SE-056)
-  | EAtomicConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic connection type mismatch (SE-057)
-  | EAtomicArrayConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic array connection type mismatch (SE-058)
-  | EAtomicArrayConnectionSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Atomic array connection size mismatch (SE-059)
-  | EConstantWithoutKnownType (Const SemanticAnn) -- ^ Constant without known type (SE-060)
-  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer (SE-061)
-  | EStructInitializerTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Struct initializer type mismatch (SE-062)
-  | EEnumInitializerExpectedTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Enum initializer expected type mismatch (SE-063)
-  | ESliceInvalidUse -- ^ Invalid use of a slice (SE-064)
-  | EArrayInitializerInvalidUse -- ^ Invalid use of an array initializer (SE-065)
-  | EArrayInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an array initializer to a non-array type (SE-066)
-  | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer (SE-067)
-  | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type (SE-068)
-  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer (SE-069)
-  | EArrayInitializerSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Array initializer size mismatch (SE-070)
-  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch (SE-071)
-  | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch (SE-072)
-  | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value (SE-073)
-  | EReturnValueNotUnit -- ^ Return value not expected (SE-074)
-  | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type (SE-075)
-  | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type (SE-076)
-  | ENoTypeFound Identifier -- ^ Type not found (SE-077)
-  | EGlobalNotType (Identifier, Location) -- ^ Global object but not a type (SE-078)
-  | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object (SE-079)
-  | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant (SE-080)
-  | ESymbolAlreadyDefined (Identifier, Location) -- ^ Symbol already defined (SE-081)
-  | EContinueInvalidExpression -- ^ Invalid expression in continue statement (SE-082)
-  | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement (SE-083)
-  | EContinueInvalidMemberCall (TerminaType SemanticAnn) -- ^ Invalid member call in continue statement (SE-084)
-  | EContinueActionExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in action call in continue statement (SE-085)
-  | EContinueActionMissingArgs (Identifier, Location) -- ^ Missing parameters in action call in continue statement (SE-086)
-  | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer (SE-087)
-  | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found (SE-088)
-  | EEnumVariantExtraParams (Identifier, Location) (Identifier, [TerminaType SemanticAnn]) Integer -- ^ Extra parameters in enum variant (SE-089)
-  | EEnumVariantMissingParams (Identifier, Location) (Identifier, [TerminaType SemanticAnn]) Integer -- ^ Missing parameters in enum variant (SE-090)
-  | EEnumVariantParamTypeMismatch (Identifier, Location) (Identifier, Integer, TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in enum variant (SE-091)
-  | EFunctionNotFound Identifier -- ^ Function not found (SE-092)
-  | EGlobalNotFunction (Identifier, Location) -- ^ Global object but not a function (SE-093)
-  | EUnexpectedNumericConstant (TerminaType SemanticAnn) -- ^ Unexpected numeric constant (SE-094)
-  | EInvalidAssignmentExprType (TerminaType SemanticAnn) -- ^ Invalid assignment expression type (SE-095)
-  | EInvalidMessageType (TerminaType SemanticAnn) -- ^ Invalid message type (SE-096)
-  | EInvalidOptionType (TerminaType SemanticAnn) -- ^ Invalid option type (SE-097)
-  | EInvalidReferenceType (TerminaType SemanticAnn) -- ^ Invalid reference type (SE-098)
-  | EInvalidFixedLocationType (TerminaType SemanticAnn) -- ^ Invalid fixed-location type (SE-099)
-  | EInvalidAllocatorType (TerminaType SemanticAnn) -- ^ Invalid allocator type (SE-100)
-  | EInvalidClassFieldType (TerminaType SemanticAnn) -- ^ Invalid class field type (SE-101)
-  | EInvalidStructFieldType (TerminaType SemanticAnn) -- ^ Invalid struct field type (SE-102)
-  | EInvalidEnumParameterType (TerminaType SemanticAnn) -- ^ Invalid enum parameter type (SE-103)
-  | EInvalidAccessPortType (TerminaType SemanticAnn) -- ^ Invalid access port type (SE-104)
-  | EInvalidDeclarationType (TerminaType SemanticAnn) -- ^ Invalid declaration type (SE-105)
-  | EInvalidTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier (SE-106)
-  | EInvalidNumericConstantType (TerminaType SemanticAnn) -- ^ Invalid numeric constant type (SE-107)
-  | EInvalidActionParameterType (TerminaType SemanticAnn) -- ^ Invalid action parameter type (SE-108)
-  | EInvalidProcedureParameterType (TerminaType SemanticAnn) -- ^ Invalid procedure parameter type (SE-109)
-  | EMemberFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra arguments in member function call (SE-110)
-  | EMemberFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing arguments in member function call (SE-111)
-  | EMemberFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in member function call (SE-112)
-  | EArrayIndexNotUSize (TerminaType SemanticAnn) -- ^ Invalid array index type (SE-113)
-  | EArraySliceLowerBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice lower bound type (SE-114)
-  | EArraySliceUpperBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice upper bound type (SE-115)
-  | EOutboundPortSendInvalidNumArgs Integer -- ^ Invalid number of arguments in outbound port send (SE-116)
-  | EOutboundPortArgTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in output port (SE-117)
-  | EAssignmentExprMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Assignment expression type mismatch (SE-118)
-  | EFieldValueAssignmentMissingFields (TerminaType SemanticAnn, Location) [Identifier] -- ^ Missing field/s in field assignment expression (SE-119)
-  | EFieldValueAssignmentUnknownFields (TerminaType SemanticAnn, Location) [Identifier] -- ^ Unknown field/s in field assignment expression (SE-120)
-  | EFieldNotFixedLocation Identifier (TerminaType SemanticAnn) -- ^ Field is not a fixed-location (SE-121)
-  | EFieldNotAccessPort Identifier (TerminaType SemanticAnn) -- ^ Field is not an access port (SE-122)
-  | EFieldNotSinkOrInboundPort Identifier (TerminaType SemanticAnn) -- ^ Field is not a sink or in port (SE-123)
-  | EFieldNotOutboundPort Identifier (TerminaType SemanticAnn) -- ^ Field is not an out port (SE-124)
-  | EMemberAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid member access type (SE-125)
-  | EMemberFunctionCallInvalidType (TerminaType SemanticAnn) -- ^ Invalid member function call type (SE-126)
-  | EMemberAccessUnknownField (Identifier, Location) Identifier -- ^ Unknown field in member access (SE-127)
-  | EInvalidProcedureCallInsideMemberFunction -- ^ Invalid procedure call inside member function (SE-128)
-  | EConstantOutRange (Const SemanticAnn) -- ^ Numeric constant out of range (SE-129)
-  | EForIteratorInvalidType (TerminaType SemanticAnn) -- ^ Invalid for iterator type (SE-130)
-  | EUsedTypeName Identifier Location -- ^ Type name already used (SE-131)
-  | EUsedGlobalName Identifier Location -- ^ Global object name already used (SE-132)
-  | EUsedFunName Identifier Location -- ^ Function name already used (SE-133)
-  | EAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid access port connection (SE-134)
-  | EAccessPortConnectionInterfaceNotProvided Identifier Identifier -- ^ Resource does not provide the interface (SE-135)
-  | ESinkPortConnectionInvalidGlobal Identifier -- ^ Invalid sink port connection (SE-136)
-  | EInboundPortConnectionInvalidObject Identifier -- ^ Invalid inbound port connection (SE-137)
-  | EOutboundPortConnectionInvalidGlobal Identifier -- ^ Invalid outbound port connection (SE-138)
-  | EAllocatorPortConnectionInvalidGlobal Identifier -- ^ Invalid allocator port connection (SE-139)
-  | EAtomicAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic access port connection (SE-140)
-  | EAtomicArrayAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic array access port connection (SE-141)
-  | EStructDefNotUniqueField [Identifier] -- ^ Repeated field in struct definition (SE-142)
-  | EEnumDefNotUniqueVariant [Identifier] -- ^ Repeated variant in enum definition (SE-143)
-  | EInterfaceNotUniqueProcedure [Identifier] -- ^ Repeated procedure in interface definition (SE-144)
-  | EClassLoop [(Identifier, Location)] -- ^ Loop between member function calls in class definition (SE-145)
-  | EDereferenceInvalidType (TerminaType SemanticAnn) -- ^ Invalid dereference type (SE-146)
-  | EMatchInvalidType (TerminaType SemanticAnn) -- ^ Invalid match type (SE-147)
-  | EMatchCaseDuplicate Identifier Location -- ^ Duplicate case in match statement (SE-148)
-  | EMatchCaseUnknownVariants [Identifier] -- ^ Unknown variant/s in match case (SE-149)
-  | EMatchMissingCases [Identifier] -- ^ Missing case/s in match statement (SE-150)
-  | EIsVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-variant expression (SE-151)
-  | EIsOptionVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-option-variant expression (SE-152)
-  | EIsVariantEnumTypeMismatch Identifier Identifier -- ^ Enum type mismatch in is variant expression (SE-153)
-  | EOutboundPortInvalidProcedure Identifier -- ^ Invalid procedure in outbound port (SE-154)
-  | EInvalidPoolInitialization -- ^ Invalid pool initialization (SE-155)
-  | EInvalidMsgQueueInitialization -- ^ Invalid message queue initialization (SE-156)
-  | EUnknownGlobal Identifier -- ^ Unknown global object (SE-157)
-  | EInvalidInterruptEmitterType (TerminaType SemanticAnn) -- ^ Invalid interrupt emitter type (SE-158)
-  | EInvalidPeriodicTimerEmitterType (TerminaType SemanticAnn) -- ^ Invalid periodic timer emitter type (SE-159)
-  | EInvalidSystemInitEmitterType (TerminaType SemanticAnn) -- ^ Invalid system init emitter type (SE-160)
-  | EInboundPortConnectionMsgQueueTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Message queue type mismatch in inbound port connection (SE-161)
-  | EOutboundPortConnectionMsgQueueTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Message queue type mismatch in outbound port connection (SE-162)
-  | EAllocatorPortConnectionPoolTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Pool type mismatch in allocator port connection (SE-163)
-  | EInvalidTaskType (TerminaType SemanticAnn) -- ^ Invalid task type (SE-164)
-  | EInvalidHandlerType (TerminaType SemanticAnn) -- ^ Invalid handler type (SE-165)
-  | EInvalidResourceType (TerminaType SemanticAnn) -- ^ Invalid resource type (SE-166)
-  | EInvalidEmitterType (TerminaType SemanticAnn) -- ^ Invalid emitter type (SE-167)
-  | EInvalidChannelType (TerminaType SemanticAnn) -- ^ Invalid channel type (SE-168)
-  | EEmitterClassNotInstantiable Identifier -- ^ Emitter class not instantiable (SE-169)
-  | ESingleExpressionTypeNotUnit (TerminaType SemanticAnn) -- ^ Single expression type not unit (SE-170)
-  | EInterfaceDuplicatedExtendedIface Identifier -- ^ Duplicated extended interface (SE-171)
-  | EInterfaceDuplicatedExtendedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in extended interfaces (SE-172)
-  | EInterfaceProcedurePreviouslyExtended Identifier Identifier -- ^ Procedure previously defined by an extended interface (SE-173)
-  | EInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface (SE-174)
-  | EResourceDuplicatedProvidedIface Identifier -- ^ Duplicated provided interface (SE-175)
-  | EResourceDuplicatedProvidedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in provided interfaces (SE-176)
-  | EResourceInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface (SE-177)
-  | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer (SE-178)
-  | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch (SE-179)
-  | EStringInitializerNotArrayOfChars (TerminaType SemanticAnn) -- ^ Assignment of a string array initializer to an invalid type (SE-180)
-  | EExpectedConstType (TerminaType SemanticAnn) -- ^ Invalid type for constant (SE-181)
+  | EInvalidArrayIndexing (TerminaType SemanticAnn) -- ^ Invalid array indexing
+  | ENotNamedObject Identifier -- ^ Object not found
+  | EExpressionNotConstant -- ^ Expected constant expression
+  | EAssignmentToImmutable -- ^ Assignment to immutable variable
+  | EIfElseNoOtherwise -- ^ Missing else clause
+  | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error
+  | EInvalidParameterType (Parameter SemanticAnn) -- ^ Invalid parameter type
+  | EInvalidReturnType (TerminaType SemanticAnn) -- ^ Invalid return type
+  | EProcedureCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in procedure call
+  | EProcedureCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in procedure call
+  | EProcedureCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure call
+  | EUnknownProcedure Identifier -- ^ Unknown procedure
+  | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface
+  | EResourceClassAction (Identifier, Location) Identifier -- ^ Resource class defines an action
+  | EResourceClassInPort (Identifier, Location) Identifier -- ^ Resource class defines an in port
+  | EResourceClassOutPort (Identifier, Location) Identifier -- ^ Resource class defines an out port
+  | EInterfaceNotFound Identifier -- ^ Interface not found
+  | EGlobalNotInterface Identifier -- ^ The type is not an interface
+  | EProcedureNotFromProvidedInterfaces (Identifier, Location) Identifier -- ^ Procedure not from provided interfaces
+  | EMissingProcedure Identifier Identifier -- ^ Missing procedure
+  | EProcedureExtraParams (Identifier, Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in procedure definition
+  | EProcedureMissingParams (Identifier, Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in procedure definition
+  | EProcedureParamTypeMismatch (Identifier, Identifier, TerminaType SemanticAnn, Location) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure definition
+  | ETaskClassProvides Identifier -- ^ Task class provides an interface
+  | ETaskClassProcedure (Identifier, Location) Identifier -- ^ Task class defines a procedure
+  | ETaskClassNoActions Identifier -- ^ Task class does not define any actions
+  | EHandlerClassProvides Identifier -- ^ Handler class provides an interface
+  | EHandlerClassProcedure (Identifier, Location) Identifier -- ^ Handler class defines a procedure
+  | EHandlerClassNoAction Identifier -- ^ Handler class does not define any actions
+  | EHandlerClassMultipleActions Identifier Location -- ^ Handler class defines multiple actions
+  | EHandlerClassNoSinkPort Identifier -- ^ Handler class does not define a sink port
+  | EHandlerClassMultipleSinkPorts Identifier Location -- ^ Handler class defines multiple sink ports
+  | EHandlerClassInPort (Identifier, Location) Identifier -- ^ Handler class defines an in port
+  | EIfElseIfCondNotBool (TerminaType SemanticAnn) -- ^ If-else-if condition is not a boolean
+  | EFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in function call
+  | EFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in function call
+  | EFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in function call
+  | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function
+  | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object
+  | EMutableReferenceToPrivate -- ^ Mutable reference to immutable object
+  | EBinOpExpectedTypeLeft Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation expected type on the left
+  | EBinOpExpectedTypeRight Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation expected type on the right
+  | EBinOpTypeMismatch Op (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Binary operation type mismatch
+  | EBinOpExpectedTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not boolean
+  | EBinOpLeftTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the left
+  | EBinOpRightTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the right
+  | EBinOpExpectedTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not numeric
+  | EBinOpLeftTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the left
+  | EBinOpRightTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the right
+  | EBinOpRightTypeNotPos Op (TerminaType SemanticAnn) -- ^ Binary operation expected positive numeric type on the right
+  | EBinOpLeftTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the left
+  | EBinOpRightTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the right
+  | EAtomicAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic access interface
+  | EAtomicArrayAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for the atomic array access interface
+  | EAtomicInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic type
+  | EAtomicArrayInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic array type
+  | EAtomicConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic connection type mismatch
+  | EAtomicArrayConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic array connection type mismatch
+  | EAtomicArrayConnectionSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Atomic array connection size mismatch
+  | EConstantWithoutKnownType (Const SemanticAnn) -- ^ Constant without known type
+  | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer
+  | EStructInitializerTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Struct initializer type mismatch
+  | EEnumInitializerExpectedTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Enum initializer expected type mismatch
+  | ESliceInvalidUse -- ^ Invalid use of a slice
+  | EArrayInitializerInvalidUse -- ^ Invalid use of an array initializer
+  | EArrayInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an array initializer to a non-array type
+  | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer
+  | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type
+  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer
+  | EArrayInitializerSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Array initializer size mismatch
+  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch
+  | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
+  | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
+  | EReturnValueNotUnit -- ^ Return value not expected
+  | EInvalidArrayType (TerminaType SemanticAnn) -- ^ Invalid array type
+  | EInvalidBoxType (TerminaType SemanticAnn) -- ^ Invalid box type
+  | ENoTypeFound Identifier -- ^ Type not found
+  | EGlobalNotType (Identifier, Location) -- ^ Global object but not a type
+  | EInvalidAccessToGlobal Identifier -- ^ Invalid access to global object
+  | EConstantIsReadOnly Identifier -- ^ Invalid write to a constant
+  | ESymbolAlreadyDefined (Identifier, Location) -- ^ Symbol already defined
+  | EContinueInvalidExpression -- ^ Invalid expression in continue statement
+  | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement
+  | EContinueInvalidMemberCall (TerminaType SemanticAnn) -- ^ Invalid member call in continue statement
+  | EContinueActionExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in action call in continue statement
+  | EContinueActionMissingArgs (Identifier, Location) -- ^ Missing parameters in action call in continue statement
+  | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer
+  | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found
+  | EEnumVariantExtraParams (Identifier, Location) (Identifier, [TerminaType SemanticAnn]) Integer -- ^ Extra parameters in enum variant
+  | EEnumVariantMissingParams (Identifier, Location) (Identifier, [TerminaType SemanticAnn]) Integer -- ^ Missing parameters in enum variant
+  | EEnumVariantParamTypeMismatch (Identifier, Location) (Identifier, Integer, TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in enum variant
+  | EFunctionNotFound Identifier -- ^ Function not found
+  | EGlobalNotFunction (Identifier, Location) -- ^ Global object but not a function
+  | EUnexpectedNumericConstant (TerminaType SemanticAnn) -- ^ Unexpected numeric constant
+  | EInvalidAssignmentExprType (TerminaType SemanticAnn) -- ^ Invalid assignment expression type
+  | EInvalidMessageType (TerminaType SemanticAnn) -- ^ Invalid message type
+  | EInvalidOptionType (TerminaType SemanticAnn) -- ^ Invalid option type
+  | EInvalidReferenceType (TerminaType SemanticAnn) -- ^ Invalid reference type
+  | EInvalidFixedLocationType (TerminaType SemanticAnn) -- ^ Invalid fixed-location type
+  | EInvalidAllocatorType (TerminaType SemanticAnn) -- ^ Invalid allocator type
+  | EInvalidClassFieldType (TerminaType SemanticAnn) -- ^ Invalid class field type
+  | EInvalidStructFieldType (TerminaType SemanticAnn) -- ^ Invalid struct field type
+  | EInvalidEnumParameterType (TerminaType SemanticAnn) -- ^ Invalid enum parameter type
+  | EInvalidAccessPortType (TerminaType SemanticAnn) -- ^ Invalid access port type
+  | EInvalidDeclarationType (TerminaType SemanticAnn) -- ^ Invalid declaration type
+  | EInvalidTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier
+  | EInvalidNumericConstantType (TerminaType SemanticAnn) -- ^ Invalid numeric constant type
+  | EInvalidActionParameterType (TerminaType SemanticAnn) -- ^ Invalid action parameter type
+  | EInvalidProcedureParameterType (TerminaType SemanticAnn) -- ^ Invalid procedure parameter type
+  | EMemberFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra arguments in member function call
+  | EMemberFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing arguments in member function call
+  | EMemberFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in member function call
+  | EArrayIndexNotUSize (TerminaType SemanticAnn) -- ^ Invalid array index type
+  | EArraySliceLowerBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice lower bound type
+  | EArraySliceUpperBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice upper bound type
+  | EOutboundPortSendInvalidNumArgs Integer -- ^ Invalid number of arguments in outbound port send
+  | EOutboundPortArgTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in output port
+  | EAssignmentExprMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Assignment expression type mismatch
+  | EFieldValueAssignmentMissingFields (TerminaType SemanticAnn, Location) [Identifier] -- ^ Missing field/s in field assignment expression
+  | EFieldValueAssignmentUnknownFields (TerminaType SemanticAnn, Location) [Identifier] -- ^ Unknown field/s in field assignment expression
+  | EFieldNotFixedLocation Identifier (TerminaType SemanticAnn) -- ^ Field is not a fixed-location
+  | EFieldNotAccessPort Identifier (TerminaType SemanticAnn) -- ^ Field is not an access port
+  | EFieldNotSinkOrInboundPort Identifier (TerminaType SemanticAnn) -- ^ Field is not a sink or in port
+  | EFieldNotOutboundPort Identifier (TerminaType SemanticAnn) -- ^ Field is not an out port
+  | EMemberAccessInvalidType (TerminaType SemanticAnn) -- ^ Invalid member access type
+  | EMemberFunctionCallInvalidType (TerminaType SemanticAnn) -- ^ Invalid member function call type
+  | EMemberAccessUnknownField (Identifier, Location) Identifier -- ^ Unknown field in member access
+  | EInvalidProcedureCallInsideMemberFunction -- ^ Invalid procedure call inside member function
+  | EConstantOutRange (Const SemanticAnn) -- ^ Numeric constant out of range
+  | EForIteratorInvalidType (TerminaType SemanticAnn) -- ^ Invalid for iterator type
+  | EUsedTypeName Identifier Location -- ^ Type name already used
+  | EUsedGlobalName Identifier Location -- ^ Global object name already used
+  | EUsedFunName Identifier Location -- ^ Function name already used
+  | EAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid access port connection
+  | EAccessPortConnectionInterfaceNotProvided Identifier Identifier -- ^ Resource does not provide the interface
+  | ESinkPortConnectionInvalidGlobal Identifier -- ^ Invalid sink port connection
+  | EInboundPortConnectionInvalidObject Identifier -- ^ Invalid inbound port connection
+  | EOutboundPortConnectionInvalidGlobal Identifier -- ^ Invalid outbound port connection
+  | EAllocatorPortConnectionInvalidGlobal Identifier -- ^ Invalid allocator port connection
+  | EAtomicAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic access port connection
+  | EAtomicArrayAccessPortConnectionInvalidGlobal Identifier -- ^ Invalid atomic array access port connection
+  | EStructDefNotUniqueField [Identifier] -- ^ Repeated field in struct definition
+  | EEnumDefNotUniqueVariant [Identifier] -- ^ Repeated variant in enum definition
+  | EInterfaceNotUniqueProcedure [Identifier] -- ^ Repeated procedure in interface definition
+  | EClassLoop [(Identifier, Location)] -- ^ Loop between member function calls in class definition
+  | EDereferenceInvalidType (TerminaType SemanticAnn) -- ^ Invalid dereference type
+  | EMatchInvalidType (TerminaType SemanticAnn) -- ^ Invalid match type
+  | EMatchCaseDuplicate Identifier Location -- ^ Duplicate case in match statement
+  | EMatchCaseUnknownVariants [Identifier] -- ^ Unknown variant/s in match case
+  | EMatchMissingCases [Identifier] -- ^ Missing case/s in match statement
+  | EIsVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-variant expression
+  | EIsOptionVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-option-variant expression
+  | EIsVariantEnumTypeMismatch Identifier Identifier -- ^ Enum type mismatch in is variant expression
+  | EOutboundPortInvalidProcedure Identifier -- ^ Invalid procedure in outbound port
+  | EInvalidPoolInitialization -- ^ Invalid pool initialization
+  | EInvalidMsgQueueInitialization -- ^ Invalid message queue initialization
+  | EUnknownGlobal Identifier -- ^ Unknown global object
+  | EInvalidInterruptEmitterType (TerminaType SemanticAnn) -- ^ Invalid interrupt emitter type
+  | EInvalidPeriodicTimerEmitterType (TerminaType SemanticAnn) -- ^ Invalid periodic timer emitter type
+  | EInvalidSystemInitEmitterType (TerminaType SemanticAnn) -- ^ Invalid system init emitter type
+  | EInboundPortConnectionMsgQueueTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Message queue type mismatch in inbound port connection
+  | EOutboundPortConnectionMsgQueueTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Message queue type mismatch in outbound port connection
+  | EAllocatorPortConnectionPoolTypeMismatch Identifier (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Pool type mismatch in allocator port connection
+  | EInvalidTaskType (TerminaType SemanticAnn) -- ^ Invalid task type
+  | EInvalidHandlerType (TerminaType SemanticAnn) -- ^ Invalid handler type
+  | EInvalidResourceType (TerminaType SemanticAnn) -- ^ Invalid resource type
+  | EInvalidEmitterType (TerminaType SemanticAnn) -- ^ Invalid emitter type
+  | EInvalidChannelType (TerminaType SemanticAnn) -- ^ Invalid channel type
+  | EEmitterClassNotInstantiable Identifier -- ^ Emitter class not instantiable
+  | ESingleExpressionTypeNotUnit (TerminaType SemanticAnn) -- ^ Single expression type not unit
+  | EInterfaceDuplicatedExtendedIface Identifier -- ^ Duplicated extended interface
+  | EInterfaceDuplicatedExtendedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in extended interfaces
+  | EInterfaceProcedurePreviouslyExtended Identifier Identifier -- ^ Procedure previously defined by an extended interface
+  | EInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface
+  | EResourceDuplicatedProvidedIface Identifier -- ^ Duplicated provided interface
+  | EResourceDuplicatedProvidedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in provided interfaces
+  | EResourceInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface
+  | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer
+  | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch
+  | EStringInitializerNotArrayOfChars (TerminaType SemanticAnn) -- ^ Assignment of a string array initializer to an invalid type
+  | EInvalidConstType (TerminaType SemanticAnn) -- ^ Invalid type for constant
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -239,7 +238,7 @@ instance ErrorMessage SemanticErrors where
 
     errorIdent (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "SE-001"
     errorIdent (AnnotatedError (ENotNamedObject _ident) _pos) = "SE-002"
-    errorIdent (AnnotatedError ENotConstant _pos) = "SE-003"
+    errorIdent (AnnotatedError EExpressionNotConstant _pos) = "SE-003"
     errorIdent (AnnotatedError EAssignmentToImmutable _pos) = "SE-004"
     errorIdent (AnnotatedError EIfElseNoOtherwise _pos) = "SE-005"
     errorIdent (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "SE-006"
@@ -417,12 +416,12 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
     errorIdent (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-179"
     errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
-    errorIdent (AnnotatedError (EExpectedConstType _ty) _pos) = "SE-181"
+    errorIdent (AnnotatedError (EInvalidConstType _ty) _pos) = "SE-181"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
     errorTitle (AnnotatedError (ENotNamedObject _ident) _pos) = "object not found"
-    errorTitle (AnnotatedError ENotConstant _pos) = "invalid use of a non-constant object"
+    errorTitle (AnnotatedError EExpressionNotConstant _pos) = "expected constant expression"
     errorTitle (AnnotatedError EAssignmentToImmutable _pos) = "assignment to immutable variable"
     errorTitle (AnnotatedError EIfElseNoOtherwise _pos) = "missing else clause"
     errorTitle (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "invalid cast"
@@ -600,7 +599,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
     errorTitle (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "string initializer size mismatch"
     errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
-    errorTitle (AnnotatedError (EExpectedConstType _ty) _pos) = "invalid type for constant"
+    errorTitle (AnnotatedError (EInvalidConstType _ty) _pos) = "invalid type for constant"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -617,7 +616,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")) 
-                ENotConstant ->
+                EExpressionNotConstant ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just "The expression is not constant.")
@@ -1965,7 +1964,7 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Invalid use of a string initializer.\n" <>
                             "You are trying to assign a string initializer to an object of type \x1b[31m" <>
                             showText ty <> "\x1b[0m."))
-                EExpectedConstType ty ->
+                EInvalidConstType ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>

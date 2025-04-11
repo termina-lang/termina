@@ -21,7 +21,7 @@ classWithOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0
       Parameter "param6" TInt32,
       Parameter "param7" TInt64
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 classWithTwoProceduresAndZeroFields :: AnnASTElement SemanticAnn
 classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
@@ -33,12 +33,12 @@ classWithTwoProceduresAndZeroFields = TypeDefinition (Class ResourceClass "Class
       Parameter "param0" TUInt8,
       Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 32)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 noHandlerClassWithoutOneProcedureAndZeroFields :: AnnASTElement SemanticAnn
 noHandlerClassWithoutOneProcedureAndZeroFields = TypeDefinition (Class ResourceClass "Class0" [
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 classWithOneProcedureAndTwoFields :: AnnASTElement SemanticAnn
 classWithOneProcedureAndTwoFields = TypeDefinition
@@ -47,16 +47,16 @@ classWithOneProcedureAndTwoFields = TypeDefinition
     ClassField (FieldDefinition "field1" (TArray TUInt64 (buildConstExprTUSize 24))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 noHandlerClassWithOneEmptyProcedure :: AnnASTElement SemanticAnn
 noHandlerClassWithOneEmptyProcedure = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt8 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field1" (TArray TUInt64 (buildConstExprTUSize 10))
+    ClassField (FieldDefinition "field1" (TArray TUInt64 (buildConstExprTUSize 24))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [Modifier "no_handler" Nothing]) undefined
+  ] ["Interface0"] [Modifier "no_handler" Nothing]) (buildTypeAnn Internal)
 
 packedClass :: AnnASTElement SemanticAnn
 packedClass = TypeDefinition
@@ -69,7 +69,7 @@ packedClass = TypeDefinition
       Parameter "param0" TChar,
       Parameter "param1" (TReference Mutable (TArray TUInt8 (buildConstExprTUSize 16)))
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [Modifier "packed" Nothing]) undefined
+  ] ["Interface0"] [Modifier "packed" Nothing]) (buildTypeAnn Internal)
 
 alignedClass :: AnnASTElement SemanticAnn
 alignedClass = TypeDefinition
@@ -79,7 +79,7 @@ alignedClass = TypeDefinition
     ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) undefined
+  ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) (buildTypeAnn Internal)
 
 packedAndAlignedClass :: AnnASTElement SemanticAnn
 packedAndAlignedClass = TypeDefinition
@@ -92,7 +92,7 @@ packedAndAlignedClass = TypeDefinition
   ] ["Interface0"] [
       Modifier "packed" Nothing,
       Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))
-    ]) undefined
+    ]) (buildTypeAnn Internal)
 
 classWithFixedLocationField :: AnnASTElement SemanticAnn
 classWithFixedLocationField = TypeDefinition
@@ -100,7 +100,7 @@ classWithFixedLocationField = TypeDefinition
     ClassField (FieldDefinition "field0" TUInt32 (buildFieldAnn Internal)),
     ClassField (FieldDefinition "field1" (TFixedLocation TUInt32) (buildFieldAnn Internal)),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 classWithAccessPortField :: AnnASTElement SemanticAnn
 classWithAccessPortField = TypeDefinition
@@ -109,7 +109,7 @@ classWithAccessPortField = TypeDefinition
     ClassField (FieldDefinition "field1" (TAccessPort (TInterface RegularInterface "Interface1"))
       (buildAccessPortFieldAnn Internal (M.fromList [("test0", InterfaceProcedure "test0" [] [] (buildExpAnn Internal TUnit))]))),
     ClassProcedure "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] []) undefined
+  ] ["Interface0"] []) (buildTypeAnn Internal)
 
 spec :: Spec
 spec = do

@@ -60,20 +60,29 @@ checkIntConstant loc tyI ti@(TInteger i _) =
 -- |typeTypeSpecifier|.  Thus, we do not need to check if the type of structs,
 -- enums, etc. are previously defined.  Note that we do not change the
 -- |TerminaType| in any way, that's why this function return |()|.
-checkTerminaType :: Location -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
-checkTerminaType loc (TArray ty _s) =
+checkTerminaType :: 
+  Location -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
+checkTerminaType loc (TArray ty s) = 
   checkTerminaType loc ty >>
-  arrayTyOrFail loc ty
-  -- TODO: check size constant 
-  -- checkSize loc s
-checkTerminaType loc (TMsgQueue ty _s) = 
+  arrayTyOrFail loc ty >>
+  getExprType s >>= 
+    \case { 
+      TConstSubtype _ -> return ();
+      _ -> throwError $ annotateError loc EExpressionNotConstant
+    }
+checkTerminaType loc (TMsgQueue ty s) = 
   checkTerminaType loc ty >>
-  msgTyOrFail loc ty 
-  -- TODO: check size constant 
-  -- checkSize loc s
-checkTerminaType loc (TPool ty _s) = checkTerminaType loc ty
-  -- TODO: check size constant 
-  -- >> checkSize loc s
+  msgTyOrFail loc ty >>
+  getExprType s >>= \case { 
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
+checkTerminaType loc (TPool ty s) = 
+  checkTerminaType loc ty >>
+  getExprType s >>= \case { 
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
 checkTerminaType loc (TOption ty) = 
   checkTerminaType loc ty >>
   optionTyOrFail loc ty
@@ -104,17 +113,23 @@ checkTerminaType loc (TAllocator ty) =
 checkTerminaType loc (TAtomicAccess ty) = 
   checkTerminaType loc ty >>
   catchExpectedNum loc EAtomicAccessInvalidType (numTyOrFail loc ty)
-checkTerminaType loc (TAtomicArrayAccess ty _s) = 
+checkTerminaType loc (TAtomicArrayAccess ty s) = 
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicArrayAccessInvalidType (numTyOrFail loc ty)
--- TODO: check size constant 
+  catchExpectedNum loc EAtomicArrayAccessInvalidType (numTyOrFail loc ty) >>
+  getExprType s >>= \case { 
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
 checkTerminaType loc (TAtomic ty) = 
   checkTerminaType loc ty >>
   catchExpectedNum loc EAtomicInvalidType (numTyOrFail loc ty)
-checkTerminaType loc (TAtomicArray ty _s) =
+checkTerminaType loc (TAtomicArray ty s) =
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicArrayInvalidType (numTyOrFail loc ty)
--- TODO: check size constant 
+  catchExpectedNum loc EAtomicArrayInvalidType (numTyOrFail loc ty) >>
+  getExprType s >>= \case { 
+    TConstSubtype _ -> return ();
+    _ -> throwError $ annotateError loc EExpressionNotConstant
+  }
 checkTerminaType loc (TConstSubtype ty) =
   checkTerminaType loc ty >>
   constTyOrFail loc ty
@@ -657,27 +672,23 @@ typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) 
       -- by the recursive call to |typeAssignmentExpression|
       typed_init <- typeAssignmentExpression ts typeObj iexp
       typed_init_size <- typeExpression (Just (TConstSubtype TUSize)) typeObj size
-      -- TODO: This should be done later, when we know in all cases the size of the array.
-      -- We should check the size of the array when we are performing the const propagation.
-      -- unless (size == arrsize) (throwError $ annotateError pann (EArrayInitializerSizeMismatch arrsize size))
+      -- We will check the size of the array when we are performing the const propagation.
       return $ SAST.ArrayInitializer typed_init typed_init_size (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pann) = do
   case expectedType of
-    TArray ts arrsize -> do
+    TArray ts _s -> do
       typed_exprs <- mapM (\e ->
         catchError (typeAssignmentExpression ts typeObj e) (\err -> case getError err of
           EMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           EAssignmentExprMismatch _ ty -> throwError $ annotateError (getAnnotation e) (EArrayExprListInitializerExprTypeMismatch ts ty)
           _ -> throwError err)) exprs
-      {--
-      -- TODO: This should be done later, when we know in all cases the size of the array.
-      -- We should check the size of the array when we are performing the const propagation.
-      size_value <- getIntSize pann arrsize
-      unless (length typed_exprs == fromIntegral size_value)
-        (throwError $ annotateError pann (EArrayExprListInitializerSizeMismatch size_value (fromIntegral $ length typed_exprs)))
-      --}
-      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts arrsize))
+      -- We will check the size of the array when we are performing the const propagation.
+      -- The size of the expression list initializer will be the number of its elements
+      let typed_init_size = SAST.Constant 
+            (SAST.I (TInteger (fromIntegral $ length typed_exprs) DecRepr) 
+              (Just (TConstSubtype TUSize))) (buildExpAnn pann (TConstSubtype TUSize)) 
+      return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
 typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
   case expectedType of
@@ -692,13 +703,8 @@ typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = 
 -- | TArray Initialization
   case expectedType of
     TArray TChar _ -> do
-      {--
-      -- TODO: This should be done later, when we know in all cases the size of the array.
-      -- We should check the size of the array when we are performing the const propagation.
-      let stringSize = fromIntegral (length value)
-      size_value <- getIntSize pann arrsize
-      unless (stringSize == size_value) (throwError $ annotateError pann (EStringInitializerSizeMismatch size_value stringSize))
-      --}
+      -- We will check the size of the array when we are performing the const propagation.
+      -- The size of the expression list initializer will be the number of its elements
       let typed_init_size = 
             SAST.Constant (SAST.I (TInteger (fromIntegral $ length value) DecRepr) (Just (TConstSubtype TUSize)))
                 (buildExpAnn pann (TConstSubtype TUSize))
@@ -740,7 +746,6 @@ typeExpression expectedType typeObj (AccessObject obj) = do
         sameTyOrError (getAnnotation obj) ts ts'
         -- If we have an box and expect an unboxed type:
         return $ SAST.AccessObject (unBox typed_obj)
-      -- TODO: Check const types
       (Just (TConstSubtype ts), TConstSubtype ts') -> do
         -- If the type must be an expected type, then check it.
         sameTyOrError (getAnnotation obj) ts ts'
@@ -749,7 +754,7 @@ typeExpression expectedType typeObj (AccessObject obj) = do
         -- If the type must be an expected type, then check it.
         sameTyOrError (getAnnotation obj) ts ts'
         -- We need to return an error because the type is not a const type.
-        throwError $ annotateError (getAnnotation obj) ENotConstant
+        throwError $ annotateError (getAnnotation obj) EExpressionNotConstant
       (Just ts, ts') -> do
         -- If the type must be an expected type, then check it.
         sameTyOrError (getAnnotation obj) ts ts'
@@ -1124,8 +1129,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
         case gentry of
           LocatedElement (GGlob (TAtomicArray ty' _)) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
-            -- TODO: Check the size of the array
-            -- unless (s == s') (throwError $ annotateError pann $ EAtomicArrayConnectionSizeMismatch s s')
+            -- We will check the size of the atomic array when we are performing the const propagation.
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort ifaceTy@(TInterface _ iface) -> do

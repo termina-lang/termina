@@ -137,34 +137,6 @@ getLocalObjTy loc ident =
       Nothing -> throwError $ annotateError loc (ENotNamedObject ident)
   }) . M.lookup ident
 
--- | Get the Type of a defined read-only variable. If it is not defined throw an error.
-{--
-getConst :: Location -> Identifier -> SemanticMonad (TerminaType SemanticAnn, Expression SemanticAnn)
-getConst loc ident = do
-    catchError (getGlobalEntry loc ident)
-        (\errorGlobal ->
-            -- | We have not found a global object with the name |ident|
-            case getError errorGlobal of {
-              EUnknownGlobal _ ->
-                -- | If we have not found a global object with the name |ident|, then check the local objects.
-                -- Any path that goes through here is an error.
-                catchError (getLocalObjTy loc ident)
-                (\errorLocal ->
-                  case getError errorLocal of {
-                    ENotNamedObject _ -> throwError $ annotateError loc (ENotNamedObject ident);
-                    _ -> throwError errorLocal;
-                  }) >>
-                    -- | Ooops! We found a local object with the name |ident| but it is not a constant.
-                    throwError (annotateError loc (ENotConstant ident));
-              err  -> error $ "Impossible error: " ++ show err;
-            }
-          ) >>= (\case {
-                    -- | It is a global constant!
-                    LocatedElement (GConst ts value) _ -> return (ts, value);
-                    -- | It is a global object, but not a constant.
-                    _ -> throwError $ annotateError loc (ENotConstant ident);
-    });
---}
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalEntry :: Location -> Identifier -> SemanticMonad (LocatedElement (GEntry SemanticAnn))
 getGlobalEntry loc ident =
@@ -325,6 +297,16 @@ catchExpectedNum ann ferror action = catchError action (\err -> case getError er
   EExpectedNumType ty -> throwError $ annotateError ann (ferror ty)
   _ -> throwError err)
 
+catchExpectedConstSubtype ::
+  Location
+  -- | Function to create the error
+  -> (TerminaType SemanticAnn -> Error)
+  -> SemanticMonad a
+  -> SemanticMonad a
+catchExpectedConstSubtype ann ferror action = catchError action (\err -> case getError err of
+  EInvalidConstType ty -> throwError $ annotateError ann (ferror ty)
+  _ -> throwError err)
+
 -- Helper function failing if a given |TerminaType| is not *copiable*.
 copyTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 copyTyOrFail pann ty = unless (copyTy ty) (throwError (annotateError pann (EExpectedCopyType ty)))
@@ -333,7 +315,7 @@ numTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 numTyOrFail pann ty = unless (numTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
 
 constTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
-constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EExpectedConstType ty)))
+constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EInvalidConstType ty)))
 
 optionTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 optionTyOrFail pann ty = unless (optionTy ty) (throwError (annotateError pann (EInvalidOptionType ty)))
@@ -359,6 +341,10 @@ allocTyOrFail pann ty = unless (allocTy ty) (throwError (annotateError pann (EIn
 -- Helper function failing if a given |TerminaType| cannot be used to define a class field.
 classFieldTyorFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 classFieldTyorFail pann ty = unless (classFieldTy ty) (throwError (annotateError pann (EInvalidClassFieldType ty)))
+
+constSubtypeOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
+constSubtypeOrFail _ (TConstSubtype _) = return ()
+constSubtypeOrFail loc _ = throwError (annotateError loc EExpressionNotConstant)
 
 -- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an internal error.

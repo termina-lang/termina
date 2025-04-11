@@ -6,8 +6,6 @@ import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
 
-import Utils.Annotations
-
 import UT.PPrinter.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn

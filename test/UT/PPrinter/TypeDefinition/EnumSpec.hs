@@ -4,6 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
+import Utils.Annotations
 import qualified Data.Map as M
 
 import UT.PPrinter.Common
@@ -12,20 +13,20 @@ enumWithOneRegularField :: AnnASTElement SemanticAnn
 enumWithOneRegularField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" []
-  ] []) undefined
+  ] []) (buildTypeAnn Internal)
 
 enumWithTwoRegularFields :: AnnASTElement SemanticAnn
 enumWithTwoRegularFields = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [],
     EnumVariant "variant1" []
-  ] []) undefined
+  ] []) (buildTypeAnn Internal)
 
 enumWithOneParameterizedField :: AnnASTElement SemanticAnn
 enumWithOneParameterizedField = TypeDefinition
   (Enum "id0" [
     EnumVariant "variant0" [TUInt32]
-  ] []) undefined
+  ] []) (buildTypeAnn Internal)
 
 enumWithMultipleParameterizedFields :: AnnASTElement SemanticAnn
 enumWithMultipleParameterizedFields = TypeDefinition
@@ -34,7 +35,7 @@ enumWithMultipleParameterizedFields = TypeDefinition
     EnumVariant "variant1" [],
     EnumVariant "variant2" [TUInt64, TEnum "id1", TChar],
     EnumVariant "variant3" [TInt8, TArray (TArray TChar (buildConstExprTUSize 20)) (buildConstExprTUSize 35)]
-  ] []) undefined
+  ] []) (buildTypeAnn Internal)
 
 spec :: Spec
 spec = do
