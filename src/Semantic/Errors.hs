@@ -52,7 +52,7 @@ data Error
   | ESystemInterfaceDefinition Identifier -- ^ System interface definition (Internal)
   | EInvalidArrayIndexing (TerminaType SemanticAnn) -- ^ Invalid array indexing (SE-001)
   | ENotNamedObject Identifier -- ^ Object not found (SE-002)
-  | ENotConstant Identifier -- ^ Invalid use of a non-constant object (SE-003)
+  | ENotConstant -- ^ Invalid use of a non-constant object (SE-003)
   | EAssignmentToImmutable -- ^ Assignment to immutable variable (SE-004)
   | EIfElseNoOtherwise -- ^ Missing else clause (SE-005)
   | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error (SE-006)
@@ -239,7 +239,7 @@ instance ErrorMessage SemanticErrors where
 
     errorIdent (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "SE-001"
     errorIdent (AnnotatedError (ENotNamedObject _ident) _pos) = "SE-002"
-    errorIdent (AnnotatedError (ENotConstant _ident) _pos) = "SE-003"
+    errorIdent (AnnotatedError ENotConstant _pos) = "SE-003"
     errorIdent (AnnotatedError EAssignmentToImmutable _pos) = "SE-004"
     errorIdent (AnnotatedError EIfElseNoOtherwise _pos) = "SE-005"
     errorIdent (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "SE-006"
@@ -422,7 +422,7 @@ instance ErrorMessage SemanticErrors where
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
     errorTitle (AnnotatedError (ENotNamedObject _ident) _pos) = "object not found"
-    errorTitle (AnnotatedError (ENotConstant _ident) _pos) = "invalid use of a non-constant object"
+    errorTitle (AnnotatedError ENotConstant _pos) = "invalid use of a non-constant object"
     errorTitle (AnnotatedError EAssignmentToImmutable _pos) = "assignment to immutable variable"
     errorTitle (AnnotatedError EIfElseNoOtherwise _pos) = "missing else clause"
     errorTitle (AnnotatedError (ENotCasteable _ty1 _ty2) _pos) = "invalid cast"
@@ -617,10 +617,10 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The variable \x1b[31m" <> T.pack ident <> "\x1b[0m has not been declared")) 
-                ENotConstant ident ->
+                ENotConstant ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The object \x1b[31m" <> T.pack ident <> "\x1b[0m is not a constant."))
+                        (Just "The expression is not constant.")
                 EAssignmentToImmutable ->
                     pprintSimpleError
                         sourceLines title fileName pos

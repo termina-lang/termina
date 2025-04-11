@@ -20,7 +20,6 @@ import Semantic.Monad
 
 import Parser.Types
 import Semantic.TypeChecking.Expression
-import Semantic.TypeChecking.Check
 import Core.Utils
 
 typeGlobal :: Global ParserAnn -> SemanticMonad (SAST.Global SemanticAnn, LocatedElement (GEntry SemanticAnn))

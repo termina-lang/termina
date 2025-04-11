@@ -138,6 +138,7 @@ getLocalObjTy loc ident =
   }) . M.lookup ident
 
 -- | Get the Type of a defined read-only variable. If it is not defined throw an error.
+{--
 getConst :: Location -> Identifier -> SemanticMonad (TerminaType SemanticAnn, Expression SemanticAnn)
 getConst loc ident = do
     catchError (getGlobalEntry loc ident)
@@ -163,7 +164,7 @@ getConst loc ident = do
                     -- | It is a global object, but not a constant.
                     _ -> throwError $ annotateError loc (ENotConstant ident);
     });
-
+--}
 -- | Get the Type of a defined entity variable. If it is not defined throw an error.
 getGlobalEntry :: Location -> Identifier -> SemanticMonad (LocatedElement (GEntry SemanticAnn))
 getGlobalEntry loc ident =
@@ -182,20 +183,18 @@ getLHSVarTy loc ident =
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case getError errorLocal of {
-        ENotNamedObject _ ->
-          catchError (getConst loc ident)
-          (\errorRO ->
-            case getError errorRO of {
-              ENotConstant _ -> catchError (getGlobalEntry loc ident)
-                (\errorGlobal ->
-                  case getError errorGlobal of {
-                    EUnknownGlobal _ -> 
-                      throwError $ annotateError loc (ENotNamedObject ident);
-                    _  -> throwError errorGlobal;
-                  }
-                ) >> throwError (annotateError loc (EInvalidAccessToGlobal ident));
-              _ -> throwError errorRO;
-            }) >> throwError (annotateError loc (EConstantIsReadOnly ident))
+        ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
+          (\errorGlobal ->
+            case getError errorGlobal of {
+              EUnknownGlobal _ -> 
+                throwError $ annotateError loc (ENotNamedObject ident);
+              _  -> throwError errorGlobal;
+            }
+          ) >>= (\case{
+                  LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                  LocatedElement (GConst {}) _ -> throwError $ annotateError loc (EConstantIsReadOnly ident);
+                  _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                });
           ;
         _  -> throwError errorLocal;
       })
@@ -206,22 +205,17 @@ getRHSVarTy loc ident =
   -- | If it is not defined there, check ro environment
     (\errorLocal ->
       case getError errorLocal of {
-        ENotNamedObject _ ->
-          catchError (getConst loc ident >>= (\(ts, _) -> return (Immutable, ts)))
-          (\errorRO ->
-            case getError errorRO of {
-              ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
-                (\errorGlobal ->
-                  case getError errorGlobal of {
-                    EUnknownGlobal _ -> throwError $ annotateError loc (ENotNamedObject ident);
-                    _  -> throwError errorGlobal;
-                  }
-                ) >>= (\case{
-                        LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
-                        _ -> throwError $ annotateError loc (ENotNamedObject ident);
-                      });
-              _ -> throwError errorRO;
-            })
+        ENotNamedObject _ -> catchError (getGlobalEntry loc ident)
+          (\errorGlobal ->
+            case getError errorGlobal of {
+              EUnknownGlobal _ -> throwError $ annotateError loc (ENotNamedObject ident);
+              _  -> throwError errorGlobal;
+            }
+          ) >>= (\case{
+                  LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
+                  LocatedElement (GConst ts _) _ -> return (Immutable, ts);
+                  _ -> throwError $ annotateError loc (ENotNamedObject ident);
+                });
           ;
         _  -> throwError errorLocal;
       })

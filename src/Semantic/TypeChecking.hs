@@ -30,7 +30,6 @@ import Data.Maybe
 import qualified Control.Monad.State.Strict as ST
 import Parser.Types
 import Semantic.TypeChecking.Statement
-import Semantic.TypeChecking.Check
 import Semantic.TypeChecking.Global
 import Semantic.TypeChecking.TypeDefinition
 import Semantic.TypeChecking.Expression

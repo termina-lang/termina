@@ -33,7 +33,6 @@ import Data.Maybe
 import Parser.Types
 import Utils.Monad
 import Semantic.TypeChecking.Statement
-import Semantic.TypeChecking.Check
 import Semantic.TypeChecking.Expression
 import qualified Data.Set as S
 import qualified Data.List as L
