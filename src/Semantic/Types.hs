@@ -144,7 +144,9 @@ kClassMember (ClassAction idx ps ty _blk ann) =
 -- Subtyping.
 -- This fuction says what types can be casted into others.
 casteableTys :: TerminaType a -> TerminaType a -> Bool
-casteableTys a b = numTy a && numTy b
+casteableTys source@(TConstSubtype _) target@(TConstSubtype _) = numTy source && numTy target
+casteableTys _ (TConstSubtype _) = False
+casteableTys source target = numTy source && numTy target
 
 -- Relation between types
 -- we use to define (box A \subseteq A)

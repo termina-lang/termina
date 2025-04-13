@@ -19,17 +19,17 @@ getEmitterIdentifier (TPInterruptEmittter ident _) = ident
 getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 
-getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPClassMemberFunction a)
+getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getMemberFunctions = foldl' (\acc member -> 
   case member of
     ClassMethod identifier mRetTy blk ann  -> 
-      M.insert identifier (TPClassMemberFunction identifier [] mRetTy blk ann)   acc
+      M.insert identifier (TPFunction identifier [] mRetTy blk ann)   acc
     ClassProcedure identifier params blk ann -> 
-      M.insert identifier (TPClassMemberFunction identifier params Nothing blk ann) acc
+      M.insert identifier (TPFunction identifier params Nothing blk ann) acc
     ClassAction identifier param rty blk ann -> 
-      M.insert identifier (TPClassMemberFunction identifier [param] (Just rty) blk ann) acc
+      M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
     ClassViewer identifier params mRetTy blk ann -> 
-      M.insert identifier (TPClassMemberFunction identifier params mRetTy blk ann) acc
+      M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
     _ -> acc
   ) M.empty
 
@@ -209,6 +209,7 @@ getExprType (StructInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return
 getExprType (EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 
 -- | This function returns the name of a port. The function assumes that the object is

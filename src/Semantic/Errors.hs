@@ -107,7 +107,6 @@ data Error
   | EAtomicArrayInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic array type
   | EAtomicConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic connection type mismatch
   | EAtomicArrayConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic array connection type mismatch
-  | EAtomicArrayConnectionSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Atomic array connection size mismatch
   | EConstantWithoutKnownType (Const SemanticAnn) -- ^ Constant without known type
   | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer
   | EStructInitializerTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Struct initializer type mismatch
@@ -118,8 +117,6 @@ data Error
   | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer
   | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type
   | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer
-  | EArrayInitializerSizeMismatch (Expression SemanticAnn) (Expression SemanticAnn) -- ^ Array initializer size mismatch
-  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch
   | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
   | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
   | EReturnValueNotUnit -- ^ Return value not expected
@@ -227,7 +224,6 @@ data Error
   | EResourceDuplicatedProvidedProcedure Identifier Identifier Identifier -- ^ Duplicated procedure in provided interfaces
   | EResourceInterfacePreviouslyExtended Identifier Identifier -- ^ Interface previously extended by another interface
   | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer
-  | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch
   | EStringInitializerNotArrayOfChars (TerminaType SemanticAnn) -- ^ Assignment of a string array initializer to an invalid type
   | EInvalidConstType (TerminaType SemanticAnn) -- ^ Invalid type for constant
   deriving Show
@@ -294,7 +290,6 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "SE-056"
     errorIdent (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-057"
     errorIdent (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-058"
-    errorIdent (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "SE-059"
     errorIdent (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "SE-060"
     errorIdent (AnnotatedError EStructInitializerInvalidUse _pos) = "SE-061"
     errorIdent (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "SE-062"
@@ -305,8 +300,6 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "SE-067"
     errorIdent (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "SE-068"
     errorIdent (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "SE-069"
-    errorIdent (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-070"
-    errorIdent (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-071"
     errorIdent (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "SE-072"
     errorIdent (AnnotatedError (EReturnValueExpected _ty) _pos) = "SE-073"
     errorIdent (AnnotatedError EReturnValueNotUnit _pos) = "SE-074"
@@ -414,7 +407,6 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "SE-176"
     errorIdent (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "SE-177"
     errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
-    errorIdent (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "SE-179"
     errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
     errorIdent (AnnotatedError (EInvalidConstType _ty) _pos) = "SE-181"
     errorIdent _ = "Internal"
@@ -477,7 +469,6 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "invalid atomic array type"
     errorTitle (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic connection type mismatch"
     errorTitle (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic array connection type mismatch"
-    errorTitle (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "atomic array connection size mismatch"
     errorTitle (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "constant without known type"
     errorTitle (AnnotatedError EStructInitializerInvalidUse _pos) = "invalid use of struct initializer"
     errorTitle (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "struct initializer type mismatch"
@@ -488,8 +479,6 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "invalid use of an expression list array initializer"
     errorTitle (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "assignment of an array expression list initializer to a non-array type"
     errorTitle (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "invalid use of an option variant initializer"
-    errorTitle (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array initializer size mismatch"
-    errorTitle (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array expression list initializer size mismatch"
     errorTitle (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "list of initializing expressions type mismatch"
     errorTitle (AnnotatedError (EReturnValueExpected _ty) _pos) = "expected return value"
     errorTitle (AnnotatedError EReturnValueNotUnit _pos) = "return value not expected"
@@ -597,7 +586,6 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EResourceDuplicatedProvidedProcedure _iface1 _iface2 _procId) _pos) = "procedure duplicated in provided interfaces"
     errorTitle (AnnotatedError (EResourceInterfacePreviouslyExtended _iface1 _iface2) _pos) = "interface previously extended by another interface"
     errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
-    errorTitle (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "string initializer size mismatch"
     errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
     errorTitle (AnnotatedError (EInvalidConstType _ty) _pos) = "invalid type for constant"
     errorTitle (AnnotatedError _err _pos) = "internal error"
@@ -1234,11 +1222,6 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> -- showText expectedSize <>
-                            "\x1b[0m but the array has size ...")) -- \x1b[31m" <> showText actualSize <> "\x1b[0m."))
                 EConstantWithoutKnownType c ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -1291,16 +1274,6 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just $ "You are trying to use an option variant initializer in an invalid context.\n" <>
                                 "Option variant initializers can only be used to initialize option objects.")
-                EArrayInitializerSizeMismatch _expectedSize _initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the array initializer is \x1b[31m" <> -- showText initializerSize <>
-                            "\x1b[0m but the expected size is ...")) -- \x1b[31m" <> showText expectedSize <> "\x1b[0m."))
-                EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the array expression list initializer is \x1b[31m" <> T.pack (show initializerSize) <>
-                            "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
                 EArrayExprListInitializerExprTypeMismatch expectedTy actualTy ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -1953,11 +1926,6 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just $ "You are trying to use a string initializer in an invalid context.\n" <>
                                 "String initializers can only be used to initialize arrays of characters.")
-                EStringInitializerSizeMismatch expectedSize initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the string initializer is \x1b[31m" <> T.pack (show initializerSize) <>
-                            "\x1b[0m but the array size is of \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
                 EStringInitializerNotArrayOfChars ty ->
                     pprintSimpleError
                         sourceLines title fileName pos

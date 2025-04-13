@@ -27,7 +27,7 @@ newCmdArgsParser = NewCmdArgs
     <$> argument str (metavar "PROJECT"
         <> help "Name of the new project")
     <*> option str (long "platform" <> short 'p'
-        <> value "rtems5-noel-spike"
+        <> value "posix-gcc"
         <> help "Target platform for the new project")
     <*> switch (long "verbose"
         <> short 'v'

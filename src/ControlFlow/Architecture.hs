@@ -129,22 +129,11 @@ genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
     }
 genArchTypeDef _ = return ()
 
-evalConstExpression :: Expression SemanticAnn -> ArchitectureMonad (Const SemanticAnn)
-evalConstExpression (Constant value _ann) = do
-  return value 
-evalConstExpression (AccessObject (Variable identifier _ann)) = do
-  globals <- ST.gets globalConstants
-  case M.lookup identifier globals of
-    Just (TPGlobalConstant _ _ value _) -> return value
-    Nothing -> throwError $ annotateError Internal EUnboxingConstExpressionValue
-evalConstExpression _ = throwError $ annotateError Internal EUnboxingConstExpressionValue
-
 genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal _ (Const identifier ty expr _ ann) = do
-  value <- evalConstExpression expr
   ST.modify $ \tp ->
     tp {
-      globalConstants = M.insert identifier (TPGlobalConstant identifier ty value ann) (globalConstants tp)
+      globalConstants = M.insert identifier (TPGlobalConstant identifier ty expr ann) (globalConstants tp)
     }
 genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
@@ -293,10 +282,10 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
-genArchElement _ func@(Function identifier _ _ _ _ _) = 
+genArchElement _ func@(Function identifier params mRet block _ ann) = 
   ST.modify $ \tp ->
     tp {
-      functions = M.insert identifier (TPFunction identifier func) (functions tp)
+      functions = M.insert identifier (TPFunction identifier params mRet block ann) (functions tp)
     }
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
 genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef

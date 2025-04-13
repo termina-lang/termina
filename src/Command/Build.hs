@@ -41,6 +41,7 @@ import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
+import ControlFlow.ConstPropagation (runConstPropagation)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -284,6 +285,20 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
+constPropagation :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+constPropagation bbProject progArchitecture = 
+  let result = runConstPropagation progArchitecture in
+  case result of
+    Just err -> 
+      -- | Create the source files map. This map will be used to obtainn the source files that
+      -- will be feed to the error pretty printer. The source files map must use as key the
+      -- path of the source file and as element the text of the source file.
+      let sourceFilesMap = 
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+                M.empty bbProject in
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    Nothing -> return ()
+
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
 buildCommand (BuildCmdArgs chatty) = do
@@ -364,6 +379,8 @@ buildCommand (BuildCmdArgs chatty) = do
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
+    when chatty (putStrLn . debugMessage $ "Performing constant propagation")
+    constPropagation bbProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject

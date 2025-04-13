@@ -10,7 +10,7 @@ import Utils.Annotations
 -- This module contains the function thhat will be used to generate
 -- map of the architecture of the program.
 
-data TPClassMemberFunction a = TPClassMemberFunction
+data TPFunction a = TPFunction
     Identifier -- ^ name of the member function
     [Parameter a] -- ^ list of parameters (possibly empty)
     (Maybe (TerminaType a)) -- ^ return type of the membber function
@@ -28,7 +28,7 @@ data TPClass a = TPClass {
     classKind :: ClassKind,
     
     -- | Class member functions
-    classMemberFunctions :: M.Map Identifier (TPClassMemberFunction a),
+    classMemberFunctions :: M.Map Identifier (TPFunction a),
 
     -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
@@ -234,18 +234,6 @@ instance Annotated TPPool where
   getAnnotation (TPPool _ _ _ _ a) = a
   updateAnnotation (TPPool i t s m _) = TPPool i t s m
 
-data TPFunction a = TPFunction {
-
-    -- | Name of the function
-    functionName :: Identifier,
-
-    -- | Map of the output ports of the function
-    -- It maps the name of the port to the type of the data that is sent through
-    -- the port.
-    functionDefinition :: AnnASTElement a
-
-} deriving Show
-
 data TPGlobalConstant a = TPGlobalConstant {
 
     -- | Name of the global constant
@@ -255,7 +243,7 @@ data TPGlobalConstant a = TPGlobalConstant {
     constantType :: TerminaType a,
 
     -- | Value of the global constant
-    constantValue :: Const a,
+    constantValue :: Expression a,
 
     -- | Annotations associated with the global constant
     constantAnn :: a

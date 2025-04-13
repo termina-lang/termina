@@ -220,11 +220,9 @@ whereIsDefined ident = do
       Just ob -> return . Just . location $ ob
     Just ob -> return . Just . location $ ob
 
--- | Checks if two type are the same numeric type.
--- If they are not, it throws a mismatch error.
 sameTyOrError :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> SemanticMonad ()
-sameTyOrError loc t1 t2 =
-  unless (sameTy t1 t2) (throwError $ annotateError loc $ EMismatch t1 t2)
+sameTyOrError loc expectedTy actualTy =
+  unless (sameTy expectedTy actualTy) (throwError $ annotateError loc $ EMismatch expectedTy actualTy)
 
 unBox :: Object SemanticAnn -> Object SemanticAnn
 unBox t = Unbox t (unboxTypeAnn (getAnnotation t))

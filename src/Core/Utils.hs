@@ -22,6 +22,7 @@ copyTy (TEnum _)        = True
 copyTy (TOption (TBoxSubtype {})) = False
 copyTy (TOption _)      = True
 copyTy (TFixedLocation _)    = True
+copyTy (TConstSubtype ty) = copyTy ty
 copyTy _               = False
 
 optionTy :: TerminaType' expr a -> Bool
@@ -252,6 +253,7 @@ posTy TUInt16 = True
 posTy TUInt32 = True
 posTy TUInt64 = True
 posTy TUSize  = True
+posTy (TConstSubtype ty) = posTy ty
 posTy _      = False
 
 -- | Predicate defining when a |TerminaType| can be used in a comparison.
@@ -267,6 +269,7 @@ eqTy TInt64  = True
 eqTy TUSize  = True
 eqTy TBool   = True
 eqTy TChar   = True
+eqTy (TConstSubtype ty) = eqTy ty
 eqTy _      = False
 
 memberIntCons :: Integer -> TerminaType' expr a -> Bool
@@ -331,7 +334,10 @@ rootType (TFixedLocation ts) = rootType ts
 rootType t = t
 
 -- Type equality
-sameTy :: TerminaType' expr a -> TerminaType' expr a -> Bool
+sameTy :: 
+  TerminaType' expr a -- ^ Expected type
+  -> TerminaType' expr a  -- ^ Actual type
+  -> Bool
 sameTy  TUInt8  TUInt8 = True
 sameTy  TUInt16  TUInt16 = True
 sameTy  TUInt32  TUInt32 = True
@@ -345,7 +351,7 @@ sameTy  TBool  TBool = True
 sameTy  TUnit TUnit = True
 sameTy  TChar TChar = True
 sameTy  (TConstSubtype tyspecl) (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
-sameTy  (TConstSubtype tyspecl) tyspecr = sameTy tyspecl tyspecr
+sameTy  (TConstSubtype _) _ = False
 sameTy  tyspecl (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TOption _) (TOption TUnit) = True
 sameTy  (TOption TUnit) (TOption _) = True

@@ -47,6 +47,7 @@ getExprType (SAST.StructInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = r
 getExprType (SAST.EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | This function returns the name of a port. The function assumes that the object is

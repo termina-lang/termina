@@ -766,16 +766,27 @@ typeExpression expectedType typeObj (AccessObject obj) = do
       (Nothing, _) ->
         return $ SAST.AccessObject typed_obj
 -- | Constant literals with an expected type.
+typeExpression (Just (TConstSubtype expectedType)) typeObj (Constant c pann) = do
+  typed_c <- typeConstant pann typeObj c
+  -- | Call the function that checks that the constant is of the expected type.
+  checkConstant pann expectedType typed_c
+  return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype expectedType))
 typeExpression (Just expectedType) typeObj (Constant c pann) = do
   typed_c <- typeConstant pann typeObj c
   -- | Call the function that checks that the constant is of the expected type.
   checkConstant pann expectedType typed_c
-  return $ SAST.Constant typed_c (buildExpAnn pann expectedType)
+  return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype expectedType))
 -- | Integer literals without an expected type but with a known type.
 typeExpression Nothing typeObj (Constant c@(I _ (Just ts)) pann) = do
-  ty <- typeTypeSpecifier pann typeObj ts
   typed_c <- typeConstant pann typeObj c
-  return $ SAST.Constant typed_c (buildExpAnn pann ty)
+  typedTS <- typeTypeSpecifier pann typeObj ts
+  case typedTS of
+    TConstSubtype ty -> do
+      checkConstant pann ty typed_c
+      return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype ty))
+    ty -> do
+      checkConstant pann ty typed_c
+      return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype ty))
 -- | Integer literals without an expected type and without a known type.
 -- This is an error, since we cannot infer the type of the constant.
 typeExpression Nothing _ (Constant (I tInt Nothing) pann) = do
@@ -783,19 +794,23 @@ typeExpression Nothing _ (Constant (I tInt Nothing) pann) = do
 -- | Boolean literals without an expected type.
 typeExpression Nothing typeObj (Constant c@(B {}) pann) = do
   typed_c <- typeConstant pann typeObj c
-  return $ SAST.Constant typed_c (buildExpAnn pann TBool)
+  return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype TBool))
 -- | Character literals without an expected type.
 typeExpression Nothing typeObj (Constant c@(C {}) pann) = do
   typed_c <- typeConstant pann typeObj c
-  return $ SAST.Constant typed_c (buildExpAnn pann TChar)
+  return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype TChar))
 typeExpression expectedType typeObj (Casting e nts pann) = do
   nty <- typeTypeSpecifier pann typeObj nts
-  maybe (return ()) (sameTyOrError pann nty) expectedType
+  maybe (return ()) (flip (sameTyOrError pann) nty) expectedType
   -- | Casting Expressions.
   typed_exp <- typeExpression Nothing typeObj e
   type_exp <- getExprType typed_exp
   if casteableTys type_exp nty
-  then return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
+  then 
+    case (nty, type_exp) of 
+      (TConstSubtype _, TConstSubtype _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
+      (_, TConstSubtype _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann (TConstSubtype nty)))
+      (_, _) -> return (SAST.Casting typed_exp nty (buildExpAnn pann nty))
   else throwError (annotateError pann $ ENotCasteable type_exp nty)
 typeExpression expectedType typeObj (BinOp op le re pann) = do
 
@@ -851,8 +866,16 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           _ -> throwError err)
       tyle_ty <- getExprType tyle
       unless (isValid tyle_ty) (throwError $ annotateError (getAnnotation lnume) (lerror tyle_ty))
-      tyre <- catchMismatch pann (EBinOpTypeMismatch op tyle_ty) (typeExpression (Just tyle_ty) typeObj rnume)
-      return (tyle_ty, tyle, tyre)
+      case tyle_ty of
+        TConstSubtype tyle_ty' -> do
+          tyre <- catchMismatch pann (EBinOpTypeMismatch op tyle_ty') (typeExpression (Just tyle_ty') typeObj rnume)
+          tyre_ty <- getExprType tyre
+          case tyre_ty of
+            TConstSubtype _ -> return (tyle_ty, tyle, tyre) 
+            _ -> return (tyle_ty', tyle, tyre)
+        _ -> do
+          tyre <- catchMismatch pann (EBinOpTypeMismatch op tyle_ty) (typeExpression (Just tyle_ty) typeObj rnume)
+          return (tyle_ty, tyle, tyre)
 
     -- | This function checks the that the lhs and the rhs are both
     -- equal to the expected type (if any) and that the expected type is
@@ -877,23 +900,30 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     -- This function is used to check the binary expressions bitwise left shift and
     -- bitwise right shift.
     leftNumRightPosType :: SemanticMonad (SAST.Expression SemanticAnn)
-    leftNumRightPosType =
+    leftNumRightPosType = do
+      tyre <- typeExpression Nothing typeObj re
+      tyre_ty <- getExprType tyre
+      unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
       case expectedType of
+        ty@(Just ty'@(TConstSubtype _)) -> do
+          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
+            (typeExpression ty typeObj le)
+          case tyre_ty of
+            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
+            _ -> throwError $ annotateError (getAnnotation re) EExpressionNotConstant
         ty@(Just ty') -> do
           unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
-          tyre <- typeExpression Nothing typeObj re
-          tyre_ty <- getExprType tyre
-          unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
+          tyle_ty <- getExprType tyle
+          case (tyle_ty, tyre_ty) of
+            (TConstSubtype _, TConstSubtype _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype ty'))
+            (_, _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
-          tyre <- typeExpression Nothing typeObj re
           tyle_ty <- getExprType tyle
-          tyre_ty <- getExprType tyre
           unless (numTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotNum op tyle_ty))
-          unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
@@ -902,16 +932,20 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameEquatableTyBool =
       case expectedType of
         (Just TBool) -> do
-          (_, tyle, tyre) <-
+          (ty, tyle, tyre) <-
             sameTypeExpressions eqTy
               (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+          case ty of
+            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
+            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          (_, tyle, tyre) <-
+          (ty, tyle, tyre) <-
             sameTypeExpressions eqTy
               (EBinOpLeftTypeNotEq op) (EBinOpRightTypeNotEq op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+          case ty of
+            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
+            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is numeric. This function is used to check the binary expressions <, <=, > and >=.
@@ -919,16 +953,20 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameNumTyBool =
       case expectedType of
         (Just TBool) -> do
-          (_, tyle, tyre) <-
+          (ty, tyle, tyre) <-
             sameTypeExpressions numTy
               (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+          case ty of 
+            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
+            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
-          (_, tyle, tyre) <-
+          (ty, tyle, tyre) <-
             sameTypeExpressions numTy
               (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
+          case ty of
+            TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
+            _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is boolean. This function is used to check the binary expressions && and ||.
@@ -973,7 +1011,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
         -- the access kind of the object.
         TBoxSubtype ty -> do
           -- | Check that the expected type is the same as the base type.  
-          maybe (return ()) (sameTyOrError pann (TReference refKind ty)) expectedType
+          maybe (return ()) (flip (sameTyOrError pann) (TReference refKind ty)) expectedType
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind ty)))
         _ -> do
           -- | Check if the we are allowed to create that kind of reference from the object
@@ -1001,7 +1039,7 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
       (typeExpression (Just p) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-  maybe (return ()) (sameTyOrError ann retty) expectedType
+  maybe (return ()) (flip (sameTyOrError ann) retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 
 ----------------------------------------
@@ -1036,7 +1074,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
     Enum lhs_enum ty_vs _mods ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
-          maybe (return ()) (sameTyOrError pann TBool) expectedType
+          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EUnboxingEnumType
@@ -1045,7 +1083,7 @@ typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pa
   (_, obj_ty) <- getObjType obj_typed
   case obj_ty of
     (TOption {}) -> do
-      maybe (return ()) (sameTyOrError pann TBool) expectedType
+      maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
       return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
     _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
