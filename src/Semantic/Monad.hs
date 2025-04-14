@@ -76,16 +76,6 @@ getEnumTy loc iden =
       _ -> throwError $ annotateError Internal EUnboxingEnumType
     })
 
--- | Add new *local* immutable objects and execute computation in the
--- new local environment.
-addLocalImmutObjs :: Location 
-  -> [(Identifier, TerminaType SemanticAnn)] 
-  -> SemanticMonad a -> SemanticMonad a
-addLocalImmutObjs loc newVars ma  =
-  localScope (addVariables newVars >> ma)
-  where
-    addVariables = mapM_ (uncurry (insertLocalImmutObj loc))
-
 -- | Insert mutable object (variable) in local scope.
 insertLocalMutObj :: Location -> Identifier -> TerminaType SemanticAnn -> SemanticMonad ()
 insertLocalMutObj loc ident ty = do

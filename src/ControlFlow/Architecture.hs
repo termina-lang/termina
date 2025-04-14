@@ -282,7 +282,7 @@ genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =
 genArchGlobal _ (Channel {}) = error "Internal error: invalid channel declaration"
 
 genArchElement :: QualifiedName -> AnnASTElement SemanticAnn -> ArchitectureMonad ()
-genArchElement _ func@(Function identifier params mRet block _ ann) = 
+genArchElement _ (Function identifier params mRet block _ ann) = 
   ST.modify $ \tp ->
     tp {
       functions = M.insert identifier (TPFunction identifier params mRet block ann) (functions tp)

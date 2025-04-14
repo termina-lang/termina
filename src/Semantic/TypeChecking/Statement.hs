@@ -104,11 +104,12 @@ typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt 
     <$> (case mWhile of
               Nothing -> return Nothing
               Just whileC -> do
-                  typed_whileC <- addLocalImmutObjs anns [(it_id, it_ty)] $
+                  typed_whileC <- localScope $ do
+                      insertLocalImmutObj anns it_id it_ty
                       typeExpression (Just TBool) typeRHSObject whileC
                   return (Just typed_whileC)
         )
-    <*> addLocalImmutObjs anns [(it_id, it_ty)] (typeBlock retTy body_stmt)
+    <*> localScope (insertLocalImmutObj anns it_id it_ty >> typeBlock retTy body_stmt)
     <*> return (buildStmtAnn anns)
 typeStatement _retTy (SingleExpStmt expr anns) = do
   typed_expr <- catchError (typeExpression (Just TUnit) typeRHSObject expr) (
@@ -183,7 +184,12 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
           typeMatchCase' (MatchCase cIdent bVars bd mcann) supIdent tVars
             | cIdent == supIdent =
               if length bVars == length tVars then
-              flip (SAST.MatchCase cIdent bVars) (buildStmtMatchCaseAnn (matchAnnotation c) tVars) <$> addLocalImmutObjs mcann (zip bVars tVars) (typeBlock retTy bd)
+              flip (SAST.MatchCase cIdent bVars) 
+                  (buildStmtMatchCaseAnn (matchAnnotation c) tVars) 
+                  <$> localScope (
+                        mapM_ (uncurry $ insertLocalImmutObj mcann) (zip bVars tVars) >>
+                        typeBlock retTy bd
+                      )
               else throwError $ annotateError Internal EMatchCaseInternalError
             | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariants [supIdent]
 

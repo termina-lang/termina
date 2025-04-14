@@ -39,21 +39,21 @@ import qualified Data.List as L
 
 typeProcedureParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeProcedureParameter loc (Parameter ident ts) = do
-  ty <- typeTypeSpecifier loc typeGlobalObject ts
+  ty <- typeTypeSpecifier loc typeRHSObject ts
   let procParam = SAST.Parameter ident ty
   checkProcedureParameterType loc procParam
   return procParam
 
 typeParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeParameter loc (Parameter ident ts) = do
-  ty <- typeTypeSpecifier loc typeGlobalObject ts
+  ty <- typeTypeSpecifier loc typeRHSObject ts
   let param = SAST.Parameter ident ty
   checkParameterType loc param
   return param
 
 typeActionParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeActionParameter loc (Parameter ident ts) = do
-  ty <- typeTypeSpecifier loc typeGlobalObject ts
+  ty <- typeTypeSpecifier loc typeRHSObject ts
   let param = SAST.Parameter ident ty
   checkActionParameterType loc param
   return param
@@ -299,28 +299,45 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             -- Interesting case
             ClassProcedure mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.
-              ps_ty <- mapM (typeProcedureParameter mann) ps_ts
-              typed_bret <- addLocalImmutObjs mann (("self", TReference Mutable (TGlobal kind ident)) : fmap (\p -> (paramIdentifier p, paramType p)) ps_ty) (typeBlock Nothing blk)
+              (ps_ty, typed_bret) <- localScope $ do
+                  insertLocalImmutObj mann "self" (TReference Mutable (TGlobal kind ident))
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                      typedParam <- typeProcedureParameter mann param
+                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      return typedParam)
+                  typed_bret <- typeBlock Nothing blk
+                  return (ps_ty, typed_bret)
               let newPrc = SAST.ClassProcedure mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
               return (newPrc : prevMembers)
             ClassMethod mIdent mts mbody mann -> do
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
-              typed_bret <- addLocalImmutObjs mann [("self", TReference Private (TGlobal kind ident))] (typeBlock mty mbody)
-              let newMth = SAST.ClassMethod mIdent mty  typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+              typed_bret <- localScope $ do 
+                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  typeBlock mty mbody
+              let newMth = SAST.ClassMethod mIdent mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent ps_ts mts mbody mann -> do
-              ps_ty <- mapM (typeParameter mann) ps_ts
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
-              typed_bret <- addLocalImmutObjs mann (("self", TReference Immutable (TGlobal kind ident)) : fmap (\p -> (paramIdentifier p, paramType p)) ps_ty) (typeBlock mty mbody)
+              (ps_ty, typed_bret) <- localScope $ do
+                  insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                      typedParam <- typeProcedureParameter mann param
+                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      return typedParam)
+                  typed_bret <- typeBlock mty mbody
+                  return (ps_ty, typed_bret)
               let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
             ClassAction mIdent p_ts ts mbody mann -> do
               p_ty <- typeActionParameter mann p_ts
               ty <- typeTypeSpecifier mann typeGlobalObject ts
               checkReturnType mann ty
-              typed_bret <- addLocalImmutObjs mann (("self", TReference Private (TGlobal kind ident)) : [(paramIdentifier p_ty, paramType p_ty)]) (typeBlock (Just ty) mbody)
+              typed_bret <- localScope $ do 
+                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)
+                  typeBlock (Just ty) mbody
               let newAct = SAST.ClassAction mIdent p_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder

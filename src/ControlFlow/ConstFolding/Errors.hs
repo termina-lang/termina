@@ -120,12 +120,12 @@ instance ErrorMessage ConstFoldError where
                 EConstIntegerOverflow value ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The value \x1b[31m" <> T.pack (show value) <>
+                        (Just ("The resulting value \x1b[31m" <> T.pack (show value) <>
                             "\x1b[0m is too large for the type \x1b[31m" <> showText ty <> "\x1b[0m."))
                 EConstIntegerUnderflow value ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The value \x1b[31m" <> T.pack (show value) <>
+                        (Just ("The resulting value \x1b[31m" <> T.pack (show value) <>
                             "\x1b[0m produces an underflow of the type \x1b[31m" <> showText ty <> "\x1b[0m."))
                 EConstDivisionByZero ->
                     pprintSimpleError

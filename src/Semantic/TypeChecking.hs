@@ -35,6 +35,7 @@ import Semantic.TypeChecking.TypeDefinition
 import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import Semantic.Environment
+import Utils.Monad
 
 typeElement :: AnnASTElement ParserAnn
   -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
@@ -43,10 +44,13 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   -- Check the return type 
   mty <- maybe (return Nothing) (typeTypeSpecifier anns typeGlobalObject >=>
       (\ty -> checkReturnType anns ty >> return (Just ty))) mts
-  ps_ty <- forM ps_ts (typeParameter anns)
-  typedBret <- addLocalImmutObjs anns
-                (fmap (\p -> (paramIdentifier p , paramType p)) ps_ty)
-                (typeBlock mty bret)
+  (ps_ty, typedBret) <- localScope $ do
+      ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+          typedParam <- typeParameter anns param
+          insertLocalImmutObj anns paramId (paramType typedParam)
+          return typedParam)
+      typedBret <- typeBlock mty bret
+      return (ps_ty, typedBret)
   mds_ty <- mapM (typeModifier anns typeGlobalObject) mds_ts
   let functionSeman = FunctionSeman (map paramType ps_ty) (fromMaybe TUnit mty)
   return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)

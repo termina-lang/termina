@@ -244,7 +244,8 @@ genExpression (BinOp op left right ann) =
                         let leftExprType = getCExprType leftExpr
                         case leftExprType of
                             CTBool _ -> return leftExpr
-                            _ -> return $ cast leftExprType leftExpr |>> getLocation ann
+                            CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) leftExpr |>> getLocation ann
+                            _ -> throwError $ InternalError $ "Unsupported left expression type: " ++ show leftExprType
                     _ -> return leftExpr)
             cRight <- (do
                 rightExpr <- genExpression right
@@ -253,7 +254,8 @@ genExpression (BinOp op left right ann) =
                         let rightExprType = getCExprType rightExpr
                         case rightExprType of
                             CTBool _ -> return rightExpr
-                            _ -> return $ cast rightExprType rightExpr |>> getLocation ann
+                            CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) rightExpr |>> getLocation ann
+                            _ -> throwError $ InternalError $ "Unsupported left expression type: " ++ show rightExpr
                     _ -> genExpression right)
             return $ CExprBinaryOp (cBinOp op) cLeft cRight (getCExprType cLeft) cAnn
 

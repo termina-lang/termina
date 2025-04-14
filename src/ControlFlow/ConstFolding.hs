@@ -190,7 +190,7 @@ constFoldParams (param:params) (expr:exprs) = do
       constValue <- evalConstExpression expr
       ST.modify (\s -> s { localConstEnv = M.insert (paramIdentifier param) constValue (localConstEnv s) })
       constFoldParams params exprs
-    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+    _ -> constFoldParams params exprs
 constFoldParams _ _ = throwError $ annotateError Internal EInvalidParameterList
 
 constFoldObject :: Object SemanticAnn -> ConstFoldMonad ()
@@ -217,9 +217,20 @@ constFoldObject (Unbox obj _) = constFoldObject obj
 constFoldExpression :: Expression SemanticAnn -> ConstFoldMonad ()
 constFoldExpression (AccessObject obj) = constFoldObject obj
 constFoldExpression (Constant _ _) = return ()
-constFoldExpression (BinOp _ lhs rhs _) =
-  constFoldExpression lhs >>
+constFoldExpression expr@(BinOp op lhs rhs ann) = do
+  constFoldExpression lhs
   constFoldExpression rhs
+  lhs_type <- getExprType lhs
+  rhs_type <- getExprType rhs
+  ty <- getExprType expr
+  case (lhs_type, rhs_type) of
+    (TConstSubtype _, TConstSubtype _) -> do
+      -- If both lhs and rhs are constant expressions, evaluate the bin op.
+      -- The evaluation will trigger an error if the result is not valid.
+      lhs_value <- evalConstExpression lhs
+      rhs_value <- evalConstExpression rhs
+      void $ evalBinOp (getLocation ann) op lhs_value rhs_value ty
+    _ -> return ()
 constFoldExpression (ReferenceExpression _ obj _) = constFoldObject obj
 constFoldExpression (Casting expr _ _) = constFoldExpression expr
 constFoldExpression (FunctionCall ident args _) = do
@@ -498,41 +509,41 @@ constFoldBasicBlocks (Block body _) = localInputScope $ mapM_ constFoldBasicBloc
 constFoldEmitter :: TPEmitter SemanticAnn -> ConstFoldMonad ()
 constFoldEmitter (TPInterruptEmittter ident _) = do
   progArchitecture <- ST.gets progArch
-  let (glb, portName, _) = 
+  let (glb, portName, _) =
         case M.lookup ident (emitterTargets progArchitecture) of
           Just o -> o
           Nothing -> error $ "Emitter not found: " ++ show ident
   case M.lookup glb (tasks progArchitecture) of
     Just (TPTask task clsId _ _ _ _ _ _ _) -> do
       -- Get the task class id
-      let taskCls = 
+      let taskCls =
             case M.lookup clsId (taskClasses progArchitecture) of
               Just cls -> cls
               Nothing -> error $ "Task class not found: " ++ show clsId
       -- Get the task port connections
-          targetAction = 
+          targetAction =
                 case M.lookup portName (sinkPorts taskCls) of
                   Just (_, a) -> a
                   Nothing -> error $ "Port not found: " ++ show portName
-          action = case M.lookup targetAction (classMemberFunctions taskCls) of 
+          action = case M.lookup targetAction (classMemberFunctions taskCls) of
             Just a -> a
-            Nothing -> error $ "Function not found: " ++ show targetAction  
+            Nothing -> error $ "Function not found: " ++ show targetAction
       switchInputScope task $ constFoldFunction action
     Nothing -> case M.lookup glb (handlers progArchitecture) of
       Just (TPHandler handler clsId _ _ _ _ _ _) -> do
         -- Get the handler class id
-        let handlerCls = 
+        let handlerCls =
               case M.lookup clsId (handlerClasses progArchitecture) of
                 Just cls -> cls
                 Nothing -> error $ "Handler class not found: " ++ show clsId
         -- Get the handler port connections
-            targetAction = 
+            targetAction =
                 case M.lookup portName (sinkPorts handlerCls) of
                   Just (_, a) -> a
                   Nothing -> error $ "Port not found: " ++ show portName
-            action = case M.lookup targetAction (classMemberFunctions handlerCls) of 
+            action = case M.lookup targetAction (classMemberFunctions handlerCls) of
               Just a -> a
-              Nothing -> error $ "Function not found: " ++ show targetAction  
+              Nothing -> error $ "Function not found: " ++ show targetAction
         switchInputScope handler $ constFoldFunction action
       Nothing -> throwError $ annotateError Internal EUnboxingEmitter
   return ()
@@ -565,6 +576,15 @@ runConstFolding progArchitecture =
     loadGlobalConstEvironment >>
     mapM_ (\func -> unless (functionHasConstParams func) $
         constFoldFunction func) (M.elems $ functions progArchitecture) >>
+    mapM_ (\func -> unless (functionHasConstParams func) $
+        constFoldFunction func) 
+          (concatMap (M.elems . classMemberFunctions) (M.elems (taskClasses progArchitecture)))>>
+    mapM_ (\func -> unless (functionHasConstParams func) $
+        constFoldFunction func) 
+          (concatMap (M.elems . classMemberFunctions) (M.elems (handlerClasses progArchitecture)))>>
+    mapM_ (\func -> unless (functionHasConstParams func) $
+        constFoldFunction func) 
+          (concatMap (M.elems . classMemberFunctions) (M.elems (resourceClasses progArchitecture)))>>
     mapM_ constFoldEmitter progEmitters of
       (Left err, _) -> Just err
       (Right _, _) -> Nothing

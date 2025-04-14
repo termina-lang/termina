@@ -181,13 +181,17 @@ useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse _ann)
   mapM_ (useExpression . elseIfCond) elseIfs
   -- Finally, use the if conditional expression
   useExpression eCond
-useDefBasicBlock (ForLoopBlock  _itIdent _itTy _eB _eE mBrk block ann) = do
+useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     prevSt <- ST.get
     -- What happens inside the body of a for, may not happen at all.
     loopSt <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody block) >> ST.get)
     finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
     maybe (return ()) useExpression mBrk
+    -- Use the expressions of the for loop bounds, just in case they contain
+    -- references to const input parameters.
+    useExpression eB
+    useExpression eE
 useDefBasicBlock (MatchBlock e mcase ann) = do
   prevSt <- ST.get
   sets <- maybe (throwError $ annotateError (getLocation ann) EUnboxingExpressionType)
