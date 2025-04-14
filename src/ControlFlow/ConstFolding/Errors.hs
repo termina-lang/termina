@@ -15,31 +15,42 @@ import Semantic.Types
 
 data Error =
   EUnboxingEmitter -- ^ Unboxing emitter (Internal)
-  | EUnboxingPort -- ^ Unboxing port (Internal)
+  | EUnboxingPort -- ^ Unboxing port (Internal)
   | EUnboxingObject -- ^ Unboxing object (Internal)
   | EUnboxingExpression -- ^ Unboxing expression (Internal)
+  | EUnknownTask Identifier -- ^ Unknown task (Internal)
+  | EUnknownTaskClass Identifier -- ^ Unknown task class (Internal)
+  | EUnknownInputPort Identifier Identifier -- ^ Unknown input port (Internal)
+  | EUnknownAccessPort Identifier Identifier -- ^ Unknown access port (Internal)
+  | EUnknownHandler Identifier -- ^ Unknown handler (Internal)
+  | EUnknownHandlerClass Identifier -- ^ Unknown handler class (Internal)
+  | EUnknownChannel Identifier -- ^ Unknown channel (Internal)
+  | EUnknownMemberFunction Identifier -- ^ Unknown member function (Internal)
+  | EUnknownResource Identifier -- ^ Unknown resource (Internal)
+  | EUnknownResourceClass Identifier -- ^ Unknown resource class(Internal)
+  | EUnknownResourceProcedure Identifier Identifier -- ^ Unknown resource procedure (Internal)
   | EUnknownIdentifier Identifier -- ^ Unknown identifier (Internal)
   | EInvalidObject -- ^ Invalid object (Internal)
   | EInvalidExpression String -- ^ Invalid expression (Internal)
-  | EInvalidConstantEvaluation -- ^ Invalid constant evaluation (Internal)
+  | EInvalidConstantEvaluation -- ^ Invalid constant evaluation (Internal)
   | ENotConstant -- ^ Not constant (Internal)
-  | EInvalidParameterList -- ^ Invalid parameter list (Internal)
-  | EInvalidFieldValueAssignmentAnnotation -- ^ Invalid field value assignment annotation (Internal)
+  | EInvalidParameterList -- ^ Invalid parameter list (Internal)
+  | EInvalidFieldValueAssignmentAnnotation -- ^ Invalid field value assignment annotation (Internal)
   | EAtomicArrayConnectionSizeMismatch Integer Integer -- ^ Atomic array connection size mismatch
   | EArrayInitializerSizeMismatch Integer Integer -- ^ Array initializer size mismatch
   | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch
   | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch
-  | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
-  | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
+  | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
+  | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstDivisionByZero -- ^ Constant division by zero
-  | EConstCondition (Const SemanticAnn) -- ^ Constant condition
-  | EForLoopStatementZeroIterations -- ^ For loop statement with zero iterations
-  | EForLoopStatementNegativeIterations Integer Integer -- ^ For loop statement with negative iterations
+  | EConstCondition (Const SemanticAnn) -- ^ Constant condition
+  | EForLoopStatementZeroIterations -- ^ For loop statement with zero iterations
+  | EForLoopStatementNegativeIterations Integer Integer -- ^ For loop statement with negative iterations
   | EArraySliceOutOfBounds Integer Integer -- ^ Array slice out of bounds
   | EArraySliceNegativeRange Integer Integer -- ^ Array slice negative range
   | EArraySliceInvalidRange Integer Integer Integer -- ^ Array slice invalid range
-  | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
-  | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
+  | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
+  | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   deriving Show
 
 type ConstFoldError = AnnotatedError Error Location

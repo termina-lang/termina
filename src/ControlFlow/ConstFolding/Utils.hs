@@ -67,59 +67,80 @@ getPortName obj = do
 getFunctionMembers :: (MonadError ConstFoldError m) => 
     TerminaProgArch SemanticAnn -> Identifier -> m (M.Map Identifier (TPFunction SemanticAnn))
 getFunctionMembers progArchitecture ident =
-  case M.lookup ident (tasks progArchitecture) of
-    Just task -> 
-        let taskCls =
-            case M.lookup (taskClass tsk) (taskClasses progArchitecture) of
-                Just cls -> return $ classMemberFunctions cls
-                Nothing -> error $ "class not found" ++ show (taskClass tsk)
-    Nothing -> 
-      case M.lookup ident (handlers progArchitecture) of
-        Just handler -> 
-            return $ classMemberFunctions (handlerClasses progArchitecture M.! handlerClass handler)
-        Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
+    case M.lookup ident (tasks progArchitecture) of
+        Just task -> 
+            maybe (throwError $ annotateError Internal (EUnknownTaskClass (taskClass task)))
+                    (return . classMemberFunctions) $ 
+                        M.lookup (taskClass task) (taskClasses progArchitecture)
+        Nothing -> 
+            case M.lookup ident (handlers progArchitecture) of
+                Just handler -> 
+                    maybe (throwError $ annotateError Internal (EUnknownHandlerClass (handlerClass handler)))
+                            (return . classMemberFunctions) $ 
+                                M.lookup (handlerClass handler) (handlerClasses progArchitecture)
+                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
 
 followSendMessage :: (MonadError ConstFoldError m) =>
     TerminaProgArch SemanticAnn -> Identifier -> Identifier -> m (Identifier, TPFunction SemanticAnn)
-followSendMessage progArchitecture ident portName = do
-    case M.lookup ident (tasks progArchitecture) of
-        Just task -> do
-            let (channel, _) = taskOutputPortConns task M.! portName
-                (targetTask, targetPort, _) = channelTargets progArchitecture M.! channel
-                targetTaskCls = taskClasses progArchitecture M.! targetTask
-                (_, targetAction) = inputPorts targetTaskCls M.! targetPort
-            return $ (targetTask, classMemberFunctions targetTaskCls M.! targetAction)
+followSendMessage progArchitecture currentId portName = do
+    case M.lookup currentId (tasks progArchitecture) of
+        Just currentTask -> do
+            channel <- maybe (throwError $ annotateError Internal (EUnknownTask currentId)) (return . fst) $ 
+                            M.lookup portName (taskOutputPortConns currentTask) 
+            (targetTaskId, targetPort, _) <- 
+                        maybe (throwError $ annotateError Internal (EUnknownChannel channel)) return $ 
+                            M.lookup channel (channelTargets progArchitecture)
+            targetTask <- maybe (throwError $ annotateError Internal (EUnknownTask targetTaskId)) return $ 
+                            M.lookup targetTaskId (tasks progArchitecture)
+            targetTaskCls <- maybe (throwError $ annotateError Internal (EUnknownTaskClass (taskClass targetTask))) return $ 
+                            M.lookup (taskClass targetTask) (taskClasses progArchitecture)
+            targetAction <- maybe (throwError $ annotateError Internal (EUnknownInputPort targetTaskId targetPort)) (return . snd) $ 
+                            M.lookup targetPort (inputPorts targetTaskCls)
+            actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
+                            M.lookup targetAction (classMemberFunctions targetTaskCls)
+            return (targetTaskId, actionFunction)
         Nothing -> 
-            case M.lookup ident (handlers progArchitecture) of
-                Just handler -> do
-                    let (channel, _) = handlerOutputPortConns handler M.! portName
-                        (targetTask, targetPort, _) = channelTargets progArchitecture M.! channel
-                        targetTaskCls = taskClasses progArchitecture M.! targetTask
-                        (_, targetAction) = inputPorts targetTaskCls M.! targetPort
-                    return $ (targetTask, classMemberFunctions targetTaskCls M.! targetAction)
-                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
+            case M.lookup currentId (handlers progArchitecture) of
+                Just currentHandler -> do
+                    channel <- maybe (throwError $ annotateError Internal (EUnknownHandler currentId)) (return . fst) $ M.lookup portName (handlerOutputPortConns currentHandler)
+                    (targetTaskId, targetPort, _) <- 
+                                maybe (throwError $ annotateError Internal (EUnknownChannel channel)) return $ 
+                                    M.lookup channel (channelTargets progArchitecture)
+                    targetTask <- maybe (throwError $ annotateError Internal (EUnknownTask targetTaskId)) return $ 
+                                    M.lookup targetTaskId (tasks progArchitecture)
+                    targetTaskCls <- maybe (throwError $ annotateError Internal (EUnknownTaskClass (taskClass targetTask))) return $ 
+                                    M.lookup (taskClass targetTask) (taskClasses progArchitecture)
+                    targetAction <- maybe (throwError $ annotateError Internal (EUnknownInputPort targetTaskId targetPort)) (return . snd) $ 
+                                    M.lookup targetPort (inputPorts targetTaskCls)
+                    actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
+                                    M.lookup targetAction (classMemberFunctions targetTaskCls)
+                    return (targetTaskId, actionFunction)
+                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier currentId)
 
 followProcedureCall :: (MonadError ConstFoldError m) =>
     TerminaProgArch SemanticAnn -> Identifier -> Identifier -> Identifier -> m (Identifier, TPFunction SemanticAnn)
 followProcedureCall progArchitecture ident portName procName = do
   case M.lookup ident (tasks progArchitecture) of
     Just task -> do
-        let (targetResource, _) = taskAPConnections task M.! portName
-            resource = resources progArchitecture M.! targetResource
-            resourceCls = resourceClasses progArchitecture M.! resourceClass resource
-        return (targetResource, classMemberFunctions resourceCls M.! procName)
+        (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (taskAPConnections task)
+        resource <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
+        resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))) return $ M.lookup (resourceClass resource) (resourceClasses progArchitecture)
+        resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+        return (targetResource, resourceProc)
     Nothing -> 
       case M.lookup ident (handlers progArchitecture) of
         Just handler -> do
-            let (targetResource, _) = handlerAPConnections handler M.! portName
-                resource = resources progArchitecture M.! targetResource
-                resourceCls = resourceClasses progArchitecture M.! resourceClass resource
-            return (targetResource, classMemberFunctions resourceCls M.! procName)
+            (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (handlerAPConnections handler)
+            resource <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
+            resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))) return $ M.lookup (resourceClass resource) (resourceClasses progArchitecture)
+            resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+            return (targetResource, resourceProc)
         Nothing ->
             case M.lookup ident (resources progArchitecture) of
               Just resource -> do
-                let (targetResource, _) = resAPConnections resource M.! portName
-                let resource' = resources progArchitecture M.! targetResource
-                let resourceCls = resourceClasses progArchitecture M.! resourceClass resource'
-                return (targetResource, classMemberFunctions resourceCls M.! procName)
+                    (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (resAPConnections resource)
+                    resource' <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
+                    resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource'))) return $ M.lookup (resourceClass resource') (resourceClasses progArchitecture)
+                    resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+                    return (targetResource, resourceProc)
               Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
