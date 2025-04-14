@@ -1102,7 +1102,7 @@ typeFieldAssignment
 typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty _) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
-    flip (SAST.FieldValueAssignment faid) (buildStmtAnn pann) <$> typeAssignmentExpression fty typeObj faexp
+    flip (SAST.FieldValueAssignment faid) (buildExpAnn pann fty) <$> typeAssignmentExpression fty typeObj faexp
   else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
 typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
   if fid == faid
@@ -1163,12 +1163,12 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
             catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
           _ -> throwError $ annotateError loc $ EAtomicAccessPortConnectionInvalidGlobal sid
-      TAccessPort (TAtomicArrayAccess ty s) ->
+      TAccessPort (TAtomicArrayAccess ty portSize) ->
         case gentry of
-          LocatedElement (GGlob (TAtomicArray ty' _)) _ -> do
+          LocatedElement (GGlob (TAtomicArray ty' glbSize)) _ -> do
             catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
             -- We will check the size of the atomic array when we are performing the const propagation.
-            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty s)
+            return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty portSize glbSize)
           _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort ifaceTy@(TInterface _ iface) -> do
         -- | Get the interface definition

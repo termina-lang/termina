@@ -41,7 +41,7 @@ import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
-import ControlFlow.ConstPropagation (runConstPropagation)
+import ControlFlow.ConstFolding (runConstFolding)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -287,7 +287,7 @@ checkProjectBoxSources bbProject progArchitecture =
 
 constPropagation :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
 constPropagation bbProject progArchitecture = 
-  let result = runConstPropagation progArchitecture in
+  let result = runConstFolding progArchitecture in
   case result of
     Just err -> 
       -- | Create the source files map. This map will be used to obtainn the source files that
@@ -379,7 +379,7 @@ buildCommand (BuildCmdArgs chatty) = do
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
-    when chatty (putStrLn . debugMessage $ "Performing constant propagation")
+    when chatty (putStrLn . debugMessage $ "Performing constant folding")
     constPropagation bbProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")

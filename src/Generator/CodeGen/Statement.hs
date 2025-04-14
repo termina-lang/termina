@@ -283,7 +283,7 @@ genStructInitialization before level cObj expr = do
                     return $ pre_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
                 else
                     return $ no_cr ((cObj @. fld @: __termina_allocator_t) @. thatField @: void_ptr @= resourceExpr) : (cPoolProcedures ++ rest)
-            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts size))) _) : xs) = do
+            genFieldAssignments before' (FieldPortConnection AccessPortConnection fld res (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts size _))) _) : xs) = do
                 rest <- genFieldAssignments False xs
                 cTs <- genType noqual (TArray ts size)
                 let portFieldObj = cObj @. fld @: cTs

@@ -56,6 +56,8 @@ data ConnectionSeman a =
   | APAtomicArrayConnTy
     -- | type specifier of the connected atomic array
     (TerminaType a)
+    -- | Size of the port to which the atomic array is connected
+    (Expression a)
     -- | Size of the connected atomic array
     (Expression a)
   | APPoolConnTy
@@ -227,8 +229,12 @@ buildPoolConnAnn loc ts s = SemanticAnn (STy (PortConnection (APPoolConnTy ts s)
 buildAtomicConnAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildAtomicConnAnn loc ts = SemanticAnn (STy (PortConnection (APAtomicConnTy ts))) loc
 
-buildAtomicArrayConnAnn :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> SemanticAnn
-buildAtomicArrayConnAnn loc ts s = SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts s))) loc
+buildAtomicArrayConnAnn :: Location 
+  -> TerminaType SemanticAnn 
+  -> Expression SemanticAnn 
+  -> Expression SemanticAnn 
+  -> SemanticAnn
+buildAtomicArrayConnAnn loc ts portSize glbSize = SemanticAnn (STy (PortConnection (APAtomicArrayConnTy ts portSize glbSize))) loc
 
 buildSinkPortConnAnn :: Location -> TerminaType SemanticAnn -> Identifier -> SemanticAnn
 buildSinkPortConnAnn loc ts action = SemanticAnn (STy (PortConnection (SPConnTy ts action))) loc
