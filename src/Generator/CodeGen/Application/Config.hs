@@ -55,12 +55,9 @@ genConfigFile mName progArchitecture = do
             pre_cr $ _define "__TERMINA_APP_CONFIG_PERIODIC_TIMERS" (Just [show (length (M.elems periodicTimers))]),
             pre_cr $ _define "__TERMINA_APP_CONFIG_MUTEXES" (Just [show (length mutexes)]),
             pre_cr $ _define "__TERMINA_APP_CONFIG_MESSAGE_QUEUES" (Just [show (length msgQueues)])
-            -- #define CONFIGURE_MAXIMUM_TIMERS
-            -- #define CONFIGURE_MAXIMUM_SEMAPHORES
         ] ++ messageBufferMemory ++
         [
-            pre_cr $ _define "__TERMINA_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)]),
-            pre_cr $ _define "__TERMINA_CONFIG_SYS_PRINT_BUFFER_SIZE" (Just [show (256 :: Integer)])
+            pre_cr $ _define "__TERMINA_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)])
         ] ++
         [
             pre_cr _endif
