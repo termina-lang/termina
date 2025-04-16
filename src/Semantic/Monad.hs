@@ -56,7 +56,7 @@ getGlobalTypeDef loc tid  = gets global >>=
 
 getFunctionTy :: Location 
   -> Identifier 
-  -> SemanticMonad ([TerminaType SemanticAnn], TerminaType SemanticAnn, Location)
+  -> SemanticMonad ([Parameter SemanticAnn], TerminaType SemanticAnn, Location)
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
@@ -98,7 +98,7 @@ insertGlobalTy loc tydef =
  where
    type_name = getTypeIdentifier tydef
 
-insertGlobalFun :: Location -> Identifier -> [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticMonad ()
+insertGlobalFun :: Location -> Identifier -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticMonad ()
 insertGlobalFun loc ident ps rettype =
   insertGlobal ident (LocatedElement (GFun (FunctionSeman ps rettype)) loc) (EUsedFunName ident)
 

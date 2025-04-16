@@ -174,7 +174,7 @@ poolSemAnn ts = objSemAnn Mutable (TAccessPort (TAllocator ts))
 msgQueueSemAnn :: TerminaType SemanticAnn -> SemanticAnn
 msgQueueSemAnn ts = objSemAnn Mutable (TOutPort ts)
 
-funSemAnn :: [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
+funSemAnn :: [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
 funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 
 renderExpression :: Expression SemanticAnn -> Text

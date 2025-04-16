@@ -52,7 +52,7 @@ typeElement (Function ident ps_ts mts bret mds_ts anns) = do
       typedBret <- typeBlock mty bret
       return (ps_ty, typedBret)
   mds_ty <- mapM (typeModifier anns typeGlobalObject) mds_ts
-  let functionSeman = FunctionSeman (map paramType ps_ty) (fromMaybe TUnit mty)
+  let functionSeman = FunctionSeman ps_ty (fromMaybe TUnit mty)
   return (Function ident ps_ty mty typedBret mds_ty (SemanticAnn (FnTy functionSeman) anns), LocatedElement (GFun functionSeman) anns)
 typeElement (GlobalDeclaration gbl) = first GlobalDeclaration <$> typeGlobal gbl
 typeElement (TypeDefinition tydef ann) = do

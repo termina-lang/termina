@@ -17,8 +17,8 @@ selfDereference :: Object SemanticAnn
 selfDereference = Dereference self (resourceObjSemAnn Mutable "Resource")
 
 tmChannelsend, selfFoo0 :: Expression SemanticAnn
-tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [TUInt16] TUnit)
-selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] (funSemAnn [TUInt16, TUInt16] TUnit)
+tmChannelsend = MemberFunctionCall tmChannel "send" [AccessObject bar0] (funSemAnn [Parameter "element" TUInt16] TUnit)
+selfFoo0 = MemberFunctionCall selfDereference "foo0" [AccessObject bar0, AccessObject bar1] (funSemAnn [Parameter "bar0" TUInt16, Parameter "bar1" TUInt16] TUnit)
 
 tmChannelSendStmt, selfFoo0Stmt :: Statement SemanticAnn
 tmChannelSendStmt = SingleExpStmt tmChannelsend stmtSemAnn

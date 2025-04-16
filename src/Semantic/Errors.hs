@@ -57,9 +57,9 @@ data Error
   | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error
   | EInvalidParameterType (Parameter SemanticAnn) -- ^ Invalid parameter type
   | EInvalidReturnType (TerminaType SemanticAnn) -- ^ Invalid return type
-  | EProcedureCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in procedure call
-  | EProcedureCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in procedure call
-  | EProcedureCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure call
+  | EProcedureCallExtraArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Extra parameters in procedure call
+  | EProcedureCallMissingArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Missing parameters in procedure call
+  | EProcedureCallArgTypeMismatch (Identifier, Parameter SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in procedure call
   | EUnknownProcedure Identifier -- ^ Unknown procedure
   | EResourceClassNoProvides Identifier -- ^ Resource class does not provide any interface
   | EResourceClassAction (Identifier, Location) Identifier -- ^ Resource class defines an action
@@ -83,9 +83,9 @@ data Error
   | EHandlerClassMultipleSinkPorts Identifier Location -- ^ Handler class defines multiple sink ports
   | EHandlerClassInPort (Identifier, Location) Identifier -- ^ Handler class defines an in port
   | EIfElseIfCondNotBool (TerminaType SemanticAnn) -- ^ If-else-if condition is not a boolean
-  | EFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in function call
-  | EFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing parameters in function call
-  | EFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in function call
+  | EFunctionCallExtraArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Extra parameters in function call
+  | EFunctionCallMissingArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Missing parameters in function call
+  | EFunctionCallArgTypeMismatch (Identifier, Parameter SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in function call
   | EMemberAccessNotFunction Identifier -- ^ Access to a member that is not a function
   | EMutableReferenceToImmutable -- ^ Mutable reference to immutable object
   | EMutableReferenceToPrivate -- ^ Mutable reference to immutable object
@@ -130,7 +130,7 @@ data Error
   | EContinueInvalidExpression -- ^ Invalid expression in continue statement
   | EContinueInvalidMethodOrViewerCall Identifier -- ^ Invalid method or viewer call in continue statement
   | EContinueInvalidMemberCall (TerminaType SemanticAnn) -- ^ Invalid member call in continue statement
-  | EContinueActionExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra parameters in action call in continue statement
+  | EContinueActionExtraArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Extra parameters in action call in continue statement
   | EContinueActionMissingArgs (Identifier, Location) -- ^ Missing parameters in action call in continue statement
   | EEnumVariantInitializerInvalidUse -- ^ Invalid use of an enum variant initializer
   | EEnumVariantNotFound Identifier Identifier -- ^ Enum variant not found
@@ -155,9 +155,9 @@ data Error
   | EInvalidNumericConstantType (TerminaType SemanticAnn) -- ^ Invalid numeric constant type
   | EInvalidActionParameterType (TerminaType SemanticAnn) -- ^ Invalid action parameter type
   | EInvalidProcedureParameterType (TerminaType SemanticAnn) -- ^ Invalid procedure parameter type
-  | EMemberFunctionCallExtraArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Extra arguments in member function call
-  | EMemberFunctionCallMissingArgs (Identifier, [TerminaType SemanticAnn], Location) Integer -- ^ Missing arguments in member function call
-  | EMemberFunctionCallArgTypeMismatch (Identifier, TerminaType SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in member function call
+  | EMemberFunctionCallExtraArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Extra arguments in member function call
+  | EMemberFunctionCallMissingArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Missing arguments in member function call
+  | EMemberFunctionCallArgTypeMismatch (Identifier, Parameter SemanticAnn, Location) Integer (TerminaType SemanticAnn) -- ^ Parameter type mismatch in member function call
   | EArrayIndexNotUSize (TerminaType SemanticAnn) -- ^ Invalid array index type
   | EArraySliceLowerBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice lower bound type
   | EArraySliceUpperBoundNotUSize (TerminaType SemanticAnn) -- ^ Invalid array slice upper bound type
@@ -657,7 +657,7 @@ instance ErrorMessage SemanticErrors where
                                 procSourceLines ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") procFileName
                                 procPos Nothing
                         _ -> ""
-                EProcedureCallArgTypeMismatch (ident, expectedTy, procPos) numArgs actualTy ->
+                EProcedureCallArgTypeMismatch (ident, (Parameter _ expectedTy), procPos) numArgs actualTy ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Argument \x1b[31m#" <> T.pack (show numArgs) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <>
@@ -1099,7 +1099,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EFunctionCallArgTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EFunctionCallArgTypeMismatch (funcId, (Parameter _ expectedTy), funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1515,7 +1515,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EMemberFunctionCallArgTypeMismatch (funcId, expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EMemberFunctionCallArgTypeMismatch (funcId, (Parameter _ expectedTy), funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in

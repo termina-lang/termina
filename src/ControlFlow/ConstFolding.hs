@@ -40,6 +40,10 @@ switchInputScope target comp = do
   ST.put prevst
   return res
 
+data PassedArgument a =
+  ConstantArgument (Const a) a
+  | VariableArgument (TerminaType a) a
+
 evalConstObject :: Object SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
 evalConstObject (Variable ident _) = do
   localEnv <- ST.gets localConstEnv
@@ -150,6 +154,16 @@ evalBinOp _ LogicalOr (B lhs) (B rhs) _ =
 evalBinOp _ _ _ _ _ =
   throwError $ annotateError Internal (EInvalidExpression "invalid bin op")
 
+-- | Evaluates the type of an expression. This basically only applies to
+-- arrays. The function returns the same expression but with the types
+-- (i.e., the array sizes) evaluated.
+evalExpressionType :: Location -> TerminaType SemanticAnn -> ConstFoldMonad (TerminaType SemanticAnn)
+evalExpressionType loc (TArray ty arraySize)= do
+  arraySizeValue <- evalConstExpression arraySize
+  ty' <- evalExpressionType loc ty
+  return (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize)))
+evalExpressionType _ ty = return ty
+
 evalConstExpression :: Expression SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
 evalConstExpression (AccessObject obj) = do
   evalConstObject obj
@@ -182,16 +196,32 @@ functionHasConstParams (TPFunction _ params _ _ _) = do
     isConstParam (Parameter _ (TConstSubtype _)) = True
     isConstParam _ = False
 
-constFoldParams :: [Parameter SemanticAnn] -> [Expression SemanticAnn] -> ConstFoldMonad ()
-constFoldParams [] [] = return ()
-constFoldParams (param:params) (expr:exprs) = do
-  case paramType param of
-    (TConstSubtype _) -> do
-      constValue <- evalConstExpression expr
-      ST.modify (\s -> s { localConstEnv = M.insert (paramIdentifier param) constValue (localConstEnv s) })
-      constFoldParams params exprs
-    _ -> constFoldParams params exprs
-constFoldParams _ _ = throwError $ annotateError Internal EInvalidParameterList
+constFoldPassArguments :: Location -> [Parameter SemanticAnn] -> [PassedArgument SemanticAnn] -> ConstFoldMonad ()
+constFoldPassArguments _ [] [] = return ()
+constFoldPassArguments loc (param:params) (arg:args) = do
+  case (paramType param, arg) of
+    (TConstSubtype _, ConstantArgument value _) -> do
+      ST.modify (\s -> s { localConstEnv = M.insert (paramIdentifier param) value (localConstEnv s) })
+      constFoldPassArguments loc params args
+    (ty, VariableArgument ty' ann) ->
+      checkSameTy (getLocation ann) ty ty'
+    _ -> constFoldPassArguments loc params args
+  
+  where
+
+    checkSameTy :: Location -> TerminaType SemanticAnn -> TerminaType SemanticAnn -> ConstFoldMonad ()
+    checkSameTy loc' (TReference _ (TArray ty arraySize)) (TReference _ (TArray ty' arraySize')) = do
+      arraySizeValue <- evalConstExpression arraySize
+      arraySizeValue' <- evalConstExpression arraySize'
+      case (arraySizeValue, arraySizeValue') of
+        (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
+          if lhs == rhs then
+            checkSameTy loc' ty ty'
+          else
+            throwError $ annotateError loc' (EReferencedArraySizeMismatch lhs rhs)
+        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+    checkSameTy _ _ _ = return ()
+constFoldPassArguments _ _ _ = throwError $ annotateError Internal EInvalidParameterList
 
 constFoldObject :: Object SemanticAnn -> ConstFoldMonad ()
 constFoldObject (Variable {}) = return ()
@@ -294,13 +324,22 @@ constFoldExpression (EnumVariantInitializer _ _ exprs _) =
 constFoldExpression e = throwError $ annotateError Internal (EInvalidExpression $ "invalid expression: " ++ show e)
 
 constFoldFlowTransfer :: [Expression SemanticAnn] -> TPFunction SemanticAnn -> ConstFoldMonad ()
-constFoldFlowTransfer exprs func@(TPFunction _ params _ _ _) =
-  when (functionHasConstParams func) $
-    localInputScope $ constFoldParams params exprs >>
-      constFoldFunction func
+constFoldFlowTransfer exprs func@(TPFunction _ params _ _ ann) = do
+  args <- mapM (\expr -> do
+    exprType <- getExprType expr
+    case exprType of
+      (TConstSubtype _) -> flip ConstantArgument (getAnnotation expr) <$> evalConstExpression expr 
+      _ -> do
+        exprType' <- evalExpressionType (getLocation . getAnnotation $ expr) exprType
+        return $ VariableArgument exprType' (getAnnotation expr)) exprs
+  localInputScope $ 
+    constFoldPassArguments (getLocation ann) params args >> 
+    -- If the function has constant parameters, we need to evaluate the function
+    when (functionHasConstParams func) (constFoldFunction func)
+    
 
-constFoldAssignment :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-constFoldAssignment loc (TArray ty arraySize) initExpr@(ArrayInitializer assignmentExpr _ _) = do
+constFoldCheckExprType :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
+constFoldCheckExprType loc (TArray ty arraySize) initExpr@(ArrayInitializer assignmentExpr _ _) = do
   arraySizeValue <- evalConstExpression arraySize
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -313,8 +352,8 @@ constFoldAssignment loc (TArray ty arraySize) initExpr@(ArrayInitializer assignm
       else
         throwError $ annotateError loc (EArrayInitializerSizeMismatch lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-  constFoldAssignment loc ty assignmentExpr
-constFoldAssignment loc (TArray ty arraySize) initExpr@(ArrayExprListInitializer assignmentExprs _) = do
+  constFoldCheckExprType loc ty assignmentExpr
+constFoldCheckExprType loc (TArray ty arraySize) initExpr@(ArrayExprListInitializer assignmentExprs _) = do
   arraySizeValue <- evalConstExpression arraySize
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -327,8 +366,8 @@ constFoldAssignment loc (TArray ty arraySize) initExpr@(ArrayExprListInitializer
       else
         throwError $ annotateError loc (EArrayExprListInitializerSizeMismatch lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-  mapM_ (constFoldAssignment loc ty) assignmentExprs
-constFoldAssignment loc (TArray _ arraySize) initExpr@(StringInitializer {}) = do
+  mapM_ (constFoldCheckExprType loc ty) assignmentExprs
+constFoldCheckExprType loc (TArray _ arraySize) initExpr@(StringInitializer {}) = do
   arraySizeValue <- evalConstExpression arraySize
   initExprType <- getExprType initExpr
   initExprSizeValue <- case initExprType of
@@ -341,14 +380,14 @@ constFoldAssignment loc (TArray _ arraySize) initExpr@(StringInitializer {}) = d
       else
         throwError $ annotateError loc (EStringInitializerSizeMismatch lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-constFoldAssignment loc (TStruct _) (StructInitializer fas _) = do
+constFoldCheckExprType loc (TStruct _) (StructInitializer fas _) = do
   mapM_ constFoldFieldAssignment fas
 
   where
 
     constFoldFieldAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad ()
     constFoldFieldAssignment (FieldValueAssignment _ expr (SemanticAnn (ETy (SimpleType ty)) _)) = do
-      constFoldAssignment loc ty expr
+      constFoldCheckExprType loc ty expr
     constFoldFieldAssignment (FieldValueAssignment {}) = do
       throwError $ annotateError loc EInvalidFieldValueAssignmentAnnotation
     constFoldFieldAssignment (FieldAddressAssignment {}) = return ()
@@ -363,16 +402,16 @@ constFoldAssignment loc (TStruct _) (StructInitializer fas _) = do
             throwError $ annotateError loc (EAtomicArrayConnectionSizeMismatch lhs rhs)
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     constFoldFieldAssignment (FieldPortConnection {}) = return ()
-constFoldAssignment _ _ expr = constFoldExpression expr
+constFoldCheckExprType _ _ expr = constFoldExpression expr
 
 constFoldStatement :: Statement SemanticAnn -> ConstFoldMonad ()
 constFoldStatement (Declaration _ _ ty initExpr ann) =
-  constFoldAssignment (getLocation ann) ty initExpr
+  constFoldCheckExprType (getLocation ann) ty initExpr
 constFoldStatement (AssignmentStmt obj expr ann) = do
   constFoldObject obj
   constFoldExpression expr
   objType <- getObjType obj
-  constFoldAssignment (getLocation ann) objType expr
+  constFoldCheckExprType (getLocation ann) objType expr
 constFoldStatement (SingleExpStmt expr _) = do
   constFoldExpression expr
 
@@ -500,55 +539,21 @@ constFoldBasicBlock (ReturnBlock (Just expr) _) = do
   constFoldExpression expr
 constFoldBasicBlock (ContinueBlock expr _) =
   constFoldExpression expr
-constFoldBasicBlock (SystemCall {}) =
-  return ()
+constFoldBasicBlock (SystemCall obj _ exprs (SemanticAnn (ETy (AppType params TUnit)) loc)) = do
+  constFoldObject obj
+  args <- mapM (\expr -> do
+    exprType <- getExprType expr
+    case exprType of
+      (TConstSubtype _) -> flip ConstantArgument (getAnnotation expr) <$> evalConstExpression expr 
+      _ -> do
+        exprType' <- evalExpressionType (getLocation . getAnnotation $ expr) exprType
+        return $ VariableArgument exprType' (getAnnotation expr)) exprs
+  localInputScope $ 
+    constFoldPassArguments loc params args
+constFoldBasicBlock (SystemCall {}) = throwError $ annotateError Internal EInvalidSystemCallAnnotation
 
 constFoldBasicBlocks :: Block SemanticAnn -> ConstFoldMonad ()
 constFoldBasicBlocks (Block body _) = localInputScope $ mapM_ constFoldBasicBlock body
-
-constFoldEmitter :: TPEmitter SemanticAnn -> ConstFoldMonad ()
-constFoldEmitter (TPInterruptEmittter ident _) = do
-  progArchitecture <- ST.gets progArch
-  let (glb, portName, _) =
-        case M.lookup ident (emitterTargets progArchitecture) of
-          Just o -> o
-          Nothing -> error $ "Emitter not found: " ++ show ident
-  case M.lookup glb (tasks progArchitecture) of
-    Just (TPTask task clsId _ _ _ _ _ _ _) -> do
-      -- Get the task class id
-      let taskCls =
-            case M.lookup clsId (taskClasses progArchitecture) of
-              Just cls -> cls
-              Nothing -> error $ "Task class not found: " ++ show clsId
-      -- Get the task port connections
-          targetAction =
-                case M.lookup portName (sinkPorts taskCls) of
-                  Just (_, a) -> a
-                  Nothing -> error $ "Port not found: " ++ show portName
-          action = case M.lookup targetAction (classMemberFunctions taskCls) of
-            Just a -> a
-            Nothing -> error $ "Function not found: " ++ show targetAction
-      switchInputScope task $ constFoldFunction action
-    Nothing -> case M.lookup glb (handlers progArchitecture) of
-      Just (TPHandler handler clsId _ _ _ _ _ _) -> do
-        -- Get the handler class id
-        let handlerCls =
-              case M.lookup clsId (handlerClasses progArchitecture) of
-                Just cls -> cls
-                Nothing -> error $ "Handler class not found: " ++ show clsId
-        -- Get the handler port connections
-            targetAction =
-                case M.lookup portName (sinkPorts handlerCls) of
-                  Just (_, a) -> a
-                  Nothing -> error $ "Port not found: " ++ show portName
-            action = case M.lookup targetAction (classMemberFunctions handlerCls) of
-              Just a -> a
-              Nothing -> error $ "Function not found: " ++ show targetAction
-        switchInputScope handler $ constFoldFunction action
-      Nothing -> throwError $ annotateError Internal EUnboxingEmitter
-  return ()
-constFoldEmitter (TPPeriodicTimerEmitter {}) = return ()
-constFoldEmitter (TPSystemInitEmitter {}) = return ()
 
 loadGlobalConstEvironment :: ConstFoldMonad ()
 loadGlobalConstEvironment = do
@@ -563,8 +568,7 @@ runConstFolding ::
   TerminaProgArch SemanticAnn
   -> Maybe ConstFoldError
 runConstFolding progArchitecture =
-  let progEmitters = M.elems $ emitters progArchitecture
-      env = ConstFoldSt
+  let env = ConstFoldSt
         {
           localConstEnv = M.empty,
           globalConstEnv = M.empty,
@@ -576,15 +580,30 @@ runConstFolding progArchitecture =
     loadGlobalConstEvironment >>
     mapM_ (\func -> unless (functionHasConstParams func) $
         constFoldFunction func) (M.elems $ functions progArchitecture) >>
-    mapM_ (\func -> unless (functionHasConstParams func) $
-        constFoldFunction func) 
-          (concatMap (M.elems . classMemberFunctions) (M.elems (taskClasses progArchitecture)))>>
-    mapM_ (\func -> unless (functionHasConstParams func) $
-        constFoldFunction func) 
-          (concatMap (M.elems . classMemberFunctions) (M.elems (handlerClasses progArchitecture)))>>
-    mapM_ (\func -> unless (functionHasConstParams func) $
-        constFoldFunction func) 
-          (concatMap (M.elems . classMemberFunctions) (M.elems (resourceClasses progArchitecture)))>>
-    mapM_ constFoldEmitter progEmitters of
+    forM_ (tasks progArchitecture) (\task -> do
+          taskCls <- case M.lookup (taskClass task) (taskClasses progArchitecture) of
+            Just cls -> return cls
+            Nothing -> throwError $ annotateError Internal (EUnknownTaskClass (taskClass task))
+          switchInputScope (taskName task) $ 
+            forM_ (classMemberFunctions taskCls) (\func -> unless (functionHasConstParams func) $
+                constFoldFunction func)) >>
+    forM_ (handlers progArchitecture) (\handler -> do
+          handlerCls <- case M.lookup (handlerClass handler) (handlerClasses progArchitecture) of
+            Just cls -> return cls
+            Nothing -> throwError $ annotateError Internal (EUnknownHandlerClass (handlerClass handler))
+          switchInputScope (handlerName handler) $ 
+            mapM_ (\func -> unless (functionHasConstParams func) $
+                constFoldFunction func) (classMemberFunctions handlerCls)) >>
+    forM_ (resources progArchitecture) (\resource -> do
+          -- We don't want to fold the system_entry resource
+          -- The implementation of the procedures of this reosurce is done
+          -- outside Termina
+          unless (resourceName resource == "system_entry") $ do
+           resourceCls <- case M.lookup (resourceClass resource) (resourceClasses progArchitecture) of
+             Just cls -> return cls
+             Nothing -> throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))
+           switchInputScope (resourceName resource) $
+             mapM_ (\func -> unless (functionHasConstParams func) $
+                 constFoldFunction func) (classMemberFunctions resourceCls)) of
       (Left err, _) -> Just err
       (Right _, _) -> Nothing

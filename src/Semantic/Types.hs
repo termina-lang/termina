@@ -26,7 +26,7 @@ data ExprSeman a
   = SimpleType (TerminaType a)
   | ObjectType AccessKind (TerminaType a)
   | AccessPortObjType (M.Map Identifier (InterfaceMember a)) (TerminaType a)
-  | AppType [TerminaType a] (TerminaType a)
+  | AppType [Parameter a] (TerminaType a)
   deriving (Show, Functor)
 
 data StmtSeman a
@@ -35,10 +35,10 @@ data StmtSeman a
     | PortConnection (ConnectionSeman a)
   deriving (Show, Functor)
 
-data ProcedureSeman a = ProcedureSeman Identifier [TerminaType a] [Modifier a]
+data ProcedureSeman a = ProcedureSeman Identifier [Parameter a] [Modifier a]
   deriving (Show, Functor)
 
-data FunctionSeman a = FunctionSeman [TerminaType a] (TerminaType a)
+data FunctionSeman a = FunctionSeman [Parameter a] (TerminaType a)
   deriving (Show, Functor)
 
 data ConnectionSeman a =
@@ -175,7 +175,7 @@ getObjectSAnns (SemanticAnn (ETy (ObjectType ak ty)) _) = Just (ak, ty)
 getObjectSAnns (SemanticAnn (ETy (AccessPortObjType _ ty)) _) = Just (Mutable, ty)
 getObjectSAnns _                                    = Nothing
 
-getArgumentsType :: SemanticElems a -> Maybe [TerminaType a]
+getArgumentsType :: SemanticElems a -> Maybe [Parameter a]
 getArgumentsType (ETy (AppType ts _)) = Just ts
 getArgumentsType _                    = Nothing
 
@@ -201,8 +201,8 @@ buildExpAnnObj loc ak ty = SemanticAnn (ETy (ObjectType ak ty)) loc
 buildExpAnnAccessPortObj :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnnAccessPortObj loc ifaces pty = SemanticAnn (ETy (AccessPortObjType ifaces pty)) loc
 
-buildExpAnnApp :: Location -> [TerminaType SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
-buildExpAnnApp loc tys rty = SemanticAnn (ETy (AppType tys rty)) loc
+buildExpAnnApp :: Location -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnApp loc params rty = SemanticAnn (ETy (AppType params rty)) loc
 
 -- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
 buildGlobalAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn

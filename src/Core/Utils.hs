@@ -388,27 +388,27 @@ findClassField i
   L.find (\case {ClassField (FieldDefinition ident _ _) -> ident == i;
                  _ -> False;})
 
-findClassProcedure :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty a], a)
+findClassProcedure :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([Parameter' ty a], a)
 findClassProcedure i
   = fmap
-  (\case {ClassProcedure _ ps _ a -> (map paramType ps,a)
+  (\case {ClassProcedure _ ps _ a -> (ps, a)
          ; _ -> error "Impossible after find"})
   .
   L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe ([ty a], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe ([Parameter' ty a], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ ps _ a -> (map paramType ps, a)})
+  (\case {InterfaceProcedure _ ps _ a -> (ps, a)})
   .
   L.find (\case{InterfaceProcedure ident _ _ _ -> (ident == i)})
 
-findClassViewerOrMethod :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([ty a], Maybe (ty a), a)
+findClassViewerOrMethod :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([Parameter' ty a], Maybe (ty a), a)
 findClassViewerOrMethod i
   = fmap
   (\case {
-    ClassViewer _ ps mty _ a -> (map paramType ps, mty, a);
+    ClassViewer _ ps mty _ a -> (ps, mty, a);
     ClassMethod _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })
@@ -421,11 +421,11 @@ findClassViewerOrMethod i
     }
   )
 
-findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (ty a, ty a, a)
+findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Parameter' ty a, ty a, a)
 findClassAction i
   =  fmap
   (\case {
-    ClassAction _ param rty _ a -> (paramType param, rty, a);
+    ClassAction _ param rty _ a -> (param, rty, a);
     _ -> error "Impossible after find"
     })
   .

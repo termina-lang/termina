@@ -146,10 +146,6 @@ getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))
 getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
-getParameterTypes :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m [TerminaType SemanticAnn]
-getParameterTypes (FunctionCall _ _ (SemanticAnn (ETy (AppType params _)) _)) = return params
-getParameterTypes ann = throwError $ InternalError $ "invalid parameter annotation: " ++ show ann
-
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts

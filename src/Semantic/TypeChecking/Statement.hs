@@ -226,7 +226,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
       -> SAST.TerminaType SemanticAnn -- ^ type of the object
       -> Identifier -- ^ type of the member function to be called
       -> [Expression ParserAnn] -- ^ arguments
-      -> SemanticMonad (([SAST.TerminaType SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
+      -> SemanticMonad (([SAST.Parameter SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
     typeActionCall ann obj_ty ident args =
       case obj_ty of
         TGlobal _ dident -> getGlobalTypeDef ann dident >>=
@@ -237,17 +237,17 @@ typeStatement _rTy (ContinueStmt contE anns) =
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
-                    Just (ts, rty, SemanticAnn _ loc) -> do
-                      case ts of
+                    Just (param@(Parameter _ ty), rty, SemanticAnn _ loc) -> do
+                      case ty of
                         TUnit -> case args of
-                          [] -> return (([], []), ts)
+                          [] -> return (([], []), ty)
                           _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
                         _ -> case args of
                           [arg] -> do
-                            typed_arg <- typeExpression (Just ts) typeRHSObject arg
-                            return (([ts], [typed_arg]), rty)
+                            typed_arg <- typeExpression (Just ty) typeRHSObject arg
+                            return (([param], [typed_arg]), rty)
                           [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
-                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [ts], loc) (fromIntegral (length args)))
+                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound

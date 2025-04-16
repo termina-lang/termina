@@ -107,10 +107,10 @@ genType qual (TStruct ident) = return (CTTypeDef ident qual)
 genType qual (TInterface RegularInterface ident) = return (CTTypeDef ident qual)
 genType _qual (TInterface SystemInterface _) = throwError $ InternalError "System interfaces shall not be translated to C types"
 
-genFunctionType :: TerminaType SemanticAnn -> [TerminaType SemanticAnn] -> CGenerator CType
+genFunctionType :: TerminaType SemanticAnn -> [Parameter SemanticAnn] -> CGenerator CType
 genFunctionType ts tsParams = do
     ts' <- genType noqual ts
-    tsParams' <- traverse (genType noqual) tsParams
+    tsParams' <- traverse (genType noqual . paramType) tsParams
     return (CTFunction ts' tsParams')
 
 genParameterDeclaration :: Parameter SemanticAnn -> CGenerator CDeclaration
