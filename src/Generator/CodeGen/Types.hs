@@ -43,30 +43,6 @@ __termina_interrupt_connection_t = typeDef "__termina_interrupt_connection_t"
 __termina_interrupt_handler_connection_t = typeDef "__termina_interrupt_handler_connection_t"
 __termina_interrupt_action_t = typeDef "__termina_interrupt_action_t"
 
-
--- void __termina__add_timeval(TimeVal * const lhs, const TimeVal * const rhs);
-__termina__add_timeval :: CExpression
-__termina__add_timeval = "__termina__add_timeval" @: 
-    CTFunction void
-        [
-            -- | TimeVal * const lhs
-            _const . ptr $ _TimeVal,
-            -- | const TimeVal * const rhs
-            _const . ptr $ _const _TimeVal
-        ]
-
--- Result classId__handle(classId * const self,
---                                  uint32_t _irq_vector);
-irq_handler :: Ident -> Ident -> CExpression
-irq_handler classId handler = (classId <::> handler) @:
-    CTFunction (typeDef "Result")
-        [
-            -- | CRISCVUARTHandler * const self
-            _const . ptr $ classId,
-            -- | uint32_t _irq_vector
-            uint32_t
-        ]
-
 timer_handler :: Ident -> Ident -> CExpression
 timer_handler classId handler = (classId <::> handler) @:
     CTFunction void
@@ -255,6 +231,14 @@ __termina_app__install_emitters = "__termina_app__install_emitters" @:
 __termina_app__enable_protection :: CExpression
 __termina_app__enable_protection = "__termina_app__enable_protection" @:
     CTFunction void []
+
+__termina_app__init_channel_connections :: CExpression
+__termina_app__init_channel_connections = "__termina_app__init_channel_connections" @:
+    CTFunction void
+        [
+            -- | Status * const status
+            _const . ptr $ _Status
+        ]
 
 __termina_app__init_msg_queues :: CExpression
 __termina_app__init_msg_queues = "__termina_app__init_msg_queues" @:

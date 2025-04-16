@@ -18,7 +18,6 @@ data ConstFoldSt = ConstFoldSt
     localConstEnv :: M.Map Identifier (Const SemanticAnn),
     globalConstEnv :: M.Map Identifier (Const SemanticAnn),
     currentElement :: Maybe Identifier,
-    maxDepth :: Integer,
     progArch :: TerminaProgArch SemanticAnn
   }
 
@@ -573,8 +572,7 @@ runConstFolding progArchitecture =
           localConstEnv = M.empty,
           globalConstEnv = M.empty,
           currentElement = Nothing,
-          progArch = progArchitecture,
-          maxDepth = 1
+          progArch = progArchitecture
         } in
   case flip ST.runState env . runExceptT $
     loadGlobalConstEvironment >>

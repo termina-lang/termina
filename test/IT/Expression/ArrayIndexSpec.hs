@@ -60,7 +60,7 @@ spec = do
               "\n" ++
               "    array0[3U] = 10U;\n" ++
               "\n" ++
-              "    array0[foo] = 1024U;\n" ++
+              "    array0[__termina_array__index(10U, foo)] = 1024U;\n" ++
               "\n" ++
               "    array1[3U][4U] = INT64_C(1024);\n" ++
               "\n" ++
@@ -88,7 +88,7 @@ spec = do
               "\n" ++
               "    p_array0[3U] = 10U;\n" ++
               "\n" ++
-              "    p_array0[(size_t)foo] = 1024U;\n" ++
+              "    p_array0[__termina_array__index(10U, (size_t)foo)] = 1024U;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -124,15 +124,34 @@ genObject o@(Variable identifier _ann) = do
     cType <- getObjType o >>= genType noqual
     -- Return the C identifier
     return (identifier @: cType)
-genObject o@(ArrayIndexExpression obj index _ann) = do
+genObject (ArrayIndexExpression obj index ann) = do
+    objType <- getObjType obj
+    (ty, arraySize) <- case objType of 
+        (TArray ty arraySize) -> return (ty, arraySize)
+        (TReference _ (TArray ty arraySize)) -> return (ty, arraySize)
+        _ -> throwError $ InternalError $ "Invalid object type: " ++ show obj ++ ". Expected an array."
     -- Generate the C code for the object
-    cExpr <- genObject obj
+    cObj <- genObject obj
     -- Extract the C object from the expression
-    ctype <- getObjType o >>= genType noqual
+    ctype <- genType noqual ty
+    -- Check the type of the index expression
+    indexType <- getExprType index
     -- Generate the C code for the index
     cIndex <- genExpression index
-    -- Return the C code for the array index expression
-    return $ cExpr @$$ cIndex @: ctype
+    case indexType of
+        (TConstSubtype _) -> do
+            -- If the index is constant, we just need to generate the C code
+            -- for the index expression
+            -- Return the C code for the array index expression
+            return $ cObj @$$ cIndex @: ctype
+        _ -> do
+            -- If the index is not a constant, we need to call the index
+            -- checker function
+            cArraySize <- genExpression arraySize
+            let cAnn = buildGenericAnn ann
+                cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
+                cFunctionCall = CExprCall (CExprValOf (CVar "__termina_array__index" cFuncType) cFuncType cAnn) [cArraySize, cIndex] (CTSizeT noqual) cAnn
+            return $ cObj @$$ cFunctionCall @: ctype
 genObject o@(MemberAccess obj identifier _ann) = do
     cObj <- genObject obj
     ctype <- getObjType o >>= genType noqual
@@ -312,13 +331,27 @@ genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (ArraySliceExpression _ak obj lower _rb ann) = do
-    cObjType <- getObjType obj
-    case cObjType of
-        (TArray ty _) -> do
-            cObj <- genObject obj
-            cLower <- genExpression lower
+genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
+    objType <- getObjType obj
+    expectedType <- getExprType expr
+    lowerType <- getExprType lower
+    upperType <- getExprType upper
+    cLower <- genExpression lower
+    cObj <- genObject obj
+    case (objType, expectedType, lowerType, upperType) of
+        (TArray ty _, _, TConstSubtype _, TConstSubtype _) -> do
             cType <- genType noqual ty
             return $ addrOf (cObj @$$ cLower @: cType) |>> getLocation ann
-        _ -> throwError $ InternalError $ "Unsupported object. Not an array: " ++ show obj
+        (TArray ty arraySize, TReference _ (TArray _ expectedSize), _, _) -> do
+            cType <- genType noqual ty
+            cUpper <- genExpression upper
+            cArraySize <- genExpression arraySize
+            cExpectedSize <- genExpression expectedSize
+            let cAnn = buildGenericAnn ann
+                cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t, _const size_t, _const size_t]
+                cFunctionCall = 
+                    CExprCall (CExprValOf (CVar "__termina_array__slice" cFuncType) cFuncType cAnn) 
+                            [cArraySize, cExpectedSize, cLower, cUpper] (CTSizeT noqual) cAnn
+            return $ addrOf (cObj @$$ cFunctionCall @: cType) |>> getLocation ann
+        (ty, _,  _, _) -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o

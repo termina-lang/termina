@@ -42,7 +42,9 @@ spec = do
               "    \n" ++
               "    for (size_t i = 0U; i < 5U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        input[i] = input[i] + 1U;\n" ++
+              "        input[__termina_array__index(5U,\n" ++
+              "                                     i)] = input[__termina_array__index(5U,\n" ++
+              "                                                                        i)] + 1U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++

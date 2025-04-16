@@ -24,7 +24,7 @@ uint32Const0 :: Expression SemanticAnn
 uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
 
 usizeConst0x8 :: Expression SemanticAnn
-usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just TUSize)) usizeExprSemAnn
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just TUSize)) (simpleTySemAnn (TConstSubtype TUSize))
 
 optionVar :: Expression SemanticAnn
 optionVar = AccessObject (Variable "option_var" optionBoxUInt32ObjSemAnn)

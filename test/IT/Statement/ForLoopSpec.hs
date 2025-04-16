@@ -49,7 +49,7 @@ spec = do
               "\n" ++
               "    for (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
               "        \n" ++
-              "        total = total + array0[i];\n" ++
+              "        total = total + array0[__termina_array__index(10U, i)];\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -77,7 +77,7 @@ spec = do
               "\n" ++
               "    for (size_t i = 0U; i < 10U && found == 0; i = i + 1U) {\n" ++
               "        \n" ++
-              "        if (array0[i] == 1024U) {\n" ++
+              "        if (array0[__termina_array__index(10U, i)] == 1024U) {\n" ++
               "            \n" ++
               "            found = 1;\n" ++
               "\n" ++

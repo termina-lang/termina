@@ -232,8 +232,10 @@ genChannelConnections :: TerminaProgArch a -> CGenerator CFileItem
 genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
     channelConnections <- concat <$> mapM genChannelConnection targets
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") [] @-> void $
-            trail_cr . block $ channelConnections
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ _Status)] @-> void $
+            trail_cr . block $ 
+                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                : channelConnections
 
     where
 
@@ -579,6 +581,12 @@ genAppInit progArchitecture = do
                 -- This function cannot fail, so we do not check the status.
                 pre_cr $ __termina_app__init_globals @@ [],
                 pre_cr $ __termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ _Status)]
+            ] ++
+            [
+                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                        $ trail_cr . block $ [ 
+                            pre_cr $ __termina_app__init_channel_connections @@ ["status" @: (_const . ptr $ _Status)]
+                        ]
             ] ++
             [
                 pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)

@@ -40,7 +40,7 @@ spec = do
         pack (
           "\nfor (size_t i = 0U; i < 10U; i = i + 1U) {\n" ++
           "    \n" ++
-          "    total = total + array0[i];\n" ++
+          "    total = total + array0[__termina_array__index(10U, i)];\n" ++
           "\n" ++
           "}")
     it "Prints a for loop statement with break condition" $ do
@@ -48,6 +48,6 @@ spec = do
         pack (
           "\nfor (size_t i = 0U; i < 10U && i != 5U; i = i + 1U) {\n" ++
           "    \n" ++
-          "    total = total + array0[i];\n" ++
+          "    total = total + array0[__termina_array__index(10U, i)];\n" ++
           "\n" ++
           "}")

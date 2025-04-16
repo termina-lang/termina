@@ -24,9 +24,9 @@ pArray0 :: Object SemanticAnn
 pArray0 = Variable "p_array0" refArrayAnn
 
 usizeIndex3, usizeIndex4, usizeConst0x8 :: Expression SemanticAnn
-usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just TUSize)) usizeExprSemAnn
-usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just TUSize)) usizeExprSemAnn
-usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just TUSize)) usizeExprSemAnn
+usizeIndex3 = Constant (I (TInteger 3 DecRepr) (Just TUSize)) (simpleTySemAnn (TConstSubtype TUSize))
+usizeIndex4 = Constant (I (TInteger 4 DecRepr) (Just TUSize)) (simpleTySemAnn (TConstSubtype TUSize))
+usizeConst0x8 = Constant (I (TInteger 8 DecRepr) (Just TUSize)) (simpleTySemAnn (TConstSubtype TUSize))
 
 boxArray0 :: Object SemanticAnn
 boxArray0 = Variable "box_array0" boxArrayObjAnn
@@ -60,19 +60,19 @@ spec = do
         pack "array0[8U]"
     it "Prints the expression: array[var0]" $ do
       renderExpression array0IndexVar0 `shouldBe`
-        pack "array0[var0]"
+        pack "array0[__termina_array__index(10U, var0)]"
     it "Prints the expression: array1[3 : u32][4 : u32]" $ do
       renderExpression array1IndexExpression `shouldBe`
         pack "array1[3U][4U]"
     it "Prints the expression: box_array0[0x08 : u8]" $ do
       renderExpression boxArray0IndexConstant `shouldBe`
         pack "((uint32_t *)box_array0.data)[8U]"
-    it "Prints the expression: box_array0[var0]" $ do
+    it "Prints the expression: box_array0[__termina_array__index(10U, var0)]" $ do
       renderExpression boxArray0IndexVar0 `shouldBe`
-        pack "((uint32_t *)box_array0.data)[var0]"
+        pack "((uint32_t *)box_array0.data)[__termina_array__index(10U, var0)]"
     it "Prints the expression: *array0[3 : u32]" $ do
       renderExpression derefpArray0IndexConstant `shouldBe`
         pack "p_array0[3U]"
     it "Prints the expression: *array0[var0]" $ do
       renderExpression derefpArray0IndexVar0 `shouldBe`
-        pack "p_array0[var0]" 
+        pack "p_array0[__termina_array__index(10U, var0)]" 
