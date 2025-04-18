@@ -285,8 +285,8 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constPropagation :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-constPropagation bbProject progArchitecture = 
+constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+constFolding bbProject progArchitecture = 
   let result = runConstFolding progArchitecture in
   case result of
     Just err -> 
@@ -380,7 +380,7 @@ buildCommand (BuildCmdArgs chatty) = do
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    constPropagation bbProject programArchitecture
+    constFolding bbProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject

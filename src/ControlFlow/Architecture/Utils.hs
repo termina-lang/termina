@@ -311,3 +311,13 @@ getStackSize = getStackSize' . taskModifiers
     getStackSize' [] = TInteger 4096 DecRepr
     getStackSize' ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
     getStackSize' (_ : modifiers) = getStackSize' modifiers
+  
+isUnprotected :: ProcedureSeman a -> Bool
+isUnprotected (ProcedureSeman _ _ modifiers)= isUnprotected' modifiers
+
+  where
+    
+    isUnprotected' :: [Modifier a] -> Bool
+    isUnprotected' [] = False
+    isUnprotected' ((Modifier "unprotected" Nothing) : _) = True
+    isUnprotected' (_ : xs) = isUnprotected' xs

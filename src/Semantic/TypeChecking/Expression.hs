@@ -1263,7 +1263,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
             LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
               extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures loc) extends
-              let procs = [ProcedureSeman procid params [] | (InterfaceProcedure procid params _ _) <- members ++ extendedMembers]
+              let procs = [ProcedureSeman procid params ms | (InterfaceProcedure procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->

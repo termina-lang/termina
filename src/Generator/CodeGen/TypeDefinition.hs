@@ -413,8 +413,6 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     no_cr $ "status" @: _Status @. variant @: enumFieldType @= "Status__Success" @: enumFieldType,
                     -- uint32_t next_msg = 0U;
                     pre_cr $ var "next_msg" uint32_t @:= dec 0 @: uint32_t,
-                    -- size_t size = 0U;
-                    pre_cr $ var "size" size_t @:= dec 0 @: size_t,
                     -- Result result;
                     pre_cr $ var "result" (typeDef "Result"),
                     -- result.__variant = Result__Ok;

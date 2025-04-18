@@ -367,23 +367,35 @@ genEnableProtection progArchitecture resLockingMap = do
                             no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
                                     @= freeLock @: freeFunctionType
                         ]
-                APConnTy (TInterface RegularInterface iface)
-                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
-                    -- Generate last procedures without new lines
-                    procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
-                        clsFunctionName <- genClassFunctionName resource procedureId
-                        procFunctionType <- genFunctionType TUnit ptys
-                        clsFunctionNameLock <- procedureMutexLock clsFunctionName
-                        return $
-                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType
-                        )
-                    -- Generate first procedure with a preceding new line
-                    clsFunctionName <- genClassFunctionName resource pr
-                    procFunctionType <- genFunctionType TUnit prtys
-                    clsFunctionNameLock <- procedureMutexLock clsFunctionName
-                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType) : procs
+                APConnTy (TInterface _ iface)
+                        (TGlobal ResourceClass resource) pss -> do
+                    case [p | p <- pss, not (isUnprotected p) ] of
+                        [] -> return []
+                        -- Generate first procedure with a preceding new line
+                        [ProcedureSeman pr prtys _modifiers] -> do
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureMutexLock clsFunctionName
+                            return [
+                                pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                    @= clsFunctionNameLock @: procFunctionType)
+                                ]
+                        ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
+                            -- Generate last procedures without new lines
+                            procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
+                                clsFunctionName <- genClassFunctionName resource procedureId
+                                procFunctionType <- genFunctionType TUnit ptys
+                                clsFunctionNameLock <- procedureMutexLock clsFunctionName
+                                return $
+                                    no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType
+                                )
+                            -- Generate first procedure with a preceding new line
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureMutexLock clsFunctionName
+                            return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType) : procs
                 _ -> return []
 
         genEnableResourceTaskLock ::
@@ -406,23 +418,34 @@ genEnableProtection progArchitecture resLockingMap = do
                             no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
                                     @= freeLock @: freeFunctionType
                         ]
-                APConnTy (TInterface RegularInterface iface)
-                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
-                    -- Generate last procedures without new lines
-                    procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
-                        clsFunctionName <- genClassFunctionName resource procedureId
-                        procFunctionType <- genFunctionType TUnit ptys
-                        clsFunctionNameLock <- procedureTaskLock clsFunctionName
-                        return $
-                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType
-                        )
-                    -- Generate first procedure with a preceding new line
-                    clsFunctionName <- genClassFunctionName resource pr
-                    procFunctionType <- genFunctionType TUnit prtys
-                    clsFunctionNameLock <- procedureTaskLock clsFunctionName
-                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType) : procs
+                APConnTy (TInterface _ iface)
+                        (TGlobal ResourceClass resource) pss -> do
+                    case [p | p <- pss, not (isUnprotected p) ] of
+                        [] -> return []
+                        -- Generate first procedure with a preceding new line
+                        [ProcedureSeman pr prtys _modifiers] -> do
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureTaskLock clsFunctionName
+                            return [ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType)
+                                ]
+                        ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
+                            -- Generate last procedures without new lines
+                            procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
+                                clsFunctionName <- genClassFunctionName resource procedureId
+                                procFunctionType <- genFunctionType TUnit ptys
+                                clsFunctionNameLock <- procedureTaskLock clsFunctionName
+                                return $
+                                    no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType
+                                )
+                            -- Generate first procedure with a preceding new line
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureTaskLock clsFunctionName
+                            return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType) : procs
                 _ -> return []
 
         genEnableResourceEventLock ::
@@ -445,23 +468,34 @@ genEnableProtection progArchitecture resLockingMap = do
                             no_cr $ taskId @: typeDef classId @. portId @: __termina_allocator_t @. "free" @: ptr freeFunctionType
                                     @= freeLock @: freeFunctionType
                         ]
-                APConnTy (TInterface RegularInterface iface)
-                        (TGlobal ResourceClass resource) ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
-                    -- Generate last procedures without new lines
-                    procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
-                        clsFunctionName <- genClassFunctionName resource procedureId
-                        procFunctionType <- genFunctionType TUnit ptys
-                        clsFunctionNameLock <- procedureEventLock clsFunctionName
-                        return $
-                            no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType
-                        )
-                    -- Generate first procedure with a preceding new line
-                    clsFunctionName <- genClassFunctionName resource pr
-                    procFunctionType <- genFunctionType TUnit prtys
-                    clsFunctionNameLock <- procedureEventLock clsFunctionName
-                    return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
-                                @= clsFunctionNameLock @: procFunctionType) : procs
+                APConnTy (TInterface _ iface)
+                        (TGlobal ResourceClass resource) pss -> do
+                    case [p | p <- pss, not (isUnprotected p) ] of
+                        [] -> return []
+                        [ProcedureSeman pr prtys _modifiers] -> do
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureEventLock clsFunctionName
+                            return [ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType)
+                                ]
+                        ((ProcedureSeman pr prtys _modifiers) : pxs) -> do
+                            -- Generate last procedures without new lines
+                            procs <- forM pxs (\(ProcedureSeman procedureId ptys _modifiers) -> do
+                                clsFunctionName <- genClassFunctionName resource procedureId
+                                procFunctionType <- genFunctionType TUnit ptys
+                                clsFunctionNameLock <- procedureEventLock clsFunctionName
+                                return $
+                                    no_cr $ taskId @: typeDef classId @. portId @: typeDef iface @. procedureId @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType
+                                )
+                            -- Generate first procedure with a preceding new line
+                            clsFunctionName <- genClassFunctionName resource pr
+                            procFunctionType <- genFunctionType TUnit prtys
+                            clsFunctionNameLock <- procedureEventLock clsFunctionName
+                            return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
+                                        @= clsFunctionNameLock @: procFunctionType) : procs
+                            
                 _ -> return []
 
         genEnableProtectionHandler :: TPHandler SemanticAnn -> CGenerator [CCompoundBlockItem]
