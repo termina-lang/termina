@@ -37,6 +37,8 @@ genGlobalDecl (GlobalDeclaration (Const identifier ts _expr _ ann)) = do
     return [
             pre_cr $ extern (var identifier cTs) |>> getLocation ann
         ]
+-- | Constant expressions are already substituted in the semantic phase
+genGlobalDecl (GlobalDeclaration (ConstExpr {})) = return []
 genGlobalDecl decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl
 
 
@@ -67,4 +69,6 @@ genGlobal (GlobalDeclaration (Const identifier ts expr _ ann)) = do
     return [
             pre_cr . global $ identifier @: cTs @:= cExpr |>> getLocation ann
         ]
+-- | Constant expressions are already substituted in the semantic phase
+genGlobal (GlobalDeclaration (ConstExpr {})) = return []
 genGlobal decl = throwError $ InternalError $ "unsupported global declaration: " ++ show decl

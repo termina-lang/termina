@@ -135,6 +135,9 @@ genArchGlobal _ (Const identifier ty expr _ ann) = do
     tp {
       globalConstants = M.insert identifier (TPGlobalConstant identifier ty expr ann) (globalConstants tp)
     }
+-- | Const expressions have been already substituted by the type checker
+-- | Nothing to do here
+genArchGlobal _ (ConstExpr {}) = return ()
 genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->

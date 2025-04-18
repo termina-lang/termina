@@ -120,8 +120,17 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
       return (SAST.Channel ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidChannelType ty)
 typeGlobal (Const ident ts expr mods anns) = do
-  ty <- TConstSubtype <$> typeTypeSpecifier anns typeGlobalObject ts
+  ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
-  typed_expr <- typeExpression (Just ty) typeGlobalObject expr
+  constTyOrFail anns ty
+  let constType = TConstSubtype ty
+  typed_expr <- typeExpression (Just constType) typeGlobalObject expr
   tyMods <- mapM (typeModifier anns typeGlobalObject) mods
-  return (SAST.Const ident ty typed_expr tyMods (buildGlobalAnn anns ty), LocatedElement (GConst ty typed_expr) anns)
+  return (SAST.Const ident constType typed_expr tyMods (buildGlobalAnn anns constType), LocatedElement (GConst constType typed_expr) anns)
+typeGlobal (ConstExpr ident ts expr mods anns) = do
+  ty <- typeTypeSpecifier anns typeGlobalObject ts
+  checkTerminaType anns ty
+  declTyOrFail anns ty
+  typed_expr <- typeAssignmentExpression ty typeGlobalObject expr
+  tyMods <- mapM (typeModifier anns typeGlobalObject) mods
+  return (SAST.ConstExpr ident ty typed_expr tyMods (buildGlobalAnn anns ty), LocatedElement (GConstExpr ty typed_expr) anns)

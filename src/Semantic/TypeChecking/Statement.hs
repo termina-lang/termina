@@ -46,8 +46,7 @@ typeStatement _retTy (Declaration lhs_id lhs_ak lhs_ts expr anns) = do
   -- Check if the type is a valid declaration type
   declTyOrFail anns lhs_type
   -- Expression and type must match
-  typed_aexpr <- typeAssignmentExpression lhs_type typeRHSObject expr
-  ety <- mustBeTy lhs_type typed_aexpr
+  ety <- typeAssignmentExpression lhs_type typeRHSObject expr
   -- Insert object in the corresponding environment
   -- If the object is mutable, then we insert it in the local mutable environment
   -- otherwise we insert it in the read-only environment

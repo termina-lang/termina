@@ -226,6 +226,7 @@ data Error
   | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer
   | EStringInitializerNotArrayOfChars (TerminaType SemanticAnn) -- ^ Assignment of a string array initializer to an invalid type
   | EInvalidConstType (TerminaType SemanticAnn) -- ^ Invalid type for constant
+  | EInvalidAccessToConstExpr Identifier -- ^ Invalid access to constant expression
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -409,6 +410,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EStringInitializerInvalidUse _pos) = "SE-178"
     errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
     errorIdent (AnnotatedError (EInvalidConstType _ty) _pos) = "SE-181"
+    errorIdent (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "SE-182"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -588,6 +590,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError EStringInitializerInvalidUse _pos) = "invalid use of a string initializer"
     errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
     errorTitle (AnnotatedError (EInvalidConstType _ty) _pos) = "invalid type for constant"
+    errorTitle (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "invalid access to a constant expression"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -1937,6 +1940,10 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a constant.\n" <>
                                "Only numeric types, boolean and character types are valid for constants."))
+                EInvalidAccessToConstExpr ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n"))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

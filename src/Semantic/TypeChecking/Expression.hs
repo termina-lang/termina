@@ -27,6 +27,8 @@ import qualified Data.List  (find, sortOn)
 import Parser.Types
 import qualified Data.Set as S
 import qualified Data.List as L
+import qualified Control.Monad.State as ST
+import Semantic.Environment
 
 checkConstant :: Location -> SAST.TerminaType SemanticAnn -> SAST.Const SemanticAnn -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
@@ -732,39 +734,72 @@ typeExpression ::
   -> SemanticMonad (SAST.Expression SemanticAnn)
 -- Object access
 typeExpression expectedType typeObj (AccessObject obj) = do
-    -- | Type the object
-    typed_obj <- typeObj obj
-    -- | Get the type of the object
-    (_, obj_type) <- getObjType typed_obj
-    case (expectedType, obj_type) of
-      (Just (TBoxSubtype ts), TBoxSubtype ts') -> do
-        -- If the type must be an expected type, then check it.
-        sameTyOrError (getAnnotation obj) ts ts'
-        return $ SAST.AccessObject typed_obj
-      (Just ts, TBoxSubtype ts') -> do
-        -- If the type must be an expected type, then check it.
-        sameTyOrError (getAnnotation obj) ts ts'
-        -- If we have an box and expect an unboxed type:
-        return $ SAST.AccessObject (unBox typed_obj)
-      (Just (TConstSubtype ts), TConstSubtype ts') -> do
-        -- If the type must be an expected type, then check it.
-        sameTyOrError (getAnnotation obj) ts ts'
-        return $ SAST.AccessObject typed_obj
-      (Just (TConstSubtype ts), ts') -> do
-        -- If the type must be an expected type, then check it.
-        sameTyOrError (getAnnotation obj) ts ts'
-        -- We need to return an error because the type is not a const type.
-        throwError $ annotateError (getAnnotation obj) EExpressionNotConstant
-      (Just ts, ts') -> do
-        -- If the type must be an expected type, then check it.
-        sameTyOrError (getAnnotation obj) ts ts'
-        return $ SAST.AccessObject typed_obj
-      -- If we are requesting an object without an expected type, then we must
-      -- be casting the result. Thus, we must return an unboxed object.
-      (Nothing, TBoxSubtype _)->
-        return $ SAST.AccessObject (unBox typed_obj)
-      (Nothing, _) ->
-        return $ SAST.AccessObject typed_obj
+  case obj of 
+    Variable ident loc -> do
+      -- | This is the case of a single variable access.
+      -- | We need to check if the variable name refers to a constexpression or not
+      glb <- ST.gets global
+      case M.lookup ident glb of
+        Just (LocatedElement (GConstExpr _ty expr) _) -> do
+          exprType <- getExprType expr
+          case (expectedType, exprType) of
+            (Just (TConstSubtype ts), TConstSubtype ts') -> do
+              -- If the type must be an expected type, then check it.
+              sameTyOrError loc ts ts'
+              return expr
+            (Just (TConstSubtype ts), ts') -> do
+              -- If the type must be an expected type, then check it.
+              sameTyOrError loc ts ts'
+              -- We need to return an error because the type is not a const type.
+              throwError $ annotateError loc EExpressionNotConstant
+            (Just ts, ts') -> do
+              -- If the type must be an expected type, then check it.
+              sameTyOrError loc ts ts'
+              return expr
+            -- If we are requesting an object without an expected type, then we must
+            -- be casting the result. Thus, we must return an unboxed object.
+            (Nothing, _) ->
+              return expr
+        _ -> typeObjExpression
+    _ -> typeObjExpression
+
+  where
+
+    typeObjExpression :: SemanticMonad (SAST.Expression SemanticAnn)
+    typeObjExpression = do
+      -- | Type the object
+      typed_obj <- typeObj obj
+      -- | Get the type of the object
+      (_, obj_type) <- getObjType typed_obj
+      case (expectedType, obj_type) of
+        (Just (TBoxSubtype ts), TBoxSubtype ts') -> do
+          -- If the type must match an expected type, then check it.
+          sameTyOrError (getAnnotation obj) ts ts'
+          return $ SAST.AccessObject typed_obj
+        (Just ts, TBoxSubtype ts') -> do
+          -- If the type must match an expected type, then check it.
+          sameTyOrError (getAnnotation obj) ts ts'
+          -- If we have an box and expect an unboxed type:
+          return $ SAST.AccessObject (unBox typed_obj)
+        (Just (TConstSubtype ts), TConstSubtype ts') -> do
+          -- If the type must be an expected type, then check it.
+          sameTyOrError (getAnnotation obj) ts ts'
+          return $ SAST.AccessObject typed_obj
+        (Just (TConstSubtype ts), ts') -> do
+          -- If the type must be an expected type, then check it.
+          sameTyOrError (getAnnotation obj) ts ts'
+          -- We need to return an error because the type is not a const type.
+          throwError $ annotateError (getAnnotation obj) EExpressionNotConstant
+        (Just ts, ts') -> do
+          -- If the type must be an expected type, then check it.
+          sameTyOrError (getAnnotation obj) ts ts'
+          return $ SAST.AccessObject typed_obj
+        -- If we are requesting an object without an expected type, then we must
+        -- be casting the result. Thus, we must return an unboxed object.
+        (Nothing, TBoxSubtype _)->
+          return $ SAST.AccessObject (unBox typed_obj)
+        (Nothing, _) ->
+          return $ SAST.AccessObject typed_obj
 -- | Constant literals with an expected type.
 typeExpression (Just (TConstSubtype expectedType)) typeObj (Constant c pann) = do
   typed_c <- typeConstant pann typeObj c
@@ -884,13 +919,24 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     sameNumType :: SemanticMonad (SAST.Expression SemanticAnn)
     sameNumType =
       case expectedType of
+        ty@(Just (TConstSubtype ty')) -> do
+          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
+            (typeExpression ty typeObj le)
+          tyre <- catchMismatch (getAnnotation re) (EBinOpExpectedTypeRight op ty')
+            (typeExpression ty typeObj re)
+          return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype ty'))
         ty@(Just ty') -> do
           unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           tyre <- catchMismatch (getAnnotation re) (EBinOpExpectedTypeRight op ty')
             (typeExpression ty typeObj re)
-          return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
+          tyle_ty <- getExprType tyle
+          tyre_ty <- getExprType tyre
+          case (tyle_ty, tyre_ty) of
+            (TConstSubtype _, TConstSubtype _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype ty'))
+            (_, _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
           (ty, tyle, tyre) <- sameTypeExpressions numTy (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty)

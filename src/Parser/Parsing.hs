@@ -47,7 +47,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Ports Subtyping
              ["access", "sink", "in", "out"]
       ++ -- Global declarations
-             ["task", "function", "handler", "resource", "const"]
+             ["task", "function", "handler", "resource", "const", "constexpr"]
       ++ -- Stmt
              ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
@@ -906,6 +906,20 @@ handlerDeclParser = do
   _ <- semi
   return $ Handler identifier typeSpecifier initializer modifiers (Position startPos endPos)
 
+constExprDeclParser :: Parser (Global ParserAnn)
+constExprDeclParser = do
+  modifiers <- many modifierParser
+  startPos <- getPosition
+  reserved "constexpr"
+  identifier <- identifierParser
+  reservedOp ":"
+  typeSpecifier <- typeSpecifierParser
+  _ <- reservedOp "="
+  initializer <- expressionParser
+  endPos <- getPosition
+  _ <- semi
+  return $ ConstExpr identifier typeSpecifier initializer modifiers (Position startPos endPos)
+
 constDeclParser :: Parser (Global ParserAnn)
 constDeclParser = do
   modifiers <- many modifierParser
@@ -927,6 +941,7 @@ globalDeclParser = do
     <|> try handlerDeclParser
     <|> try emitterDeclParser
     <|> try channelDeclParser
+    <|> try constExprDeclParser
     <|> constDeclParser
   return $ GlobalDeclaration g
 

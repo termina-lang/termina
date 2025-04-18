@@ -155,6 +155,7 @@ getLHSVarTy loc ident =
           ) >>= (\case{
                   LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                   LocatedElement (GConst {}) _ -> throwError $ annotateError loc (EConstantIsReadOnly ident);
+                  LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
                   _ -> throwError $ annotateError loc (ENotNamedObject ident);
                 });
           ;
@@ -176,6 +177,7 @@ getRHSVarTy loc ident =
           ) >>= (\case{
                   LocatedElement (GGlob _) _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                   LocatedElement (GConst ts _) _ -> return (Immutable, ts);
+                  LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
                   _ -> throwError $ annotateError loc (ENotNamedObject ident);
                 });
           ;
@@ -194,6 +196,8 @@ getGlobalVarTy loc ident =
                 }
               ) >>= (\case {
                         LocatedElement (GGlob ty@(TGlobal ResourceClass _)) _  -> return (Mutable, ty);
+                        LocatedElement (GConst ts _) _ -> return (Immutable, ts);
+                        LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);
                       });
 

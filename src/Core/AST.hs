@@ -249,6 +249,13 @@ data Global' ty expr a
       (expr a) -- ^ initialization expression
       [Modifier' ty a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
+    -- | Constant expression constructor
+    | ConstExpr
+      Identifier -- ^ name of the constant
+      (ty a) -- ^ type of the constant
+      (expr a) -- ^ initialization expression
+      [Modifier' ty a] -- ^ list of possible modifiers
+      a -- ^ transpiler annotations
 
   deriving (Show, Functor)
 
@@ -259,6 +266,7 @@ instance Annotated (Global' ty expr) where
   getAnnotation (Emitter _ _ _ _ a)    = a
   getAnnotation (Handler _ _ _ _ a)   = a
   getAnnotation (Const _ _ _ _ a)    = a
+  getAnnotation (ConstExpr _ _ _ _ a)    = a
 
   updateAnnotation (Task n t i m _) = Task n t i m
   updateAnnotation (Resource n t i m _) = Resource n t i m
@@ -266,6 +274,7 @@ instance Annotated (Global' ty expr) where
   updateAnnotation (Emitter n t i m _) = Emitter n t i m
   updateAnnotation (Handler n t i m _) = Handler n t i m
   updateAnnotation (Const n t i m _) = Const n t i m
+  updateAnnotation (ConstExpr n t i m _) = ConstExpr n t i m
 
 -- Extremelly internal type definition
 data TypeDef' ty blk a

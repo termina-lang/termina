@@ -119,6 +119,8 @@ data GEntry a
   -- ^ Globals
   | GConst (TerminaType a) (Expression a)
   -- ^ Constants
+  | GConstExpr (TerminaType a) (Expression a)
+  -- ^ Constant Expressions
   | GType (SemanTypeDef a)
   -- ^ Types
   deriving (Show, Functor)

@@ -301,6 +301,7 @@ getGlobalIdentifier (Channel ident _ _ _ _)  = ident
 getGlobalIdentifier (Emitter ident _ _ _ _)  = ident
 getGlobalIdentifier (Handler ident _ _ _ _)  = ident
 getGlobalIdentifier (Const ident _ _ _ _)    = ident
+getGlobalIdentifier (ConstExpr ident _ _ _ _) = ident
 
 getGlobalType :: Global' ty expr a -> ty a
 getGlobalType (Task _ ty _ _ _)     = ty
@@ -309,6 +310,7 @@ getGlobalType (Channel _ ty _ _ _)  = ty
 getGlobalType (Emitter _ ty _ _ _)  = ty
 getGlobalType (Handler _ ty _ _ _)  = ty
 getGlobalType (Const _ ty _ _ _)    = ty
+getGlobalType (ConstExpr _ ty _ _ _) = ty
 
 ----------------------------------------
 -- Box Helpers
