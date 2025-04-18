@@ -49,6 +49,7 @@ data Error
   | EEnumDefEmpty Identifier -- ^ Empty enum definition (Internal)
   | EInterfaceEmpty Identifier -- ^ Empty interface definition (Internal)
   | ESystemInterfaceDefinition Identifier -- ^ System interface definition (Internal)
+  | EInvalidConstExprType (TerminaType SemanticAnn) -- ^ Invalid constant expression type (Internal)
   | EInvalidArrayIndexing (TerminaType SemanticAnn) -- ^ Invalid array indexing
   | ENotNamedObject Identifier -- ^ Object not found
   | EExpressionNotConstant -- ^ Expected constant expression
@@ -660,7 +661,7 @@ instance ErrorMessage SemanticErrors where
                                 procSourceLines ("Procedure \x1b[31m" <> T.pack ident <> "\x1b[0m is defined here:") procFileName
                                 procPos Nothing
                         _ -> ""
-                EProcedureCallArgTypeMismatch (ident, (Parameter _ expectedTy), procPos) numArgs actualTy ->
+                EProcedureCallArgTypeMismatch (ident, Parameter _ expectedTy, procPos) numArgs actualTy ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Argument \x1b[31m#" <> T.pack (show numArgs) <> "\x1b[0m of procedure \x1b[31m" <> T.pack ident <>
@@ -1102,7 +1103,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EFunctionCallArgTypeMismatch (funcId, (Parameter _ expectedTy), funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1518,7 +1519,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EMemberFunctionCallArgTypeMismatch (funcId, (Parameter _ expectedTy), funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in

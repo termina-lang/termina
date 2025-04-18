@@ -259,6 +259,15 @@ useMCase (MatchCase _mIdent bvars blk ann)
   = useDefBasicBlocks (blockBody blk)
   >> mapM_ (`defVariable` getLocation ann) bvars
 
+useArraySize :: TerminaType SemanticAnn -> UDM VarUsageError ()
+useArraySize (TReference _ (TArray ty size)) = do
+  useArraySize ty
+  useExpression size
+useArraySize (TArray ty size) = do
+  useArraySize ty
+  useExpression size
+useArraySize _ty = return ()
+
 checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
 checkUseVariableStates prevSt sets = do
   finalSt <- checkOptionBoxStates prevSt sets 
@@ -336,6 +345,7 @@ useDefCMemb (ClassMethod _ident _tyret bret _ann)
   = useDefBlockRet bret
 useDefCMemb (ClassProcedure _ident ps blk ann)
   = useDefBlockRet blk
+  >> mapM_ (useArraySize . paramType) ps
   >> mapM_ (`defArgumentsProc` getLocation ann) ps
   -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
@@ -367,6 +377,7 @@ useDefTypeDef (Enum {}) = return ()
 useDefFrag :: AnnASTElement SemanticAnn -> UDM VarUsageError ()
 useDefFrag (Function _ident ps _ty blk _mods anns)
  = useDefBlockRet blk
+ >> mapM_ (useArraySize . paramType) ps
  >> mapM_ (`defArgumentsProc` getLocation anns) ps
  -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
 useDefFrag (GlobalDeclaration {})

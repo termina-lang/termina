@@ -29,6 +29,7 @@ import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Control.Monad.State as ST
 import Semantic.Environment
+import Utils.Monad
 
 checkConstant :: Location -> SAST.TerminaType SemanticAnn -> SAST.Const SemanticAnn -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
@@ -333,9 +334,16 @@ typeMemberFunctionCall ann obj_ty ident args =
                   -- Check that the number of parameters are OK
                   when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
                   when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
-                  typed_args <- zipWithM (\(p, idx) e ->
+                  typed_args <- localScope $ zipWithM (\(p, idx) e ->
                     catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
-                      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                      (
+                        case paramType p of 
+                          (TConstSubtype pty) -> do
+                            -- | See FunctionCall comment
+                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
+                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
+                            return typedArgument
+                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -352,9 +360,16 @@ typeMemberFunctionCall ann obj_ty ident args =
               let (psLen , asLen) = (length ps, length args)
               when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, loc) (fromIntegral asLen)))
               when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
-              typed_args <- zipWithM (\(p, idx) e ->
+              typed_args <- localScope $ zipWithM (\(p, idx) e ->
                 catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
-                  (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                  (
+                        case paramType p of 
+                          (TConstSubtype pty) -> do
+                            -- | See FunctionCall comment
+                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
+                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
+                            return typedArgument
+                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
         );
         _ -> throwError $ annotateError Internal EUnboxingInterface
@@ -1039,9 +1054,10 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
         TArray ty _ -> do
           checkReferenceAccessKind obj_ak
           case expectedType of
-            Just rtype@(TReference _ak (TArray ts _size)) -> do
+            Just (TReference ak (TArray ts rawSize)) -> do
               unless (sameTy ty ts) (throwError $ annotateError pann $ EMismatch ts ty)
-              return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann rtype))
+              expectedSize <- evalArraySizeExpr rawSize
+              return (SAST.ArraySliceExpression refKind typed_obj typed_lower typed_upper (buildExpAnn pann (TReference ak (TArray ts expectedSize))))
             Just ety -> throwError $ annotateError pann $ EMismatch (TReference refKind ty) ety
             _ -> throwError $ annotateError pann ESliceInvalidUse
         _ -> throwError $ annotateError Internal EMalformedSlice
@@ -1065,7 +1081,19 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
           maybe (return ()) (flip (sameTyOrError pann) (TReference refKind obj_type)) expectedType
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind obj_type)))
 
-  where
+  where 
+
+    evalArraySizeExpr :: SAST.Expression SemanticAnn -> SemanticMonad (SAST.Expression SemanticAnn)
+    evalArraySizeExpr expr@(SAST.AccessObject (SAST.Variable ident' _)) = do
+      glb <- ST.gets global
+      case M.lookup ident' glb of
+        Just (LocatedElement (GConstExpr _ty cexpr) _) -> do
+          cExprType <- getExprType cexpr
+          case cExprType of
+            TConstSubtype TUSize -> return cexpr
+            ty -> throwError $ annotateError Internal (EInvalidConstExprType ty)
+        _ -> return expr
+    evalArraySizeExpr expr = return expr
 
     checkReferenceAccessKind :: AccessKind -> SemanticMonad ()
     checkReferenceAccessKind obj_ak =
@@ -1083,8 +1111,20 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   -- Check that the number of parameters are OK
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
-  typed_args <- zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
-      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+  typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
+      (
+        case paramType p of 
+          (TConstSubtype pty) -> do
+            -- | We need to type the expression and ADD it to the global context as a const expression
+            -- We have to do this because the const parameter may have been used to define an array size
+            -- of another parameter. We may have to expand the size of the array if we are passing a
+            -- slice of an array as parameter whose bounds are not known at compile time. We are using
+            -- the global const substitution mechanism instread of implementing a new one for this
+            -- case so that we can reuse the code.
+            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
+            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
+            return typedArgument
+          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
   maybe (return ()) (flip (sameTyOrError ann) retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 
