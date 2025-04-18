@@ -118,6 +118,8 @@ data Error
   | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer
   | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type
   | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer
+  | EForLoopLowerBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop lower bound type mismatch
+  | EForLoopUpperBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop upper bound type mismatch
   | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
   | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
   | EReturnValueNotUnit -- ^ Return value not expected
@@ -302,6 +304,8 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "SE-067"
     errorIdent (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "SE-068"
     errorIdent (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "SE-069"
+    errorIdent (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-070"
+    errorIdent (AnnotatedError (EForLoopUpperBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-071"
     errorIdent (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "SE-072"
     errorIdent (AnnotatedError (EReturnValueExpected _ty) _pos) = "SE-073"
     errorIdent (AnnotatedError EReturnValueNotUnit _pos) = "SE-074"
@@ -482,6 +486,8 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "invalid use of an expression list array initializer"
     errorTitle (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "assignment of an array expression list initializer to a non-array type"
     errorTitle (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "invalid use of an option variant initializer"
+    errorTitle (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "for loop lower bound type mismatch"
+    errorTitle (AnnotatedError (EForLoopUpperBoundTypeMismatch _exppectedTy _actualTy) _pos) = "for loop upper bound type mismatch"
     errorTitle (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "list of initializing expressions type mismatch"
     errorTitle (AnnotatedError (EReturnValueExpected _ty) _pos) = "expected return value"
     errorTitle (AnnotatedError EReturnValueNotUnit _pos) = "return value not expected"
@@ -1278,6 +1284,16 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just $ "You are trying to use an option variant initializer in an invalid context.\n" <>
                                 "Option variant initializers can only be used to initialize option objects.")
+                EForLoopLowerBoundTypeMismatch expectedTy actualTy ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The lower bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <>
+                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                EForLoopUpperBoundTypeMismatch expectedTy actualTy ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The upper bound of the for loop is expected to be of the type of the iterator \x1b[31m" <> showText expectedTy <>
+                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
                 EArrayExprListInitializerExprTypeMismatch expectedTy actualTy ->
                     pprintSimpleError
                         sourceLines title fileName pos
