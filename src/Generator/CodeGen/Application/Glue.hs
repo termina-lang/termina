@@ -115,6 +115,8 @@ genInitEmitters progArchitecture = do
                                     @. "sink_msgq_id" @: __termina_id_t @= sinkMsgQueueId @:  __termina_id_t,
                                 no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_port_id" @: __termina_id_t @= variantForPort @:  __termina_id_t,
+                                pre_cr $ targetEntity @: typeDef tskCls @. targetPort @: __termina_id_t
+                                    @= sinkMsgQueueId @: __termina_id_t,
                                 pre_cr $ __termina_periodic_timer__init @@ [
                                     timerId @: __termina_id_t,
                                     addrOf ("connection" @: __termina_periodic_timer_connection_t),
@@ -156,16 +158,20 @@ genInitEmitters progArchitecture = do
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
                     Just (TPTask _ tskCls _ _ _ _ _ _ _) -> do
                         variantForPort <- genVariantForPort tskCls targetPort
+                        taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
+                        sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
                         return [
                                 pre_cr $ var "connection" __termina_interrupt_connection_t,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                     @= "__TerminaEmitterConnectionType__Task" @: enumFieldType,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
-                                    @. "task_msg_queue_id" @: __termina_id_t @= namefy targetEntity <::> "msg_queue_id" @: __termina_id_t,
+                                    @. "task_msg_queue_id" @: __termina_id_t @= taskMsgQueueId @: __termina_id_t,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
-                                    @. "sink_msgq_id" @: __termina_id_t @= namefy targetEntity <::> targetPort  @:  __termina_id_t,
+                                    @. "sink_msgq_id" @: __termina_id_t @= sinkMsgQueueId @:  __termina_id_t,
                                 no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_port_id" @: __termina_id_t @= variantForPort @:  __termina_id_t,
+                                pre_cr $ targetEntity @: typeDef tskCls @. targetPort @: __termina_id_t
+                                    @= sinkMsgQueueId @: __termina_id_t,
                                 pre_cr $ __termina_interrupt__init @@ [
                                     dec irqVector @: __termina_id_t,
                                     addrOf ("connection" @: __termina_interrupt_connection_t),
