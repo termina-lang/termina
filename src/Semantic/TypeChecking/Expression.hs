@@ -559,7 +559,8 @@ typeTypeSpecifier loc typeObj ts@(TSDefinedType "Pool" [typeParam, sizeParam]) =
   return $ TPool tyTypeParam tySizeParam
 typeTypeSpecifier loc typeObj (TSArray ts s) = do
   ty <- typeTypeSpecifier loc typeObj ts
-  arraySize <- typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  arraySize <- catchMismatch loc EArrayIndexNotUSize 
+      (typeExpression (Just (TConstSubtype TUSize)) typeObj s)
   return $ TArray ty arraySize
 typeTypeSpecifier loc typeObj (TSReference ak ts) = 
   TReference ak <$> typeTypeSpecifier loc typeObj ts
