@@ -65,6 +65,10 @@ inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do
             localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
         _ -> throwError $ annotateError Internal EUnboxingMatchCase
     localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
+inOutDestroyOptionMatchCases optionBoxSource [MatchCase "Some" [arg] body _] =
+    localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
+inOutDestroyOptionMatchCases _ [MatchCase "None" _ noneBody _] = 
+    localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
 inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EUnboxingMatchCase
 
 inOutBasicBlock :: BasicBlock SemanticAnn -> BoxInOutMonad ()
@@ -83,7 +87,7 @@ inOutBasicBlock (IfElseBlock _eCond bTrue elseIfs bFalse _ann) =
 inOutBasicBlock (ForLoopBlock {}) =
     -- | Inside a for loop, there cannot be any box releasing
     return ()
-inOutBasicBlock (MatchBlock eMatch cases _) = do
+inOutBasicBlock (MatchBlock eMatch cases mDefaultCase _) = do
     -- | We need to check if we are destroying a box
     eTy <- getExprType eMatch
     case eTy of
@@ -97,6 +101,9 @@ inOutBasicBlock (MatchBlock eMatch cases _) = do
             optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
             inOutDestroyOptionMatchCases optionBoxSource cases
         _ -> mapM_ (mapM_ inOutBasicBlock) (blockBody . matchBody <$> cases)
+    case mDefaultCase of
+        Just (DefaultCase defBody _) -> mapM_ inOutBasicBlock (blockBody defBody)
+        Nothing -> return ()
 inOutBasicBlock (SendMessage obj arg ann) = do
     msgTy <- getExprType arg
     case msgTy of

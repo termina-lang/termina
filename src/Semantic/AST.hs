@@ -124,14 +124,18 @@ instance Annotated Expression where
   updateAnnotation (ArraySliceExpression ak obj e1 e2 _) = ArraySliceExpression ak obj e1 e2
   updateAnnotation (StringInitializer s _) = StringInitializer s
 
-
 data MatchCase a = MatchCase
   {
     matchIdentifier :: Identifier
   , matchBVars      :: [Identifier]
   , matchBody       :: Block a
   , matchAnnotation :: a
-  } deriving (Show,Functor)
+  } deriving (Show, Functor)
+
+data DefaultCase a = DefaultCase
+  (Block a)
+  a
+  deriving (Show, Functor)
 
 data ElseIf a = ElseIf
   {
@@ -170,6 +174,7 @@ data Statement a =
   | MatchStmt
     (Expression a) -- ^ expression to match
     [MatchCase a] -- ^ list of match cases
+    (Maybe (DefaultCase a)) -- ^ default case
     a
   | SingleExpStmt
     (Expression a) -- ^ expression

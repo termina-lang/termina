@@ -108,6 +108,7 @@ data Error
   | EAtomicArrayInvalidType (TerminaType SemanticAnn) -- ^ Invalid atomic array type
   | EAtomicConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic connection type mismatch
   | EAtomicArrayConnectionTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Atomic array connection type mismatch
+  | EInvalidDefaultCase -- ^ Invalid default case in match statement
   | EConstantWithoutKnownType (Const SemanticAnn) -- ^ Constant without known type
   | EStructInitializerInvalidUse -- ^ Invalid use of a struct initializer
   | EStructInitializerTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Struct initializer type mismatch
@@ -294,6 +295,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "SE-056"
     errorIdent (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-057"
     errorIdent (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "SE-058"
+    errorIdent (AnnotatedError EInvalidDefaultCase _pos) = "SE-059"
     errorIdent (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "SE-060"
     errorIdent (AnnotatedError EStructInitializerInvalidUse _pos) = "SE-061"
     errorIdent (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "SE-062"
@@ -1232,6 +1234,10 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The type of the elements of the connected atomic array is expected to be \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but the array is of elements of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                EInvalidDefaultCase ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "The cases are already exhaustive, the default case is not needed.")
                 EConstantWithoutKnownType c ->
                     pprintSimpleError
                         sourceLines title fileName pos

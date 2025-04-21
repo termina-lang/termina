@@ -461,10 +461,14 @@ constFoldBasicBlock (ForLoopBlock _ _ from_expr to_expr mWhile body_stmt ann) = 
               _ -> return ()
           Nothing -> return ()
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-constFoldBasicBlock (MatchBlock expr cases _) =
+constFoldBasicBlock (MatchBlock expr cases mDefaultCase _) =
   constFoldExpression expr >>
   mapM_ (\(MatchCase _ _ blk _) -> do
-    constFoldBasicBlocks blk) cases
+    constFoldBasicBlocks blk) cases >>
+  case mDefaultCase of
+    Just (DefaultCase blk _) -> do
+      constFoldBasicBlocks blk
+    Nothing -> return ()
 constFoldBasicBlock (SendMessage obj expr _) = do
   constFoldObject obj
   constFoldExpression expr

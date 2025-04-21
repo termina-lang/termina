@@ -53,8 +53,11 @@ mapStatementOption (IfElseStmt _ (Block stmts _) elseIfs elseBlk _) =
   -- | Get the option types from the else statements
   maybe (return ()) (mapM_ mapStatementOption . blockBody) elseBlk
 mapStatementOption (ForLoopStmt _ _ _ _ _ (Block stmts _) _) = mapM_ mapStatementOption stmts
-mapStatementOption (MatchStmt _ cases _) =
+mapStatementOption (MatchStmt _ cases mDefaultCase _) = do
   mapM_ (\(MatchCase _ _ (Block stmts _) _) -> mapM_ mapStatementOption stmts) cases
+  case mDefaultCase of
+    Just (DefaultCase (Block stmts _) _) -> mapM_ mapStatementOption stmts
+    Nothing -> return ()
 mapStatementOption _ = return ()
 
 mapInterfaceProcedureOption ::

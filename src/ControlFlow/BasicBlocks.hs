@@ -15,6 +15,7 @@ import Semantic.Types
 import Control.Monad.Except
 import ControlFlow.BasicBlocks.Utils
 import ControlFlow.BasicBlocks.Errors
+import Control.Monad
 
 -- | This function appends a statement to a regular block.  If the statement is
 -- a declaration or an assignment, or a regular single expression statement, it
@@ -25,18 +26,18 @@ import ControlFlow.BasicBlocks.Errors
 -- 
 -- The statement will be appended at the beginning of the block, since the order
 -- of the statements is reversed upon calling this function.
-appendRegularBlock :: 
+appendRegularBlock ::
     [BasicBlock SemanticAnn] -- ^ Accumulator of blocks
     -> BasicBlock SemanticAnn -- ^ Current (regular) block
     -> [SAST.Statement SemanticAnn] -- ^ Remaining statements
     -> BBGenerator [BasicBlock SemanticAnn]
-appendRegularBlock acc currBlock [] = 
+appendRegularBlock acc currBlock [] =
     -- | If there are no more statements, we shall return the current block
     -- appended to the accumulator
     return $ currBlock : acc
-appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) = 
+appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
     case stmt of
-        SAST.SingleExpStmt expr ann -> 
+        SAST.SingleExpStmt expr ann ->
             case expr of
                 SAST.MemberFunctionCall obj _ _ _ -> do
                     obj_ty <- getObjType obj
@@ -46,12 +47,12 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        TGlobal _ _ -> 
+                        TGlobal _ _ ->
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        TReference {} -> 
+                        TReference {} ->
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | In any other case, we shall end the current regular
                         -- block and create a new one 
@@ -59,30 +60,30 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                 SAST.DerefMemberFunctionCall obj _ _ _ -> do
                     obj_ty <- getObjType obj
                     case obj_ty of
-                        TReference {} -> 
+                        TReference {} ->
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         _ -> throwError $ InternalError ("appendRegularBlock: unexpected object type " ++ show obj_ty)
-                _ -> appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs 
-        SAST.Declaration name accessKind typeSpecifier expr ann -> 
+                _ -> appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
+        SAST.Declaration name accessKind typeSpecifier expr ann ->
             appendRegularBlock acc (RegularBlock (Declaration name accessKind typeSpecifier expr ann : currStmts)) xs
         SAST.AssignmentStmt obj expr ann -> appendRegularBlock acc (RegularBlock (AssignmentStmt obj expr ann : currStmts)) xs
         _ -> genBBlocks (currBlock : acc) (stmt : xs)
 appendRegularBlock _ currBlock _ = throwError $ InternalError ("appendRegularBlock: unexpected block type " ++ show currBlock)
 
-genBBlocks :: 
+genBBlocks ::
     [BasicBlock SemanticAnn] -- ^ Accumulator of blocks
     -> [SAST.Statement SemanticAnn] -- ^ Remaining statements
     -> BBGenerator [BasicBlock SemanticAnn]
-genBBlocks acc [] = 
+genBBlocks acc [] =
     -- | If there are no more statements, we shall return the accumulator
     return acc
-genBBlocks acc (stmt : xs) = 
+genBBlocks acc (stmt : xs) =
     case stmt of
         -- | Procedure calls are always a single statement, since they do not
         -- return any value.  For those cases, we shall create a new single
         -- block that will depend on the type of the object and the procedure or
         -- operation that is being called
-        SAST.SingleExpStmt expr ann -> 
+        SAST.SingleExpStmt expr ann ->
             case expr of
                 SAST.MemberFunctionCall obj funcName args ann' -> do
                     obj_ty <- getObjType obj
@@ -90,26 +91,26 @@ genBBlocks acc (stmt : xs) =
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        TGlobal _ _ -> 
+                        TGlobal _ _ ->
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If we are calling a function from a reference, it
                         -- means that we are calling an inner function of the
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        TReference {} -> 
+                        TReference {} ->
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If the object is an access port of a user-defined interface type, we shall create
                         -- a new procedure call block
-                        TAccessPort (TInterface RegularInterface _) -> 
+                        TAccessPort (TInterface RegularInterface _) ->
                             genBBlocks (ProcedureCall obj funcName args ann' : acc) xs
-                        TAccessPort (TInterface SystemInterface _) -> 
+                        TAccessPort (TInterface SystemInterface _) ->
                             genBBlocks (SystemCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block
                         -- of the corresponding type (AllocBox or FreeBox)
                         TAccessPort (TAllocator _) -> do
                             -- | We need to check the operation (alloc or free)
-                            case funcName of 
+                            case funcName of
                                 "alloc" -> case args of
                                     [opt] -> genBBlocks (AllocBox obj opt ann' : acc) xs
                                     _ -> throwError $ InternalError ("genBBlocks: unexpected number of arguments of procedure " ++ funcName)
@@ -158,14 +159,14 @@ genBBlocks acc (stmt : xs) =
                 SAST.DerefMemberFunctionCall obj _ _ _ -> do
                     obj_ty <- getObjType obj
                     case obj_ty of
-                        TReference {} -> 
+                        TReference {} ->
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         _ -> throwError $ InternalError ("genBBlocks: unexpected object type " ++ show obj_ty)
                 _ -> appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
         SAST.Declaration name accessKind typeSpecifier expr ann -> appendRegularBlock acc (RegularBlock [Declaration name accessKind typeSpecifier expr ann]) xs
         SAST.AssignmentStmt obj expr ann -> appendRegularBlock acc (RegularBlock [AssignmentStmt obj expr ann]) xs
         SAST.ForLoopStmt iterator typeSpecifier initial final breakCondition (SAST.Block loopStmts blkann) ann -> do
-            loopBlocks <- genBBlocks [] (reverse loopStmts) 
+            loopBlocks <- genBBlocks [] (reverse loopStmts)
             genBBlocks (ForLoopBlock iterator typeSpecifier initial final breakCondition (Block loopBlocks blkann) ann : acc) xs
         SAST.IfElseStmt condition ifBlk elseIfs elseStmts ann -> do
             ifBlocks <- genBBBlock ifBlk
@@ -176,12 +177,13 @@ genBBlocks acc (stmt : xs) =
                     return $ Just blocks
                 Nothing -> return Nothing
             genBBlocks (IfElseBlock condition ifBlocks elseIfBlocks elseBlocks ann : acc) xs
-        SAST.MatchStmt expr matchCases ann -> do
+        SAST.MatchStmt expr matchCases mDefaultCase ann -> do
             matchCasesBlocks <- mapM genMatchCaseBBlocks matchCases
-            genBBlocks (MatchBlock expr matchCasesBlocks ann : acc) xs
+            defaultCase <- maybe (return Nothing) (genDefaultBBlock >=> (return . Just)) mDefaultCase
+            genBBlocks (MatchBlock expr matchCasesBlocks defaultCase ann : acc) xs
         SAST.ReturnStmt expr ann -> genBBlocks (ReturnBlock expr ann : acc) xs
         SAST.ContinueStmt expr ann -> genBBlocks (ContinueBlock expr ann : acc) xs
-    
+
     where
 
         -- | This function generates the basic blocks for an else-if block
@@ -196,6 +198,10 @@ genBBlocks acc (stmt : xs) =
             blocks <- genBBBlock caseBlk
             return $ MatchCase identifier args blocks ann
 
+        genDefaultBBlock :: SAST.DefaultCase SemanticAnn -> BBGenerator (DefaultCase SemanticAnn)
+        genDefaultBBlock (SAST.DefaultCase caseBlk ann) = do
+            blocks <- genBBBlock caseBlk
+            return $ DefaultCase blocks ann
 
 -- | This function generates the basic blocks for a return block. This is the
 -- type of block that is the basis of a function and method body. It is
@@ -242,7 +248,7 @@ genBBAnnASTElement :: SAST.AnnASTElement SemanticAnn -> BBGenerator (AnnASTEleme
 genBBAnnASTElement (SAST.Function name args retType body modifiers ann) = do
     bRet <- genBBBlock body
     return $ Function name args retType bRet modifiers ann
-genBBAnnASTElement (SAST.GlobalDeclaration global) = 
+genBBAnnASTElement (SAST.GlobalDeclaration global) =
     return $ GlobalDeclaration global
 genBBAnnASTElement (SAST.TypeDefinition typeDef ann) = do
     bbTypeDef <- genBBTypeDef typeDef

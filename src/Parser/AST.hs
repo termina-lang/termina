@@ -137,7 +137,12 @@ data MatchCase a = MatchCase
   , matchBVars      :: [Identifier]
   , matchBody       :: Block a
   , matchAnnotation :: a
-  } deriving (Show,Functor)
+  } deriving (Show, Functor)
+
+data DefaultCase a = DefaultCase
+  (Block a)
+  a
+  deriving (Show, Functor)
 
 data ElseIf a = ElseIf
   {
@@ -176,6 +181,7 @@ data Statement a =
   | MatchStmt
     (Expression a) -- ^ expression to match
     [MatchCase a] -- ^ list of match cases
+    (Maybe (DefaultCase a)) -- ^ default case
     a
   | SingleExpStmt
     (Expression a) -- ^ expression

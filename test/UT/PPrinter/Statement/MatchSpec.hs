@@ -61,16 +61,16 @@ matchCaseNone = MatchCase "None" [] (Block [constToFoo1] stmtSemAnn) (matchCaseS
 --   }
 -- }
 matchOption0 :: Statement SemanticAnn 
-matchOption0 = MatchStmt optionVar [matchCaseSome0, matchCaseNone] stmtSemAnn
+matchOption0 = MatchStmt optionVar [matchCaseSome0, matchCaseNone] Nothing stmtSemAnn
 
 matchOption1 :: Statement SemanticAnn
-matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] stmtSemAnn
+matchOption1 = MatchStmt optionVar [matchCaseNone, matchCaseSome1] Nothing stmtSemAnn
 
 getInteger :: Expression SemanticAnn
 getInteger = FunctionCall "get_integer" [] (SemanticAnn (ETy (AppType [] (TOption (TBoxSubtype TUInt32)))) Internal)
 
 matchOption2 :: Statement SemanticAnn
-matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] stmtSemAnn
+matchOption2 = MatchStmt getInteger [matchCaseSome0, matchCaseNone] Nothing stmtSemAnn
 
 spec :: Spec
 spec = do

@@ -69,8 +69,12 @@ selfInvStmt (IfElseStmt eC (Block bIfStmts _) bEls bEl _ann) prevMap =
 selfInvStmt (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts _) _ann) prevMap =
   (\prevMap' -> maybe prevMap' (`selfInv` prevMap') cBreak) $
     foldr selfInvStmt prevMap stmts
-selfInvStmt (MatchStmt e mcases _ann) prevMap =
-  selfInv e $ foldr selfInvCase prevMap mcases
+selfInvStmt (MatchStmt e mcases mDefaultCase _ann) prevMap =
+  let casesSelfInv = selfInv e $ foldr selfInvCase prevMap mcases in
+  case mDefaultCase of
+    Just (DefaultCase blk _) -> 
+      foldr selfInvStmt casesSelfInv (blockBody blk)
+    Nothing -> casesSelfInv
 
   where
 
@@ -102,8 +106,12 @@ fieldDepStmt (IfElseStmt eC (Block bIfStmts _) bEls bEl _ann) prevMap =
 fieldDepStmt (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts _) _ann) prevMap =
   (\prevMap' -> maybe prevMap' (`fieldDepExpr` prevMap') cBreak) $
     foldr fieldDepStmt prevMap stmts
-fieldDepStmt (MatchStmt e mcases _ann) prevMap =
-  fieldDepExpr e $ foldr fieldDepCase prevMap mcases
+fieldDepStmt (MatchStmt e mcases mDefaultCase _ann) prevMap =
+  let casesFieldDep = fieldDepExpr e $ foldr fieldDepCase prevMap mcases in
+  case mDefaultCase of
+    Just (DefaultCase blk _) -> 
+      foldr fieldDepStmt casesFieldDep (blockBody blk)
+    Nothing -> casesFieldDep
 
   where
 

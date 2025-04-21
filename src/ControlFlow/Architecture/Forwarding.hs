@@ -39,8 +39,11 @@ addForwardingBlock action (IfElseBlock _ ifBlock elifs elseBlocks _) = do
     mapM_ (\(ElseIf _ blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)) elifs
     maybe (return ()) (mapM_ (addForwardingBlock action) . blockBody) elseBlocks
 -- | We may have sending blocks inside the cases of a match block
-addForwardingBlock action (MatchBlock _ cases _) = do
+addForwardingBlock action (MatchBlock _ cases mDefaultCase _) = do
     mapM_ (\(MatchCase _ _ blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)) cases
+    case mDefaultCase of
+        Just (DefaultCase blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)
+        Nothing -> return ()
 -- | We don't have to do anything for the rest of the blocks
 addForwardingBlock _ _ = return ()
 

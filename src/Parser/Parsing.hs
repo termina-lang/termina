@@ -49,7 +49,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Global declarations
              ["task", "function", "handler", "resource", "const", "constexpr"]
       ++ -- Stmt
-             ["var", "let", "match", "for", "if", "else", "return", "continue", "while"]
+             ["var", "let", "match", "case", "for", "if", "else", "return", "continue", "while"]
       ++ -- Trigger
              ["triggers"]
       ++ -- Provide/extend
@@ -783,13 +783,25 @@ matchCaseParser = do
   caseBlk <- blockParser
   MatchCase caseId args caseBlk . Position startPos <$> getPosition
 
+defaultCaseParser :: Parser (DefaultCase ParserAnn)
+defaultCaseParser = do
+  startPos <- getPosition
+  reserved "case"
+  reserved "_"
+  reservedOp "=>"
+  caseBlk <- blockParser
+  DefaultCase caseBlk . Position startPos <$> getPosition
+
 matchStmtParser :: Parser (Statement ParserAnn)
 matchStmtParser = do
   startPos <- getPosition
   reserved "match"
   matchExpression <- expressionParser
-  cases <- braces (many1 $ try matchCaseParser)
-  MatchStmt matchExpression cases . Position startPos <$> getPosition
+  (cases, defaultCase) <- braces (do
+      cs <- many1 $ try matchCaseParser
+      dc <- optionMaybe defaultCaseParser
+      return (cs, dc))
+  MatchStmt matchExpression cases defaultCase . Position startPos <$> getPosition
 
 elseIfParser :: Parser (ElseIf ParserAnn)
 elseIfParser = do

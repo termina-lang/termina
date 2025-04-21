@@ -118,11 +118,17 @@ typeStatement _retTy (SingleExpStmt expr anns) = do
       EMismatch ty _ -> throwError $ annotateError anns (ESingleExpressionTypeNotUnit ty)
       _ -> throwError err)
   return $ SAST.SingleExpStmt typed_expr (buildStmtAnn anns)
-typeStatement retTy (MatchStmt matchE cases ann) = do
+typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   type_matchE <- getExprType typed_matchE
   -- Check for duplicate cases
   ord_cases <- sortAndCheckCaseDuplicates M.empty cases
+  let total = isNothing mDefaultCase
+  mTypedDefCase <- case mDefaultCase of
+    Nothing -> return Nothing
+    Just (DefaultCase bd ann') -> do
+      typed_bd <- localScope $ typeBlock retTy bd
+      return $ Just (SAST.DefaultCase typed_bd (buildStmtAnn ann'))
   case type_matchE of
     TEnum t -> getGlobalTypeDef ann t >>=
         \case {
@@ -130,12 +136,15 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
             let ord_flsDef = Data.List.sort (variantIdentifier <$> flsDef)
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-            case zipSameLength
+            case zipSameLength total
                   (annotateError ann . EMatchMissingCases)
                   (annotateError ann . EMatchCaseUnknownVariants)
+                  (annotateError ann EInvalidDefaultCase)
                   (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
               Left e -> throwError e
-              Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
+              Right cs -> do
+                typedCases <- sequence cs
+                return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
           _ -> throwError $ annotateError Internal EUnboxingEnumType
         }
@@ -143,12 +152,15 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
       let ord_flsDef = ["None", "Some"]
           variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [t])] 
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      case zipSameLength
+      case zipSameLength total
             (annotateError ann . EMatchMissingCases)
             (annotateError ann . EMatchCaseUnknownVariants)
+            (annotateError ann EInvalidDefaultCase)
             (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
         Left e -> throwError e
-        Right cs -> flip (SAST.MatchStmt typed_matchE) (buildStmtAnn ann) <$> sequence cs
+        Right cs -> do 
+          typedCases <- sequence cs
+          return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
 
     where
@@ -161,15 +173,15 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
           Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
 
       -- Zipping list of same length
-      zipSameLength ::  ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-      zipSameLength = zipSameLength' []
+      zipSameLength :: Bool -> ([b] -> e) -> ([a] -> e) -> e -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
+      zipSameLength total = zipSameLength' []
         where
           -- Tail recursive version
-          zipSameLength' :: [c] -> ([b] -> e) -> ([a] -> e) -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-          zipSameLength' acc _ _ _ [] [] = Right acc
-          zipSameLength' acc erra errb f (a : as) (b : bs) = zipSameLength' (f a b : acc) erra errb f as bs
-          zipSameLength' _ erra _ _ [] bs = Left (erra bs)
-          zipSameLength' _ _ errb _ as [] = Left (errb as)
+          zipSameLength' :: [c] -> ([b] -> e) -> ([a] -> e) -> e -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
+          zipSameLength' acc _ _ errc _ [] [] = if total then Right acc else Left errc
+          zipSameLength' acc erra errb errc f (a : as) (b : bs) = zipSameLength' (f a b : acc) erra errb errc f as bs
+          zipSameLength' acc erra _ _ _ [] bs = if total then Left (erra bs) else Right acc
+          zipSameLength' _ _ errb _ _ as [] = Left (errb as)
       --
 
       typeMatchCase :: M.Map Identifier (MatchCase ParserAnn)
@@ -192,7 +204,7 @@ typeStatement retTy (MatchStmt matchE cases ann) = do
                         typeBlock retTy bd
                       )
               else throwError $ annotateError Internal EMatchCaseInternalError
-            | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariants [supIdent]
+            | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariants [cIdent]
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of

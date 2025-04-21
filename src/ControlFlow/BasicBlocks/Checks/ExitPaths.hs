@@ -31,10 +31,16 @@ doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
             (let elseIfsExit = foldl' (\prevState (ElseIf _ elifBlocks _) ->
                     prevState && doesBlockExit (last (blockBody elifBlocks))) ifBlocksExit elseIfBlocks in
                 (elseIfsExit && doesBlockExit (last (blockBody elseBlocks)))))
-doesBlockExit (MatchBlock _ cases _) =
-    foldl'
-        (\prevState (MatchCase _ _ blocks _) ->
-            prevState && doesBlockExit (last (blockBody blocks))) True cases
+doesBlockExit (MatchBlock _ cases mDefaultCase _) =
+    let doesCasesExit = foldl'
+            (\prevState (MatchCase _ _ blocks _) ->
+                prevState && doesBlockExit (last (blockBody blocks))) True cases 
+    in
+    case mDefaultCase of
+        Just (DefaultCase (Block blocks _) _) ->
+            -- | Check the exit of the default case
+            doesCasesExit && doesBlockExit (last blocks)
+        Nothing -> doesCasesExit
 doesBlockExit _ = False
 
 checkBlockPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPathsCheckST
@@ -70,10 +76,14 @@ checkBlockPaths loc stmts = do
                 (IfElseBlock _ ifBlocks _ _ _ : xb) ->
                     checkBlockPaths loc (reverse (blockBody ifBlocks)) >>
                     checkBlockPaths loc xb
-                (MatchBlock _ cases _ : xb) ->
+                (MatchBlock _ cases mDefaultCase _ : xb) -> do
                     mapM_
                         (\(MatchCase _ _ blocks ann) -> 
-                            checkBlockPaths (getLocation ann) (reverse (blockBody blocks))) cases >>
+                            checkBlockPaths (getLocation ann) (reverse (blockBody blocks))) cases
+                    case mDefaultCase of
+                        Just (DefaultCase (Block blocks _) ann') ->
+                            void $ checkBlockPaths (getLocation ann') (reverse blocks)
+                        Nothing -> return ()
                     checkBlockPaths loc xb
                 (ForLoopBlock _ _ _ _ _ loopBlocks ann : xb) ->
                     checkBlockPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkBlockPaths loc xb
@@ -115,7 +125,7 @@ checkActionPaths loc stmts = do
                                 checkActionPaths loc xb
                         IfElseBlock _ _ _ _ ann ->
                             throwError $ annotateError (getLocation ann) EEActionIfBlockMissingElseExit
-                        blk@(MatchBlock _ cases ann) ->
+                        blk@(MatchBlock _ cases mDefaultCase ann) ->
                             if not (doesBlockExit blk) then
                                 throwError $ annotateError (getLocation ann) EEActionMatchBlockShallExit
                             else do
@@ -123,7 +133,11 @@ checkActionPaths loc stmts = do
                                     (\prevState (MatchCase _ _ blocks ann') -> do
                                         matchCaseState <- localScope (checkActionPaths (getLocation ann') (reverse (blockBody blocks)))
                                         return (max matchCaseState prevState)) step cases
-                                put matchCaseState
+                                case mDefaultCase of
+                                    Just (DefaultCase (Block blocks _) ann') -> do
+                                        defaultCaseState <- localScope (checkActionPaths (getLocation ann') (reverse blocks))
+                                        put (max defaultCaseState matchCaseState)
+                                    Nothing -> put matchCaseState
                                 checkActionPaths loc xb
                         _ -> throwError $ annotateError loc EEActionShallExit
         -- | If we are here, it means that we may exit the block or send messages BUT there
@@ -153,7 +167,7 @@ checkActionPaths loc stmts = do
                         IfElseBlock _ ifBlocks _ _ _ ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
-                        blk@(MatchBlock _ cases _) ->
+                        blk@(MatchBlock _ cases mDefaultCase _) ->
                             if doesBlockExit blk then
                                 throwError $ annotateError loc EEActionMatchBlockShallNotExit
                             else do
@@ -161,7 +175,11 @@ checkActionPaths loc stmts = do
                                     (\prevState (MatchCase _ _ blocks ann) -> do
                                         matchCaseState <- localScope (setAllowedContinue >> checkActionPaths (getLocation ann) (reverse (blockBody blocks)))
                                         return (max matchCaseState prevState)) step cases
-                                put matchCaseState
+                                case mDefaultCase of
+                                    Just (DefaultCase (Block blocks _) ann') -> do
+                                        defaultCaseState <- localScope (setAllowedContinue >> checkActionPaths (getLocation ann') (reverse blocks))
+                                        put (max defaultCaseState matchCaseState)
+                                    Nothing -> put matchCaseState
                                 checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
                             setExitNotAllowed >> checkActionPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkActionPaths loc xb
@@ -190,12 +208,16 @@ checkActionPaths loc stmts = do
                         (IfElseBlock _ ifBlocks _ _ _) ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
-                        (MatchBlock _ cases _) -> do
+                        (MatchBlock _ cases mDefaultCase _) -> do
                             matchCaseState <- foldM
                                 (\prevState (MatchCase _ _ blocks ann) -> do
                                     matchCaseState <- localScope (checkActionPaths (getLocation ann) (reverse (blockBody blocks)))
                                     return (max matchCaseState prevState)) step cases
-                            put matchCaseState
+                            case mDefaultCase of
+                                Just (DefaultCase (Block blocks _) ann') -> do
+                                    defaultCaseState <- localScope (checkActionPaths (getLocation ann') (reverse blocks))
+                                    put (max defaultCaseState matchCaseState)
+                                Nothing -> put matchCaseState
                             checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
                             setExitNotAllowed >> checkActionPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkActionPaths loc xb
@@ -222,12 +244,16 @@ checkActionPaths loc stmts = do
                         (IfElseBlock _ ifBlocks _ _ _) ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
-                        (MatchBlock _ cases _) -> do
+                        (MatchBlock _ cases mDefaultCase _) -> do
                             matchCaseState <- foldM
                                 (\prevState (MatchCase _ _ blocks ann) -> do
                                     matchCaseState <- localScope (checkActionPaths (getLocation ann) (reverse (blockBody blocks)))
                                     return (max matchCaseState prevState)) step cases
-                            put matchCaseState
+                            case mDefaultCase of
+                                Just (DefaultCase (Block blocks _) ann') -> do
+                                    defaultCaseState <- localScope (checkActionPaths (getLocation ann') (reverse blocks))
+                                    put (max defaultCaseState matchCaseState)
+                                Nothing -> put matchCaseState
                             checkActionPaths loc xb
                         (ForLoopBlock _ _ _ _ _ loopBlocks ann) ->
                             setExitNotAllowed >> checkActionPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkActionPaths loc xb
@@ -250,10 +276,14 @@ checkActionPaths loc stmts = do
                 (IfElseBlock _ ifBlocks _ _ _ : xb) ->
                     checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                     checkActionPaths loc xb
-                (MatchBlock _ cases _ : xb) ->
+                (MatchBlock _ cases mDefaultCases _ : xb) -> do
                     mapM_
                         (\(MatchCase _ _ blocks ann) -> 
-                            checkActionPaths (getLocation ann) (reverse (blockBody blocks))) cases >>
+                            checkActionPaths (getLocation ann) (reverse (blockBody blocks))) cases
+                    case mDefaultCases of
+                        Just (DefaultCase (Block blocks _) ann') ->
+                            void $ checkActionPaths (getLocation ann') (reverse blocks)
+                        Nothing -> return ()
                     checkActionPaths loc xb
                 (ForLoopBlock _ _ _ _ _ loopBlocks ann : xb) ->
                     checkActionPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkActionPaths loc xb

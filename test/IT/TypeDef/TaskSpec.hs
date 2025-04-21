@@ -151,8 +151,6 @@ spec = do
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   
-              "    size_t size = 0U;\n" ++
-              "\n" ++   
               "    Result result;\n" ++
               "    result.__variant = Result__Ok;\n" ++
               "\n" ++ 

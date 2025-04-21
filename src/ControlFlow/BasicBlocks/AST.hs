@@ -34,7 +34,12 @@ data MatchCase a = MatchCase
   , matchBVars      :: [Identifier]
   , matchBody       :: Block a
   , matchAnnotation :: a
-  } deriving (Show,Functor)
+  } deriving (Show, Functor)
+
+data DefaultCase a = DefaultCase
+  (Block a)
+  a
+  deriving (Show, Functor)
 
 data ElseIf a = ElseIf
   {
@@ -76,7 +81,7 @@ data BasicBlock a =
         (Maybe (Expression a)) -- ^ break condition (optional)
         (Block a) a
     -- | Match basic block
-    | MatchBlock (Expression a) [MatchCase a] a
+    | MatchBlock (Expression a) [MatchCase a] (Maybe (DefaultCase a)) a
     -- | Send message
     | SendMessage (Object a) (Expression a) a
     -- | Call to a resource procedure

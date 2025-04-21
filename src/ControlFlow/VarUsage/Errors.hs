@@ -43,6 +43,7 @@ data Error
   | EAllocNotMoved Identifier -- ^ Option-box allocated but not moved (VE-011)
   | EAllocTwice Identifier Location -- ^ Option-box allocated twice (VE-012)
   | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (VE-013)
+  | EOptionBoxMatchMissingSomeCase 
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -62,6 +63,7 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (EAllocNotMoved _ident) _pos) = "VE-011"
     errorIdent (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "VE-012"
     errorIdent (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "VE-013"
+    errorIdent (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "VE-014"
     errorIdent (AnnotatedError e _pos) = T.pack $ show e
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
@@ -77,6 +79,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (EAllocNotMoved _ident) _pos) = "option-box allocated but not moved"
     errorTitle (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "option-box allocated twice"
     errorTitle (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "option-box moved but not allocated"
+    errorTitle (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "option-box match missing some"
     errorTitle _ = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start _end)) files =
@@ -205,6 +208,11 @@ instance ErrorMessage VarUsageError where
                     pprintSimpleError
                         moveSourceLines "The variable was moved here:" moveFileName
                         prevMove Nothing
+            EOptionBoxMatchMissingSomeCase ->
+                pprintSimpleError 
+                    sourceLines title fileName pos
+                    (Just "Option-box match is missing Some case.")
+
             _ -> T.pack $ show pos ++ ": " ++ show e
 -- | Print the error as is
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e

@@ -192,9 +192,9 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     -- references to const input parameters.
     useExpression eB
     useExpression eE
-useDefBasicBlock (MatchBlock e mcase ann) = do
+useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
   prevSt <- ST.get
-  sets <- maybe (throwError $ annotateError (getLocation ann) EUnboxingExpressionType)
+  caseSets <- maybe (throwError $ annotateError (getLocation ann) EUnboxingExpressionType)
     (\case
         TOption (TBoxSubtype _) ->
             case mcase of
@@ -204,6 +204,12 @@ useDefBasicBlock (MatchBlock e mcase ann) = do
                   >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
                 noneBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
                 return [(someBlk, getLocation . matchAnnotation $ mSome), (noneBlk, getLocation . matchAnnotation $ mNone)]
+              [mSome@(MatchCase "Some" _ _ _)] -> do
+                someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
+                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
+                return [(someBlk, getLocation . matchAnnotation $ mSome)]
+              [MatchCase "None" _ _ _] -> 
+                throwError $ annotateError (getLocation ann) EOptionBoxMatchMissingSomeCase
               _ -> throwError $ annotateError Internal EMalformedOptionBoxMatch;
         -- Otherwise, it is a simple use variable.
         _ -> runMultipleEncapsWithEmptyVars (
@@ -211,6 +217,11 @@ useDefBasicBlock (MatchBlock e mcase ann) = do
             blockSt <- useMCase c >> ST.get
             return (blockSt, getLocation . matchAnnotation $ c)) mcase);
     ) (getResultingType $ getSemanticAnn $ getAnnotation e)
+  sets <- case mDefaultCase of
+    Just (DefaultCase blk ann') -> do
+      defaultBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody blk) >> ST.get)
+      return $ (defaultBlk, getLocation ann') : caseSets
+    Nothing -> return caseSets
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
   useExpression e
