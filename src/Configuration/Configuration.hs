@@ -63,7 +63,7 @@ instance FromJSON TerminaConfig where
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
-    o .:?  "builder" .!= None <*>
+    o .:   "builder" <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
 
@@ -112,6 +112,6 @@ defaultConfig projectName plt = TerminaConfig {
     profile = Release,
     enableSystemInit = False,
     enableSystemPort = False,
-    builder = None,
+    builder = Make,
     platformFlags = defaultPlatformFlags
 }
