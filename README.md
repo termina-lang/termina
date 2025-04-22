@@ -24,7 +24,7 @@ The main source of documentation of this project is the [Termina book](https://t
 
 The current status of the project is as follows:
 
-- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by the Termina OSAL that can be found in its [repository](https://github.com/termina-lang/termina-osal).
+- The project is still in a preliminary phase. The transpiler is able to generate C code for different platforms. This code is supported by the Termina Operating System Abstraction Layer (OSAL) that can be found in its [repository](https://github.com/termina-lang/termina-osal).
 - The transpiler incorporates a type checker and a fully functional semantic parser capable of detecting errors and generating meaningful error messages.
 - The transpiler implements a simple Language Server Protocol (LSP) server that can be used by different integrated development environments.
 - The transpiler allows detecting a number of errors at compile time thanks to its type system and the semantic analyzer, but there are other errors such as, for example, the indexing of arrays out of bounds, whose detection is performed at runtime.
@@ -35,7 +35,8 @@ The current status of the project is as follows:
 The following features are under consideration and are not yet present or available to the application developer:
 
 - Generic programming. The language implements a small number of parametric types for memory management and inter-task communication, but there is no flexible mechanism to allow generic programming.
-- Implementation of support for other real-time operating systems. The Termina runtime, available in this repository, supports a small number of platforms. It is planned to incorporate new platforms in the near future.
+- Support for Symmetric Multiprocessing Systems (SMP). Currently, the language does not incorporate facilities for the deployment of applications in SMP systems.
+- Implementation of support for other real-time operating systems. The Termina OSAL supports a small number of platforms. It is planned to incorporate new platforms in the near future.
 
 ## Contribute
 
