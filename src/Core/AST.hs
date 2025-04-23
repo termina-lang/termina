@@ -96,6 +96,7 @@ data TypeSpecifier' expr a
   | TSSinkPort (TypeSpecifier' expr a) Identifier
   | TSInPort (TypeSpecifier' expr a) Identifier
   | TSOutPort (TypeSpecifier' expr a)  
+  | TSInternal (TypeSpecifier' expr a)
   | TSUnit
   deriving (Show, Ord, Eq, Functor)
 
@@ -129,10 +130,15 @@ data TerminaType' expr a
   | TSinkPort (TerminaType' expr a) Identifier
   | TInPort (TerminaType' expr a) Identifier
   | TOutPort (TerminaType' expr a)
+  -- | Internal resource types
+  | TInternal (TerminaType' expr a)
   -- | Unit type
   | TUnit
   -- | Global object types
-  | TGlobal ClassKind Identifier
+  | TResource Identifier
+  | TEmitter Identifier
+  | TTask Identifier
+  | THandler Identifier
   deriving (Show, Functor)
 
 instance Eq (TerminaType' expr a) where

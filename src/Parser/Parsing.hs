@@ -45,7 +45,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Fixed-location subtyping
              ["loc"]
       ++ -- Ports Subtyping
-             ["access", "sink", "in", "out"]
+             ["access", "sink", "in", "out", "internal"]
       ++ -- Global declarations
              ["task", "function", "handler", "resource", "const", "constexpr"]
       ++ -- Stmt
@@ -346,6 +346,11 @@ sinkPortParser = do
   ts <- typeSpecifierParser
   _ <- reserved "triggers"
   TSSinkPort ts <$> identifierParser
+
+internalResourceParser :: Parser (TypeSpecifier ParserAnn)
+internalResourceParser = do
+  _ <- reserved "internal"
+  TSInternal <$> typeSpecifierParser
 
 accessPortParser :: Parser (TypeSpecifier ParserAnn)
 accessPortParser = reservedOp "access" >> TSAccessPort <$> typeSpecifierParser

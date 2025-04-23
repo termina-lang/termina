@@ -38,7 +38,7 @@ stdlibGlobalEnv =
 sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
 sysInitGlobalEnv =
   [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
-   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
+   ("system_init", LocatedElement (GGlob (TEmitter "SystemInit")) Internal)]
 
 systemPortGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
 systemPortGlobalEnv =
@@ -82,7 +82,7 @@ systemPortGlobalEnv =
     -- target platform.
     ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal),
     ("SystemEntry", LocatedElement (GType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] [])) Internal),
-    ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
+    ("system_entry", LocatedElement (GGlob (TResource "SystemEntry")) Internal)
   ]
 
 makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment

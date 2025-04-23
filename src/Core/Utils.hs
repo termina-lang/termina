@@ -364,7 +364,10 @@ sameTy  (TBoxSubtype tyspecl) (TBoxSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TArray typespecl _sizel) (TArray typespecr _sizer) = sameTy typespecl typespecr
 sameTy  (TStruct idl) (TStruct idr) = idl == idr
 sameTy  (TEnum idl) (TEnum idr) = idl == idr
-sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
+sameTy  (TTask idl) (TTask idr) = idl == idr
+sameTy  (TEmitter idl) (TEmitter idr) = idl == idr
+sameTy  (THandler idl) (THandler idr) = idl == idr
+sameTy  (TResource idl) (TResource idr) = idl == idr
 sameTy  (TInterface RegularInterface idl) (TInterface RegularInterface idr) = idl == idr
 sameTy  (TInterface SystemInterface idl) (TInterface SystemInterface idr) = idl == idr
 sameTy  (TAtomic tyl) (TAtomic tyr) = sameTy tyl tyr 

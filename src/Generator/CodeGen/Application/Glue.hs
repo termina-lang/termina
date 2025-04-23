@@ -374,7 +374,7 @@ genEnableProtection progArchitecture resLockingMap = do
                                     @= freeLock @: freeFunctionType
                         ]
                 APConnTy (TInterface _ iface)
-                        (TGlobal ResourceClass resource) pss -> do
+                        (TResource resource) pss -> do
                     case [p | p <- pss, not (isUnprotected p) ] of
                         [] -> return []
                         -- Generate first procedure with a preceding new line
@@ -425,7 +425,7 @@ genEnableProtection progArchitecture resLockingMap = do
                                     @= freeLock @: freeFunctionType
                         ]
                 APConnTy (TInterface _ iface)
-                        (TGlobal ResourceClass resource) pss -> do
+                        (TResource resource) pss -> do
                     case [p | p <- pss, not (isUnprotected p) ] of
                         [] -> return []
                         -- Generate first procedure with a preceding new line
@@ -475,7 +475,7 @@ genEnableProtection progArchitecture resLockingMap = do
                                     @= freeLock @: freeFunctionType
                         ]
                 APConnTy (TInterface _ iface)
-                        (TGlobal ResourceClass resource) pss -> do
+                        (TResource resource) pss -> do
                     case [p | p <- pss, not (isUnprotected p) ] of
                         [] -> return []
                         [ProcedureSeman pr prtys _modifiers] -> do

@@ -27,7 +27,7 @@ typeGlobal (Task ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
   case ty of
-    TGlobal TaskClass _ -> do
+    TTask _ -> do
       exprty <-
         case mexpr of
           -- If it has an initial value great
@@ -41,7 +41,7 @@ typeGlobal (Handler ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
   case ty of
-    TGlobal HandlerClass _ -> do
+    THandler _ -> do
       exprty <-
         case mexpr of
           -- If it has an initial value great
@@ -56,7 +56,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
   checkTerminaType anns ty
   case ty of
     -- | User-defined resources
-    TGlobal ResourceClass _ -> do
+    TResource _ -> do
       exprty <-
         case mexpr of
           -- If it has an initial value great
@@ -94,7 +94,7 @@ typeGlobal (Emitter ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
   case ty of
-    TGlobal EmitterClass clsId -> do
+    TEmitter clsId -> do
       unless (emitterInstTy clsId) (throwError $ annotateError anns (EEmitterClassNotInstantiable clsId))
       exprty <-
         case mexpr of

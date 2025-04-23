@@ -47,7 +47,11 @@ appendRegularBlock acc currBlock@(RegularBlock currStmts) (stmt : xs) =
                         -- self object, since the language does not allow us to
                         -- create references from ports. Thus, we shall create a
                         -- new regular block
-                        TGlobal _ _ ->
+                        TResource _ ->
+                            appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
+                        THandler _ ->
+                            appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
+                        TTask _ ->
                             appendRegularBlock acc (RegularBlock (SingleExpStmt expr ann : currStmts)) xs
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
@@ -91,7 +95,11 @@ genBBlocks acc (stmt : xs) =
                         -- | If the object is of a defined type, it means that
                         -- we are calling an inner function of the self object,
                         -- so we shall create a new regular block
-                        TGlobal _ _ ->
+                        TTask _ ->
+                            appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
+                        TResource _ ->
+                            appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
+                        THandler _ ->
                             appendRegularBlock acc (RegularBlock [SingleExpStmt expr ann]) xs
                         -- | If we are calling a function from a reference, it
                         -- means that we are calling an inner function of the

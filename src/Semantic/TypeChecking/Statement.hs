@@ -220,14 +220,22 @@ typeStatement _rTy (ContinueStmt contE anns) =
     MemberFunctionCall obj ident args ann -> do
       obj_typed <- typeRHSObject obj
       (_, obj_ty) <- getObjType obj_typed
-      ((ps, typed_args), fty) <- typeActionCall ann obj_ty ident args
+      ((ps, typed_args), fty) <- 
+        case obj_ty of
+          TTask dident -> typeActionCall ann dident ident args
+          THandler dident -> typeActionCall ann dident ident args
+          _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
       return $ SAST.ContinueStmt (SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
     DerefMemberFunctionCall obj ident args ann -> do
       obj_typed <- typeRHSObject obj
       (_, obj_ty) <- getObjType obj_typed
       case obj_ty of
         TReference _ rTy -> do
-          ((ps, typed_args), fty) <- typeActionCall ann rTy ident args
+          ((ps, typed_args), fty) <- 
+            case rTy of
+              TTask dident -> typeActionCall ann dident ident args
+              THandler dident -> typeActionCall ann dident ident args
+              _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
           return $ SAST.ContinueStmt (SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)) (buildStmtAnn anns)
         ty -> throwError $ annotateError anns $ EDereferenceInvalidType ty
     _ -> throwError $ annotateError anns EContinueInvalidExpression
@@ -236,13 +244,11 @@ typeStatement _rTy (ContinueStmt contE anns) =
 
     typeActionCall ::
       ParserAnn
-      -> SAST.TerminaType SemanticAnn -- ^ type of the object
+      -> Identifier -- ^ type of the object
       -> Identifier -- ^ type of the member function to be called
       -> [Expression ParserAnn] -- ^ arguments
       -> SemanticMonad (([SAST.Parameter SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
-    typeActionCall ann obj_ty ident args =
-      case obj_ty of
-        TGlobal _ dident -> getGlobalTypeDef ann dident >>=
+    typeActionCall ann dident ident args = getGlobalTypeDef ann dident >>=
           \case{
             -- This case corresponds to a call to an inner method or viewer from the self object.
             LocatedElement (Class _ _identTy cls _provides _mods) _ ->
@@ -268,4 +274,3 @@ typeStatement _rTy (ContinueStmt contE anns) =
             -- Other user-defined types do not define methods (yet?)
             _ -> throwError $ annotateError Internal EUnboxingClassType
           }
-        _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)

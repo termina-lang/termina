@@ -71,6 +71,7 @@ instance ShowText (PAST.TypeSpecifier a) where
     showText (TSSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
     showText (TSInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
     showText (TSOutPort ts) = "out " <> showText ts
+    showText (TSInternal ts) = "internal " <> showText ts
     showText (TSReference ak ts) = "&" <> showText ak <> showText ts
     showText (TSDefinedType ident []) = T.pack ident
     showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
@@ -199,7 +200,10 @@ instance ShowText (TerminaType a) where
     showText (TStruct ident) = T.pack ident
     showText (TEnum ident) = T.pack ident
     showText (TInterface _ ident) = T.pack ident
-    showText (TGlobal _ ident) = T.pack ident
+    showText (TTask ident) = "task " <> T.pack ident
+    showText (TResource ident) = "resource " <> T.pack ident
+    showText (THandler ident) = "handler " <> T.pack ident
+    showText (TEmitter ident) = "emitter " <> T.pack ident
     showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TOption ts) = "Option<" <> showText ts <> ">"
     showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
@@ -216,6 +220,7 @@ instance ShowText (TerminaType a) where
     showText (TSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
     showText (TInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
     showText (TOutPort ts) = "out " <> showText ts
+    showText (TInternal ts) = "internal " <> showText ts
     showText TUnit = "()"
 
 instance ShowText TInteger where

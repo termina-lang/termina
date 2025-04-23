@@ -219,7 +219,7 @@ genStructInitialization before level cObj expr = do
         where
 
             genProcedureAssignment :: Identifier -> TerminaType SemanticAnn -> ProcedureSeman SemanticAnn -> CGenerator CCompoundBlockItem
-            genProcedureAssignment fid (TGlobal ResourceClass resource) (ProcedureSeman procid ptys _modifiers) = do
+            genProcedureAssignment fid (TResource resource) (ProcedureSeman procid ptys _modifiers) = do
                 cPortFieldType <- genType noqual (TStruct resource)
                 let portFieldObj = cObj @. fid @: cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid

@@ -279,6 +279,13 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                 (throwError (annotateError Internal EMissingIdentifier))
                 return
                 . (`M.lookup` nameClassMap)) order
+
+    selfType <- case kind of 
+          ResourceClass -> return $ TResource ident
+          TaskClass -> return $ TTask ident
+          HandlerClass -> return $ THandler ident
+          _ -> throwError $ annotateError Internal EUnboxingClassType
+
   ----------------------------------------
   -- Type check in order, if a method is missing is because there is a loop.
     fnChecked <-
@@ -300,7 +307,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             ClassProcedure mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference Mutable (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference Mutable selfType)
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
                       typedParam <- typeProcedureParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
@@ -313,7 +320,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
               typed_bret <- localScope $ do 
-                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference Private selfType)
                   typeBlock mty mbody
               let newMth = SAST.ClassMethod mIdent mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
@@ -321,7 +328,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
               (ps_ty, typed_bret) <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference Immutable selfType)
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
                       typedParam <- typeProcedureParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
@@ -335,7 +342,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               ty <- typeTypeSpecifier mann typeGlobalObject ts
               checkReturnType mann ty
               typed_bret <- localScope $ do 
-                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference Private selfType)
                   insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)
                   typeBlock (Just ty) mbody
               let newAct = SAST.ClassAction mIdent p_ty ty typed_bret (buildExpAnn mann ty)

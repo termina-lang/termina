@@ -49,7 +49,10 @@ genType qual TUSize = return (CTSizeT qual)
 genType qual TBool = return (CTBool qual)
 genType qual TChar = return (CTChar qual)
 -- | Primitive type
-genType qual (TGlobal _ clsIdentifier) = return (CTTypeDef clsIdentifier qual)
+genType qual (TResource clsIdentifier) = return (CTTypeDef clsIdentifier qual)
+genType qual (TEmitter clsIdentifier) = return (CTTypeDef clsIdentifier qual)
+genType qual (TTask clsIdentifier) = return (CTTypeDef clsIdentifier qual)
+genType qual (THandler clsIdentifier) = return (CTTypeDef clsIdentifier qual)
 -- | TArray type
 genType qual (TArray ts' s) = do
     ts <- genType qual ts'
@@ -89,6 +92,7 @@ genType _qual (TAtomicArrayAccess ts _) = do
 genType _qual (TSinkPort {}) = return (CTTypeDef sinkPort noqual)
 genType _qual (TOutPort {}) = return (CTTypeDef outPort noqual)
 genType _qual (TInPort {}) = return (CTTypeDef inPort noqual)
+genType qual (TInternal ts) = genType qual ts
 genType qual (TReference Immutable ts) = do
     case ts of
         TArray {} -> genType constqual ts
@@ -215,11 +219,28 @@ genMemberFunctionAccess obj ident args ann = do
         (TReference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
-                (TGlobal _ classId) ->
+                (TTask classId) ->
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
+                (THandler classId) ->
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
+                (TResource classId) ->
                     return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
-        (TGlobal _ classId) ->
+        (TTask classId) -> memberFunctionAccessClass classId cFuncType cObjExpr cArgs
+        (THandler classId) -> memberFunctionAccessClass classId cFuncType cObjExpr cArgs
+        (TResource classId) -> memberFunctionAccessClass classId cFuncType cObjExpr cArgs
+        -- | Anything else should not happen
+        _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
+    
+    where
+
+        memberFunctionAccessClass :: Identifier 
+            -> CType 
+            -> CExpression 
+            -> [CExpression] 
+            -> CGenerator CExpression
+        memberFunctionAccessClass classId cFuncType cObjExpr cArgs  = 
             case obj of
                 (Dereference _ _) ->
                     let selfCType = ptr (typeDef classId) in
@@ -228,8 +249,6 @@ genMemberFunctionAccess obj ident args ann = do
                     -- | If the left hand size is a class:
                 _ -> 
                     return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
-        -- | Anything else should not happen
-        _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
         
 
 genExpression :: Expression SemanticAnn -> CGenerator CExpression

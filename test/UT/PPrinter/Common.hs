@@ -160,10 +160,10 @@ refStructSemAnn :: Identifier -> SemanticAnn
 refStructSemAnn ident = refSemAnn (TStruct ident)
 
 refGlobalResourceSemAnn :: Identifier -> SemanticAnn
-refGlobalResourceSemAnn ident = refSemAnn (TGlobal ResourceClass ident)
+refGlobalResourceSemAnn ident = refSemAnn (TResource ident)
 
 resourceObjSemAnn :: AccessKind -> Identifier -> SemanticAnn
-resourceObjSemAnn ak ident = objSemAnn ak (TGlobal ResourceClass ident)
+resourceObjSemAnn ak ident = objSemAnn ak (TResource ident)
 
 refEnumSemAnn :: Identifier -> SemanticAnn
 refEnumSemAnn ident = refSemAnn (TEnum ident)

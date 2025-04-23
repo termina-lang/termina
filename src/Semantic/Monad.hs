@@ -195,7 +195,7 @@ getGlobalVarTy loc ident =
                    _  -> throwError errorGlobal;
                 }
               ) >>= (\case {
-                        LocatedElement (GGlob ty@(TGlobal ResourceClass _)) _  -> return (Mutable, ty);
+                        LocatedElement (GGlob ty@(TResource _)) _  -> return (Mutable, ty);
                         LocatedElement (GConst ts _) _ -> return (Immutable, ts);
                         LocatedElement (GConstExpr {}) _ -> throwError $ annotateError loc (EInvalidAccessToConstExpr ident);
                         _ -> throwError $ annotateError loc (EInvalidAccessToGlobal ident);

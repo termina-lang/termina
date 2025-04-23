@@ -235,7 +235,15 @@ getMemberField loc obj_ty ident =
         ;
         _ -> throwError $ annotateError Internal EUnboxingStructType
       }
-    TGlobal _ dident -> getGlobalTypeDef loc dident >>=
+    TResource dident -> getMemberFieldClass dident
+    THandler dident -> getMemberFieldClass dident
+    TTask dident -> getMemberFieldClass dident
+    ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
+  
+  where
+
+    getMemberFieldClass :: Identifier -> SemanticMonad (SAST.TerminaType SemanticAnn, SemanticAnn)
+    getMemberFieldClass dident = getGlobalTypeDef loc dident >>=
       \case {
         -- Or a class
         LocatedElement (Class _clsKind _identTy cls _implements _mods) clsLoc ->
@@ -248,7 +256,7 @@ getMemberField loc obj_ty ident =
         -- Other types do not have members.
         _ -> throwError $ annotateError Internal EUnboxingClassType
       }
-    ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
+
 
 typeObject ::
   -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
@@ -321,35 +329,9 @@ typeMemberFunctionCall ::
 typeMemberFunctionCall ann obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
-    TGlobal _clsKind dident -> getGlobalTypeDef ann dident >>=
-      \case{
-        -- This case corresponds to a call to an inner method or viewer from the self object.
-        LocatedElement (Class _ _identTy cls _provides _mods) _ ->
-          case findClassProcedure ident cls of
-            Just _ -> throwError $ annotateError ann EInvalidProcedureCallInsideMemberFunction
-            Nothing ->
-              case findClassViewerOrMethod ident cls of
-                Just (ps, _, anns) -> do
-                  let (psLen , asLen ) = (length ps, length args)
-                  -- Check that the number of parameters are OK
-                  when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
-                  when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
-                  typed_args <- localScope $ zipWithM (\(p, idx) e ->
-                    catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
-                      (
-                        case paramType p of 
-                          (TConstSubtype pty) -> do
-                            -- | See FunctionCall comment
-                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
-                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
-                            return typedArgument
-                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-                  fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
-                  return ((ps, typed_args), fty)
-                Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
-          ;
-        _ -> throwError $ annotateError Internal EUnboxingClassType
-      }
+    TTask dident -> typeMemberFunctionCallClass dident
+    THandler dident -> typeMemberFunctionCallClass dident
+    TResource dident -> typeMemberFunctionCallClass dident
     TAccessPort (TInterface _ dident) -> getGlobalTypeDef ann dident >>=
       \case{
         LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
@@ -450,6 +432,40 @@ typeMemberFunctionCall ann obj_ty ident args =
         _ -> throwError $ annotateError ann $ EOutboundPortInvalidProcedure ident
     ty -> throwError $ annotateError ann (EMemberFunctionCallInvalidType ty)
 
+  where
+
+    typeMemberFunctionCallClass :: Identifier 
+      -> SemanticMonad (([SAST.Parameter SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
+    typeMemberFunctionCallClass dident = getGlobalTypeDef ann dident >>=
+      \case{
+        -- This case corresponds to a call to an inner method or viewer from the self object.
+        LocatedElement (Class _ _identTy cls _provides _mods) _ ->
+          case findClassProcedure ident cls of
+            Just _ -> throwError $ annotateError ann EInvalidProcedureCallInsideMemberFunction
+            Nothing ->
+              case findClassViewerOrMethod ident cls of
+                Just (ps, _, anns) -> do
+                  let (psLen , asLen ) = (length ps, length args)
+                  -- Check that the number of parameters are OK
+                  when (psLen < asLen) (throwError $ annotateError ann (EMemberFunctionCallExtraArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
+                  when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
+                  typed_args <- localScope $ zipWithM (\(p, idx) e ->
+                    catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
+                      (
+                        case paramType p of 
+                          (TConstSubtype pty) -> do
+                            -- | See FunctionCall comment
+                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
+                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
+                            return typedArgument
+                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                  fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
+                  return ((ps, typed_args), fty)
+                Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
+          ;
+        _ -> throwError $ annotateError Internal EUnboxingClassType
+      }
+
 ----------------------------------------
 -- These functions are useful:
 -- typeLHSObject looks up in write local environment
@@ -494,7 +510,11 @@ typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
   case glbTypeDef of 
     Struct s _ _ -> return $ TStruct s
     Enum e _ _ -> return $ TEnum e
-    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
+    Class EmitterClass c _ _ _ -> return $ TEmitter c 
+    Class TaskClass c _ _ _ -> return $ TTask c 
+    Class HandlerClass c _ _ _ -> return $ THandler c 
+    Class ResourceClass c _ _ _ -> return $ TResource c
+    Class ChannelClass _ _ _ _ -> throwError $ annotateError Internal EUnboxingClassType
     Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
     Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "Allocator" [typeParam]) = 
@@ -643,7 +663,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
         <*> pure (buildExpAnn pann (TStruct id_ty));
     _ -> throwError $ annotateError Internal EUnboxingStructType;
   }
-typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitializer fs mts pann) = do
+typeAssignmentExpression expected_type@(TResource id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
   case mts of
     (Just ts) -> do
@@ -654,13 +674,68 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
       getGlobalTypeDef pann id_ty
     Nothing -> getGlobalTypeDef pann id_ty
   >>= \case{
-    LocatedElement (Class clsKind _ident members _provides _mods) clsLoc ->
+    LocatedElement (Class ResourceClass _ident members _provides _mods) clsLoc ->
       let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
         SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
-        <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
+        <*> pure (buildExpAnn pann (TResource id_ty));
     _ -> throwError $ annotateError Internal EUnboxingClassType;
   }
+typeAssignmentExpression expected_type@(TEmitter id_ty) typeObj (StructInitializer fs mts pann) = do
+  -- | Check field type
+  case mts of
+    (Just ts) -> do
+      init_ty <- typeTypeSpecifier pann typeObj ts
+      catchMismatch pann
+        (EStructInitializerTypeMismatch expected_type)
+        (sameTyOrError pann expected_type init_ty)
+      getGlobalTypeDef pann id_ty
+    Nothing -> getGlobalTypeDef pann id_ty
+  >>= \case{
+    LocatedElement (Class EmitterClass _ident members _provides _mods) clsLoc ->
+      let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
+        SAST.StructInitializer
+        <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
+        <*> pure (buildExpAnn pann (TEmitter id_ty));
+    _ -> throwError $ annotateError Internal EUnboxingClassType;
+  }
+typeAssignmentExpression expected_type@(TTask id_ty) typeObj (StructInitializer fs mts pann) = do
+  -- | Check field type
+  case mts of
+    (Just ts) -> do
+      init_ty <- typeTypeSpecifier pann typeObj ts
+      catchMismatch pann
+        (EStructInitializerTypeMismatch expected_type)
+        (sameTyOrError pann expected_type init_ty)
+      getGlobalTypeDef pann id_ty
+    Nothing -> getGlobalTypeDef pann id_ty
+  >>= \case{
+    LocatedElement (Class TaskClass _ident members _provides _mods) clsLoc ->
+      let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
+        SAST.StructInitializer
+        <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
+        <*> pure (buildExpAnn pann (TTask id_ty));
+    _ -> throwError $ annotateError Internal EUnboxingClassType;
+  }
+typeAssignmentExpression expected_type@(THandler id_ty) typeObj (StructInitializer fs mts pann) = do
+  -- | Check field type
+  case mts of
+    (Just ts) -> do
+      init_ty <- typeTypeSpecifier pann typeObj ts
+      catchMismatch pann
+        (EStructInitializerTypeMismatch expected_type)
+        (sameTyOrError pann expected_type init_ty)
+      getGlobalTypeDef pann id_ty
+    Nothing -> getGlobalTypeDef pann id_ty
+  >>= \case{
+    LocatedElement (Class HandlerClass _ident members _provides _mods) clsLoc ->
+      let fields = [fld | ClassField fld@(FieldDefinition {}) <- members] in
+        SAST.StructInitializer
+        <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
+        <*> pure (buildExpAnn pann (THandler id_ty));
+    _ -> throwError $ annotateError Internal EUnboxingClassType;
+  }
+
 typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantInitializer id_ty variant args pann) = do
   unless (id_expected == id_ty) (throwError $ annotateError pann (EEnumInitializerExpectedTypeMismatch expected_type (TEnum id_ty)))
   -- | Enum Variant
@@ -1206,7 +1281,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection
     case fty of
       TSinkPort ty action  ->
         case gentry of
-          LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
+          LocatedElement  (GGlob ets@(TEmitter clsId)) _ -> do
             checkEmitterDataType loc clsId ty
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
           _ -> throwError $ annotateError loc $ ESinkPortConnectionInvalidGlobal sid
@@ -1267,7 +1342,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
               let procs = [ProcedureSeman procid params ms | (InterfaceProcedure procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
-                LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
+                LocatedElement (GGlob rts@(TResource clsId)) _ ->
                   getGlobalTypeDef loc clsId >>=
                   \case {
                       LocatedElement (Class _ _ _ provides _) _ -> (do
