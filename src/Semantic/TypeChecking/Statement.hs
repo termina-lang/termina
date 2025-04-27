@@ -131,7 +131,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
             when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
-              throwError . annotateError ann . EMatchMissingCases)
+              \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
             typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
             when (not total && (length flsDefIdents == length casesIdents)) $
               throwError $ annotateError ann EInvalidDefaultCase
@@ -145,7 +145,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [t])] 
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
       when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
-        throwError . annotateError ann . EMatchMissingCases)
+        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
         throwError $ annotateError ann EInvalidDefaultCase

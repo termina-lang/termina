@@ -189,14 +189,14 @@ spec = do
               "\n" ++
               "    uint32_t foo = 0U;\n" ++
               "\n" ++
-              "    if (option0.__variant == Some) {\n" ++
+              "    if (option0.__variant == None) {\n" ++
+              "        \n" ++
+              "\n" ++
+              "    } else {\n" ++
               "        \n" ++
               "        __termina_box_t value = option0.Some.__0;\n" ++
               "\n" ++
               "        foo = *(uint32_t *)value.data;\n" ++
-              "\n" ++
-              "    } else {\n" ++
-              "        \n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -284,13 +284,12 @@ spec = do
               "    msg.In.__0 = 10U;\n" ++
               "    msg.In.__1 = 10U;\n" ++
               "\n" ++
-              "    if (msg.__variant == Message__Stop) {\n" ++
+              "    if (msg.__variant == Message__In) {\n" ++
               "        \n" ++
-              "        ret = 0U;\n" ++
+              "        uint32_t param0 = msg.In.__0;\n" ++
+              "        uint32_t param1 = msg.In.__1;\n" ++
               "\n" ++
-              "    } else if (msg.__variant == Message__Reset) {\n" ++
-              "        \n" ++
-              "        ret = 1U;\n" ++
+              "        ret = param0 + param1;\n" ++
               "\n" ++
               "    } else if (msg.__variant == Message__Out) {\n" ++
               "        \n" ++
@@ -298,12 +297,13 @@ spec = do
               "\n" ++
               "        ret = result;\n" ++
               "\n" ++
+              "    } else if (msg.__variant == Message__Stop) {\n" ++
+              "        \n" ++
+              "        ret = 0U;\n" ++
+              "\n" ++
               "    } else {\n" ++
               "        \n" ++
-              "        uint32_t param0 = msg.In.__0;\n" ++
-              "        uint32_t param1 = msg.In.__1;\n" ++
-              "\n" ++
-              "        ret = param0 + param1;\n" ++
+              "        ret = 1U;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
