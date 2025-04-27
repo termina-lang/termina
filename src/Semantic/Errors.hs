@@ -198,7 +198,7 @@ data Error
   | EDereferenceInvalidType (TerminaType SemanticAnn) -- ^ Invalid dereference type
   | EMatchInvalidType (TerminaType SemanticAnn) -- ^ Invalid match type
   | EMatchCaseDuplicate Identifier Location -- ^ Duplicate case in match statement
-  | EMatchCaseUnknownVariants [Identifier] -- ^ Unknown variant/s in match case
+  | EMatchCaseUnknownVariant Identifier -- ^ Unknown variant in match case
   | EMatchMissingCases [Identifier] -- ^ Missing case/s in match statement
   | EIsVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-variant expression
   | EIsOptionVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-option-variant expression
@@ -385,7 +385,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EDereferenceInvalidType _ty) _pos) = "SE-146"
     errorIdent (AnnotatedError (EMatchInvalidType _ty) _pos) = "SE-147"
     errorIdent (AnnotatedError (EMatchCaseDuplicate _ident _loc) _pos) = "SE-148"
-    errorIdent (AnnotatedError (EMatchCaseUnknownVariants _variants) _pos) = "SE-149"
+    errorIdent (AnnotatedError (EMatchCaseUnknownVariant _variant) _pos) = "SE-149"
     errorIdent (AnnotatedError (EMatchMissingCases _variants) _pos) = "SE-150"
     errorIdent (AnnotatedError (EIsVariantInvalidType _ty) _pos) = "SE-151"
     errorIdent (AnnotatedError (EIsOptionVariantInvalidType _ty) _pos) = "SE-152"
@@ -567,7 +567,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EDereferenceInvalidType _ty) _pos) = "invalid type for dereference"
     errorTitle (AnnotatedError (EMatchInvalidType _ty) _pos) = "invalid type for match statement"
     errorTitle (AnnotatedError (EMatchCaseDuplicate _ident _loc) _pos) = "duplicate case in match statement"
-    errorTitle (AnnotatedError (EMatchCaseUnknownVariants _variants) _pos) = "unknown variant/s in match case"
+    errorTitle (AnnotatedError (EMatchCaseUnknownVariant _variant) _pos) = "unknown variant in match case"
     errorTitle (AnnotatedError (EMatchMissingCases _variants) _pos) = "missing case/s in match statement"
     errorTitle (AnnotatedError (EIsVariantInvalidType _ty) _pos) = "invalid type for is-variant expression"
     errorTitle (AnnotatedError (EIsOptionVariantInvalidType _ty) _pos) = "invalid type for is-option-variant expression"
@@ -1808,15 +1808,10 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             prevSourceLines "The variant is previously used here:" prevFileName
                             prevCase Nothing
-                EMatchCaseUnknownVariants [variantName] ->
+                EMatchCaseUnknownVariant variantName ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant of the enum or option."))
-                EMatchCaseUnknownVariants variantNames ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Variants \x1b[31m" <> T.intercalate ", " (map T.pack variantNames) <>
-                            "\x1b[0m are not valid variants of the enum or option."))
                 EMatchMissingCases [caseIdent] -> 
                     pprintSimpleError
                         sourceLines title fileName pos

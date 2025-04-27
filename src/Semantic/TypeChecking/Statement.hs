@@ -18,13 +18,7 @@ import Control.Monad.Except
 import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
-
-----------------------------------------
--- Libaries and stuff
-
-import qualified Data.List  (sort)
 import Data.Maybe
-
 import Parser.Types
 import Utils.Monad
 import Semantic.TypeChecking.Expression
@@ -122,8 +116,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
   typed_matchE <- typeExpression Nothing typeRHSObject matchE
   type_matchE <- getExprType typed_matchE
   -- Check for duplicate cases
-  ord_cases <- sortAndCheckCaseDuplicates M.empty cases
-  let total = isNothing mDefaultCase
+  checkCaseDuplicates cases
   mTypedDefCase <- case mDefaultCase of
     Nothing -> return Nothing
     Just (DefaultCase bd ann') -> do
@@ -133,69 +126,70 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TEnum t -> getGlobalTypeDef ann t >>=
         \case {
           LocatedElement (Enum _ident flsDef _mods) _ -> do
-            let ord_flsDef = Data.List.sort (variantIdentifier <$> flsDef)
+            let flsDefIdents = variantIdentifier <$> flsDef
+                casesIdents = matchIdentifier <$> cases
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-            case zipSameLength total
-                  (annotateError ann . EMatchMissingCases)
-                  (annotateError ann . EMatchCaseUnknownVariants)
-                  (annotateError ann EInvalidDefaultCase)
-                  (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
-              Left e -> throwError e
-              Right cs -> do
-                typedCases <- sequence cs
-                return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
+            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+              throwError . annotateError ann . EMatchMissingCases)
+            typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
+            when (not total && (length flsDefIdents == length casesIdents)) $
+              throwError $ annotateError ann EInvalidDefaultCase
+            return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
           _ -> throwError $ annotateError Internal EUnboxingEnumType
         }
     TOption t -> do
-      let ord_flsDef = ["None", "Some"]
+      let flsDefIdents = ["None", "Some"]
+          casesIdents = matchIdentifier <$> cases
           variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [t])] 
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      case zipSameLength total
-            (annotateError ann . EMatchMissingCases)
-            (annotateError ann . EMatchCaseUnknownVariants)
-            (annotateError ann EInvalidDefaultCase)
-            (typeMatchCase caseMap variantMap) ord_cases ord_flsDef of
-        Left e -> throwError e
-        Right cs -> do 
-          typedCases <- sequence cs
-          return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+        throwError . annotateError ann . EMatchMissingCases)
+      typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
+      when (not total && (length flsDefIdents == length casesIdents)) $
+        throwError $ annotateError ann EInvalidDefaultCase
+      return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
 
     where
 
-      sortAndCheckCaseDuplicates :: M.Map Identifier Location -> [MatchCase ParserAnn] -> SemanticMonad [Identifier]
-      sortAndCheckCaseDuplicates acc [] = return $ Data.List.sort (M.keys acc)
-      sortAndCheckCaseDuplicates acc ((MatchCase i _ _ loc) : cs) =
-        case M.lookup i acc of
-          Nothing -> sortAndCheckCaseDuplicates (M.insert i loc acc) cs
-          Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
+      total = isNothing mDefaultCase
 
-      -- Zipping list of same length
-      zipSameLength :: Bool -> ([b] -> e) -> ([a] -> e) -> e -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-      zipSameLength total = zipSameLength' []
-        where
-          -- Tail recursive version
-          zipSameLength' :: [c] -> ([b] -> e) -> ([a] -> e) -> e -> (a -> b -> c) -> [a] -> [b] -> Either e [c]
-          zipSameLength' acc _ _ errc _ [] [] = if total then Right acc else Left errc
-          zipSameLength' acc erra errb errc f (a : as) (b : bs) = zipSameLength' (f a b : acc) erra errb errc f as bs
-          zipSameLength' acc erra _ _ _ [] bs = if total then Left (erra bs) else Right acc
-          zipSameLength' _ _ errb _ _ as [] = Left (errb as)
-      --
+      checkCaseDuplicates :: [MatchCase ParserAnn] -> SemanticMonad ()
+      checkCaseDuplicates = foldM_ checkCaseDuplicates' M.empty
+
+      checkCaseDuplicates' :: 
+        M.Map Identifier Location 
+        -> MatchCase ParserAnn 
+        -> SemanticMonad (M.Map Identifier Location)
+      checkCaseDuplicates' acc (MatchCase i _ _ loc) =
+        case M.lookup i acc of
+          Nothing -> return $ M.insert i loc acc
+          Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
+      
+      checkMissingCase :: 
+        M.Map Identifier a 
+        -> [Identifier]
+        -> Identifier -> SemanticMonad [Identifier]
+      checkMissingCase m acc i =
+        case M.lookup i m of
+          Nothing -> return $ i : acc
+          Just _ -> return acc
 
       typeMatchCase :: M.Map Identifier (MatchCase ParserAnn)
         -> M.Map Identifier (SAST.EnumVariant SemanticAnn)
-        -> Identifier -> Identifier -> SemanticMonad (SAST.MatchCase SemanticAnn)
-      typeMatchCase caseMap variantMap caseId vId =
-        let (EnumVariant _ vData) = variantMap M.! vId in
-        typeMatchCase' c vId vData
+        -> Identifier -> SemanticMonad (SAST.MatchCase SemanticAnn)
+      typeMatchCase caseMap variantMap caseId = 
+        case M.lookup caseId variantMap of 
+          Nothing -> throwError $ annotateError ann (EMatchCaseUnknownVariant caseId)
+          Just (EnumVariant _ vData) ->  typeMatchCase' c vData
+
         where
 
           c = caseMap M.! caseId
           
-          typeMatchCase' (MatchCase cIdent bVars bd mcann) supIdent tVars
-            | cIdent == supIdent =
+          typeMatchCase' (MatchCase cIdent bVars bd mcann) tVars =
               if length bVars == length tVars then
               flip (SAST.MatchCase cIdent bVars) 
                   (buildStmtMatchCaseAnn (matchAnnotation c) tVars) 
@@ -204,7 +198,6 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                         typeBlock retTy bd
                       )
               else throwError $ annotateError Internal EMatchCaseInternalError
-            | otherwise = throwError $ annotateError mcann $ EMatchCaseUnknownVariants [cIdent]
 
 typeStatement rTy (ReturnStmt retExpression anns) =
   case (rTy, retExpression) of
