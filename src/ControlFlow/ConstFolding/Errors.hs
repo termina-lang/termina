@@ -102,16 +102,16 @@ instance ErrorMessage ConstFoldError where
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
         in
             case err of 
-                EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize ->
+                EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> -- showText expectedSize <>
-                            "\x1b[0m but the array has size ...")) -- \x1b[31m" <> showText actualSize <> "\x1b[0m."))
-                EArrayInitializerSizeMismatch _expectedSize _initializerSize ->
+                        (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> T.pack (show expectedSize) <> 
+                            "\x1b[0m but the array has size \x1b[31m" <> T.pack (show actualSize) <> "\x1b[0m."))
+                EArrayInitializerSizeMismatch expectedSize initializerSize ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("The size of the array initializer is \x1b[31m" <> -- showText initializerSize <>
-                            "\x1b[0m but the expected size is ...")) -- \x1b[31m" <> showText expectedSize <> "\x1b[0m."))
+                        (Just ("The size of the array initializer is \x1b[31m" <> T.pack (show initializerSize) <>
+                            "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
                 EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
                     pprintSimpleError
                         sourceLines title fileName pos

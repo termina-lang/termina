@@ -162,6 +162,8 @@ getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = retur
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsOptionVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject

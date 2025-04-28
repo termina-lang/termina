@@ -379,18 +379,18 @@ constFoldCheckExprType loc (TArray _ arraySize) initExpr@(StringInitializer {}) 
       else
         throwError $ annotateError loc (EStringInitializerSizeMismatch lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-constFoldCheckExprType loc (TStruct _) (StructInitializer fas _) = do
+constFoldCheckExprType _ (TStruct _) (StructInitializer fas _) = do
   mapM_ constFoldFieldAssignment fas
 
   where
 
     constFoldFieldAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad ()
-    constFoldFieldAssignment (FieldValueAssignment _ expr (SemanticAnn (ETy (SimpleType ty)) _)) = do
-      constFoldCheckExprType loc ty expr
-    constFoldFieldAssignment (FieldValueAssignment {}) = do
-      throwError $ annotateError loc EInvalidFieldValueAssignmentAnnotation
+    constFoldFieldAssignment (FieldValueAssignment _ expr (SemanticAnn (ETy (SimpleType ty)) loc')) = do
+      constFoldCheckExprType loc' ty expr
+    constFoldFieldAssignment (FieldValueAssignment _ _ ann) = do
+      throwError $ annotateError (getLocation ann) EInvalidFieldValueAssignmentAnnotation
     constFoldFieldAssignment (FieldAddressAssignment {}) = return ()
-    constFoldFieldAssignment (FieldPortConnection AccessPortConnection _ _ (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy _ portSize glbSize))) _)) = do
+    constFoldFieldAssignment (FieldPortConnection AccessPortConnection _ _ (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy _ portSize glbSize))) loc')) = do
       portSizeValue <- evalConstExpression portSize
       glbSizeValue <- evalConstExpression glbSize
       case (portSizeValue, glbSizeValue) of
@@ -398,7 +398,7 @@ constFoldCheckExprType loc (TStruct _) (StructInitializer fas _) = do
           if lhs == rhs then
             return ()
           else
-            throwError $ annotateError loc (EAtomicArrayConnectionSizeMismatch lhs rhs)
+            throwError $ annotateError loc' (EAtomicArrayConnectionSizeMismatch lhs rhs)
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     constFoldFieldAssignment (FieldPortConnection {}) = return ()
 constFoldCheckExprType _ _ expr = constFoldExpression expr

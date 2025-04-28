@@ -44,6 +44,8 @@ getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = retur
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsOptionVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 
 -- | This function returns the name of a port. The function assumes that the object is
