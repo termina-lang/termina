@@ -81,8 +81,14 @@ getFunctionMembers progArchitecture ident =
                     maybe (throwError $ annotateError Internal (EUnknownHandlerClass (handlerClass handler)))
                             (return . classMemberFunctions) $ 
                                 M.lookup (handlerClass handler) (handlerClasses progArchitecture)
-                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
-
+                Nothing ->
+                    case M.lookup ident (resources progArchitecture) of
+                        Just resource ->
+                            maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource)))
+                                    (return . classMemberFunctions) $ 
+                                        M.lookup (resourceClass resource) (resourceClasses progArchitecture)
+                        Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
+ 
 followSendMessage :: (MonadError ConstFoldError m) =>
     TerminaProgArch SemanticAnn -> Identifier -> Identifier -> m (Identifier, TPFunction SemanticAnn)
 followSendMessage progArchitecture currentId portName = do
@@ -118,7 +124,7 @@ followSendMessage progArchitecture currentId portName = do
                     actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
                                     M.lookup targetAction (classMemberFunctions targetTaskCls)
                     return (targetTaskId, actionFunction)
-                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier currentId)
+                Nothing -> error "Cacafuti 3" -- throwError $ annotateError Internal (EUnknownIdentifier currentId)
 
 followProcedureCall :: (MonadError ConstFoldError m) =>
     TerminaProgArch SemanticAnn -> Identifier -> Identifier -> Identifier -> m (Identifier, TPFunction SemanticAnn)
@@ -146,4 +152,4 @@ followProcedureCall progArchitecture ident portName procName = do
                     resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource'))) return $ M.lookup (resourceClass resource') (resourceClasses progArchitecture)
                     resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
                     return (targetResource, resourceProc)
-              Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
+              Nothing -> error "Cacafuti " -- throwError $ annotateError Internal (EUnknownIdentifier ident)
