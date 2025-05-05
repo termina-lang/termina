@@ -126,6 +126,7 @@ data BasicBlock a =
     | ContinueBlock
         (Expression a)
         a
+    | RebootBlock a
     -- | System call
     | SystemCall
         (Object a) -- ^ access port

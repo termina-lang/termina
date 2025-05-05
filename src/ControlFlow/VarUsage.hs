@@ -265,6 +265,7 @@ useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
 useDefBasicBlock (ReturnBlock e _ann) =
   maybe (return ()) useExpression e
 useDefBasicBlock (ContinueBlock e _ann) = useExpression e
+useDefBasicBlock (RebootBlock _ann) = return ()
 useDefBasicBlock (SystemCall obj _ident args _ann) =
   useObject obj >> mapM_ useArguments args
 

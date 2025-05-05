@@ -183,6 +183,7 @@ genBBlocks acc (stmt : xs) =
             genBBlocks (MatchBlock expr matchCasesBlocks defaultCase ann : acc) xs
         SAST.ReturnStmt expr ann -> genBBlocks (ReturnBlock expr ann : acc) xs
         SAST.ContinueStmt expr ann -> genBBlocks (ContinueBlock expr ann : acc) xs
+        SAST.RebootStmt ann -> genBBlocks (RebootBlock ann : acc) xs
 
     where
 

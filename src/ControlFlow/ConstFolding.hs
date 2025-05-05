@@ -549,6 +549,7 @@ constFoldBasicBlock (ReturnBlock (Just expr) _) = do
   constFoldExpression expr
 constFoldBasicBlock (ContinueBlock expr _) =
   constFoldExpression expr
+constFoldBasicBlock (RebootBlock _) = return ()
 constFoldBasicBlock (SystemCall obj _ exprs (SemanticAnn (ETy (AppType params TUnit)) loc)) = do
   constFoldObject obj
   args <- mapM (\expr -> do

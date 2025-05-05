@@ -87,6 +87,7 @@ selfInvStmt (ReturnStmt ret _ann) prevMap =
   maybe prevMap (`selfInv` prevMap) ret
 selfInvStmt (ContinueStmt ret _ann) prevMap = 
   selfInv ret prevMap
+selfInvStmt (RebootStmt _ann) prevMap = prevMap
 
 fieldDepStmt :: Statement a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
 fieldDepStmt (Declaration _vident _accK _type e _ann) prevMap = fieldDepExpr e prevMap
@@ -124,6 +125,7 @@ fieldDepStmt (ReturnStmt ret _ann) prevMap =
   maybe prevMap (`fieldDepExpr` prevMap) ret
 fieldDepStmt (ContinueStmt ret _ann) prevMap = 
   fieldDepExpr ret prevMap
+fieldDepStmt (RebootStmt _ann) prevMap = prevMap
 
 fieldDepExpr :: Expression a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
 fieldDepExpr (MemberFunctionCall obj mident _args _ann) prevMap =

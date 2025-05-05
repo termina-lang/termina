@@ -185,6 +185,7 @@ data Statement a =
   | ContinueStmt
     (Expression a)
     a
+  | RebootStmt a
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement

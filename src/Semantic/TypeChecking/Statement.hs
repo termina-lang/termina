@@ -284,3 +284,4 @@ typeStatement _rTy (ContinueStmt contE anns) =
             _ -> throwError $ annotateError Internal EUnboxingClassType
           }
         _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
+typeStatement _retTy (RebootStmt anns) = return $ SAST.RebootStmt (buildStmtAnn anns)

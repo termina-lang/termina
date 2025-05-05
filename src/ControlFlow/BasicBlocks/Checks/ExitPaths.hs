@@ -19,6 +19,7 @@ import Utils.Monad
 doesBlockExit :: BasicBlock SemanticAnn -> Bool
 doesBlockExit (ReturnBlock {}) = True
 doesBlockExit (ContinueBlock {}) = True
+doesBlockExit (RebootBlock {}) = True
 doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
     let
         -- | Check the exit of the if block
@@ -66,6 +67,7 @@ checkBlockPaths loc stmts = do
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidContinue
+                (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidReboot
                 (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
                     checkBlockPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_
@@ -111,6 +113,9 @@ checkActionPaths loc stmts = do
                         ContinueBlock {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
+                        RebootBlock {} ->
+                            -- | The rest of the blocks shall not exit
+                            setAllowedSend >> checkActionPaths loc xb
                         blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) ann) ->
                             if not (doesBlockExit blk) then
                                 throwError $ annotateError (getLocation ann) EEActionIfBlockShallExit
@@ -149,6 +154,7 @@ checkActionPaths loc stmts = do
                     case x of
                         ReturnBlock _ ann -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                         ContinueBlock _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
+                        RebootBlock ann -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
@@ -193,6 +199,9 @@ checkActionPaths loc stmts = do
                         ContinueBlock {} -> 
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
+                        RebootBlock {} -> 
+                            -- | The rest of the blocks shall not exit
+                            setAllowedSend >> checkActionPaths loc xb
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
@@ -229,6 +238,7 @@ checkActionPaths loc stmts = do
                     case x of
                         ReturnBlock _ ann -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                         ContinueBlock _ ann -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
+                        RebootBlock ann -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             checkActionPaths loc xb
@@ -266,6 +276,7 @@ checkActionPaths loc stmts = do
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (getLocation ann) EEInvalidReturn
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
+                (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
                 (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
                     checkActionPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_

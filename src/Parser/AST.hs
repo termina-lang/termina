@@ -186,12 +186,13 @@ data Statement a =
   | SingleExpStmt
     (Expression a) -- ^ expression
     a
-  | ReturnStmt
+  | ReturnStmt
     (Maybe (Expression a)) -- ^ return expression
     a
-  | ContinueStmt
+  | ContinueStmt
     (Expression a)
     a
+  | RebootStmt a
   deriving (Show, Functor)
 
 -- | |BlockRet| represent a body block with its return statement

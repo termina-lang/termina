@@ -724,6 +724,14 @@ continueStmtParser = do
   _ <- semi
   return $ ContinueStmt ret (Position startPos endPos)
 
+rebootStmtParser :: Parser (Statement ParserAnn)
+rebootStmtParser = do
+  startPos <- getPosition
+  _ <- reserved "reboot"
+  endPos <- getPosition
+  _ <- semi
+  return $ RebootStmt (Position startPos endPos)
+
 functionParser :: Parser (AnnASTElement ParserAnn)
 functionParser = do
   modifiers <- many modifierParser
@@ -804,6 +812,7 @@ blockItemParser
   <|> try matchStmtParser
   <|> try returnStmtParser
   <|> try continueStmtParser
+  <|> try rebootStmtParser
   <|> singleExprStmtParser
 
 assignmentStmtPaser :: Parser (Statement ParserAnn)

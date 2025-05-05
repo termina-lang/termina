@@ -22,6 +22,8 @@ data ExitCheckError =
     | EEActionIfBlockShallNotExit -- ^ If block shall not exit (EE-010)
     | EEActionMatchBlockShallNotExit -- ^ Match block shall not exit (EE-011)
     | EEActionIfBlockMissingElseExit -- ^ Missing else exit on an action if block (EE-012)
+    | EEInvalidReboot -- ^ Invalid reboot statement (EE-013)
+    | EEActionInvalidReboot -- ^ Invalid reboot statement on an action (EE-014)
     deriving (Show)
 
 type PathsCheckError = AnnotatedError ExitCheckError Location
@@ -40,6 +42,8 @@ instance ErrorMessage PathsCheckError where
     errorIdent (AnnotatedError EEActionIfBlockShallNotExit _pos) = "EE-010"
     errorIdent (AnnotatedError EEActionMatchBlockShallNotExit _pos) = "EE-011"
     errorIdent (AnnotatedError EEActionIfBlockMissingElseExit _pos) = "EE-012"
+    errorIdent (AnnotatedError EEInvalidReboot _pos) = "EE-013"
+    errorIdent (AnnotatedError EEActionInvalidReboot _pos) = "EE-014"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError EEInvalidReturn _pos) = "invalid return statement"
@@ -54,6 +58,8 @@ instance ErrorMessage PathsCheckError where
     errorTitle (AnnotatedError EEActionIfBlockShallNotExit _pos) = "if block shall not exit"
     errorTitle (AnnotatedError EEActionMatchBlockShallNotExit _pos) = "match block shall not exit"
     errorTitle (AnnotatedError EEActionIfBlockMissingElseExit _pos) = "missing else exit on an action if block"
+    errorTitle (AnnotatedError EEInvalidReboot _pos) = "invalid reboot statement"
+    errorTitle (AnnotatedError EEActionInvalidReboot _pos) = "invalid reboot statement on an action"
     errorTitle _ = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start _end)) files =
@@ -122,6 +128,16 @@ instance ErrorMessage PathsCheckError where
                         sourceLines title fileName pos
                         (Just ("Missing continue statement.\n" <>
                             "This if block is the last statement of an action and all its branches must have an exit point in the form of a continue statement. Thus, it must have an else branch."))
+                EEInvalidReboot ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid reboot statement.\n" <>
+                            "Reboot statements are only allowed inside actions."))
+                EEActionInvalidReboot ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid reboot statement.\n" <>
+                            "Reboot statements are only allowed as the last statement of an execution path of an action."))
                 _ -> T.pack $ show pos ++ ": " ++ show e
 
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e

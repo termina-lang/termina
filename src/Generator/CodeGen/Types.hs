@@ -193,6 +193,10 @@ __termina_exec__shutdown :: CExpression
 __termina_exec__shutdown = "__termina_exec__shutdown" @:
     CTFunction void []
 
+__termina_exec__reboot :: CExpression
+__termina_exec__reboot = "__termina_exec__reboot" @:
+    CTFunction void []
+
 __termina_pool__alloc :: CExpression
 __termina_pool__alloc = "__termina_pool__alloc" @:
     CTFunction void
