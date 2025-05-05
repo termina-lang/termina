@@ -6,6 +6,7 @@ import Data.Text
 import Semantic.Types
 import qualified Data.Map as M
 import Utils.Annotations
+import Generator.Monadic
 
 import UT.PPrinter.Common
 
@@ -115,7 +116,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints a class with one procedure and zero fields" $ do
-      renderTypeDefinitionDecl M.empty classWithOneProcedureAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
           "    __termina_id_t __mutex_id;\n" ++
@@ -140,7 +141,7 @@ spec = do
           "                                    int16_t param5, int32_t param6,\n" ++
           "                                    int64_t param7);")
     it "Prints a class with two procedures and zero fields" $ do
-      renderTypeDefinitionDecl M.empty classWithTwoProceduresAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
           "    __termina_id_t __mutex_id;\n" ++
@@ -164,7 +165,7 @@ spec = do
           "void Class0__procedure1__event_lock(void * const __this, uint8_t param0,\n" ++
           "                                    uint8_t param1[32U]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
-      renderTypeDefinitionDecl M.empty noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -175,7 +176,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a class marked as no_handler with two fields" $ do
-      renderTypeDefinitionDecl M.empty noHandlerClassWithOneEmptyProcedure `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -188,7 +189,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a class with one procedure and two fields" $ do
-      renderTypeDefinitionDecl M.empty classWithOneProcedureAndTwoFields `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -201,7 +202,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a packed class" $ do
-      renderTypeDefinitionDecl M.empty packedClass `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes packedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -218,7 +219,7 @@ spec = do
             "void Class0__procedure0__event_lock(void * const __this, char param0,\n" ++
             "                                    uint8_t param1[16U]);")
     it "Prints an aligned class" $ do
-      renderTypeDefinitionDecl M.empty alignedClass `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes alignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -232,7 +233,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a packed & aligned class" $ do
-      renderTypeDefinitionDecl M.empty packedAndAlignedClass `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes packedAndAlignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -246,7 +247,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a class with a fixed location field" $ do
-      renderTypeDefinitionDecl M.empty classWithFixedLocationField `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++
@@ -259,7 +260,7 @@ spec = do
             "void Class0__procedure0__task_lock(void * const __this);\n" ++
             "void Class0__procedure0__event_lock(void * const __this);")
     it "Prints a class with an access port field" $ do
-      renderTypeDefinitionDecl M.empty classWithAccessPortField `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes classWithAccessPortField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    __termina_id_t __mutex_id;\n" ++

@@ -59,30 +59,64 @@ genStringInitialization before level cObj value = do
             else
                 return $ no_cr current : rest
 
-genOptionInitialization ::
+genMonadicTypeInitialization ::
     Bool
     -> Integer
     -> CObject
     -> Expression SemanticAnn
     -> CGenerator [CCompoundBlockItem]
-genOptionInitialization before level cObj expr =
+genMonadicTypeInitialization before level cObj expr =
     case expr of
-        (OptionVariantInitializer (Some e) ann) -> do
+        (MonadicVariantInitializer (Some e) ann) -> do
             let cSomeVariantFieldObj = cObj @. optionSomeVariant @: enumFieldType
-            fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj optionSomeField e
+            fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj (namefy "0") e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let someVariantExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
             if before then
                 return $ pre_cr (variantsFieldsObj @= someVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
             else
                 return $ no_cr (variantsFieldsObj @= someVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
-        (OptionVariantInitializer None ann) -> do
+        (MonadicVariantInitializer None ann) -> do
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let noneVariantExpr = optionNoneVariant @: enumFieldType |>> getLocation ann
             if before then
                 return [pre_cr (variantsFieldsObj @= noneVariantExpr |>> getLocation ann) |>> getLocation ann]
             else
                 return [no_cr (variantsFieldsObj @= noneVariantExpr |>> getLocation ann) |>> getLocation ann]
+        (MonadicVariantInitializer Success ann) -> do
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
+            let successVariantExpr = statusSuccessVariant @: enumFieldType |>> getLocation ann
+            if before then
+                return [pre_cr (variantsFieldsObj @= successVariantExpr |>> getLocation ann) |>> getLocation ann]
+            else
+                return [no_cr (variantsFieldsObj @= successVariantExpr |>> getLocation ann) |>> getLocation ann]
+        (MonadicVariantInitializer (Failure e) ann) -> do
+            let cFailureVariantFieldObj = cObj @. statusFailureVariant @: enumFieldType
+            fieldInitalization <- genFieldInitialization False level cFailureVariantFieldObj (namefy "0") e
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
+            let failureVariantExpr = statusFailureVariant @: enumFieldType |>> getLocation ann
+            if before then
+                return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+            else
+                return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+        (MonadicVariantInitializer (Ok e) ann) -> do
+            let cOkVariantFieldObj = cObj @. resultOkVariant @: enumFieldType
+            fieldInitalization <- genFieldInitialization False level cOkVariantFieldObj (namefy "0") e
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
+            let failureVariantExpr = resultOkVariant @: enumFieldType |>> getLocation ann
+            if before then
+                return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+            else
+                return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+        (MonadicVariantInitializer (Error e) ann) -> do
+            let cErrorVariantFieldObj = cObj @. resultErrorVariant @: enumFieldType
+            fieldInitalization <- genFieldInitialization False level cErrorVariantFieldObj (namefy "0") e
+            let variantsFieldsObj = cObj @. variant @: enumFieldType
+            let failureVariantExpr = resultErrorVariant @: enumFieldType |>> getLocation ann
+            if before then
+                return $ pre_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
+            else
+                return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
 genArrayInitialization ::
@@ -115,7 +149,7 @@ genArrayInitialization before level cObj expr = do
         (StringInitializer value _ann) ->
             genStringInitialization before level cObj value
         (StructInitializer {}) -> genStructInitialization before level cObj expr
-        (OptionVariantInitializer {}) -> genOptionInitialization before level cObj expr
+        (MonadicVariantInitializer {}) -> genMonadicTypeInitialization before level cObj expr
         (EnumVariantInitializer {}) -> genEnumInitialization before level cObj expr
         _ -> do
             cExpr <- genExpression expr
@@ -180,8 +214,8 @@ genFieldInitialization before level cObj fid expr = do
     case expr of
         StructInitializer {} ->
             genStructInitialization before level cFieldObj expr
-        OptionVariantInitializer {} ->
-            genOptionInitialization before level cFieldObj expr
+        MonadicVariantInitializer {} ->
+            genMonadicTypeInitialization before level cFieldObj expr
         ArrayInitializer {} ->
             genArrayInitialization before level cFieldObj expr
         StringInitializer value _ ->
@@ -466,6 +500,13 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
                 return (id, sname, const (return pname))
+            (TStatus ts) -> do
+                sname <- genStatusStructName ts
+                pname <- genStatusParameterStructName ts
+                return (id, sname, const (return pname))
+            (TResult okTy errorTy) -> do
+                sname <- genResultStructName okTy errorTy
+                return (id, sname, genResultParameterStructName okTy errorTy)
             _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
     case expr of
         (AccessObject {}) -> do
@@ -641,7 +682,7 @@ genStatement (AssignmentStmt obj expr  _) = do
             return [pre_cr (addrOf cObj |>> getLocation ann) |>> getLocation ann]
         _ -> case expr of
             (StructInitializer {}) -> genStructInitialization True 0 cObj expr
-            (OptionVariantInitializer {}) -> genOptionInitialization True 0 cObj expr
+            (MonadicVariantInitializer {}) -> genMonadicTypeInitialization True 0 cObj expr
             (EnumVariantInitializer {}) -> genEnumInitialization True 0 cObj expr
             _ -> do
                 cExpr <- genExpression expr
@@ -662,8 +703,8 @@ genStatement (Declaration identifier _ ts expr ann) = do
             return $
                 pre_cr (var identifier cType) |>> getLocation ann
                 : structInitialization
-        (OptionVariantInitializer {}) -> do
-            optionInitialization <- genOptionInitialization False 0 cObj expr
+        (MonadicVariantInitializer {}) -> do
+            optionInitialization <- genMonadicTypeInitialization False 0 cObj expr
             return $
                 pre_cr (var identifier cType) |>> getLocation ann
                 : optionInitialization

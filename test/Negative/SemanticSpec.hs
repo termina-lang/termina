@@ -118,14 +118,14 @@ testSE009 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Result {\n" ++
+       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
        "\n" ++
        "\n" ++
-       "        var ret : Result = Result::Ok;\n" ++
+       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(data, 100, 200);\n" ++
        "\n" ++
-       "        return ret;\n" ++
+       "        return status;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -146,14 +146,14 @@ testSE010 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Result {\n" ++
+       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
        "\n" ++
        "\n" ++
-       "        var ret : Result = Result::Ok;\n" ++
+       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(data);\n" ++
        "\n" ++
-       "        return ret;\n" ++
+       "        return status;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -174,14 +174,14 @@ testSE011 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Result {\n" ++
+       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
        "\n" ++
        "\n" ++
-       "        var ret : Result = Result::Ok;\n" ++
+       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure0(100, data);\n" ++
        "\n" ++
-       "        return ret;\n" ++
+       "        return status;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -202,13 +202,13 @@ testSE012 = "\n" ++
        "\n" ++
        "    input : sink u32 triggers action0;\n" ++
        "\n" ++
-       "    action action0(&priv self, data : u32) -> Result {\n" ++
+       "    action action0(&priv self, data : u32) -> Status<i32> {\n" ++
        "\n" ++
-       "        var ret : Result = Result::Ok;\n" ++
+       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
        "        self->ap.procedure1(data);\n" ++
        "\n" ++
-       "        return ret;\n" ++
+       "        return status;\n" ++
        "\n" ++
        "    }\n" ++
        "\n" ++
@@ -234,11 +234,11 @@ testSE014 = "interface TMChannelInterface {\n" ++
        "    \n" ++
        "    tm_sent_packets : u32;\n" ++
        "    \n" ++
-       "    action send_packet(&priv self, input : u32) -> Result {\n" ++
+       "    action send_packet(&priv self, input : u32) -> Status<i32> {\n" ++
        "\n" ++
-       "        var ret : Result = Result::Ok;\n" ++
+       "        var status : Status<i32> = Success;\n" ++
        "\n" ++
-       "        return ret;\n" ++
+       "        return status;\n" ++
        "\n" ++
        "    }\n" ++
        "    \n" ++
@@ -292,71 +292,71 @@ spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
     it "SE-001: invalid array indexing" $ do
-     runNegativeTest testSE001
+     runNegativeTestTypeCheck testSE001
        `shouldSatisfy`
         isEInvalidArrayIndexing TUInt32
     it "SE-002: object not found" $ do
-        runNegativeTest testSE002
+        runNegativeTestTypeCheck testSE002
         `shouldSatisfy`
             isENotNamedObject "foo"
     it "SE-003: expected constant expression" $ do
-     runNegativeTest testSE003
+     runNegativeTestTypeCheck testSE003
        `shouldSatisfy`
         isEExpressionNotConstant
     it "SE-004: assignment to immutable variable" $ do
-     runNegativeTest testSE004
+     runNegativeTestTypeCheck testSE004
        `shouldSatisfy`
         isEAssignmentToImmutable
     it "SE-005: missing else clause" $ do
-     runNegativeTest testSE005
+     runNegativeTestTypeCheck testSE005
        `shouldSatisfy`
         isEIfElseNoOtherwise
     it "SE-006: invalid cast" $ do
-     runNegativeTest testSE006
+     runNegativeTestTypeCheck testSE006
        `shouldSatisfy`
         isENotCasteableTBoolTUInt32 
     it "SE-007: invalid parameter type (defining a box parameter)" $ do
-     runNegativeTest testSE007
+     runNegativeTestTypeCheck testSE007
        `shouldSatisfy`
         isEInvalidParameterTypeBox
     it "SE-007: invalid parameter type (defining a fixed size array parameter)" $ do
-     runNegativeTest testSE007_2
+     runNegativeTestTypeCheck testSE007_2
        `shouldSatisfy`
         isEInvalidParameterTypeArray
     it "SE-008: invalid return type" $ do
-     runNegativeTest testSE008
+     runNegativeTestTypeCheck testSE008
        `shouldSatisfy`
         isEInvalidReturnType 
     it "SE-009: extra arguments in procedure call" $ do
-     runNegativeTest testSE009
+     runNegativeTestTypeCheck testSE009
        `shouldSatisfy`
         isEProcedureCallExtraArgs 
     it "SE-010: missing arguments in procedure call" $ do
-     runNegativeTest testSE010
+     runNegativeTestTypeCheck testSE010
        `shouldSatisfy`
         isEProcedureCallMissingArgs 
     it "SE-011: argument type mismatch in procedure call" $ do
-     runNegativeTest testSE011
+     runNegativeTestTypeCheck testSE011
        `shouldSatisfy`
         isEProcedureCallArgTypeMismatch 
     it "SE-012: unknown procedure" $ do
-     runNegativeTest testSE012
+     runNegativeTestTypeCheck testSE012
        `shouldSatisfy`
         isEUnknownProcedure "procedure1"
     it "SE-013: resource class does not provide any interface" $ do
-     runNegativeTest testSE013
+     runNegativeTestTypeCheck testSE013
        `shouldSatisfy`
         isEResourceClassNoProvides "id0"
     it "SE-014: resource class defines an action" $ do
-     runNegativeTest testSE014
+     runNegativeTestTypeCheck testSE014
        `shouldSatisfy`
         isEResourceClassAction "send_packet"
     it "SE-015: resource class defines an in port" $ do
-     runNegativeTest testSE015
+     runNegativeTestTypeCheck testSE015
        `shouldSatisfy`
         isEResourceClassInPort "input_msg"
     it "SE-015: resource class defines an out port" $ do
-     runNegativeTest testSE016
+     runNegativeTestTypeCheck testSE016
        `shouldSatisfy`
         isEResourceClassOutPort "output_msg"
 

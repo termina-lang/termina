@@ -88,13 +88,21 @@ instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
     showText (FieldPortConnection AccessPortConnection ident glb _) =
         T.pack ident <> " <-> " <> T.pack glb
 
-instance (ShowText (expr a)) => ShowText (OptionVariant' expr a) where
+instance (ShowText (expr a)) => ShowText (MonadicVariant' expr a) where
     showText (Some e) = "Some(" <> showText e <> ")"
     showText None = "None"
+    showText (Ok e) = "Ok(" <> showText e <> ")"
+    showText (Error e) = "Error(" <> showText e <> ")"
+    showText Success = "Success"
+    showText (Failure e) = "Failure(" <> showText e <> ")"
 
-instance ShowText OptionVariantLabel where
+instance ShowText MonadicVariantLabel where
     showText SomeLabel = "Some"
     showText NoneLabel = "None"
+    showText OkLabel = "Ok"
+    showText ErrorLabel = "Error"
+    showText SuccessLabel = "Success"
+    showText FailureLabel = "Failure"
 
 instance ShowText (PAST.Object a) where
     showText (PAST.Variable ident _) = T.pack ident
@@ -130,13 +138,13 @@ instance ShowText (PAST.Expression a) where
         "{" <> T.intercalate ", " (map showText fs) <> "} : " <> showText ty
     showText (PAST.EnumVariantInitializer ident variant args _) = 
         T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
-    showText (PAST.OptionVariantInitializer ov _) = 
+    showText (PAST.MonadicVariantInitializer ov _) = 
         "Some(" <> showText ov <> ")"
     showText (PAST.StringInitializer str _) = 
         "\"" <> T.pack str <> "\""
     showText (PAST.IsEnumVariantExpression obj ident variant _) = 
         showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
-    showText (PAST.IsOptionVariantExpression obj variant _) = 
+    showText (PAST.IsMonadicVariantExpression obj variant _) = 
         showText obj <> " is " <> showText variant
 
 instance ShowText (Object a) where
@@ -170,13 +178,13 @@ instance ShowText (Expression a) where
         "{" <> T.intercalate ", " (map showText fs) <> "}"
     showText (EnumVariantInitializer ident variant args _) = 
         T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
-    showText (OptionVariantInitializer ov _) = 
+    showText (MonadicVariantInitializer ov _) = 
         "Some(" <> showText ov <> ")"
     showText (StringInitializer str _) = 
         "\"" <> T.pack str <> "\""
     showText (IsEnumVariantExpression obj ident variant _) = 
         showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
-    showText (IsOptionVariantExpression obj variant _) = 
+    showText (IsMonadicVariantExpression obj variant _) = 
         showText obj <> " is " <> showText variant
     showText (ArraySliceExpression ak obj lower upper _) = 
          showText ak <> " " <> showText obj <> "[" <> showText lower <> ".." <> showText upper <> "]"
@@ -201,7 +209,9 @@ instance ShowText (TerminaType a) where
     showText (TInterface _ ident) = T.pack ident
     showText (TGlobal _ ident) = T.pack ident
     showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
-    showText (TOption ts) = "Option<" <> showText ts <> ">"
+    showText (TOption ty) = "Option<" <> showText ty <> ">"
+    showText (TResult tyOk tyError) = "Result<" <> showText tyOk <> "; " <> showText tyError <> ">"
+    showText (TStatus ty) = "Status<" <> showText ty <> ">"
     showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
     showText (TPool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
     showText (TAllocator ts) = "Allocator<" <> showText ts <> ">"

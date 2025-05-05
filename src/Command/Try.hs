@@ -26,6 +26,7 @@ import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
 import Generator.Environment (getPlatformInterruptMap)
+import Generator.Monadic (emptyMonadicTypes)
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -94,9 +95,9 @@ printHeaderModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-    case runGenHeaderFile configParams (getPlatformInterruptMap TestPlatform) False (qualifiedName bbModule) moduleDeps tAST M.empty of
+    case runGenHeaderFile configParams (getPlatformInterruptMap TestPlatform) (qualifiedName bbModule) moduleDeps tAST emptyMonadicTypes of
         Left err -> die . errorMessage $ show err
-        Right cHeaderFile -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
+        Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 
 -- | Command handler for the "try" command
 tryCommand :: TryCmdArgs -> IO ()

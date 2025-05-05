@@ -109,8 +109,10 @@ data TerminaType' expr a
   | TEnum Identifier
   | TInterface InterfaceKind Identifier
   | TArray (TerminaType' expr a) (expr a)
-  | TOption (TerminaType' expr a)
   -- Built-in polymorphic types
+  | TOption (TerminaType' expr a)
+  | TResult (TerminaType' expr a) (TerminaType' expr a)
+  | TStatus (TerminaType' expr a)
   | TMsgQueue (TerminaType' expr a) (expr a) -- Message queues
   | TPool (TerminaType' expr a) (expr a) -- Memory pools
   | TAtomic (TerminaType' expr a) -- TAtomic variables
@@ -159,8 +161,12 @@ instance Ord (TerminaType' expr a) where
   TInt16 `compare` TInt16 = EQ
   TInt32 `compare` TInt32 = EQ
   TInt64 `compare` TInt64 = EQ
+  TUSize `compare` TUSize = EQ
   TStruct ident `compare` TStruct ident' = ident `compare` ident'
   TEnum ident `compare` TEnum ident' = ident `compare` ident'
+  TOption ty `compare` TOption ty' = ty `compare` ty'
+  TStatus ty `compare` TStatus ty' = ty `compare` ty'
+  TResult okTy errorTy `compare` TResult okTy' errorTy' = okTy `compare` okTy' <> errorTy `compare` errorTy'
   TBoxSubtype t `compare` TBoxSubtype t' = t `compare` t'
   TConstSubtype t `compare` TConstSubtype t' = t `compare` t'
   _ `compare` _ = LT
@@ -192,10 +198,13 @@ data Op
   | LogicalOr
   deriving Show
 
-data OptionVariant' expr a = None | Some (expr a)
+data MonadicVariant' expr a = 
+  None | Some (expr a) 
+  | Ok (expr a) | Error (expr a) 
+  | Success | Failure (expr a)
   deriving (Show, Functor)
 
-data OptionVariantLabel = NoneLabel | SomeLabel
+data MonadicVariantLabel = NoneLabel | SomeLabel | OkLabel | ErrorLabel | SuccessLabel | FailureLabel
   deriving (Show)
 
 ----------------------------------------

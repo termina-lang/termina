@@ -7,7 +7,6 @@ module Generator.CodeGen.Application.Glue where
 import Generator.LanguageC.AST
 import qualified Data.Map as M
 import Generator.CodeGen.Common
-import Control.Monad.Reader
 import Modules.Modules (QualifiedName)
 import Semantic.Types
 import ControlFlow.Architecture.Types
@@ -22,15 +21,18 @@ import Semantic.AST
 import Control.Monad (forM)
 import Data.List (find)
 import Generator.CodeGen.Expression
+import Generator.Monadic
+import Control.Monad.State
+import qualified Data.Set as S
 
 
 genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
 genInitTasks progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
     initTasks <- mapM genOSALTaskInit progTasks
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_tasks") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_tasks") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initTasks
 
     where
@@ -44,7 +46,7 @@ genInitTasks progArchitecture = do
                 taskStackSize = getCInteger . getStackSize $ tsk
             cTaskFunctionName <- taskFunctionName classId
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ tskName @: typeDef classId @. namefy "task_msg_queue_id" @: __termina_id_t
                             @= taskMsgQueueId @: __termina_id_t,
@@ -54,7 +56,7 @@ genInitTasks progArchitecture = do
                             taskStackSize @: size_t,
                             cTaskFunctionName @: __termina_task_entry_t,
                             addrOf (tskName @: typeDef classId),
-                            "status" @: (_const . ptr $ _Status)
+                            "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
 
@@ -65,9 +67,9 @@ genInitEmitters :: TerminaProgArch a -> CGenerator CFileItem
 genInitEmitters progArchitecture = do
     let progEmitters = M.elems $ emitters progArchitecture
     initEmitter <- mapM genOSALEmitterInit $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_emitters") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_emitters") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initEmitter
 
     where
@@ -97,7 +99,7 @@ genInitEmitters progArchitecture = do
                                 timerId @: __termina_id_t,
                                 addrOf ("connection" @: __termina_periodic_timer_connection_t),
                                 addrOf (timer @: __termina_periodic_timer_t @. "period" @: _TimeVal),
-                                "status" @: (_const . ptr $ _Status)
+                                "status" @: (_const . ptr $ int32_t)
                             ]
                         ]
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
@@ -121,12 +123,12 @@ genInitEmitters progArchitecture = do
                                     timerId @: __termina_id_t,
                                     addrOf ("connection" @: __termina_periodic_timer_connection_t),
                                     addrOf (timer @: __termina_periodic_timer_t @. "period" @: _TimeVal),
-                                    "status" @: (_const . ptr $ _Status)
+                                    "status" @: (_const . ptr $ int32_t)
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
         genEmitterConnection (TPInterruptEmittter irq _) = do
-            irqMap <- asks interruptsMap
+            irqMap <- gets interruptsMap
             irqVector <- case M.lookup irq irqMap of
                 Just v -> return v
                 Nothing -> throwError $ InternalError $ "Invalid interrupt emitter: " ++ show irq
@@ -152,7 +154,7 @@ genInitEmitters progArchitecture = do
                             pre_cr $ __termina_interrupt__init @@ [
                                 dec irqVector @: __termina_id_t,
                                 addrOf ("connection" @: __termina_interrupt_connection_t),
-                                "status" @: (_const . ptr $ _Status)
+                                "status" @: (_const . ptr $ int32_t)
                             ]
                         ]
                 Nothing -> case M.lookup targetEntity (tasks progArchitecture) of
@@ -175,7 +177,7 @@ genInitEmitters progArchitecture = do
                                 pre_cr $ __termina_interrupt__init @@ [
                                     dec irqVector @: __termina_id_t,
                                     addrOf ("connection" @: __termina_interrupt_connection_t),
-                                    "status" @: (_const . ptr $ _Status)
+                                    "status" @: (_const . ptr $ int32_t)
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
@@ -187,14 +189,14 @@ genInitEmitters progArchitecture = do
             -- | Obtain the identifier of the target entity and the port to which the
             -- interrupt emitter is connected
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ periodicTimerConnection
         genOSALEmitterInit irq@(TPInterruptEmittter {}) = do
             interruptConnection <- genEmitterConnection irq
             -- | Obtain the identifier of the target entity and the port to which the
             -- interrupt emitter is connected
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ interruptConnection
         genOSALEmitterInit _ = throwError $ InternalError "Invalid event emitter"
 
@@ -206,9 +208,9 @@ genInitMutexes :: TerminaProgArch SemanticAnn -> M.Map Identifier OSALResourceLo
 genInitMutexes progArchitecture mutexes = do
     let mutexesList = M.toList mutexes
     initMutexes <- mapM genOSALMutexInit mutexesList
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initMutexes
 
     where
@@ -221,7 +223,7 @@ genInitMutexes progArchitecture mutexes = do
                     Just _ -> return pool
                     _ -> throwError $ InternalError $ "Invalid resource: " ++ show identifier
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ identifier @: typeDef resourceCls @. namefy "mutex_id" @: __termina_id_t
                             @= mutexId @: __termina_id_t,
@@ -229,7 +231,7 @@ genInitMutexes progArchitecture mutexes = do
                             mutexId @: __termina_id_t,
                             "__TerminaMutexPolicy__Ceiling" @: enumFieldType,
                             getCInteger ceilingPriority @: __termina_task_prio_t,
-                            "status" @: (_const . ptr $ _Status)
+                            "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
         genOSALMutexInit _ = throwError $ InternalError "Invalid resource lock"
@@ -238,9 +240,9 @@ genChannelConnections :: TerminaProgArch a -> CGenerator CFileItem
 genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
     channelConnections <- concat <$> mapM genChannelConnection targets
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $ 
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : channelConnections
 
     where
@@ -263,9 +265,9 @@ genChannelConnections progArchitecture = do
 genInitPools :: [TPPool SemanticAnn] -> CGenerator CFileItem
 genInitPools pls = do
     initPools <- mapM genPoolInit pls
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initPools
 
     where
@@ -275,7 +277,7 @@ genInitPools pls = do
             cTs <- genType noqual ts
             poolId <- genDefinePoolIdLabel identifier
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ identifier @: __termina_pool_t @. namefy "pool_id" @: __termina_id_t
                             @= poolId @: __termina_id_t,
@@ -285,16 +287,16 @@ genInitPools pls = do
                                     cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
                                     _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
                                     _sizeOfType cTs,
-                                    "status" @: (_const . ptr $ _Status)
+                                    "status" @: (_const . ptr $ int32_t)
                                 ]
                 ]
 
 genInitMessageQueues :: [OSALMsgQueue] -> CGenerator CFileItem
 genInitMessageQueues queues = do
     initMsgQueues <- mapM genOSALMsgQueueInit queues
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ _Status)] @-> void $
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType)
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initMsgQueues
 
     where
@@ -303,13 +305,13 @@ genInitMessageQueues queues = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
                             cSize,
                             _sizeOfType __termina_id_t,
-                            "status" @: (_const . ptr $ _Status)
+                            "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
@@ -317,26 +319,26 @@ genInitMessageQueues queues = do
             cSize <- genExpression size
             cTs <- genType noqual ty
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
                             cSize,
                             _sizeOfType cTs,
-                            "status" @: (_const . ptr $ _Status)
+                            "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
             return $
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
                             cSize,
                             _sizeOfType __termina_id_t,
-                            "status" @: (_const . ptr $ _Status)
+                            "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
 
@@ -556,20 +558,20 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     no_cr $ _SystemEntry__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- Result result;
-                    pre_cr $ var "result" _Result,
-                    -- result.__variant = Result__Ok;
-                    no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
-                    -- result = classFunctionName(self, current);
-                    pre_cr $ "result" @: _Result @=
+                    -- __status_int32_t status;
+                    pre_cr $ var "status" __status_int32_t,
+                    -- status.__variant = Success;
+                    no_cr $ ("status" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    -- status = classFunctionName(self, current);
+                    pre_cr $ "status" @: __status_int32_t @=
                         timer_handler classId targetAction @@
                             [
                                 "self" @: ptr classIdType,
                                 "current" @: _TimeVal
                             ],
-                    -- if (result.__variant != Result__Ok)
+                    -- if (status.__variant != Success)
                     pre_cr $ _if (
-                            (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
+                            (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
                             -- __termina_exec__shutdown();
                             no_cr $ __termina_exec__shutdown @@ []
@@ -587,74 +589,74 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     no_cr $ _SystemEntry__clock_get_uptime @@ [addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- Result result;
-                    pre_cr $ var "result" _Result,
-                    -- result.__variant = Result__Ok;
-                    no_cr $ ("result" @: _Result) @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType,
-                    -- result = classFunctionName(self, current);
-                    pre_cr $ "result" @: _Result @=
+                    -- __status_int32_t status;
+                    pre_cr $ var "status" __status_int32_t,
+                    -- status.__variant = Success;
+                    no_cr $ ("status" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    -- status = classFunctionName(self, current);
+                    pre_cr $ "status" @: __status_int32_t @=
                         timer_handler classId targetAction @@
                             [
                                 "self" @: ptr classIdType,
                                 deref ("current" @: (_const . ptr $ _TimeVal))
                             ],
-                    -- if (result.__variant != Result__Ok)
+                    -- if (status.__variant != Success)
                     pre_cr $ _if (
-                            (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
+                            (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
                             -- __termina_exec__shutdown();
                             no_cr $ __termina_exec__shutdown @@ []
                         ],
                     pre_cr $ _return Nothing
                 ]
-genInitalEventFunction _ _ = throwError $ InternalError $ "Invalid event emitter"
+genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
 genAppInit :: TerminaProgArch a -> CGenerator CFileItem
 genAppInit progArchitecture = do
     return $ pre_cr $ function (namefy "termina_app" <::> "init") [
-            "status" @: (_const . ptr $ _Status)
+            "status" @: (_const . ptr $ int32_t)
         ] @-> void $
         trail_cr . block $
             [
-                pre_cr ((("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType) @= "Status__Success" @: enumFieldType),
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t),
                 -- | External call to __termina_app__init_globals().
                 -- This function cannot fail, so we do not check the status.
                 pre_cr $ __termina_app__init_globals @@ [],
-                pre_cr $ __termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ _Status)]
+                pre_cr $ __termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ int32_t)]
             ] ++
             [
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [ 
-                            pre_cr $ __termina_app__init_channel_connections @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__init_channel_connections @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ] ++
             [
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [ 
-                            pre_cr $ __termina_app__init_pools @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__init_pools @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
-            ] ++ ([pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+            ] ++ ([pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [
-                            pre_cr $ __termina_app__initial_event @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__initial_event @@ ["status" @: (_const . ptr $ int32_t)]
                         ] | any (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture)]) ++
             [
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [ 
-                            pre_cr $ __termina_app__init_mutexes @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__init_mutexes @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ] ++
             [
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [ 
                             pre_cr $ __termina_app__enable_protection @@ []
                         ],
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_emitters @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__init_emitters @@ ["status" @: (_const . ptr $ int32_t)]
                         ],
-                pre_cr $ _if ("Status__Success" @: enumFieldType @== ("status" @: (_const . ptr $ _Status)) @. variant @: enumFieldType)
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_tasks @@ ["status" @: (_const . ptr $ _Status)]
+                            pre_cr $ __termina_app__init_tasks @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ]
 
@@ -718,5 +720,7 @@ runGenMainFile ::
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
 runGenMainFile config irqMap mainFilePath progArchitecture =
-    runReader (runExceptT (genMainFile mainFilePath progArchitecture))
-        (CGeneratorEnv M.empty config irqMap)
+    case runState (runExceptT (genMainFile mainFilePath progArchitecture))
+        (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config irqMap) of
+    (Left err, _) -> Left err
+    (Right cFile, _) -> Right cFile

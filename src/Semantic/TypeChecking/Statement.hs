@@ -150,6 +150,28 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
       when (not total && (length flsDefIdents == length casesIdents)) $
         throwError $ annotateError ann EInvalidDefaultCase
       return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
+    TStatus t -> do
+      let flsDefIdents = ["Success", "Failure"]
+          casesIdents = matchIdentifier <$> cases
+          variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [t])]
+          caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+      typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
+      when (not total && (length flsDefIdents == length casesIdents)) $
+        throwError $ annotateError ann EInvalidDefaultCase
+      return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
+    TResult okTy errorTy -> do
+      let flsDefIdents = ["Ok", "Error"]
+          casesIdents = matchIdentifier <$> cases
+          variantMap = M.fromList [("Ok", EnumVariant "Ok" [okTy]), ("Error", EnumVariant "Error" [errorTy])]
+          caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+        \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+      typedCases <- mapM (typeMatchCase caseMap variantMap) casesIdents
+      when (not total && (length flsDefIdents == length casesIdents)) $
+        throwError $ annotateError ann EInvalidDefaultCase
+      return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
     _ -> throwError $  annotateError ann $ EMatchInvalidType type_matchE
 
     where

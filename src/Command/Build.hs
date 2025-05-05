@@ -12,7 +12,6 @@ import qualified Options.Applicative as O
 import Control.Monad
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Semantic.AST as SAST
 
 import System.FilePath
 import System.Exit
@@ -23,7 +22,7 @@ import Text.Parsec (runParser)
 import qualified Data.Map as M
 import Semantic.Types (SemanticAnn)
 import Modules.Modules
-import Generator.Option (OptionMap, runMapOptionsAnnotatedProgram)
+import Generator.Monadic
 import Data.List (foldl')
 import Generator.CodeGen.Module (runGenSourceFile, runGenHeaderFile)
 import Generator.LanguageC.Printer (runCPrinter)
@@ -42,6 +41,9 @@ import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
 import ControlFlow.ConstFolding (runConstFolding)
+import qualified Data.Set as S
+import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
+import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -145,33 +147,27 @@ typeModules parsedProject =
                   (SemanticData typedProgram)
           typeModules' (M.insert m typedModule typedProject) newState ms
 
-optionMapModules :: TypedProject -> (OptionMap, OptionMap)
-optionMapModules = M.partitionWithKey
-                (\k _ -> case k of
-                  SAST.TStruct {} -> False
-                  SAST.TEnum {} -> False
-                  _ -> True) . foldl' optionMapModule M.empty . M.elems
+monadicTypesMapModules :: TypedProject -> MonadicTypes
+monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.elems
 
   where
-    optionMapModule :: OptionMap -> TypedModule -> OptionMap
-    optionMapModule prevMap typedModule = runMapOptionsAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
+    monadicTypesMapModule :: MonadicTypes -> TypedModule -> MonadicTypes
+    monadicTypesMapModule prevMap typedModule = runMapMonadicTypesAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
 
 genModules ::
   TerminaConfig
   -> Platform
-  -- | Whether to include the option.h file or not
-  -> Bool
   -- | The map with the option types to generate from defined types 
-  -> OptionMap
+  -> MonadicTypes
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-genModules params plt includeOptionH definedTypesOptionMap =
-  mapM_ printModule . M.elems
+genModules params plt initialMonadicTypes =
+  foldM_ printModule initialMonadicTypes . M.elems
 
   where
 
-    printModule :: BasicBlocksModule -> IO ()
-    printModule bbModule = do
+    printModule :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
+    printModule currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
@@ -181,12 +177,13 @@ genModules params plt includeOptionH definedTypesOptionMap =
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
-      case runGenHeaderFile params (getPlatformInterruptMap plt) includeOptionH (qualifiedName bbModule) moduleDeps tAST definedTypesOptionMap of
+      case runGenHeaderFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
         Left err -> die . errorMessage $ show err
-        Right cHeaderFile -> do
+        Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
           createDirectoryIfMissing True (takeDirectory headerFile)
           TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
+          return newMonadicTypes
 
 genInitFile :: TerminaConfig -> Platform -> BasicBlocksProject -> IO ()
 genInitFile params plt bbProject = do
@@ -197,13 +194,29 @@ genInitFile params plt bbProject = do
     Left err -> die . errorMessage $ show err
     Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (profile params == Debug) cInitFile
 
-genOptionHeaderFile :: TerminaConfig -> Platform -> OptionMap -> IO ()
-genOptionHeaderFile params plt basicTypesOptionMap = do
+genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
+genOptionHeaderFile params plt monadicTypes = do
   let destinationPath = outputFolder params
-      optionsFilePath = destinationPath </> "include" </> "options" <.> "h"
-  case runGenOptionHeaderFile params (getPlatformInterruptMap plt) basicTypesOptionMap of
+      optionFilePath = destinationPath </> "include" </> "option" <.> "h"
+  case runGenOptionHeaderFile params (getPlatformInterruptMap plt) optionFilePath monadicTypes of
     Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile optionsFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+    Right cOptionsFile -> TIO.writeFile optionFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+
+genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
+genStatusHeaderFile params plt monadicTypes = do
+  let destinationPath = outputFolder params
+      statusFilePath = destinationPath </> "include" </> "status" <.> "h"
+  case runGenStatusHeaderFile params (getPlatformInterruptMap plt) statusFilePath monadicTypes of
+    Left err -> die . errorMessage $ show err
+    Right cOptionsFile -> TIO.writeFile statusFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+
+genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
+genResultHeaderFile params plt monadicTypes = do
+  let destinationPath = outputFolder params
+      resultFilePath = destinationPath </> "include" </> "result" <.> "h"
+  case runGenResultHeaderFile params (getPlatformInterruptMap plt) resultFilePath monadicTypes of
+    Left err -> die . errorMessage $ show err
+    Right cOptionsFile -> TIO.writeFile resultFilePath $ runCPrinter (profile params == Debug) cOptionsFile
 
 genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture bbProject initialTerminaProgram orderedDependencies = do
@@ -345,7 +358,7 @@ buildCommand (BuildCmdArgs chatty) = do
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
-    let (basicTypesOptionMap, definedTypesOptionMap) = optionMapModules typedProject
+    let monadicTypes = monadicTypesMapModules typedProject
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
     bbProject <- 
@@ -383,8 +396,22 @@ buildCommand (BuildCmdArgs chatty) = do
     constFolding bbProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
-    genModules config plt (not (M.null basicTypesOptionMap)) definedTypesOptionMap bbProject
+    genModules config plt monadicTypes bbProject
     genInitFile config plt bbProject
     genPlatformCode config plt bbProject programArchitecture
-    genOptionHeaderFile config plt basicTypesOptionMap
+    unless (S.null (S.filter (\case {
+        TStruct _ -> False;
+        TEnum _ -> False;
+        _ -> True;
+        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes
+    unless (S.null (S.filter (\case {
+        TStruct _ -> False;
+        TEnum _ -> False;
+        _ -> True;
+        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes
+    unless (S.null (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
+        TStruct _ -> False;
+        TEnum _ -> False;
+        _ -> True;
+        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

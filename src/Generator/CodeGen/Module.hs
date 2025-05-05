@@ -13,10 +13,12 @@ import Modules.Modules
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map as M
-import Control.Monad.Reader (runReader)
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration
+import Generator.Monadic
+import Control.Monad.State
+import qualified Data.Set as S
 
 
 genModuleDefineLabel :: QualifiedName -> String
@@ -43,25 +45,40 @@ genSourceASTElement func@(Function {}) = genFunction func
 genHeaderFile ::
     -- | Include option.h
     Bool
+    -- | Include status.h
+    -> Bool
+    -- | Include result.h
+    -> Bool
     -- | Module name
     -> QualifiedName
     -- | Import list
     -> [QualifiedName]
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
-genHeaderFile includeOptionH mName imports program = do
+genHeaderFile includeOptionH includeStatusH includeResultH mName imports program = do
     let defineLabel = genModuleDefineLabel mName
-        includeList = map (`genInclude` False) imports
     items <- concat <$> mapM genHeaderASTElement program
+    extra <- gets extraImports
+    let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
     return $ CHeaderFile mName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
             CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
             CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
-        ] ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
-        ++ includeList ++ items ++ [
+        ] ++ includeList 
+        ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
+        ++ ([CPPDirective (CPPInclude False "status.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
+        ++ ([CPPDirective (CPPInclude False "result.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
+        ++ items 
+        ++ [
             CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
+    
+    where
+
+        genIncludeList :: [QualifiedName] -> [CFileItem]
+        genIncludeList [] = []
+        genIncludeList (x:xs) = genInclude x True : map (`genInclude` False) xs
 
 genSourceFile ::
     -- | Module name
@@ -82,17 +99,36 @@ runGenSourceFile ::
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
 runGenSourceFile config irqMap mName program = 
-    runReader (runExceptT (genSourceFile mName program)) (CGeneratorEnv M.empty config irqMap) 
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config irqMap) of
+    (Left err, _) -> Left err
+    (Right file, _) -> Right file
 
 runGenHeaderFile :: 
     TerminaConfig 
     -> M.Map Identifier Integer
-    -> Bool 
     -> QualifiedName 
     -> [QualifiedName] 
     -> AnnotatedProgram SemanticAnn 
-    -> OptionTypes 
-    -> Either CGeneratorError CFile
-runGenHeaderFile config irqMap includeOptionH mName imports program opts = 
-    runReader (runExceptT (genHeaderFile includeOptionH mName imports program)) 
-        (CGeneratorEnv opts config irqMap)
+    -> MonadicTypes 
+    -> Either CGeneratorError (CFile, MonadicTypes)
+runGenHeaderFile config irqMap mName imports program monadicTys = 
+    let includeOptionH = not (S.null (S.filter (\case {
+            TStruct _ -> False;
+            TEnum _ -> False;
+            _ -> True;
+            }) (optionTypes monadicTys)))
+        includeStatusH = not (S.null (S.filter (\case {
+            TStruct _ -> False;
+            TEnum _ -> False;
+            _ -> True;
+            }) (statusTypes monadicTys)))
+        includeResultH = not (S.null (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
+            TStruct _ -> False;
+            TEnum _ -> False;
+            _ -> True;
+            }) $ resultTypes monadicTys))
+    in
+    case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
+        (CGeneratorEnv mName S.empty monadicTys config irqMap) of
+    (Left err, _) -> Left err
+    (Right file, env) -> Right (file, monadicTypes env)

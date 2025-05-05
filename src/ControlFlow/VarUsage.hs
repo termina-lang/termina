@@ -88,7 +88,7 @@ useExpression (Casting e _ty _a)
   = useExpression e
 useExpression (IsEnumVariantExpression obj _ _ _)
   = useObject obj
-useExpression (IsOptionVariantExpression obj _ _)
+useExpression (IsMonadicVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
@@ -103,10 +103,14 @@ useExpression (StructInitializer fs _ann)
   = mapM_ useFieldAssignment fs
 useExpression (EnumVariantInitializer _ident _ident2 es _ann)
   = mapM_ useExpression es
-useExpression (OptionVariantInitializer opt _ann)
+useExpression (MonadicVariantInitializer opt _ann)
   = case opt of
         None   -> return ()
         Some e -> useExpression e
+        Success -> return ()
+        Failure e -> useExpression e
+        Ok e -> useExpression e
+        Error e -> useExpression e
 useExpression (FunctionCall _ident args _ann)
   = mapM_ useArguments args
 useExpression (StringInitializer _str _a)
@@ -135,13 +139,13 @@ useDefStmt (AssignmentStmt obj e ann) = do
   case obj_ty of
     (_, TOption (TBoxSubtype _)) -> 
       -- | We are assigning to an option-box. This can only be done through a
-      -- OptionVariantInitializer.
+      -- MonadicVariantInitializer.
       case e of 
-        OptionVariantInitializer None _ -> 
+        MonadicVariantInitializer None _ -> 
           case obj of
             Variable ident _ -> initializeOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-        OptionVariantInitializer (Some boxObjExpr) _ -> do
+        MonadicVariantInitializer (Some boxObjExpr) _ -> do
           -- | We need to move the box object 
           case boxObjExpr of
             AccessObject (Variable ident _) -> 

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.CodeGen.Application.Option where
+module Generator.CodeGen.Application.Status where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
@@ -16,19 +16,19 @@ import Generator.Monadic
 import Control.Monad.State
 import Modules.Modules
 
-genOptionPathName :: FilePath
-genOptionPathName = "option" <.> "h"
+genStatusPathName :: FilePath
+genStatusPathName = "status" <.> "h"
 
-genOptionHeaderFile :: CGenerator CFile
-genOptionHeaderFile = do
-    let defineLabel = "__OPTION_H__"
-    optionSet <- gets (S.filter (\case {
+genStatusHeaderFile :: CGenerator CFile
+genStatusHeaderFile = do
+    let defineLabel = "__STATUS_H__"
+    statusSet <- gets (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . optionTypes . monadicTypes)
-    items <- concat <$> mapM genOptionStruct (S.toList optionSet)
-    return $ CHeaderFile genOptionPathName $
+        }) . statusTypes . monadicTypes)
+    items <- concat <$> mapM genStatusStruct (S.toList statusSet)
+    return $ CHeaderFile genStatusPathName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
             CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
@@ -38,14 +38,14 @@ genOptionHeaderFile = do
             CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
 
-runGenOptionHeaderFile ::
+runGenStatusHeaderFile ::
     TerminaConfig
     -> M.Map Identifier Integer
     -> QualifiedName
     -> MonadicTypes
     -> Either CGeneratorError CFile
-runGenOptionHeaderFile config irqMap optionFileName opts =
-    case runState (runExceptT genOptionHeaderFile)
+runGenStatusHeaderFile config irqMap optionFileName opts =
+    case runState (runExceptT genStatusHeaderFile)
         (CGeneratorEnv optionFileName S.empty opts config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

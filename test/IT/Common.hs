@@ -5,10 +5,9 @@ import Parser.Parsing
 import Semantic.TypeChecking
 import Semantic.Environment
 import Text.Parsec
-import qualified Data.Map as M
 import ControlFlow.BasicBlocks
 import Configuration.Configuration
-import Generator.Option
+import Generator.Monadic
 import Configuration.Platform
 import Generator.CodeGen.Module
 import Generator.LanguageC.Printer
@@ -27,9 +26,9 @@ renderHeader includeOptionH input = case parse (contents topLevel) "" input of
         case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams irqMap includeOptionH "test" [] bbAST M.empty of
+            case runGenHeaderFile configParams irqMap includeOptionH "test" [] bbAST emptyMonadicTypes of
               Left err -> pack $ show err
-              Right cHeaderFile -> runCPrinter False cHeaderFile
+              Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
 renderSource :: String -> Text
 renderSource input = case parse (contents topLevel) "" input of
@@ -47,10 +46,10 @@ renderSource input = case parse (contents topLevel) "" input of
               Left err -> pack $ show err
               Right cSourceFile -> runCPrinter False cSourceFile
 
-renderOption :: OptionMap -> Text
-renderOption optionMap =
+renderOption :: MonadicTypes -> Text
+renderOption monadicTypes =
   let configParams = defaultConfig "test" TestPlatform 
       irqMap = getPlatformInterruptMap TestPlatform in
-  case runGenOptionHeaderFile configParams irqMap optionMap of
+  case runGenOptionHeaderFile configParams irqMap "test" monadicTypes of
     Left err -> pack $ show err
     Right cOptionsFile -> runCPrinter False cOptionsFile

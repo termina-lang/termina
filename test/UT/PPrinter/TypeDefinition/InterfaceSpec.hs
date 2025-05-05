@@ -4,7 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
-import qualified Data.Map as M
+import Generator.Monadic
 
 import UT.PPrinter.Common
 
@@ -26,7 +26,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing classes" $ do
     it "Prints an interface with one procedure" $ do
-      renderTypeDefinitionDecl M.empty interfaceWithOneProcedure `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes interfaceWithOneProcedure `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
           "    void * __that;\n" ++

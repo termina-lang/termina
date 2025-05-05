@@ -9,14 +9,15 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
 import qualified Data.Map as M
-import qualified Data.Set as S
-import Control.Monad.Reader
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)
 import Generator.CodeGen.Application.Utils
 import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
+import Generator.Monadic
+import qualified Data.Set as S
+import Control.Monad.State
 
 filterStructModifiers :: [Modifier a] -> [Modifier a]
 filterStructModifiers = filter (\case
@@ -38,15 +39,15 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort ts@(TAtomicArrayAcc
     cTs <- genType noqual ts
     return [field identifier cTs]
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface RegularInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
-    let cThatField = field thatField (ptr void) 
+    let cThatField = field thatField (ptr void)
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
-            CDecl 
-                (CTSStructUnion 
-                    (CStruct CStructTag Nothing (cThatField : memberFields) [])) 
+            CDecl
+                (CTSStructUnion
+                    (CStruct CStructTag Nothing (cThatField : memberFields) []))
                 (Just identifier) Nothing
         ]
-    
+
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
@@ -58,12 +59,12 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
 genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemInterface _)) (SemanticAnn (FTy (AccessPortField members)) _)) = do
     memberFields <- mapM genInterfaceProcedureField (M.elems members)
     return [
-            CDecl 
-                (CTSStructUnion 
-                    (CStruct CStructTag Nothing memberFields [])) 
+            CDecl
+                (CTSStructUnion
+                    (CStruct CStructTag Nothing memberFields []))
                 (Just identifier) Nothing
         ]
-    
+
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
@@ -77,15 +78,128 @@ genFieldDeclaration (FieldDefinition identifier ts _) = do
     cTs <- genType noqual ts
     return [field identifier cTs]
 
-genOptionSomeParameterStruct :: SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
-genOptionSomeParameterStruct ann ts = do
+genOptionSomeParameterStruct :: TerminaType SemanticAnn ->  CGenerator CFileItem
+genOptionSomeParameterStruct ts = do
     cTs <- genType noqual ts
-    let fld = field optionSomeField cTs
+    let fld = field (namefy "0") cTs
     identifier <- genOptionParameterStructName ts
-    return $ pre_cr $ struct identifier [fld] [] |>> getLocation ann
+    return $ pre_cr $ struct identifier [fld] []
 
-genOptionStruct :: SemanticAnn -> TerminaType SemanticAnn -> CGenerator [CFileItem]
-genOptionStruct ann (TOption ts) = do
+genStatusFailureParameterStruct :: TerminaType SemanticAnn ->  CGenerator CFileItem
+genStatusFailureParameterStruct ts = do
+    cTs <- genType noqual ts
+    let fld = field (namefy "0") cTs
+    identifier <- genStatusParameterStructName ts
+    return $ pre_cr $ struct identifier [fld] []
+
+genStatusStruct :: TerminaType SemanticAnn -> CGenerator [CFileItem]
+genStatusStruct ts = do
+    paramsStructName <- genStatusParameterStructName ts
+    enumStructName <- genEnumStructName "status"
+    paramsStructType <- genType noqual (TStruct paramsStructName)
+    enumStructType <- genType noqual (TStruct enumStructName)
+    let failure = field statusFailureVariant paramsStructType
+        this_variant = field variant enumStructType
+    identifier <- genStatusStructName ts
+    paramStruct <- genStatusFailureParameterStruct ts
+    return [
+            paramStruct,
+            pre_cr $ struct identifier [failure, this_variant] []
+        ]
+
+genResultOkParameterStruct :: TerminaType SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
+genResultOkParameterStruct okTy errorTy = do
+    cTs <- genType noqual okTy
+    let fld = field (namefy "0") cTs
+    identifier <- genResultParameterStructName okTy errorTy resultOkVariant
+    return $ pre_cr $ struct identifier [fld] []
+
+genResultErrorParameterStruct :: TerminaType SemanticAnn -> TerminaType SemanticAnn ->  CGenerator CFileItem
+genResultErrorParameterStruct okTy errorTy = do
+    cTs <- genType noqual errorTy
+    let fld = field (namefy "0") cTs
+    identifier <- genResultParameterStructName okTy errorTy resultErrorVariant
+    return $ pre_cr $ struct identifier [fld] []
+
+genResultStruct :: TerminaType SemanticAnn -> TerminaType SemanticAnn -> CGenerator [CFileItem]
+genResultStruct okTy errorTy = do
+    okParamStructName <- genResultParameterStructName okTy errorTy resultOkVariant
+    okParamsStructType <- genType noqual (TStruct okParamStructName)
+    errorParamStructName <- genResultParameterStructName okTy errorTy resultErrorVariant
+    errorParamsStructType <- genType noqual (TStruct errorParamStructName)
+    enumStructName <- genEnumStructName "result"
+    enumStructType <- genType noqual (TStruct enumStructName)
+    let ok = field resultOkVariant okParamsStructType
+        err = field resultErrorVariant errorParamsStructType
+        this_variant = field variant enumStructType
+    identifier <- genResultStructName okTy errorTy
+    okParamStruct <- genResultOkParameterStruct okTy errorTy
+    errorParamStruct <- genResultErrorParameterStruct okTy errorTy
+    return [
+            okParamStruct,
+            errorParamStruct,
+            pre_cr $ struct identifier [ok, err, this_variant] []
+        ]
+
+genResultStructFromTypeDef :: TerminaType SemanticAnn -> (TerminaType SemanticAnn, TerminaType SemanticAnn) -> CGenerator [CFileItem]
+genResultStructFromTypeDef (TStruct identifier) (okTy@(TStruct okIdentifier), errorTy@(TStruct errorIdentifier)) = do
+    genTypes <- gets (generatedTypes . monadicTypes)
+    if (identifier == okIdentifier) && (identifier == errorIdentifier) then do
+        genResultStruct okTy errorTy
+    else if (identifier == okIdentifier) && M.member errorTy genTypes then do
+        let errorTyModule = genTypes M.! errorTy
+        modify $ \st -> st {
+            extraImports = S.insert errorTyModule (extraImports st)
+        } 
+        genResultStruct okTy errorTy 
+    else if (identifier == errorIdentifier) && M.member okTy genTypes then do
+        let okTyModule = genTypes M.! okTy
+        modify $ \st -> st {
+            extraImports = S.insert okTyModule (extraImports st)
+        } 
+        genResultStruct okTy errorTy 
+    else return []
+genResultStructFromTypeDef (TStruct identifier) (TStruct okIdentifier, errorTy) =
+    if identifier == okIdentifier then
+        genResultStruct (TStruct okIdentifier) errorTy
+    else
+        throwError $ InternalError $ "Invalid result struct: " ++ show identifier ++ " " ++ show okIdentifier ++ " " ++ show errorTy
+genResultStructFromTypeDef (TStruct identifier) (okTy, TStruct errorIdentifier) =
+    if identifier == errorIdentifier then
+        genResultStruct okTy (TStruct errorIdentifier)
+    else
+        throwError $ InternalError $ "Invalid result struct: " ++ show identifier ++ " " ++ show okTy ++ " " ++ show errorIdentifier
+genResultStructFromTypeDef (TEnum identifier) (okTy@(TEnum okIdentifier), errorTy@(TEnum errorIdentifier)) = do
+    genTypes <- gets (generatedTypes . monadicTypes)
+    if (identifier == okIdentifier) && (identifier == errorIdentifier) then do
+        genResultStruct okTy errorTy
+    else if (identifier == okIdentifier) && M.member errorTy genTypes then do
+        let errorTyModule = genTypes M.! errorTy
+        modify $ \st -> st {
+            extraImports = S.insert errorTyModule (extraImports st)
+        } 
+        genResultStruct okTy errorTy 
+    else if (identifier == errorIdentifier) && M.member okTy genTypes then do
+        let okTyModule = genTypes M.! okTy
+        modify $ \st -> st {
+            extraImports = S.insert okTyModule (extraImports st)
+        } 
+        genResultStruct okTy errorTy 
+    else return []
+genResultStructFromTypeDef (TEnum identifier) (TEnum okIdentifier, errorTy) =
+    if identifier == okIdentifier then
+        genResultStruct (TEnum okIdentifier) errorTy
+    else
+        throwError $ InternalError $ "Invalid result enum: " ++ show identifier ++ " " ++ show okIdentifier ++ " " ++ show errorTy
+genResultStructFromTypeDef (TEnum identifier) (okTy, TEnum errorIdentifier) =
+    if identifier == errorIdentifier then
+        genResultStruct okTy (TEnum errorIdentifier)
+    else
+        throwError $ InternalError $ "Invalid result enum: " ++ show identifier ++ " " ++ show okTy ++ " " ++ show errorIdentifier
+genResultStructFromTypeDef _ _ = throwError $ InternalError "Invalid result enum: not a struct"
+
+genOptionStruct :: TerminaType SemanticAnn -> CGenerator [CFileItem]
+genOptionStruct ts = do
     paramsStructName <- genOptionParameterStructName ts
     enumStructName <- genEnumStructName "option"
     paramsStructType <- genType noqual (TStruct paramsStructName)
@@ -93,12 +207,11 @@ genOptionStruct ann (TOption ts) = do
     let some = field optionSomeVariant paramsStructType
         this_variant = field variant enumStructType
     identifier <- genOptionStructName ts
-    paramStruct <- genOptionSomeParameterStruct ann ts
+    paramStruct <- genOptionSomeParameterStruct ts
     return [
             paramStruct,
-            pre_cr $ struct identifier [some, this_variant] [] |>> getLocation ann
+            pre_cr $ struct identifier [some, this_variant] []
         ]
-genOptionStruct ts _ = throwError $ InternalError $ "Type not an option: " ++ show ts
 
 genAttribute :: Modifier a -> CGenerator CAttribute
 genAttribute (Modifier name Nothing) = do
@@ -113,7 +226,7 @@ genAttribute (Modifier name (Just expr)) = do
         genConst c = do
             let cAnn = LocatedElement CGenericAnn Internal
             case c of
-                (I i _) -> 
+                (I i _) ->
                     let cInteger = genInteger i in
                     return $ CExprConstant (CIntConst cInteger) (CTInt IntSize32 Unsigned noqual) cAnn
                 (B True) -> return $ CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTBool noqual) cAnn
@@ -169,10 +282,25 @@ genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = d
     let cAnn = buildDeclarationAnn ann True
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
     cFields <- concat <$> mapM genFieldDeclaration fls
-    opts <- asks optionTypes
-    optsDeclExt <- concat <$> maybe (return [])
-        (mapM (genOptionStruct ann) . S.toList) (M.lookup (TStruct identifier) opts)
-    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : optsDeclExt
+    opts <- gets (optionTypes . monadicTypes)
+    optsDeclExt <- if S.member (TStruct identifier) opts then
+        genOptionStruct (TStruct identifier)
+        else return []
+    stats <- gets (statusTypes . monadicTypes)
+    statusDeclExt <- if S.member (TStruct identifier) stats then
+        genStatusStruct (TStruct identifier)
+        else return []
+    results <- gets (resultTypes . monadicTypes)
+    resultsDeclExt <- concat <$> case M.lookup (TStruct identifier) results of
+        Nothing -> return []
+        Just resultSet -> mapM (genResultStructFromTypeDef (TStruct identifier)) (S.toList resultSet)
+    currModule <- gets currentModule
+    modify $ \st -> st {
+            monadicTypes = (monadicTypes st) {
+                generatedTypes = M.insert (TStruct identifier) currModule (generatedTypes . monadicTypes $ st)
+            }
+        }
+    return $ CExtDecl (CEDStructUnion (Just identifier) (CStruct CStructTag Nothing cFields structModifiers)) cAnn : (optsDeclExt ++ statusDeclExt ++ resultsDeclExt)
 genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     let cAnn = buildDeclarationAnn ann True
         variantsWithParams = filter (not . null . assocData) variants
@@ -180,8 +308,16 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
     pEnumVariants <- mapM (\(EnumVariant this_variant _) -> genEnumVariantName identifier this_variant) variants
     pEnumParameterStructs <- mapM (genEnumVariantParameterStruct ann identifier) variantsWithParams
     enumStruct <- genEnumStruct enumName variantsWithParams
+    opts <- gets (optionTypes . monadicTypes)
+    optsDeclExt <- if S.member (TEnum identifier) opts then
+        genOptionStruct (TStruct identifier)
+        else return []
+    stats <- gets (statusTypes . monadicTypes)
+    statusDeclExt <- if S.member (TEnum identifier) stats then
+        genStatusStruct (TStruct identifier)
+        else return []
     return $ CExtDecl (CEDEnum (Just enumName) (CEnum Nothing [(v, Nothing) | v <- pEnumVariants] [])) cAnn
-                : pEnumParameterStructs ++ [enumStruct]
+                : pEnumParameterStructs ++ (enumStruct : optsDeclExt ++ statusDeclExt)
 
         where
 
@@ -244,10 +380,10 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     case clsKind of
         TaskClass -> do
             cTaskFunction <- genTaskFunctionDeclaration
-            return $ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction] 
+            return $ [pre_cr (struct identifier structFields structModifiers |>> getLocation ann), cTaskFunction]
                 ++ cFunctions
-        _ -> 
-            return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann) 
+        _ ->
+            return $ pre_cr (struct identifier structFields structModifiers |>> getLocation ann)
                 : cFunctions
 
     where
@@ -336,32 +472,31 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             classFunctionName <- genClassFunctionName classId action
             classStructType <- genType noqual (TStruct classId)
             cDataType <- genType noqual dts
-            let classFunctionType = CTFunction _Result
+            let classFunctionType = CTFunction __status_int32_t
                     [_const . ptr $ classStructType, cDataType]
             return
                 [
                     -- case variant:
                     pre_cr $ _case (this_variant @: enumFieldType) $
-                    -- __termina_msg_queue__recv(self->port, &action_msg_data, &status);
                     indent . pre_cr $ __termina_msg_queue__recv @@
                             [
                                 ("self" @: ptr classStructType) @. port @: __termina_id_t,
                                 cast void_ptr (addrOf ((action <::> "msg_data") @: cDataType)),
-                                addrOf ("status" @: _Status)
+                                addrOf ("status" @: int32_t)
                             ],
                     -- if (status.__variant != Status__Success)
                     indent . pre_cr $ _if (
-                            "status" @: _Status @. variant @: enumFieldType @!= "Status__Success" @: enumFieldType)
+                           "status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
                             -- __termina_exec__shutdown();
                             no_cr $ __termina_exec__shutdown @@ []
                         ],
-                    -- result = classFunctionName(self, action_msg_data);
-                    indent . pre_cr $ "result" @: CTTypeDef "Result" noqual @=
+                    -- status = classFunctionName(self, action_msg_data);
+                    indent . pre_cr $ "result" @: __status_int32_t @=
                         (classFunctionName @: classFunctionType) @@ ["self" @: classStructType, (action <::> "msg_data") @: cDataType],
-                    -- if (result.__variant != Result__Ok)
+                    -- if (result.__variant != Status__Success)
                     indent . pre_cr $ _if (
-                            (("result" @: typeDef "Result") @. variant) @: enumFieldType @!= "Result__Ok" @: enumFieldType)
+                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
                             -- rtems_shutdown_executive(1);
                             no_cr $ __termina_exec__shutdown @@ []
@@ -380,11 +515,11 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             [
                                 ("self" @: ptr classStructType) @. taskMsgQueueIDField @: __termina_id_t,
                                 addrOf ("next_msg" @: uint32_t),
-                                addrOf ("status" @: _Status)
+                                addrOf ("status" @: int32_t)
                             ],
-                    -- if (RTEMS_SUCCESSFUL != status)
+                    -- if (status != Status__Success)
                     pre_cr $ _if
-                            ("status" @: _Status @. variant @: enumFieldType @!= "Status__Success" @: enumFieldType)
+                            ("status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
                             -- break;
                             no_cr _break
@@ -408,15 +543,14 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             return $ [
                     -- ClassIdentifier * self = (ClassIdentifier *)&arg;
                     pre_cr $ var "self" (ptr classId) @:= cast (ptr classId) ("arg" @: ptr void),
-                    -- rtems_status_code status = RTEMS_SUCCESSFUL;
-                    pre_cr $ var "status" _Status,
-                    no_cr $ "status" @: _Status @. variant @: enumFieldType @= "Status__Success" @: enumFieldType,
+                    -- int32_t status = 0;
+                    pre_cr $ var "status" int32_t @:= dec 0 @: int32_t,
                     -- uint32_t next_msg = 0U;
                     pre_cr $ var "next_msg" uint32_t @:= dec 0 @: uint32_t,
-                    -- Result result;
-                    pre_cr $ var "result" (typeDef "Result"),
-                    -- result.__variant = Result__Ok;
-                    no_cr $ ("result" @: typeDef "Result") @. variant @: enumFieldType @= "Result__Ok" @: enumFieldType
+                    -- __status_int32_t result;
+                    pre_cr $ var "result" __status_int32_t,
+                    -- result.__variant = Success;
+                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType
                 ] ++ msgDataVars ++
                 [
                     pre_cr $ _for Nothing Nothing Nothing loop,
@@ -480,24 +614,24 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                             (ptr void : cParamTypes)
                     let cBody = [
                                 selfCastStmt,
-                                pre_cr $ var "status" _Status,
-                                no_cr $ "status" @: _Status @. variant @: enumFieldType @= "Status__Success" @: enumFieldType,
+                                pre_cr $ var "status" __status_int32_t,
+                                no_cr $ "status" @: __status_int32_t @. variant @: enumFieldType @= "Success" @: enumFieldType,
                                 pre_cr $ __termina_mutex__lock @@
                                     [
                                         (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
-                                        addrOf ("status" @: _Status)
+                                        addrOf ("status" @: __status_int32_t)
                                     ],
                                 no_cr $ procedureFunction @@ ("self" @: ptr void : cParamExpressions),
                                 no_cr $ __termina_mutex__unlock @@
                                     [
                                         (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
-                                        addrOf ("status" @: _Status)
+                                        addrOf ("status" @: __status_int32_t)
                                     ]
                             ]
                     return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "mutex_lock") (cThisParam : cParamDecls)
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
-                
+
                 genProcedureTaskLock :: CGenerator CFileItem
                 genProcedureTaskLock = do
                     cThisParam <- genThisParam
@@ -521,7 +655,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                     return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "task_lock") (cThisParam : cParamDecls)
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
-                
+
                 genProcedureEventLock :: CGenerator CFileItem
                 genProcedureEventLock = do
                     cThisParam <- genThisParam

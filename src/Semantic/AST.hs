@@ -57,16 +57,16 @@ data Expression
     Identifier -- ^ Variant identifier
     [Expression a] -- ^ list of expressions
     a
-  | OptionVariantInitializer (OptionVariant a) a
+  | MonadicVariantInitializer (MonadicVariant a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
     (Object a) -- ^ Enum object
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
-  | IsOptionVariantExpression
+  | IsMonadicVariantExpression
     (Object a) -- ^ Opion object
-    OptionVariantLabel -- ^ Variant label
+    MonadicVariantLabel -- ^ Variant label
     a
   | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
   -- ^ TArray slice. This is a reference to an slisce of an array.
@@ -98,11 +98,11 @@ instance Annotated Expression where
   getAnnotation (EnumVariantInitializer _ _ _ a)  = a
   getAnnotation (ArrayInitializer _ _ a)          = a
   getAnnotation (ArrayExprListInitializer _ a)    = a
-  getAnnotation (OptionVariantInitializer _ a)    = a
+  getAnnotation (MonadicVariantInitializer _ a)    = a
   getAnnotation (MemberFunctionCall _ _ _ a)      = a
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
-  getAnnotation (IsOptionVariantExpression _ _ a) = a
+  getAnnotation (IsMonadicVariantExpression _ _ a) = a
   getAnnotation (ArraySliceExpression _ _ _ _ a)    = a
   getAnnotation (StringInitializer _ a) = a
 
@@ -116,11 +116,11 @@ instance Annotated Expression where
   updateAnnotation (EnumVariantInitializer id1 id2 es _) = EnumVariantInitializer id1 id2 es
   updateAnnotation (ArrayInitializer e s _) = ArrayInitializer e s
   updateAnnotation (ArrayExprListInitializer es _) = ArrayExprListInitializer es
-  updateAnnotation (OptionVariantInitializer ov _) = OptionVariantInitializer ov
+  updateAnnotation (MonadicVariantInitializer ov _) = MonadicVariantInitializer ov
   updateAnnotation (MemberFunctionCall obj f es _) = MemberFunctionCall obj f es
   updateAnnotation (DerefMemberFunctionCall obj f es _) = DerefMemberFunctionCall obj f es
   updateAnnotation (IsEnumVariantExpression obj id1 id2 _) = IsEnumVariantExpression obj id1 id2
-  updateAnnotation (IsOptionVariantExpression obj v _) = IsOptionVariantExpression obj v
+  updateAnnotation (IsMonadicVariantExpression obj v _) = IsMonadicVariantExpression obj v
   updateAnnotation (ArraySliceExpression ak obj e1 e2 _) = ArraySliceExpression ak obj e1 e2
   updateAnnotation (StringInitializer s _) = StringInitializer s
 
@@ -203,7 +203,7 @@ type Const = Const' TerminaType
 type Modifier = Modifier' TerminaType
 type FieldDefinition = FieldDefinition' TerminaType
 type EnumVariant = EnumVariant' TerminaType
-type OptionVariant = OptionVariant' Expression
+type MonadicVariant = MonadicVariant' Expression
 
 type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression

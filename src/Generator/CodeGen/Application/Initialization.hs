@@ -10,10 +10,12 @@ import Semantic.Types
 import Generator.CodeGen.Statement
 import Modules.Modules
 import qualified Data.Map as M
-import Control.Monad.Reader (runReader)
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
 import Generator.LanguageC.Embedded
+import Generator.Monadic (emptyMonadicTypes)
+import Control.Monad.State
+import qualified Data.Set as S
 
 genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
 genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
@@ -60,8 +62,10 @@ genInitFile mName prjprogs = do
 runGenInitFile :: 
     TerminaConfig 
     -> M.Map Identifier Integer
-    -> FilePath 
+    -> QualifiedName 
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
 runGenInitFile config irqMap initFilePath prjprogs = 
-    runReader (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv M.empty config irqMap)
+    case runState (runExceptT (genInitFile initFilePath prjprogs)) 
+        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config irqMap) of
+    (Left err, _) -> Left err
+    (Right file, _) -> Right file

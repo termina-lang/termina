@@ -2,9 +2,8 @@ module Negative.VarUsageSpec (spec) where
 
 import Test.Hspec
 import Semantic.AST
-import Semantic.Errors
+import ControlFlow.VarUsage.Errors
 import Negative.Common
-import Semantic.Types
 
 testVE001 :: String
 testVE001 = "function fun0(_data : u32) -> u32 {\n" ++
@@ -15,3 +14,15 @@ testVE001 = "function fun0(_data : u32) -> u32 {\n" ++
        "\n" ++
        "}\n"
 
+spec :: Spec
+spec = do
+  describe "Semantic Errors" $ do
+    it "VE-001: invalid array indexing" $ do
+     runNegativeTestVarUsage testVE001
+       `shouldSatisfy`
+        isEUsedIgnoredParameter "_data"
+
+  where
+
+    isEUsedIgnoredParameter :: Identifier -> Maybe Error -> Bool
+    isEUsedIgnoredParameter inIdent = \case Just (EUsedIgnoredParameter ident) -> (inIdent == ident); _ -> False

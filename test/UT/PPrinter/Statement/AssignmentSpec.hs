@@ -112,8 +112,8 @@ unboxVar0AssignFoo1 = AssignmentStmt unboxVar0 (AccessObject foo1) stmtSemAnn
 unboxVar0AssignConst = AssignmentStmt unboxVar0 (Constant (I (TInteger 1024 DecRepr) (Just TUInt32)) uint32ExprSemAnn) stmtSemAnn
 
 option0Assign, option1Assign :: Statement SemanticAnn
-option0Assign = AssignmentStmt option0 (OptionVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32ExprSemAnn) stmtSemAnn
-option1Assign = AssignmentStmt option1 (OptionVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
+option0Assign = AssignmentStmt option0 (MonadicVariantInitializer (Some (AccessObject boxVar0)) optionBoxUInt32ExprSemAnn) stmtSemAnn
+option1Assign = AssignmentStmt option1 (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
 
 str0 :: Object SemanticAnn
 str0 = Variable "str0" (objSemAnn Mutable (TArray TChar (buildConstExprTUSize 12)))

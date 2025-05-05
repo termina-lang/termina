@@ -118,7 +118,7 @@ data Error
   | EArrayInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an array initializer to a non-array type
   | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer
   | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type
-  | EOptionVariantInitializerInvalidUse -- ^ Invalid use of an option variant initializer
+  | EMonadicVariantInitializerInvalidUse -- ^ Invalid use of a builtin variant initializer
   | EForLoopLowerBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop lower bound type mismatch
   | EForLoopUpperBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop upper bound type mismatch
   | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
@@ -230,7 +230,14 @@ data Error
   | EStringInitializerInvalidUse -- ^ Invalid use of a string initializer
   | EStringInitializerNotArrayOfChars (TerminaType SemanticAnn) -- ^ Assignment of a string array initializer to an invalid type
   | EInvalidConstType (TerminaType SemanticAnn) -- ^ Invalid type for constant
-  | EInvalidAccessToConstExpr Identifier -- ^ Invalid access to constant expression
+  | EInvalidAccessToConstExpr Identifier -- ^ Invalid access to constant expression
+  | EInvalidResultType (TerminaType SemanticAnn) -- ^ Invalid type for result
+  | EInvalidStatusType (TerminaType SemanticAnn) -- ^ Invalid type for status
+  | EInvalidVariantForOption Identifier -- ^ Invalid variant for option
+  | EInvalidVariantForResult Identifier -- ^ Invalid variant for result
+  | EInvalidVariantForStatus Identifier -- ^ Invalid variant for status
+  | EInvalidResultTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier for result
+  | EMonadicVariantParameterTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in monadic variant
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -305,7 +312,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EArrayInitializerNotArray _ty) _pos) = "SE-066"
     errorIdent (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "SE-067"
     errorIdent (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "SE-068"
-    errorIdent (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "SE-069"
+    errorIdent (AnnotatedError EMonadicVariantInitializerInvalidUse _pos) = "SE-069"
     errorIdent (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-070"
     errorIdent (AnnotatedError (EForLoopUpperBoundTypeMismatch _expectedTy _actualTy) _pos) = "SE-071"
     errorIdent (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "SE-072"
@@ -418,6 +425,13 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "SE-180"
     errorIdent (AnnotatedError (EInvalidConstType _ty) _pos) = "SE-181"
     errorIdent (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "SE-182"
+    errorIdent (AnnotatedError (EInvalidResultType _ty) _pos) = "SE-183"
+    errorIdent (AnnotatedError (EInvalidStatusType _ty) _pos) = "SE-184"
+    errorIdent (AnnotatedError (EInvalidVariantForOption _ident) _pos) = "SE-185"
+    errorIdent (AnnotatedError (EInvalidVariantForResult _ident) _pos) = "SE-186"
+    errorIdent (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "SE-187"
+    errorIdent (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "SE-188"
+    errorIdent (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "SE-189"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -487,7 +501,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EArrayInitializerNotArray _ty) _pos) = "assignment of an array initializer to a non-array type"
     errorTitle (AnnotatedError EArrayExprListInitializerInvalidUse _pos) = "invalid use of an expression list array initializer"
     errorTitle (AnnotatedError (EArrayExprListInitializerNotArray _ty) _pos) = "assignment of an array expression list initializer to a non-array type"
-    errorTitle (AnnotatedError EOptionVariantInitializerInvalidUse _pos) = "invalid use of an option variant initializer"
+    errorTitle (AnnotatedError EMonadicVariantInitializerInvalidUse _pos) = "invalid use of an builtin variant initializer"
     errorTitle (AnnotatedError (EForLoopLowerBoundTypeMismatch _expectedTy _actualTy) _pos) = "for loop lower bound type mismatch"
     errorTitle (AnnotatedError (EForLoopUpperBoundTypeMismatch _exppectedTy _actualTy) _pos) = "for loop upper bound type mismatch"
     errorTitle (AnnotatedError (EArrayExprListInitializerExprTypeMismatch _expectedTy _actualTy) _pos) = "list of initializing expressions type mismatch"
@@ -600,6 +614,13 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EStringInitializerNotArrayOfChars _ty) _pos) = "assignment of a string array initializer to an invalid type"
     errorTitle (AnnotatedError (EInvalidConstType _ty) _pos) = "invalid type for constant"
     errorTitle (AnnotatedError (EInvalidAccessToConstExpr _ident) _pos) = "invalid access to a constant expression"
+    errorTitle (AnnotatedError (EInvalidResultType _ty) _pos) = "invalid type for result"
+    errorTitle (AnnotatedError (EInvalidStatusType _ty) _pos) = "invalid type for status"
+    errorTitle (AnnotatedError (EInvalidVariantForOption _ident) _pos) = "invalid variant for option"
+    errorTitle (AnnotatedError (EInvalidVariantForResult _ident) _pos) = "invalid variant for result"
+    errorTitle (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "invalid variant for status"
+    errorTitle (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "invalid type specifier for result"
+    errorTitle (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "monadic variant parameter type mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -1285,11 +1306,11 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Invalid use of an array expression list initializer.\n" <>
                             "You are trying to assign an array expression list initializer to an object of type \x1b[31m" <>
                             showText ty <> "\x1b[0m."))
-                EOptionVariantInitializerInvalidUse ->
+                EMonadicVariantInitializerInvalidUse ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just $ "You are trying to use an option variant initializer in an invalid context.\n" <>
-                                "Option variant initializers can only be used to initialize option objects.")
+                        (Just $ "You are trying to use an variant initializer for a builtin type in an invalid context.\n" <>
+                                "Variant initializers can only be used to initialize objects.")
                 EForLoopLowerBoundTypeMismatch expectedTy actualTy ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -1962,6 +1983,39 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Constant expression \x1b[31m" <> T.pack ident <> "\x1b[0m cannot be accessed in this context.\n"))
+                EInvalidResultType ty -> 
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a result."))
+                EInvalidStatusType ty -> 
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a status."))
+                EInvalidVariantForOption variantName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for an option.\n" <>
+                               "Only the variants \x1b[31mNone\x1b[0m and \x1b[31mSome\x1b[0m are valid."))
+                EInvalidVariantForResult variantName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a result.\n" <>
+                                    "Only the variants \x1b[31mOk\x1b[0m and \x1b[31mError\x1b[0m are valid."))
+                EInvalidVariantForStatus variantName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The variant \x1b[31m" <> T.pack variantName <> "\x1b[0m is not a valid variant for a status.\n" <>
+                                "Only the variants \x1b[31mSuccess\x1b[0m, \x1b[31mFailure\x1b[0m are valid."))
+                EInvalidResultTypeSpecifier typeSpec ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type specifier \x1b[31m" <> showText typeSpec <> "\x1b[0m is not a valid type specifier for a result.\n" <>
+                               "Result types must be of the form \x1b[31mResult<R; L>\x1b[0m, where \x1b[31mR\x1b[0m is the valid result type and \x1b[31mL\x1b[0m is the error type."))
+                EMonadicVariantParameterTypeMismatch expectedTy actualTy ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <>
+                            "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

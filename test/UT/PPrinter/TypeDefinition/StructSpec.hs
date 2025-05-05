@@ -4,11 +4,12 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
-import qualified Data.Map as M
-import qualified Data.Set as S
 import Utils.Annotations
+import Generator.Monadic
 
 import UT.PPrinter.Common
+import qualified Data.Set as S
+import qualified Data.Map as M
 
 {- | Struct type with a single field.
 In Termina's concrete sytax:
@@ -88,7 +89,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
     it "Prints a struct with just one field" $ do
-       renderTypeDefinitionDecl (M.fromList [(TStruct "id0", S.fromList [TOption (TStruct "id0")])]) structWithOneField `shouldBe`
+       renderTypeDefinitionDecl (MonadicTypes (S.fromList [TStruct "id0"]) (S.fromList [TStruct "id0"]) M.empty M.empty) structWithOneField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -96,21 +97,39 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    id0 __0;\n" ++
-            "} __option_id0_params_t;\n" ++
+            "} __option_id0__Some_params_t;\n" ++
             "\n" ++     
             "typedef struct {\n" ++
-            "    __option_id0_params_t Some;\n" ++
+            "    __option_id0__Some_params_t Some;\n" ++
             "    __enum_option_t __variant;\n" ++
-            "} __option_id0_t;")
+            "} __option_id0_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __status_id0__Failure_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "    __status_id0__Failure_params_t Failure;\n" ++
+            "    __enum_status_t __variant;\n" ++
+            "} __status_id0_t;")
     it "Prints a struct with two fields" $ do
-      renderTypeDefinitionDecl M.empty structWithTwoFields `shouldBe`
+      renderTypeDefinitionDecl (MonadicTypes S.empty (S.fromList [TStruct "id0"]) M.empty M.empty) structWithTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
             "    uint16_t field1;\n" ++
-            "} id0;")
+            "} id0;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __status_id0__Failure_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "    __status_id0__Failure_params_t Failure;\n" ++
+            "    __enum_status_t __variant;\n" ++
+            "} __status_id0_t;")
     it "Prints a packed struct" $ do
-      renderTypeDefinitionDecl M.empty packedStruct `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes packedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -118,7 +137,7 @@ spec = do
             "    uint32_t field2[10U];\n" ++
             "} __attribute__((packed)) id0;")
     it "Prints an aligned struct" $ do
-      renderTypeDefinitionDecl M.empty alignedStruct `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes alignedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++
@@ -126,7 +145,7 @@ spec = do
             "    uint32_t field2[10U];\n" ++
             "} __attribute__((aligned(16U))) id0;")
     it "Prints a packet & aligned struct" $ do
-      renderTypeDefinitionDecl M.empty packedAndAlignedStruct `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes packedAndAlignedStruct `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
             "    uint8_t field0;\n" ++

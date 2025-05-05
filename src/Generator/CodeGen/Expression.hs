@@ -60,6 +60,12 @@ genType _qual (TOption (TBoxSubtype _)) = return (CTTypeDef optionBox noqual)
 genType _qual (TOption ts) = do
     optName <- genOptionStructName ts
     return (CTTypeDef optName noqual)
+genType _qual (TResult tyOk tyError) = do
+    resultName <- genResultStructName tyOk tyError
+    return (CTTypeDef resultName noqual)
+genType _qual (TStatus ts) = do
+    optName <- genStatusStructName ts
+    return (CTTypeDef optName noqual)
 -- Non-primitive types:
 -- | Box subtype
 genType _qual (TBoxSubtype _) = return (CTTypeDef boxStruct noqual)
@@ -323,12 +329,12 @@ genExpression (IsEnumVariantExpression obj enum this_variant ann) = do
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = (enum <::> this_variant) @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (IsOptionVariantExpression obj NoneLabel ann) = do
+genExpression (IsMonadicVariantExpression obj NoneLabel ann) = do
     cObj <- genObject obj
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = optionNoneVariant @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (IsOptionVariantExpression obj SomeLabel ann) = do
+genExpression (IsMonadicVariantExpression obj SomeLabel ann) = do
     cObj <- genObject obj
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = optionSomeVariant @: enumFieldType |>> getLocation ann

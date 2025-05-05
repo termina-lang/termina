@@ -68,16 +68,16 @@ data Expression
     Identifier -- ^ Variant identifier
     [Expression a] -- ^ list of expressions
     a
-  | OptionVariantInitializer (OptionVariant a) a
+  | MonadicVariantInitializer (MonadicVariant a) a
   | StringInitializer String a -- ^ String literal
   | IsEnumVariantExpression
     (Object a) -- ^ Enum object
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
-  | IsOptionVariantExpression
-    (Object a) -- ^ Opion object
-    OptionVariantLabel -- ^ Variant label
+  | IsMonadicVariantExpression
+    (Object a) -- ^ Option object
+    MonadicVariantLabel -- ^ Variant label
     a
   deriving (Show, Functor)
 
@@ -107,12 +107,12 @@ instance Annotated Expression where
   getAnnotation (EnumVariantInitializer _ _ _ a)  = a
   getAnnotation (ArrayInitializer _ _ a)          = a
   getAnnotation (ArrayExprListInitializer _ a)    = a
-  getAnnotation (OptionVariantInitializer _ a)    = a
+  getAnnotation (MonadicVariantInitializer _ a)    = a
   getAnnotation (StringInitializer _ a)           = a
   getAnnotation (MemberFunctionCall _ _ _ a)      = a
   getAnnotation (DerefMemberFunctionCall _ _ _ a) = a
   getAnnotation (IsEnumVariantExpression _ _ _ a) = a
-  getAnnotation (IsOptionVariantExpression _ _ a) = a
+  getAnnotation (IsMonadicVariantExpression _ _ a) = a
 
   updateAnnotation (AccessObject obj)             = AccessObject . updateAnnotation obj
   updateAnnotation (Constant c _)                 = Constant c
@@ -124,12 +124,12 @@ instance Annotated Expression where
   updateAnnotation (EnumVariantInitializer e v args _) = EnumVariantInitializer e v args
   updateAnnotation (ArrayInitializer e s _)       = ArrayInitializer e s
   updateAnnotation (ArrayExprListInitializer es _) = ArrayExprListInitializer es
-  updateAnnotation (OptionVariantInitializer v _) = OptionVariantInitializer v
+  updateAnnotation (MonadicVariantInitializer v _) = MonadicVariantInitializer v
   updateAnnotation (StringInitializer s _)        = StringInitializer s
   updateAnnotation (MemberFunctionCall obj f args _) = MemberFunctionCall obj f args
   updateAnnotation (DerefMemberFunctionCall obj f args _) = DerefMemberFunctionCall obj f args
   updateAnnotation (IsEnumVariantExpression obj e v _) = IsEnumVariantExpression obj e v
-  updateAnnotation (IsOptionVariantExpression obj v _) = IsOptionVariantExpression obj v
+  updateAnnotation (IsMonadicVariantExpression obj v _) = IsMonadicVariantExpression obj v
 
 data MatchCase a = MatchCase
   {
@@ -211,7 +211,7 @@ type Const = Const' TypeSpecifier
 type Modifier = Modifier' TypeSpecifier
 type FieldDefinition = FieldDefinition' TypeSpecifier
 type EnumVariant = EnumVariant' TypeSpecifier
-type OptionVariant = OptionVariant' Expression
+type MonadicVariant = MonadicVariant' Expression
 
 type AnnASTElement = AnnASTElement' TypeSpecifier Block Expression
 type FieldAssignment = FieldAssignment' Expression

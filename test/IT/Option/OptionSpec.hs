@@ -4,19 +4,19 @@ import IT.Common
 
 import Test.Hspec
 import Data.Text
-import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Core.AST
-import Generator.Option
+import Generator.Monadic
 
 test0 :: String
 test0 = "task class CHousekeeping {\n" ++
         "\n" ++
         "  data_in : sink u32 triggers action0;\n" ++
         "\n" ++
-        "  action action0(&priv self, _data : u32) -> Result {\n" ++
+        "  action action0(&priv self, _data : u32) -> Status<i32> {\n" ++
         "\n" ++
-        "    var ret : Result = Result::Ok;\n" ++
+        "    var ret : Status<i32> = Success;\n" ++
         "    var opt : Option<u32> = None;\n" ++
         "\n" ++
         "    opt = Some(0 : u32);\n" ++
@@ -34,8 +34,13 @@ test0 = "task class CHousekeeping {\n" ++
         "\n" ++
         "};\n"
 
-test0OptionMap :: OptionMap
-test0OptionMap = M.fromList [(TUInt32, S.fromList [TOption TUInt32])]
+test0OptionMap :: MonadicTypes
+test0OptionMap = MonadicTypes {
+  optionTypes = S.fromList [TUInt32],
+  statusTypes = S.empty,
+  resultTypes = M.empty,
+  generatedTypes = M.empty
+}
 
 spec :: Spec
 spec = do
@@ -56,7 +61,7 @@ spec = do
               "\n" ++   
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++   
-              "Result CHousekeeping__action0(void * const __this, uint32_t _data);\n" ++
+              "__status_int32_t CHousekeeping__action0(void * const __this, uint32_t _data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do
@@ -68,10 +73,10 @@ spec = do
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t __0;\n" ++
-              "} __option_uint32_params_t;\n" ++
+              "} __option_uint32__Some_params_t;\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    __option_uint32_params_t Some;\n" ++
+              "    __option_uint32__Some_params_t Some;\n" ++
               "    __enum_option_t __variant;\n" ++
               "} __option_uint32_t;\n" ++
               "\n" ++

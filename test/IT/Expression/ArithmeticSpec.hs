@@ -146,8 +146,8 @@ spec = do
              "    \n" ++ 
              "    id0 * self = (id0 *)__this;\n" ++
              "\n" ++
-             "    Status status;\n" ++
-             "    status.__variant = Status__Success;\n" ++
+             "    __status_int32_t status;\n" ++
+             "    status.__variant = Success;\n" ++
              "\n" ++
              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
              "    id0__test1(self, foo);\n" ++

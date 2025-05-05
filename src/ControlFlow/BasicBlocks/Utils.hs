@@ -36,7 +36,7 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 getExprType :: (MonadError BBGeneratorError m) => SAST.Expression SemanticAnn -> m (SAST.TerminaType SemanticAnn)
 getExprType (SAST.AccessObject obj) = getObjType obj
 getExprType (SAST.Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.OptionVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.MonadicVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
@@ -50,7 +50,7 @@ getExprType (SAST.ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) 
 getExprType (SAST.StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (SAST.IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (SAST.IsOptionVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (SAST.IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 -- | This function returns the name of a port. The function assumes that the object is

@@ -17,6 +17,9 @@ import Modules.Modules (QualifiedName)
 import Configuration.Configuration
 import Semantic.AST
 import Generator.CodeGen.Expression
+import Generator.Monadic
+import Control.Monad.State
+import qualified Data.Set as S
 
 genConfigFile ::
     QualifiedName
@@ -131,5 +134,7 @@ runGenConfigFile ::
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
 runGenConfigFile config irqMap configFilePath progArchitecture =
-    runReader (runExceptT (genConfigFile configFilePath progArchitecture))
-        (CGeneratorEnv M.empty config irqMap)
+    case runState (runExceptT (genConfigFile configFilePath progArchitecture))
+        (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config irqMap) of
+    (Left err, _) -> Left err
+    (Right file, _) -> Right file

@@ -89,6 +89,14 @@ checkTerminaType loc (TPool ty s) =
 checkTerminaType loc (TOption ty) = 
   checkTerminaType loc ty >>
   optionTyOrFail loc ty
+checkTerminaType loc (TResult tyOk tyError) = 
+  checkTerminaType loc tyOk >>
+  checkTerminaType loc tyError >>
+  resultTyOrFail loc tyOk >>
+  resultTyOrFail loc tyError
+checkTerminaType loc (TStatus ty) = 
+  checkTerminaType loc ty >>
+  statusTyOrFail loc ty
 checkTerminaType loc (TReference _ ty) =
   checkTerminaType loc ty >>
   refTyOrFail loc ty
@@ -488,15 +496,6 @@ typeTypeSpecifier :: Location
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> PAST.TypeSpecifier ParserAnn 
   -> SemanticMonad (SAST.TerminaType SemanticAnn)
-typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
-  -- Check that the type was defined
-  (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
-  case glbTypeDef of 
-    Struct s _ _ -> return $ TStruct s
-    Enum e _ _ -> return $ TEnum e
-    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
-    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
-    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "Allocator" [typeParam]) = 
   case typeParam of
     TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
@@ -537,6 +536,23 @@ typeTypeSpecifier loc typeObj ts@(TSDefinedType "Option" [typeParam]) =
     TypeParamIdentifier ident -> TOption <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
     TypeParamTypeSpec ts' -> TOption <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Result" [typeParamOk, typeParamError]) = do
+  tyOk <- case typeParamOk of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  tyError <- case typeParamError of
+    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
+  return $ TResult tyOk tyError  
+typeTypeSpecifier loc _ ts@(TSDefinedType "Result" _) =
+  throwError $ annotateError loc (EInvalidResultTypeSpecifier ts)
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Status" [typeParam]) = 
+  case typeParam of
+    TypeParamIdentifier ident -> TStatus <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeParamTypeSpec ts' -> TStatus <$> typeTypeSpecifier loc typeObj ts'
+    _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 typeTypeSpecifier loc typeObj ts@(TSDefinedType "MsgQueue" [typeParam, sizeParam]) = do
   tyTypeParam <- case typeParam of
     TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
@@ -562,6 +578,15 @@ typeTypeSpecifier loc typeObj (TSArray ts s) = do
   arraySize <- catchMismatch loc EArrayIndexNotUSize 
       (typeExpression (Just (TConstSubtype TUSize)) typeObj s)
   return $ TArray ty arraySize
+typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
+  -- Check that the type was defined
+  (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
+  case glbTypeDef of 
+    Struct s _ _ -> return $ TStruct s
+    Enum e _ _ -> return $ TEnum e
+    Class clsKind c _ _ _ -> return $ TGlobal clsKind c 
+    Interface RegularInterface i _ _ _ -> return $ TInterface RegularInterface i
+    Interface SystemInterface i _ _ _ -> return $ TInterface SystemInterface i
 typeTypeSpecifier loc typeObj (TSReference ak ts) = 
   TReference ak <$> typeTypeSpecifier loc typeObj ts
 typeTypeSpecifier loc typeObj (TSBoxSubtype ts) = 
@@ -708,15 +733,41 @@ typeAssignmentExpression expectedType typeObj (ArrayExprListInitializer exprs pa
               (Just (TConstSubtype TUSize))) (buildExpAnn pann (TConstSubtype TUSize)) 
       return $ SAST.ArrayExprListInitializer typed_exprs (buildExpAnn pann (TArray ts typed_init_size))
     ts -> throwError $ annotateError pann (EArrayExprListInitializerNotArray ts)
-typeAssignmentExpression expectedType typeObj (OptionVariantInitializer vexp anns) =
+typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp anns) =
   case expectedType of
     TOption ts -> do
       case vexp of
-        None -> return $ SAST.OptionVariantInitializer None (buildExpAnn anns (TOption ts))
+        None -> return $ SAST.MonadicVariantInitializer None (buildExpAnn anns (TOption ts))
         Some e -> do
-          typed_e <- typeExpression (Just ts) typeObj e
-          return $ SAST.OptionVariantInitializer (Some typed_e) (buildExpAnn anns (TOption ts))
-    _ -> throwError $ annotateError anns EOptionVariantInitializerInvalidUse
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeExpression (Just ts) typeObj e
+          return $ SAST.MonadicVariantInitializer (Some typed_e) (buildExpAnn anns (TOption ts))
+        Ok _ -> throwError $ annotateError anns (EInvalidVariantForOption "Ok")
+        Error _ -> throwError $ annotateError anns (EInvalidVariantForOption "Error")
+        Success -> throwError $ annotateError anns (EInvalidVariantForOption "Success")
+        Failure _ -> throwError $ annotateError anns (EInvalidVariantForOption "Failure")
+    TResult tsOk tsError -> do
+      case vexp of
+        Ok e -> do
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsOk) $ typeExpression (Just tsOk) typeObj e
+          return $ SAST.MonadicVariantInitializer (Ok typed_e) (buildExpAnn anns (TResult tsOk tsError))
+        Error e -> do
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsError) $ typeExpression (Just tsError) typeObj e
+          return $ SAST.MonadicVariantInitializer (Error typed_e) (buildExpAnn anns (TResult tsOk tsError))
+        Success -> throwError $ annotateError anns (EInvalidVariantForResult "Success")
+        Failure _ -> throwError $ annotateError anns (EInvalidVariantForResult "Failure")
+        None -> throwError $ annotateError anns (EInvalidVariantForResult "None")
+        Some _ -> throwError $ annotateError anns (EInvalidVariantForResult "Some")
+    TStatus ts -> do
+      case vexp of
+        Success -> return $ SAST.MonadicVariantInitializer Success (buildExpAnn anns (TStatus ts))
+        Failure e -> do
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeExpression (Just ts) typeObj e
+          return $ SAST.MonadicVariantInitializer (Failure typed_e) (buildExpAnn anns (TStatus ts))
+        None -> throwError $ annotateError anns (EInvalidVariantForStatus "None")
+        Some _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Some")
+        Ok _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Ok")
+        Error _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Error")
+    _ -> throwError $ annotateError anns EMonadicVariantInitializerInvalidUse
 typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = do
 -- | TArray Initialization
   case expectedType of
@@ -1165,18 +1216,18 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EUnboxingEnumType
-typeExpression expectedType typeObj (IsOptionVariantExpression obj variant_id pann) = do
+typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id pann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
   case obj_ty of
     (TOption {}) -> do
       maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
-      return $ SAST.IsOptionVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+      return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
     _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann EArrayInitializerInvalidUse
 typeExpression _ _ (ArrayExprListInitializer _ pann) = throwError $ annotateError pann EArrayExprListInitializerInvalidUse
-typeExpression _ _ (OptionVariantInitializer _ pann) = throwError $ annotateError pann EOptionVariantInitializerInvalidUse
+typeExpression _ _ (MonadicVariantInitializer _ pann) = throwError $ annotateError pann EMonadicVariantInitializerInvalidUse
 typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateError pann EEnumVariantInitializerInvalidUse
 typeExpression _ _ (StringInitializer _ pann) = throwError $ annotateError pann EStringInitializerInvalidUse
 

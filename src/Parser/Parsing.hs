@@ -8,7 +8,7 @@ import           Parser.AST
 -- Importing position from Parsec
 import           Text.Parsec.Pos
 -- Importing parser combinators
-import           Text.Parsec
+import           Text.Parsec hiding (Error, Ok)
 import           Text.Parsec.String
 
 -- Importing tokenizer
@@ -404,17 +404,36 @@ functionCallParser = do
   params <- parens (sepBy (try expressionParser) comma)
   FunctionCall ident params . Position startPos <$> getPosition
 
-optionVariantExprParser :: Parser (Expression ParserAnn)
-optionVariantExprParser =
+builtinVariantExprParser :: Parser (Expression ParserAnn)
+builtinVariantExprParser =
   (do
     startPos <- getPosition
     _ <- reserved "None"
-    OptionVariantInitializer None . Position startPos <$> getPosition) <|>
+    MonadicVariantInitializer None . Position startPos <$> getPosition) <|>
   (do
     startPos <- getPosition
     _ <- reserved "Some"
     someExpr <- parens expressionParser
-    OptionVariantInitializer (Some someExpr) . Position startPos <$> getPosition)
+    MonadicVariantInitializer (Some someExpr) . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    _ <- reserved "Ok"
+    okExpr <- parens expressionParser
+    MonadicVariantInitializer (Ok okExpr) . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    _ <- reserved "Error"
+    errorExpr <- parens expressionParser
+    MonadicVariantInitializer (Error errorExpr) . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    _ <- reserved "Success"
+    MonadicVariantInitializer Success . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    _ <- reserved "Failure"
+    failureExpr <- parens expressionParser
+    MonadicVariantInitializer (Failure failureExpr) . Position startPos <$> getPosition)
 
 enumVariantExprParser :: Parser (Expression ParserAnn)
 enumVariantExprParser = do
@@ -436,26 +455,50 @@ isEnumVariantExprParser = do
   variant <- identifierParser
   IsEnumVariantExpression object enum variant . Position startPos <$> getPosition
 
-isOptionVariantExprParser :: Parser (Expression ParserAnn)
-isOptionVariantExprParser =
+isMonadicVariantExprParser :: Parser (Expression ParserAnn)
+isMonadicVariantExprParser =
   (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "None"
-    IsOptionVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
   (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Some"
-    IsOptionVariantExpression object SomeLabel . Position startPos <$> getPosition)
+    IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "Ok"
+    IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "Error"
+    IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "Success"
+    IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
+  (do
+    startPos <- getPosition
+    object <- objectParser
+    _ <- reserved "is"
+    _ <- reserved "Failure"
+    IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition)
 
 expressionParser :: Parser (Expression ParserAnn)
-expressionParser = try optionVariantExprParser
+expressionParser = try builtinVariantExprParser
   <|> try enumVariantExprParser
   <|> try mutableReferenceExprParser
-  <|> try isOptionVariantExprParser
+  <|> try isMonadicVariantExprParser
   <|> try arrayExprListInitializerParser
   <|> arrayInitializerParser
   <|> referenceExprParser

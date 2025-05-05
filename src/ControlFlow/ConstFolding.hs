@@ -291,7 +291,7 @@ constFoldExpression (DerefMemberFunctionCall obj ident args _) = do
         Nothing -> throwError $ annotateError Internal (EInvalidExpression "invalid deref member function call")
     Nothing -> throwError $ annotateError Internal (EInvalidExpression "invalid deref member function call no current member")
 constFoldExpression (IsEnumVariantExpression obj _ _ _) = constFoldObject obj
-constFoldExpression (IsOptionVariantExpression obj _ _) = constFoldObject obj
+constFoldExpression (IsMonadicVariantExpression obj _ _) = constFoldObject obj
 constFoldExpression expr@(ArraySliceExpression _ obj lower upper ann) = do
   constFoldObject obj
   constFoldExpression lower
@@ -315,8 +315,15 @@ constFoldExpression expr@(ArraySliceExpression _ obj lower upper ann) = do
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
 
-constFoldExpression (OptionVariantInitializer None _) = return ()
-constFoldExpression (OptionVariantInitializer (Some expr) _) = do
+constFoldExpression (MonadicVariantInitializer None _) = return ()
+constFoldExpression (MonadicVariantInitializer (Some expr) _) = do
+  constFoldExpression expr
+constFoldExpression (MonadicVariantInitializer Success _) = return ()
+constFoldExpression (MonadicVariantInitializer (Failure expr) _) = do
+  constFoldExpression expr
+constFoldExpression (MonadicVariantInitializer (Ok expr) _) = do
+  constFoldExpression expr
+constFoldExpression (MonadicVariantInitializer (Error expr) _) = do
   constFoldExpression expr
 constFoldExpression (EnumVariantInitializer _ _ exprs _) =
   mapM_ constFoldExpression exprs

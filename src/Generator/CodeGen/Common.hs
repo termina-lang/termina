@@ -4,28 +4,30 @@ module Generator.CodeGen.Common where
 
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
-import Control.Monad.Reader
 import Control.Monad.Except
 import Data.Map
-import Data.Set
 import Generator.LanguageC.AST
 import Data.Char
 import Numeric
 import Utils.Annotations
 import Configuration.Configuration
+import Generator.Monadic
+import qualified Control.Monad.State as ST
+import Modules.Modules
+import qualified Data.Set as S
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-type OptionTypes = Map (TerminaType SemanticAnn) (Set (TerminaType SemanticAnn))
-
 data CGeneratorEnv = CGeneratorEnv { 
-    optionTypes :: OptionTypes,
+    currentModule :: QualifiedName,
+    extraImports :: S.Set QualifiedName,
+    monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
     interruptsMap :: Map Identifier Integer
   }
 
-type CGenerator = ExceptT CGeneratorError (Reader CGeneratorEnv)
+type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
 
 -- |  This function is used to create the names of temporal variables
 --  and symbols.
@@ -34,6 +36,9 @@ namefy = ("__" <>)
 
 (<::>) :: Identifier -> Identifier -> Identifier
 (<::>) id0 id1 = id0 <> "__" <> id1
+
+(<:>) :: Identifier -> Identifier -> Identifier
+(<:>) id0 id1 = id0 <> "_" <> id1
 
 -- | Termina's pretty builtin types
 optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
@@ -53,10 +58,10 @@ msgQueue = namefy "termina_msg_queue_t"
 periodicTimer = namefy "termina_periodic_timer_t"
 
 atomicMethodName :: Identifier -> Identifier
-atomicMethodName mName = "atomic_" <> mName
+atomicMethodName mName = "atomic" <:> mName
 
 poolMemoryArea :: Identifier -> Identifier
-poolMemoryArea identifier = namefy $ "pool_" <> identifier <> "_memory"
+poolMemoryArea identifier = namefy $ "pool" <:> identifier <:> "memory"
 
 msgQueueSendMethodName :: Identifier
 msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
@@ -66,60 +71,64 @@ resourceLock = namefy "termina_resource" <::> "lock"
 resourceUnlock = namefy "termina_resource" <::> "unlock"
 
 thatField, thisParam, selfParam :: Identifier
-thatField = "__that"
-thisParam = "__this"
+thatField = namefy "that"
+thisParam = namefy "this"
 selfParam = "self"
 
 mutexIDField, taskMsgQueueIDField, timerField :: Identifier
-mutexIDField = "__mutex_id"
-taskMsgQueueIDField = "__task_msg_queue_id"
-timerField = "__timer_id"
+mutexIDField = namefy $ "mutex" <:> "id"
+taskMsgQueueIDField = namefy $ "task" <:> "msg_queue" <:> "id"
+timerField = namefy $ "timer" <:> "id"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-genEnumStructName identifier = return $ namefy $ "enum_" <> identifier <> "_t"
+genEnumStructName identifier = return $ namefy $ "enum" <:> identifier <:> "t"
 
 genEnumVariantName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genEnumVariantName enumId this_variant = return $ enumId <::> this_variant
 
 genEnumParameterStructName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
-genEnumParameterStructName enumId this_variant = return $ namefy $ "enum_" <> enumId <::> this_variant <> "_params_t"
+genEnumParameterStructName enumId this_variant = return $ namefy $ "enum" <:> enumId <::> this_variant <:> "params" <:> "t"
 
 genClassFunctionName :: (MonadError CGeneratorError m) => Identifier -> Identifier -> m Identifier
 genClassFunctionName className functionName = return $ className <::> functionName
 
+genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
+genTypeSpecName TBool = return "bool"
+genTypeSpecName TChar = return "char"
+genTypeSpecName TUInt8 = return "uint8"
+genTypeSpecName TUInt16 = return "uint16"
+genTypeSpecName TUInt32 = return "uint32"
+genTypeSpecName TUInt64 = return "uint64"
+genTypeSpecName TInt8 = return "int8"
+genTypeSpecName TInt16 = return "int16"
+genTypeSpecName TInt32 = return "int32"
+genTypeSpecName TInt64 = return "int64"
+genTypeSpecName (TStruct ident) = return ident
+genTypeSpecName (TEnum ident) = return ident
+genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+
 -- | This function returns the name of the struct that represents the parameters
 -- of an option type. 
 genOptionParameterStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
-genOptionParameterStructName TBool = return $ namefy "option_bool_params_t"
-genOptionParameterStructName TChar = return $ namefy "option_char_params_t"
-genOptionParameterStructName TUInt8 = return $ namefy "option_uint8_params_t"
-genOptionParameterStructName TUInt16 = return $ namefy "option_uint16_params_t"
-genOptionParameterStructName TUInt32 = return $ namefy "option_uint32_params_t"
-genOptionParameterStructName TUInt64 = return $ namefy "option_uint64_params_t"
-genOptionParameterStructName TInt8 = return $ namefy "option_int8_params_t"
-genOptionParameterStructName TInt16 = return $ namefy "option_int16_params_t"
-genOptionParameterStructName TInt32 = return $ namefy "option_int32_params_t"
-genOptionParameterStructName TInt64 = return $ namefy "option_int64_params_t"
-genOptionParameterStructName ts@(TOption _) = throwError $ InternalError $ "invalid recursive option type: " ++ show ts
-genOptionParameterStructName (TBoxSubtype _) = return $ namefy "option_box_params_t"
-genOptionParameterStructName ts = do
-    tsName <- genTypeSpecName ts
-    return $ namefy $ "option_" <> tsName <> "_params_t"
+genOptionParameterStructName (TBoxSubtype _) = return $ namefy "option" <:> "box" <:> "params" <:> "t"
+genOptionParameterStructName ty = do
+    tyName <- genTypeSpecName ty
+    return $ namefy "option" <:> tyName <::> "Some" <:> "params" <:> "t"
 
-    where
+genStatusParameterStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
+genStatusParameterStructName ty = do
+    tyName <- genTypeSpecName ty
+    return $ namefy "status" <:> tyName <::> "Failure" <:> "params" <:> "t"
 
-        genTypeSpecName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
-        genTypeSpecName TUInt8 = return "uint8"
-        genTypeSpecName TUInt16 = return "uint16"
-        genTypeSpecName TUInt32 = return "uint32"
-        genTypeSpecName TUInt64 = return "uint64"
-        genTypeSpecName TInt8 = return "int8"
-        genTypeSpecName TInt16 = return "int16"
-        genTypeSpecName TInt32 = return "int32"
-        genTypeSpecName TInt64 = return "int64"
-        genTypeSpecName (TStruct ident) = return ident
-        genTypeSpecName (TEnum ident) = return ident
-        genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+genResultParameterStructName :: (MonadError CGeneratorError m) => 
+    TerminaType SemanticAnn 
+    -> TerminaType SemanticAnn
+    -> Identifier
+    -> m Identifier
+genResultParameterStructName okTy errorTy this_variant = do
+    okTyName <- genTypeSpecName okTy
+    errorTyName <- genTypeSpecName errorTy
+    return $ namefy "result" <:> okTyName <:> errorTyName <::> this_variant <:> "params" <:> "t"
 
 variant :: Identifier
 variant = namefy "variant"
@@ -128,8 +137,13 @@ optionSomeVariant, optionNoneVariant :: Identifier
 optionSomeVariant = "Some"
 optionNoneVariant = "None"
 
-optionSomeField :: Identifier
-optionSomeField = "__0"
+resultOkVariant, resultErrorVariant :: Identifier
+resultOkVariant = "Ok"
+resultErrorVariant = "Error"
+
+statusSuccessVariant, statusFailureVariant :: Identifier
+statusSuccessVariant = "Success"
+statusFailureVariant = "Failure"
 
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
@@ -149,7 +163,7 @@ getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ s
 getExprType :: (MonadError CGeneratorError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (MonadicVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
@@ -163,7 +177,7 @@ getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) =
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (IsOptionVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
 unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
@@ -176,26 +190,29 @@ unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
 -- the semantic annotation is correct. If the option type is not well-typed, the
 -- function will throw an internal error.
 genOptionStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
-genOptionStructName TBool = return $ namefy "option_bool_t"
-genOptionStructName TChar = return $ namefy "option_char_t"
-genOptionStructName TUInt8 = return $ namefy "option_uint8_t"
-genOptionStructName TUInt16 = return $ namefy "option_uint16_t"
-genOptionStructName TUInt32 = return $ namefy "option_uint32_t"
-genOptionStructName TUInt64 = return $ namefy "option_uint64_t"
-genOptionStructName TInt8 = return $ namefy "option_int8_t"
-genOptionStructName TInt16 = return $ namefy "option_int16_t"
-genOptionStructName TInt32 = return $ namefy "option_int32_t"
-genOptionStructName TInt64 = return $ namefy "option_int64_t"
 genOptionStructName (TBoxSubtype _) = return optionBox
-genOptionStructName (TStruct ident) = return $ namefy "option_" <> ident <> "_t" 
-genOptionStructName (TEnum ident) = return $ namefy "option_" <> ident <> "_t" 
-genOptionStructName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
+genOptionStructName ty = do
+    tyName <- genTypeSpecName ty
+    return $ namefy "option" <:> tyName <:> "t"
+
+genStatusStructName :: (MonadError CGeneratorError m) => TerminaType SemanticAnn -> m Identifier
+genStatusStructName ty = do
+    tyName <- genTypeSpecName ty
+    return $ namefy "status" <:> tyName <:> "t"
+
+
+genResultStructName :: (MonadError CGeneratorError m) => 
+    TerminaType SemanticAnn 
+    -> TerminaType SemanticAnn -> m Identifier
+genResultStructName tyOk tyError = do
+    tyOkName <- genTypeSpecName tyOk
+    tyErrorName <- genTypeSpecName tyError
+    return $ namefy "result" <:> tyOkName <::> tyErrorName <:> "t"
 
 getCInteger :: TInteger -> CInteger
 getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
 getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
 getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
-
 
 genIndexOf :: (MonadError CGeneratorError m) => CObject -> CExpression -> m CObject
 genIndexOf obj index = 
@@ -300,13 +317,13 @@ enumFieldType :: CType
 enumFieldType = CTInt IntSize32 Unsigned noqual
 
 procedureMutexLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureMutexLock procedureId = return $ procedureId <::> "mutex_lock"
+procedureMutexLock procedureId = return $ procedureId <::> "mutex" <:> "lock"
 
 procedureEventLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureEventLock procedureId = return $ procedureId <::> "event_lock"
+procedureEventLock procedureId = return $ procedureId <::> "event" <:> "lock"
 
 procedureTaskLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureTaskLock procedureId = return $ procedureId <::> "task_lock"
+procedureTaskLock procedureId = return $ procedureId <::> "task" <:> "lock"
 
 taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-taskFunctionName classId = return $ namefy classId <::> "termina_task"
+taskFunctionName classId = return $ namefy classId <::> "termina" <:> "task"

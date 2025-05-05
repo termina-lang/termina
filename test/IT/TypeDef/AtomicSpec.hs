@@ -10,9 +10,9 @@ test0 = "task class CHousekeeping {\n" ++
         "  interval : access AtomicAccess<u32>;\n" ++
         "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
-        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Status<i32> {\n" ++
         "\n" ++
-        "    var ret : Result = Result::Ok;\n" ++
+        "    var ret : Status<i32> = Success;\n" ++
         "    var local : u32 = 0;\n" ++
         "\n" ++
         "    self->interval.store(32);\n" ++
@@ -28,9 +28,9 @@ test1 = "task class CHousekeeping {\n" ++
         "  interval : access AtomicArrayAccess<u32; 10>;\n" ++
         "  timer : sink TimeVal triggers timeout;\n" ++
         "\n" ++
-        "  action timeout(&priv self, current : TimeVal) -> Result {\n" ++
+        "  action timeout(&priv self, current : TimeVal) -> Status<i32> {\n" ++
         "\n" ++
-        "    var ret : Result = Result::Ok;\n" ++
+        "    var ret : Status<i32> = Success;\n" ++
         "    var local : u32 = 0;\n" ++
         "\n" ++
         "    self->interval.store_index(0, 32);\n" ++
@@ -61,7 +61,7 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -69,12 +69,12 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    Result ret;\n" ++
-              "    ret.__variant = Result__Ok;\n" ++
+              "    __status_int32_t ret;\n" ++
+              "    ret.__variant = Success;\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -90,13 +90,12 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++  
-              "    Status status;\n" ++
-              "    status.__variant = Status__Success;\n" ++
+              "    int32_t status = 0L;\n" ++
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   
-              "    Result result;\n" ++
-              "    result.__variant = Result__Ok;\n" ++
+              "    __status_int32_t result;\n" ++
+              "    result.__variant = Success;\n" ++
               "\n" ++ 
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++ 
@@ -105,7 +104,7 @@ spec = do
               "        __termina_msg_queue__recv(self->__task_msg_queue_id, &next_msg,\n" ++
               "                                  &status);\n" ++
               "\n" ++  
-              "        if (status.__variant != Status__Success) {\n" ++
+              "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++   
@@ -116,13 +115,13 @@ spec = do
               "                __termina_msg_queue__recv(self->timer,\n" ++
               "                                          (void *)&timeout__msg_data, &status);\n" ++
               "\n" ++   
-              "                if (status.__variant != Status__Success) {\n" ++
+              "                if (status != 0L) {\n" ++
               "                    __termina_exec__shutdown();\n" ++
               "                }\n" ++
               "\n" ++   
               "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
               "\n" ++   
-              "                if (result.__variant != Result__Ok) {\n" ++
+              "                if (result.__variant != Success) {\n" ++
               "                    __termina_exec__shutdown();\n" ++
               "                }\n" ++
               "\n" ++   
@@ -160,7 +159,7 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -168,12 +167,12 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "Result CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    Result ret;\n" ++
-              "    ret.__variant = Result__Ok;\n" ++
+              "    __status_int32_t ret;\n" ++
+              "    ret.__variant = Success;\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -189,13 +188,12 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)arg;\n" ++
               "\n" ++  
-              "    Status status;\n" ++
-              "    status.__variant = Status__Success;\n" ++
+              "    int32_t status = 0L;\n" ++
               "\n" ++  
               "    uint32_t next_msg = 0U;\n" ++
               "\n" ++   
-              "    Result result;\n" ++
-              "    result.__variant = Result__Ok;\n" ++
+              "    __status_int32_t result;\n" ++
+              "    result.__variant = Success;\n" ++
               "\n" ++ 
               "    TimeVal timeout__msg_data;\n" ++
               "\n" ++ 
@@ -204,7 +202,7 @@ spec = do
               "        __termina_msg_queue__recv(self->__task_msg_queue_id, &next_msg,\n" ++
               "                                  &status);\n" ++
               "\n" ++  
-              "        if (status.__variant != Status__Success) {\n" ++
+              "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++   
@@ -215,13 +213,13 @@ spec = do
               "                __termina_msg_queue__recv(self->timer,\n" ++
               "                                          (void *)&timeout__msg_data, &status);\n" ++
               "\n" ++   
-              "                if (status.__variant != Status__Success) {\n" ++
+              "                if (status != 0L) {\n" ++
               "                    __termina_exec__shutdown();\n" ++
               "                }\n" ++
               "\n" ++   
               "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
               "\n" ++   
-              "                if (result.__variant != Result__Ok) {\n" ++
+              "                if (result.__variant != Success) {\n" ++
               "                    __termina_exec__shutdown();\n" ++
               "                }\n" ++
               "\n" ++   

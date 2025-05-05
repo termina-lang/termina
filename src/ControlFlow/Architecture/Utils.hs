@@ -198,7 +198,7 @@ getObjType _ = throwError $ annotateError Internal EUnboxingObject
 getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (OptionVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (MonadicVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
@@ -211,7 +211,7 @@ getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = retur
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType (IsOptionVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType _ = throwError $ annotateError Internal EUnboxingExpression
 
 -- | This function returns the name of a port. The function assumes that the object is

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Generator.CodeGen.Application.Option where
+module Generator.CodeGen.Application.Result where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
@@ -16,19 +16,19 @@ import Generator.Monadic
 import Control.Monad.State
 import Modules.Modules
 
-genOptionPathName :: FilePath
-genOptionPathName = "option" <.> "h"
+genResultPathName :: FilePath
+genResultPathName = "result" <.> "h"
 
-genOptionHeaderFile :: CGenerator CFile
-genOptionHeaderFile = do
-    let defineLabel = "__OPTION_H__"
-    optionSet <- gets (S.filter (\case {
+genResultHeaderFile :: CGenerator CFile
+genResultHeaderFile = do
+    let defineLabel = "__RESULT_H__"
+    resultSet <- gets (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . optionTypes . monadicTypes)
-    items <- concat <$> mapM genOptionStruct (S.toList optionSet)
-    return $ CHeaderFile genOptionPathName $
+        }) . resultTypes . monadicTypes)
+    items <- concat <$> mapM (uncurry genResultStruct) (S.toList resultSet)
+    return $ CHeaderFile genResultPathName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
             CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
@@ -38,14 +38,14 @@ genOptionHeaderFile = do
             CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
         ]
 
-runGenOptionHeaderFile ::
+runGenResultHeaderFile ::
     TerminaConfig
     -> M.Map Identifier Integer
     -> QualifiedName
     -> MonadicTypes
     -> Either CGeneratorError CFile
-runGenOptionHeaderFile config irqMap optionFileName opts =
-    case runState (runExceptT genOptionHeaderFile)
-        (CGeneratorEnv optionFileName S.empty opts config irqMap) of
+runGenResultHeaderFile config irqMap resultFileName monadicTys =
+    case runState (runExceptT genResultHeaderFile)
+        (CGeneratorEnv resultFileName S.empty monadicTys config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

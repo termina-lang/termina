@@ -5,9 +5,11 @@ import Semantic.AST
 import Data.Text
 import Semantic.Types
 import Utils.Annotations
-import qualified Data.Map as M
+import Generator.Monadic
 
 import UT.PPrinter.Common
+import qualified Data.Set as S
+import qualified Data.Map as M
 
 enumWithOneRegularField :: AnnASTElement SemanticAnn
 enumWithOneRegularField = TypeDefinition
@@ -41,7 +43,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing enums" $ do
     it "Prints an enum with one regular variant" $ do
-      renderTypeDefinitionDecl M.empty enumWithOneRegularField `shouldBe`
+      renderTypeDefinitionDecl (MonadicTypes (S.fromList [TEnum "id0"]) (S.fromList [TEnum "id0"]) M.empty M.empty) enumWithOneRegularField `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -49,9 +51,27 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "} id0;")
+            "} id0;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __option_id0__Some_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "    __option_id0__Some_params_t Some;\n" ++
+            "    __enum_option_t __variant;\n" ++
+            "} __option_id0_t;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __status_id0__Failure_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "    __status_id0__Failure_params_t Failure;\n" ++
+            "    __enum_status_t __variant;\n" ++
+            "} __status_id0_t;")
     it "Prints an enum with two regular variants" $ do
-      renderTypeDefinitionDecl M.empty enumWithTwoRegularFields `shouldBe`
+      renderTypeDefinitionDecl (MonadicTypes S.empty (S.fromList [TEnum "id0"]) M.empty M.empty) enumWithTwoRegularFields `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++
@@ -60,9 +80,18 @@ spec = do
             "\n" ++
             "typedef struct {\n" ++
             "    __enum_id0_t __variant;\n" ++
-            "} id0;")
+            "} id0;\n" ++
+            "\n" ++
+            "typedef struct {\n" ++
+            "    id0 __0;\n" ++
+            "} __status_id0__Failure_params_t;\n" ++
+            "\n" ++     
+            "typedef struct {\n" ++
+            "    __status_id0__Failure_params_t Failure;\n" ++
+            "    __enum_status_t __variant;\n" ++
+            "} __status_id0_t;")
     it "Prints an enum with one parameterized variant" $ do
-      renderTypeDefinitionDecl M.empty enumWithOneParameterizedField `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes enumWithOneParameterizedField `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0\n" ++
@@ -77,7 +106,7 @@ spec = do
             "    __enum_id0__variant0_params_t variant0;\n" ++
             "} id0;")
     it "Prints an enum with multiple parameterized variants" $ do
-      renderTypeDefinitionDecl M.empty enumWithMultipleParameterizedFields `shouldBe`
+      renderTypeDefinitionDecl emptyMonadicTypes enumWithMultipleParameterizedFields `shouldBe`
         pack (
             "\ntypedef enum {\n" ++
             "    id0__variant0,\n" ++

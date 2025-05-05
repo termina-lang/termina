@@ -3,7 +3,7 @@ module UT.PPrinter.FunctionSpec (spec) where
 import Test.Hspec
 import Semantic.AST
 import Data.Text
-import qualified Data.Map as M
+import Generator.Monadic
 import Semantic.Types
 import UT.PPrinter.Common
 
@@ -122,16 +122,16 @@ spec :: Spec
 spec = do
   describe "Pretty printing function declarations" $ do
     it "Prints fuction0 declaration" $ do
-      renderFunctionDecl M.empty function0 `shouldBe`
+      renderFunctionDecl emptyMonadicTypes function0 `shouldBe`
         pack "\nvoid function0();"
     it "Prints fuction1 declaration" $ do
-      renderFunctionDecl M.empty function1 `shouldBe`
+      renderFunctionDecl emptyMonadicTypes function1 `shouldBe`
         pack "\nuint32_t function1();"
     it "Prints fuction2 declaration" $ do
-      renderFunctionDecl M.empty function2 `shouldBe`
+      renderFunctionDecl emptyMonadicTypes function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0);"
     it "Prints fuction4 declaration" $ do
-      renderFunctionDecl M.empty function3 `shouldBe`
+      renderFunctionDecl emptyMonadicTypes function3 `shouldBe`
         pack "\nuint32_t function3(uint32_t param0, uint32_t param1[10U]);"
   describe "Pretty printing function definitions" $ do
     it "Prints fuction0 definition" $ do
