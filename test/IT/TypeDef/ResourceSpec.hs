@@ -86,12 +86,11 @@ spec = do
               "    \n" ++ 
               "    TMChannel * self = (TMChannel *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t status;\n" ++
-              "    status.__variant = Success;\n" ++
+              "    int32_t __status = 0L;\n" ++
               "\n" ++
-              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &__status);\n" ++
               "    TMChannel__get_tm_sent_packets(self, packets);\n" ++
-              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &__status);\n" ++
               "\n" ++  
               "}\n" ++
               "\n" ++  
@@ -162,12 +161,11 @@ spec = do
               "    \n" ++ 
               "    UARTDriver * self = (UARTDriver *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t status;\n" ++
-              "    status.__variant = Success;\n" ++
+              "    int32_t __status = 0L;\n" ++
               "\n" ++
-              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &__status);\n" ++
               "    UARTDriver__get_status(self, ret);\n" ++
-              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &__status);\n" ++
               "\n" ++  
               "}\n" ++
               "\n" ++  

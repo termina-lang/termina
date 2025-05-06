@@ -503,6 +503,10 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
                 return (id, sname, const (return pname))
+            (TReference _ (TOption ts)) -> do
+                sname <- genOptionStructName ts
+                pname <- genOptionParameterStructName ts
+                return (id, sname, const (return pname))
             (TStatus ts) -> do
                 sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
@@ -679,9 +683,9 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             (\sym index cParamType ->
                                 case cParamType of
                                     CTPointer {} ->
-                                        pre_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> getLocation ann
+                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> getLocation ann
                                     _ ->
-                                        pre_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> getLocation ann) xp [1..] (tail cParamTypes)
+                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> getLocation ann) xp [1..] (tail cParamTypes)
                     case head cParamTypes of
                         CTPointer {} ->
                             return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) : rest

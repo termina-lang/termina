@@ -1226,13 +1226,46 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EUnboxingEnumType
 typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id pann) = do
-  obj_typed <- typeObj obj
-  (_, obj_ty) <- getObjType obj_typed
-  case obj_ty of
-    (TOption {}) -> do
-      maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
-      return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
-    _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
+  case variant_id of
+    NoneLabel -> typeOptionVariant
+    SomeLabel -> typeOptionVariant
+    SuccessLabel -> typeStatusVariant
+    FailureLabel -> typeStatusVariant
+    OkLabel -> typeResultVariant
+    ErrorLabel -> typeResultVariant
+  
+  where 
+
+    typeOptionVariant :: SemanticMonad (SAST.Expression SemanticAnn)
+    typeOptionVariant = do
+      obj_typed <- typeObj obj
+      (_, obj_ty) <- getObjType obj_typed
+      case obj_ty of
+        (TOption {}) -> do
+          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+        _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
+
+    typeStatusVariant :: SemanticMonad (SAST.Expression SemanticAnn)
+    typeStatusVariant = do
+      obj_typed <- typeObj obj
+      (_, obj_ty) <- getObjType obj_typed
+      case obj_ty of
+        (TStatus {}) -> do
+          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+        _ -> throwError $ annotateError pann (EIsStatusVariantInvalidType obj_ty)
+
+    typeResultVariant :: SemanticMonad (SAST.Expression SemanticAnn)
+    typeResultVariant = do
+      obj_typed <- typeObj obj
+      (_, obj_ty) <- getObjType obj_typed
+      case obj_ty of
+        (TResult {}) -> do
+          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
+        _ -> throwError $ annotateError pann (EIsResultVariantInvalidType obj_ty)
+
 typeExpression _ _ (StructInitializer _ _ pann) = throwError $ annotateError pann EStructInitializerInvalidUse
 typeExpression _ _ (ArrayInitializer _ _ pann) = throwError $ annotateError pann EArrayInitializerInvalidUse
 typeExpression _ _ (ArrayExprListInitializer _ pann) = throwError $ annotateError pann EArrayExprListInitializerInvalidUse

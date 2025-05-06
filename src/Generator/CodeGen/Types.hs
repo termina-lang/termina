@@ -108,8 +108,8 @@ __termina_periodic_timer__init = "__termina_periodic_timer__init" @:
             _const . ptr $ _const __termina_periodic_timer_connection_t,
             -- | const TimeVal * const period,
             _const . ptr $ _const _TimeVal,
-            -- | __status_int32_t * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_interrupt__init :: CExpression
@@ -120,8 +120,8 @@ __termina_interrupt__init = "__termina_interrupt__init" @:
             _const __termina_id_t,
             -- | const __termina_interrupt_connection_t * const connection,
             _const . ptr $ _const __termina_interrupt_connection_t,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_mutex_policy_t, __termina_task_prio_t :: CType
@@ -145,8 +145,8 @@ __termina_task__init = "__termina_task__init" @:
             __termina_task_entry_t,
             -- | void * arg,
             ptr void,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_mutex__init :: CExpression
@@ -159,8 +159,8 @@ __termina_mutex__init = "__termina_mutex__init" @:
             _const __termina_mutex_policy_t,
             -- | const __termina_task_prio_t prio_ceiling,
             _const __termina_task_prio_t,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_msg_queue__init :: CExpression
@@ -173,8 +173,8 @@ __termina_msg_queue__init = "__termina_msg_queue__init" @:
             _const size_t,
             -- | const size_t message_queue_size,
             _const size_t,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_msg_queue__recv :: CExpression
@@ -185,8 +185,8 @@ __termina_msg_queue__recv = "__termina_msg_queue__recv" @:
             _const __termina_id_t,
             -- | void * const element,
             ptr void,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_exec__shutdown :: CExpression
@@ -219,16 +219,16 @@ __termina_app__init_tasks :: CExpression
 __termina_app__init_tasks = "__termina_app__init_tasks" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__install_emitters :: CExpression
 __termina_app__install_emitters = "__termina_app__install_emitters" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__enable_protection :: CExpression
@@ -239,48 +239,48 @@ __termina_app__init_channel_connections :: CExpression
 __termina_app__init_channel_connections = "__termina_app__init_channel_connections" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__init_msg_queues :: CExpression
 __termina_app__init_msg_queues = "__termina_app__init_msg_queues" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__initial_event :: CExpression
 __termina_app__initial_event = "__termina_app__initial_event" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__init_emitters :: CExpression
 __termina_app__init_emitters = "__termina_app__init_emitters" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__init_pools :: CExpression
 __termina_app__init_pools = "__termina_app__init_pools" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_app__init_mutexes :: CExpression
 __termina_app__init_mutexes = "__termina_app__init_mutexes" @:
     CTFunction void
         [
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_mutex__lock :: CExpression
@@ -289,8 +289,8 @@ __termina_mutex__lock = "__termina_mutex__lock" @:
         [
             -- | const __termina_id_t mutex_id
             _const __termina_id_t,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_mutex__unlock :: CExpression
@@ -299,8 +299,8 @@ __termina_mutex__unlock = "__termina_mutex__unlock" @:
         [
             -- | const __termina_id_t mutex_id
             _const __termina_id_t,
-            -- | Status * const status
-            _const . ptr $ __status_int32_t
+            -- | int32_t * const status
+            _const . ptr $ int32_t
         ]
 
 __termina_task_lock_t :: CType

@@ -329,15 +329,16 @@ genExpression (IsEnumVariantExpression obj enum this_variant ann) = do
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
     let rightExpr = (enum <::> this_variant) @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (IsMonadicVariantExpression obj NoneLabel ann) = do
+genExpression (IsMonadicVariantExpression obj this_variant ann) = do
     cObj <- genObject obj
     let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
-    let rightExpr = optionNoneVariant @: enumFieldType |>> getLocation ann
-    return $ leftExpr @== rightExpr |>> getLocation ann
-genExpression (IsMonadicVariantExpression obj SomeLabel ann) = do
-    cObj <- genObject obj
-    let leftExpr = cObj @. variant @: enumFieldType |>> getLocation ann
-    let rightExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
+    let rightExpr = case this_variant of 
+            NoneLabel -> optionNoneVariant @: enumFieldType |>> getLocation ann
+            SomeLabel -> optionSomeVariant @: enumFieldType |>> getLocation ann
+            SuccessLabel -> statusSuccessVariant @: enumFieldType |>> getLocation ann
+            FailureLabel -> statusFailureVariant @: enumFieldType |>> getLocation ann
+            OkLabel -> resultOkVariant @: enumFieldType |>> getLocation ann
+            ErrorLabel -> resultErrorVariant @: enumFieldType |>> getLocation ann
     return $ leftExpr @== rightExpr |>> getLocation ann
 genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
     objType <- getObjType obj

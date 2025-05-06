@@ -119,12 +119,11 @@ spec = do
               "    \n" ++ 
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t status;\n" ++
-              "    status.__variant = Success;\n" ++
+              "    int32_t __status = 0L;\n" ++
               "\n" ++
-              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &__status);\n" ++
               "    id0__assignment_test1(self, box_var0);\n" ++
-              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &__status);\n" ++
               "\n" ++  
               "}\n" ++
               "\n" ++  
@@ -206,12 +205,11 @@ spec = do
               "    \n" ++ 
               "    id0 * self = (id0 *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t status;\n" ++
-              "    status.__variant = Success;\n" ++
+              "    int32_t __status = 0L;\n" ++
               "\n" ++
-              "    __termina_mutex__lock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__lock(self->__mutex_id, &__status);\n" ++
               "    id0__assignment_test2(self, box_var0, box_var1);\n" ++
-              "    __termina_mutex__unlock(self->__mutex_id, &status);\n" ++
+              "    __termina_mutex__unlock(self->__mutex_id, &__status);\n" ++
               "\n" ++  
               "}\n" ++
               "\n" ++  

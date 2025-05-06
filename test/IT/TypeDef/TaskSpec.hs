@@ -115,13 +115,13 @@ spec = do
               "    __option_box_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
-              "    (self->message_pool.alloc)(self->message_pool.__that, &alloc_msg);\n"  ++
+              "    self->message_pool.alloc(self->message_pool.__that, &alloc_msg);\n"  ++
               "\n"  ++
               "    if (alloc_msg.__variant == Some) {\n"  ++
               "        \n" ++
               "        __termina_box_t msg = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        (self->message_pool.free)(self->message_pool.__that, msg);\n" ++
+              "        self->message_pool.free(self->message_pool.__that, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n"  ++

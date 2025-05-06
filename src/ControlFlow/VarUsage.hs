@@ -43,19 +43,20 @@ useArguments e@(AccessObject (Variable ident ann))
       let loc = getLocation ann in
       safeMoveBox ident loc
     _ -> useExpression e
+useArguments (ReferenceExpression _ (Variable ident _ann) _a) =
+  safeUseVariable ident
 -- Box variables inside expressions are read as values.
 useArguments e = useExpression e
 
 useObject :: Object SemanticAnn -> UDM VarUsageError ()
-useObject (Variable ident ann)
-  =
+useObject (Variable ident ann) =
   let loc = getLocation ann in
   maybe
-        (throwError $ annotateError loc EUnboxingObjectType)
-        (\case {
-            TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
-            _ -> safeUseVariable ident
-        }) (getTypeSemAnn ann)
+    (throwError $ annotateError loc EUnboxingObjectType)
+    (\case {
+        TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
+        _ -> safeUseVariable ident
+    }) (getTypeSemAnn ann)
 useObject (ArrayIndexExpression obj e _ann)
   = useObject obj >> useExpression e
 useObject (MemberAccess obj _i _ann)
@@ -82,7 +83,9 @@ useExpression (Constant _c _a)
   = return ()
 useExpression (BinOp _o el er _ann)
   = useExpression el >> useExpression er
-useExpression (ReferenceExpression _aK obj _a)
+useExpression (ReferenceExpression _refKind (Variable ident _ann) _a) 
+  = safeUseVariable ident
+useExpression (ReferenceExpression _ obj _a)
   = useObject obj
 useExpression (Casting e _ty _a)
   = useExpression e
@@ -243,7 +246,9 @@ useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
     -- I don't think we can have expression computing variables here.
     ReferenceExpression Mutable (Variable avar _anni) _ann ->
       allocOptionBox avar (getLocation ann)
-    _ ->throwError $ annotateError (getLocation ann) EBadAllocArg
+    AccessObject (Variable avar _anni) ->
+      allocOptionBox avar (getLocation ann)
+    _ -> throwError $ annotateError (getLocation ann) EBadAllocArg
 useDefBasicBlock (FreeBox obj arg ann)
   = useObject obj >>
   case arg of

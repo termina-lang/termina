@@ -614,21 +614,20 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                             (ptr void : cParamTypes)
                     let cBody = [
                                 selfCastStmt,
-                                pre_cr $ var "status" __status_int32_t,
-                                no_cr $ "status" @: __status_int32_t @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                                pre_cr $ var (namefy "status") int32_t @:= dec 0 @: int32_t,
                                 pre_cr $ __termina_mutex__lock @@
                                     [
                                         (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
-                                        addrOf ("status" @: __status_int32_t)
+                                        addrOf (namefy "status" @: int32_t)
                                     ],
                                 no_cr $ procedureFunction @@ ("self" @: ptr void : cParamExpressions),
                                 no_cr $ __termina_mutex__unlock @@
                                     [
                                         (selfParam @: ptr selfCType) @. mutexIDField @: __termina_id_t,
-                                        addrOf ("status" @: __status_int32_t)
+                                        addrOf (namefy "status" @: int32_t)
                                     ]
                             ]
-                    return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "mutex_lock") (cThisParam : cParamDecls)
+                    return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "mutex" <:> "lock") (cThisParam : cParamDecls)
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
 
@@ -652,7 +651,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                                         "lock" @: __termina_task_lock_t
                                     ]
                             ]
-                    return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "task_lock") (cThisParam : cParamDecls)
+                    return $ CFunctionDef Nothing (CFunction (CTVoid noqual) (clsFuncName <::> "task" <:> "lock") (cThisParam : cParamDecls)
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
 

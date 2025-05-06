@@ -239,6 +239,8 @@ data Error
   | EInvalidResultTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier for result
   | EMonadicVariantParameterTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in monadic variant
   | EObjectPreviouslyMoved Location -- ^ Object previously moved
+  | EIsStatusVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-status-variant expression
+  | EIsResultVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-result-variant expression
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -434,6 +436,8 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "SE-188"
     errorIdent (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "SE-189"
     errorIdent (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "SE-190"
+    errorIdent (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "SE-191"
+    errorIdent (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "SE-192"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -624,6 +628,8 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "invalid type specifier for result"
     errorTitle (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "monadic variant parameter type mismatch"
     errorTitle (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "object previously moved"
+    errorTitle (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "invalid type for is-status-variant expression"
+    errorTitle (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "invalid type for is-result-variant expression"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -2029,6 +2035,14 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         prevSourceLines "The object was previously moved here:" prevFileName
                         prevPos Nothing
+                EIsStatusVariantInvalidType ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-status-variant expression."))
+                EIsResultVariantInvalidType ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-result-variant expression."))
                         
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where

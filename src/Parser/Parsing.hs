@@ -457,42 +457,42 @@ isEnumVariantExprParser = do
 
 isMonadicVariantExprParser :: Parser (Expression ParserAnn)
 isMonadicVariantExprParser =
-  (do
+  try (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "None"
     IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
-  (do
+  try (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Some"
     IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition) <|>
-  (do
+  try (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Ok"
-    IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
-  (do
+    IsMonadicVariantExpression object OkLabel . Position startPos <$> getPosition) <|>
+  try (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Error"
-    IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition) <|>
-  (do
+    IsMonadicVariantExpression object ErrorLabel . Position startPos <$> getPosition) <|>
+  try (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Success"
-    IsMonadicVariantExpression object NoneLabel . Position startPos <$> getPosition) <|>
+    IsMonadicVariantExpression object SuccessLabel . Position startPos <$> getPosition) <|>
   (do
     startPos <- getPosition
     object <- objectParser
     _ <- reserved "is"
     _ <- reserved "Failure"
-    IsMonadicVariantExpression object SomeLabel . Position startPos <$> getPosition)
+    IsMonadicVariantExpression object FailureLabel . Position startPos <$> getPosition)
 
 expressionParser :: Parser (Expression ParserAnn)
 expressionParser = try builtinVariantExprParser

@@ -246,9 +246,9 @@ instance CPrint CExpression where
         pexpr2 <- pprintPrec 2 expr2
         return $ parenPrec p (-1) $ pexpr1 <> comma <+> pexpr2
     pprintPrec p (CExprCall expr args _ _) = do
-        pexpr <- pprintPrec 30 expr
+        pexpr <- pprintPrec 26 expr
         pargs <- mapM (pprintPrec 2) args
-        return $ parenPrec p 30 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
+        return $ parenPrec p 26 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
 
 prependLine :: Bool -> DocStyle -> DocStyle
 prependLine True doc = line <> doc
