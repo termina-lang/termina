@@ -7,6 +7,7 @@ import Parser.AST
 import qualified Data.Map as M
 import Extras.TopSort
 import qualified Data.Set as S
+import qualified Semantic.AST as SAST
 
 -- Helper to detect invocations to 'self'
 objIsSelf :: Object a -> Bool
@@ -179,3 +180,19 @@ fieldDepClass (ClassViewer _vId _params _type bRet _ann) =
 fieldDepClass (ClassAction _aId _param _type bRet _ann) =
   M.union (fieldDepBlock bRet M.empty)
 
+(<::>) :: Identifier -> Identifier -> Identifier
+(<::>) i1 i2 = i1 ++ "__" ++ i2
+
+getMovedHash :: SAST.Object a -> Maybe Identifier -> Identifier
+getMovedHash (SAST.Variable ident _ann) prev =
+  maybe ident (ident <::>) prev
+getMovedHash (SAST.Dereference obj _ann) prev = 
+  getMovedHash obj prev
+getMovedHash (SAST.DereferenceMemberAccess obj mident _ann) prev =
+  getMovedHash obj $ (mident <::>) <$> prev
+getMovedHash (SAST.MemberAccess obj mident _ann) prev =
+  getMovedHash obj $ (mident <::>) <$> prev
+getMovedHash (SAST.ArrayIndexExpression obj _expr _ann) _prev =
+  getMovedHash obj Nothing
+getMovedHash (SAST.Unbox obj _ann) _prev =
+  getMovedHash obj Nothing

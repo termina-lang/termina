@@ -496,6 +496,9 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             (TEnum enumId) -> do
                 enumStructName <- genEnumStructName enumId
                 return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
+            TReference _ (TEnum enumId) -> do
+                enumStructName <- genEnumStructName enumId
+                return ((<::>) enumId, enumStructName, genEnumParameterStructName enumId)
             (TOption ts) -> do
                 sname <- genOptionStructName ts
                 pname <- genOptionParameterStructName ts
@@ -504,11 +507,47 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 sname <- genStatusStructName ts
                 pname <- genStatusParameterStructName ts
                 return (id, sname, const (return pname))
+            (TReference _ (TStatus ts)) -> do
+                sname <- genStatusStructName ts
+                pname <- genStatusParameterStructName ts
+                return (id, sname, const (return pname))
+            (TReference _ (TResult okTy errorTy)) -> do
+                sname <- genResultStructName okTy errorTy
+                return (id, sname, genResultParameterStructName okTy errorTy)
             (TResult okTy errorTy) -> do
                 sname <- genResultStructName okTy errorTy
                 return (id, sname, genResultParameterStructName okTy errorTy)
             _ -> throwError $ InternalError $ "Unsupported match expression type: " ++ show expr
     case expr of
+        (ReferenceExpression _ obj _) -> do
+            cObj <- genObject obj
+            case matchCases of
+                -- | If there is only one case, we only need to check the variant if
+                -- there is no default case
+                [m@(MatchCase identifier _ _ ann')] -> do
+                    paramsStructName <- genParamsStructName identifier
+                    cTy <- genType noqual (TStruct paramsStructName)
+                    case mDefaultCase of
+                        Just d@(DefaultCase _ ann'') -> do
+                            let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> getLocation ann
+                                cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> getLocation ann
+                            theCase <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
+                            defCaseBlk <- genDefaultCase d
+                            let cDefaultCase = (trail_cr . block) defCaseBlk |>> getLocation ann''
+                            return [pre_cr $ _if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann') theCase cDefaultCase]
+                        Nothing -> genMatchCase cObj cTy m
+                -- | The first one must add a preceding blank line
+                m@(MatchCase identifier _ _ ann') : xs -> do
+                    paramsStructName <- genParamsStructName identifier
+                    cTy <- genType noqual (TStruct paramsStructName)
+                    rest <- genMatchCases cObj casePrefix genParamsStructName xs
+                    cBlk <- flip CSCompound (buildCompoundAnn ann' False True) <$> genMatchCase cObj cTy m
+                    -- | TODO: The size of the enum field has been hardcoded, it should be
+                    -- platform dependent
+                    let cEnumVariantsFieldExpr = cObj @. variant @: uint32_t |>> getLocation ann
+                        cCasePrefixIdentExpr = casePrefix identifier @: uint32_t |>> getLocation ann
+                    return [pre_cr $ _if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr |>> getLocation ann') cBlk rest]
+                _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         (AccessObject {}) -> do
             cObj <- genExpression expr >>= unboxObject
             case matchCases of
@@ -630,12 +669,24 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             case params of
                 [] -> return []
                 [param] ->
-                    return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann]
+                    case head cParamTypes of
+                        CTPointer {} ->
+                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> getLocation ann]
+                        _ ->
+                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann]
                 (p : xp) -> do
                     let rest = zipWith3
                             (\sym index cParamType ->
-                                no_cr $ var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) xp [1..] (tail cParamTypes)
-                    return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann : rest
+                                case cParamType of
+                                    CTPointer {} ->
+                                        pre_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> getLocation ann
+                                    _ ->
+                                        pre_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> getLocation ann) xp [1..] (tail cParamTypes)
+                    case head cParamTypes of
+                        CTPointer {} ->
+                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) : rest
+                        _ ->
+                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann : rest
 
 
 genBlocks (ReturnBlock mExpr ann) =

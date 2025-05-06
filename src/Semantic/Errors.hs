@@ -238,6 +238,7 @@ data Error
   | EInvalidVariantForStatus Identifier -- ^ Invalid variant for status
   | EInvalidResultTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier for result
   | EMonadicVariantParameterTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in monadic variant
+  | EObjectPreviouslyMoved Location -- ^ Object previously moved
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -432,6 +433,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "SE-187"
     errorIdent (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "SE-188"
     errorIdent (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "SE-189"
+    errorIdent (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "SE-190"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -621,6 +623,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidVariantForStatus _ident) _pos) = "invalid variant for status"
     errorTitle (AnnotatedError (EInvalidResultTypeSpecifier _ts) _pos) = "invalid type specifier for result"
     errorTitle (AnnotatedError (EMonadicVariantParameterTypeMismatch _expectedTy _actualTy) _pos) = "monadic variant parameter type mismatch"
+    errorTitle (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "object previously moved"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -2016,6 +2019,17 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
+                EObjectPreviouslyMoved prevPos@(Position prevStart _) -> 
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "You are trying to access an object that has been moved.\n") <>
+                    pprintSimpleError
+                        prevSourceLines "The object was previously moved here:" prevFileName
+                        prevPos Nothing
+                        
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

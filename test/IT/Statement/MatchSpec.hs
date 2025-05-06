@@ -76,7 +76,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing match statements" $ do
     it "Prints declaration of function match_test0" $ do
-      renderHeader False test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
@@ -157,7 +157,7 @@ spec = do
               "\n" ++  
               "}\n")
     it "Prints declaration of procedure match_test1" $ do
-      renderHeader False test1 `shouldBe`
+      renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
@@ -237,7 +237,7 @@ spec = do
               "\n" ++  
               "}\n")
     it "Prints declaration of function match_test2" $ do
-      renderHeader False test2 `shouldBe`
+      renderHeader test2 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

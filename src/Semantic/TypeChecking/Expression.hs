@@ -29,7 +29,16 @@ import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Control.Monad.State as ST
 import Semantic.Environment
-import Utils.Monad
+import Utils.Monad 
+import Semantic.Utils
+
+checkObjectNotMoved :: Location -> SAST.Object a -> SemanticMonad (SAST.Object a)
+checkObjectNotMoved loc obj = do
+  let objectHash = getMovedHash obj Nothing
+  movedObjects <- ST.gets moved
+  case M.lookup objectHash movedObjects of
+    Nothing -> return obj
+    Just movedLocation -> throwError $ annotateError loc (EObjectPreviouslyMoved movedLocation)
 
 checkConstant :: Location -> SAST.TerminaType SemanticAnn -> SAST.Const SemanticAnn -> SemanticMonad ()
 checkConstant loc expected_type (I ti (Just type_c)) =
@@ -266,17 +275,17 @@ typeObject ::
   -> SemanticMonad (SAST.Object SemanticAnn)
 typeObject getVarTy (Variable ident ann) = do
   (ak, ty) <- getVarTy ann ident
-  return $ SAST.Variable ident (buildExpAnnObj ann ak ty)
+  checkObjectNotMoved ann $ SAST.Variable ident (buildExpAnnObj ann ak ty)
 typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
   typed_obj <- typeObject getVarTy obj
   (obj_ak, obj_ty) <- getObjType typed_obj
   case obj_ty of
     TArray ty_elems _vexp -> do
         idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
-        return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
+        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
     TReference ref_ak (TArray ty_elems _vexp) -> do
         idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
-        return $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
+        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
@@ -296,13 +305,13 @@ typeObject _ (MemberAccess obj ident ann) = do
   ft <- getMemberField ann obj_ty ident
   case ft of
     (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
-      return $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
-    (fty, _) -> return $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fty
+      checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+    (fty, _) -> checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fty
 typeObject getVarTy (Dereference obj ann) = do
   typed_obj <- typeObject getVarTy obj
   (_, obj_ty) <- getObjType typed_obj
   case obj_ty of
-    TReference ak ty -> return $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
+    TReference ak ty -> checkObjectNotMoved ann $ SAST.Dereference typed_obj $ buildExpAnnObj ann ak ty
     ty              -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeObject _getVarTy (PAST.ArraySlice _obj _lower _upper anns) = do
   -- | TArray slices can only be used as part of a reference expression. If we are here,
@@ -316,8 +325,8 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
       ft <- getMemberField ann rTy ident
       case ft of
         (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
-          return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
-        (fty, _) -> return $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fty
+          checkObjectNotMoved ann $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+        (fty, _) -> checkObjectNotMoved ann $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fty
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 
 typeMemberFunctionCall ::

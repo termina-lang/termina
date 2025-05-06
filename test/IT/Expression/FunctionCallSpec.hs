@@ -19,7 +19,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing function call expressions" $ do
     it "Prints declaration of functions of test0" $ do
-      renderHeader False test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

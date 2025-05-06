@@ -139,6 +139,26 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           ;
           _ -> throwError $ annotateError Internal EUnboxingEnumType
         }
+    TReference refKind (TEnum t) -> getGlobalTypeDef ann t >>=
+        \case {
+          LocatedElement (Enum _ident flsDef _mods) _ -> do
+            let flsDefIdents = variantIdentifier <$> flsDef
+                casesIdents = matchIdentifier <$> cases
+                -- | The parameters will now be refernces to the the actual objects
+                -- inside the enum
+                variantMap = M.fromList (
+                  map (\(EnumVariant vId variantParams) -> 
+                    (vId, EnumVariant vId (TReference refKind <$> variantParams))) flsDef)
+                caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
+            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+              \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
+            typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase caseMap variantMap) casesIdents)
+            when (not total && (length flsDefIdents == length casesIdents)) $
+              throwError $ annotateError ann EInvalidDefaultCase
+            return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
+          ;
+          _ -> throwError $ annotateError Internal EUnboxingEnumType
+        }
     TOption t -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
@@ -177,6 +197,12 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     where
 
       total = isNothing mDefaultCase
+
+
+      moveExpression :: SAST.Expression SemanticAnn -> SemanticMonad ()
+      moveExpression (SAST.ReferenceExpression _ obj eann) = moveObject (getLocation eann) obj
+      moveExpression (SAST.AccessObject obj) = moveObject (getLocation . getAnnotation $ obj) obj
+      moveExpression _ = throwError $ annotateError Internal EMatchCaseInternalError
 
       checkCaseDuplicates :: [MatchCase ParserAnn] -> SemanticMonad ()
       checkCaseDuplicates = foldM_ checkCaseDuplicates' M.empty

@@ -39,7 +39,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of class TMChannel without no_handler" $ do
-      renderHeader False test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
@@ -117,7 +117,7 @@ spec = do
               "\n" ++  
               "}\n")
     it "Prints declaration of class UARTDriver" $ do
-      renderHeader False test1 `shouldBe`
+      renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

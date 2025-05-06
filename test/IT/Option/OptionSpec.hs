@@ -46,13 +46,11 @@ spec :: Spec
 spec = do
   describe "Pretty printing pool methods" $ do
     it "Prints header file of test0" $ do
-      renderHeader True test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
-              "\n" ++
-              "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++

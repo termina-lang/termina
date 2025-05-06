@@ -15,11 +15,15 @@ type GlobalEnv = M.Map Identifier (LocatedElement (GEntry SemanticAnn))
 -- variables to their type
 type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType SemanticAnn))
 
+-- | Map with the moved variables
+type MovedEnv = M.Map Identifier Location
+
 -- | Environment required to type expression packed into just one type.
 data Environment
  = ExprST
  { global :: GlobalEnv
  , local  :: LocalEnv
+ , moved  :: MovedEnv
  }
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
@@ -89,5 +93,5 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
   let sysInitEnv = if enableSystemInit config then sysInitGlobalEnv else [] 
       sysPortEnv = if enableSystemPort config then systemPortGlobalEnv else [] 
   in
-  ExprST (M.fromList (stdlibGlobalEnv ++ sysInitEnv ++ sysPortEnv ++ pltEnvironment)) M.empty
-makeInitialGlobalEnv Nothing pltEnvironment = ExprST (M.fromList (stdlibGlobalEnv ++ pltEnvironment)) M.empty
+  ExprST (M.fromList (stdlibGlobalEnv ++ sysInitEnv ++ sysPortEnv ++ pltEnvironment)) M.empty M.empty
+makeInitialGlobalEnv Nothing pltEnvironment = ExprST (M.fromList (stdlibGlobalEnv ++ pltEnvironment)) M.empty M.empty

@@ -14,8 +14,8 @@ import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option
 import Generator.Environment
 
-renderHeader :: Bool -> String -> Text
-renderHeader includeOptionH input = case parse (contents topLevel) "" input of
+renderHeader :: String -> Text
+renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform
@@ -26,7 +26,7 @@ renderHeader includeOptionH input = case parse (contents topLevel) "" input of
         case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams irqMap includeOptionH "test" [] bbAST emptyMonadicTypes of
+            case runGenHeaderFile configParams irqMap "test" [] bbAST emptyMonadicTypes of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 

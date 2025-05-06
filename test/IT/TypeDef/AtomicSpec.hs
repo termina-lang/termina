@@ -45,13 +45,11 @@ spec :: Spec
 spec = do
   describe "Classes with atomic access ports" $ do
     it "Prints declaration of class with atomic access port" $ do
-      renderHeader True test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
-              "\n" ++
-              "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++
@@ -143,13 +141,11 @@ spec = do
               "\n" ++
               "}\n")
     it "Prints declaration of class with atomic access port" $ do
-      renderHeader True test1 `shouldBe`
+      renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
-              "\n" ++
-              "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++

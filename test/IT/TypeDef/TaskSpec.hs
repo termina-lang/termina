@@ -56,13 +56,11 @@ spec :: Spec
 spec = do
   describe "Pretty printing class methods" $ do
     it "Prints declaration of task class CHousekeeping" $ do
-      renderHeader True test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
-              "\n" ++
-              "#include \"option.h\"\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    uint32_t sender_id;\n" ++

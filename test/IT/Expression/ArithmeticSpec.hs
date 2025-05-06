@@ -46,7 +46,7 @@ spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
     it "Prints declaration of function test0" $ do
-      renderHeader False test0 `shouldBe`
+      renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++
@@ -88,7 +88,7 @@ spec = do
               "\n" ++
               "}\n")    
     it "Prints declaration of function test1" $ do
-     renderHeader False test1 `shouldBe`
+     renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
               "\n" ++

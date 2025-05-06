@@ -26,6 +26,7 @@ import qualified Parser.Types as Parser
 import Utils.Monad
 
 import Control.Monad.State
+import Semantic.Utils
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 
@@ -91,6 +92,14 @@ insertLocalImmutObj loc ident ty = do
   case prev of
     Nothing -> modify (\s -> s{local = M.insert ident (LocatedElement (Immutable, ty) loc) (local s)})
     Just prevloc -> throwError $ annotateError loc $ ESymbolAlreadyDefined (ident, prevloc)
+
+moveObject :: Location -> Object a -> SemanticMonad ()
+moveObject loc obj = 
+  let objectHash = getMovedHash obj Nothing
+  in
+    modify (\s -> s{
+      moved = M.insert objectHash loc (moved s)
+    })
   
 insertGlobalTy :: Location -> SemanTypeDef SemanticAnn -> SemanticMonad ()
 insertGlobalTy loc tydef =
