@@ -103,6 +103,7 @@ genTypeSpecName TInt8 = return "int8"
 genTypeSpecName TInt16 = return "int16"
 genTypeSpecName TInt32 = return "int32"
 genTypeSpecName TInt64 = return "int64"
+genTypeSpecName TUSize = return "size"
 genTypeSpecName (TStruct ident) = return ident
 genTypeSpecName (TEnum ident) = return ident
 genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'

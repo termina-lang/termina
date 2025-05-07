@@ -709,7 +709,7 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
           then
              flip (SAST.EnumVariantInitializer id_ty variant) (buildExpAnn pann (TEnum id_ty))
               <$> zipWithM (\(ty, position) e ->
-                catchMismatch pann (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty)) (typeExpression (Just ty) typeObj e)) (zip ps [0 :: Integer ..]) args
+                catchMismatch pann (EEnumVariantParamTypeMismatch (enumId, loc) (variant, position, ty)) (typeAssignmentExpression ty typeObj e)) (zip ps [0 :: Integer ..]) args
           else if psLen < asLen
           then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
           else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
@@ -748,7 +748,7 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
       case vexp of
         None -> return $ SAST.MonadicVariantInitializer None (buildExpAnn anns (TOption ts))
         Some e -> do
-          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeExpression (Just ts) typeObj e
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeAssignmentExpression ts typeObj e
           return $ SAST.MonadicVariantInitializer (Some typed_e) (buildExpAnn anns (TOption ts))
         Ok _ -> throwError $ annotateError anns (EInvalidVariantForOption "Ok")
         Error _ -> throwError $ annotateError anns (EInvalidVariantForOption "Error")
@@ -757,10 +757,10 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
     TResult tsOk tsError -> do
       case vexp of
         Ok e -> do
-          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsOk) $ typeExpression (Just tsOk) typeObj e
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsOk) $ typeAssignmentExpression tsOk typeObj e
           return $ SAST.MonadicVariantInitializer (Ok typed_e) (buildExpAnn anns (TResult tsOk tsError))
         Error e -> do
-          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsError) $ typeExpression (Just tsError) typeObj e
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch tsError) $ typeAssignmentExpression tsError typeObj e
           return $ SAST.MonadicVariantInitializer (Error typed_e) (buildExpAnn anns (TResult tsOk tsError))
         Success -> throwError $ annotateError anns (EInvalidVariantForResult "Success")
         Failure _ -> throwError $ annotateError anns (EInvalidVariantForResult "Failure")
@@ -770,7 +770,7 @@ typeAssignmentExpression expectedType typeObj (MonadicVariantInitializer vexp an
       case vexp of
         Success -> return $ SAST.MonadicVariantInitializer Success (buildExpAnn anns (TStatus ts))
         Failure e -> do
-          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeExpression (Just ts) typeObj e
+          typed_e <- catchMismatch (getAnnotation e) (EMonadicVariantParameterTypeMismatch ts) $ typeAssignmentExpression ts typeObj e
           return $ SAST.MonadicVariantInitializer (Failure typed_e) (buildExpAnn anns (TStatus ts))
         None -> throwError $ annotateError anns (EInvalidVariantForStatus "None")
         Some _ -> throwError $ annotateError anns (EInvalidVariantForStatus "Some")

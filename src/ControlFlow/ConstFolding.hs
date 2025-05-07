@@ -243,6 +243,9 @@ constFoldObject (Dereference obj _) = constFoldObject obj
 constFoldObject (DereferenceMemberAccess obj _ _) = constFoldObject obj
 constFoldObject (Unbox obj _) = constFoldObject obj
 
+-- | Folds constant expressions in the AST, evaluating constant expressions
+-- and validating their results. This function traverses the expression tree
+-- and performs constant folding where possible.
 constFoldExpression :: Expression SemanticAnn -> ConstFoldMonad ()
 constFoldExpression (AccessObject obj) = constFoldObject obj
 constFoldExpression (Constant _ _) = return ()
