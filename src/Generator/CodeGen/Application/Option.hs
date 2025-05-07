@@ -27,7 +27,7 @@ genOptionHeaderFile = do
         TEnum _ -> False;
         _ -> True;
         }) . optionTypes . monadicTypes)
-    items <- concat <$> mapM genOptionStruct (S.toList optionSet)
+    items <- concat <$> traverse genOptionStruct (S.toList optionSet)
     return $ CHeaderFile genOptionPathName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),

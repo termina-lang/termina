@@ -27,7 +27,7 @@ genResultHeaderFile = do
         TEnum _ -> False;
         _ -> True;
         }) . resultTypes . monadicTypes)
-    items <- concat <$> mapM (uncurry genResultStruct) (S.toList resultSet)
+    items <- concat <$> traverse (uncurry genResultStruct) (S.toList resultSet)
     return $ CHeaderFile genResultPathName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),

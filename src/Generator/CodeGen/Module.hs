@@ -57,7 +57,7 @@ genHeaderFile ::
     -> CGenerator CFile
 genHeaderFile includeOptionH includeStatusH includeResultH mName imports program = do
     let defineLabel = genModuleDefineLabel mName
-    items <- concat <$> mapM genHeaderASTElement program
+    items <- concat <$> traverse genHeaderASTElement program
     extra <- gets extraImports
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
     return $ CHeaderFile mName $
@@ -87,7 +87,7 @@ genSourceFile ::
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile
 genSourceFile mName program = do
-    items <- concat <$> mapM genSourceASTElement program
+    items <- concat <$> traverse genSourceASTElement program
     return $ CSourceFile mName $
         CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
         : items

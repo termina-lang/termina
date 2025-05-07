@@ -210,7 +210,7 @@ collectExtendedInterfaces loc ident = do
         -- If the global type is an interface, we return the procedures.
         (LocatedElement (Interface _ _ extends _ _) _) -> (do
           -- If the interface is well-typed, this should not fail:
-          extendedTree <- concat <$> mapM (collectExtendedInterfaces loc) extends
+          extendedTree <- concat <$> traverse (collectExtendedInterfaces loc) extends
           return $ extends ++ extendedTree);
         -- If the global type is not an interface, we throw an error.
         _ -> throwError $ annotateError loc (EGlobalNotInterface ident)
@@ -370,7 +370,7 @@ typeMemberFunctionCall ann obj_ty ident args =
     TAccessPort (TInterface _ dident) -> getGlobalTypeDef ann dident >>=
       \case{
         LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
-          extendedProcedures <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures ann) extends
+          extendedProcedures <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures ann) extends
           case findInterfaceProcedure ident (members ++ extendedProcedures) of
             Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
             Just (ps, SemanticAnn _ loc) -> do
@@ -1356,7 +1356,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
           \case {
             LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
-              extendedMembers <- concat <$> mapM (fmap M.elems . collectInterfaceProcedures loc) extends
+              extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures loc) extends
               let procs = [ProcedureSeman procid params ms | (InterfaceProcedure procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
@@ -1365,7 +1365,7 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
                   \case {
                       LocatedElement (Class _ _ _ provides _) _ -> (do
                         -- Collect the interfaces provided by the resource and their extended interfaces
-                        extendedProvides <- concat <$> mapM (collectExtendedInterfaces loc) provides;
+                        extendedProvides <- concat <$> traverse (collectExtendedInterfaces loc) provides;
                         case Data.List.find (iface ==) (provides ++ extendedProvides) of
                           Just _ ->
                             case fann of

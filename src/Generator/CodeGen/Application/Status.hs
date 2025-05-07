@@ -27,7 +27,7 @@ genStatusHeaderFile = do
         TEnum _ -> False;
         _ -> True;
         }) . statusTypes . monadicTypes)
-    items <- concat <$> mapM genStatusStruct (S.toList statusSet)
+    items <- concat <$> traverse genStatusStruct (S.toList statusSet)
     return $ CHeaderFile genStatusPathName $
         [
             CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),

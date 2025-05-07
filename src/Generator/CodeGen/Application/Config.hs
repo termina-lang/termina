@@ -38,7 +38,7 @@ genConfigFile mName progArchitecture = do
     taskMessageQueues <- getTasksMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
 
-    cVariantsForTaskPorts <- concat <$> mapM genVariantsForTaskPorts (M.elems taskClss)
+    cVariantsForTaskPorts <- concat <$> traverse genVariantsForTaskPorts (M.elems taskClss)
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
     cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
     cPoolDefines <- genDefinePoolId (M.keys $ pools progArchitecture)

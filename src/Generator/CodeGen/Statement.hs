@@ -344,7 +344,7 @@ genStructInitialization loc before level cObj expr = do
     _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
-genBlocks (RegularBlock stmts) = concat <$> mapM genStatement stmts
+genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
 genBlocks (ProcedureCall obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
@@ -449,12 +449,12 @@ genBlocks (SendMessage obj arg ann) = do
                 ]
 genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
-    cIfBlk <- concat <$> mapM genBlocks (blockBody ifBlk)
+    cIfBlk <- concat <$> traverse genBlocks (blockBody ifBlk)
     cElseBlk <-
         (case elseBlk of
             Nothing -> return Nothing
             Just elseBlk' -> do
-                blks <- concat <$> mapM genBlocks (blockBody elseBlk')
+                blks <- concat <$> traverse genBlocks (blockBody elseBlk')
                 return . Just $ (trail_cr . block $ blks) |>> getLocation ann)
     mAlts <- genAlternatives cElseBlk elifsBlks
     case mAlts of
@@ -467,7 +467,7 @@ genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
         genAlternatives prev [] = return prev
         genAlternatives prev (ElseIf expr' blk ann' : xs) = do
             cExpr' <- genExpression expr'
-            cBlk <- concat <$> mapM genBlocks (blockBody blk)
+            cBlk <- concat <$> traverse genBlocks (blockBody blk)
             mPrev <- genAlternatives prev xs
             case mPrev of
                 Nothing -> return . Just $ _if cExpr' (trail_cr . block $ cBlk) |>> getLocation ann'
@@ -485,7 +485,7 @@ genBlocks (ForLoopBlock iterator iteratorTS initValue endValue breakCond body an
                     cBreak <- genExpression break'
                     return $ (cIteratorExpr @< endExpr |>> getLocation ann) @&& cBreak |>> getLocation ann
 
-    cBody <- concat <$> mapM genBlocks (blockBody body)
+    cBody <- concat <$> traverse genBlocks (blockBody body)
     return
         [pre_cr $ _for_let
             (var iterator cIteratorType @:= initExpr)
@@ -663,12 +663,12 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             -> CGenerator [CCompoundBlockItem]
         genMatchCase cObj cParamsStructType c@(MatchCase _ _ blk' _) = do
             decls <- genMatchCaseParams cObj cParamsStructType c
-            cBlk <- concat <$> mapM genBlocks (blockBody blk')
+            cBlk <- concat <$> traverse genBlocks (blockBody blk')
             return $ decls ++ cBlk
 
         genDefaultCase :: DefaultCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genDefaultCase (DefaultCase blk' _) = do
-            concat <$> mapM genBlocks (blockBody blk')
+            concat <$> traverse genBlocks (blockBody blk')
 
         genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
         genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann _)) = do

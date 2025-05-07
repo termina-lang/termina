@@ -281,7 +281,7 @@ genTypeDefinitionDecl :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genTypeDefinitionDecl (TypeDefinition (Struct identifier fls modifiers) ann) = do
     let cAnn = buildDeclarationAnn ann True
     structModifiers <- mapM genAttribute (filterStructModifiers modifiers)
-    cFields <- concat <$> mapM genFieldDeclaration fls
+    cFields <- concat <$> traverse genFieldDeclaration fls
     opts <- gets (optionTypes . monadicTypes)
     optsDeclExt <- if S.member (TStruct identifier) opts then
         genOptionStruct (TStruct identifier)
@@ -367,8 +367,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             ClassField (FieldDefinition _ (TSinkPort {}) _) -> False;
             ClassField (FieldDefinition _ (TInPort {}) _) -> False;
             _ -> True}) fields
-    cFields <- concat <$> mapM genClassField fields'
-    cFunctions <- concat <$> mapM genClassFunctionDeclaration functions
+    cFields <- concat <$> traverse genClassField fields'
+    cFunctions <- concat <$> traverse genClassFunctionDeclaration functions
     let structFields = case clsKind of
             TaskClass ->
                 let cIDField = field taskMsgQueueIDField (typeDef terminaID) in
@@ -507,7 +507,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
         genLoop :: CGenerator CStatement
         genLoop = do
             classStructType <- genType noqual (TStruct classId)
-            cases <- concat <$> mapM genCase actions
+            cases <- concat <$> traverse genCase actions
             return $ trail_cr . block $ [
                     -- | status = __termina_msg_queue__recv(
                     -- |                self->__task.msgq_id, &next_msg);
@@ -561,7 +561,7 @@ genTaskClassCode _ = throwError $ InternalError "Not a task class definition"
 genClassDefinition :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides _) _) = do
     (_fields, functions) <- classifyClassMembers cls
-    cFunctionDefs <- concat <$> mapM genClassFunctionDefinition functions
+    cFunctionDefs <- concat <$> traverse genClassFunctionDefinition functions
     case clsKind of
         TaskClass -> do
             cTaskClassCode <- genTaskClassCode clsdef

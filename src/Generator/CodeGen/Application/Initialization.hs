@@ -57,7 +57,7 @@ genInitFile mName prjprogs = do
         genItems [] = return []
         genItems (obj:objs) = do
             items <- genInitializeObj Internal True obj
-            rest <- concat <$> mapM (genInitializeObj Internal False) objs
+            rest <- concat <$> traverse (genInitializeObj Internal False) objs
             return $ items ++ rest
 
 runGenInitFile :: 

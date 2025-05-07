@@ -239,7 +239,7 @@ genInitMutexes progArchitecture mutexes = do
 genChannelConnections :: TerminaProgArch a -> CGenerator CFileItem
 genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
-    channelConnections <- concat <$> mapM genChannelConnection targets
+    channelConnections <- concat <$> traverse genChannelConnection targets
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $ 
                 pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)

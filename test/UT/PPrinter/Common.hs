@@ -194,7 +194,7 @@ renderStatement stmt =
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> mapM genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
