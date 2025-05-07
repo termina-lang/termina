@@ -788,6 +788,8 @@ typeAssignmentExpression expectedType _typeObj (StringInitializer value pann) = 
                 (buildExpAnn pann (TConstSubtype TUSize))
       return $ SAST.StringInitializer value (buildExpAnn pann (TArray TChar typed_init_size))
     ty -> throwError $ annotateError pann (EStringInitializerNotArrayOfChars ty)
+typeAssignmentExpression expectedType@(TBoxSubtype _) typeObj expr = do
+  catchMismatch (getAnnotation expr) (EAssignmentExprMismatch expectedType) (typeExpression (Just expectedType) typeObj expr)
 typeAssignmentExpression expectedType typeObj expr = do
   let loc = getAnnotation expr
   typed_expr <- catchMismatch (getAnnotation expr) (EAssignmentExprMismatch expectedType) (typeExpression (Just expectedType) typeObj expr)
