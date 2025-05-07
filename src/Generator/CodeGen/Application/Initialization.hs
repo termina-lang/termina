@@ -16,21 +16,22 @@ import Generator.LanguageC.Embedded
 import Generator.Monadic (emptyMonadicTypes)
 import Control.Monad.State
 import qualified Data.Set as S
+import Utils.Annotations
 
-genInitializeObj :: Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
-genInitializeObj before (Resource identifier _ (Just expr) _ _) = do
+genInitializeObj :: Location -> Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
+genInitializeObj loc before (Resource identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization before 0 cObj expr
-genInitializeObj before (Task identifier _ (Just expr) _ _) = do
+    genStructInitialization loc before 0 cObj expr
+genInitializeObj loc before (Task identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization before 0 cObj expr
-genInitializeObj before (Handler identifier _ (Just expr) _ _) = do
+    genStructInitialization loc before 0 cObj expr
+genInitializeObj loc before (Handler identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization before 0 cObj expr
-genInitializeObj before (Emitter identifier _ (Just expr) _ _) = do
+    genStructInitialization loc before 0 cObj expr
+genInitializeObj loc before (Emitter identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization before 0 cObj expr
-genInitializeObj _ _ = return []
+    genStructInitialization loc before 0 cObj expr
+genInitializeObj _ _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile
 genInitFile mName prjprogs = do
@@ -55,8 +56,8 @@ genInitFile mName prjprogs = do
         genItems :: [Global SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genItems [] = return []
         genItems (obj:objs) = do
-            items <- genInitializeObj True obj
-            rest <- concat <$> mapM (genInitializeObj False) objs
+            items <- genInitializeObj Internal True obj
+            rest <- concat <$> mapM (genInitializeObj Internal False) objs
             return $ items ++ rest
 
 runGenInitFile :: 

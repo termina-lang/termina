@@ -309,8 +309,8 @@ genInitMessageQueues queues = do
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
-                            cSize,
                             _sizeOfType __termina_id_t,
+                            cSize,
                             "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
@@ -323,8 +323,8 @@ genInitMessageQueues queues = do
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
-                            cSize,
                             _sizeOfType cTs,
+                            cSize,
                             "status" @: (_const . ptr $ int32_t)
                         ]
                 ]
@@ -336,8 +336,8 @@ genInitMessageQueues queues = do
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
                             msgQueueId @: __termina_id_t,
-                            cSize,
                             _sizeOfType __termina_id_t,
+                            cSize,
                             "status" @: (_const . ptr $ int32_t)
                         ]
                 ]

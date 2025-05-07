@@ -12,15 +12,16 @@ import Utils.Annotations
 import Generator.CodeGen.Types
 
 genEnumInitialization ::
+    Location
     -- | Prepend a line to the initialization expression 
-    Bool
+    -> Bool
     -> Integer ->
     -- | Enum
     CObject ->
     -- |  The initialization expression
     Expression SemanticAnn ->
     CGenerator [CCompoundBlockItem]
-genEnumInitialization before level cObj expr = do
+genEnumInitialization loc before level cObj expr = do
     case expr of
         -- \| This function can only be called with a field values assignments expressions
         (EnumVariantInitializer ts this_variant params ann) -> do
@@ -28,7 +29,7 @@ genEnumInitialization before level cObj expr = do
             cParams <- zipWithM (\e index -> do
                 cType <- getExprType e >>= genType noqual
                 let cFieldObj = cObj @. this_variant @: cType
-                genFieldInitialization False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
+                genFieldInitialization loc False level cFieldObj (namefy (show (index :: Integer))) e) params [0..]
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let variantExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType exprCAnn
             if before then
@@ -38,13 +39,14 @@ genEnumInitialization before level cObj expr = do
         _ -> error "Incorrect expression"
 
 genStringInitialization ::
+    Location
     -- | Prepend a line to the initialization expression 
-    Bool
+    -> Bool
     -> Integer
     -> CObject
     -> String
     -> CGenerator [CCompoundBlockItem]
-genStringInitialization before level cObj value = do
+genStringInitialization loc before level cObj value = do
     genStringItemsInitialization before level 0 value
 
     where
@@ -55,21 +57,22 @@ genStringInitialization before level cObj value = do
             rest <- genStringItemsInitialization False level' (idx + 1) xs
             let current = cObj @$$ (dec idx @: size_t) @: char @= x @: char
             if before' then
-                return $ pre_cr current : rest
+                return $ (pre_cr current |>> loc) : rest
             else
-                return $ no_cr current : rest
+                return $ (no_cr current |>> loc) : rest
 
 genMonadicTypeInitialization ::
-    Bool
+    Location
+    -> Bool
     -> Integer
     -> CObject
     -> Expression SemanticAnn
     -> CGenerator [CCompoundBlockItem]
-genMonadicTypeInitialization before level cObj expr =
+genMonadicTypeInitialization loc before level cObj expr =
     case expr of
         (MonadicVariantInitializer (Some e) ann) -> do
             let cSomeVariantFieldObj = cObj @. optionSomeVariant @: enumFieldType
-            fieldInitalization <- genFieldInitialization False level cSomeVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldInitialization loc False level cSomeVariantFieldObj (namefy "0") e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let someVariantExpr = optionSomeVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -92,7 +95,7 @@ genMonadicTypeInitialization before level cObj expr =
                 return [no_cr (variantsFieldsObj @= successVariantExpr |>> getLocation ann) |>> getLocation ann]
         (MonadicVariantInitializer (Failure e) ann) -> do
             let cFailureVariantFieldObj = cObj @. statusFailureVariant @: enumFieldType
-            fieldInitalization <- genFieldInitialization False level cFailureVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldInitialization loc False level cFailureVariantFieldObj (namefy "0") e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = statusFailureVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -101,7 +104,7 @@ genMonadicTypeInitialization before level cObj expr =
                 return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer (Ok e) ann) -> do
             let cOkVariantFieldObj = cObj @. resultOkVariant @: enumFieldType
-            fieldInitalization <- genFieldInitialization False level cOkVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldInitialization loc False level cOkVariantFieldObj (namefy "0") e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = resultOkVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -110,7 +113,7 @@ genMonadicTypeInitialization before level cObj expr =
                 return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         (MonadicVariantInitializer (Error e) ann) -> do
             let cErrorVariantFieldObj = cObj @. resultErrorVariant @: enumFieldType
-            fieldInitalization <- genFieldInitialization False level cErrorVariantFieldObj (namefy "0") e
+            fieldInitalization <- genFieldInitialization loc False level cErrorVariantFieldObj (namefy "0") e
             let variantsFieldsObj = cObj @. variant @: enumFieldType
             let failureVariantExpr = resultErrorVariant @: enumFieldType |>> getLocation ann
             if before then
@@ -120,15 +123,16 @@ genMonadicTypeInitialization before level cObj expr =
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
 genArrayInitialization ::
+    Location
     -- | Prepend a line to the initialization expression 
-    Bool
+    -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
     -> CObject
     -> Expression SemanticAnn
     -> CGenerator [CCompoundBlockItem]
-genArrayInitialization before level cObj expr = do
+genArrayInitialization loc before level cObj expr = do
     case expr of
         (ArrayInitializer expr' size ann) -> do
             cSize <- genExpression size
@@ -139,18 +143,18 @@ genArrayInitialization before level cObj expr = do
                 incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> getLocation ann
                 cObjType = getCObjType cObj
             cObjArrayItemType <- getCArrayItemType cObjType
-            arrayInit <- genArrayInitialization False (level + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
+            arrayInit <- genArrayInitialization loc False (level + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
             if before then
                 return [pre_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
             else
                 return [no_cr $ _for_let initDecl condExpr incrExpr (block arrayInit)]
         (ArrayExprListInitializer exprs _ann) ->
             genArrayItemsInitialization before level 0 exprs
-        (StringInitializer value _ann) ->
-            genStringInitialization before level cObj value
-        (StructInitializer {}) -> genStructInitialization before level cObj expr
-        (MonadicVariantInitializer {}) -> genMonadicTypeInitialization before level cObj expr
-        (EnumVariantInitializer {}) -> genEnumInitialization before level cObj expr
+        (StringInitializer value _) ->
+            genStringInitialization loc before level cObj value
+        (StructInitializer {}) -> genStructInitialization loc before level cObj expr
+        (MonadicVariantInitializer {}) -> genMonadicTypeInitialization loc before level cObj expr
+        (EnumVariantInitializer {}) -> genEnumInitialization loc before level cObj expr
         _ -> do
             cExpr <- genExpression expr
             exprType <- getExprType expr
@@ -164,7 +168,7 @@ genArrayInitialization before level cObj expr = do
             rest <- genArrayItemsInitialization False level' (idx + 1) xs
             let cObjType = getCObjType cObj
             cObjArrayItemType <- getCArrayItemType cObjType
-            current <- genArrayInitialization before' level' (cObj @$$ (CInteger idx CDecRepr @: size_t) @: cObjArrayItemType) x
+            current <- genArrayInitialization loc before' level' (cObj @$$ (CInteger idx CDecRepr @: size_t) @: cObjArrayItemType) x
             return $ current ++ rest
 
         genArrayInitializationFromExpression :: Integer ->
@@ -199,8 +203,9 @@ genArrayInitialization before level cObj expr = do
 
 
 genFieldInitialization ::
+    Location
     -- | Prepend a line to the initialization expression 
-    Bool
+    -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
@@ -208,44 +213,44 @@ genFieldInitialization ::
     -> Identifier
     -> Expression SemanticAnn
     -> CGenerator [CCompoundBlockItem]
-genFieldInitialization before level cObj fid expr = do
+genFieldInitialization loc before level cObj fid expr = do
     cExprType <- getExprType expr >>= genType noqual
     let cFieldObj = cObj @. fid @: cExprType
     case expr of
         StructInitializer {} ->
-            genStructInitialization before level cFieldObj expr
+            genStructInitialization loc before level cFieldObj expr
         MonadicVariantInitializer {} ->
-            genMonadicTypeInitialization before level cFieldObj expr
+            genMonadicTypeInitialization loc before level cFieldObj expr
         ArrayInitializer {} ->
-            genArrayInitialization before level cFieldObj expr
+            genArrayInitialization loc before level cFieldObj expr
         StringInitializer value _ ->
-            genStringInitialization before level cFieldObj value
+            genStringInitialization loc before level cFieldObj value
         ArrayExprListInitializer {} ->
-            genArrayInitialization before level cFieldObj expr
+            genArrayInitialization loc before level cFieldObj expr
         EnumVariantInitializer {} ->
-            genEnumInitialization before level cFieldObj expr
+            genEnumInitialization loc before level cFieldObj expr
         _ -> do
             exprType <- getExprType expr
-            let ann = getAnnotation expr
             case exprType of
-                TArray _ _ -> genArrayInitialization before level cFieldObj expr
+                TArray _ _ -> genArrayInitialization loc before level cFieldObj expr
                 _ -> do
                     cExpr <- genExpression expr
                     if before then
-                        return [pre_cr (cFieldObj @= cExpr) |>> getLocation ann]
+                        return [pre_cr (cFieldObj @= cExpr) |>> loc]
                     else
-                        return [no_cr (cFieldObj @= cExpr) |>> getLocation ann]
+                        return [no_cr (cFieldObj @= cExpr) |>> loc]
 
 genStructInitialization ::
+    Location
     -- | Prepend a line to the initialization expression 
-    Bool
+    -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
     -> Integer
     -> CObject
     -> Expression SemanticAnn
     -> CGenerator [CCompoundBlockItem]
-genStructInitialization before level cObj expr = do
+genStructInitialization loc before level cObj expr = do
   case expr of
     -- \| This function can only be called with a field values assignments expressions
     (StructInitializer vas ann) -> genFieldAssignments before vas
@@ -269,7 +274,7 @@ genStructInitialization before level cObj expr = do
             genFieldAssignments :: Bool -> [FieldAssignment SemanticAnn] -> CGenerator [CCompoundBlockItem]
             genFieldAssignments _ [] = return []
             genFieldAssignments before' (FieldValueAssignment fld expr' _: xs) = do
-                fieldInit <- genFieldInitialization before' level cObj fld expr'
+                fieldInit <- genFieldInitialization loc before' level cObj fld expr'
                 rest <- genFieldAssignments False xs
                 return $ fieldInit ++ rest
             genFieldAssignments before' (FieldAddressAssignment fld addr (SemanticAnn (ETy (SimpleType ts)) _):xs) = do
@@ -729,44 +734,44 @@ genBlocks (SystemCall obj ident args ann) = do
         [pre_cr ((cObj @. ident @: cFuncType) @@ cArgs |>> getLocation ann) |>> getLocation ann]
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
-genStatement (AssignmentStmt obj expr  _) = do
+genStatement (AssignmentStmt obj expr ann) = do
+    let loc = getLocation ann
     typeObj <- getObjType obj
     cObj <- genObject obj
     case typeObj of
-        TArray _ _ -> genArrayInitialization True 0 cObj expr
+        TArray _ _ -> genArrayInitialization loc True 0 cObj expr
         (TFixedLocation _) -> do
-            let ann = getAnnotation obj
-            return [pre_cr (addrOf cObj |>> getLocation ann) |>> getLocation ann]
+            return [pre_cr (addrOf cObj) |>> loc]
         _ -> case expr of
-            (StructInitializer {}) -> genStructInitialization True 0 cObj expr
-            (MonadicVariantInitializer {}) -> genMonadicTypeInitialization True 0 cObj expr
-            (EnumVariantInitializer {}) -> genEnumInitialization True 0 cObj expr
+            (StructInitializer {}) -> genStructInitialization loc True 0 cObj expr
+            (MonadicVariantInitializer {}) -> genMonadicTypeInitialization loc True 0 cObj expr
+            (EnumVariantInitializer {}) -> genEnumInitialization loc True 0 cObj expr
             _ -> do
                 cExpr <- genExpression expr
-                let ann = getAnnotation expr
-                return [pre_cr (cObj @= cExpr |>> getLocation ann) |>> getLocation ann]
+                return [pre_cr (cObj @= cExpr) |>> getLocation ann]
 genStatement (Declaration identifier _ ts expr ann) = do
+  let loc = getLocation ann
   cType <- genType noqual ts
   let cObj = CVar identifier cType
   case ts of
     TArray _ _ -> do
-        arrayInitialization <- genArrayInitialization False 0 cObj expr
+        arrayInitialization <- genArrayInitialization loc False 0 cObj expr
         return $
-            pre_cr (var identifier cType) |>> getLocation ann
+            pre_cr (var identifier cType) |>> loc
             : arrayInitialization
     _ -> case expr of
         (StructInitializer {}) -> do
-            structInitialization <- genStructInitialization False 0 cObj expr
+            structInitialization <- genStructInitialization loc False 0 cObj expr
             return $
                 pre_cr (var identifier cType) |>> getLocation ann
                 : structInitialization
         (MonadicVariantInitializer {}) -> do
-            optionInitialization <- genMonadicTypeInitialization False 0 cObj expr
+            optionInitialization <- genMonadicTypeInitialization loc False 0 cObj expr
             return $
                 pre_cr (var identifier cType) |>> getLocation ann
                 : optionInitialization
         (EnumVariantInitializer {}) -> do
-            enumInitialization <- genEnumInitialization False 0 cObj expr
+            enumInitialization <- genEnumInitialization loc False 0 cObj expr
             return $
                 pre_cr (var identifier cType) |>> getLocation ann
                 : enumInitialization
