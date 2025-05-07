@@ -201,6 +201,26 @@ genDefineMutexId (mutex : xs) = do
 genDefineTaskIdLabel :: Identifier -> CGenerator Identifier
 genDefineTaskIdLabel t = return $ namefy t <::> "task_id"
 
+genDefineHandlerIdLabel :: Identifier -> CGenerator Identifier
+genDefineHandlerIdLabel t = return $ namefy t <::> "handler_id"
+
+genDefineHandlerId :: [Identifier] -> CGenerator [CFileItem]
+genDefineHandlerId [] = return []
+genDefineHandlerId (task : xs) = do
+    this_task <- genDefineHandlerIdLabel task
+    rest <- genDefineHandlerId' xs 1
+    return $ pre_cr (_define this_task (Just [show (0 :: Integer)])) : rest
+
+    where
+
+        genDefineHandlerId' :: [Identifier] -> Integer -> CGenerator [CFileItem]
+        genDefineHandlerId' [] _ = return []
+        genDefineHandlerId' (t : xt) value = do
+            rest <- genDefineHandlerId' xt (value + 1)
+            this_task <- genDefineHandlerIdLabel t
+            return $ _define this_task (Just [show value]) : rest
+
+
 genDefineTaskId :: [Identifier] -> CGenerator [CFileItem]
 genDefineTaskId [] = return []
 genDefineTaskId (task : xs) = do

@@ -25,6 +25,22 @@ import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
 
+genInitHandlers :: TerminaProgArch a -> CGenerator CFileItem
+genInitHandlers progArchitecture = do
+    let progHandlers = M.elems $ handlers progArchitecture
+    initHandlers <- mapM genOSALHandlerInit progHandlers
+    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_handlers") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $
+                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
+                : initHandlers
+
+    where
+
+        genOSALHandlerInit :: TPHandler a -> CGenerator CCompoundBlockItem
+        genOSALHandlerInit hndlr = do
+            handlerId <- genDefineHandlerIdLabel (handlerName hndlr)
+            return $ pre_cr $ 
+                handlerName hndlr @: typeDef (handlerClass hndlr) @. handlerIDField @: __termina_id_t @= handlerId @: __termina_id_t
 
 genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
 genInitTasks progArchitecture = do
@@ -48,6 +64,8 @@ genInitTasks progArchitecture = do
             return $
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
+                        pre_cr $ tskName @: typeDef classId @. taskIDField @: __termina_id_t
+                            @= taskId @: __termina_id_t,
                         pre_cr $ tskName @: typeDef classId @. namefy "task_msg_queue_id" @: __termina_id_t
                             @= taskMsgQueueId @: __termina_id_t,
                         pre_cr $ __termina_task__init @@ [
@@ -677,6 +695,7 @@ genMainFile mName progArchitecture = do
     cAtomicArrayDeclarations <- genAtomicArrayDeclarations (M.elems $ atomicArrays progArchitecture)
 
     initTasks <- genInitTasks progArchitecture
+    initHandlers <- genInitHandlers progArchitecture
     initEmitters <- genInitEmitters progArchitecture
     initPools <- genInitPools (M.elems $ pools progArchitecture)
     initMutexes <- genInitMutexes progArchitecture mutexes
@@ -701,7 +720,7 @@ genMainFile mName progArchitecture = do
         ] 
         ++ cAtomicDeclarations ++ cAtomicArrayDeclarations
         ++ cPoolMemoryAreas
-        ++ [initTasks, initEmitters, initMutexes, initPools, initMessageQueues,
+        ++ [initTasks, initHandlers, initEmitters, initMutexes, initPools, initMessageQueues,
             enableProtection, channelConnections] ++ initialEventFunction
         ++ [appInit]
 

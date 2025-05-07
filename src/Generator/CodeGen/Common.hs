@@ -75,10 +75,13 @@ thatField = namefy "that"
 thisParam = namefy "this"
 selfParam = "self"
 
-mutexIDField, taskMsgQueueIDField, timerField :: Identifier
+mutexIDField, taskMsgQueueIDField,
+    timerField, taskIDField, handlerIDField :: Identifier
 mutexIDField = namefy $ "mutex" <:> "id"
 taskMsgQueueIDField = namefy $ "task" <:> "msg_queue" <:> "id"
 timerField = namefy $ "timer" <:> "id"
+taskIDField = namefy $ "task" <:> "id"
+handlerIDField = namefy $ "handler" <:> "id"
 
 genEnumStructName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 genEnumStructName identifier = return $ namefy $ "enum" <:> identifier <:> "t"

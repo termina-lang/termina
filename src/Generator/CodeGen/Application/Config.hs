@@ -41,6 +41,7 @@ genConfigFile mName progArchitecture = do
     cVariantsForTaskPorts <- concat <$> traverse genVariantsForTaskPorts (M.elems taskClss)
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
     cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
+    cHandlerDefines <- genDefineHandlerId (M.keys $ handlers progArchitecture)
     cPoolDefines <- genDefinePoolId (M.keys $ pools progArchitecture)
     cMsgQueueDefines <- genDefineMsgQueueId (taskMessageQueues ++ channelMessageQueues)
     cTimerDefines <- genDefineTimerId (M.keys periodicTimers)
@@ -51,7 +52,13 @@ genConfigFile mName progArchitecture = do
     return $ CHeaderFile mName $ [
             _ifndef "__CONFIG_H__",
             _define "__CONFIG_H__" Nothing
-        ] ++ cVariantsForTaskPorts ++ cMutexDefines ++ cTaskDefines ++ cMsgQueueDefines ++ cPoolDefines ++ cTimerDefines
+        ] ++ cVariantsForTaskPorts 
+        ++ cMutexDefines 
+        ++ cTaskDefines 
+        ++ cHandlerDefines 
+        ++ cMsgQueueDefines 
+        ++ cPoolDefines 
+        ++ cTimerDefines
         ++ [
             pre_cr $ _define "__TERMINA_APP_CONFIG_POOLS" (Just [show (length progPools)]),
             pre_cr $ _define "__TERMINA_APP_CONFIG_TASKS" (Just [show (length progTasks)]),

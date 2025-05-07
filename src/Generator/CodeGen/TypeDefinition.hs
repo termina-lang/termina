@@ -371,7 +371,11 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
     cFunctions <- concat <$> traverse genClassFunctionDeclaration functions
     let structFields = case clsKind of
             TaskClass ->
-                let cIDField = field taskMsgQueueIDField (typeDef terminaID) in
+                let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID) 
+                    cTaskIDField = field taskIDField (typeDef terminaID) in
+                [cTaskIDField, cMsgQueueIDField] ++ cFields
+            HandlerClass ->
+                let cIDField = field handlerIDField (typeDef terminaID) in
                 cIDField : cFields
             ResourceClass ->
                 let cIDField = field mutexIDField (typeDef terminaID) in
