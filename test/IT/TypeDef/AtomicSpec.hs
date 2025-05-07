@@ -52,6 +52,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    __termina_id_t __task_id;\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    _Atomic uint32_t * interval;\n" ++
@@ -148,6 +149,7 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    __termina_id_t __task_id;\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    _Atomic uint32_t * interval;\n" ++

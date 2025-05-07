@@ -69,6 +69,7 @@ spec = do
               "} Message;\n" ++
               "\n" ++
               "typedef struct {\n" ++
+              "    __termina_id_t __task_id;\n" ++
               "    __termina_id_t __task_msg_queue_id;\n" ++
               "    __termina_id_t timer;\n" ++
               "    __termina_allocator_t message_pool;\n" ++
