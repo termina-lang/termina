@@ -18,6 +18,7 @@ getEmitterIdentifier :: TPEmitter a -> Identifier
 getEmitterIdentifier (TPInterruptEmittter ident _) = ident
 getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
+getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 
 getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getMemberFunctions = foldl' (\acc member -> 
