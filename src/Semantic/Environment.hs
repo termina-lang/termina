@@ -35,17 +35,52 @@ stdlibGlobalEnv =
     ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
-    ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal)
-  ]
-
-sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-sysInitGlobalEnv =
-  [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
-   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
-
-systemPortGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-systemPortGlobalEnv =
-  [
+    ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal),
+    ("ExceptionSource", LocatedElement (GType (Enum "ExceptionSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
+    ("Exception", LocatedElement (GType (Enum "Exception" [
+      -- | Action failure
+      EnumVariant "EActionFailure" [
+        -- | Source of the exception
+        TEnum "ExceptionSource", 
+        -- | ID of the source port
+        TUSize, 
+        -- | Error code returned by the action
+        TInt32],
+      -- | Message queue full
+      EnumVariant "EMsgQueueFull" [
+        -- | ID of the message queue
+        TUSize],
+      EnumVariant "EArrayIndexOutOfBounds" [
+        -- | Address of the offending expression
+        TUSize,
+        -- | Size of the array
+        TUSize,
+        -- | Offending index
+        TUSize],
+      EnumVariant "EArraySliceOutOfBounds" [
+        -- | Address of the offending expression
+        TUSize,
+        -- | Size of the array
+        TUSize,
+        -- | Offending upper index
+        TUSize],
+      EnumVariant "EArraySliceNegativeRange" [
+        -- | Address of the offending expression
+        TUSize,
+        -- | Lower index
+        TUSize,
+        -- | Upper index
+        TUSize],
+      EnumVariant "EArraySliceInvalidRange" [
+        -- | Address of the offending expression
+        TUSize,
+        -- | Expected size of the array
+        TUSize,
+        -- | Lower index
+        TUSize,
+        -- | Upper index
+        TUSize]
+      ] [])) Internal),
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
@@ -83,15 +118,42 @@ systemPortGlobalEnv =
     -- We are currently assuming that there is a common implementation of the SystemAPI. In the future
     -- this approach could allow to have different implementations of the SystemAPI depending on the
     -- target platform.
-    ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal),
-    ("SystemEntry", LocatedElement (GType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] [])) Internal),
+    ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)
+  ]
+
+sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+sysInitGlobalEnv =
+  [("SystemInit", LocatedElement (GType (Class EmitterClass "SystemInit" [] [] [])) Internal),
+   ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)]
+  
+sysExceptGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+sysExceptGlobalEnv =
+  [("SystemExcept", LocatedElement (GType (Class EmitterClass "SystemExcept" [] [] [])) Internal),
+   ("system_except", LocatedElement (GGlob (TGlobal EmitterClass "SystemExcept")) Internal)]
+
+systemEntryGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
+systemEntryGlobalEnv =
+  [("SystemEntry", LocatedElement (GType (Class ResourceClass "SystemEntry" [] ["SystemAPI"] [])) Internal),
     ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
 makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
 makeInitialGlobalEnv (Just config) pltEnvironment = 
-  let sysInitEnv = if enableSystemInit config then sysInitGlobalEnv else [] 
-      sysPortEnv = if enableSystemPort config then systemPortGlobalEnv else [] 
+  let 
+    globalEnv = mconcat [
+      stdlibGlobalEnv,
+      [
+        env | enableSystemInit config, env <- sysInitGlobalEnv
+      ],
+      [
+        env | enableSystemPort config, env <- systemEntryGlobalEnv
+      ],
+      [
+        env | enableSystemExcept config, env <- sysExceptGlobalEnv
+      ], pltEnvironment]
   in
-  ExprST (M.fromList (stdlibGlobalEnv ++ sysInitEnv ++ sysPortEnv ++ pltEnvironment)) M.empty M.empty
-makeInitialGlobalEnv Nothing pltEnvironment = ExprST (M.fromList (stdlibGlobalEnv ++ pltEnvironment)) M.empty M.empty
+  ExprST (M.fromList globalEnv) M.empty M.empty
+makeInitialGlobalEnv Nothing pltEnvironment = 
+  let globalEnv = mconcat [stdlibGlobalEnv, pltEnvironment]
+  in
+  ExprST (M.fromList globalEnv) M.empty M.empty

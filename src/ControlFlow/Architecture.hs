@@ -152,6 +152,10 @@ genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
       }
+    (TGlobal EmitterClass "SystemExcept") -> ST.modify $ \tp ->
+      tp {
+        emitters = M.insert ident (TPSystemExceptEmitter ident ann) (emitters tp)
+      }
     -- | Any other emitter class is not supported (this should not happen)
     _ -> throwError $ annotateError Internal EUnsupportedEmitterClass
 genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitializer assignments _)) modifiers tann) = do

@@ -110,16 +110,21 @@ data TPEmitter a =
   | TPSystemInitEmitter
     Identifier -- ^ emitter identifier
     a -- ^ annotations
+  | TPSystemExceptEmitter
+    Identifier -- ^ emitter identifier
+    a -- ^ annotations
   deriving Show
 
 instance Annotated TPEmitter where
   getAnnotation (TPInterruptEmittter _ a) = a
   getAnnotation (TPPeriodicTimerEmitter _ _ a) = a
   getAnnotation (TPSystemInitEmitter _ a) = a
+  getAnnotation (TPSystemExceptEmitter _ a) = a
 
   updateAnnotation (TPInterruptEmittter i _) = TPInterruptEmittter i
   updateAnnotation (TPPeriodicTimerEmitter i m _) = TPPeriodicTimerEmitter i m
   updateAnnotation (TPSystemInitEmitter i _) = TPSystemInitEmitter i
+  updateAnnotation (TPSystemExceptEmitter i _) = TPSystemExceptEmitter i
 
 data TPResource a = TPResource {
 

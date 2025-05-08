@@ -46,6 +46,7 @@ data TerminaConfig =
     profile :: !ProjectProfile,
     enableSystemInit :: !Bool,
     enableSystemPort :: !Bool,
+    enableSystemExcept :: !Bool,
     builder :: !ProjectBuilder,
     platformFlags :: !PlatformFlags
   } deriving (Eq, Show)
@@ -63,6 +64,7 @@ instance FromJSON TerminaConfig where
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
+    o .:?  "enable-system-except" .!= False <*>
     o .:   "builder" <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
   parseJSON _ = fail "Expected configuration object"
@@ -79,6 +81,7 @@ instance ToJSON TerminaConfig where
             prjProfile
             prjEnableSystemInit
             prjEnableSystemPort
+            prjEnableSystemExcept
             prjBuilder
             prjPlatformFlags
         ) = object $ [
@@ -94,7 +97,8 @@ instance ToJSON TerminaConfig where
                 _ -> []
             -- We only serialize the enable-system-init flag if it is different from the default value
             <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
-            <> if prjEnableSystemInit then ["enable-system-port" .= prjEnableSystemPort] else []
+            <> if prjEnableSystemPort then ["enable-system-port" .= prjEnableSystemPort] else []
+            <> if prjEnableSystemExcept then ["enable-system-except" .= prjEnableSystemExcept] else []
             <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
             -- We only serialize the platform flags corresponding to the selected platform
             <> case prjPlatform of
@@ -112,6 +116,7 @@ defaultConfig projectName plt = TerminaConfig {
     profile = Release,
     enableSystemInit = False,
     enableSystemPort = False,
+    enableSystemExcept = False,
     builder = Make,
     platformFlags = defaultPlatformFlags
 }
