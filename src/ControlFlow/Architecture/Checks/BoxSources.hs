@@ -13,6 +13,48 @@ import Utils.Annotations
 import Core.AST
 import qualified Data.Map as M
 
+-- | This module provides functionality to verify the correctness of box sources
+-- in a Termina program architecture. It ensures that boxes are allocated, 
+-- transferred, and freed in a manner consistent with the program's architecture 
+-- and semantics. The checks are performed using a monadic context that allows 
+-- for error handling and access to the program's architecture.
+--
+-- The main exported function is:
+--
+-- * 'checkBoxSources': This function performs a comprehensive check of all 
+--   box sources in the program architecture, ensuring that all pools, tasks, 
+--   handlers, and resources adhere to the expected box source semantics.
+--
+-- The module defines several helper functions to handle specific cases:
+--
+-- * 'checkBoxSourceProcedureCallResource', 'checkBoxSourceProcedureCallHandler', 
+--   and 'checkBoxSourceProcedureCallTask': These functions verify the source 
+--   of boxes passed during procedure calls for resources, handlers, and tasks, 
+--   respectively.
+--
+-- * 'checkBoxProcedureCall': A higher-level function that determines the type 
+--   of the calling element (task, handler, or resource) and delegates the 
+--   procedure call check to the appropriate function.
+--
+-- * 'checkBoxSourceTaskSend', 'checkBoxSourceHandlerSend', and 
+--   'checkBoxSourceResourceFree': These functions validate the sources of boxes 
+--   sent or freed by tasks, handlers, and resources.
+--
+-- * 'getBoxSourceChannel' and 'getBoxSourceSend': These functions trace the 
+--   source of a box through channels and connections.
+--
+-- * 'checkResourceSourceInBox', 'checkTaskSourceInBox', and 
+--   'checkHandlerSourceInBox': These functions validate the source of a box 
+--   within a resource, task, or handler, ensuring that the box's origin matches 
+--   the expected source.
+--
+-- The module uses the 'BoxSourcesCheckMonad', a combination of the 'ExceptT' 
+-- and 'Reader' monads, to handle errors and provide access to the program 
+-- architecture during the checks.
+--
+-- Errors are reported using the 'ArchitectureError' type, with detailed 
+-- annotations to help trace the source of mismatches or inconsistencies.
+
 type BoxSourcesCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
 checkNextSource :: Location -> BoxSourcesCheckMonad () -> BoxSourcesCheckMonad ()
