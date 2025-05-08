@@ -241,6 +241,7 @@ data Error
   | EObjectPreviouslyMoved Location -- ^ Object previously moved
   | EIsStatusVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-status-variant expression
   | EIsResultVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-result-variant expression
+  | EInvalidSystemExceptEmitterType (TerminaType SemanticAnn) -- ^ Invalid system except emitter type
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -438,6 +439,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "SE-190"
     errorIdent (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "SE-191"
     errorIdent (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "SE-192"
+    errorIdent (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "SE-193"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -630,6 +632,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EObjectPreviouslyMoved _loc) _pos) = "object previously moved"
     errorTitle (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "invalid type for is-status-variant expression"
     errorTitle (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "invalid type for is-result-variant expression"
+    errorTitle (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "invalid system exception emitter type"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -2043,6 +2046,11 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for is-result-variant expression."))
+                EInvalidSystemExceptEmitterType ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("System exception emitters emit data of type \x1b[31m" <> showText (TEnum "Exception" :: TerminaType a) <> 
+                            "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
                         
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where

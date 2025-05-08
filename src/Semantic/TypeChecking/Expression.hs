@@ -200,6 +200,8 @@ checkEmitterDataType loc "PeriodicTimer" ty =
   unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidPeriodicTimerEmitterType ty))
 checkEmitterDataType loc "SystemInit" ty =
   unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidSystemInitEmitterType ty))
+checkEmitterDataType loc "SystemExcept" ty =
+  unless (sameTy ty (TEnum "Exception")) (throwError $ annotateError loc (EInvalidSystemExceptEmitterType ty))
 checkEmitterDataType _ _ _ = throwError $ annotateError Internal EUnboxingEmittterClass
 
 collectExtendedInterfaces :: Location -> Identifier -> SemanticMonad [Identifier]
