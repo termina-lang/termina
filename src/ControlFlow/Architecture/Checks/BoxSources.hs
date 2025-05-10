@@ -57,7 +57,27 @@ import qualified Data.Map as M
 
 type BoxSourcesCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))
 
-checkNextSource :: Location -> BoxSourcesCheckMonad () -> BoxSourcesCheckMonad ()
+-- | Updates the error trace with the current location when a box source mismatch occurs.
+-- 
+-- This function wraps a computation in the 'BoxSourcesCheckMonad' and ensures that
+-- if an 'EMismatchedBoxSource' error is thrown, the provided location is added to
+-- the error's trace. This helps in tracking the sequence of locations leading to
+-- the mismatch.
+--
+-- Errors other than 'EMismatchedBoxSource' are propagated unchanged.
+--
+-- ==== Parameters
+--
+-- * @loc@: The current location to be added to the error trace.
+-- * @BoxSourcesCheckMonad ()@: The computation to be executed and monitored for errors.
+--
+-- ==== Returns
+--
+-- A new 'BoxSourcesCheckMonad' computation with updated error handling.
+checkNextSource :: 
+    Location 
+    -> BoxSourcesCheckMonad () 
+    -> BoxSourcesCheckMonad ()
 checkNextSource loc = withExceptT (\case {
         AnnotatedError (EMismatchedBoxSource expectedSource actualSource traceLocations) lastLocation ->
             AnnotatedError (EMismatchedBoxSource expectedSource actualSource (loc : traceLocations)) lastLocation;
