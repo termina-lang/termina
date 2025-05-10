@@ -177,7 +177,7 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
             case M.lookup pname (sinkPorts tpClass) of
               Just _ -> do
                 connectedEmitters <- emitterTargets <$> ST.get
-                -- | Check if the target emmiter is already connected to a sink port
+                -- | Check if the target emitter is already connected to a sink port
                 case M.lookup target connectedEmitters of
                   Nothing -> do
                     ST.modify $ \tp ->
@@ -252,7 +252,7 @@ genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructIn
         case M.lookup pname (sinkPorts tpClass) of
           Just _ -> do
             connectedEmitters <- emitterTargets <$> ST.get
-            -- | Check if the target emmiter is already connected to a sink port
+            -- | Check if the target emitter is already connected to a sink port
             case M.lookup target connectedEmitters of
               Nothing -> do
                 ST.modify $ \tp ->
