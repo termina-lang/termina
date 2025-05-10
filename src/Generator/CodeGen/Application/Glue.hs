@@ -105,12 +105,15 @@ genInitEmitters progArchitecture = do
                 Just (TPHandler identifier classId _ _ _ _ _ _) -> do
                     let cls = handlerClasses progArchitecture M.! classId
                         (_, targetAction) = sinkPorts cls M.! targetPort
+                    handlerId <- genDefineHandlerIdLabel identifier
                     return [
                             pre_cr $ var "connection" __termina_periodic_timer_connection_t,
                             no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                 @= "__TerminaEmitterConnectionType__Handler" @: enumFieldType,
                             no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_object" @: ptr void @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
+                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
+                                @. "handler_id" @: __termina_periodic_timer_action_t @= handlerId @: size_t,
                             no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_action" @: __termina_periodic_timer_action_t @= classId <::> targetAction @: __termina_periodic_timer_action_t,
                             pre_cr $ __termina_periodic_timer__init @@ [
@@ -591,8 +594,8 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     pre_cr $ _if (
                             (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
-                            -- __termina_exec__shutdown();
-                            no_cr $ __termina_exec__shutdown @@ []
+                            -- __termina_exec__reboot();
+                            no_cr $ __termina_exec__reboot @@ []
                         ],
                     pre_cr $ _return Nothing
                 ]
@@ -622,8 +625,8 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                     pre_cr $ _if (
                             (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
-                            -- __termina_exec__shutdown();
-                            no_cr $ __termina_exec__shutdown @@ []
+                            -- __termina_exec__reboot();
+                            no_cr $ __termina_exec__reboot @@ []
                         ],
                     pre_cr $ _return Nothing
                 ]
@@ -671,6 +674,10 @@ genAppInit progArchitecture = do
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [
                             pre_cr $ __termina_app__init_emitters @@ ["status" @: (_const . ptr $ int32_t)]
+                        ],
+                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+                        $ trail_cr . block $ [
+                            pre_cr $ __termina_app__init_handlers @@ ["status" @: (_const . ptr $ int32_t)]
                         ],
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [

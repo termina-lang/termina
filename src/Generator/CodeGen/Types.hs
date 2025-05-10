@@ -54,19 +54,16 @@ timer_handler classId handler = (classId <::> handler) @:
 
 system_init_handler :: Ident -> Ident -> CExpression
 system_init_handler classId handler = (classId <::> handler) @:
-    CTFunction (typeDef "Result")
+    CTFunction __status_int32_t
         [
-            -- | CRISCVUARTHandler * const self
             _const . ptr $ classId,
             -- | TimeVal current
             _TimeVal
         ]
 
--- | Result __termina_pool__init(__termina_pool_t * const pool, void * p_memory_area,
---                            size_t memory_area_size, size_t block_size);
 __termina_pool__init :: CExpression
 __termina_pool__init = "__termina_pool__init" @:
-    CTFunction (typeDef "Result")
+    CTFunction int32_t
         [
             -- | __termina_pool_t * const pool
             _const . ptr $ __termina_pool_t,
@@ -189,9 +186,27 @@ __termina_msg_queue__recv = "__termina_msg_queue__recv" @:
             _const . ptr $ int32_t
         ]
 
-__termina_exec__shutdown :: CExpression
-__termina_exec__shutdown = "__termina_exec__shutdown" @:
-    CTFunction void []
+__termina_except__msg_queue_send_error :: CExpression
+__termina_except__msg_queue_send_error = "__termina_except__msg_queue_send_error" @:
+    CTFunction void
+        [
+            -- | const size_t msg_queue_id
+            _const size_t,
+            -- | const int32_t error_code
+            _const int32_t
+        ]
+
+__termina_except__action_failure :: CExpression
+__termina_except__action_failure = "__termina_except__action_failure" @:
+    CTFunction void
+        [
+            -- | const Exception source
+            _const (typeDef "Exception"),
+            -- | const size_t sink_port_id,
+            _const size_t,
+            -- | const int32_t error_code
+            _const int32_t
+        ]
 
 __termina_exec__reboot :: CExpression
 __termina_exec__reboot = "__termina_exec__reboot" @:
@@ -217,6 +232,14 @@ __termina_pool__free = "__termina_pool__free" @:
 
 __termina_app__init_tasks :: CExpression
 __termina_app__init_tasks = "__termina_app__init_tasks" @:
+    CTFunction void
+        [
+            -- | int32_t * const status
+            _const . ptr $ int32_t
+        ]
+
+__termina_app__init_handlers :: CExpression
+__termina_app__init_handlers = "__termina_app__init_handlers" @:
     CTFunction void
         [
             -- | int32_t * const status

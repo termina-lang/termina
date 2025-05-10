@@ -476,6 +476,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             classFunctionName <- genClassFunctionName classId action
             classStructType <- genType noqual (TStruct classId)
             cDataType <- genType noqual dts
+
             let classFunctionType = CTFunction __status_int32_t
                     [_const . ptr $ classStructType, cDataType]
             return
@@ -492,8 +493,11 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     indent . pre_cr $ _if (
                            "status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
-                            -- __termina_exec__shutdown();
-                            no_cr $ __termina_exec__shutdown @@ []
+                            -- __termina_except__msg_queue_send_error(port, status);
+                            no_cr $ __termina_except__msg_queue_send_error @@ [
+                                ("self" @: ptr classStructType) @. port @: __termina_id_t,
+                                "status" @: int32_t
+                            ]
                         ],
                     -- status = classFunctionName(self, action_msg_data);
                     indent . pre_cr $ "result" @: __status_int32_t @=
@@ -502,8 +506,19 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     indent . pre_cr $ _if (
                             (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
                         $ block [
-                            -- rtems_shutdown_executive(1);
-                            no_cr $ __termina_exec__shutdown @@ []
+                            -- ExceptSource source;
+                            pre_cr $ var "source" (typeDef "ExceptSource"),
+                            -- source.__variant = ExceptSource__Handler;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
+                            -- source.Task.__0 = port_connection->handler.handler_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+
+                            -- __termina_except__action_failure(source, , status.Failure.__0);
+                            pre_cr $ __termina_except__action_failure @@ [
+                                "source" @: typeDef "ExceptSource",
+                                this_variant @: size_t,
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                            ]
                         ],
                     indent . pre_cr $ _break
                 ]
@@ -533,10 +548,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             [
                                 -- default:
                                 pre_cr $ _default $
-                                    -- rtems_shutdown_executive(1);
-                                    indent . pre_cr $ __termina_exec__shutdown @@ [],
-                                    -- break;
-                                    indent . pre_cr $ _break
+                                    -- __termina_exec__reboot(1);
+                                    indent . pre_cr $ __termina_exec__reboot @@ []
                             ])
                 ]
 
@@ -557,8 +570,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType
                 ] ++ msgDataVars ++
                 [
-                    pre_cr $ _for Nothing Nothing Nothing loop,
-                    pre_cr $ __termina_exec__shutdown @@ []
+                    pre_cr $ _for Nothing Nothing Nothing loop
                 ]
 genTaskClassCode _ = throwError $ InternalError "Not a task class definition"
 

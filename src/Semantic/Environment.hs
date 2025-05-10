@@ -36,12 +36,12 @@ stdlibGlobalEnv =
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
     ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal),
-    ("ExceptionSource", LocatedElement (GType (Enum "ExceptionSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
+    ("ExceptSource", LocatedElement (GType (Enum "ExceptSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
       -- | Action failure
       EnumVariant "EActionFailure" [
         -- | Source of the exception
-        TEnum "ExceptionSource", 
+        TEnum "ExceptSource", 
         -- | ID of the source port
         TUSize, 
         -- | Error code returned by the action
