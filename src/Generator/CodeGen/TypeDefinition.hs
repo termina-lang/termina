@@ -493,8 +493,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     indent . pre_cr $ _if (
                            "status" @: int32_t @!= dec 0 @: int32_t)
                         $ block [
-                            -- __termina_except__msg_queue_send_error(port, status);
-                            no_cr $ __termina_except__msg_queue_send_error @@ [
+                            -- __termina_except__msg_queue_recv_error(port, status);
+                            no_cr $ __termina_except__msg_queue_recv_error @@ [
                                 ("self" @: ptr classStructType) @. port @: __termina_id_t,
                                 "status" @: int32_t
                             ]
@@ -505,7 +505,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     -- if (result.__variant != Status__Success)
                     indent . pre_cr $ _if (
                             (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
-                        $ block [
+                        $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
                             -- source.__variant = ExceptSource__Handler;
@@ -549,7 +549,8 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                                 -- default:
                                 pre_cr $ _default $
                                     -- __termina_exec__reboot(1);
-                                    indent . pre_cr $ __termina_exec__reboot @@ []
+                                    indent . pre_cr $ __termina_exec__reboot @@ [],
+                                    indent . pre_cr $ _break
                             ])
                 ]
 

@@ -186,8 +186,8 @@ __termina_msg_queue__recv = "__termina_msg_queue__recv" @:
             _const . ptr $ int32_t
         ]
 
-__termina_except__msg_queue_send_error :: CExpression
-__termina_except__msg_queue_send_error = "__termina_except__msg_queue_send_error" @:
+__termina_except__msg_queue_recv_error :: CExpression
+__termina_except__msg_queue_recv_error = "__termina_except__msg_queue_recv_error" @:
     CTFunction void
         [
             -- | const size_t msg_queue_id

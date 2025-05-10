@@ -172,28 +172,34 @@ spec = do
               "                                          (void *)&timeout__msg_data, &status);\n" ++
               "\n" ++   
               "                if (status != 0L) {\n" ++
-              "                    __termina_exec__shutdown();\n" ++
+              "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
               "\n" ++   
               "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
               "\n" ++   
               "                if (result.__variant != Success) {\n" ++
-              "                    __termina_exec__shutdown();\n" ++
+              "                    \n" ++ 
+              "                    ExceptSource source;\n" ++
+              "                    source.__variant = ExceptSource__Handler;\n" ++
+              "                    source.Task.__0 = self->__task_id;\n" ++
+              "\n" ++
+              "                    __termina_except__action_failure(source,\n" ++
+              "                                                     __CHousekeeping__timer,\n" ++
+              "                                                     result.Failure.__0);\n" ++
+              "\n" ++
               "                }\n" ++
               "\n" ++   
               "                break;\n" ++
               "\n" ++   
               "            default:\n" ++
               "\n" ++   
-              "                __termina_exec__shutdown();\n" ++
+              "                __termina_exec__reboot();\n" ++
               "\n" ++   
               "                break;\n" ++
               "\n" ++   
               "        }\n" ++
               "\n" ++   
               "    }\n" ++
-              "\n" ++   
-              "    __termina_exec__shutdown();\n" ++
               "\n" ++   
               "    return;\n" ++
               "\n" ++
