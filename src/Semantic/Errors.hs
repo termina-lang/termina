@@ -35,6 +35,7 @@ data Error
   | EUnboxingMemberFunctionType -- ^ Error when unboxing a member function type (Internal)
   | EUnboxingInterface -- ^ Error when unboxing an interface (Internal)
   | EUnboxingEmittterClass -- ^ Error when unboxing an emitter class (Internal)
+  | EUnboxingActionClass -- ^ Error when unboxing an action class (Internal)
   | EUnboxingIntConst -- ^ Error when unboxing an integer constant (Internal)
   | EExpectedArrayTy (TerminaType SemanticAnn) -- ^ Expected a valid type for the elements of an array (Internal)
   | EExpectedCopyType (TerminaType SemanticAnn) -- ^ Expected a copiable type (Internal)
@@ -242,6 +243,11 @@ data Error
   | EIsStatusVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-status-variant expression
   | EIsResultVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-result-variant expression
   | EInvalidSystemExceptEmitterType (TerminaType SemanticAnn) -- ^ Invalid system except emitter type
+  | EInvalidInterruptActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid interrupt action return type
+  | EInvalidPeriodicTimerActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid periodic timer action return type
+  | EInvalidSystemInitActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid system init action return type
+  | EInvalidSystemExceptActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid system except action return type
+  | EInvalidMsgQueueActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid message queue action return type
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -440,6 +446,11 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "SE-191"
     errorIdent (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "SE-192"
     errorIdent (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "SE-193"
+    errorIdent (AnnotatedError (EInvalidInterruptActionReturnType _ident _ty) _pos) = "SE-194"
+    errorIdent (AnnotatedError (EInvalidPeriodicTimerActionReturnType _ident _ty) _pos) = "SE-195"
+    errorIdent (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "SE-196"
+    errorIdent (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "SE-197"
+    errorIdent (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "SE-198"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -633,6 +644,11 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EIsStatusVariantInvalidType _ty) _pos) = "invalid type for is-status-variant expression"
     errorTitle (AnnotatedError (EIsResultVariantInvalidType _ty) _pos) = "invalid type for is-result-variant expression"
     errorTitle (AnnotatedError (EInvalidSystemExceptEmitterType _ty) _pos) = "invalid system exception emitter type"
+    errorTitle (AnnotatedError (EInvalidInterruptActionReturnType _ident _ty) _pos) = "invalid interrupt action return type"
+    errorTitle (AnnotatedError (EInvalidPeriodicTimerActionReturnType _ident _ty) _pos) = "invalid periodic timer action return type"
+    errorTitle (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "invalid system init action return type"
+    errorTitle (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "invalid system exception action return type"
+    errorTitle (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "invalid message queue action return type"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position start end)) files =
@@ -2051,7 +2067,31 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("System exception emitters emit data of type \x1b[31m" <> showText (TEnum "Exception" :: TerminaType a) <> 
                             "\x1b[0m but you are expecting data of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                        
+                EInvalidInterruptActionReturnType ident ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The return type of actions attached to the interrupt event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
+                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EInvalidPeriodicTimerActionReturnType ident ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The return type of actions attached to the periodic timer event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
+                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EInvalidSystemInitActionReturnType ident ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The return type of actions attached to the system init event is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <> 
+                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EInvalidSystemExceptActionReturnType ident ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Actions that handle system exceptions shall not return a value.\n" <>
+                            "However, the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EInvalidMsgQueueActionReturnType ident ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The return type of the actions attached to the reception of messages from a message queue is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <>
+                            "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

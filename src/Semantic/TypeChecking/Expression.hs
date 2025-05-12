@@ -204,6 +204,17 @@ checkEmitterDataType loc "SystemExcept" ty =
   unless (sameTy ty (TEnum "Exception")) (throwError $ annotateError loc (EInvalidSystemExceptEmitterType ty))
 checkEmitterDataType _ _ _ = throwError $ annotateError Internal EUnboxingEmittterClass
 
+checkEmitterActionReturnType :: Location -> Identifier -> Identifier -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
+checkEmitterActionReturnType loc "Interrupt" action ty =
+  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidInterruptActionReturnType action ty))
+checkEmitterActionReturnType loc "PeriodicTimer" action ty =
+  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidPeriodicTimerActionReturnType action ty))
+checkEmitterActionReturnType loc "SystemInit" action ty =
+  unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidSystemInitActionReturnType action ty))
+checkEmitterActionReturnType loc "SystemExcept" action ty =
+  unless (sameTy ty TUnit) (throwError $ annotateError loc (EInvalidSystemExceptActionReturnType action ty))
+checkEmitterActionReturnType _ _ _ _ = throwError $ annotateError Internal EUnboxingActionClass
+
 collectExtendedInterfaces :: Location -> Identifier -> SemanticMonad [Identifier]
 collectExtendedInterfaces loc ident = do
   catchError (getGlobalTypeDef loc ident)
@@ -1278,44 +1289,65 @@ typeExpression _ _ (EnumVariantInitializer _ _ _ pann) = throwError $ annotateEr
 typeExpression _ _ (StringInitializer _ pann) = throwError $ annotateError pann EStringInitializerInvalidUse
 
 typeFieldAssignment
-  :: Location -> (SAST.TerminaType SemanticAnn, Location)
+  :: (SAST.TerminaType SemanticAnn, Location)
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> SAST.FieldDefinition SemanticAnn
   -> FieldAssignment ParserAnn
   -> SemanticMonad (SAST.FieldAssignment SemanticAnn)
-typeFieldAssignment loc tyDef typeObj (FieldDefinition fid fty _) (FieldValueAssignment faid faexp pann) =
+typeFieldAssignment tyDef typeObj (FieldDefinition fid fty _) (FieldValueAssignment faid faexp pann) =
   if fid == faid
   then
     flip (SAST.FieldValueAssignment faid) (buildExpAnn pann fty) <$> typeAssignmentExpression fty typeObj faexp
-  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
+  else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [faid])
+typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
       TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
-      ty -> throwError $ annotateError loc (EFieldNotFixedLocation fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [faid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection InboundPortConnection pid sid pann) =
+      ty -> throwError $ annotateError pann (EFieldNotFixedLocation fid ty)
+  else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [faid])
+typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection InboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
     \gentry ->
     case fty of
-      TSinkPort ty action  ->
+      TSinkPort ty action -> do
+        rty <- case tyDef of
+          (TGlobal _ clsId, _) -> getActionReturnType clsId action
+          _ -> throwError $ annotateError Internal EUnboxingClassType
         case gentry of
           LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
-            checkEmitterDataType loc clsId ty
+            checkEmitterDataType pann clsId ty
+            checkEmitterActionReturnType pann clsId action rty
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildSinkPortConnAnn pann ets action)
-          _ -> throwError $ annotateError loc $ ESinkPortConnectionInvalidGlobal sid
-      TInPort ty action  ->
+          _ -> throwError $ annotateError pann $ ESinkPortConnectionInvalidGlobal sid
+      TInPort ty action  -> do
+        rty <- case tyDef of
+          (TGlobal _ clsId, _) -> getActionReturnType clsId action
+          _ -> throwError $ annotateError Internal EUnboxingClassType
         case gentry of
           LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
-            catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
+            catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError pann ty ty')
+            unless (sameTy rty (TStatus TInt32)) (throwError $ annotateError pann (EInvalidMsgQueueActionReturnType action rty))
             return $ SAST.FieldPortConnection InboundPortConnection pid sid (buildInPortConnAnn pann cts action)
-          _ -> throwError $ annotateError loc $ EInboundPortConnectionInvalidObject sid
-      ty -> throwError $ annotateError loc (EFieldNotSinkOrInboundPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
+          _ -> throwError $ annotateError pann $ EInboundPortConnectionInvalidObject sid
+      ty -> throwError $ annotateError pann (EFieldNotSinkOrInboundPort fid ty)
+  else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
+
+  where
+
+    getActionReturnType :: Identifier -> Identifier -> SemanticMonad (SAST.TerminaType SemanticAnn)
+    getActionReturnType clsId action = do
+      getGlobalTypeDef pann clsId >>=
+        \case
+          LocatedElement (Class _ _ members _ _) _ -> 
+            case findClassAction action members of
+              Just (_, rty, _) -> return rty
+              Nothing -> throwError $ annotateError Internal EUnboxingClassType
+          _ -> throwError $ annotateError Internal EUnboxingClassType
+
+typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -1324,12 +1356,12 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty _) (FieldPortConnection
       TOutPort ty ->
         case gentry of
           LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
-            catchMismatch pann (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError loc ty ty')
+            catchMismatch pann (EOutboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection OutboundPortConnection pid sid (buildOutPortConnAnn pann cts)
-          _ -> throwError $ annotateError loc $ EOutboundPortConnectionInvalidGlobal sid
-      ty -> throwError $ annotateError loc (EFieldNotOutboundPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
-typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection AccessPortConnection pid sid pann) =
+          _ -> throwError $ annotateError pann $ EOutboundPortConnectionInvalidGlobal sid
+      ty -> throwError $ annotateError pann (EFieldNotOutboundPort fid ty)
+  else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
+typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection AccessPortConnection pid sid pann) =
   if fid == pid
   then
     getGlobalEntry pann sid >>=
@@ -1338,38 +1370,38 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
       TAccessPort (TAllocator ty) ->
         case gentry of
           LocatedElement (GGlob (TPool ty' s)) _ -> do
-            catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError loc ty ty')
+            catchMismatch pann (EAllocatorPortConnectionPoolTypeMismatch sid ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildPoolConnAnn pann ty s)
-          _ -> throwError $ annotateError loc $ EAllocatorPortConnectionInvalidGlobal sid
+          _ -> throwError $ annotateError pann $ EAllocatorPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicAccess ty) ->
         case gentry of
           LocatedElement (GGlob (TAtomic ty')) _ -> do
-            catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
+            catchMismatch pann (EAtomicConnectionTypeMismatch ty) (sameTyOrError pann ty ty')
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicConnAnn pann ty)
-          _ -> throwError $ annotateError loc $ EAtomicAccessPortConnectionInvalidGlobal sid
+          _ -> throwError $ annotateError pann $ EAtomicAccessPortConnectionInvalidGlobal sid
       TAccessPort (TAtomicArrayAccess ty portSize) ->
         case gentry of
           LocatedElement (GGlob (TAtomicArray ty' glbSize)) _ -> do
-            catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError loc ty ty')
+            catchMismatch pann (EAtomicArrayConnectionTypeMismatch ty) (sameTyOrError pann ty ty')
             -- We will check the size of the atomic array when we are performing the const propagation.
             return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAtomicArrayConnAnn pann ty portSize glbSize)
-          _ -> throwError $ annotateError loc $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
+          _ -> throwError $ annotateError pann $ EAtomicArrayAccessPortConnectionInvalidGlobal sid
       TAccessPort ifaceTy@(TInterface _ iface) -> do
         -- | Get the interface definition
-        getGlobalTypeDef loc iface >>=
+        getGlobalTypeDef pann iface >>=
           \case {
             LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
-              extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures loc) extends
+              extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures pann) extends
               let procs = [ProcedureSeman procid params ms | (InterfaceProcedure procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->
-                  getGlobalTypeDef loc clsId >>=
+                  getGlobalTypeDef pann clsId >>=
                   \case {
                       LocatedElement (Class _ _ _ provides _) _ -> (do
                         -- Collect the interfaces provided by the resource and their extended interfaces
-                        extendedProvides <- concat <$> traverse (collectExtendedInterfaces loc) provides;
+                        extendedProvides <- concat <$> traverse (collectExtendedInterfaces pann) provides;
                         case Data.List.find (iface ==) (provides ++ extendedProvides) of
                           Just _ ->
                             case fann of
@@ -1377,16 +1409,16 @@ typeFieldAssignment loc tyDef _ (FieldDefinition fid fty fann) (FieldPortConnect
                                 let filteredProcs = filter (\(ProcedureSeman procid _ _) -> M.member procid usedProcs) procs in
                                 return $ SAST.FieldPortConnection AccessPortConnection pid sid (buildAccessPortConnAnn pann ifaceTy rts filteredProcs)
                               _ -> error "Invalid annotation for field"
-                          _ -> throwError $ annotateError loc $ EAccessPortConnectionInterfaceNotProvided sid iface
+                          _ -> throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
                       );
                       _ -> throwError $ annotateError Internal EUnboxingInterface
                   }
-                _ -> throwError $ annotateError loc $ EAccessPortConnectionInvalidGlobal sid
+                _ -> throwError $ annotateError pann $ EAccessPortConnectionInvalidGlobal sid
             );
             _ -> throwError $ annotateError Internal EUnboxingInterface
           }
-      ty -> throwError $ annotateError loc (EFieldNotAccessPort fid ty)
-  else throwError $ annotateError loc (EFieldValueAssignmentUnknownFields tyDef [pid])
+      ty -> throwError $ annotateError pann (EFieldNotAccessPort fid ty)
+  else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])
 
 typeFieldAssignments
   :: Location -> (SAST.TerminaType SemanticAnn, Location)
@@ -1410,6 +1442,6 @@ typeFieldAssignments faLoc tyDef typeObj fds fas = checkSortedFields sorted_fds 
     checkSortedFields ms [] _ = tError (EFieldValueAssignmentMissingFields tyDef (fmap fieldIdentifier ms))
     checkSortedFields (d:ds) (a:as) acc =
       if fieldIdentifier d == getFid a then
-        typeFieldAssignment faLoc tyDef typeObj d a >>= checkSortedFields ds as . (:acc)
+        typeFieldAssignment tyDef typeObj d a >>= checkSortedFields ds as . (:acc)
       else
         throwError $ annotateError faLoc (EFieldValueAssignmentMissingFields tyDef [fieldIdentifier d])
