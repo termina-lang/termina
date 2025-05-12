@@ -280,7 +280,9 @@ genChannelConnections progArchitecture = do
                     no_cr $ channelName @: __termina_msg_queue_t @. "channel_msg_queue_id" @: __termina_id_t
                         @= channelMsgQueueId @: __termina_id_t,
                     no_cr $ channelName @: __termina_msg_queue_t @. "port_id" @: __termina_id_t
-                        @= portVariant @: __termina_id_t
+                        @= portVariant @: __termina_id_t,
+                    pre_cr $ targetName @: typeDef classId @. targetPort @: __termina_id_t
+                        @= channelMsgQueueId @: __termina_id_t
                 ]
 
 genInitPools :: [TPPool SemanticAnn] -> CGenerator CFileItem
