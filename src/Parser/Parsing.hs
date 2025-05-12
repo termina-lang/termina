@@ -844,14 +844,41 @@ defaultCaseParser = do
   caseBlk <- blockParser
   DefaultCase caseBlk . Position startPos <$> getPosition
 
+-- lookAhead parser that checks for "case _"
+isDefaultCase :: Parser ()
+isDefaultCase = do
+  reserved "case"
+  reserved "_" -- just check that "_" is next
+
+-- lookAhead parser that accepts "case" not followed by "_"
+isRegularCase :: Parser ()
+isRegularCase = do
+  reserved "case"
+  notFollowedBy (reserved "_")
+
+parseCases :: [MatchCase ParserAnn] -> Parser ([MatchCase ParserAnn], Maybe (DefaultCase ParserAnn))
+parseCases acc = do
+  -- Check for default case first
+  mDefault <- optionMaybe $ try $ lookAhead isDefaultCase >> defaultCaseParser
+  case mDefault of
+    Just defCase -> return (reverse acc, Just defCase)
+    Nothing -> do
+      -- Check for normal case
+      canContinue <- optionMaybe $ try $ lookAhead isRegularCase
+      case canContinue of
+        Just _ -> do
+          c <- matchCaseParser -- If this fails, it should propagate!
+          parseCases (c : acc)
+        Nothing -> return (reverse acc, Nothing)
+
 matchStmtParser :: Parser (Statement ParserAnn)
 matchStmtParser = do
   startPos <- getPosition
   reserved "match"
   matchExpression <- expressionParser
   (cases, defaultCase) <- braces (do
-      cs <- many1 $ try matchCaseParser
-      dc <- optionMaybe defaultCaseParser
+      c <- matchCaseParser
+      (cs, dc) <- parseCases [c]
       return (cs, dc))
   MatchStmt matchExpression cases defaultCase . Position startPos <$> getPosition
 
