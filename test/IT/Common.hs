@@ -17,7 +17,7 @@ import Generator.Environment
 import qualified Data.Set as S
 
 renderHeader :: String -> Text
-renderHeader input = case parse (contents topLevel) "" input of
+renderHeader input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform
@@ -33,7 +33,7 @@ renderHeader input = case parse (contents topLevel) "" input of
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
 renderSource :: String -> Text
-renderSource input = case parse (contents topLevel) "" input of
+renderSource input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform

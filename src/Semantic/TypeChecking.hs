@@ -36,7 +36,6 @@ import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import Semantic.Environment
 import Utils.Monad
-import Modules.Modules
 import qualified Data.Set as S
 
 typeElement :: AnnASTElement ParserAnn

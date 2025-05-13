@@ -15,7 +15,7 @@ import ControlFlow.VarUsage
 import qualified Data.Set as S
 
 runNegativeTestTypeCheck :: String -> Maybe Semantic.Error
-runNegativeTestTypeCheck input = case parse (contents topLevel) "" input of
+runNegativeTestTypeCheck input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let config = defaultConfig "test" TestPlatform in
@@ -24,7 +24,7 @@ runNegativeTestTypeCheck input = case parse (contents topLevel) "" input of
       Right _ -> Nothing
 
 runNegativeTestVarUsage :: String -> Maybe VarUsage.Error
-runNegativeTestVarUsage input = case parse (contents topLevel) "" input of
+runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let config = defaultConfig "test" TestPlatform in

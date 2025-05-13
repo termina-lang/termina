@@ -31,7 +31,6 @@ import qualified Control.Monad.State as ST
 import Semantic.Environment
 import Utils.Monad 
 import Semantic.Utils
-import Text.Parsec.Pos (sourceName)
 
 checkObjectNotMoved :: Location -> SAST.Object a -> SemanticMonad (SAST.Object a)
 checkObjectNotMoved loc obj = do
