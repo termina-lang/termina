@@ -25,7 +25,7 @@ import Semantic.AST (
   Object,
   Modifier,
   Const, TerminaType)
-import Modules.Modules
+import Utils.Annotations
 
 
 data MatchCase a = MatchCase

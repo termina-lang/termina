@@ -5,7 +5,6 @@ module ControlFlow.Architecture.Utils where
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.Architecture.Types
 import qualified Data.Map as M
-import Modules.Modules
 import qualified Data.Set as S
 import Data.List (group, sort, foldl')
 import Control.Monad.Except

@@ -275,14 +275,14 @@ emptyRange :: LSP.Range
 emptyRange = LSP.Range (LSP.Position 0 0) (LSP.Position 0 0)
 
 loc2Range :: Location -> LSP.Range
-loc2Range (Position start end) = 
+loc2Range (Position _ start end) = 
     LSP.Range 
         (LSP.Position (fromIntegral (sourceLine start) - 1) (fromIntegral (sourceColumn start) - 1))
         (LSP.Position (fromIntegral (sourceLine end) - 1) (fromIntegral (sourceColumn end) - 1))
 loc2Range _ = emptyRange
 
 pprintSimpleError :: T.Text -> T.Text -> String -> Location -> Maybe T.Text -> T.Text
-pprintSimpleError sourceLines errorMessage fileName (Position start end) msg = 
+pprintSimpleError sourceLines errorMessage fileName (Position _ start end) msg = 
     TL.toStrict $ prettyErrors sourceLines [genSimpleErrata]
     
     where

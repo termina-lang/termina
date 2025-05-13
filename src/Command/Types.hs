@@ -12,6 +12,7 @@ import Semantic.Types
 import Parser.Types
 
 import Modules.Modules
+import Utils.Annotations
 
 newtype ParsingData = ParsingData {
   parsedAST :: PAST.AnnotatedProgram ParserAnn

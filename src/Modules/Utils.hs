@@ -1,6 +1,5 @@
 module Modules.Utils where
 import Parser.Errors
-import Modules.Modules
 import Utils.Annotations
 import System.FilePath
 

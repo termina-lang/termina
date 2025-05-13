@@ -96,7 +96,7 @@ instance ErrorMessage ConstFoldError where
     errorTitle (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "referenced array size mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."

@@ -27,6 +27,7 @@ import Text.Parsec.Error
 import Semantic.Environment
 import Generator.Environment (getPlatformInterruptMap)
 import Generator.Monadic (emptyMonadicTypes)
+import qualified Data.Set as S
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -56,9 +57,9 @@ loadSingleModule filePath = do
     -- read it
     src_code <- TIO.readFile filePath
     -- parse it
-    case runParser terminaModuleParser () filePath (T.unpack src_code) of
+    case runParser terminaModuleParser noExtension filePath (T.unpack src_code) of
         Left err -> 
-            let pErr = annotateError (Position (errorPos err) (errorPos err)) (EParseError err)
+            let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
                 fileMap = M.singleton filePath src_code
             in
             TIO.putStrLn (toText pErr fileMap) >> exitFailure
@@ -69,7 +70,7 @@ loadSingleModule filePath = do
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
     let config = (\c -> c{ enableSystemInit = True, enableSystemPort = True }) $ defaultConfig "test" TestPlatform
-        result = runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule . parsedAST . metadata $ parsedModule)
+        result = runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule (S.singleton (qualifiedName parsedModule)) . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in

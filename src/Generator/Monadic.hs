@@ -8,7 +8,7 @@ import qualified Data.Set as S
 import qualified Control.Monad.State.Strict as ST
 import Semantic.Types ( SemanticAnn )
 import qualified Data.Map as M
-import Modules.Modules
+import Utils.Annotations
 
 data MonadicTypes = MonadicTypes {
     optionTypes :: S.Set (TerminaType SemanticAnn),

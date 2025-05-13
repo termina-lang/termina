@@ -62,7 +62,7 @@ instance ErrorMessage PathsCheckError where
     errorTitle (AnnotatedError EEActionInvalidReboot _pos) = "invalid reboot statement on an action"
     errorTitle _ = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."

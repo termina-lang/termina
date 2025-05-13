@@ -39,7 +39,7 @@ instance ErrorMessage ParsingErrors where
     errorTitle (AnnotatedError (EImportedFilesLoop _imports) _pos) = "cycle between project source files"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
@@ -73,7 +73,7 @@ instance ErrorMessage ParsingErrors where
             -- | Prints a trace of imports
             printImportTrace :: QualifiedName -> [ModuleDependency] -> T.Text
             printImportTrace _ [] = ""
-            printImportTrace currentFile [ModuleDependency finalCall tracePos@(Position traceStartPos _)] =
+            printImportTrace currentFile [ModuleDependency finalCall tracePos@(Position _ traceStartPos _)] =
                 let title = "\nFinally, module \x1b[31m" <> T.pack currentFile <> 
                         "\x1b[0m imports module \x1b[31m" <> T.pack finalCall <> "\x1b[0m again here:"
                     traceFileName = sourceName traceStartPos
@@ -81,7 +81,7 @@ instance ErrorMessage ParsingErrors where
                 in
                     pprintSimpleError 
                         traceSourceLines title traceFileName tracePos Nothing
-            printImportTrace currentFile (ModuleDependency nextCall tracePos@(Position traceStartPos _) : xr) =
+            printImportTrace currentFile (ModuleDependency nextCall tracePos@(Position _ traceStartPos _) : xr) =
                 let title = "\nModule \x1b[31m" <> T.pack currentFile <> 
                         "\x1b[0m imports module \x1b[31m" <> T.pack nextCall <> "\x1b[0m here:"
                     traceFileName = sourceName traceStartPos

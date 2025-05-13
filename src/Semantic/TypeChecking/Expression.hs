@@ -31,6 +31,7 @@ import qualified Control.Monad.State as ST
 import Semantic.Environment
 import Utils.Monad 
 import Semantic.Utils
+import Text.Parsec.Pos (sourceName)
 
 checkObjectNotMoved :: Location -> SAST.Object a -> SemanticMonad (SAST.Object a)
 checkObjectNotMoved loc obj = do
@@ -602,7 +603,22 @@ typeTypeSpecifier loc typeObj (TSArray ts s) = do
   return $ TArray ty arraySize
 typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
   -- Check that the type was defined
-  (LocatedElement glbTypeDef _) <- getGlobalTypeDef loc ident
+  (LocatedElement glbTypeDef loc') <- getGlobalTypeDef loc ident
+  -- | Check that the location of the type is in the dependencies set
+  -- of the current module. This is important because the type
+  -- can be defined in another module and we need to check that
+  -- the module is properly imported.
+  case loc' of
+    Position qualifiedName _ _ -> do
+      -- | Check that the type is defined in the current module
+      -- | or in a module that is imported.
+      visibleMods <- ST.gets visible
+      if S.member qualifiedName visibleMods then
+        return ()
+      else
+        throwError $ annotateError loc (ETypeNotInScope ident qualifiedName)
+    _ -> return ()
+
   case glbTypeDef of 
     Struct s _ _ -> return $ TStruct s
     Enum e _ _ -> return $ TEnum e

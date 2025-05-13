@@ -7,7 +7,6 @@ module Generator.CodeGen.Application.Glue where
 import Generator.LanguageC.AST
 import qualified Data.Map as M
 import Generator.CodeGen.Common
-import Modules.Modules (QualifiedName)
 import Semantic.Types
 import ControlFlow.Architecture.Types
 import Configuration.Configuration
@@ -24,6 +23,7 @@ import Generator.CodeGen.Expression
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
+import Utils.Annotations
 
 genInitHandlers :: TerminaProgArch a -> CGenerator CFileItem
 genInitHandlers progArchitecture = do

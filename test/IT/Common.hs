@@ -14,13 +14,15 @@ import Generator.LanguageC.Printer
 import Generator.CodeGen.Application.Option
 import Generator.Environment
 
+import qualified Data.Set as S
+
 renderHeader :: String -> Text
 renderHeader input = case parse (contents topLevel) "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform
         irqMap = getPlatformInterruptMap TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of
@@ -36,7 +38,7 @@ renderSource input = case parse (contents topLevel) "" input of
   Right ast -> 
     let configParams = defaultConfig "test" TestPlatform
         irqMap = getPlatformInterruptMap TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of

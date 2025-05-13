@@ -13,13 +13,13 @@ import ControlFlow.Architecture.Types
 import Generator.Utils
 import ControlFlow.Architecture.Utils
 import Generator.CodeGen.Application.Utils
-import Modules.Modules (QualifiedName)
 import Configuration.Configuration
 import Semantic.AST
 import Generator.CodeGen.Expression
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
+import Utils.Annotations
 
 genConfigFile ::
     QualifiedName

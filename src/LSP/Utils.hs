@@ -26,13 +26,15 @@ import qualified Language.LSP.Server as LSP
 import qualified Language.LSP.Diagnostics as LSP
 import LSP.Modules
 import qualified Data.SortedList as SL
-import Modules.Modules (ModuleDependency (..), QualifiedName)
+import Modules.Modules (ModuleDependency (..))
 import Semantic.TypeChecking
 import System.FilePath
 import Parser.Types
 import qualified Parser.AST as PAST
 import Modules.Utils
 import Semantic.Environment
+import Command.Utils (getModuleDependencyList)
+import qualified Data.Set as S
 
 filePathToUri :: MonadIO m => FilePath -> m LSP.Uri
 filePathToUri = liftIO . (LSP.filePathToUri <$>) . canonicalizePath
@@ -126,9 +128,9 @@ loadTerminaModule fullP srcPath = do
       return Nothing
     Right src_code ->
       -- parse it
-      case runParser terminaModuleParser () fullP (T.unpack src_code) of
+      case runParser terminaModuleParser fullP fullP (T.unpack src_code) of
         Left err -> do
-          let pErr = annotateError (Position (errorPos err) (errorPos err)) (EParseError err)
+          let pErr = annotateError (Position fullP (errorPos err) (errorPos err)) (EParseError err)
               fileMap = M.singleton fullP src_code
               newModule = TerminaStoredModule fullP [] src_code (toDiagnostics pErr fileMap) Nothing Nothing
           modify (\s -> 
@@ -171,17 +173,18 @@ loadVSFile filePath = do
         (return . Left)
     Just fileContents -> return $ Right fileContents
 
-typeModules :: Environment -> [QualifiedName] -> HandlerM Environment
-typeModules finalState [] = pure finalState
-typeModules prevState (m:ms) = do
+typeModules :: FilePath -> Environment -> [QualifiedName] -> HandlerM Environment
+typeModules _srcPath finalState [] = pure finalState
+typeModules srcPath prevState (m:ms) = do
   parsedProject <- gets project_modules
   let parsedModule = parsedProject M.! m
+  let moduleDependencies = S.fromList $ getModuleDependencyList (importedModules <$> parsedProject) (importedModules parsedModule)
   case parsing parsedModule of
     Nothing -> 
       -- This means that the module has not been parsed or that the parsing failed
       return prevState
     Just parsingData -> do
-      let result = runTypeChecking prevState (typeTerminaModule . parsedAST $ parsingData)
+      let result = runTypeChecking prevState (typeTerminaModule (S.insert (srcPath </> m <.> "fin") moduleDependencies) . parsedAST $ parsingData)
       case result of
         (Left err) -> do
           -- | Create the source files map. This map will be used to obtain the source files that
@@ -207,4 +210,4 @@ typeModules prevState (m:ms) = do
                   parsedModule { semantic = Just semanticData }
                   (project_modules s) })          
           -- | We need to update the project store
-          typeModules newState ms
+          typeModules srcPath newState ms

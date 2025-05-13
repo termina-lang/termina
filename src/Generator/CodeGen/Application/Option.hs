@@ -14,7 +14,6 @@ import Control.Monad.Except
 import Configuration.Configuration
 import Generator.Monadic
 import Control.Monad.State
-import Modules.Modules
 
 genOptionPathName :: FilePath
 genOptionPathName = "option" <.> "h"

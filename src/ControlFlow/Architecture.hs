@@ -13,7 +13,6 @@ import ControlFlow.Architecture.Utils
 import Semantic.Types
 import Utils.Annotations
 import qualified Data.Map as M
-import Modules.Modules
 import ControlFlow.Architecture.BoxInOut
 import ControlFlow.Architecture.Forwarding
 import Configuration.Configuration

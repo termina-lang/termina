@@ -9,7 +9,6 @@ import Generator.CodeGen.Common
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
-import Modules.Modules
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
 import qualified Data.Map as M

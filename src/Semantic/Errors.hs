@@ -248,6 +248,7 @@ data Error
   | EInvalidSystemInitActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid system init action return type
   | EInvalidSystemExceptActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid system except action return type
   | EInvalidMsgQueueActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid message queue action return type
+  | ETypeNotInScope Identifier QualifiedName -- ^ Type not in scope
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -451,6 +452,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "SE-196"
     errorIdent (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "SE-197"
     errorIdent (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "SE-198"
+    errorIdent (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "SE-199"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -649,9 +651,10 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidSystemInitActionReturnType _ident _ty) _pos) = "invalid system init action return type"
     errorTitle (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "invalid system exception action return type"
     errorTitle (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "invalid message queue action return type"
+    errorTitle (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "type not in scope"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
@@ -697,7 +700,7 @@ instance ErrorMessage SemanticErrors where
                     "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
                     "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")) <>
                     case procPos of 
-                        Position procStart _procEnd -> 
+                        Position _ procStart _procEnd -> 
                             let procFileName = sourceName procStart
                                 procSourceLines = files M.! procFileName in
                             pprintSimpleError
@@ -711,7 +714,7 @@ instance ErrorMessage SemanticErrors where
                             "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
                             "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show numArgs) <> "\x1b[0m.")) <>
                     case procPos of 
-                        Position procStart _procEnd -> 
+                        Position _ procStart _procEnd -> 
                             let procFileName = sourceName procStart
                                 procSourceLines = files M.! procFileName in
                             pprintSimpleError
@@ -725,7 +728,7 @@ instance ErrorMessage SemanticErrors where
                             "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m.")) <>
                     case procPos of 
-                        Position procStart _procEnd -> 
+                        Position _ procStart _procEnd -> 
                             let procFileName = sourceName procStart
                                 procSourceLines = files M.! procFileName in
                             pprintSimpleError
@@ -742,7 +745,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Resource class \x1b[31m" <> T.pack ident <> "\x1b[0m does not provide any interface.\n" <>
                             "A resource class must provide at least one interface."))
-                EResourceClassAction (classId, Position startPosClass endPosClass) ident ->
+                EResourceClassAction (classId, Position _ startPosClass endPosClass) ident ->
                     let actionStartLine = sourceLine start
                         actionEndLine = sourceLine end
                         actionStartColumn = sourceColumn start
@@ -784,7 +787,7 @@ instance ErrorMessage SemanticErrors where
                                         ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the action \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                                         <> "Resource classes cannot define actions."))
                             ] 
-                EResourceClassInPort (classId, Position startPosClass endPosClass) ident ->
+                EResourceClassInPort (classId, Position _ startPosClass endPosClass) ident ->
                     let portStartLine = sourceLine start
                         portEndLine = sourceLine end
                         portStartColumn = sourceColumn start
@@ -826,7 +829,7 @@ instance ErrorMessage SemanticErrors where
                                         ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the in port \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                                         <> "Resource classes cannot define in ports."))
                             ]
-                EResourceClassOutPort (classId, Position startPosClass endPosClass) ident ->
+                EResourceClassOutPort (classId, Position _ startPosClass endPosClass) ident ->
                     let portStartLine = sourceLine start
                         portEndLine = sourceLine end
                         portStartColumn = sourceColumn start
@@ -875,7 +878,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Identifier \x1b[31m" <> T.pack ident <> "\x1b[0m is not an interface."))
-                EProcedureNotFromProvidedInterfaces (classId, Position startPosClass endPosClass) ident ->
+                EProcedureNotFromProvidedInterfaces (classId, Position _ startPosClass endPosClass) ident ->
                     let portStartLine = sourceLine start
                         portEndLine = sourceLine end
                         portStartColumn = sourceColumn start
@@ -921,7 +924,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is not being provided."))
-                EProcedureExtraParams (ifaceId, procId, params, procPos@(Position procStart _procEnd)) paramNumber ->
+                EProcedureExtraParams (ifaceId, procId, params, procPos@(Position _ procStart _procEnd)) paramNumber ->
                     let procFileName = sourceName procStart
                         procSourceLines = files M.! procFileName
                     in
@@ -934,7 +937,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             procSourceLines "The interface of the procedure is defined here:" procFileName
                             procPos Nothing
-                EProcedureMissingParams (ifaceId, procId, params, procPos@(Position procStart _procEnd)) paramNumber ->
+                EProcedureMissingParams (ifaceId, procId, params, procPos@(Position _ procStart _procEnd)) paramNumber ->
                     let procFileName = sourceName procStart
                         procSourceLines = files M.! procFileName
                     in
@@ -947,7 +950,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             procSourceLines "The interface of the procedure is defined here:" procFileName
                             procPos Nothing
-                EProcedureParamTypeMismatch (ifaceId, procId, expectedTy, procPos@(Position procStart _procEnd)) actualTy ->
+                EProcedureParamTypeMismatch (ifaceId, procId, expectedTy, procPos@(Position _ procStart _procEnd)) actualTy ->
                     let procFileName = sourceName procStart
                         procSourceLines = files M.! procFileName
                     in
@@ -966,7 +969,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Task class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <>
                             "Task classes must not provide any interface."))
-                ETaskClassProcedure (classId, Position startPosClass endPosClass) ident ->
+                ETaskClassProcedure (classId, Position _ startPosClass endPosClass) ident ->
                     let procStartLine = sourceLine start
                         procEndLine = sourceLine end
                         procStartColumn = sourceColumn start
@@ -1018,7 +1021,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m provides an interface.\n" <>
                             "Handler classes must not provide any interface."))
-                EHandlerClassProcedure (classId, Position startPosClass endPosClass) ident ->
+                EHandlerClassProcedure (classId, Position _ startPosClass endPosClass) ident ->
                     let procStartLine = sourceLine start
                         procEndLine = sourceLine end
                         procStartColumn = sourceColumn start
@@ -1065,7 +1068,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Handler class \x1b[31m" <> T.pack ident <> "\x1b[0m does not define any actions.\n" <>
                             "Handler classes must define exactly one action."))
-                EHandlerClassMultipleActions classId prevActPos@(Position actStartPos _actEndPos) ->
+                EHandlerClassMultipleActions classId prevActPos@(Position _ actStartPos _actEndPos) ->
                     let actFileName = sourceName actStartPos
                         actSourceLines = files M.! actFileName 
                     in
@@ -1080,7 +1083,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m does not define any sink port.\n" <>
                             "Handler classes must define exactly one sink port."))
-                EHandlerClassMultipleSinkPorts classId prevPortPos@(Position portStartPos _portEndPos) ->
+                EHandlerClassMultipleSinkPorts classId prevPortPos@(Position _ portStartPos _portEndPos) ->
                     let portFileName = sourceName portStartPos
                         portSourceLines = files M.! portFileName 
                     in
@@ -1090,7 +1093,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             portSourceLines "Another sink port is defined here:" portFileName
                             prevPortPos Nothing
-                EHandlerClassInPort (classId, Position startPosClass endPosClass) ident ->
+                EHandlerClassInPort (classId, Position _ startPosClass endPosClass) ident ->
                     let portStartLine = sourceLine start
                         portEndLine = sourceLine end
                         portStartColumn = sourceColumn start
@@ -1136,7 +1139,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The condition in the statement is expected to be of type \x1b[31mbool\x1b[0m but it is of type \x1b[31m" <> showText ts <> "\x1b[0m."))
-                EFunctionCallExtraArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+                EFunctionCallExtraArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1148,7 +1151,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EFunctionCallMissingArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+                EFunctionCallMissingArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1160,7 +1163,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position _ funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1374,7 +1377,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not found."))
-                EGlobalNotType (ident, globalPos@(Position globalStart _)) ->
+                EGlobalNotType (ident, globalPos@(Position _ globalStart _)) ->
                     let globalFileName = sourceName globalStart
                         globalSourceLines = files M.! globalFileName
                     in
@@ -1392,7 +1395,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The constant \x1b[31m" <> T.pack ident <> "\x1b[0m is read-only and cannot be modified."))
-                ESymbolAlreadyDefined (ident, symbolPos@(Position symbolStart _symbolEnd)) ->
+                ESymbolAlreadyDefined (ident, symbolPos@(Position _ symbolStart _symbolEnd)) ->
                     let symbolFileName = sourceName symbolStart
                         symbolSourceLines = files M.! symbolFileName
                     in
@@ -1416,7 +1419,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("This statement can only be used to call a continuation action.\n" <>
                             "Calling a procedure of an object of type \x1b[31m" <> showText ts <> "\x1b[0m in a continue statement is invalid."))
-                EContinueActionExtraArgs (ident, params, actionPos@(Position actStartPos _endPos)) argNumber ->
+                EContinueActionExtraArgs (ident, params, actionPos@(Position _ actStartPos _endPos)) argNumber ->
                     let actFileName = sourceName actStartPos
                         actSourceLines = files M.! actFileName
                     in
@@ -1428,7 +1431,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             actSourceLines "The action is defined here:" actFileName
                             actionPos Nothing
-                EContinueActionMissingArgs (ident, actionPos@(Position actStartPos _endPos)) ->
+                EContinueActionMissingArgs (ident, actionPos@(Position _ actStartPos _endPos)) ->
                     let actFileName = sourceName actStartPos
                         actSourceLines = files M.! actFileName
                     in
@@ -1448,7 +1451,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m."))
-                EEnumVariantExtraParams (enumId, enumPos@(Position enumStart _end)) (variant, params) paramNumber ->
+                EEnumVariantExtraParams (enumId, enumPos@(Position _ enumStart _end)) (variant, params) paramNumber ->
                     let enumFileName = sourceName enumStart
                         enumSourceLines = files M.! enumFileName
                     in
@@ -1461,7 +1464,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             enumSourceLines "The enum is defined here:" enumFileName
                             enumPos Nothing
-                EEnumVariantMissingParams (enumId, enumPos@(Position enumStart _end)) (variant, params) paramNumber ->
+                EEnumVariantMissingParams (enumId, enumPos@(Position _ enumStart _end)) (variant, params) paramNumber ->
                     let enumFileName = sourceName enumStart
                         enumSourceLines = files M.! enumFileName
                     in
@@ -1474,7 +1477,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             enumSourceLines "The enum is defined here:" enumFileName
                             enumPos Nothing
-                EEnumVariantParamTypeMismatch (enumId, enumPos@(Position enumStart _end)) (variant, paramNumber, expectedTy) actualTy ->
+                EEnumVariantParamTypeMismatch (enumId, enumPos@(Position _ enumStart _end)) (variant, paramNumber, expectedTy) actualTy ->
                     let enumFileName = sourceName enumStart
                         enumSourceLines = files M.! enumFileName
                     in
@@ -1492,7 +1495,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Function \x1b[31m" <> T.pack ident <> "\x1b[0m not found."))
-                EGlobalNotFunction (ident, globalPos@(Position globalStart _)) ->
+                EGlobalNotFunction (ident, globalPos@(Position _ globalStart _)) ->
                     let globalFileName = sourceName globalStart
                         globalSourceLines = files M.! globalFileName
                     in
@@ -1566,7 +1569,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid parameter type for a procedure."))
-                EMemberFunctionCallExtraArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+                EMemberFunctionCallExtraArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1578,7 +1581,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EMemberFunctionCallMissingArgs (funcId, params, funcPos@(Position funcStart _procEnd)) argNumber ->
+                EMemberFunctionCallMissingArgs (funcId, params, funcPos@(Position _ funcStart _procEnd)) argNumber ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1590,7 +1593,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             funcSourceLines ("Member function \x1b[31m" <> T.pack funcId <> "\x1b[0m is defined here:") funcFileName
                             funcPos Nothing
-                EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position funcStart _procEnd)) argNumber actualTy ->
+                EMemberFunctionCallArgTypeMismatch (funcId, Parameter _ expectedTy, funcPos@(Position _ funcStart _procEnd)) argNumber actualTy ->
                     let funcFileName = sourceName funcStart
                         funcSourceLines = files M.! funcFileName
                     in
@@ -1639,7 +1642,7 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Field \x1b[31m" <> T.pack field <>
                             "\x1b[0m is not being assigned a value in the field assignment expression.")) <>
                     case recordPos of
-                        Position recordStart _end ->
+                        Position _ recordStart _end ->
                             let recordFileName = sourceName recordStart
                                 recordSourceLines = files M.! recordFileName
                             in
@@ -1653,7 +1656,7 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
                             "\x1b[0m are not being assigned a value in the field assignment expression.")) <>
                     case recordPos of
-                        Position recordStart _end ->
+                        Position _ recordStart _end ->
                             let recordFileName = sourceName recordStart
                                 recordSourceLines = files M.! recordFileName
                             in
@@ -1667,7 +1670,7 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Field \x1b[31m" <> T.pack field <>
                             "\x1b[0m is not a field of the type \x1b[31m" <> showText record <> "\x1b[0m.")) <>
                     case recordPos of
-                        Position recordStart _end ->
+                        Position _ recordStart _end ->
                             let recordFileName = sourceName recordStart
                                 recordSourceLines = files M.! recordFileName
                             in
@@ -1681,7 +1684,7 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Fields \x1b[31m" <> T.intercalate ", " (map T.pack fields) <>
                             "\x1b[0m are not fields of the type \x1b[31m" <> showText record <> "\x1b[0m.")) <>
                     case recordPos of
-                        Position recordStart _end ->
+                        Position _ recordStart _end ->
                             let recordFileName = sourceName recordStart
                                 recordSourceLines = files M.! recordFileName
                             in
@@ -1721,7 +1724,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for member function call."))
-                EMemberAccessUnknownField (recordId, recordPos@(Position recordStart _end)) field ->
+                EMemberAccessUnknownField (recordId, recordPos@(Position _ recordStart _end)) field ->
                     let recordFileName = sourceName recordStart
                         recordSourceLines = files M.! recordFileName
                     in
@@ -1744,7 +1747,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a for-loop iterator."))
-                EUsedTypeName ident prevPos@(Position prevStart _) ->
+                EUsedTypeName ident prevPos@(Position _ prevStart _) ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
@@ -1754,7 +1757,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             prevSourceLines "The symbol is previously used here:" prevFileName
                             prevPos Nothing
-                EUsedGlobalName ident prevPos@(Position prevStart _) ->
+                EUsedGlobalName ident prevPos@(Position _ prevStart _) ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
@@ -1764,7 +1767,7 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             prevSourceLines "The symbol is previously used here:" prevFileName
                             prevPos Nothing
-                EUsedFunName ident prevPos@(Position prevStart _) ->
+                EUsedFunName ident prevPos@(Position _ prevStart _) ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
@@ -1847,7 +1850,7 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for match statement."))
-                EMatchCaseDuplicate variantName prevCase@(Position prevStart _) ->
+                EMatchCaseDuplicate variantName prevCase@(Position _ prevStart _) ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
@@ -2044,7 +2047,7 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The parameter of the variant is expected to be of type \x1b[31m" <> showText expectedTy <>
                             "\x1b[0m but you are providing it of type \x1b[31m" <> showText actualTy <> "\x1b[0m."))
-                EObjectPreviouslyMoved prevPos@(Position prevStart _) -> 
+                EObjectPreviouslyMoved prevPos@(Position _ prevStart _) -> 
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
@@ -2092,13 +2095,22 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The return type of the actions attached to the reception of messages from a message queue is expected to be \x1b[31m" <> showText (TStatus TInt32 :: TerminaType a) <>
                             "\x1b[0m but the return type of action \x1b[31m" <> T.pack ident <> "\x1b[0m is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                ETypeNotInScope ident qualifiedName ->
+                    -- | Change slashes to dots:
+                    let importString = T.replace "\\" "." $ T.pack qualifiedName
+                        importString' = T.replace "/" "." importString
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <>
+                            "The type is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 
             -- | Prints a trace of member function calls
             printCallTrace :: Identifier -> [(Identifier, Location)] -> T.Text
             printCallTrace _ [] = ""
-            printCallTrace currentCall [(finalCall, tracePos@(Position traceStartPos _))] =
+            printCallTrace currentCall [(finalCall, tracePos@(Position _ traceStartPos _))] =
                 let title = "\nFinally, member function \x1b[31m" <> T.pack currentCall <> 
                         "\x1b[0m calls \x1b[31m" <> T.pack finalCall <> "\x1b[0m again here:"
                     traceFileName = sourceName traceStartPos
@@ -2106,7 +2118,7 @@ instance ErrorMessage SemanticErrors where
                 in
                     pprintSimpleError 
                         traceSourceLines title traceFileName tracePos Nothing
-            printCallTrace currentCall ((nextCall, tracePos@(Position traceStartPos _)) : xr) =
+            printCallTrace currentCall ((nextCall, tracePos@(Position _ traceStartPos _)) : xr) =
                 let title = "\nMember function \x1b[31m" <> T.pack currentCall <> 
                         "\x1b[0m calls \x1b[31m" <> T.pack nextCall <> "\x1b[0m here:"
                     traceFileName = sourceName traceStartPos

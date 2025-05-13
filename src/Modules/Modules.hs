@@ -9,8 +9,6 @@ import qualified Data.Text as T
 import Utils.Annotations
 import Extras.TopSort
 
-type QualifiedName = FilePath
-
 data ModuleDependency = ModuleDependency QualifiedName Location
   deriving Show
 

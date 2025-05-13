@@ -10,7 +10,8 @@ import Control.Concurrent.MVar
 import Control.Monad.Reader
 import qualified Data.Map as M
 import LSP.Modules 
-import Modules.Modules (QualifiedName)
+
+import Utils.Annotations
 
 data ServerState = 
   ServerState {

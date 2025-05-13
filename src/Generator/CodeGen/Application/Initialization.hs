@@ -8,7 +8,6 @@ import System.FilePath
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Generator.CodeGen.Statement
-import Modules.Modules
 import qualified Data.Map as M
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration

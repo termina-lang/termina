@@ -70,7 +70,7 @@ initializeHandler _req = do
                       return ())
                     (\orderedDependencies -> 
                       let initialGlobalEnv = makeInitialGlobalEnv (Just cfg) (getPlatformInitialGlobalEnv cfg plt) in
-                      void $ typeModules initialGlobalEnv orderedDependencies)
+                      void $ typeModules (sourceModulesFolder cfg) initialGlobalEnv orderedDependencies)
                     $ sortProjectDepsOrLoop projectDependencies 
               return ()
 
@@ -90,7 +90,9 @@ typeProject = do
               Nothing -> []
               Just plt -> getPlatformInitialGlobalEnv cfg' plt
       let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv
-      void $ typeModules initialGlobalEnv orderedDependencies)
+      case cfg of
+        Nothing -> void $ typeModules "" initialGlobalEnv orderedDependencies
+        Just cfg' -> void $ typeModules (sourceModulesFolder cfg') initialGlobalEnv orderedDependencies)
     $ sortProjectDepsOrLoop projectDependencies
   diags <- gets project_modules
   mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 

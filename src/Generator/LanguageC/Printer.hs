@@ -259,7 +259,7 @@ indentStmt True doc = indentTab doc
 indentStmt False doc = doc
 
 addDebugLine :: Bool -> Location -> DocStyle -> DocStyle
-addDebugLine True (Position startPos _) doc = vsep [
+addDebugLine True (Position _ startPos _) doc = vsep [
         pretty "#line" <+> pretty (sourceLine startPos) <+> pretty "\"" <> pretty (sourceName startPos) <> pretty "\"",
         doc
     ]

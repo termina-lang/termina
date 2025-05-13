@@ -42,6 +42,16 @@ debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
+getModuleDependencyList ::  M.Map QualifiedName [ModuleDependency] -> [ModuleDependency] -> [QualifiedName]
+getModuleDependencyList typedProject importedMods =
+  let moduleDependencies = (\(ModuleDependency qname _) -> qname) <$> importedMods
+      moduleDependencies' = mconcat $ (\m -> 
+        case M.lookup m typedProject of
+          Nothing -> error $ "Module not found: " ++ m ++ " in project: " ++ show (M.keys typedProject)
+          Just prevMod -> getModuleDependencyList typedProject prevMod) <$> moduleDependencies
+  in
+  moduleDependencies ++ moduleDependencies'
+
 getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
 getModuleImports (Just srcPath) m =
     mapM buildAndTest (modules m) <&> sequence

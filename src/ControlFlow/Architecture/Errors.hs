@@ -67,13 +67,13 @@ instance ErrorMessage ArchitectureError where
     errorTitle (AnnotatedError (EUnusedPool _ident) _pos) = "unused pool"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
         in
         case err of
-            EDuplicatedEmitterConnection emitter prevPos@(Position prevStart _prevEnd) ->
+            EDuplicatedEmitterConnection emitter prevPos@(Position _ prevStart _prevEnd) ->
                 let prevFileName = sourceName prevStart
                     prevSourceLines = files M.! prevFileName
                 in
@@ -85,7 +85,7 @@ instance ErrorMessage ArchitectureError where
                     pprintSimpleError
                         prevSourceLines "The previous connection was done here:" prevFileName
                         prevPos Nothing
-            EDuplicatedChannelConnection channel prevPos@(Position procStart _procEnd) ->
+            EDuplicatedChannelConnection channel prevPos@(Position _ procStart _procEnd) ->
                 let prevFileName = sourceName procStart
                     prevSourceLines = files M.! prevFileName
                 in
@@ -141,14 +141,14 @@ instance ErrorMessage ArchitectureError where
                 -- | Prints a trace of box allocations 
                 printBoxTrace :: Identifier -> [Location] -> T.Text
                 printBoxTrace _ [] = ""
-                printBoxTrace expectedSource [tracePos@(Position traceStartPos _)] =
+                printBoxTrace expectedSource [tracePos@(Position _ traceStartPos _)] =
                     let title = "\nThe box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
                         traceFileName = sourceName traceStartPos
                         traceSourceLines = files M.! traceFileName
                     in
                         pprintSimpleError 
                             traceSourceLines title traceFileName tracePos Nothing
-                printBoxTrace expectedSource (tracePos@(Position traceStartPos _) : xr) =
+                printBoxTrace expectedSource (tracePos@(Position _ traceStartPos _) : xr) =
                     let title = "\nThe box is first moved here:"
                         traceFileName = sourceName traceStartPos
                         traceSourceLines = files M.! traceFileName
@@ -159,14 +159,14 @@ instance ErrorMessage ArchitectureError where
 
                 printBoxTrace' :: Identifier -> [Location] -> T.Text
                 printBoxTrace' _ [] = ""
-                printBoxTrace' expectedSource [tracePos@(Position traceStartPos _)] =
+                printBoxTrace' expectedSource [tracePos@(Position _ traceStartPos _)] =
                     let title = "\nFinally, box is being freed here to allocator \x1b[31m" <> T.pack expectedSource <> "\x1b[0m:"
                         traceFileName = sourceName traceStartPos
                         traceSourceLines = files M.! traceFileName
                     in
                         pprintSimpleError 
                             traceSourceLines title traceFileName tracePos Nothing
-                printBoxTrace' expectedSource (tracePos@(Position traceStartPos _) : xr) =
+                printBoxTrace' expectedSource (tracePos@(Position _ traceStartPos _) : xr) =
                     let title = "\nThe box is moved again here:"
                         traceFileName = sourceName traceStartPos
                         traceSourceLines = files M.! traceFileName

@@ -71,9 +71,9 @@ loadTerminaModule root filePath srcPath = do
   -- read it
   src_code <- TIO.readFile fullP
   -- parse it
-  case runParser terminaModuleParser () fullP (T.unpack src_code) of
+  case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
     Left err -> 
-      let pErr = annotateError (Position (errorPos err) (errorPos err)) (EParseError err)
+      let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
           fileMap = M.singleton fullP src_code
       in
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
@@ -123,11 +123,13 @@ typeModules parsedProject =
 
   where
 
+
     typeModules' :: TypedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
     typeModules' typedProject finalState [] = pure (typedProject, finalState)
     typeModules' typedProject prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
-      let result = runTypeChecking prevState (typeTerminaModule . parsedAST . metadata $ parsedModule)
+      let moduleDependencies = S.fromList $ getModuleDependencyList (importedModules <$> typedProject) (importedModules parsedModule)
+      let result = runTypeChecking prevState (typeTerminaModule (S.insert  m moduleDependencies) . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
           -- | Create the source files map. This map will be used to obtain the source files that

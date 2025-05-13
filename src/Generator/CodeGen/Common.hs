@@ -13,7 +13,6 @@ import Utils.Annotations
 import Configuration.Configuration
 import Generator.Monadic
 import qualified Control.Monad.State as ST
-import Modules.Modules
 import qualified Data.Set as S
 
 newtype CGeneratorError = InternalError String

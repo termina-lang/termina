@@ -82,7 +82,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "option-box match missing some"
     errorTitle _ = "internal error"
 
-    toText e@(AnnotatedError err pos@(Position start _end)) files =
+    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
             sourceLines = files M.! fileName
             title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
@@ -103,7 +103,7 @@ instance ErrorMessage VarUsageError where
                     sourceLines title fileName pos
                     (Just ("Box variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is declared but not moved."))
-            EBoxMovedTwice ident prevMove@(Position moveStart _moveEnd) ->
+            EBoxMovedTwice ident prevMove@(Position _ moveStart _moveEnd) ->
                 -- | We can safely assume that the previous move is in the same file
                 let moveFileName = sourceName moveStart
                     moveSourceLines = files M.! moveFileName
@@ -115,7 +115,7 @@ instance ErrorMessage VarUsageError where
                     pprintSimpleError
                         moveSourceLines "The previous move was done here:" moveFileName
                         prevMove Nothing
-            EOptionBoxMovedTwice ident prevMove@(Position moveStart _moveEnd) ->
+            EOptionBoxMovedTwice ident prevMove@(Position _ moveStart _moveEnd) ->
                 -- | We can safely assume that the previous move is in the same file
                 let moveFileName = sourceName moveStart
                     moveSourceLines = files M.! moveFileName
@@ -127,7 +127,7 @@ instance ErrorMessage VarUsageError where
                     pprintSimpleError
                         moveSourceLines "The previous move was done here:" moveFileName
                         prevMove Nothing
-            EDifferentOptionBoxUse ident rval (lval, otherPos@(Position otherStart _otherEnd)) ->
+            EDifferentOptionBoxUse ident rval (lval, otherPos@(Position _ otherStart _otherEnd)) ->
                 -- | We can safely assume that the other position is in the same file
                 let otherFileName = sourceName otherStart
                     otherSourceLines = files M.! otherFileName
@@ -151,7 +151,7 @@ instance ErrorMessage VarUsageError where
             EMissingOptionBox ident prevVal ->
                 -- | We can safely assume that the other position is in the same file
                 let otherFileName = case getLocation prevVal of
-                        Position otherStart _otherEnd -> sourceName otherStart
+                        Position _ otherStart _otherEnd -> sourceName otherStart
                         _ -> error "EMissingUsedOptionBox: TFixedLocation is not a position"
                     otherSourceLines = files M.! otherFileName
                 in
@@ -164,7 +164,7 @@ instance ErrorMessage VarUsageError where
                         otherSourceLines ("However, in this previous branch, option-box \x1b[31m" <> T.pack ident <>
                             "\x1b[0m was \x1b[31m" <> showText prevVal <> "\x1b[0m:") otherFileName
                         (getLocation prevVal) Nothing
-            EMissingBoxMove ident otherMove@(Position otherStart _othersEnd) ->
+            EMissingBoxMove ident otherMove@(Position _ otherStart _othersEnd) ->
                 let otherFileName = sourceName otherStart
                     otherSourceLines = files M.! otherFileName
                 in
@@ -186,7 +186,7 @@ instance ErrorMessage VarUsageError where
                     sourceLines title fileName pos
                     (Just ("Option-box variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is allocated but not moved."))
-            EAllocTwice ident prevAlloc@(Position allocStart _allocEnd) ->
+            EAllocTwice ident prevAlloc@(Position _ allocStart _allocEnd) ->
                 let allocFileName = sourceName allocStart
                     allocSourceLines = files M.! allocFileName
                 in
@@ -197,7 +197,7 @@ instance ErrorMessage VarUsageError where
                     pprintSimpleError
                         allocSourceLines "The previous allocation was done here:" allocFileName
                         prevAlloc Nothing
-            EMovedWithoutAlloc ident prevMove@(Position moveStart _moveEnd) ->
+            EMovedWithoutAlloc ident prevMove@(Position _ moveStart _moveEnd) ->
                 let moveFileName = sourceName moveStart
                     moveSourceLines = files M.! moveFileName
                 in

@@ -8,8 +8,10 @@ import Data.Kind
 import Control.Monad.Except
 import Text.Parsec.Pos
 
+type QualifiedName = FilePath
+
 data Location =
-  Position !SourcePos !SourcePos -- ^ Source code start and end position
+  Position QualifiedName !SourcePos !SourcePos -- ^ Source code start and end position
   | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen

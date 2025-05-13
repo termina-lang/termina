@@ -5,6 +5,7 @@ import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
 import Configuration.Configuration
+import qualified Data.Set as S
 
 ----------------------------------------
 -- | Global env
@@ -24,6 +25,9 @@ data Environment
  { global :: GlobalEnv
  , local  :: LocalEnv
  , moved  :: MovedEnv
+ -- | Set of all the modules that are imported in the current module together with the
+ -- | current module.
+ , visible :: S.Set QualifiedName
  }
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
@@ -152,8 +156,8 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
         env | enableSystemExcept config, env <- sysExceptGlobalEnv
       ], pltEnvironment]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty
+  ExprST (M.fromList globalEnv) M.empty M.empty S.empty
 makeInitialGlobalEnv Nothing pltEnvironment = 
   let globalEnv = mconcat [stdlibGlobalEnv, pltEnvironment]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty
+  ExprST (M.fromList globalEnv) M.empty M.empty S.empty

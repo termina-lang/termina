@@ -36,6 +36,8 @@ import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import Semantic.Environment
 import Utils.Monad
+import Modules.Modules
+import qualified Data.Set as S
 
 typeElement :: AnnASTElement ParserAnn
   -> SemanticMonad (SAST.AnnASTElement SemanticAnn, LocatedElement (GEntry SemanticAnn))
@@ -82,9 +84,12 @@ addElement (TypeDefinition ty _) el =
   insertGlobal type_name el (EUsedTypeName type_name)
 
 typeTerminaModule ::
-  AnnotatedProgram ParserAnn
+  S.Set QualifiedName
+  -> AnnotatedProgram ParserAnn
   -> SemanticMonad (SAST.AnnotatedProgram SemanticAnn)
-typeTerminaModule = mapM typeAndAdd
+typeTerminaModule visibleModules prog = do
+  ST.modify (\st -> st { visible = visibleModules })
+  mapM typeAndAdd prog
 
   where
     typeAndAdd :: AnnASTElement ParserAnn -> SemanticMonad (SAST.AnnASTElement SemanticAnn)
