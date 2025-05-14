@@ -700,8 +700,6 @@ genMainFile mName progArchitecture = do
     let mutexes = M.filter (\case{ OSALResourceLockMutex {} -> True; _ -> False }) resLockingMap
 
     cPoolMemoryAreas <- genPoolMemoryAreas (M.elems $ pools progArchitecture)
-    cAtomicDeclarations <- genAtomicDeclarations (M.elems $ atomics progArchitecture)
-    cAtomicArrayDeclarations <- genAtomicArrayDeclarations (M.elems $ atomicArrays progArchitecture)
 
     initTasks <- genInitTasks progArchitecture
     initHandlers <- genInitHandlers progArchitecture
@@ -727,7 +725,6 @@ genMainFile mName progArchitecture = do
         ++ [
             externInitGlobals
         ] 
-        ++ cAtomicDeclarations ++ cAtomicArrayDeclarations
         ++ cPoolMemoryAreas
         ++ [initTasks, initHandlers, initEmitters, initMutexes, initPools, initMessageQueues,
             enableProtection, channelConnections] ++ initialEventFunction

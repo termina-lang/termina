@@ -249,6 +249,7 @@ data Error
   | EInvalidSystemExceptActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid system except action return type
   | EInvalidMsgQueueActionReturnType Identifier (TerminaType SemanticAnn) -- ^ Invalid message queue action return type
   | ETypeNotInScope Identifier QualifiedName -- ^ Type not in scope
+  | EFunctionNotInScope Identifier QualifiedName -- ^ Function not in scope
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -453,6 +454,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "SE-197"
     errorIdent (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "SE-198"
     errorIdent (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "SE-199"
+    errorIdent (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "SE-200"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -652,6 +654,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidSystemExceptActionReturnType _ident _ty) _pos) = "invalid system exception action return type"
     errorTitle (AnnotatedError (EInvalidMsgQueueActionReturnType _ident _ty) _pos) = "invalid message queue action return type"
     errorTitle (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "type not in scope"
+    errorTitle (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "function not in scope"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2104,6 +2107,15 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <>
                             "The type is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it."))
+                EFunctionNotInScope ident qualifiedName ->
+                    -- | Change slashes to dots:
+                    let importString = T.replace "\\" "." $ T.pack qualifiedName
+                        importString' = T.replace "/" "." importString
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The function \x1b[31m" <> T.pack ident <> "\x1b[0m is not in scope.\n" <>
+                            "The function is defined in the module \x1b[31m" <> importString' <> "\x1b[0m. You need to import it."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

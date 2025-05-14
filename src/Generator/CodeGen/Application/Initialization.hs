@@ -16,8 +16,17 @@ import Generator.Monadic (emptyMonadicTypes)
 import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
+import Generator.CodeGen.Expression
 
 genInitializeObj :: Location -> Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
+genInitializeObj loc before (Resource identifier ty@(TAtomic {}) (Just expr) _ _) = do
+    cType <- genType noqual ty
+    let cObj = identifier @: cType
+    genAtomicInitialization loc before 0 cObj expr
+genInitializeObj loc before (Resource identifier ty@(TAtomicArray {}) (Just expr) _ _) = do
+    cType <- genType noqual ty
+    let cObj = identifier @: cType
+    genAtomicArrayInitialization loc before 0 cObj expr
 genInitializeObj loc before (Resource identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
     genStructInitialization loc before 0 cObj expr

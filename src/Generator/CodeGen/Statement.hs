@@ -11,6 +11,79 @@ import Generator.CodeGen.Expression
 import Utils.Annotations
 import Generator.CodeGen.Types
 
+genAtomicStore :: Location -> Bool -> CObject -> Expression SemanticAnn -> CGenerator CCompoundBlockItem
+genAtomicStore loc before' cObj expr = do
+    cInitializationExpr <- genExpression expr
+    let cObjType = getCObjType cObj
+        cObjExpr = addrOf cObj
+        cFuncType = CTFunction (CTVoid noqual) [cObjType]
+        methodCallExpr = atomicMethodName "store" @: cFuncType @@ [cObjExpr, cInitializationExpr]
+    if before' then
+        return $ pre_cr methodCallExpr |>> loc
+    else
+        return $ no_cr methodCallExpr |>> loc
+
+genAtomicArrayInitialization ::
+    Location
+    -- | Prepend a line to the initialization expression 
+    -> Bool
+    -- | Current array nesting level. This argument is used to
+    -- generate the name of the iterator variable.
+    -> Integer
+    -> CObject
+    -> Expression SemanticAnn
+    -> CGenerator [CCompoundBlockItem]
+genAtomicArrayInitialization loc before level cObj expr = do
+    case expr of 
+        (StructInitializer [FieldValueAssignment "values" assignmentExpr _] _ann) -> do
+            case assignmentExpr of
+                (ArrayInitializer expr' size _ann) -> do
+                    cSize <- genExpression size
+                    let iterator = namefy $ "i" ++ show level
+                        cIteratorExpr = iterator @: size_t
+                        initDecl = var iterator size_t @:= dec 0 @: size_t
+                        condExpr = cIteratorExpr @< cSize
+                        incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t
+                        cObjType = getCObjType cObj
+                    cObjArrayItemType <- getCArrayItemType cObjType
+                    arrayInit <- genAtomicStore loc False (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
+                    if before then
+                        return [pre_cr (_for_let initDecl condExpr incrExpr (block [arrayInit])) |>> loc]
+                    else
+                        return [no_cr (_for_let initDecl condExpr incrExpr (block [arrayInit])) |>> loc]
+                (ArrayExprListInitializer exprs _ann) -> 
+                    genAtomicArrayItemsInitialization before level 0 exprs
+                _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
+        _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
+    
+    where 
+
+        genAtomicArrayItemsInitialization :: Bool -> Integer -> Integer -> [Expression SemanticAnn] -> CGenerator [CCompoundBlockItem]
+        genAtomicArrayItemsInitialization _before _level _idx [] = return []
+        genAtomicArrayItemsInitialization before' level' idx (x:xs) = do
+            rest <- genAtomicArrayItemsInitialization False level' (idx + 1) xs
+            let cObjType = getCObjType cObj
+            cObjArrayItemType <- getCArrayItemType cObjType
+            current <- genAtomicStore loc before' (cObj @$$ (CInteger idx CDecRepr @: size_t) @: cObjArrayItemType) x
+            return $ current : rest
+
+genAtomicInitialization ::
+    Location
+    -- | Prepend a line to the initialization expression 
+    -> Bool
+    -- | Current array nesting level. This argument is used to
+    -- generate the name of the iterator variable.
+    -> Integer
+    -> CObject
+    -> Expression SemanticAnn
+    -> CGenerator [CCompoundBlockItem]
+genAtomicInitialization loc before _level cObj expr = do
+    case expr of 
+        (StructInitializer [FieldValueAssignment "value" assignmentExpr _] _ann) -> do
+            atomicInit <- genAtomicStore loc before cObj assignmentExpr
+            return [atomicInit]
+        _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr 
+
 genEnumInitialization ::
     Location
     -- | Prepend a line to the initialization expression 

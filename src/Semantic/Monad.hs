@@ -27,6 +27,7 @@ import Utils.Monad
 
 import Control.Monad.State
 import Semantic.Utils
+import qualified Data.Set as S
 
 type SemanticMonad = ExceptT SemanticErrors (ST.State Environment)
 
@@ -61,7 +62,19 @@ getFunctionTy :: Location
 getFunctionTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError loc (EFunctionNotFound iden))
   >>= \case
-    LocatedElement (GFun (FunctionSeman args retty)) entryLoc -> return (args, retty, entryLoc)
+    LocatedElement (GFun (FunctionSeman args retty)) entryLoc -> do
+      case entryLoc of
+        Position qualifiedName _ _ -> do
+          -- | Check that the type is defined in the current module
+          -- | or in a module that is imported.
+          visibleMods <- ST.gets visible
+          if S.member qualifiedName visibleMods then
+            return ()
+          else
+            throwError $ annotateError loc (EFunctionNotInScope iden qualifiedName)
+        _ -> return ()
+      
+      return (args, retty, entryLoc)
     LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
 
 -- | Get the type definition of an enum type from the global environment.

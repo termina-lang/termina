@@ -172,13 +172,13 @@ fieldDepClass :: ClassMember a
   -> M.Map Identifier (S.Set Identifier)
 fieldDepClass (ClassField {}) = id
 fieldDepClass (ClassMethod _mId _type bRet _ann) = 
-  M.union (fieldDepBlock bRet M.empty)
+  M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassProcedure _pId _params bRet _ann) = 
-  M.union (fieldDepBlock bRet M.empty)
+  M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassViewer _vId _params _type bRet _ann) =
-  M.union (fieldDepBlock bRet M.empty)
+  M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassAction _aId _param _type bRet _ann) =
-  M.union (fieldDepBlock bRet M.empty)
+  M.unionWith S.union (fieldDepBlock bRet M.empty)
 
 (<::>) :: Identifier -> Identifier -> Identifier
 (<::>) i1 i2 = i1 ++ "__" ++ i2
