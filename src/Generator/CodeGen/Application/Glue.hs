@@ -372,9 +372,10 @@ genEnableProtection progArchitecture resLockingMap = do
         progHandlers = M.elems $ handlers progArchitecture
     taskProtections <- concat <$> forM progTasks genEnableProtectionTask
     handlerProtections <- concat <$> forM progHandlers genEnableProtectionHandler
+    resourceProtections <- concat <$> forM (M.elems $ resources progArchitecture) genEnableProtectionResource
     return $ pre_cr $ static_function (namefy "termina_app" <::> "enable_protection") [] @-> void $
             trail_cr . block $
-                taskProtections ++ handlerProtections
+                taskProtections ++ handlerProtections ++ resourceProtections
 
     where
 
@@ -546,6 +547,18 @@ genEnableProtection progArchitecture resLockingMap = do
             let taskId = taskName tsk
                 classId = taskClass tsk
                 apConnections = taskAPConnections tsk
+            concat <$> forM (M.toList apConnections) (\(portName, (targetResource, ann)) ->
+                case resLockingMap M.! targetResource of
+                    OSALResourceLockNone -> return []
+                    OSALResourceLockIrq -> genEnableResourceTaskLock taskId classId portName ann
+                    OSALResourceLockMutex _ ->
+                        genEnableResourceMutex taskId classId portName ann)
+
+        genEnableProtectionResource :: TPResource SemanticAnn -> CGenerator [CCompoundBlockItem]
+        genEnableProtectionResource res = do
+            let taskId = resourceName res
+                classId = resourceClass res
+                apConnections = resAPConnections res
             concat <$> forM (M.toList apConnections) (\(portName, (targetResource, ann)) ->
                 case resLockingMap M.! targetResource of
                     OSALResourceLockNone -> return []
