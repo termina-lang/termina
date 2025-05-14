@@ -184,7 +184,7 @@ typeModules srcPath prevState (m:ms) = do
       -- This means that the module has not been parsed or that the parsing failed
       return prevState
     Just parsingData -> do
-      let result = runTypeChecking prevState (typeTerminaModule (S.insert (srcPath </> m <.> "fin") moduleDependencies) . parsedAST $ parsingData)
+      let result = runTypeChecking prevState (typeTerminaModule (S.insert m moduleDependencies) . parsedAST $ parsingData)
       case result of
         (Left err) -> do
           -- | Create the source files map. This map will be used to obtain the source files that
