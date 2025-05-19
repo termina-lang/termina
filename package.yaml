@@ -33,6 +33,7 @@ dependencies:
 - filepath
 - text
 - directory
+- time
 - containers
 - mtl
 # Error messages pretty printer

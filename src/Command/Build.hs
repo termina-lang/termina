@@ -70,6 +70,7 @@ loadTerminaModule root filePath srcPath = do
   let fullP = root </> filePath <.> "fin"
   -- read it
   src_code <- TIO.readFile fullP
+  mod_time <- getModificationTime fullP
   -- parse it
   case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
     Left err -> 
@@ -84,7 +85,7 @@ loadTerminaModule root filePath srcPath = do
           let fileMap = M.singleton fullP src_code in
           TIO.putStrLn (toText err fileMap) >> exitFailure
         Right imports ->
-          return $ TerminaModuleData filePath fullP imports src_code (ParsingData . frags $ term)
+          return $ TerminaModuleData filePath fullP mod_time imports src_code (ParsingData . frags $ term)
 
 -- | Load the modules of the project
 loadModules
@@ -144,6 +145,7 @@ typeModules parsedProject =
                 TerminaModuleData
                   (qualifiedName parsedModule)
                   (fullPath parsedModule)
+                  (modificationTime parsedModule)
                   (importedModules parsedModule)
                   (sourcecode parsedModule)
                   (SemanticData typedProgram)
@@ -172,13 +174,44 @@ genModules params plt initialMonadicTypes =
     printModule currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
+          headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
+      sourceFileExists <- doesFileExist sourceFile
+      if sourceFileExists
+        then do
+          sourceFileTime <- getModificationTime sourceFile
+          if sourceFileTime > modificationTime bbModule
+            then return () 
+          else do
+            printSource bbModule
+      else do
+        printSource bbModule
+      headerFileExists <- doesFileExist headerFile
+      if headerFileExists 
+        then do
+          headerFileTime <- getModificationTime headerFile
+          if headerFileTime > modificationTime bbModule
+            then return currentMonadicTypes
+          else do
+            printHeader currentMonadicTypes bbModule
+        else do
+          printHeader currentMonadicTypes bbModule
+
+    printSource :: BasicBlocksModule -> IO () 
+    printSource bbModule = do
+      let destinationPath = outputFolder params
+          sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
-          moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenSourceFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
+    
+    printHeader :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
+    printHeader currentMonadicTypes bbModule = do
+      let destinationPath = outputFolder params
+          tAST = basicBlocksAST . metadata $ bbModule
+          moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
       case runGenHeaderFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
         Left err -> die . errorMessage $ show err
         Right (cHeaderFile, newMonadicTypes) -> do

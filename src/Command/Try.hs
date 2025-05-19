@@ -28,6 +28,7 @@ import Semantic.Environment
 import Generator.Environment (getPlatformInterruptMap)
 import Generator.Monadic (emptyMonadicTypes)
 import qualified Data.Set as S
+import System.Directory
 
 -- | Data type for the "try" command arguments
 data TryCmdArgs =
@@ -56,6 +57,7 @@ loadSingleModule filePath = do
     let noExtension = dropExtension filePath
     -- read it
     src_code <- TIO.readFile filePath
+    mod_time <- getModificationTime filePath
     -- parse it
     case runParser terminaModuleParser noExtension filePath (T.unpack src_code) of
         Left err -> 
@@ -65,7 +67,7 @@ loadSingleModule filePath = do
             TIO.putStrLn (toText pErr fileMap) >> exitFailure
         Right term -> do
             -- Imported modules are ignored
-            return $ TerminaModuleData noExtension filePath [] src_code (ParsingData . frags $ term)
+            return $ TerminaModuleData noExtension filePath mod_time [] src_code (ParsingData . frags $ term)
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
@@ -79,6 +81,7 @@ typeSingleModule parsedModule = do
             return $ TerminaModuleData
                     (qualifiedName parsedModule)
                     (fullPath parsedModule)
+                    (modificationTime parsedModule)
                     []
                     (sourcecode parsedModule)
                     (SemanticData typedProgram)

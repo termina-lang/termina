@@ -6,6 +6,7 @@ module Modules.Modules where
 
 -- Containers
 import qualified Data.Text as T
+import Data.Time
 import Utils.Annotations
 import Extras.TopSort
 
@@ -24,6 +25,8 @@ data TerminaModuleData a = TerminaModuleData {
   -- | File path to the module
   -- This is the full path where the module's source file is located
   fullPath :: !FilePath,
+  -- | Module's last modification time
+  modificationTime :: !UTCTime,
   -- | List of imported modules
   importedModules :: [ModuleDependency],
   -- | Source code

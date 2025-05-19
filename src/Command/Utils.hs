@@ -106,6 +106,7 @@ genBasicBlocksModule typedModule = do
         Right bbAST -> pure $ TerminaModuleData
             (qualifiedName typedModule)
             (fullPath typedModule)
+            (modificationTime typedModule)
             (importedModules typedModule)
             (sourcecode typedModule)
             (BasicBlockData bbAST)
