@@ -63,13 +63,13 @@ inOutDestroyOptionMatchCases optionBoxSource [fstCase, sndCase] = do
     case someCase of
         MatchCase "Some" [arg] body _ -> do
             localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
-        _ -> throwError $ annotateError Internal EUnboxingMatchCase
+        _ -> throwError $ annotateError Internal EInvalidMatchCase
     localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
 inOutDestroyOptionMatchCases optionBoxSource [MatchCase "Some" [arg] body _] =
     localInputScope (addBox arg (getInBox optionBoxSource) >> mapM_ inOutBasicBlock (blockBody body))
 inOutDestroyOptionMatchCases _ [MatchCase "None" _ noneBody _] = 
     localInputScope (mapM_ inOutBasicBlock (blockBody noneBody))
-inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EUnboxingMatchCase
+inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EInvalidMatchCase
 
 inOutBasicBlock :: BasicBlock SemanticAnn -> BoxInOutMonad ()
 inOutBasicBlock (AllocBox obj arg ann) = do

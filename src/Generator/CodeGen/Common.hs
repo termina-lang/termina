@@ -183,9 +183,13 @@ getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _
 getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
-unboxObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
-unboxObject (CExprValOf obj _ _) = return obj
-unboxObject e = throwError $ InternalError ("invalid unbox object: " ++ show e)
+-- | Extracts the 'CObject' from a 'CExpression'.
+-- This function is typically used when an expression is known to be a direct
+-- representation of an object, i.e., an 'CExprValOf'.
+-- It throws an 'InternalError' if the expression is not a 'CExprValOf'.
+getCObject :: (MonadError CGeneratorError m) => CExpression -> m CObject
+getCObject (CExprValOf obj _ _) = return obj
+getCObject e = throwError $ InternalError ("getCObject: Expected CExprValOf, but received: " ++ show e)
 
 -- | Generates the name of the option struct type.
 -- This function is used to generate the name of the struct that represents the
@@ -260,7 +264,7 @@ genMsgQueueSendCall cObj cArg cAnn = do
             return $
                 CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
         _ -> do
-            cArgObj <- unboxObject cArg
+            cArgObj <- getCObject cArg
             let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
             return $
                 CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn

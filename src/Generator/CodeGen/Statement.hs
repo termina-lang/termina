@@ -262,7 +262,7 @@ genArrayInitialization loc before level cObj expr = do
                         condExpr = cIteratorExpr @< cSize |>> getLocation ann
                         incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> getLocation ann
                     cTs' <- genType noqual ts'
-                    rhsCObject <- unboxObject rhsCExpr
+                    rhsCObject <- getCObject rhsCExpr
                     arrayInit <- genArrayInitializationFromExpression (lvl + 1) (CIndexOf lhsCObj cIteratorExpr cTs') (CExprValOf (CIndexOf rhsCObject cIteratorExpr cTs') cTs' exprCAnn) ts' ann
                     if before && lvl == 0 then
                         return [pre_cr $ _for_let initExpr condExpr incrExpr (block arrayInit)]
@@ -633,7 +633,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                     return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) cBlk rest) |>> loc']
                 _ -> throwError $ InternalError $ "Match statement without cases: " ++ show match
         (AccessObject {}) -> do
-            cObj <- genExpression expr >>= unboxObject
+            cObj <- genExpression expr >>= getCObject
             case matchCases of
                 -- | If there is only one case, we only need to check the variant if
                 -- there is no default case

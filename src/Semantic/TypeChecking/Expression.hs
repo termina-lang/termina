@@ -202,7 +202,7 @@ checkEmitterDataType loc "SystemInit" ty =
   unless (sameTy ty (TStruct "TimeVal")) (throwError $ annotateError loc (EInvalidSystemInitEmitterType ty))
 checkEmitterDataType loc "SystemExcept" ty =
   unless (sameTy ty (TEnum "Exception")) (throwError $ annotateError loc (EInvalidSystemExceptEmitterType ty))
-checkEmitterDataType _ _ _ = throwError $ annotateError Internal EUnboxingEmittterClass
+checkEmitterDataType _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
 
 checkEmitterActionReturnType :: Location -> Identifier -> Identifier -> SAST.TerminaType SemanticAnn -> SemanticMonad ()
 checkEmitterActionReturnType loc "Interrupt" action ty =
@@ -213,7 +213,7 @@ checkEmitterActionReturnType loc "SystemInit" action ty =
   unless (sameTy ty (TStatus TInt32)) (throwError $ annotateError loc (EInvalidSystemInitActionReturnType action ty))
 checkEmitterActionReturnType loc "SystemExcept" action ty =
   unless (sameTy ty TUnit) (throwError $ annotateError loc (EInvalidSystemExceptActionReturnType action ty))
-checkEmitterActionReturnType _ _ _ _ = throwError $ annotateError Internal EUnboxingActionClass
+checkEmitterActionReturnType _ _ _ _ = throwError $ annotateError Internal EInvalidEmitterClass
 
 collectExtendedInterfaces :: Location -> Identifier -> SemanticMonad [Identifier]
 collectExtendedInterfaces loc ident = do
@@ -263,7 +263,7 @@ getMemberField loc obj_ty ident =
               (throwError $ annotateError loc (EMemberAccessUnknownField (dident, strLoc) ident))
               (\fld -> return (fieldTerminaType fld, fieldAnnotation fld)) mfield
         ;
-        _ -> throwError $ annotateError Internal EUnboxingStructType
+        _ -> throwError $ annotateError Internal EExpectedStructType
       }
     TGlobal _ dident -> getGlobalTypeDef loc dident >>=
       \case {
@@ -276,7 +276,7 @@ getMemberField loc obj_ty ident =
             Just fld -> return fld
         ;
         -- Other types do not have members.
-        _ -> throwError $ annotateError Internal EUnboxingClassType
+        _ -> throwError $ annotateError Internal EExpectedClassType
       }
     ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
 
@@ -374,11 +374,11 @@ typeMemberFunctionCall ann obj_ty ident args =
                             ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
                             return typedArgument
                           ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-                  fty <- maybe (throwError $ annotateError Internal EUnboxingMemberFunctionType) return (getTypeSemAnn anns)
+                  fty <- maybe (throwError $ annotateError Internal EInvalidMemberFunctionTypeAnnotation) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
           ;
-        _ -> throwError $ annotateError Internal EUnboxingClassType
+        _ -> throwError $ annotateError Internal EExpectedClassType
       }
     TAccessPort (TInterface _ dident) -> getGlobalTypeDef ann dident >>=
       \case{
@@ -402,7 +402,7 @@ typeMemberFunctionCall ann obj_ty ident args =
                           ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
               return ((ps, typed_args), TUnit)
         );
-        _ -> throwError $ annotateError Internal EUnboxingInterface
+        _ -> throwError $ annotateError Internal EExpectedInterfaceType
       }
     TAccessPort (TAllocator ty_pool) ->
       case ident of
@@ -703,7 +703,7 @@ typeAssignmentExpression expected_type@(TStruct id_ty) typeObj (StructInitialize
       SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, strLoc) typeObj ty_fs fs
         <*> pure (buildExpAnn pann (TStruct id_ty));
-    _ -> throwError $ annotateError Internal EUnboxingStructType;
+    _ -> throwError $ annotateError Internal EExpectedStructType;
   }
 typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
@@ -721,7 +721,7 @@ typeAssignmentExpression expected_type@(TGlobal _ id_ty) typeObj (StructInitiali
         SAST.StructInitializer
         <$> typeFieldAssignments pann (expected_type, clsLoc) typeObj fields fs
         <*> pure (buildExpAnn pann (TGlobal clsKind id_ty));
-    _ -> throwError $ annotateError Internal EUnboxingClassType;
+    _ -> throwError $ annotateError Internal EExpectedClassType;
   }
 typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantInitializer id_ty variant args pann) = do
   unless (id_expected == id_ty) (throwError $ annotateError pann (EEnumInitializerExpectedTypeMismatch expected_type (TEnum id_ty)))
@@ -742,7 +742,7 @@ typeAssignmentExpression expected_type@(TEnum id_expected) typeObj (EnumVariantI
           then throwError $ annotateError pann (EEnumVariantExtraParams (enumId, loc) (variant, ps) (fromIntegral asLen))
           else throwError $ annotateError pann (EEnumVariantMissingParams (enumId, loc) (variant, ps) (fromIntegral asLen))
      ;
-    _ -> throwError $ annotateError Internal EUnboxingEnumType
+    _ -> throwError $ annotateError Internal EExpectedEnumType
   }
 typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) = do
 -- | TArray Initialization
@@ -1254,7 +1254,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
           maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
-    _ -> throwError $ annotateError Internal EUnboxingEnumType
+    _ -> throwError $ annotateError Internal EExpectedEnumType
 typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id pann) = do
   case variant_id of
     NoneLabel -> typeOptionVariant
@@ -1330,7 +1330,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
       TSinkPort ty action -> do
         rty <- case tyDef of
           (TGlobal _ clsId, _) -> getActionReturnType clsId action
-          _ -> throwError $ annotateError Internal EUnboxingClassType
+          _ -> throwError $ annotateError Internal EExpectedClassType
         case gentry of
           LocatedElement  (GGlob ets@(TGlobal EmitterClass clsId)) _ -> do
             checkEmitterDataType pann clsId ty
@@ -1340,7 +1340,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
       TInPort ty action  -> do
         rty <- case tyDef of
           (TGlobal _ clsId, _) -> getActionReturnType clsId action
-          _ -> throwError $ annotateError Internal EUnboxingClassType
+          _ -> throwError $ annotateError Internal EExpectedClassType
         case gentry of
           LocatedElement (GGlob cts@(TMsgQueue ty' _)) _ -> do
             catchMismatch pann (EInboundPortConnectionMsgQueueTypeMismatch sid ty) (sameTyOrError pann ty ty')
@@ -1359,8 +1359,8 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection Inb
           LocatedElement (Class _ _ members _ _) _ -> 
             case findClassAction action members of
               Just (_, rty, _) -> return rty
-              Nothing -> throwError $ annotateError Internal EUnboxingClassType
-          _ -> throwError $ annotateError Internal EUnboxingClassType
+              Nothing -> throwError $ annotateError Internal EExpectedClassType
+          _ -> throwError $ annotateError Internal EExpectedClassType
 
 typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection OutboundPortConnection pid sid pann) =
   if fid == pid
@@ -1426,11 +1426,11 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
                               _ -> error "Invalid annotation for field"
                           _ -> throwError $ annotateError pann $ EAccessPortConnectionInterfaceNotProvided sid iface
                       );
-                      _ -> throwError $ annotateError Internal EUnboxingInterface
+                      _ -> throwError $ annotateError Internal EExpectedInterfaceType
                   }
                 _ -> throwError $ annotateError pann $ EAccessPortConnectionInvalidGlobal sid
             );
-            _ -> throwError $ annotateError Internal EUnboxingInterface
+            _ -> throwError $ annotateError Internal EExpectedInterfaceType
           }
       ty -> throwError $ annotateError pann (EFieldNotAccessPort fid ty)
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [pid])

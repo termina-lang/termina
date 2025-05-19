@@ -17,8 +17,9 @@ import qualified Language.LSP.Protocol.Types as LSP
 data Error
   = ESetMaxBound -- ^ The set has reached its maximum bound (Internal)  
   | EMapMaxBound -- ^ The map has reached its maximum bound (Internal)
-  | EUnboxingObjectType -- ^ Error when trying to unbox an object type (Internal)
-  | EUnboxingExpressionType -- ^ Error when trying to unbox an expression type (Internal)
+  | EExpectedOptionBoxType -- ^ Expected option-box type (Internal)
+  | EInvalidObjectTypeAnnotation -- ^ Error when the semantic annotation of an object does not contain the expected type information (Internal)
+  | EInvalidExprTypeAnnotation -- ^ Error when the semantic annotation of an expression does not contain the expected type information (Internal)
   | EDefiningBox -- ^ Error when trying to declare variable of box type (Internal)
   | EBadAllocArg -- ^ Bad argument for alloc (Internal)
   | EBadFreeArg -- ^ Bad argument for free (Internal)

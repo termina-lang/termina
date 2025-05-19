@@ -263,6 +263,6 @@ unboxTypeAnn :: SemanticAnn -> SemanticAnn
 unboxTypeAnn (SemanticAnn (ETy en) p) = SemanticAnn (ETy (unboxExpType en)) p
 unboxTypeAnn _                    = error "impossible 888"
 
-unboxConnectionAnn :: SemanticAnn -> ConnectionSeman SemanticAnn
-unboxConnectionAnn (SemanticAnn (STy (PortConnection connAnn)) _) = connAnn
-unboxConnectionAnn _ = error "Invalid annotation"
+getConnectionAnn :: SemanticAnn -> ConnectionSeman SemanticAnn
+getConnectionAnn (SemanticAnn (STy (PortConnection connAnn)) _) = connAnn
+getConnectionAnn _ = error "Invalid annotation"

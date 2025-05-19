@@ -137,7 +137,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
               throwError $ annotateError ann EInvalidDefaultCase
             return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
-          _ -> throwError $ annotateError Internal EUnboxingEnumType
+          _ -> throwError $ annotateError Internal EExpectedEnumType
         }
     TReference refKind (TEnum t) -> getGlobalTypeDef ann t >>=
         \case {
@@ -157,7 +157,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
               throwError $ annotateError ann EInvalidDefaultCase
             return $ SAST.MatchStmt typed_matchE typedCases mTypedDefCase (buildStmtAnn ann)
           ;
-          _ -> throwError $ annotateError Internal EUnboxingEnumType
+          _ -> throwError $ annotateError Internal EExpectedEnumType
         }
     TOption t -> do
       let flsDefIdents = ["None", "Some"]
@@ -340,7 +340,7 @@ typeStatement _rTy (ContinueStmt contE anns) =
                     _ -> throwError $ annotateError Internal EContinueActionNotFound
               ;
             -- Other user-defined types do not define methods (yet?)
-            _ -> throwError $ annotateError Internal EUnboxingClassType
+            _ -> throwError $ annotateError Internal EExpectedClassType
           }
         _ -> throwError $ annotateError ann (EContinueInvalidMemberCall obj_ty)
 typeStatement _retTy (RebootStmt anns) = return $ SAST.RebootStmt (buildStmtAnn anns)

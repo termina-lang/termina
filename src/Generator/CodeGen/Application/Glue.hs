@@ -386,7 +386,7 @@ genEnableProtection progArchitecture resLockingMap = do
             -> SemanticAnn
             -> CGenerator [CCompoundBlockItem]
         genEnableResourceMutex taskId classId portId ann = do
-            let apConnectionAnn = unboxConnectionAnn ann
+            let apConnectionAnn = getConnectionAnn ann
             case apConnectionAnn of
                 APPoolConnTy {} -> do
                     let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
@@ -437,7 +437,7 @@ genEnableProtection progArchitecture resLockingMap = do
             -> SemanticAnn
             -> CGenerator [CCompoundBlockItem]
         genEnableResourceTaskLock taskId classId portId ann = do
-            let apConnectionAnn = unboxConnectionAnn ann
+            let apConnectionAnn = getConnectionAnn ann
             case apConnectionAnn of
                 APPoolConnTy {} -> do
                     let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]
@@ -487,7 +487,7 @@ genEnableProtection progArchitecture resLockingMap = do
             -> SemanticAnn
             -> CGenerator [CCompoundBlockItem]
         genEnableResourceEventLock taskId classId portId ann = do
-            let apConnectionAnn = unboxConnectionAnn ann
+            let apConnectionAnn = getConnectionAnn ann
             case apConnectionAnn of
                 APPoolConnTy {} -> do
                     let allocFunctionType = CTFunction void [void_ptr, ptr __option_box_t]

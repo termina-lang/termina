@@ -182,14 +182,19 @@ getGlobDeclModules progArchitecture =
 -- function will throw an error.
 getObjType :: (MonadError ArchitectureError m) => Object SemanticAnn -> m (TerminaType SemanticAnn)
 getObjType (Variable _ (SemanticAnn (ETy (ObjectType _ ts)) _))                  = return ts
+getObjType (Variable {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
+getObjType (ArrayIndexExpression {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts
+getObjType (MemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
+getObjType (Dereference {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
+getObjType (Unbox {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
 getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
-getObjType _ = throwError $ annotateError Internal EUnboxingObject
+getObjType (DereferenceMemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 
 -- | This function returns the type of an expression. The type is extracted from the
 -- expression's semantic annotation. The function assumes that the expression is well-typed
@@ -198,21 +203,37 @@ getObjType _ = throwError $ annotateError Internal EUnboxingObject
 getExprType :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m (TerminaType SemanticAnn)
 getExprType (AccessObject obj) = getObjType obj
 getExprType (Constant _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (Constant {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (MonadicVariantInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (MonadicVariantInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (BinOp _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (BinOp {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (ReferenceExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ReferenceExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (Casting _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (Casting {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (FunctionCall _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (FunctionCall {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (MemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (MemberFunctionCall {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (DerefMemberFunctionCall _ _ _ (SemanticAnn (ETy (AppType _ ts)) _)) = return ts
+getExprType (DerefMemberFunctionCall {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (StructInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (StructInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (EnumVariantInitializer _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (EnumVariantInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (ArrayInitializer _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (ArrayExprListInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArrayExprListInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (StringInitializer _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (StringInitializer {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
+getExprType (ArraySliceExpression _ _ _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (ArraySliceExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
+getExprType (IsEnumVariantExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
-getExprType _ = throwError $ annotateError Internal EUnboxingExpression
+getExprType (IsMonadicVariantExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 
 -- | This function returns the name of a port. The function assumes that the object is
 -- a port and that the object is well-typed. If the object is not a port or if the object
@@ -225,39 +246,39 @@ getPortName obj = do
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
-                _ -> throwError $ annotateError Internal EUnboxingPort
+                _ -> throwError $ annotateError Internal EInvalidPortAccessExpression
         TOutPort _ -> 
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
-                _ -> throwError $ annotateError Internal EUnboxingPort
-        _ -> throwError $ annotateError Internal EUnboxingPort
+                _ -> throwError $ annotateError Internal EInvalidPortAccessExpression
+        _ -> throwError $ annotateError Internal EExpectedPort
 
 getObjOptionBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getObjOptionBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
     TOption (TBoxSubtype _) -> return name
-    _ -> throwError $ annotateError Internal EUnboxingOptionBox
+    _ -> throwError $ annotateError Internal EExpectedOptionBoxType
 getObjOptionBoxName (Dereference expr _) = getObjOptionBoxName expr
-getObjOptionBoxName _ = throwError $ annotateError Internal EUnboxingOptionBox
+getObjOptionBoxName _ = throwError $ annotateError Internal EExpectedOptionBoxType
 
 getObjBoxName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getObjBoxName obj@(Variable name _) = do
   ty <- getObjType obj
   case ty of
     TBoxSubtype _ -> return name
-    _ -> throwError $ annotateError Internal EUnboxingBox
-getObjBoxName _ = throwError $ annotateError Internal EUnboxingBox
+    _ -> throwError $ annotateError Internal EExpectedBoxSubtype
+getObjBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
   
 getExprOptionBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m Identifier
 getExprOptionBoxName (AccessObject obj) = getObjOptionBoxName obj
 getExprOptionBoxName (ReferenceExpression _ak obj _ann) = getObjOptionBoxName obj
-getExprOptionBoxName _ = throwError $ annotateError Internal EUnboxingOptionBox
+getExprOptionBoxName _ = throwError $ annotateError Internal EExpectedOptionBoxType
 
 getExprBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m Identifier
 getExprBoxName (AccessObject obj) = getObjBoxName obj
-getExprBoxName _ = throwError $ annotateError Internal EUnboxingBox
+getExprBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
 
 getInBox :: InOptionBox a -> InBox a
 getInBox (InOptionBoxAlloc ident ann) = InBoxAlloc ident ann

@@ -14,10 +14,10 @@ import Semantic.Types
 
 
 data Error =
-  EUnboxingEmitter -- ^ Unboxing emitter (Internal)
-  | EUnboxingPort -- ^ Unboxing port (Internal)
-  | EUnboxingObject -- ^ Unboxing object (Internal)
-  | EUnboxingExpression -- ^ Unboxing expression (Internal)
+  EExpectedPort -- ^ Error when trying to access a port field (Internal)
+  | EInvalidPortAccessExpression -- ^ Error when trying to access a port access expression (Internal)
+  | EInvalidObjectTypeAnnotation -- ^ Error when the semantic annotation of an object does not contain the expected type information (Internal)
+  | EInvalidExprTypeAnnotation -- ^ Error when the semantic annotation of an expression does not contain the expected type information (Internal)
   | EUnknownTask Identifier -- ^ Unknown task (Internal)
   | EUnknownTaskClass Identifier -- ^ Unknown task class (Internal)
   | EUnknownInputPort Identifier Identifier -- ^ Unknown input port (Internal)

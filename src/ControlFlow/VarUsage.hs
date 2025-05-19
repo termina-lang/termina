@@ -52,7 +52,7 @@ useObject :: Object SemanticAnn -> UDM VarUsageError ()
 useObject (Variable ident ann) =
   let loc = getLocation ann in
   maybe
-    (throwError $ annotateError loc EUnboxingObjectType)
+    (throwError $ annotateError loc EExpectedOptionBoxType)
     (\case {
         TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
         _ -> safeUseVariable ident
@@ -74,7 +74,7 @@ useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
 useFieldAssignment _ = return ()
 
 getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
-getObjType = maybe (throwError EUnboxingObjectType) return . getObjectSAnns . getAnnotation
+getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
@@ -201,7 +201,7 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     useExpression eE
 useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
   prevSt <- ST.get
-  caseSets <- maybe (throwError $ annotateError (getLocation ann) EUnboxingExpressionType)
+  caseSets <- maybe (throwError $ annotateError (getLocation ann) EInvalidExprTypeAnnotation)
     (\case
         TOption (TBoxSubtype _) ->
             case mcase of

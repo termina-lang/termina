@@ -82,12 +82,12 @@ getFunctionTy loc iden =
 -- there is an error it is an internal error.
 getEnumTy :: Location -> Identifier -> SemanticMonad (LocatedElement (SemanTypeDef SemanticAnn))
 getEnumTy loc iden = 
-  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EUnboxingEnumType) >>=
+  catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EExpectedEnumType) >>=
   (\case {
       LocatedElement (GType tydef@(Enum {})) entryLoc  -> return (LocatedElement tydef entryLoc);
       -- | If we are here, it means that the type was not an enum type.
       -- This should never happen.
-      _ -> throwError $ annotateError Internal EUnboxingEnumType
+      _ -> throwError $ annotateError Internal EExpectedEnumType
     })
 
 -- | Insert mutable object (variable) in local scope.
@@ -257,7 +257,7 @@ mustBeTy ty expression =
 
 getIntConst :: Const a -> SemanticMonad Integer
 getIntConst (I (TInteger i _) _) = return i
-getIntConst _ = throwError $ annotateError Internal EUnboxingIntConst
+getIntConst _ = throwError $ annotateError Internal EExpectedIntConstant
 
 catchMismatch :: 
   -- | Location of the error
@@ -367,11 +367,12 @@ constSubtypeOrFail _ (TConstSubtype _) = return ()
 constSubtypeOrFail loc _ = throwError (annotateError loc EExpressionNotConstant)
 
 -- | This function gets the access kind and type of an already semantically
--- annotated object. If the object is not annotated properly, it throws an internal error.
+-- annotated object. If the object is not annotated properly, it throws an
+-- internal error.
 getObjType :: Object SemanticAnn -> SemanticMonad (AccessKind, TerminaType SemanticAnn)
-getObjType = maybe (throwError $ annotateError Internal EUnboxingObject) return . getObjectSAnns . getAnnotation
+getObjType = maybe (throwError $ annotateError Internal EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
 getExprType :: Expression SemanticAnn -> SemanticMonad (TerminaType SemanticAnn)
 getExprType
-  = maybe (throwError $ annotateError Internal EUnboxingExpression) return
+  = maybe (throwError $ annotateError Internal EInvalidExprTypeAnnotation) return
   . getResultingType . getSemanticAnn . getAnnotation
