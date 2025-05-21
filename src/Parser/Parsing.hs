@@ -40,6 +40,8 @@ lexer = Tok.makeTokenParser langDef
       ,"unit"]
       ++ -- Struct and enum types
              ["struct", "enum"]
+      ++ -- Class types
+             ["class"]
       ++ -- Box Subtyping
              ["box"]
       ++ -- Fixed-location subtyping
