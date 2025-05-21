@@ -533,7 +533,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     pre_cr $ __termina_msg_queue__recv @@
                             [
                                 ("self" @: ptr classStructType) @. taskMsgQueueIDField @: __termina_id_t,
-                                addrOf ("next_msg" @: uint32_t),
+                                addrOf ("next_msg" @: __termina_id_t),
                                 addrOf ("status" @: int32_t)
                             ],
                     -- if (status != Status__Success)
@@ -543,7 +543,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                             -- break;
                             no_cr _break
                         ],
-                    pre_cr $ _switch ("next_msg" @: uint32_t) $
+                    pre_cr $ _switch ("next_msg" @: __termina_id_t) $
                         trail_cr . block $ (cases ++
                             [
                                 -- default:
@@ -564,7 +564,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                     -- int32_t status = 0;
                     pre_cr $ var "status" int32_t @:= dec 0 @: int32_t,
                     -- uint32_t next_msg = 0U;
-                    pre_cr $ var "next_msg" uint32_t @:= dec 0 @: uint32_t,
+                    pre_cr $ var "next_msg" __termina_id_t @:= dec 0 @: __termina_id_t,
                     -- __status_int32_t result;
                     pre_cr $ var "result" __status_int32_t,
                     -- result.__variant = Success;

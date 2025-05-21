@@ -91,7 +91,7 @@ spec = do
               "\n" ++  
               "    int32_t status = 0L;\n" ++
               "\n" ++  
-              "    uint32_t next_msg = 0U;\n" ++
+              "    __termina_id_t next_msg = 0U;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
               "    result.__variant = Success;\n" ++
@@ -194,7 +194,7 @@ spec = do
               "\n" ++  
               "    int32_t status = 0L;\n" ++
               "\n" ++  
-              "    uint32_t next_msg = 0U;\n" ++
+              "    __termina_id_t next_msg = 0U;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
               "    result.__variant = Success;\n" ++
