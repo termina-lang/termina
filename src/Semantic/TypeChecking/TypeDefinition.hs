@@ -341,11 +341,28 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               let newAct = SAST.ClassAction mIdent p_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
+    -- Check that the sink and in ports are well defined, i.e., that the actions
+    -- triggered by the ports are defined in the class.
+    let ty_action_set = foldl (\accumulatedActions m -> 
+          case m of 
+              ClassAction act _ _ _ _  -> S.insert act accumulatedActions
+              _ -> accumulatedActions) S.empty fnChecked
+    mapM_ (checkTriggeredAction ty_action_set) ty_fls
+      
     -- | Return the class with the methods, procedures, viewers and actions
     -- checked. The methods, procedures, viewers and actions are reverse-sorted
     -- to math the order of the topological sort (they are inserted in reverse
     -- order).
     return (SAST.Class kind ident (ty_fls ++ reverse fnChecked) provides mds_ty)
+
+  where 
+
+    checkTriggeredAction :: S.Set Identifier -> SAST.ClassMember SemanticAnn -> SemanticMonad ()
+    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TSinkPort _ act) fann)) =
+      unless (S.member act actions) (throwError $ annotateError (getLocation fann) (EUnknownAction act))
+    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TInPort _ act) fann)) =
+      unless (S.member act actions) (throwError $ annotateError (getLocation fann) (EUnknownAction act))
+    checkTriggeredAction _ _ = return ()
 
 ----------------------------------------
 -- Field definition helpers.
