@@ -125,7 +125,11 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
 
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
     typeInterfaceProcedure (InterfaceProcedure procId ps_ts mds_ts' annIP) = do
-      ps_ty <- mapM (typeProcedureParameter annIP) ps_ts
+      ps_ty <- localScope $ do
+          forM ps_ts (\param@(Parameter paramId _) -> do
+            typedParam <- typeProcedureParameter ann param
+            insertLocalImmutObj ann paramId (paramType typedParam)
+            return typedParam)
       mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
       return $ InterfaceProcedure procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
 
@@ -296,7 +300,6 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
           case newMember of
             -- Filtered Cases
             ClassField {} -> throwError (annotateError Internal EMalformedClassTyping)
-            -- Interesting case
             ClassProcedure mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
@@ -323,7 +326,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
-                      typedParam <- typeProcedureParameter mann param
+                      typedParam <- typeParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
@@ -423,7 +426,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
           _ -> error "internal error: checkClassKind"
         }) prcs
   -- Check that all procedures are provided and that the parameters match
-  checkSortedProcedures sorted_provided sorted_prcs
+  localScope $ checkSortedProcedures sorted_provided sorted_prcs
 
   where
 
@@ -437,9 +440,11 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
-      zipWithM_ (\p@(Parameter _ ty) (Parameter _ ts) -> do
-        ty' <- typeTypeSpecifier loc typeRHSObject ts
-        unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))) ps ps'
+      zipWithM_ (\p@(Parameter _ ty) (Parameter pId ts) -> do
+          ty' <- typeTypeSpecifier loc typeRHSObject ts
+          unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
+          insertLocalImmutObj anns pId ty'
+        ) ps ps'
       checkSortedProcedures ds as
     checkSortedProcedures _ _ = throwError (annotateError Internal EMalformedClassTyping)
 
