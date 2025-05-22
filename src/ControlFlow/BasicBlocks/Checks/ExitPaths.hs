@@ -23,24 +23,24 @@ doesBlockExit (RebootBlock {}) = True
 doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
     let
         -- | Check the exit of the if block
-        ifBlocksExit = doesBlockExit (last (blockBody ifBlocks))
+        ifBlocksExit = not (null (blockBody ifBlocks)) && doesBlockExit (last (blockBody ifBlocks))
     in
         -- | Check the exit of the else if blocks
         -- If the if block exits, then we must check the else if blocks
         -- and the else block (if present) 
         (ifBlocksExit &&
             (let elseIfsExit = foldl' (\prevState (ElseIf _ elifBlocks _) ->
-                    prevState && doesBlockExit (last (blockBody elifBlocks))) ifBlocksExit elseIfBlocks in
-                (elseIfsExit && doesBlockExit (last (blockBody elseBlocks)))))
+                    prevState && not (null (blockBody elifBlocks)) && doesBlockExit (last (blockBody elifBlocks))) ifBlocksExit elseIfBlocks in
+                (elseIfsExit && not (null (blockBody elseBlocks)) && doesBlockExit (last (blockBody elseBlocks)))))
 doesBlockExit (MatchBlock _ cases mDefaultCase _) =
     let doesCasesExit = foldl'
             (\prevState (MatchCase _ _ blocks _) ->
-                prevState && doesBlockExit (last (blockBody blocks))) True cases 
+                prevState && not (null (blockBody blocks)) && doesBlockExit (last (blockBody blocks))) True cases 
     in
     case mDefaultCase of
         Just (DefaultCase (Block blocks _) _) ->
             -- | Check the exit of the default case
-            doesCasesExit && doesBlockExit (last blocks)
+            doesCasesExit && not (null blocks) && doesBlockExit (last blocks)
         Nothing -> doesCasesExit
 doesBlockExit _ = False
 
