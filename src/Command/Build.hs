@@ -180,11 +180,13 @@ genModules params plt initialMonadicTypes =
       -- | Get the modification time of the transpiler itself
       exePath <- getExecutablePath
       exeModificationTime <- getModificationTime exePath
+      terminaYamlModificationTime <- getModificationTime "termina.yaml"
       if sourceFileExists
         then do
           sourceFileTime <- getModificationTime sourceFile
           if sourceFileTime > modificationTime bbModule &&
-             sourceFileTime > exeModificationTime
+             sourceFileTime > exeModificationTime &&
+             sourceFileTime > terminaYamlModificationTime
             then return () 
           else do
             printSource bbModule
@@ -195,7 +197,8 @@ genModules params plt initialMonadicTypes =
         then do
           headerFileTime <- getModificationTime headerFile
           if headerFileTime > modificationTime bbModule &&
-             headerFileTime > exeModificationTime
+             headerFileTime > exeModificationTime &&
+             headerFileTime > terminaYamlModificationTime
             then return currentMonadicTypes
           else do
             printHeader currentMonadicTypes bbModule
