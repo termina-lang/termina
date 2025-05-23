@@ -12,6 +12,8 @@ import Core.Utils
 import ControlFlow.ConstFolding.Utils
 import Data.Bits
 import Control.Monad
+import Command.Types
+import Modules.Modules
 
 data ConstFoldSt = ConstFoldSt
   {
@@ -578,10 +580,42 @@ loadGlobalConstEvironment = do
     constExpr <- evalConstExpression expr
     ST.modify (\s -> s { globalConstEnv = M.insert identifier constExpr (globalConstEnv s) })) (M.elems glbConstants)
 
+evalFieldType :: FieldDefinition SemanticAnn -> ConstFoldMonad (FieldDefinition SemanticAnn)
+evalFieldType (FieldDefinition name ty (SemanticAnn (ETy (SimpleType _)) loc)) = do
+  ty' <- evalExpressionType loc ty
+  return $ FieldDefinition name ty' (SemanticAnn (ETy (SimpleType ty')) loc)
+evalFieldType f = return f
+
+evalFieldDefinitions ::  AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
+evalFieldDefinitions (TypeDefinition (Struct name fields mods) ann) = do
+  fields' <- mapM evalFieldType fields
+  return $ TypeDefinition (Struct name fields' mods) ann
+evalFieldDefinitions (TypeDefinition (Class clsKind name members ifaces mods) ann) = do
+  members' <- mapM evalMember members
+  return $ TypeDefinition (Class clsKind name members' ifaces mods) ann
+
+  where
+
+    evalMember :: ClassMember SemanticAnn -> ConstFoldMonad (ClassMember SemanticAnn)
+    evalMember (ClassField fieldDef) = do
+      fieldDef' <- evalFieldType fieldDef
+      return $ ClassField fieldDef'
+    evalMember m = return m
+
+evalFieldDefinitions e = return e
+
+evalModuleTypeDefinitions :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
+evalModuleTypeDefinitions (TerminaModuleData modQualifiedName modFullPath 
+    modModificationTime modImportedModules modSourcecode (BasicBlockData ast)) =
+    TerminaModuleData modQualifiedName modFullPath 
+        modModificationTime modImportedModules modSourcecode . BasicBlockData <$> mapM evalFieldDefinitions ast
+    
+
 runConstFolding ::
-  TerminaProgArch SemanticAnn
-  -> Maybe ConstFoldError
-runConstFolding progArchitecture =
+  BasicBlocksProject
+  -> TerminaProgArch SemanticAnn
+  -> Either ConstFoldError BasicBlocksProject
+runConstFolding bbProject progArchitecture =
   let env = ConstFoldSt
         {
           localConstEnv = M.empty,
@@ -617,6 +651,7 @@ runConstFolding progArchitecture =
              Nothing -> throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))
            switchInputScope (resourceName resource) $
              mapM_ (\func -> unless (functionHasConstParams func) $
-                 constFoldFunction func) (classMemberFunctions resourceCls)) of
-      (Left err, _) -> Just err
-      (Right _, _) -> Nothing
+                 constFoldFunction func) (classMemberFunctions resourceCls)) >>
+    mapM evalModuleTypeDefinitions bbProject of
+      (Left err, _) -> Left err
+      (Right bbProject', _) -> Right bbProject'

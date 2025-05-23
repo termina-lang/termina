@@ -333,11 +333,10 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
+constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO BasicBlocksProject
 constFolding bbProject progArchitecture = 
-  let result = runConstFolding progArchitecture in
-  case result of
-    Just err -> 
+  case runConstFolding bbProject progArchitecture of
+    Left err -> 
       -- | Create the source files map. This map will be used to obtainn the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
       -- path of the source file and as element the text of the source file.
@@ -345,7 +344,7 @@ constFolding bbProject progArchitecture =
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    Nothing -> return ()
+    Right bbProject' -> return bbProject'
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
@@ -396,39 +395,39 @@ buildCommand (BuildCmdArgs chatty) = do
     let monadicTypes = monadicTypesMapModules typedProject
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
-    bbProject <- 
+    rawBBProject <- 
       either
         (\err -> 
           TIO.putStrLn (toText err M.empty) >> exitFailure)
         return
         $ genBasicBlocks typedProject
     when chatty (putStrLn . debugMessage $ "Checking basic blocks paths")
-    case basicBlockPathsCheckModules bbProject of
+    case basicBlockPathsCheckModules rawBBProject of
       Nothing -> return ()
       Just err -> 
         let sourceFilesMap = 
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
-              M.empty bbProject in
+              M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
-    case useDefCheckModules bbProject of
+    case useDefCheckModules rawBBProject of
       Nothing -> return ()
       Just err -> 
         let sourceFilesMap = 
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
-              M.empty bbProject in
+              M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies 
-    checkEmitterConnections bbProject programArchitecture
-    checkChannelConnections bbProject programArchitecture
-    checkResourceUsage bbProject programArchitecture
-    checkPoolUsage bbProject programArchitecture
-    checkProjectBoxSources bbProject programArchitecture
+    programArchitecture <- genArchitecture rawBBProject (getPlatformInitialProgram config plt) orderedDependencies 
+    checkEmitterConnections rawBBProject programArchitecture
+    checkChannelConnections rawBBProject programArchitecture
+    checkResourceUsage rawBBProject programArchitecture
+    checkPoolUsage rawBBProject programArchitecture
+    checkProjectBoxSources rawBBProject programArchitecture
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    constFolding bbProject programArchitecture
+    bbProject <- constFolding rawBBProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes bbProject
