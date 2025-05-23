@@ -426,7 +426,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
           _ -> error "internal error: checkClassKind"
         }) prcs
   -- Check that all procedures are provided and that the parameters match
-  localScope $ checkSortedProcedures sorted_provided sorted_prcs
+  checkSortedProcedures sorted_provided sorted_prcs
 
   where
 
@@ -440,7 +440,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
       when (psLen > psLen') (throwError $ annotateError ann (EProcedureMissingParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
-      zipWithM_ (\p@(Parameter _ ty) (Parameter pId ts) -> do
+      localScope $ zipWithM_ (\p@(Parameter _ ty) (Parameter pId ts) -> do
           ty' <- typeTypeSpecifier loc typeRHSObject ts
           unless (sameTy ty ty') (throwError $ annotateError ann (EProcedureParamTypeMismatch (ifaceId, prcId, paramType p, loc) ty'))
           insertLocalImmutObj anns pId ty'
