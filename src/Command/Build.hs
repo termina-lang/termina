@@ -44,6 +44,7 @@ import ControlFlow.ConstFolding (runConstFolding)
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
+import System.Environment
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -176,10 +177,14 @@ genModules params plt initialMonadicTypes =
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
       sourceFileExists <- doesFileExist sourceFile
+      -- | Get the modification time of the transpiler itself
+      exePath <- getExecutablePath
+      exeModificationTime <- getModificationTime exePath
       if sourceFileExists
         then do
           sourceFileTime <- getModificationTime sourceFile
-          if sourceFileTime > modificationTime bbModule
+          if sourceFileTime > modificationTime bbModule &&
+             sourceFileTime > exeModificationTime
             then return () 
           else do
             printSource bbModule
@@ -189,7 +194,8 @@ genModules params plt initialMonadicTypes =
       if headerFileExists 
         then do
           headerFileTime <- getModificationTime headerFile
-          if headerFileTime > modificationTime bbModule
+          if headerFileTime > modificationTime bbModule &&
+             headerFileTime > exeModificationTime
             then return currentMonadicTypes
           else do
             printHeader currentMonadicTypes bbModule
