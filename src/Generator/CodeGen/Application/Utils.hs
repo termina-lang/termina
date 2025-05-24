@@ -50,17 +50,46 @@ data OSALResourceLock =
 
 -- | This function generates the list of OSAL message queues that must be created
 -- from the list of tasks in the program architecture. For each task, a message queue
--- is created for the task itself and for each sink port of the task.
-getTasksMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> m [OSALMsgQueue]
-getTasksMessageQueues progArchitecture = return $ foldr (\glb acc ->
+-- is created for each sink port of the task.
+getSinkPortMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> m [OSALMsgQueue]
+getSinkPortMessageQueues progArchitecture = return $ foldr (\glb acc ->
         case glb of
-            TPTask identifier classId _ sinkPConns _ _ _ _ _ -> OSALTaskMsgQueue identifier classId (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize))) :
+            TPTask identifier classId _ sinkPConns _ _ _ _ _ -> 
                 let tpClass = taskClasses progArchitecture M.! classId in
                 foldr (\portId acc' ->
                     let (ts, _) = sinkPorts tpClass M.! portId in
                     OSALSinkPortMsgQueue identifier classId portId ts (Constant (I (TInteger 1 DecRepr) Nothing) (buildExpAnn Internal (TConstSubtype TUSize))) : acc'
                 ) acc (M.keys sinkPConns)
     ) [] (tasks progArchitecture)
+
+getTasksMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> [OSALMsgQueue] -> m [OSALMsgQueue]
+getTasksMessageQueues progArchitecture msgqs = do
+    foldM (\acc (TPTask identifier classId _ _ _ _ _ _ _) -> do
+        filteredQueues <- filterM (\case {
+            OSALTaskMsgQueue {} -> throwError $ InternalError "getTasksMessageQueues: there is already a task message queue";
+            OSALChannelMsgQueue _ _ _ target _ -> return $ target == identifier;
+            OSALSinkPortMsgQueue target _ _ _ _  -> return $ target == identifier;
+        }) msgqs
+        curr <- getTaskMessageQueue identifier classId filteredQueues
+        return $ curr : acc) [] (tasks progArchitecture)
+    
+    where 
+
+        getTaskMessageQueue :: (MonadError CGeneratorError m) => Identifier -> Identifier -> [OSALMsgQueue] -> m OSALMsgQueue
+        getTaskMessageQueue identifier classId (queue : msgQueues) = do
+            size <- case queue of 
+                OSALTaskMsgQueue {} -> throwError $ InternalError "getTaskMessageQueue: there is already a task message queue"
+                OSALChannelMsgQueue _ _ size' _ _ -> return size'
+                OSALSinkPortMsgQueue _ _ _ _ size' -> return size'
+            size' <- foldM (\acc q ->
+                case q of
+                    OSALTaskMsgQueue {} -> throwError $ InternalError "getTaskMessageQueue: there is already a task message queue"
+                    OSALChannelMsgQueue _ _ size' _ _ -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
+                    OSALSinkPortMsgQueue _ _ _ _ size' -> return $ BinOp Addition acc size' (buildExpAnn Internal (TConstSubtype TUSize))
+                ) size msgQueues
+            return $ OSALTaskMsgQueue identifier classId size'
+        getTaskMessageQueue _ _ _ = throwError $ InternalError "getTaskMessageQueue: the task does not have message queues"
+
 
 -- | This function generates the list of OSAL message queues that must be created
 -- from the list of channels in the program architecture. For each channel, a message

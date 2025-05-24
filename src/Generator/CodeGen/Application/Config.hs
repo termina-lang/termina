@@ -35,18 +35,19 @@ genConfigFile mName progArchitecture = do
 
     let mutexes = M.filter (\case{ OSALResourceLockMutex {} -> True; _ -> False }) resLockingMap
 
-    taskMessageQueues <- getTasksMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
+    sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
+    taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
 
     cVariantsForTaskPorts <- concat <$> traverse genVariantsForTaskPorts (M.elems taskClss)
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
     cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
     cHandlerDefines <- genDefineHandlerId (M.keys $ handlers progArchitecture)
     cPoolDefines <- genDefinePoolId (M.keys $ pools progArchitecture)
-    cMsgQueueDefines <- genDefineMsgQueueId (taskMessageQueues ++ channelMessageQueues)
+    cMsgQueueDefines <- genDefineMsgQueueId (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues)
     cTimerDefines <- genDefineTimerId (M.keys periodicTimers)
 
-    let msgQueues = taskMessageQueues ++ channelMessageQueues
+    let msgQueues = taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues
     messageBufferMemory <- genMessageBufferMemory msgQueues
 
     return $ CHeaderFile mName $ [
@@ -80,7 +81,7 @@ genConfigFile mName progArchitecture = do
         genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
         genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
             cSize <- genExpression size
-            let cSizeOf = _sizeOfType uint32_t
+            let cSizeOf = _sizeOfType (typeDef terminaID)
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [

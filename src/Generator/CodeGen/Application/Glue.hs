@@ -706,8 +706,9 @@ genMainFile :: QualifiedName
 genMainFile mName progArchitecture = do
     let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
         externInitGlobals = CExtDecl (CEDFunction void (namefy $ "termina_app" <::> "init_globals") []) (internalAnn (CDeclarationAnn True))
-    taskMessageQueues <- getTasksMessageQueues progArchitecture
+    sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
+    taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
 
     resLockingMap <- genResLockingMap progArchitecture dependenciesMap
     let mutexes = M.filter (\case{ OSALResourceLockMutex {} -> True; _ -> False }) resLockingMap
@@ -719,7 +720,7 @@ genMainFile mName progArchitecture = do
     initEmitters <- genInitEmitters progArchitecture
     initPools <- genInitPools (M.elems $ pools progArchitecture)
     initMutexes <- genInitMutexes progArchitecture mutexes
-    initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ channelMessageQueues)
+    initMessageQueues <- genInitMessageQueues (taskMessageQueues ++ sinkPortMessageQueues ++ channelMessageQueues)
 
     channelConnections <- genChannelConnections progArchitecture
     enableProtection <- genEnableProtection progArchitecture resLockingMap
