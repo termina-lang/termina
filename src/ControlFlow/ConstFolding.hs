@@ -163,6 +163,9 @@ evalExpressionType loc (TArray ty arraySize)= do
   arraySizeValue <- evalConstExpression arraySize
   ty' <- evalExpressionType loc ty
   return (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize)))
+evalExpressionType loc (TAtomicArray ty arraySize) = do
+  arraySizeValue <- evalConstExpression arraySize
+  return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn loc TUSize)))
 evalExpressionType _ ty = return ty
 
 evalConstExpression :: Expression SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
@@ -581,16 +584,16 @@ loadGlobalConstEvironment = do
     ST.modify (\s -> s { globalConstEnv = M.insert identifier constExpr (globalConstEnv s) })) (M.elems glbConstants)
 
 evalFieldType :: FieldDefinition SemanticAnn -> ConstFoldMonad (FieldDefinition SemanticAnn)
-evalFieldType (FieldDefinition name ty (SemanticAnn (ETy (SimpleType _)) loc)) = do
+evalFieldType (FieldDefinition name ty (SemanticAnn (FTy SimpleField) loc)) = do
   ty' <- evalExpressionType loc ty
-  return $ FieldDefinition name ty' (SemanticAnn (ETy (SimpleType ty')) loc)
+  return $ FieldDefinition name ty' (SemanticAnn (FTy SimpleField) loc)
 evalFieldType f = return f
 
-evalFieldDefinitions ::  AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
-evalFieldDefinitions (TypeDefinition (Struct name fields mods) ann) = do
+evalDefinitions ::  AnnASTElement SemanticAnn -> ConstFoldMonad (AnnASTElement SemanticAnn)
+evalDefinitions (TypeDefinition (Struct name fields mods) ann) = do
   fields' <- mapM evalFieldType fields
   return $ TypeDefinition (Struct name fields' mods) ann
-evalFieldDefinitions (TypeDefinition (Class clsKind name members ifaces mods) ann) = do
+evalDefinitions (TypeDefinition (Class clsKind name members ifaces mods) ann) = do
   members' <- mapM evalMember members
   return $ TypeDefinition (Class clsKind name members' ifaces mods) ann
 
@@ -601,14 +604,17 @@ evalFieldDefinitions (TypeDefinition (Class clsKind name members ifaces mods) an
       fieldDef' <- evalFieldType fieldDef
       return $ ClassField fieldDef'
     evalMember m = return m
+evalDefinitions (GlobalDeclaration (Resource name ty@(TAtomicArray {}) initExpr mods ann)) = do
+  ty' <- evalExpressionType (getLocation ann) ty
+  return $ GlobalDeclaration (Resource name ty' initExpr mods ann)
 
-evalFieldDefinitions e = return e
+evalDefinitions e = return e
 
 evalModuleTypeDefinitions :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 evalModuleTypeDefinitions (TerminaModuleData modQualifiedName modFullPath 
     modModificationTime modImportedModules modSourcecode (BasicBlockData ast)) =
     TerminaModuleData modQualifiedName modFullPath 
-        modModificationTime modImportedModules modSourcecode . BasicBlockData <$> mapM evalFieldDefinitions ast
+        modModificationTime modImportedModules modSourcecode . BasicBlockData <$> mapM evalDefinitions ast
     
 
 runConstFolding ::
