@@ -502,15 +502,20 @@ genBlocks (AtomicArrayStore obj idx arg ann) = do
 genBlocks (SendMessage obj arg ann) = do
     let cAnn = buildGenericAnn ann
     cObj <- genObject obj
-    cArg <- genExpression arg
     -- Generate the C code for the object
     case arg of
+        -- | If the argument is null, we must call the send method with a null pointer
+        (Constant Null _) -> do
+            mCall <- genMsgQueueSendNULLExpr cObj cAnn
+            return [pre_cr mCall |>> getLocation ann]
         -- | If the argument is an access object, we can use it directly
         (AccessObject {}) -> do
+            cArg <- genExpression arg
             mCall <- genMsgQueueSendCall cObj cArg cAnn
             return [pre_cr mCall |>> getLocation ann]
         -- | If it is not an object, must store it in a temporary variable
         _ -> do
+            cArg <- genExpression arg
             let cArgType = getCExprType cArg
                 cTmp = "msg" @: cArgType
             mCall <- genMsgQueueSendCall cObj cTmp cAnn

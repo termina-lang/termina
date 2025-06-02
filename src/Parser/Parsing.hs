@@ -57,7 +57,7 @@ lexer = Tok.makeTokenParser langDef
       ++ -- Provide/extend
              ["provides", "extends"]
       ++ -- Constants
-             ["true", "false"]
+             ["true", "false", "null"]
       ++ -- Modules
              ["import"]
       ++ -- Class methods
@@ -793,7 +793,7 @@ functionParser = do
   Function name params typeSpec blockRet modifiers . Position current startPos <$> getPosition
 
 constLiteralParser :: TerminaParser (Const ParserAnn)
-constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
+constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar <|> parseLitNull
   where
     parseLitInteger =
       do
@@ -802,6 +802,7 @@ constLiteralParser = parseLitInteger <|> parseLitBool <|> parseLitChar
         return (I num ty)
     parseLitBool = (reserved "true" >> return (B True)) <|> (reserved "false" >> return (B False))
     parseLitChar = C <$> charLit
+    parseLitNull = reserved "null" >> return Null
 
 constantParser :: TerminaParser (Expression ParserAnn)
 constantParser = do
@@ -1155,10 +1156,18 @@ classActionParser = do
   startPos <- getPosition
   reserved "action"
   name <- identifierParser
-  param <- parens (reserved "&priv" >> reserved "self" >> comma >> parameterParser)
+  param <- parens actionParamParser
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
   blockRet <- blockParser
   ClassAction name param typeSpec blockRet . Position current startPos <$> getPosition
+
+  where
+
+    actionParamParser :: TerminaParser (Maybe (Parameter ParserAnn))
+    actionParamParser = do
+      _ <- reserved "&priv"
+      _ <- reserved "self"
+      optionMaybe (comma >> parameterParser)
 
 classProcedureParser :: TerminaParser (ClassMember ParserAnn)
 classProcedureParser = do

@@ -7,8 +7,6 @@ import Semantic.Types
 import Control.Monad.Except
 import Data.Map
 import Generator.LanguageC.AST
-import Data.Char
-import Numeric
 import Utils.Annotations
 import Configuration.Configuration
 import Generator.Monadic
@@ -251,6 +249,14 @@ genPoolMethodCallExpr mName cObj cArg cAnn =
             return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cObjExpr, cArg] (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
 
+genMsgQueueSendNULLExpr :: (MonadError CGeneratorError m) => CObject -> CAnns -> m CExpression
+genMsgQueueSendNULLExpr cObj cAnn = do
+    let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
+    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cDataArg = CExprValOf (CVar "NULL" (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn
+    return $
+        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+
 genMsgQueueSendCall :: (MonadError CGeneratorError m) => CObject -> CExpression -> CAnns -> m CExpression
 genMsgQueueSendCall cObj cArg cAnn = do
     let cArgType = getCExprType cArg
@@ -258,16 +264,10 @@ genMsgQueueSendCall cObj cArg cAnn = do
     let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
     -- | If it is a send, the first parameter is the object to be sent. The
     -- function is expecting to receive a reference to that object.
-    case cArgType of
-        CTArray {} -> do
-            let cDataArg = CExprCast cArg (CTPointer (CTVoid noqual) noqual) cAnn
-            return $
-                CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
-        _ -> do
-            cArgObj <- getCObject cArg
-            let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
-            return $
-                CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+    cArgObj <- getCObject cArg
+    let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
+    return $
+        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
 
 genAtomicMethodCall :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
 genAtomicMethodCall mName cObj cArgs cAnn =
@@ -306,17 +306,6 @@ buildCompoundAnn (SemanticAnn _ loc) before trailing = LocatedElement (CCompound
 
 buildCPPDirectiveAnn :: SemanticAnn -> Bool -> CAnns
 buildCPPDirectiveAnn (SemanticAnn _ loc) before = LocatedElement (CPPDirectiveAnn before) loc
-
-printIntegerLiteral :: TInteger -> String
-printIntegerLiteral (TInteger i DecRepr) = show i
-printIntegerLiteral (TInteger i HexRepr) = "0x" <> (toUpper <$> showHex i "")
-printIntegerLiteral (TInteger i OctalRepr) = "0" <> showOct i ""
-
-printLiteral :: Const SemanticAnn -> String
-printLiteral (I ti _) = printIntegerLiteral ti
-printLiteral (B True) = "1"
-printLiteral (B False) = "0"
-printLiteral (C c) = "'" <> [c] <> "'"
 
 -- | TODO: The size of the enum field has been hardcoded, it should be
 -- platform dependent

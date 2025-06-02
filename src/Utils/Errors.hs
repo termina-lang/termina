@@ -74,7 +74,7 @@ instance ShowText (PAST.TypeSpecifier a) where
     showText (TSReference ak ts) = "&" <> showText ak <> showText ts
     showText (TSDefinedType ident []) = T.pack ident
     showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
-    showText TSUnit = "()"
+    showText TSUnit = "unit"
 
 instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
     showText (FieldValueAssignment ident expr _) = 
@@ -226,7 +226,7 @@ instance ShowText (TerminaType a) where
     showText (TSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
     showText (TInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
     showText (TOutPort ts) = "out " <> showText ts
-    showText TUnit = "()"
+    showText TUnit = "unit"
 
 instance ShowText TInteger where
     showText (TInteger value DecRepr) = T.pack $ show value
@@ -239,6 +239,7 @@ instance (ShowText (ty a)) => ShowText (Const' ty a) where
     showText (B True) = "true"
     showText (B False) = "false"
     showText (C c) = T.pack [c]
+    showText Null = "null"
 
 instance ShowText (TypeDef' ty blk a) where
     showText (Struct ident _ _) = T.pack $ "struct " <> ident

@@ -18,6 +18,7 @@ import Generator.CodeGen.Expression
 import Generator.Monadic
 import qualified Data.Set as S
 import Control.Monad.State
+import Core.Utils
 
 filterStructModifiers :: [Modifier a] -> [Modifier a]
 filterStructModifiers = filter (\case
@@ -232,6 +233,7 @@ genAttribute (Modifier name (Just expr)) = do
                 (B True) -> return $ CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTBool noqual) cAnn
                 (B False) -> return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTBool noqual) cAnn
                 (C ch) -> return $ CExprConstant (CCharConst (CChar ch)) (CTChar noqual) cAnn
+                Null -> throwError $ InternalError "Null constant should not be translated to C"
 
 genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant SemanticAnn -> CGenerator CFileItem
 genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do
@@ -429,10 +431,14 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             return [CExtDecl (CEDFunction retType clsFuncName [cSelfParam]) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration (ClassAction action param rts _ _) = do
             retType <- genType noqual rts
-            cParamDecl <- genParameterDeclaration param
             cThisParam <- genThisParam
             clsFuncName <- genClassFunctionName identifier action
-            return [CExtDecl (CEDFunction retType clsFuncName [cThisParam, cParamDecl]) (buildDeclarationAnn ann True)]
+            case param of
+                Just p -> do
+                    cParamDecl <- genParameterDeclaration p
+                    return [CExtDecl (CEDFunction retType clsFuncName [cThisParam, cParamDecl]) (buildDeclarationAnn ann True)]
+                Nothing ->
+                    return [CExtDecl (CEDFunction retType clsFuncName [cThisParam]) (buildDeclarationAnn ann True)]
         genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
 
@@ -471,6 +477,40 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
             return $ decl : rest
 
         genCase :: (Identifier, TerminaType SemanticAnn, Identifier) -> CGenerator [CCompoundBlockItem]
+        genCase (port, TUnit, action) = do
+            this_variant <- genVariantForPort classId port
+            classFunctionName <- genClassFunctionName classId action
+            classStructType <- genType noqual (TStruct classId)
+
+            let classFunctionType = CTFunction __status_int32_t
+                    [_const . ptr $ classStructType]
+            return
+                [
+                    -- case variant:
+                    pre_cr $ _case (this_variant @: enumFieldType) $
+                    -- status = classFunctionName(self, action_msg_data);
+                    indent . pre_cr $ "result" @: __status_int32_t @=
+                        (classFunctionName @: classFunctionType) @@ ["self" @: classStructType],
+                    -- if (result.__variant != Status__Success)
+                    indent . pre_cr $ _if (
+                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                        $ trail_cr $ block [
+                            -- ExceptSource source;
+                            pre_cr $ var "source" (typeDef "ExceptSource"),
+                            -- source.__variant = ExceptSource__Handler;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
+                            -- source.Task.__0 = port_connection->handler.handler_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
+
+                            -- __termina_except__action_failure(source, , status.Failure.__0);
+                            pre_cr $ __termina_except__action_failure @@ [
+                                "source" @: typeDef "ExceptSource",
+                                this_variant @: size_t,
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                            ]
+                        ],
+                    indent . pre_cr $ _break
+                ]
         genCase (port, dts, action) = do
             this_variant <- genVariantForPort classId port
             classFunctionName <- genClassFunctionName classId action
@@ -556,7 +596,7 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
 
         genBody :: CGenerator [CCompoundBlockItem]
         genBody = do
-            msgDataVars <- getMsgDataVariables actions
+            msgDataVars <- getMsgDataVariables [a | a@(_, dts, _) <- actions, not (sameTy dts TUnit)]
             loop <- genLoop
             return $ [
                     -- ClassIdentifier * self = (ClassIdentifier *)&arg;
@@ -711,12 +751,18 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cRetType <- genType noqual rts
             cThisParam <- genThisParam
             selfCastStmt <- genSelfCastStmt ann identifier
-            cParam <- genParameterDeclaration param
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [selfCastStmt] stmts
-            return [CFunctionDef Nothing (CFunction cRetType clsFuncName [cThisParam, cParam]
-                (CSCompound cBody (buildCompoundAnn ann False True)))
-                (buildDeclarationAnn ann True)]
+            case param of
+                Just p -> do
+                    cParam <- genParameterDeclaration p
+                    return [CFunctionDef Nothing (CFunction cRetType clsFuncName [cThisParam, cParam]
+                        (CSCompound cBody (buildCompoundAnn ann False True)))
+                        (buildDeclarationAnn ann True)]
+                Nothing ->
+                    return [CFunctionDef Nothing (CFunction cRetType clsFuncName [cThisParam]
+                        (CSCompound cBody (buildCompoundAnn ann False True)))
+                        (buildDeclarationAnn ann True)]
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
 genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e

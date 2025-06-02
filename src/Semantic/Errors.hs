@@ -251,6 +251,8 @@ data Error
   | ETypeNotInScope Identifier QualifiedName -- ^ Type not in scope
   | EFunctionNotInScope Identifier QualifiedName -- ^ Function not in scope
   | EUnknownAction Identifier -- ^ Unknown action
+  | EInPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ In port action parameter type mismatch
+  | ESinkPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Sink port action parameter type mismatch
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -457,6 +459,8 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "SE-199"
     errorIdent (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "SE-200"
     errorIdent (AnnotatedError (EUnknownAction _ident) _pos) = "SE-201"
+    errorIdent (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-202"
+    errorIdent (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-203"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -658,6 +662,8 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (ETypeNotInScope _ident _qualifiedName) _pos) = "type not in scope"
     errorTitle (AnnotatedError (EFunctionNotInScope _ident _qualifiedName) _pos) = "function not in scope"
     errorTitle (AnnotatedError (EUnknownAction _ident) _pos) = "unknown action"
+    errorTitle (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "in port action parameter type mismatch"
+    errorTitle (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "sink port action parameter type mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2123,6 +2129,40 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is not defined."))
+                EInPortActionParamTypeMismatch (ident, prevPos@(Position _ prevStart _)) expectedTy actualTy ->
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
+                    in
+                        (case expectedTy of
+                            TUnit -> 
+                                pprintSimpleError
+                                    sourceLines title fileName pos
+                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))
+                            _ ->  
+                                pprintSimpleError
+                                    sourceLines title fileName pos
+                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
+                                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))) <>
+                        pprintSimpleError
+                            prevSourceLines "The action is defined here:" prevFileName
+                            prevPos Nothing
+                ESinkPortActionParamTypeMismatch (ident, prevPos@(Position _ prevStart _)) expectedTy actualTy ->
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
+                    in
+                        (case expectedTy of
+                            TUnit -> 
+                                pprintSimpleError
+                                    sourceLines title fileName pos
+                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have no parameters but it defines a parameter of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))
+                            _ ->  
+                                pprintSimpleError
+                                    sourceLines title fileName pos
+                                    (Just ("The action \x1b[31m" <> T.pack ident <> "\x1b[0m is expected to have a parameter of type \x1b[31m" <> showText expectedTy <>
+                                        "\x1b[0m but the actual type is \x1b[31m" <> showText actualTy <> "\x1b[0m.\n"))) <>
+                        pprintSimpleError
+                            prevSourceLines "The action is defined here:" prevFileName
+                            prevPos Nothing
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

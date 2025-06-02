@@ -341,7 +341,7 @@ data ClassMember' ty blk a
       a -- ^ transpiler annotation
     | ClassAction 
       Identifier  -- ^ name of the method
-      (Parameter' ty a) -- ^ input parameter
+      (Maybe (Parameter' ty a)) -- ^ input parameter
       (ty a) -- ^ type of the return value
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
@@ -384,7 +384,7 @@ data EnumVariant' ty a = EnumVariant {
 -- - Booleans
 -- - Integers
 -- - Characters
-data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | C Char
+data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | C Char | Null
   deriving (Show, Functor)
 
 ----------------------------------------

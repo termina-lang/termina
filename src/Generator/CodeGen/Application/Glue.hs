@@ -39,7 +39,7 @@ genInitHandlers progArchitecture = do
         genOSALHandlerInit :: TPHandler a -> CGenerator CCompoundBlockItem
         genOSALHandlerInit hndlr = do
             handlerId <- genDefineHandlerIdLabel (handlerName hndlr)
-            return $ pre_cr $ 
+            return $ pre_cr $
                 handlerName hndlr @: typeDef (handlerClass hndlr) @. handlerIDField @: __termina_id_t @= handlerId @: __termina_id_t
 
 genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
@@ -262,7 +262,7 @@ genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
     channelConnections <- concat <$> traverse genChannelConnection targets
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $ 
+            trail_cr . block $
                 pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : channelConnections
 
@@ -271,14 +271,21 @@ genChannelConnections progArchitecture = do
         genChannelConnection :: (Identifier, (Identifier, Identifier, a)) -> CGenerator [CCompoundBlockItem]
         genChannelConnection (channelName, (targetName, targetPort, _)) = do
             let classId = taskClass $ tasks progArchitecture M.! targetName
+            let (TPMsgQueue _ dty _ _ _) = channels progArchitecture M.! channelName
             taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetName
             channelMsgQueueId <- genDefineChannelMsgQueueIdLabel channelName
             portVariant <- genVariantForPort classId targetPort
-            return [
-                    pre_cr $ channelName @: __termina_msg_queue_t @. "task_msg_queue_id" @: __termina_id_t
-                        @= taskMsgQueueId @: __termina_id_t,
-                    no_cr $ channelName @: __termina_msg_queue_t @. "channel_msg_queue_id" @: __termina_id_t
-                        @= channelMsgQueueId @: __termina_id_t,
+            return $ pre_cr (channelName @: __termina_msg_queue_t @. "task_msg_queue_id" @: __termina_id_t
+                        @= taskMsgQueueId @: __termina_id_t) :
+                    (case dty of
+                        TUnit -> [
+                            no_cr $ channelName @: __termina_msg_queue_t @. "channel_msg_queue_id" @: __termina_id_t
+                                @= "__TERMINA_ID_INVALID" @: __termina_id_t
+                            ]
+                        _ -> [
+                            no_cr $ channelName @: __termina_msg_queue_t @. "channel_msg_queue_id" @: __termina_id_t
+                                @= channelMsgQueueId @: __termina_id_t
+                            ]) ++ [
                     no_cr $ channelName @: __termina_msg_queue_t @. "port_id" @: __termina_id_t
                         @= portVariant @: __termina_id_t,
                     pre_cr $ targetName @: typeDef classId @. targetPort @: __termina_id_t
@@ -316,18 +323,18 @@ genInitPools pls = do
 
 genInitMessageQueues :: [OSALMsgQueue] -> CGenerator CFileItem
 genInitMessageQueues queues = do
-    initMsgQueues <- mapM genOSALMsgQueueInit queues
+    initMsgQueues <- concat <$> traverse genOSALMsgQueueInit queues
     return $ pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ int32_t)] @-> void $
             trail_cr . block $
                 pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
                 : initMsgQueues
 
     where
-        genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator CCompoundBlockItem
+        genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [CCompoundBlockItem]
         genOSALMsgQueueInit mq@(OSALTaskMsgQueue _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
-            return $
+            return [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
                         pre_cr $ __termina_msg_queue__init @@ [
@@ -336,33 +343,38 @@ genInitMessageQueues queues = do
                             cSize,
                             "status" @: (_const . ptr $ int32_t)
                         ]
+                    ]
                 ]
+        -- | Message queues with unit type do not need a definition
+        genOSALMsgQueueInit (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
             cTs <- genType noqual ty
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        pre_cr $ __termina_msg_queue__init @@ [
-                            msgQueueId @: __termina_id_t,
-                            _sizeOfType cTs,
-                            cSize,
-                            "status" @: (_const . ptr $ int32_t)
-                        ]
+            return [
+                    pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+                        $ trail_cr . block $ [
+                            pre_cr $ __termina_msg_queue__init @@ [
+                                msgQueueId @: __termina_id_t,
+                                _sizeOfType cTs,
+                                cSize,
+                                "status" @: (_const . ptr $ int32_t)
+                            ]
+                    ]
                 ]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        pre_cr $ __termina_msg_queue__init @@ [
-                            msgQueueId @: __termina_id_t,
-                            _sizeOfType __termina_id_t,
-                            cSize,
-                            "status" @: (_const . ptr $ int32_t)
-                        ]
+            return [
+                    pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+                        $ trail_cr . block $ [
+                            pre_cr $ __termina_msg_queue__init @@ [
+                                msgQueueId @: __termina_id_t,
+                                _sizeOfType __termina_id_t,
+                                cSize,
+                                "status" @: (_const . ptr $ int32_t)
+                            ]
+                    ]
                 ]
 
 genEnableProtection :: TerminaProgArch SemanticAnn -> M.Map Identifier OSALResourceLock -> CGenerator CFileItem
@@ -527,7 +539,7 @@ genEnableProtection progArchitecture resLockingMap = do
                             clsFunctionNameLock <- procedureEventLock clsFunctionName
                             return $ pre_cr (taskId @: typeDef classId @. portId @: typeDef iface @. pr @: procFunctionType
                                         @= clsFunctionNameLock @: procFunctionType) : procs
-                            
+
                 _ -> return []
 
         genEnableProtectionHandler :: TPHandler SemanticAnn -> CGenerator [CCompoundBlockItem]
@@ -662,13 +674,13 @@ genAppInit progArchitecture = do
             ] ++
             [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [ 
+                        $ trail_cr . block $ [
                             pre_cr $ __termina_app__init_channel_connections @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ] ++
             [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [ 
+                        $ trail_cr . block $ [
                             pre_cr $ __termina_app__init_pools @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ] ++ ([pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
@@ -677,13 +689,13 @@ genAppInit progArchitecture = do
                         ] | any (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture)]) ++
             [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [ 
+                        $ trail_cr . block $ [
                             pre_cr $ __termina_app__init_mutexes @@ ["status" @: (_const . ptr $ int32_t)]
                         ]
             ] ++
             [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [ 
+                        $ trail_cr . block $ [
                             pre_cr $ __termina_app__enable_protection @@ []
                         ],
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
@@ -738,7 +750,7 @@ genMainFile mName progArchitecture = do
         ] ++ includes
         ++ [
             externInitGlobals
-        ] 
+        ]
         ++ cPoolMemoryAreas
         ++ [initTasks, initHandlers, initEmitters, initMutexes, initPools, initMessageQueues,
             enableProtection, channelConnections] ++ initialEventFunction

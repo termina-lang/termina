@@ -372,7 +372,9 @@ useDefCMemb (ClassProcedure _ident ps blk ann)
 useDefCMemb (ClassViewer _ident ps _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
-useDefCMemb (ClassAction _ident p _tyret bret ann)
+useDefCMemb (ClassAction _ident Nothing _tyret bret _ann)
+  = useDefBlockRet bret
+useDefCMemb (ClassAction _ident (Just p) _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 

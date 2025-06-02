@@ -333,24 +333,24 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   return (ps_ty, typed_bret)
               let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
-            ClassAction mIdent p_ts ts mbody mann -> do
-              p_ty <- typeActionParameter mann p_ts
+            ClassAction mIdent param ts mbody mann -> do
               ty <- typeTypeSpecifier mann typeGlobalObject ts
+              param_ty <- maybe (return Nothing) (typeActionParameter mann >=> return . Just) param
               checkReturnType mann ty
               typed_bret <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
-                  insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)
+                  maybe (return ()) (\p_ty -> insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)) param_ty
                   typeBlock (Just ty) mbody
-              let newAct = SAST.ClassAction mIdent p_ty ty typed_bret (buildExpAnn mann ty)
+              let newAct = SAST.ClassAction mIdent param_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
     -- triggered by the ports are defined in the class.
-    let ty_action_set = foldl (\accumulatedActions m -> 
+    let ty_action_map = foldl (\accumulatedActions m -> 
           case m of 
-              ClassAction act _ _ _ _  -> S.insert act accumulatedActions
-              _ -> accumulatedActions) S.empty fnChecked
-    mapM_ (checkTriggeredAction ty_action_set) ty_fls
+              ClassAction act mty _ _ actann  -> M.insert act (mty, getLocation actann) accumulatedActions
+              _ -> accumulatedActions) M.empty fnChecked
+    mapM_ (checkTriggeredAction ty_action_map) ty_fls
       
     -- | Return the class with the methods, procedures, viewers and actions
     -- checked. The methods, procedures, viewers and actions are reverse-sorted
@@ -360,11 +360,38 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
 
   where 
 
-    checkTriggeredAction :: S.Set Identifier -> SAST.ClassMember SemanticAnn -> SemanticMonad ()
-    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TSinkPort _ act) fann)) =
-      unless (S.member act actions) (throwError $ annotateError (getLocation fann) (EUnknownAction act))
-    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TInPort _ act) fann)) =
-      unless (S.member act actions) (throwError $ annotateError (getLocation fann) (EUnknownAction act))
+    checkTriggeredAction :: M.Map Identifier (Maybe (SAST.Parameter SemanticAnn), Location)
+      -> SAST.ClassMember SemanticAnn
+      -> SemanticMonad ()
+    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TSinkPort port_ty act) fann)) =
+      case M.lookup act actions of
+        Just (Just p, actloc) -> do
+          let pty = paramType p
+          catchMismatch (getLocation fann) (ESinkPortActionParamTypeMismatch (act, actloc) port_ty) $
+          -- If the action is defined, check that the parameter type matches
+            sameTyOrError (getLocation fann) port_ty pty
+        Just (Nothing, actloc) -> do
+          catchMismatch (getLocation fann) (ESinkPortActionParamTypeMismatch (act, actloc) port_ty) $
+          -- If the action is defined, check that the parameter type matches
+            sameTyOrError (getLocation fann) port_ty TUnit
+        Nothing ->
+          -- If the action is not defined, throw an error
+          throwError $ annotateError (getLocation fann) (EUnknownAction act)
+
+    checkTriggeredAction actions (SAST.ClassField (SAST.FieldDefinition _ (TInPort port_ty act) fann)) =
+      case M.lookup act actions of
+        Just (Just p, actloc) -> do
+          let pty = paramType p
+          catchMismatch (getLocation fann) (EInPortActionParamTypeMismatch (act, actloc) port_ty) $
+          -- If the action is defined, check that the parameter type matches
+            sameTyOrError (getLocation fann) port_ty pty
+        Just (Nothing, actloc) -> do
+          catchMismatch (getLocation fann) (EInPortActionParamTypeMismatch (act, actloc) port_ty) $
+          -- If the action is defined, check that the parameter type matches
+            sameTyOrError (getLocation fann) port_ty TUnit
+        Nothing ->
+          -- If the action is not defined, throw an error
+          throwError $ annotateError (getLocation fann) (EUnknownAction act)
     checkTriggeredAction _ _ = return ()
 
 ----------------------------------------

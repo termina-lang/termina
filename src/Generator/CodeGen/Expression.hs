@@ -295,6 +295,7 @@ genExpression e@(Constant c ann) = do
         (B True) -> return $ dec 1 @: cType |>> getLocation ann
         (B False) -> return $ dec 0 @: cType |>> getLocation ann
         (C chr) -> return $ chr @: cType |>> getLocation ann
+        Null -> throwError $ InternalError "Null constant should not be translated to C"
 genExpression (Casting expr ts ann) = do
     cType <- genType noqual ts
     cExpr <- genExpression expr

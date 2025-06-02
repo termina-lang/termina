@@ -135,7 +135,8 @@ inOutClassMember :: M.Map Identifier (FieldDefinition SemanticAnn) -> ClassMembe
 inOutClassMember _ (ClassField {}) = return ()
 inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
-inOutClassMember actionsToPorts (ClassAction name input _ body _ann) = do
+inOutClassMember _ (ClassAction _ Nothing _ body _) = inOutBasicBlocks body
+inOutClassMember actionsToPorts (ClassAction name (Just input) _ body _ann) = do
     clearInputScope
     case paramType input of
         (TBoxSubtype _) -> do

@@ -26,7 +26,9 @@ getMemberFunctions = foldl' (\acc member ->
       M.insert identifier (TPFunction identifier [] mRetTy blk ann)   acc
     ClassProcedure identifier params blk ann -> 
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
-    ClassAction identifier param rty blk ann -> 
+    ClassAction identifier Nothing rty blk ann -> 
+      M.insert identifier (TPFunction identifier [] (Just rty) blk ann) acc
+    ClassAction identifier (Just param) rty blk ann -> 
       M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
     ClassViewer identifier params mRetTy blk ann -> 
       M.insert identifier (TPFunction identifier params mRetTy blk ann) acc

@@ -225,6 +225,7 @@ accessPortTy (TAtomicArrayAccess {}) = True
 accessPortTy _ = False
 
 msgTy :: TerminaType' expr a -> Bool
+msgTy TUnit            = True
 msgTy TUInt8           = True
 msgTy TUInt16          = True
 msgTy TUInt32          = True
@@ -471,7 +472,7 @@ findClassViewerOrMethod i
     }
   )
 
-findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Parameter' ty a, ty a, a)
+findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Parameter' ty a), ty a, a)
 findClassAction i
   =  fmap
   (\case {

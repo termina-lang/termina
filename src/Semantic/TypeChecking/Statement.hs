@@ -324,17 +324,17 @@ typeStatement _rTy (ContinueStmt contE anns) =
                 Just _ -> throwError $ annotateError ann (EContinueInvalidMethodOrViewerCall ident)
                 Nothing ->
                   case findClassAction ident cls of
-                    Just (param@(Parameter _ ty), rty, SemanticAnn _ loc) -> do
-                      case ty of
-                        TUnit -> case args of
-                          [] -> return (([], []), ty)
-                          _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
-                        _ -> case args of
+                    Just (Just param@(Parameter _ ty), rty, SemanticAnn _ loc) -> do
+                        case args of
                           [arg] -> do
                             typed_arg <- typeExpression (Just ty) typeRHSObject arg
                             return (([param], [typed_arg]), rty)
                           [] -> throwError $ annotateError ann (EContinueActionMissingArgs (ident, loc))
                           _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [param], loc) (fromIntegral (length args)))
+                    Just (Nothing, _, SemanticAnn _ loc) -> do
+                      case args of
+                        [] -> return (([], []), TUnit)
+                        _ -> throwError $ annotateError ann (EContinueActionExtraArgs (ident, [], loc) (fromIntegral (length args)))
                     -- This should not happen, since the expression has been 
                     -- type-checked before and the method should have been found.
                     _ -> throwError $ annotateError Internal EContinueActionNotFound

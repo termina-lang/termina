@@ -129,7 +129,12 @@ mapClassMemberMonadic (ClassViewer _ params maybeRet blkRet _) =
   mapM_ mapParameterMonadic params >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassAction _ param ret blkRet _) =
+mapClassMemberMonadic (ClassAction _ Nothing ret blkRet _) =
+  -- | Get the monadic types types from the return type
+  insertMonadicType ret >>
+  -- | Get the monadic types types from the block return type
+  mapM_ mapStatementMonadic (blockBody blkRet)
+mapClassMemberMonadic (ClassAction _ (Just param) ret blkRet _) =
   -- | Get the monadic types types from the parameter
   mapParameterMonadic param >>
   -- | Get the monadic types types from the return type

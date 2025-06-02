@@ -59,6 +59,8 @@ checkConstant loc expected_type (B {}) =
   sameTyOrError loc expected_type TBool
 checkConstant loc expected_type (C {}) =
   sameTyOrError loc expected_type TChar
+checkConstant loc expected_type Null =
+  sameTyOrError loc expected_type TUnit
 
 checkIntConstant :: Location -> SAST.TerminaType SemanticAnn -> TInteger -> SemanticMonad ()
 checkIntConstant loc tyI ti@(TInteger i _) =
@@ -512,6 +514,7 @@ typeConstant loc typeObj (I tInt (Just ts)) = do
   return $ SAST.I tInt (Just ty)
 typeConstant _loc _typeObj (B tBool) = return $ SAST.B tBool
 typeConstant _loc _typeObj (C tChar) = return $ SAST.C tChar
+typeConstant _loc _typeObj Null = return SAST.Null
 
 -- | Function that translates a |TypeSpecifier| into a |TerminaType|.
 typeTypeSpecifier :: Location 
@@ -940,6 +943,9 @@ typeExpression Nothing typeObj (Constant c@(B {}) pann) = do
 typeExpression Nothing typeObj (Constant c@(C {}) pann) = do
   typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype TChar))
+typeExpression Nothing typeObj (Constant c@Null pann) = do
+  typed_c <- typeConstant pann typeObj c
+  return $ SAST.Constant typed_c (buildExpAnn pann TUnit)
 typeExpression expectedType typeObj (Casting e nts pann) = do
   nty <- typeTypeSpecifier pann typeObj nts
   maybe (return ()) (flip (sameTyOrError pann) nty) expectedType

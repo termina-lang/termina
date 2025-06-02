@@ -90,6 +90,9 @@ genConfigFile mName progArchitecture = do
                     "        " <> ppSizeOf <> " ",
                     "    ) "
                 ]
+        -- | Message queues with unit type do not need to be accounted for when
+        -- assigning memory for the message buffer.
+        genMessagesForQueue (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genMessagesForQueue (OSALChannelMsgQueue _ ts size _ _) = do
             cSize <- genExpression size
             cTs <- genType noqual ts

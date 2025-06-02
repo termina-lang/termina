@@ -44,6 +44,7 @@ switchInputScope target comp = do
 data PassedArgument a =
   ConstantArgument (Const a) a
   | VariableArgument (TerminaType a) a
+  deriving Show
 
 evalConstObject :: Object SemanticAnn -> ConstFoldMonad (Const SemanticAnn)
 evalConstObject (Variable ident _) = do
@@ -202,6 +203,10 @@ functionHasConstParams (TPFunction _ params _ _ _) = do
 
 constFoldPassArguments :: Location -> [Parameter SemanticAnn] -> [PassedArgument SemanticAnn] -> ConstFoldMonad ()
 constFoldPassArguments _ [] [] = return ()
+-- | This is a special case. This can only happen when we are sending a message
+-- using a message queue of unit type. In this case, the argument to be passed
+-- must be a null constant.
+constFoldPassArguments _ [] [ConstantArgument Null _] = return ()
 constFoldPassArguments loc (param:params) (arg:args) = do
   case (paramType param, arg) of
     (TConstSubtype _, ConstantArgument value _) -> do
