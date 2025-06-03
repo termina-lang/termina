@@ -55,11 +55,22 @@ genInitFile mName prjprogs = do
         globals = map (\(mn, elems) -> (mn, [g | (GlobalDeclaration g) <- elems])) prjprogs
         modsWithGlobals = filter (\(_, objs) -> not (null objs)) globals
         incs = map fst modsWithGlobals
-        includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True))) incs
+        includes = genIncludes incs
 
         initFunctionName = namefy $ "termina_app" <::> "init_globals"
 
         includeTermina = CPPDirective (CPPInclude True ("termina" <.> "h")) (internalAnn (CPPDirectiveAnn True))
+
+        -- Generate include preprocessor directives for the modules
+        genIncludes :: [QualifiedName] -> [CFileItem]
+        genIncludes [] = []
+        genIncludes (inc:xincs) = 
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn True)) : genIncludes' xincs
+        
+        genIncludes' :: [QualifiedName] -> [CFileItem]
+        genIncludes' [] = []
+        genIncludes' (inc:xincs) =
+            CPPDirective (CPPInclude False (inc <.> "h")) (internalAnn (CPPDirectiveAnn False)) : genIncludes' xincs
 
         genItems :: [Global SemanticAnn] -> CGenerator [CCompoundBlockItem]
         genItems [] = return []
