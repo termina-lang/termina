@@ -340,6 +340,8 @@ constFoldExpression (MonadicVariantInitializer (Error expr) _) = do
   constFoldExpression expr
 constFoldExpression (EnumVariantInitializer _ _ exprs _) =
   mapM_ constFoldExpression exprs
+constFoldExpression (StructInitializer fvas _) = do
+  mapM_ constFoldFieldAssignment fvas
 constFoldExpression e = throwError $ annotateError Internal (EInvalidExpression $ "invalid expression: " ++ show e)
 
 constFoldFlowTransfer :: [Expression SemanticAnn] -> TPFunction SemanticAnn -> ConstFoldMonad ()
@@ -356,6 +358,23 @@ constFoldFlowTransfer exprs func@(TPFunction _ params _ _ ann) = do
     -- If the function has constant parameters, we need to evaluate the function
     when (functionHasConstParams func) (constFoldFunction func)
     
+constFoldFieldAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad ()
+constFoldFieldAssignment (FieldValueAssignment _ expr (SemanticAnn (ETy (SimpleType ty)) loc')) = do
+  constFoldCheckExprType loc' ty expr
+constFoldFieldAssignment (FieldValueAssignment _ _ ann) = do
+  throwError $ annotateError (getLocation ann) EInvalidFieldValueAssignmentAnnotation
+constFoldFieldAssignment (FieldAddressAssignment {}) = return ()
+constFoldFieldAssignment (FieldPortConnection AccessPortConnection _ _ (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy _ portSize glbSize))) loc')) = do
+  portSizeValue <- evalConstExpression portSize
+  glbSizeValue <- evalConstExpression glbSize
+  case (portSizeValue, glbSizeValue) of
+    (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
+      if lhs == rhs then
+        return ()
+      else
+        throwError $ annotateError loc' (EAtomicArrayConnectionSizeMismatch lhs rhs)
+    _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
+constFoldFieldAssignment (FieldPortConnection {}) = return ()
 
 constFoldCheckExprType :: Location -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
 constFoldCheckExprType loc (TArray ty arraySize) initExpr@(ArrayInitializer assignmentExpr _ _) = do
@@ -399,28 +418,6 @@ constFoldCheckExprType loc (TArray _ arraySize) initExpr@(StringInitializer {}) 
       else
         throwError $ annotateError loc (EStringInitializerSizeMismatch lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-constFoldCheckExprType _ (TStruct _) (StructInitializer fas _) = do
-  mapM_ constFoldFieldAssignment fas
-
-  where
-
-    constFoldFieldAssignment :: FieldAssignment SemanticAnn -> ConstFoldMonad ()
-    constFoldFieldAssignment (FieldValueAssignment _ expr (SemanticAnn (ETy (SimpleType ty)) loc')) = do
-      constFoldCheckExprType loc' ty expr
-    constFoldFieldAssignment (FieldValueAssignment _ _ ann) = do
-      throwError $ annotateError (getLocation ann) EInvalidFieldValueAssignmentAnnotation
-    constFoldFieldAssignment (FieldAddressAssignment {}) = return ()
-    constFoldFieldAssignment (FieldPortConnection AccessPortConnection _ _ (SemanticAnn (STy (PortConnection (APAtomicArrayConnTy _ portSize glbSize))) loc')) = do
-      portSizeValue <- evalConstExpression portSize
-      glbSizeValue <- evalConstExpression glbSize
-      case (portSizeValue, glbSizeValue) of
-        (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
-          if lhs == rhs then
-            return ()
-          else
-            throwError $ annotateError loc' (EAtomicArrayConnectionSizeMismatch lhs rhs)
-        _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-    constFoldFieldAssignment (FieldPortConnection {}) = return ()
 constFoldCheckExprType _ _ expr = constFoldExpression expr
 
 constFoldStatement :: Statement SemanticAnn -> ConstFoldMonad ()
@@ -588,6 +585,21 @@ loadGlobalConstEvironment = do
     constExpr <- evalConstExpression expr
     ST.modify (\s -> s { globalConstEnv = M.insert identifier constExpr (globalConstEnv s) })) (M.elems glbConstants)
 
+constFoldGlobalEnvironment :: BasicBlocksModule -> ConstFoldMonad ()
+constFoldGlobalEnvironment (TerminaModuleData _ _ _ _ _ (BasicBlockData ast)) = do
+  mapM_ constFoldGlobalDeclaration ast
+
+  where
+
+    constFoldGlobalDeclaration :: AnnASTElement SemanticAnn -> ConstFoldMonad ()
+    constFoldGlobalDeclaration (GlobalDeclaration (Resource _ ty (Just expr) _ ann)) = do
+        constFoldCheckExprType (getLocation ann) ty expr
+    constFoldGlobalDeclaration (GlobalDeclaration (Task _ ty (Just expr) _ ann)) = do
+        constFoldCheckExprType (getLocation ann) ty expr
+    constFoldGlobalDeclaration (GlobalDeclaration (Handler _ ty (Just expr) _ ann)) = do
+        constFoldCheckExprType (getLocation ann) ty expr
+    constFoldGlobalDeclaration _ = return ()
+
 evalFieldType :: FieldDefinition SemanticAnn -> ConstFoldMonad (FieldDefinition SemanticAnn)
 evalFieldType (FieldDefinition name ty (SemanticAnn (FTy SimpleField) loc)) = do
   ty' <- evalExpressionType loc ty
@@ -636,6 +648,7 @@ runConstFolding bbProject progArchitecture =
         } in
   case flip ST.runState env . runExceptT $
     loadGlobalConstEvironment >>
+    mapM constFoldGlobalEnvironment bbProject >>
     mapM_ (\func -> unless (functionHasConstParams func) $
         constFoldFunction func) (M.elems $ functions progArchitecture) >>
     forM_ (tasks progArchitecture) (\task -> do
