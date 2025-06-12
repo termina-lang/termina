@@ -8,13 +8,13 @@ module Modules.Modules where
 import qualified Data.Text as T
 import Data.Time
 import Utils.Annotations
-import Extras.TopSort
+import Extras.Graph
 
 data ModuleDependency = ModuleDependency QualifiedName Location
   deriving Show
 
-instance TopSortKey QualifiedName ModuleDependency where
-  topSortKey (ModuleDependency qname _) = qname
+instance GraphKey QualifiedName ModuleDependency where
+  graphKey (ModuleDependency qname _) = qname
 
 -- | Data type used to represented a loaded module
 -- | It contains the module's name, the list of imported modules, the source code

@@ -22,7 +22,7 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 
-import Extras.TopSort
+import Extras.Graph
 
 ----------------------------------------
 -- Libaries and stuff
@@ -275,7 +275,6 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                 (MemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
                 (DerefMemberFunctionCall _obj mident _args cann) -> throwError (annotateError cann (EMemberAccessNotFunction mident))
                 _ -> error "Internal TopSort Error. This should not happen"
-            Left e -> error $ "Internal TopSort Error" ++ show e
             -- Get the proper order of inclusion and get their definitions from names.
             Right order ->
               mapM

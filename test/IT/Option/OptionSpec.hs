@@ -59,8 +59,9 @@ spec = do
               "} CHousekeeping;\n" ++
               "\n" ++   
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
-              "\n" ++   
-              "__status_int32_t CHousekeeping__action0(void * const __this, uint32_t _data);\n" ++
+              "\n" ++
+              "__status_int32_t CHousekeeping__action0(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, uint32_t _data);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints option header file of test0" $ do

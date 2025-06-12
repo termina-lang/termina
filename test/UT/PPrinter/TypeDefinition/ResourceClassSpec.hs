@@ -119,159 +119,116 @@ spec = do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_id_t __mutex_id;\n" ++
+          "    __termina_resource_lock_type_t __lock_type;\n" ++
           "} Class0;\n" ++
           "\n" ++
-          "void Class0__procedure0(void * const __this, uint8_t param0, uint16_t param1,\n" ++
+          "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+          "                        void * const __this, uint8_t param0, uint16_t param1,\n" ++
           "                        uint32_t param2, uint64_t param3, int8_t param4,\n" ++
-          "                        int16_t param5, int32_t param6, int64_t param7);\n" ++
-          "void Class0__procedure0__mutex_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    uint16_t param1, uint32_t param2,\n" ++
-          "                                    uint64_t param3, int8_t param4,\n" ++
-          "                                    int16_t param5, int32_t param6,\n" ++
-          "                                    int64_t param7);\n" ++
-          "void Class0__procedure0__task_lock(void * const __this, uint8_t param0,\n" ++
-          "                                   uint16_t param1, uint32_t param2,\n" ++
-          "                                   uint64_t param3, int8_t param4,\n" ++
-          "                                   int16_t param5, int32_t param6,\n" ++
-          "                                   int64_t param7);\n" ++
-          "void Class0__procedure0__event_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    uint16_t param1, uint32_t param2,\n" ++
-          "                                    uint64_t param3, int8_t param4,\n" ++
-          "                                    int16_t param5, int32_t param6,\n" ++
-          "                                    int64_t param7);")
+          "                        int16_t param5, int32_t param6, int64_t param7);")
     it "Prints a class with two procedures and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithTwoProceduresAndZeroFields `shouldBe`
         pack (
           "\ntypedef struct {\n" ++
-          "    __termina_id_t __mutex_id;\n" ++
+          "    __termina_resource_lock_type_t __lock_type;\n" ++
           "} Class0;\n" ++
           "\n" ++
-          "void Class0__procedure0(void * const __this, uint8_t param0,\n" ++
+          "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+          "                        void * const __this, uint8_t param0,\n" ++
           "                        __option_box_t param1);\n" ++
-          "void Class0__procedure0__mutex_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    __option_box_t param1);\n" ++
-          "void Class0__procedure0__task_lock(void * const __this, uint8_t param0,\n" ++
-          "                                   __option_box_t param1);\n" ++
-          "void Class0__procedure0__event_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    __option_box_t param1);\n" ++
           "\n" ++
-          "void Class0__procedure1(void * const __this, uint8_t param0,\n" ++
-          "                        uint8_t param1[32U]);\n" ++
-          "void Class0__procedure1__mutex_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    uint8_t param1[32U]);\n" ++
-          "void Class0__procedure1__task_lock(void * const __this, uint8_t param0,\n" ++
-          "                                   uint8_t param1[32U]);\n" ++
-          "void Class0__procedure1__event_lock(void * const __this, uint8_t param0,\n" ++
-          "                                    uint8_t param1[32U]);")
+          "void Class0__procedure1(const __termina_event_t * const __ev,\n" ++
+          "                        void * const __this, uint8_t param0,\n" ++
+          "                        uint8_t param1[32U]);")
     it "Prints a class marked as no_handler with one procedure and zero fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithoutOneProcedureAndZeroFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a class marked as no_handler with two fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes noHandlerClassWithOneEmptyProcedure `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a class with one procedure and two fields" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithOneProcedureAndTwoFields `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint8_t field0;\n" ++
             "    uint64_t field1[24U];\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a packed class" $ do
       renderTypeDefinitionDecl emptyMonadicTypes packedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
             "} __attribute__((packed)) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this, char param0, uint8_t param1[16U]);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this, char param0,\n" ++
-            "                                    uint8_t param1[16U]);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this, char param0,\n" ++
-            "                                   uint8_t param1[16U]);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this, char param0,\n" ++
-            "                                    uint8_t param1[16U]);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this, char param0, uint8_t param1[16U]);")
     it "Prints an aligned class" $ do
       renderTypeDefinitionDecl emptyMonadicTypes alignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint64_t field0;\n" ++
             "    uint16_t field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
             "} __attribute__((aligned(16U))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a packed & aligned class" $ do
       renderTypeDefinitionDecl emptyMonadicTypes packedAndAlignedClass `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint64_t field0;\n" ++
             "    TCDescriptor field1;\n" ++
             "    TMDescriptor field2[32U];\n" ++
             "} __attribute__((packed, aligned(16U))) Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a class with a fixed location field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")
     it "Prints a class with an access port field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithAccessPortField `shouldBe`
         pack (
             "\ntypedef struct {\n" ++
-            "    __termina_id_t __mutex_id;\n" ++
+            "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    struct {\n" ++
             "        void * __that;\n" ++
-            "        void (* test0)(void * const);\n" ++
+            "        void (* test0)(const __termina_event_t * const, void * const);\n" ++
             "    } field1;\n" ++
             "} Class0;\n" ++
             "\n" ++
-            "void Class0__procedure0(void * const __this);\n" ++
-            "void Class0__procedure0__mutex_lock(void * const __this);\n" ++
-            "void Class0__procedure0__task_lock(void * const __this);\n" ++
-            "void Class0__procedure0__event_lock(void * const __this);")
+            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
+            "                        void * const __this);")

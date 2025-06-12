@@ -63,18 +63,16 @@ poolMemoryArea identifier = namefy $ "pool" <:> identifier <:> "memory"
 msgQueueSendMethodName :: Identifier
 msgQueueSendMethodName = namefy "termina_out_port" <::> "send"
 
-resourceLock, resourceUnlock :: Identifier
-resourceLock = namefy "termina_resource" <::> "lock"
-resourceUnlock = namefy "termina_resource" <::> "unlock"
-
-thatField, thisParam, selfParam :: Identifier
+thatField, thisParam, eventParam, selfParam, lockVar :: Identifier
 thatField = namefy "that"
 thisParam = namefy "this"
+eventParam = namefy "ev"
 selfParam = "self"
+lockVar = namefy "lock"
 
-mutexIDField, taskMsgQueueIDField,
+resourceLockTypeField, taskMsgQueueIDField,
     timerField, taskIDField, handlerIDField :: Identifier
-mutexIDField = namefy $ "mutex" <:> "id"
+resourceLockTypeField = namefy $ "lock" <:> "type"
 taskMsgQueueIDField = namefy $ "task" <:> "msg_queue" <:> "id"
 timerField = namefy $ "timer" <:> "id"
 taskIDField = namefy $ "task" <:> "id"
@@ -236,38 +234,45 @@ genAddrOf obj qual cAnn =
 
 genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CObject -> CExpression -> CAnns ->  m CExpression
 genPoolMethodCallExpr mName cObj cArg cAnn =
+    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
+        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
+    in
     case mName of
         "alloc" -> do
             let cObjExpr = CExprValOf (CField cObj thatField (CTPointer (getCObjType cObj) noqual)) (CTPointer (getCObjType cObj) noqual) cAnn
-                cFuncType = CTFunction (CTVoid noqual) [getCExprType cObjExpr, getCExprType cArg]
+                cFuncType = CTFunction (CTVoid noqual) [cEventArgType, getCExprType cObjExpr, getCExprType cArg]
                 cFunctionCall = CField cObj "alloc" cFuncType
-            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cObjExpr, cArg] (CTVoid noqual) cAnn
+            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cEventArg, cObjExpr, cArg] (CTVoid noqual) cAnn
         "free" -> do
             let cObjExpr = CExprValOf (CField cObj thatField (CTPointer (getCObjType cObj) noqual)) (CTPointer (getCObjType cObj) noqual) cAnn
-                cFuncType = CTFunction (CTVoid noqual) [getCExprType cObjExpr]
+                cFuncType = CTFunction (CTVoid noqual) [cEventArgType, getCExprType cObjExpr]
                 cFunctionCall = CField cObj "free" cFuncType
-            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cObjExpr, cArg] (CTVoid noqual) cAnn
+            return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cEventArg, cObjExpr, cArg] (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
 
 genMsgQueueSendNULLExpr :: (MonadError CGeneratorError m) => CObject -> CAnns -> m CExpression
 genMsgQueueSendNULLExpr cObj cAnn = do
-    let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
-    let cDataArg = CExprValOf (CVar "NULL" (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn
+    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
+        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
+        cFuncType = CTFunction (CTVoid noqual) [cEventArgType, getCObjType cObj, CTPointer (CTVoid noqual) noqual]
+        cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+        cDataArg = CExprValOf (CVar "NULL" (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn
     return $
-        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cEventArg, cObjExpr, cDataArg] (CTVoid noqual) cAnn
 
 genMsgQueueSendCall :: (MonadError CGeneratorError m) => CObject -> CExpression -> CAnns -> m CExpression
 genMsgQueueSendCall cObj cArg cAnn = do
-    let cArgType = getCExprType cArg
-    let cFuncType = CTFunction (CTVoid noqual) [CTPointer (CTVoid noqual) noqual]
-    let cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
+    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
+        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
+        cArgType = getCExprType cArg
+        cFuncType = CTFunction (CTVoid noqual) [cEventArgType, cArgType, CTPointer (CTVoid noqual) noqual]
+        cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
     -- | If it is a send, the first parameter is the object to be sent. The
     -- function is expecting to receive a reference to that object.
     cArgObj <- getCObject cArg
     let cDataArg = CExprCast (CExprAddrOf cArgObj (CTPointer cArgType noqual) cAnn) (CTPointer (CTVoid noqual) noqual) cAnn
     return $
-        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cObjExpr, cDataArg] (CTVoid noqual) cAnn
+        CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cEventArg, cObjExpr, cDataArg] (CTVoid noqual) cAnn
 
 genAtomicMethodCall :: (MonadError CGeneratorError m) => Identifier -> CExpression -> [CExpression] -> CAnns ->  m CExpression
 genAtomicMethodCall mName cObj cArgs cAnn =
@@ -311,15 +316,6 @@ buildCPPDirectiveAnn (SemanticAnn _ loc) before = LocatedElement (CPPDirectiveAn
 -- platform dependent
 enumFieldType :: CType
 enumFieldType = CTInt IntSize32 Unsigned noqual
-
-procedureMutexLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureMutexLock procedureId = return $ procedureId <::> "mutex" <:> "lock"
-
-procedureEventLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureEventLock procedureId = return $ procedureId <::> "event" <:> "lock"
-
-procedureTaskLock :: (MonadError CGeneratorError m) => Identifier -> m Identifier
-procedureTaskLock procedureId = return $ procedureId <::> "task" <:> "lock"
 
 taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 taskFunctionName classId = return $ namefy classId <::> "termina" <:> "task"

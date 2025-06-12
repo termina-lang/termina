@@ -16,6 +16,7 @@ import Generator.CodeGen.Application.Utils
 import Configuration.Configuration
 import Semantic.AST
 import Generator.CodeGen.Expression
+import Generator.CodeGen.Types
 import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
@@ -31,15 +32,16 @@ genConfigFile mName progArchitecture = do
         periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
         progPools = M.elems $ pools progArchitecture
 
-    resLockingMap <- genResLockingMap progArchitecture dependenciesMap
-
-    let mutexes = M.filter (\case{ OSALResourceLockMutex {} -> True; _ -> False }) resLockingMap
+    let resLockMap = genResourceLockings progArchitecture
+    let mutexes = 
+            M.filter (\case{ResourceLockMutex {} -> True; _ -> False}) resLockMap 
 
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
 
     cVariantsForTaskPorts <- concat <$> traverse genVariantsForTaskPorts (M.elems taskClss)
+    cEmitterDefines <- genDefineEmitterId (M.keys $ emitters progArchitecture)
     cMutexDefines <- genDefineMutexId (M.keys mutexes)
     cTaskDefines <- genDefineTaskId (M.keys $ tasks progArchitecture)
     cHandlerDefines <- genDefineHandlerId (M.keys $ handlers progArchitecture)
@@ -54,6 +56,7 @@ genConfigFile mName progArchitecture = do
             _ifndef "__CONFIG_H__",
             _define "__CONFIG_H__" Nothing
         ] ++ cVariantsForTaskPorts 
+        ++ cEmitterDefines
         ++ cMutexDefines 
         ++ cTaskDefines 
         ++ cHandlerDefines 
@@ -76,12 +79,10 @@ genConfigFile mName progArchitecture = do
 
     where
 
-        dependenciesMap = getResDependencies progArchitecture
-
         genMessagesForQueue :: OSALMsgQueue -> CGenerator [String]
         genMessagesForQueue (OSALTaskMsgQueue _ _ size) = do
             cSize <- genExpression size
-            let cSizeOf = _sizeOfType (typeDef terminaID)
+            let cSizeOf = _sizeOfType __termina_event_t
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
@@ -93,10 +94,10 @@ genConfigFile mName progArchitecture = do
         -- | Message queues with unit type do not need to be accounted for when
         -- assigning memory for the message buffer.
         genMessagesForQueue (OSALChannelMsgQueue _ TUnit _ _ _) = return []
-        genMessagesForQueue (OSALChannelMsgQueue _ ts size _ _) = do
+        genMessagesForQueue (OSALChannelMsgQueue _ ty size _ _) = do
             cSize <- genExpression size
-            cTs <- genType noqual ts
-            let cSizeOf = _sizeOfType cTs
+            cTy <- genType noqual ty
+            let cSizeOf = _sizeOfType cTy
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [
@@ -105,10 +106,10 @@ genConfigFile mName progArchitecture = do
                     "        " <> ppSizeOf <> " ",
                     "    ) "
                 ]
-        genMessagesForQueue (OSALSinkPortMsgQueue _ _ _ ts size) = do
+        genMessagesForQueue (OSALSinkPortMsgQueue _ _ _ ty size) = do
             cSize <- genExpression size
-            cTs <- genType noqual ts
-            let cSizeOf = _sizeOfType cTs
+            cTy <- genType noqual ty
+            let cSizeOf = _sizeOfType cTy
                 ppSize = unpack . render $ runReader (pprint cSize) (CPrinterConfig False False)
                 ppSizeOf = unpack . render $ runReader (pprint cSizeOf) (CPrinterConfig False False)
             return [

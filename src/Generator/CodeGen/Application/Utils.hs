@@ -15,11 +15,9 @@ import qualified Data.Map as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Expression
 import Generator.CodeGen.Types
-import qualified Data.Set as S
-import ControlFlow.Architecture.Utils
 import Utils.Annotations
 
--- | Data type used to represent a message queue in OSAL
+-- | Data type used to represent a message queue in OSAL
 --  There are different types depending on the original source code element that
 --  generated the message queue
 data OSALMsgQueue =
@@ -41,14 +39,7 @@ data OSALMsgQueue =
       (Expression SemanticAnn) -- ^ message queue size
     deriving Show
 
--- | Data type used to represent a resource lock in OSAL
-data OSALResourceLock =
-    OSALResourceLockNone -- ^ no resource lock
-    | OSALResourceLockIrq  -- ^ interrupt lock (disable and enable interrupts)
-    | OSALResourceLockMutex TInteger -- ^ mutex lock with priority-ceiling protocol
-    deriving Show
-
--- | This function generates the list of OSAL message queues that must be created
+-- | This function generates the list of OSAL message queues that must be created
 -- from the list of tasks in the program architecture. For each task, a message queue
 -- is created for each sink port of the task.
 getSinkPortMessageQueues :: (MonadError CGeneratorError m) => TerminaProgArch SemanticAnn -> m [OSALMsgQueue]
@@ -174,40 +165,6 @@ genAtomicArrayDeclarations (obj : objs) = do
     rest <- mapM (genAtomicArrayDeclaration False) objs
     return $ decl : rest
 
--- | Generates a map between the resources and the locking mechanism that must be used
-genResLockingMap :: (MonadError CGeneratorError m) => TerminaProgArch a -> M.Map Identifier (S.Set Identifier) -> m (M.Map Identifier OSALResourceLock)
-genResLockingMap progArchitecture = foldM (\acc (resId, resDeps) -> do
-        resLocking <- getResLocking (S.toList resDeps)
-        return $ M.insert resId resLocking acc
-    ) M.empty . M.toList
-
-    where
-
-        -- | Obtains the locking mechanism that must be used for a resource
-        getResLocking :: (MonadError CGeneratorError m) => [Identifier] -> m OSALResourceLock
-        getResLocking [] = return OSALResourceLockNone
-        getResLocking [_] = return OSALResourceLockNone
-        getResLocking (ident: ids) = 
-            case M.lookup ident (handlers progArchitecture) of
-                Just _ -> return OSALResourceLockIrq
-                Nothing -> case M.lookup ident (tasks progArchitecture) of
-                    Just tsk -> 
-                        getResLocking' (getPriority tsk) ids
-                    Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"
-
-        getResLocking' :: (MonadError CGeneratorError m) =>  TInteger -> [Identifier] -> m OSALResourceLock
-        -- | If we have reach the end of the list, it means that there are at least two different tasks that
-        -- access the resource. We are going to force the use of the priority ceiling algorithm. In the
-        -- (hopefully near) future, we will support algorithm selection via the configuration file.
-        getResLocking' ceilPrio [] = return $ OSALResourceLockMutex ceilPrio
-        getResLocking' ceilPrio (ident' : ids') = 
-            case M.lookup ident' (handlers progArchitecture) of
-                Just _ -> return OSALResourceLockIrq
-                Nothing -> case M.lookup ident' (tasks progArchitecture) of
-                    Just tsk -> 
-                        getResLocking' (min ceilPrio (getPriority tsk)) ids'
-                    Nothing -> throwError $ InternalError "genResLockingMap: the resource does not depend on a task nor a handler"
-
 genDefineMutexIdLabel :: Identifier -> CGenerator Identifier
 genDefineMutexIdLabel m = return $ namefy m <::> "mutex_id"
 
@@ -285,8 +242,27 @@ genDefinePoolId (pl : xs) = do
             this_pool <- genDefinePoolIdLabel p
             return $ _define this_pool (Just [show value]) : rest
 
+genDefineEmitterIdLabel :: Identifier -> CGenerator Identifier
+genDefineEmitterIdLabel e = return $ namefy e <::> "emitter" <:> "id"
+
+genDefineEmitterId :: [Identifier] -> CGenerator [CFileItem]
+genDefineEmitterId [] = return []
+genDefineEmitterId (emitter : xs) = do
+    this_emitter <- genDefineEmitterIdLabel emitter
+    rest <- genDefineEmitterId' xs 1
+    return $ pre_cr (_define this_emitter (Just [show (0 :: Integer)])) : rest
+
+    where
+
+        genDefineEmitterId' :: [Identifier] -> Integer -> CGenerator [CFileItem]
+        genDefineEmitterId' [] _ = return []
+        genDefineEmitterId' (e : xe) value = do
+            rest <- genDefineEmitterId' xe (value + 1)
+            this_emitter <- genDefineEmitterIdLabel e
+            return $ _define this_emitter (Just [show value]) : rest
+
 genDefineTimerIdLabel :: Identifier -> CGenerator Identifier
-genDefineTimerIdLabel t = return $ namefy t <::> "timer_id"
+genDefineTimerIdLabel t = return $ namefy t <::> "timer" <:> "id"
 
 genDefineTimerId :: [Identifier] -> CGenerator [CFileItem]
 genDefineTimerId [] = return []

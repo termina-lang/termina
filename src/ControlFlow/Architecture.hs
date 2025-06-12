@@ -1,5 +1,5 @@
 module ControlFlow.Architecture (
-    runGenArchitecture, emptyTerminaProgArch, getResDependencies, getGlobDeclModules
+    runGenArchitecture, emptyTerminaProgArch, getGlobDeclModules
 ) where
 
 import ControlFlow.Architecture.Types

@@ -4,14 +4,16 @@ module ControlFlow.Architecture.Utils where
 
 import ControlFlow.BasicBlocks.AST
 import ControlFlow.Architecture.Types
-import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Map.Strict as M
 import Data.List (group, sort, foldl')
 import Control.Monad.Except
 import ControlFlow.Architecture.Errors
 import Semantic.Types
 import Utils.Annotations
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, isJust)
+import qualified Data.Set as S
+import Extras.Graph (findDisjointPaths, reverseGraph)
+import Control.Monad.State
 
 getEmitterIdentifier :: TPEmitter a -> Identifier
 getEmitterIdentifier (TPInterruptEmittter ident _) = ident
@@ -20,25 +22,25 @@ getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 
 getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
-getMemberFunctions = foldl' (\acc member -> 
+getMemberFunctions = foldl' (\acc member ->
   case member of
-    ClassMethod identifier mRetTy blk ann  -> 
+    ClassMethod identifier mRetTy blk ann  ->
       M.insert identifier (TPFunction identifier [] mRetTy blk ann)   acc
-    ClassProcedure identifier params blk ann -> 
+    ClassProcedure identifier params blk ann ->
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
-    ClassAction identifier Nothing rty blk ann -> 
+    ClassAction identifier Nothing rty blk ann ->
       M.insert identifier (TPFunction identifier [] (Just rty) blk ann) acc
-    ClassAction identifier (Just param) rty blk ann -> 
+    ClassAction identifier (Just param) rty blk ann ->
       M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
-    ClassViewer identifier params mRetTy blk ann -> 
+    ClassViewer identifier params mRetTy blk ann ->
       M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
     _ -> acc
   ) M.empty
 
 getInputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, Identifier)
-getInputPorts = foldl' (\acc member -> 
+getInputPorts = foldl' (\acc member ->
   case member of
-    ClassField (FieldDefinition fid fty _) -> 
+    ClassField (FieldDefinition fid fty _) ->
       case fty of
         TInPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
@@ -46,9 +48,9 @@ getInputPorts = foldl' (\acc member ->
   ) M.empty
 
 getSinkPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, Identifier)
-getSinkPorts = foldl' (\acc member -> 
+getSinkPorts = foldl' (\acc member ->
   case member of
-    ClassField (FieldDefinition fid fty _) -> 
+    ClassField (FieldDefinition fid fty _) ->
       case fty of
         TSinkPort dataTy action -> M.insert fid (dataTy, action) acc
         _ -> acc
@@ -56,9 +58,9 @@ getSinkPorts = foldl' (\acc member ->
   ) M.empty
 
 getOutputPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a)
-getOutputPorts = foldl' (\acc member -> 
+getOutputPorts = foldl' (\acc member ->
   case member of
-    ClassField (FieldDefinition fid fty _) -> 
+    ClassField (FieldDefinition fid fty _) ->
       case fty of
         TOutPort dataTy -> M.insert fid dataTy acc
         _ -> acc
@@ -69,7 +71,7 @@ getPortType :: Identifier -> [ClassMember a] -> TerminaType a
 getPortType ident [] = error $ "Internal error: no port with identifier " ++ ident
 getPortType ident (member : members) =
   case member of
-    ClassField (FieldDefinition fid fty _) | fid == ident -> fty
+    ClassField (FieldDefinition fid fty _) | fid == ident -> fty
     _ -> getPortType ident members
 
 getClassMembers :: TypeDef a -> [ClassMember a]
@@ -77,25 +79,11 @@ getClassMembers (Class _ _ members _ _) = members
 getClassMembers _ = error "Internal error: getClassMembers called with the non-class type definition"
 
 getConnectedEmitters :: TerminaProgArch a -> [TPEmitter a]
-getConnectedEmitters tp = 
+getConnectedEmitters tp =
   filter (\emitter -> M.member (getEmitterIdentifier emitter) (emitterTargets tp)) $ M.elems (emitters tp)
 
-getResDependencies :: TerminaProgArch a -> M.Map Identifier (S.Set Identifier)
-getResDependencies progArchitecture = 
-  foldr (\(resource, resDeps) acc ->
-      -- | This means that the resource depends on other resources
-      -- We must obtain the list of tasks and handlers that depend on the resource
-      case M.lookup resource acc of
-        Nothing ->
-          -- | This means that the resource only depends on other resources
-          acc
-        Just agents ->
-          -- | This means that the resource depends on other resources and on tasks or handlers
-          -- We must update the list of tasks and handlers that depend on the resource
-          -- with the list of tasks and handlers that depend on the resources that the resource depends on
-          foldr (\agent acc' ->
-            resDependencies agent (S.toList resDeps) acc') acc (S.toList agents)
-    ) reverseDependencies (M.toList resDependenciesMap)
+genResourceUsageGraph :: TerminaProgArch a -> M.Map Identifier [Identifier]
+genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
 
   where
 
@@ -103,60 +91,154 @@ getResDependencies progArchitecture =
     -- resource identifier and the value is the set of resources that the
     -- resource depends on.
     resDependenciesMap :: M.Map Identifier (S.Set Identifier)
-    resDependenciesMap = foldr (\(TPResource identifier _ aps _ _) acc ->
-        if null aps then acc else
-          M.insert identifier (S.fromList (fst <$> M.elems aps)) acc
-      ) M.empty (M.elems (resources progArchitecture))
+    resDependenciesMap =
+      let initialMap = M.fromList $
+            map (, S.empty) (M.keys (pools progArchitecture)) ++
+            map (, S.empty) (M.keys (atomics progArchitecture)) ++
+            map (, S.empty) (M.keys (atomicArrays progArchitecture))
+          resoucesGraph = foldr (\(TPResource identifier _ aps _ _) acc ->
+              M.insert identifier (S.fromList (fst <$> M.elems aps)) acc
+            ) initialMap (M.elems (resources progArchitecture))
+          tasksGraph = foldr (\(TPTask identifier _ _ _ _ apConns _ _ _) acc ->
+              M.insert identifier (S.fromList (fst <$> M.elems apConns)) acc
+            ) resoucesGraph (M.elems (tasks progArchitecture))
+          handlersGraph = foldr (\(TPHandler identifier _ _ _ apConns _ _ _) acc ->
+              M.insert identifier (S.fromList (fst <$> M.elems apConns)) acc
+            ) tasksGraph (M.elems (handlers progArchitecture))
 
-    reverseTaskDependencies :: M.Map Identifier (S.Set Identifier)
-    reverseTaskDependencies = foldr (\(TPTask identifier _ _ _ _ apConns _ _ _) acc ->
-        foldr (\(target, _) acc' ->
-          case M.lookup target acc' of
-            Nothing -> M.insert target (S.singleton identifier) acc'
-            Just ids -> M.insert target (S.insert identifier ids) acc'
-          ) acc (M.elems apConns)
-      ) M.empty (M.elems (tasks progArchitecture))
+      in
+        handlersGraph
 
-    reverseDependencies :: M.Map Identifier (S.Set Identifier)
-    reverseDependencies = foldr (\(TPHandler identifier _ _ _ apConns _ _ _) acc ->
-        foldr (\(target, _) acc' ->
-          case M.lookup target acc' of
-            Nothing -> M.insert target (S.singleton identifier) acc'
-            Just ids -> M.insert target (S.insert identifier ids) acc'
-          ) acc (M.elems apConns)
-      ) reverseTaskDependencies (M.elems (handlers progArchitecture))
 
-    -- | Now we must update the reverse dependencies map with the resource dependencies
-    -- This is done by iterating over the resource dependencies map and updating the
-    -- reverse dependencies map with the resource dependencies
-    resDependencies ::
-      -- | Task or handler identifier
-      Identifier
-      -- | List of resources that indirectly depend on the task or handler
-      -> [Identifier]
-      -- | Accumulator
-      -> M.Map Identifier (S.Set Identifier)
-      -> M.Map Identifier (S.Set Identifier)
-    resDependencies _ [] acc = acc
-    resDependencies agent (res : ress) acc =
-        let acc' = case M.lookup res acc of
-                  Nothing -> M.insert res (S.singleton agent) acc
-                  Just agents -> M.insert res (S.insert agent agents) acc in
-        case M.lookup res resDependenciesMap of
-          Nothing -> resDependencies agent ress acc'
-          Just ids ->
-            -- | ids is the list of tasks and handlers that the resource depends on.
-            -- We must recursively update the dependencies of these resources so that
-            -- they also depend on the agent
-            resDependencies agent ress $ resDependencies agent (S.toList ids) acc'
+-- | Obtains the required locking mechanisms for the resources in the program architecture.
+-- This function analyzes resource dependencies and determines the appropriate locking strategy
+-- based on the system architecture and access patterns.
+--
+-- The locking strategy is determined by:
+-- 1. Whether the resource is atomic (no locking needed)
+-- 2. The types of components accessing the resource (tasks, handlers, or the handler attached to the initial event)
+-- 3. The priority levels of tasks accessing the resource
+
+newtype ResLockingSt = ResLockingSt
+  { 
+    resLockingMap :: M.Map Identifier ResourceLock
+  }
+
+-- Monad to compute.
+-- Error TopSortError and State TopSt
+type ResLockingMonad = State ResLockingSt
+
+genResourceLockings :: TerminaProgArch a -> M.Map Identifier ResourceLock
+genResourceLockings programArchitecture =
+  evalState (genResourceLockingsInternal programArchitecture >> gets resLockingMap) (ResLockingSt M.empty)
+
+genResourceLockingsInternal :: TerminaProgArch a -> ResLockingMonad ()
+genResourceLockingsInternal programArchitecture =
+  let resIds = M.keys $ resources programArchitecture
+      poolIds = M.keys $ pools programArchitecture
+      atomicIds = M.keys (atomics programArchitecture) ++ M.keys (atomicArrays programArchitecture) in
+  mapM_ processResource (resIds ++ poolIds ++ atomicIds)
+
+  where
+
+    reversedGraph = reverseGraph $ genResourceUsageGraph programArchitecture
+
+    processResource ::
+        Identifier -- ^ Resource identifier
+        -> ResLockingMonad ResourceLock
+    processResource resId = do
+      resLockMap <- gets resLockingMap
+      case M.lookup resId resLockMap of
+        Just resLock -> return resLock
+        Nothing ->
+          if isAtomic resId then
+              -- Atomic resources don't need locking
+              let resLock = ResourceLockNone in
+              modify (\st ->
+                st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
+          else do
+            -- Non-atomic resources need appropriate locking based on their dependencies
+            case findDisjointPaths reversedGraph resId of
+              Left err -> error $ "error findDisjointPaths: " ++ show reversedGraph ++ " " ++ show resId ++ " " ++ show err
+              Right [] -> error $ "Internal error: no paths found for resource " ++ resId
+              Right [_] -> 
+                -- Atomic resources don't need locking
+                let resLock = ResourceLockNone in
+                modify (\st ->
+                  st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
+              Right paths -> do
+                let dest = head <$> paths
+                resLock <- getResLocking dest
+                modify (\st ->
+                  st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
+
+    -- | Checks if a resource is atomic (either a single atomic variable or an atomic array)
+    isAtomic :: Identifier -> Bool
+    isAtomic identifier = do
+        case M.lookup identifier (atomics programArchitecture) of
+            Just _ -> True
+            Nothing -> isJust $ M.lookup identifier (atomicArrays programArchitecture)
+
+    -- | Checks if a handler is the system initialization handler
+    isInitHandler :: Identifier -> Bool
+    isInitHandler ident =
+        case M.lookup "system_init" (emitterTargets programArchitecture) of
+            Just (ident', _, _) -> ident == ident'
+            Nothing -> False
+
+    -- | Obtains the locking mechanism that must be used for a resource
+    getResLocking :: [Identifier] -> ResLockingMonad ResourceLock
+    getResLocking [] = error "Internal error: empty resource list in getResLocking"
+    getResLocking [_] = return ResourceLockNone
+    getResLocking (ident: ids) = do
+        case M.lookup ident (handlers programArchitecture) of
+            Just _ -> do
+              if isInitHandler ident then getResLocking ids
+              else return ResourceLockIrq
+            Nothing -> case M.lookup ident (tasks programArchitecture) of
+                Just tsk -> getResLocking' (getPriority tsk) ids
+                Nothing -> case M.lookup ident (resources programArchitecture) of 
+                  Just (TPResource ident' _ _ _ _ ) -> do
+                    resLock <- processResource ident'
+                    case resLock of
+                      ResourceLockNone -> getResLocking ids
+                      ResourceLockIrq -> return ResourceLockIrq
+                      ResourceLockMutex ceilPrio -> getResLocking' ceilPrio ids
+                  Nothing ->
+                    error $ "Internal error: resource not found in usage map: " ++ ident
+
+
+    getResLocking' :: TInteger -> [Identifier] -> ResLockingMonad ResourceLock
+    -- | If we have reach the end of the list, it means that there are at least two different tasks that
+    -- access the resource. We are going to force the use of the priority ceiling algorithm. In the
+    -- (hopefully near) future, we will support algorithm selection via the configuration file.
+    getResLocking' ceilPrio [] = return $ ResourceLockMutex ceilPrio
+    getResLocking' ceilPrio (ident : ids) =
+        case M.lookup ident (handlers programArchitecture) of
+            Just _ ->
+              if isInitHandler ident  then getResLocking' ceilPrio ids
+              else return ResourceLockIrq
+            Nothing -> case M.lookup ident (tasks programArchitecture) of
+                Just tsk ->
+                    getResLocking' (min ceilPrio (getPriority tsk)) ids
+                Nothing -> case M.lookup ident (resources programArchitecture) of 
+                  Just (TPResource ident' _ _ _ _ ) -> do
+                    resLock <- processResource ident'
+                    case resLock of
+                      ResourceLockNone -> getResLocking ids
+                      ResourceLockIrq -> return ResourceLockIrq
+                      ResourceLockMutex ceilPrio' -> getResLocking' (min ceilPrio ceilPrio') ids
+                  Nothing ->
+                    error $ "Internal error: resource not found in usage map: " ++ ident
+
 
 getGlobDeclModules :: TerminaProgArch a -> [QualifiedName]
-getGlobDeclModules progArchitecture = 
-  map head . group . sort $ taskModules 
-    ++ handlerModules 
+getGlobDeclModules progArchitecture =
+  map head . group . sort $ taskModules
+    ++ handlerModules
     ++ catMaybes resourceModules
-    ++ poolModules 
-    ++ atomicModules 
+    ++ poolModules
+    ++ atomicModules
     ++ atomicArrayModules
   where
     taskModules = map taskModule $ M.elems (tasks progArchitecture)
@@ -243,13 +325,13 @@ getExprType (IsMonadicVariantExpression {}) = throwError $ annotateError Interna
 getPortName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
 getPortName obj = do
     obj_type <- getObjType obj
-    case obj_type of 
-        TAccessPort _ -> 
+    case obj_type of
+        TAccessPort _ ->
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
                 _ -> throwError $ annotateError Internal EInvalidPortAccessExpression
-        TOutPort _ -> 
+        TOutPort _ ->
             case obj of
                 (MemberAccess _ portName _) -> return portName
                 (DereferenceMemberAccess _ portName _) -> return portName
@@ -272,7 +354,7 @@ getObjBoxName obj@(Variable name _) = do
     TBoxSubtype _ -> return name
     _ -> throwError $ annotateError Internal EExpectedBoxSubtype
 getObjBoxName _ = throwError $ annotateError Internal EExpectedBoxSubtype
-  
+
 getExprOptionBoxName :: (MonadError ArchitectureError m) => Expression SemanticAnn -> m Identifier
 getExprOptionBoxName (AccessObject obj) = getObjOptionBoxName obj
 getExprOptionBoxName (ReferenceExpression _ak obj _ann) = getObjOptionBoxName obj
@@ -289,9 +371,9 @@ getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident id
 getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPInterruptEmittter identifier _ -> 
+        TPInterruptEmittter identifier _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _) -> 
+                Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of
                         Just _ -> emitter : acc
                         Nothing -> acc
@@ -302,23 +384,23 @@ getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
 getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPPeriodicTimerEmitter identifier _ _ -> 
+        TPPeriodicTimerEmitter identifier _ _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
-                Just (entity, _port, _) -> 
+                Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of
                         Just _ -> emitter : acc
                         Nothing -> acc
                 Nothing -> acc
         _ -> acc
     ) [] (getConnectedEmitters progArchitecture)
-  
+
 -- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
 getPriority :: TPTask a -> TInteger
 getPriority = getPriority' . taskModifiers
 
   where
-    
+
     getPriority' :: [Modifier a] -> TInteger
     getPriority' [] = TInteger 255 DecRepr
     getPriority' ((Modifier "priority" (Just (I priority _))) : _) = priority
@@ -331,17 +413,17 @@ getStackSize :: TPTask a -> TInteger
 getStackSize = getStackSize' . taskModifiers
 
   where
-    
+
     getStackSize' :: [Modifier a] -> TInteger
     getStackSize' [] = TInteger 4096 DecRepr
     getStackSize' ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
     getStackSize' (_ : modifiers) = getStackSize' modifiers
-  
+
 isUnprotected :: ProcedureSeman a -> Bool
 isUnprotected (ProcedureSeman _ _ modifiers)= isUnprotected' modifiers
 
   where
-    
+
     isUnprotected' :: [Modifier a] -> Bool
     isUnprotected' [] = False
     isUnprotected' ((Modifier "unprotected" Nothing) : _) = True

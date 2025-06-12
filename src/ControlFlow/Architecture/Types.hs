@@ -125,6 +125,13 @@ instance Annotated TPEmitter where
   updateAnnotation (TPSystemInitEmitter i _) = TPSystemInitEmitter i
   updateAnnotation (TPSystemExceptEmitter i _) = TPSystemExceptEmitter i
 
+-- | Represents the different types of resource locking mechanisms available in the system
+data ResourceLock
+    = ResourceLockNone    -- ^ No locking required (for atomic resources or single access)
+    | ResourceLockMutex TInteger -- ^ Mutex-based locking with priority ceiling
+    | ResourceLockIrq -- ^ The resource is shared between one or more tasks and one or more handlers
+  deriving Show
+
 data TPResource a = TPResource {
 
     -- | Name of the resource

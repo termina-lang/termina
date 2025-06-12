@@ -5,7 +5,7 @@ module Semantic.Utils where
 import Core.AST
 import Parser.AST
 import qualified Data.Map as M
-import Extras.TopSort
+import Extras.Graph
 import qualified Data.Set as S
 import qualified Semantic.AST as SAST
 
@@ -37,8 +37,8 @@ type SelfInvocation a = M.Map Identifier (Expression a)
 data SelfDep a = SelfDep Identifier a
   deriving Show
 
-instance TopSortKey Identifier (SelfDep a) where
-  topSortKey (SelfDep ident _) = ident
+instance GraphKey Identifier (SelfDep a) where
+  graphKey (SelfDep ident _) = ident
 
 type SelfDepMap a = M.Map Identifier (SelfInvocation a)
 

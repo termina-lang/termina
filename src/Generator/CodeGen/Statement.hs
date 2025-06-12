@@ -313,6 +313,13 @@ genFieldInitialization loc before level cObj fid expr = do
                     else
                         return [no_cr (cFieldObj @= cExpr) |>> loc]
 
+genProcedureType :: [Parameter SemanticAnn] -> CGenerator CType
+genProcedureType tsParams = do
+    tsParams' <- traverse (genType noqual . paramType) tsParams
+    let cEventArgType = ptr __termina_event_t
+        cThatArgType = _const . ptr $ void
+    return $ CTFunction void (cEventArgType : cThatArgType : tsParams')
+
 genStructInitialization ::
     Location
     -- | Prepend a line to the initialization expression 
@@ -335,7 +342,7 @@ genStructInitialization loc before level cObj expr = do
                 cPortFieldType <- genType noqual (TStruct resource)
                 let portFieldObj = cObj @. fid @: cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
-                clsFunctionType <- genFunctionType TUnit ptys
+                clsFunctionType <- genProcedureType ptys
                 let clsFunctionExpr = clsFunctionName @: clsFunctionType
                 if before then
                     return $ pre_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> getLocation ann
@@ -421,7 +428,7 @@ genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
 genBlocks (ProcedureCall obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genFunctionType ts pts
+            cFuncType <- genProcedureType pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
@@ -435,12 +442,14 @@ genBlocks (ProcedureCall obj ident args ann) = do
             cObj' <- genObject obj'
             return $ cObj' @. identifier @: CTTypeDef iface noqual
         _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
+    let cEventArg = eventParam @: ptr __termina_event_t
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
     return
         [pre_cr ((cObj @. ident @: cFuncType) @@
-            ((cObj @. thatField @: ptr void) : cArgs) |>> getLocation ann) |>> getLocation ann]
+            (cEventArg : (cObj @. thatField @: ptr void) : cArgs) |>> getLocation ann) |>> getLocation ann]
+    
 genBlocks (AllocBox obj arg ann) = do
     -- Generate the C code for the object
     cObj <- genObject obj
@@ -796,7 +805,7 @@ genBlocks (RebootBlock ann) = do
 genBlocks (SystemCall obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
-            cFuncType <- genFunctionType ts pts
+            cFuncType <- genSystemCallType pts
             cRetType <- genType noqual ts
             return (cFuncType, cRetType)
         _ -> throwError $ InternalError $ "Invalid function annotation: " ++ show ann
@@ -811,10 +820,19 @@ genBlocks (SystemCall obj ident args ann) = do
             return $ cObj' @. identifier @: CTTypeDef iface noqual
         _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
     -- Generate the C code for the parameters
+    let cEventArg = eventParam @: ptr __termina_event_t
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
     return
-        [pre_cr ((cObj @. ident @: cFuncType) @@ cArgs |>> getLocation ann) |>> getLocation ann]
+        [pre_cr ((cObj @. ident @: cFuncType) @@ (cEventArg : cArgs) |>> getLocation ann) |>> getLocation ann]
+
+    where 
+
+        genSystemCallType :: [Parameter SemanticAnn] -> CGenerator CType
+        genSystemCallType tsParams = do
+            tsParams' <- traverse (genType noqual . paramType) tsParams
+            let cEventArgType = ptr __termina_event_t
+            return $ CTFunction void (cEventArgType : tsParams')
 
 genStatement :: Statement SemanticAnn -> CGenerator [CCompoundBlockItem]
 genStatement (AssignmentStmt obj expr ann) = do

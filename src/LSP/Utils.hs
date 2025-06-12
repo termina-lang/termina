@@ -173,12 +173,12 @@ loadVSFile filePath = do
         (return . Left)
     Just fileContents -> return $ Right fileContents
 
-typeModules :: FilePath -> Environment -> [QualifiedName] -> HandlerM Environment
-typeModules _srcPath finalState [] = pure finalState
-typeModules srcPath prevState (m:ms) = do
+typeModules :: FilePath -> M.Map QualifiedName [QualifiedName] -> Environment -> [QualifiedName] -> HandlerM Environment
+typeModules _srcPath _prevModsMap finalState [] = pure finalState
+typeModules srcPath prevModsMap prevState (m:ms) = do
   parsedProject <- gets project_modules
   let parsedModule = parsedProject M.! m
-  let moduleDependencies = S.fromList $ getModuleDependencyList (importedModules <$> parsedProject) (importedModules parsedModule)
+  let moduleDependencies = S.fromList $ getModuleDependencyList prevModsMap (importedModules parsedModule)
   case parsing parsedModule of
     Nothing -> 
       -- This means that the module has not been parsed or that the parsing failed
@@ -204,10 +204,11 @@ typeModules srcPath prevState (m:ms) = do
           return prevState
         (Right (typedProgram, newState)) -> do
           let semanticData = SemanticData typedProgram
+          let newModsMap = M.insert m (S.toList moduleDependencies) prevModsMap
           modify (\s -> 
             s { 
               project_modules = M.insert m 
                   parsedModule { semantic = Just semanticData }
                   (project_modules s) })          
           -- | We need to update the project store
-          typeModules srcPath newState ms
+          typeModules srcPath newModsMap newState ms

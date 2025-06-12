@@ -16,6 +16,7 @@ import Generator.Monadic (emptyMonadicTypes)
 import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
+import Generator.CodeGen.Types
 import Generator.CodeGen.Expression
 
 genInitializeObj :: Location -> Bool -> Global SemanticAnn -> CGenerator [CCompoundBlockItem]
@@ -27,9 +28,22 @@ genInitializeObj loc before (Resource identifier ty@(TAtomicArray {}) (Just expr
     cType <- genType noqual ty
     let cObj = identifier @: cType
     genAtomicArrayInitialization loc before 0 cObj expr
-genInitializeObj loc before (Resource identifier _ (Just expr) _ _) = do
+genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization loc before 0 cObj expr
+    let cLockNone = 
+            cObj @. "__lock_type" @: __termina_resource_lock_type_t @. "type" @: enumFieldType
+                @= "__termina_resource_lock_type__none" @: enumFieldType
+    case mexpr of
+        Just expr -> do
+            strInitialization <- genStructInitialization loc False 0 cObj expr
+            if before
+                then return $ pre_cr cLockNone : strInitialization
+                else return $ no_cr cLockNone : strInitialization
+        Nothing -> do
+            -- If no expression is provided, we initialize the object with a default value
+            if before
+                then return [pre_cr cLockNone]
+                else return [no_cr cLockNone]
 genInitializeObj loc before (Task identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
     genStructInitialization loc before 0 cObj expr

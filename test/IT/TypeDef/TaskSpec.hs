@@ -78,10 +78,12 @@ spec = do
               "\n" ++   
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "_Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "                                    const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of task class CHousekeeping" $ do
@@ -89,7 +91,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "_Bool CHousekeeping__check_interval(const CHousekeeping * const self,\n" ++
+              "_Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "                                    const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit) {\n" ++
               "    \n" ++
               "    _Bool ret = 1;\n" ++
@@ -104,7 +107,8 @@ spec = do
               "\n" ++
               "}\n" ++ 
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
@@ -116,20 +120,20 @@ spec = do
               "    __option_box_t alloc_msg;\n" ++
               "    alloc_msg.__variant = None;\n" ++
               "\n" ++
-              "    self->message_pool.alloc(self->message_pool.__that, &alloc_msg);\n"  ++
+              "    self->message_pool.alloc(__ev, self->message_pool.__that, &alloc_msg);\n"  ++
               "\n"  ++
               "    if (alloc_msg.__variant == Some) {\n"  ++
               "        \n" ++
               "        __termina_box_t msg = alloc_msg.Some.__0;\n" ++
               "\n" ++
-              "        self->message_pool.free(self->message_pool.__that, msg);\n" ++
+              "        self->message_pool.free(__ev, self->message_pool.__that, msg);\n" ++
               "\n" ++
               "    } else {\n" ++
               "        \n"  ++
               "\n" ++
               "    }\n" ++
               "\n" ++
-              "    _Bool check = CHousekeeping__check_interval(self, 10U);\n" ++
+              "    _Bool check = CHousekeeping__check_interval(__ev, self, 10U);\n" ++
               "\n" ++
               "    if (check == 0) {\n" ++
               "        \n" ++
@@ -148,7 +152,7 @@ spec = do
               "\n" ++  
               "    int32_t status = 0L;\n" ++
               "\n" ++  
-              "    __termina_id_t next_msg = 0U;\n" ++
+              "    __termina_event_t event;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
               "    result.__variant = Success;\n" ++
@@ -157,14 +161,13 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &next_msg,\n" ++
-              "                                  &status);\n" ++
+              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++   
-              "        switch (next_msg) {\n" ++
+              "        switch (event.port_id) {\n" ++
               "            \n" ++               
               "            case __CHousekeeping__timer:\n" ++
               "\n" ++   
@@ -174,9 +177,10 @@ spec = do
               "                if (status != 0L) {\n" ++
               "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
-              "\n" ++   
-              "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
-              "\n" ++   
+              "\n" ++
+              "                result = CHousekeeping__timeout(&event, self,\n" ++
+              "                                                timeout__msg_data);\n" ++
+              "\n" ++
               "                if (result.__variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++

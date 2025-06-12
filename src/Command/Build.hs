@@ -121,16 +121,16 @@ loadModules imported srcPath = do
 
 typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
 typeModules parsedProject =
-  typeModules' M.empty
+  typeModules' M.empty M.empty
 
   where
 
 
-    typeModules' :: TypedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
-    typeModules' typedProject finalState [] = pure (typedProject, finalState)
-    typeModules' typedProject prevState (m:ms) = do
+    typeModules' :: TypedProject -> M.Map QualifiedName [QualifiedName] -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
+    typeModules' typedProject _ finalState [] = pure (typedProject, finalState)
+    typeModules' typedProject prevModsMap prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
-      let moduleDependencies = S.fromList $ getModuleDependencyList (importedModules <$> typedProject) (importedModules parsedModule)
+      let moduleDependencies = S.fromList $ getModuleDependencyList prevModsMap (importedModules parsedModule)
       let result = runTypeChecking prevState (typeTerminaModule (S.insert  m moduleDependencies) . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
@@ -150,7 +150,8 @@ typeModules parsedProject =
                   (importedModules parsedModule)
                   (sourcecode parsedModule)
                   (SemanticData typedProgram)
-          typeModules' (M.insert m typedModule typedProject) newState ms
+          let newModsMap = M.insert m (S.toList moduleDependencies) prevModsMap
+          typeModules' (M.insert m typedModule typedProject) newModsMap newState ms
 
 monadicTypesMapModules :: TypedProject -> MonadicTypes
 monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.elems

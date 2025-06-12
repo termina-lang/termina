@@ -60,7 +60,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -68,7 +69,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
@@ -91,7 +93,7 @@ spec = do
               "\n" ++  
               "    int32_t status = 0L;\n" ++
               "\n" ++  
-              "    __termina_id_t next_msg = 0U;\n" ++
+              "    __termina_event_t event;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
               "    result.__variant = Success;\n" ++
@@ -100,14 +102,13 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &next_msg,\n" ++
-              "                                  &status);\n" ++
+              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++   
-              "        switch (next_msg) {\n" ++
+              "        switch (event.port_id) {\n" ++
               "            \n" ++               
               "            case __CHousekeeping__timer:\n" ++
               "\n" ++   
@@ -118,8 +119,9 @@ spec = do
               "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
               "\n" ++   
-              "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
-              "\n" ++   
+              "                result = CHousekeeping__timeout(&event, self,\n" ++
+              "                                                timeout__msg_data);\n" ++
+              "\n" ++
               "                if (result.__variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
@@ -163,7 +165,8 @@ spec = do
               "\n" ++
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current);\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current);\n" ++
               "\n" ++
               "#endif\n")
     it "Prints definition of class with atomic access port" $ do
@@ -171,7 +174,8 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "__status_int32_t CHousekeeping__timeout(void * const __this, TimeVal current) {\n" ++
+              "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
+              "                                        void * const __this, TimeVal current) {\n" ++
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
@@ -194,7 +198,7 @@ spec = do
               "\n" ++  
               "    int32_t status = 0L;\n" ++
               "\n" ++  
-              "    __termina_id_t next_msg = 0U;\n" ++
+              "    __termina_event_t event;\n" ++
               "\n" ++   
               "    __status_int32_t result;\n" ++
               "    result.__variant = Success;\n" ++
@@ -203,14 +207,13 @@ spec = do
               "\n" ++ 
               "    for (;;) {\n" ++
               "        \n" ++  
-              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &next_msg,\n" ++
-              "                                  &status);\n" ++
+              "        __termina_msg_queue__recv(self->__task_msg_queue_id, &event, &status);\n" ++
               "\n" ++  
               "        if (status != 0L) {\n" ++
               "            break;\n" ++
               "        }\n" ++
               "\n" ++   
-              "        switch (next_msg) {\n" ++
+              "        switch (event.port_id) {\n" ++
               "            \n" ++               
               "            case __CHousekeeping__timer:\n" ++
               "\n" ++   
@@ -220,9 +223,10 @@ spec = do
               "                if (status != 0L) {\n" ++
               "                    __termina_except__msg_queue_recv_error(self->timer, status);\n" ++
               "                }\n" ++
-              "\n" ++   
-              "                result = CHousekeeping__timeout(self, timeout__msg_data);\n" ++
-              "\n" ++   
+              "\n" ++
+              "                result = CHousekeeping__timeout(&event, self,\n" ++
+              "                                                timeout__msg_data);\n" ++
+              "\n" ++
               "                if (result.__variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++

@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
+import Generator.CodeGen.Types
 
 
 cBinOp :: Op -> CBinaryOp
@@ -222,18 +223,20 @@ genMemberFunctionAccess obj ident args ann = do
             case ts of
                 -- | If the left hand size is a class:
                 (TGlobal _ classId) ->
-                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
+                    let cEventArg = eventParam @: ptr __termina_event_t in
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cEventArg : cObjExpr : cArgs) |>> getLocation ann
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
         (TGlobal _ classId) ->
+            let cEventArg = eventParam @: ptr __termina_event_t in
             case obj of
                 (Dereference _ _) ->
                     let selfCType = ptr (typeDef classId) in
                     -- | If we are here, it means that we are dereferencing the self object
-                    return $ ((classId <::> ident) @: cFuncType) @@ ("self" @: selfCType : cArgs) |>> getLocation ann 
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cEventArg : "self" @: selfCType : cArgs) |>> getLocation ann 
                     -- | If the left hand size is a class:
                 _ -> 
-                    return $ ((classId <::> ident) @: cFuncType) @@ (cObjExpr : cArgs) |>> getLocation ann
+                    return $ ((classId <::> ident) @: cFuncType) @@ (cEventArg : cObjExpr : cArgs) |>> getLocation ann
         -- | Anything else should not happen
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
         

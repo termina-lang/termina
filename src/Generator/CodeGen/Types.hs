@@ -21,6 +21,42 @@ __termina_allocator_t = typeDef allocator
 __termina_msg_queue_t = typeDef msgQueue
 __termina_periodic_timer_t = typeDef periodicTimer
 
+__termina_event_t, __termina_active_entity_t,
+    __enum_termina_active_entity__handler_params_t,
+    __enum_termina_active_entity__task_params_t :: CType
+__termina_event_t = typeDef "__termina_event_t"
+__termina_active_entity_t = typeDef "__termina_active_entity_t"
+__enum_termina_active_entity__handler_params_t = typeDef "__enum_termina_active_entity__handler_params_t"
+__enum_termina_active_entity__task_params_t = typeDef "__enum_termina_active_entity__task_params_t"
+
+__termina_lock_t, __termina_resource_lock_type_t,
+    __enum_termina_resource_lock_type__mutex_params_t :: CType
+__termina_lock_t = typeDef "__termina_lock_t"
+__termina_resource_lock_type_t = typeDef "__termina_resource_lock_type_t"
+__enum_termina_resource_lock_type__mutex_params_t = typeDef "__enum_termina_resource_lock_type__mutex_params_t"
+
+__termina_resource__lock :: CExpression
+__termina_resource__lock = "__termina_resource__lock" @:
+    CTFunction __termina_lock_t 
+        [
+            -- | const __termina_id_t resource_id
+            _const . ptr $ _const __termina_active_entity_t,
+            -- | const __termina_resource_lock_type_t lock_type,
+            _const . ptr $ _const __termina_resource_lock_type_t
+        ]
+
+__termina_resource__unlock :: CExpression
+__termina_resource__unlock = "__termina_resource__unlock" @:
+    CTFunction __termina_lock_t
+        [
+            -- | const __termina_id_t resource_id
+            _const . ptr $ _const __termina_active_entity_t,
+            -- | const __termina_resource_lock_type_t lock_type,
+            _const . ptr $ _const __termina_resource_lock_type_t,
+            -- | __termina_lock_t lock
+            __termina_lock_t
+        ]
+
 __termina_box_t, __option_box_t :: CType
 __termina_box_t = typeDef boxStruct
 __option_box_t = typeDef optionBox
@@ -78,6 +114,7 @@ __termina_pool__init = "__termina_pool__init" @:
 _SystemEntry__clock_get_uptime :: CExpression
 _SystemEntry__clock_get_uptime = "SystemEntry__clock_get_uptime" @:
     CTFunction void [
+        _const . ptr $ _const __termina_event_t,
         -- | TimeVal * const current
         _const . ptr $ _TimeVal
     ]
@@ -100,6 +137,8 @@ __termina_periodic_timer__init = "__termina_periodic_timer__init" @:
     CTFunction void
         [
             -- | const __termina_id_t timer_id
+            _const __termina_id_t,
+            -- | const __termina_id_t emitter_id,
             _const __termina_id_t,
             -- | const __termina_periodic_timer_connection_t * const connection,
             _const . ptr $ _const __termina_periodic_timer_connection_t,
