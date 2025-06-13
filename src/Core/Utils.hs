@@ -142,6 +142,30 @@ parameterTy (TOption ty)      = optionTy ty
 parameterTy (TConstSubtype ty) = constTy ty
 parameterTy _                = False
 
+viewerParamTy :: TerminaType' expr a -> Bool
+viewerParamTy TUInt8            = True
+viewerParamTy TUInt16           = True
+viewerParamTy TUInt32           = True
+viewerParamTy TUInt64           = True
+viewerParamTy TInt8             = True
+viewerParamTy TInt16            = True
+viewerParamTy TInt32            = True
+viewerParamTy TInt64            = True
+viewerParamTy TUSize            = True
+viewerParamTy TBool             = True
+viewerParamTy TChar             = True
+viewerParamTy (TStruct _)       = True
+viewerParamTy (TEnum _)         = True
+viewerParamTy (TResult _ _)     = True
+viewerParamTy (TStatus _)       = True
+viewerParamTy (TReference _ (TOption (TBoxSubtype _))) = False
+viewerParamTy (TReference Immutable ty) = refTy ty
+viewerParamTy (TReference {}) = False
+viewerParamTy (TOption (TBoxSubtype _)) = False
+viewerParamTy (TOption ty)      = optionTy ty
+viewerParamTy (TConstSubtype ty) = constTy ty
+viewerParamTy _                = False
+
 procedureParamTy :: TerminaType' expr a -> Bool
 procedureParamTy TUInt8            = True
 procedureParamTy TUInt16           = True

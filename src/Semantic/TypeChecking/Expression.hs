@@ -170,6 +170,12 @@ checkProcedureParameterType loc p =
     let typeSpec = paramType p in
     unless (procedureParamTy typeSpec) (throwError (annotateError loc (EInvalidProcedureParameterType typeSpec))) >>
     checkTerminaType loc typeSpec
+  
+checkViewerParameterType :: Location -> SAST.Parameter SemanticAnn -> SemanticMonad ()
+checkViewerParameterType loc p =
+    let typeSpec = paramType p in
+    unless (viewerParamTy typeSpec) (throwError (annotateError loc (EInvalidViewerParameterType typeSpec))) >>
+    checkTerminaType loc typeSpec
 
 checkActionParameterType :: Location -> SAST.Parameter SemanticAnn -> SemanticMonad ()
 checkActionParameterType loc p =

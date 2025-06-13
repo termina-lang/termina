@@ -253,6 +253,7 @@ data Error
   | EUnknownAction Identifier -- ^ Unknown action
   | EInPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ In port action parameter type mismatch
   | ESinkPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Sink port action parameter type mismatch
+  | EInvalidViewerParameterType (TerminaType SemanticAnn) -- ^ Invalid viewer parameter type
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -461,6 +462,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EUnknownAction _ident) _pos) = "SE-201"
     errorIdent (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-202"
     errorIdent (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-203"
+    errorIdent (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "SE-204"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -664,6 +666,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EUnknownAction _ident) _pos) = "unknown action"
     errorTitle (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "in port action parameter type mismatch"
     errorTitle (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "sink port action parameter type mismatch"
+    errorTitle (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "invalid viewer parameter type"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2163,6 +2166,10 @@ instance ErrorMessage SemanticErrors where
                         pprintSimpleError
                             prevSourceLines "The action is defined here:" prevFileName
                             prevPos Nothing
+                EInvalidViewerParameterType ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a viewer parameter."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

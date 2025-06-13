@@ -44,6 +44,13 @@ typeProcedureParameter loc (Parameter ident ts) = do
   checkProcedureParameterType loc procParam
   return procParam
 
+typeViewerParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
+typeViewerParameter loc (Parameter ident ts) = do
+  ty <- typeTypeSpecifier loc typeRHSObject ts
+  let param = SAST.Parameter ident ty
+  checkViewerParameterType loc param
+  return param
+
 typeParameter :: Location -> Parameter ParserAnn -> SemanticMonad (SAST.Parameter SemanticAnn)
 typeParameter loc (Parameter ident ts) = do
   ty <- typeTypeSpecifier loc typeRHSObject ts
@@ -325,7 +332,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
-                      typedParam <- typeParameter mann param
+                      typedParam <- typeViewerParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock mty mbody
