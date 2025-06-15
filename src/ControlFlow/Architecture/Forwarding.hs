@@ -48,7 +48,7 @@ addForwardingBlock action (MatchBlock _ cases mDefaultCase _) = do
 addForwardingBlock _ _ = return ()
 
 addFordwardingAction :: ClassMember SemanticAnn -> ActionForwardingMonad ()
-addFordwardingAction (ClassAction action _ _ (Block blocks _) _) =
+addFordwardingAction (ClassAction _ action _ _ (Block blocks _) _) =
     mapM_ (addForwardingBlock action) blocks
 addFordwardingAction _ = return ()
 

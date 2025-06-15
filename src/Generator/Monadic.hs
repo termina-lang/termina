@@ -103,7 +103,7 @@ mapInterfaceProcedureMonadic ::
   InterfaceMember SemanticAnn
   -- | The resulting map
   -> MonadicTypesMonad ()
-mapInterfaceProcedureMonadic (InterfaceProcedure _ params _ _) =
+mapInterfaceProcedureMonadic (InterfaceProcedure _ _ params _ _) =
   -- | Get the monadic types types from the parameters
   mapM_ mapParameterMonadic params
 
@@ -112,12 +112,12 @@ mapClassMemberMonadic ::
   ClassMember SemanticAnn
   -> MonadicTypesMonad ()
 mapClassMemberMonadic (ClassField field) = insertMonadicType (fieldTerminaType field)
-mapClassMemberMonadic (ClassMethod _ maybeRet blkRet _) =
+mapClassMemberMonadic (ClassMethod _ _ maybeRet blkRet _) =
   -- | Get the monadic types types from the return type
   mapMaybeMonadic maybeRet >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassProcedure _ params blkRet _) =
+mapClassMemberMonadic (ClassProcedure _ _ params blkRet _) =
   -- | Get the monadic types types from the parameters
   mapM_ mapParameterMonadic params >>
   -- | Get the monadic types types from the block return type
@@ -129,12 +129,12 @@ mapClassMemberMonadic (ClassViewer _ params maybeRet blkRet _) =
   mapM_ mapParameterMonadic params >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassAction _ Nothing ret blkRet _) =
+mapClassMemberMonadic (ClassAction _ _ Nothing ret blkRet _) =
   -- | Get the monadic types types from the return type
   insertMonadicType ret >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
-mapClassMemberMonadic (ClassAction _ (Just param) ret blkRet _) =
+mapClassMemberMonadic (ClassAction _ _ (Just param) ret blkRet _) =
   -- | Get the monadic types types from the parameter
   mapParameterMonadic param >>
   -- | Get the monadic types types from the return type

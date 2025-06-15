@@ -10,7 +10,7 @@ import UT.PPrinter.Common
 
 interfaceWithOneProcedure :: AnnASTElement SemanticAnn
 interfaceWithOneProcedure = TypeDefinition (Interface RegularInterface "iface0" [] [
-    InterfaceProcedure "procedure0"[
+    InterfaceProcedure Mutable "procedure0" [
       Parameter "param0" TUInt8,
       Parameter "param1" TUInt16,
       Parameter "param2" TUInt32,

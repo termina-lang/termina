@@ -22,11 +22,11 @@ getObjType :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m (S
 getObjType (SAST.Variable _ (SemanticAnn (ETy (ObjectType _ ts)) _))                  = return ts
 getObjType (SAST.ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (SAST.MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (SAST.MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts
+getObjType (SAST.MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _))     = return ts
 getObjType (SAST.Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (SAST.Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (SAST.DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
-getObjType (SAST.DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
+getObjType (SAST.DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _)) = return ts
 getObjType ann = throwError $ InternalError $ "invalid object annotation: " ++ show ann
 
 -- | This function returns the type of an expression. The type is extracted from the

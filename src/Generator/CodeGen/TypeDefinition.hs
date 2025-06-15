@@ -52,7 +52,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface Regular
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
+        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParamTypes <- mapM (genType noqual . paramType) params
             let cEventParamType = _const . ptr $ _const __termina_event_t
                 cThisParamType = _const . ptr $ void
@@ -70,7 +70,7 @@ genFieldDeclaration (FieldDefinition identifier (TAccessPort (TInterface SystemI
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
+        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             let cEventParamType = _const . ptr $ _const __termina_event_t
             cParamTypes <- mapM (genType noqual . paramType) params
             let cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cEventParamType : cParamTypes)) noqual
@@ -264,6 +264,9 @@ classifyClassMembers e = throwError $ InternalError $ "Not a class definition: "
 genThisParam :: (MonadError CGeneratorError m) => m CDeclaration
 genThisParam = return $ field thisParam (_const . ptr $ void)
 
+genConstThisParam :: (MonadError CGeneratorError m) => m CDeclaration
+genConstThisParam = return $ field thisParam (_const . ptr $ _const void)
+
 genThatParam :: (MonadError CGeneratorError m) => m CDeclaration
 genThatParam = return $ field thatField (_const . ptr $ void)
 
@@ -284,6 +287,12 @@ genSelfCastStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genSelfCastStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
     let cExpr = cast (ptr selfCType) (thisParam @: ptr void)
+    return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
+
+genConstSelfCastStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
+genConstSelfCastStmt ann identifier = do
+    selfCType <- genType constqual (TStruct identifier)
+    let cExpr = cast (ptr selfCType) (thisParam @: ptr (_const void))
     return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
 
 -- | __termina_lock_t __lock = __termina_resource__lock(
@@ -383,7 +392,7 @@ genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _ex
     where
 
         genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure procedure params _modifiers _) = do
+        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
             cParamTypes <- mapM (genType noqual . paramType) params
             let cThisParamType = _const . ptr $ void
                 cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
@@ -442,22 +451,28 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
             return $ CExtDecl (CEDFunction retType clsFuncName (cEventParam : cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassProcedure procedure params _ _) = do
+        genClassFunctionDeclaration (ClassProcedure ak procedure params _ _) = do
             cParamDecls <- mapM genParameterDeclaration params
             cEventParam <- getEventParam
-            cThisParam <- genThisParam
+            cThisParam <- case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
             return $ CExtDecl (CEDFunction void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassMethod method rts _ _) = do
+        genClassFunctionDeclaration (ClassMethod ak method rts _ _) = do
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
             cEventParam <- getEventParam
-            cSelfParam <- genSelfParam clsdef
+            cSelfParam <- case ak of
+                Immutable -> genConstSelfParam clsdef
+                _ -> genSelfParam clsdef
             return $ CExtDecl (CEDFunction retType clsFuncName [cEventParam, cSelfParam]) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassAction action param rts _ _) = do
+        genClassFunctionDeclaration (ClassAction ak action param rts _ _) = do
             retType <- genType noqual rts
             cEventParam <- getEventParam
-            cThisParam <- genThisParam
+            cThisParam <- case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
             clsFuncName <- genClassFunctionName identifier action
             case param of
                 Just p -> do
@@ -670,12 +685,16 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassProcedure procedure parameters (Block stmts _) ann) = do
+        genClassFunctionDefinition (ClassProcedure ak procedure parameters (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier procedure
             cEventParam <- getEventParam
-            cThisParam <- genThisParam
+            cThisParam <- case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            selfCastStmt <- genSelfCastStmt ann identifier
+            selfCastStmt <- case ak of
+                Immutable -> genConstSelfCastStmt ann identifier
+                _ -> genSelfCastStmt ann identifier
             resourceLockStmt <- genResourceLockStmt ann identifier
             cBody <- foldM (\acc x -> do
                 case x of
@@ -690,23 +709,29 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
 
-        genClassFunctionDefinition (ClassMethod method rts (Block stmts _) ann) = do
+        genClassFunctionDefinition (ClassMethod ak method rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier method
             cRetType <- maybe (return void) (genType noqual) rts
             cEventParam <- getEventParam
-            cSelfParam <- genSelfParam clsdef
+            cSelfParam <- case ak of
+                Immutable -> genConstSelfParam clsdef
+                _ -> genSelfParam clsdef
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cEventParam, cSelfParam]
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
-        genClassFunctionDefinition (ClassAction action param rts (Block stmts _) ann) = do
+        genClassFunctionDefinition (ClassAction ak action param rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier action
             cRetType <- genType noqual rts
             cEventParam <- getEventParam
-            cThisParam <- genThisParam
-            selfCastStmt <- genSelfCastStmt ann identifier
+            cThisParam <-  case ak of
+                Immutable -> genConstThisParam
+                _ -> genThisParam
+            selfCastStmt <- case ak of
+                Immutable -> genConstSelfCastStmt ann identifier
+                _ -> genSelfCastStmt ann identifier
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [selfCastStmt] stmts

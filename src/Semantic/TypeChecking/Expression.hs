@@ -246,7 +246,7 @@ collectInterfaceProcedures loc ident = do
         (LocatedElement (Interface _ _ extends iface_prcs _) _) -> (do
           -- If the interface is well-typed, this should not fail:
           extededProcs <- mapM (collectInterfaceProcedures loc) extends
-          procs <- mapM (\procedure@(InterfaceProcedure procId _ _ _) -> do
+          procs <- mapM (\procedure@(InterfaceProcedure _ procId _ _ _) -> do
               return (procId, procedure)
             ) iface_prcs
           return (M.fromList procs `M.union` M.unions extededProcs));
@@ -317,16 +317,14 @@ typeObject _ (MemberAccess obj ident ann) = do
   -- field of an object, only the local objects are available, not the global ones. 
   -- This way, only the fields of objects that are in the local environment of the
   -- function can be accessed.
-  typed_obj' <- typeObject (\loc ident' -> do
-    (ak, ts) <- getLHSVarTy loc ident'
-    return (ak, ts)) obj
+  typed_obj' <- typeObject getLHSVarTy obj
   (obj_ak', obj_ty') <- getObjType typed_obj'
   let (typed_obj, obj_ak, obj_ty) =
         maybe (typed_obj', obj_ak', obj_ty') (unBox typed_obj', Mutable, ) (isBox obj_ty')
   ft <- getMemberField ann obj_ty ident
   case ft of
     (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
-      checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+      checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann obj_ak members fty
     (fty, _) -> checkObjectNotMoved ann $ SAST.MemberAccess typed_obj ident $ buildExpAnnObj ann obj_ak fty
 typeObject getVarTy (Dereference obj ann) = do
   typed_obj <- typeObject getVarTy obj
@@ -346,17 +344,18 @@ typeObject getVarTy (DereferenceMemberAccess obj ident ann) = do
       ft <- getMemberField ann rTy ident
       case ft of
         (fty@(TAccessPort (TInterface _ _)), SemanticAnn (FTy (AccessPortField members)) _) ->
-          checkObjectNotMoved ann $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann members fty
+          checkObjectNotMoved ann $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnAccessPortObj ann ak members fty
         (fty, _) -> checkObjectNotMoved ann $ SAST.DereferenceMemberAccess typed_obj ident $ buildExpAnnObj ann ak fty
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 
 typeMemberFunctionCall ::
   ParserAnn
+  -> AccessKind
   -> SAST.TerminaType SemanticAnn -- ^ type of the object
   -> Identifier -- ^ type of the member function to be called
   -> [Expression ParserAnn] -- ^ arguments
   -> SemanticMonad (([SAST.Parameter SemanticAnn], [SAST.Expression SemanticAnn]), SAST.TerminaType SemanticAnn)
-typeMemberFunctionCall ann obj_ty ident args =
+typeMemberFunctionCall ann ak obj_ty ident args =
   -- Calling a self method or viewer. We must not allow calling a procedure.
   case obj_ty of
     TGlobal _clsKind dident -> getGlobalTypeDef ann dident >>=
@@ -388,31 +387,36 @@ typeMemberFunctionCall ann obj_ty ident args =
           ;
         _ -> throwError $ annotateError Internal EExpectedClassType
       }
-    TAccessPort (TInterface _ dident) -> getGlobalTypeDef ann dident >>=
-      \case{
-        LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
-          extendedProcedures <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures ann) extends
-          case findInterfaceProcedure ident (members ++ extendedProcedures) of
-            Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
-            Just (ps, SemanticAnn _ loc) -> do
-              let (psLen , asLen) = (length ps, length args)
-              when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, loc) (fromIntegral asLen)))
-              when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
-              typed_args <- localScope $ zipWithM (\(p, idx) e ->
-                catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
-                  (
-                        case paramType p of 
-                          (TConstSubtype pty) -> do
-                            -- | See FunctionCall comment
-                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
-                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
-                            return typedArgument
-                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-              return ((ps, typed_args), TUnit)
-        );
-        _ -> throwError $ annotateError Internal EExpectedInterfaceType
+    TAccessPort (TInterface _ dident) -> do
+        getGlobalTypeDef ann dident >>=
+          \case {
+            LocatedElement (Interface _ _identTy extends members _mods) _ -> (do
+              extendedProcedures <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures ann) extends
+              case findInterfaceProcedure ident (members ++ extendedProcedures) of
+                Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
+                Just (ak', ps, SemanticAnn _ loc) -> do
+                  -- | Check that the access kind is correct.
+                  -- If the self reference is immutable, we cannot call a mutable procedure.
+                  when (ak == Immutable && ak' /= Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
+                  let (psLen , asLen) = (length ps, length args)
+                  when (psLen < asLen) (throwError $ annotateError ann (EProcedureCallExtraArgs (ident, ps, loc) (fromIntegral asLen)))
+                  when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
+                  typed_args <- localScope $ zipWithM (\(p, idx) e ->
+                    catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
+                      (
+                            case paramType p of 
+                              (TConstSubtype pty) -> do
+                                -- | See FunctionCall comment
+                                typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
+                                ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
+                                return typedArgument
+                              ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                  return ((ps, typed_args), TUnit)
+            );
+            _ -> throwError $ annotateError Internal EExpectedInterfaceType
       }
-    TAccessPort (TAllocator ty_pool) ->
+    TAccessPort (TAllocator ty_pool) -> do
+      when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
       case ident of
         "alloc" ->
           case args of
@@ -431,7 +435,7 @@ typeMemberFunctionCall ann obj_ty ident args =
             [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("free", [Parameter "element" (TBoxSubtype ty_pool)], Builtin) 0)
             _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("free", [Parameter "element" (TBoxSubtype ty_pool)], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    TAccessPort (TAtomicAccess ty_atomic) ->
+    TAccessPort (TAtomicAccess ty_atomic) -> do
       case ident of
         "load" ->
           case args of
@@ -441,7 +445,8 @@ typeMemberFunctionCall ann obj_ty ident args =
               return (([Parameter "p" (TReference Mutable ty_atomic)], [typed_arg]), TUnit)
             [] -> throwError $ annotateError ann (EProcedureCallMissingArgs ("load", [Parameter "p" (TReference Mutable ty_atomic)], Builtin) 0)
             _ -> throwError $ annotateError ann (EProcedureCallExtraArgs ("load", [Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
-        "store" ->
+        "store" -> do
+          when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
           case args of
             [value] -> do
               typed_value <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store", Parameter "v" ty_atomic, Builtin) 0)
@@ -463,7 +468,8 @@ typeMemberFunctionCall ann obj_ty ident args =
             _ -> if length args < 2 then
               throwError $ annotateError ann (EProcedureCallMissingArgs ("load_index", [Parameter "idx" TUSize, Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
               else throwError $ annotateError ann (EProcedureCallExtraArgs ("load_index", [Parameter "idx" TUSize, Parameter "p" (TReference Mutable ty_atomic)], Builtin) (fromIntegral (length args)))
-        "store_index" ->
+        "store_index" -> do
+          when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
           case args of
             [index, retval] -> do
               typed_idx <- catchMismatch ann (EProcedureCallArgTypeMismatch ("store_index", Parameter "idx" TUSize, Builtin) 0)
@@ -475,7 +481,8 @@ typeMemberFunctionCall ann obj_ty ident args =
               throwError $ annotateError ann (EProcedureCallMissingArgs ("store_index", [Parameter "idx" TUSize, Parameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
               else throwError $ annotateError ann (EProcedureCallExtraArgs ("store_index", [Parameter "idx" TUSize, Parameter "v" ty_atomic], Builtin) (fromIntegral (length args)))
         _ -> throwError $ annotateError ann (EUnknownProcedure ident)
-    TOutPort ty ->
+    TOutPort ty -> do
+      when (ak == Immutable) (throwError $ annotateError ann EInvalidAccessToOutPortFromImmutableSelfReference)
       case ident of
         -- send(T)
         "send" ->
@@ -1234,20 +1241,20 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
 ----------------------------------------
 typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
-  (_, obj_ty) <- getObjType obj_typed
-  ((ps, typed_args), fty) <- typeMemberFunctionCall ann obj_ty ident args
+  (ak, obj_ty) <- getObjType obj_typed
+  ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak obj_ty ident args
   maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
   return $ SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
 typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (_, obj_ty) <- getObjType obj_typed
   case obj_ty of
-    TReference _ rTy -> do
+    TReference ak rTy -> do
       -- NOTE: We have reused the code from MemberFunctionCall, but we must take into
       -- account that, for the time being, when we are accessing a member function through
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
-      ((ps, typed_args), fty) <- typeMemberFunctionCall ann rTy ident args
+      ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak rTy ident args
       maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
@@ -1420,7 +1427,7 @@ typeFieldAssignment tyDef _ (FieldDefinition fid fty fann) (FieldPortConnection 
             LocatedElement (Interface _ _ extends members _) _ -> (do
               -- Collect the procedures of the interface
               extendedMembers <- concat <$> traverse (fmap M.elems . collectInterfaceProcedures pann) extends
-              let procs = [ProcedureSeman procid params ms | (InterfaceProcedure procid params ms _) <- members ++ extendedMembers]
+              let procs = [ProcedureSeman procid params ms | (InterfaceProcedure _ak procid params ms _) <- members ++ extendedMembers]
               -- Check that the resource provides the interface
               case gentry of
                 LocatedElement (GGlob rts@(TGlobal ResourceClass clsId)) _ ->

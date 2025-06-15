@@ -133,10 +133,10 @@ inOutBasicBlocks (Block blocks _) = mapM_ inOutBasicBlock blocks
 
 inOutClassMember :: M.Map Identifier (FieldDefinition SemanticAnn) -> ClassMember SemanticAnn -> BoxInOutMonad ()
 inOutClassMember _ (ClassField {}) = return ()
-inOutClassMember _ (ClassMethod _ _ body _) = inOutBasicBlocks body
+inOutClassMember _ (ClassMethod _ _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
-inOutClassMember _ (ClassAction _ Nothing _ body _) = inOutBasicBlocks body
-inOutClassMember actionsToPorts (ClassAction name (Just input) _ body _ann) = do
+inOutClassMember _ (ClassAction _ _ Nothing _ body _) = inOutBasicBlocks body
+inOutClassMember actionsToPorts (ClassAction _ name (Just input) _ body _ann) = do
     clearInputScope
     case paramType input of
         (TBoxSubtype _) -> do
@@ -144,7 +144,7 @@ inOutClassMember actionsToPorts (ClassAction name (Just input) _ body _ann) = do
             addBox (paramIdentifier input) (InBoxInput (fieldIdentifier inPt))
             inOutBasicBlocks body
         _ -> inOutBasicBlocks body
-inOutClassMember _ (ClassProcedure name params body _ann) = do
+inOutClassMember _ (ClassProcedure _ name params body _ann) = do
     clearInputScope
     zipWithM_ addInParam [0..] params
     inOutBasicBlocks body

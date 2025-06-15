@@ -25,7 +25,7 @@ data FieldSeman a
 data ExprSeman a
   = SimpleType (TerminaType a)
   | ObjectType AccessKind (TerminaType a)
-  | AccessPortObjType (M.Map Identifier (InterfaceMember a)) (TerminaType a)
+  | AccessPortObjType AccessKind (M.Map Identifier (InterfaceMember a)) (TerminaType a)
   | AppType [Parameter a] (TerminaType a)
   deriving (Show, Functor)
 
@@ -135,14 +135,14 @@ type SemanTypeDef a = TypeDef' TerminaType EmptyBlock a
 -- Forgetfull Class member map
 kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a
 kClassMember (ClassField fld) = ClassField fld
-kClassMember (ClassMethod idx ps _blk ann) =
-  ClassMethod idx ps EmptyBlock ann
-kClassMember (ClassProcedure idx ps _blk ann) =
-  ClassProcedure idx ps EmptyBlock ann
+kClassMember (ClassMethod ak idx ps _blk ann) =
+  ClassMethod ak idx ps EmptyBlock ann
+kClassMember (ClassProcedure ak idx ps _blk ann) =
+  ClassProcedure ak idx ps EmptyBlock ann
 kClassMember (ClassViewer idx ps ty _blk ann) =
   ClassViewer idx ps ty EmptyBlock ann
-kClassMember (ClassAction idx ps ty _blk ann) =
-  ClassAction idx ps ty EmptyBlock ann
+kClassMember (ClassAction ak idx ps ty _blk ann) =
+  ClassAction ak idx ps ty EmptyBlock ann
 
 ----------------------------------------
 -- Subtyping.
@@ -169,12 +169,12 @@ getResultingType (ETy ty) =
       SimpleType t -> t; 
       ObjectType _ t -> t; 
       AppType _ t -> t;
-      AccessPortObjType _ t -> t;})
+      AccessPortObjType _ _ t -> t;})
 getResultingType _        = Nothing
 
 getObjectSAnns :: SemanticAnn -> Maybe (AccessKind, TerminaType SemanticAnn)
 getObjectSAnns (SemanticAnn (ETy (ObjectType ak ty)) _) = Just (ak, ty)
-getObjectSAnns (SemanticAnn (ETy (AccessPortObjType _ ty)) _) = Just (Mutable, ty)
+getObjectSAnns (SemanticAnn (ETy (AccessPortObjType ak _ ty)) _) = Just (ak, ty)
 getObjectSAnns _                                    = Nothing
 
 getArgumentsType :: SemanticElems a -> Maybe [Parameter a]
@@ -200,8 +200,8 @@ buildExpAnn = flip $ SemanticAnn . ETy . SimpleType
 buildExpAnnObj :: Location -> AccessKind -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnnObj loc ak ty = SemanticAnn (ETy (ObjectType ak ty)) loc
 
-buildExpAnnAccessPortObj :: Location -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
-buildExpAnnAccessPortObj loc ifaces pty = SemanticAnn (ETy (AccessPortObjType ifaces pty)) loc
+buildExpAnnAccessPortObj :: Location -> AccessKind -> M.Map Identifier (InterfaceMember SemanticAnn) -> TerminaType SemanticAnn -> SemanticAnn
+buildExpAnnAccessPortObj loc ak ifaces pty = SemanticAnn (ETy (AccessPortObjType ak ifaces pty)) loc
 
 buildExpAnnApp :: Location -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnnApp loc params rty = SemanticAnn (ETy (AppType params rty)) loc

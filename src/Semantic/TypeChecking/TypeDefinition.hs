@@ -118,7 +118,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   -- Check procedure names are unique
   checkUniqueNames ann
     EInterfaceNotUniqueProcedure
-      (Data.List.map (\case InterfaceProcedure ifaceId _ _ _ -> ifaceId) members)
+      (Data.List.map (\case InterfaceProcedure _ ifaceId _ _ _ -> ifaceId) members)
   -- Check that every procedure is well-defined
   procedures <- mapM typeInterfaceProcedure members
   -- Check that the name of the procedures is not repeated in the extended interfaces
@@ -131,15 +131,15 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
   where
 
     typeInterfaceProcedure :: InterfaceMember Location -> SemanticMonad (SAST.InterfaceMember SemanticAnn)
-    typeInterfaceProcedure (InterfaceProcedure procId ps_ts mds_ts' annIP) = do
+    typeInterfaceProcedure (InterfaceProcedure ak procId ps_ts mds_ts' annIP) = do
       ps_ty <- localScope $ do
           forM ps_ts (\param@(Parameter paramId _) -> do
             typedParam <- typeProcedureParameter ann param
             insertLocalImmutObj ann paramId (paramType typedParam)
             return typedParam)
       mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
-      return $ InterfaceProcedure procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
-
+      return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
+    
     -- | Checks that the procedures incorporated from the extended interfaces
     -- are not duplicated
     checkNoDuplicatedExtendedProcedures ::
@@ -154,7 +154,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
       prevProcedures <- checkNoDuplicatedExtendedProcedures' M.empty ifaces
       -- | Now we have to check that the procedures of the current interface
       -- do not collide with the procedures of the extended interfaces.
-      forM_ members $ \(InterfaceProcedure procId _ _ procAnn) -> do
+      forM_ members $ \(InterfaceProcedure _ procId _ _ procAnn) -> do
         forM_ (M.keys prevProcedures) $ \prevIface -> do
           let prevProcedueresMap = prevProcedures M.! prevIface
           case M.lookup procId prevProcedueresMap of
@@ -267,7 +267,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             Nothing -> typeClassFieldDefinition S.empty fld);
         _ -> error "Internal Error: not a field";
       }) fls
-    checkClassKind ann ident kind (ty_fls, prcs, acts) provides
+    checkClassKind ann ident kind (ty_fls, prcs, acts, mths ++ vws) provides
 
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
@@ -306,25 +306,25 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
           case newMember of
             -- Filtered Cases
             ClassField {} -> throwError (annotateError Internal EMalformedClassTyping)
-            ClassProcedure mIdent ps_ts blk mann -> do
+            ClassProcedure ak mIdent ps_ts blk mann -> do
               -- We have checked the validity of the parameters when sorting the class members.
               (ps_ty, typed_bret) <- localScope $ do
-                  insertLocalImmutObj mann "self" (TReference Mutable (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
                       typedParam <- typeProcedureParameter mann param
                       insertLocalImmutObj mann paramId (paramType typedParam)
                       return typedParam)
                   typed_bret <- typeBlock Nothing blk
                   return (ps_ty, typed_bret)
-              let newPrc = SAST.ClassProcedure mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
+              let newPrc = SAST.ClassProcedure ak mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
               return (newPrc : prevMembers)
-            ClassMethod mIdent mts mbody mann -> do
+            ClassMethod ak mIdent mts mbody mann -> do
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
               typed_bret <- localScope $ do 
-                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   typeBlock mty mbody
-              let newMth = SAST.ClassMethod mIdent mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+              let newMth = SAST.ClassMethod ak mIdent mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent ps_ts mts mbody mann -> do
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
@@ -339,22 +339,22 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   return (ps_ty, typed_bret)
               let newVw = SAST.ClassViewer mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newVw : prevMembers)
-            ClassAction mIdent param ts mbody mann -> do
+            ClassAction ak mIdent param ts mbody mann -> do
               ty <- typeTypeSpecifier mann typeGlobalObject ts
               param_ty <- maybe (return Nothing) (typeActionParameter mann >=> return . Just) param
               checkReturnType mann ty
               typed_bret <- localScope $ do 
-                  insertLocalImmutObj mann "self" (TReference Private (TGlobal kind ident))
+                  insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   maybe (return ()) (\p_ty -> insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)) param_ty
                   typeBlock (Just ty) mbody
-              let newAct = SAST.ClassAction mIdent param_ty ty typed_bret (buildExpAnn mann ty)
+              let newAct = SAST.ClassAction ak mIdent param_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)
         ) [] topSortOrder
     -- Check that the sink and in ports are well defined, i.e., that the actions
     -- triggered by the ports are defined in the class.
     let ty_action_map = foldl (\accumulatedActions m -> 
           case m of 
-              ClassAction act mty _ _ actann  -> M.insert act (mty, getLocation actann) accumulatedActions
+              ClassAction _ act mty _ _ actann  -> M.insert act (mty, getLocation actann) accumulatedActions
               _ -> accumulatedActions) M.empty fnChecked
     mapM_ (checkTriggeredAction ty_action_map) ty_fls
       
@@ -421,14 +421,22 @@ typeEnumVariant loc (EnumVariant ident ps_ts) = do
         return ty) ps_ts
   return $ SAST.EnumVariant ident ptys
 
+checkMemberFunctionAccessKind :: Location -> ClassKind -> AccessKind -> Identifier -> SemanticMonad ()
+checkMemberFunctionAccessKind loc clsKind ak ident = do
+  case (clsKind, ak) of
+    (TaskClass, Mutable) -> throwError $ annotateError loc (EMemberFunctionWithMutableSelfInTaskClass ident)
+    (HandlerClass, Mutable) -> throwError $ annotateError loc (EMemberFunctionWithMutableSelfInHandlerClass ident)
+    _ -> return ()
+
 checkClassKind :: Location 
   -> Identifier -> ClassKind
   -> ([SAST.ClassMember SemanticAnn],
       [ClassMember ParserAnn],
+      [ClassMember ParserAnn],
       [ClassMember ParserAnn])
   -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
-checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
+checkClassKind anns clsId ResourceClass (fs, prcs, acts, _restMembers) provides = do
   -- A resource must provide at least one interface
   when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
   -- Check that the provided interfaces are not duplicated
@@ -436,7 +444,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
   -- A resource must not have any actions
   case acts of
     [] -> return ()
-    (ClassAction actionId _ _ _ ann):_  ->
+    (ClassAction _ actionId _ _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- Check that the resource class does not define any in and out ports
@@ -452,10 +460,10 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
     }) fs
   -- Check that all the procedures are provided
   providedProcedures <- getProvidedProcedures provides
-  let sorted_provided = L.sortOn (\(InterfaceProcedure procId _ _ _, _) -> procId) providedProcedures
+  let sorted_provided = L.sortOn (\(InterfaceProcedure _ procId _ _ _, _) -> procId) providedProcedures
   let sorted_prcs = L.sortOn (
         \case {
-          (ClassProcedure prcId _ _ _) -> prcId;
+          (ClassProcedure _ prcId _ _ _) -> prcId;
           _ -> error "internal error: checkClassKind"
         }) prcs
   -- Check that all procedures are provided and that the parameters match
@@ -465,10 +473,11 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
 
     checkSortedProcedures :: [(SAST.InterfaceMember SemanticAnn, Identifier)] -> [ClassMember ParserAnn] -> SemanticMonad ()
     checkSortedProcedures [] [] = return ()
-    checkSortedProcedures [] ((ClassProcedure prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
-    checkSortedProcedures ((InterfaceProcedure procId _ _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
-    checkSortedProcedures ((InterfaceProcedure prcId ps _ (SemanticAnn _ loc), ifaceId) : ds) ((ClassProcedure prcId' ps' _ ann):as) =
+    checkSortedProcedures [] ((ClassProcedure _ prcId _ _ ann):_) = throwError $ annotateError ann (EProcedureNotFromProvidedInterfaces (clsId, anns) prcId)
+    checkSortedProcedures ((InterfaceProcedure _ procId _ _ _, ifaceId) : _) [] = throwError $ annotateError anns (EMissingProcedure ifaceId procId)
+    checkSortedProcedures ((InterfaceProcedure ak prcId ps _ (SemanticAnn _ loc), ifaceId) : ds) ((ClassProcedure ak' prcId' ps' _ ann):as) =
       unless (prcId == prcId') (throwError $ annotateError anns (EMissingProcedure ifaceId prcId)) >> do
+      unless (ak == ak') (throwError $ annotateError ann (EProcedureSelfAccessKindMismatch (ifaceId, prcId, ak, loc) ak'))
       let psLen = length ps
           psLen' = length ps'
       when (psLen < psLen') (throwError $ annotateError ann (EProcedureExtraParams (ifaceId, prcId, map paramType ps, loc) (fromIntegral psLen')))
@@ -537,35 +546,45 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts) provides = do
                   Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
-checkClassKind anns clsId TaskClass (_fs, prcs, acts) provides = do
+checkClassKind anns clsId TaskClass (_fs, prcs, acts, restMembers) provides = do
   -- A task must not provide any interface
   unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
   -- A task must not implement any procedures
   case prcs of
     [] -> return ()
-    (ClassProcedure procId _ _ ann):_  ->
+    (ClassProcedure _ procId _ _ ann):_  ->
         throwError $ annotateError ann (ETaskClassProcedure (clsId, anns) procId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A task must implement at least one action
   when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
-checkClassKind anns clsId HandlerClass (fs, prcs, acts) provides = do
+  mapM_ (\case {
+    ClassMethod ak ident _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
+    ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
+    _ -> return ();
+  }) (acts ++ restMembers)
+checkClassKind anns clsId HandlerClass (fs, prcs, acts, restMembers) provides = do
   -- A handler must not provide any interface
   unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
   -- A handler must not implement any procedures
   case prcs of
     [] -> return ()
-    (ClassProcedure procId _ _ ann):_  ->
+    (ClassProcedure _ procId _ _ ann):_  ->
         throwError $ annotateError ann (EHandlerClassProcedure (clsId, anns) procId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must implement only one action
   case acts of
     [] -> throwError $ annotateError anns (EHandlerClassNoAction clsId)
-    [ClassAction _actionId _ _ _ _ann] -> return ()
-    ClassAction _ _ _ _ prevActAnn : ClassAction _ _ _ _ otherActAnn : _  ->
+    [ClassAction _ _actionId _ _ _ _ann] -> return ()
+    ClassAction _ _ _ _ _ prevActAnn : ClassAction _ _ _ _ _ otherActAnn : _  ->
         throwError $ annotateError otherActAnn (EHandlerClassMultipleActions clsId prevActAnn)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must have one single sink port and cannot define any in ports
   checkHandlerPorts Nothing fs
+  mapM_ (\case {
+    ClassMethod ak ident _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
+    ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
+    _ -> return ();
+  }) (acts ++ restMembers)
 
   where
 

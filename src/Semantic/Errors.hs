@@ -254,6 +254,11 @@ data Error
   | EInPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ In port action parameter type mismatch
   | ESinkPortActionParamTypeMismatch (Identifier, Location) (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Sink port action parameter type mismatch
   | EInvalidViewerParameterType (TerminaType SemanticAnn) -- ^ Invalid viewer parameter type
+  | EInvalidAccessToProcedureFromImmutableSelfReference -- ^ Invalid access to procedure from immutable self reference
+  | EInvalidAccessToOutPortFromImmutableSelfReference -- ^ Invalid access to out port from immutable self reference
+  | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
+  | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
+  | EProcedureSelfAccessKindMismatch (Identifier, Identifier, AccessKind, Location) AccessKind -- ^ Self reference access kind mismatch in procedure
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -463,6 +468,9 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-202"
     errorIdent (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "SE-203"
     errorIdent (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "SE-204"
+    errorIdent (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "SE-205"
+    errorIdent (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "SE-206"
+    errorIdent (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) = "SE-207"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -667,6 +675,12 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "in port action parameter type mismatch"
     errorTitle (AnnotatedError (ESinkPortActionParamTypeMismatch _def _expectedTy _actualTy) _pos) = "sink port action parameter type mismatch"
     errorTitle (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "invalid viewer parameter type"
+    errorTitle (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "invalid access to procedure from immutable self reference"
+    errorTitle (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "invalid access to out port from immutable self reference"
+    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "mutable member function in task class"
+    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "member function with mutable self reference in task class"
+    errorTitle (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) =
+        "self reference access kind mismatch in procedure"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2170,6 +2184,39 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The type \x1b[31m" <> showText ty <> "\x1b[0m is not a valid type for a viewer parameter."))
+                EInvalidAccessToProcedureFromImmutableSelfReference ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("You are trying to access a non-immutable procedure from an immutable self reference. " <>
+                               "Immutable self references can only access immutable procedures."))
+                EInvalidAccessToOutPortFromImmutableSelfReference ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("You are trying to access an outbound port from an immutable self reference. " <>
+                               "Immutable self references cannot access outbound ports."))
+                EMemberFunctionWithMutableSelfInTaskClass ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
+                            "Member functions in task classes cannot define mutable self references\n" <>
+                            "Only immutable or private self references are allowed."))
+                EMemberFunctionWithMutableSelfInHandlerClass ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
+                            "Member functions in handler classes cannot define mutable self references\n" <>
+                            "Only immutable or private self references are allowed."))
+                EProcedureSelfAccessKindMismatch (ifaceId, procId, expectedAccessKind, prevPos@(Position _ prevStart _)) accessKind ->
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Procedure \x1b[31m" <> T.pack procId <> "\x1b[0m of interface \x1b[31m" <> T.pack ifaceId <> "\x1b[0m is expected to have a self reference of access kind \x1b[31m" <>
+                            showText expectedAccessKind <> "\x1b[0m but the access kind of the self reference of the implementated procedure is \x1b[31m" <> showText accessKind <> "\x1b[0m.\n")) <>
+                    pprintSimpleError
+                        prevSourceLines "The interface procedure is defined here:" prevFileName
+                        prevPos Nothing
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

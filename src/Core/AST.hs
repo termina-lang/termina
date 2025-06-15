@@ -305,6 +305,7 @@ data InterfaceMember' ty a
   = 
     -- | Procedure
     InterfaceProcedure
+      AccessKind -- ^ access kind (immutable, mutable)
       Identifier -- ^ name of the procedure
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
       [Modifier' ty a] -- ^ list of possible modifiers
@@ -321,6 +322,7 @@ data ClassMember' ty blk a
     -- | Methods. Methods are internal functions that can access the
     -- state of the object and call other methods of the same class.
     | ClassMethod 
+      AccessKind  -- ^ access kind (immutable, mutable or private)
       Identifier  -- ^ name of the method
       (Maybe (ty a)) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
@@ -329,6 +331,7 @@ data ClassMember' ty blk a
     -- interface with the outside world. They define a list of parameters and a block
     -- of statements. They do not return any value.
     | ClassProcedure
+      AccessKind -- ^ access kind (immutable, mutable or private)
       Identifier -- ^ name of the procedure
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
       (blk a) -- ^ statements block (with return) a
@@ -340,6 +343,7 @@ data ClassMember' ty blk a
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
     | ClassAction 
+      AccessKind  -- ^ access kind (immutable or private)
       Identifier  -- ^ name of the method
       (Maybe (Parameter' ty a)) -- ^ input parameter
       (ty a) -- ^ type of the return value

@@ -24,13 +24,13 @@ getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getMemberFunctions = foldl' (\acc member ->
   case member of
-    ClassMethod identifier mRetTy blk ann  ->
+    ClassMethod _ak identifier mRetTy blk ann  ->
       M.insert identifier (TPFunction identifier [] mRetTy blk ann)   acc
-    ClassProcedure identifier params blk ann ->
+    ClassProcedure _ak identifier params blk ann ->
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
-    ClassAction identifier Nothing rty blk ann ->
+    ClassAction _ak identifier Nothing rty blk ann ->
       M.insert identifier (TPFunction identifier [] (Just rty) blk ann) acc
-    ClassAction identifier (Just param) rty blk ann ->
+    ClassAction _ak identifier (Just param) rty blk ann ->
       M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
     ClassViewer identifier params mRetTy blk ann ->
       M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
@@ -270,14 +270,14 @@ getObjType (Variable {}) = throwError $ annotateError Internal EInvalidObjectTyp
 getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (ArrayIndexExpression {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _))     = return ts
 getObjType (MemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (Dereference {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (Unbox {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
-getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _)) = return ts
 getObjType (DereferenceMemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 
 -- | This function returns the type of an expression. The type is extracted from the

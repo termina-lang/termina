@@ -158,26 +158,26 @@ selfDepClass
   :: ClassMember a
   -> SelfDepMap a -> SelfDepMap a
 selfDepClass (ClassField {}) = id
-selfDepClass (ClassMethod mId _type bRet _ann) =
+selfDepClass (ClassMethod _ak mId _type bRet _ann) =
   M.insert mId (selfInvBlock bRet M.empty)
-selfDepClass (ClassProcedure pId _params bRet _ann) =
+selfDepClass (ClassProcedure _ak pId _params bRet _ann) =
   M.insert pId (selfInvBlock bRet M.empty)
 selfDepClass (ClassViewer vId _params _type bRet _ann) =
   M.insert vId (selfInvBlock bRet M.empty)
-selfDepClass (ClassAction aId _param _type bRet _ann) =
+selfDepClass (ClassAction _ak aId _param _type bRet _ann) =
   M.insert aId (selfInvBlock bRet M.empty)
 
 fieldDepClass :: ClassMember a 
   -> M.Map Identifier (S.Set Identifier) 
   -> M.Map Identifier (S.Set Identifier)
 fieldDepClass (ClassField {}) = id
-fieldDepClass (ClassMethod _mId _type bRet _ann) = 
+fieldDepClass (ClassMethod _ak _mId _type bRet _ann) = 
   M.unionWith S.union (fieldDepBlock bRet M.empty)
-fieldDepClass (ClassProcedure _pId _params bRet _ann) = 
+fieldDepClass (ClassProcedure _ak _pId _params bRet _ann) = 
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassViewer _vId _params _type bRet _ann) =
   M.unionWith S.union (fieldDepBlock bRet M.empty)
-fieldDepClass (ClassAction _aId _param _type bRet _ann) =
+fieldDepClass (ClassAction _ak _aId _param _type bRet _ann) =
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 
 (<::>) :: Identifier -> Identifier -> Identifier

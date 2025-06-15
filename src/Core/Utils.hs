@@ -466,32 +466,32 @@ findClassField i
 findClassProcedure :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([Parameter' ty a], a)
 findClassProcedure i
   = fmap
-  (\case {ClassProcedure _ ps _ a -> (ps, a)
+  (\case {ClassProcedure _ _ ps _ a -> (ps, a)
          ; _ -> error "Impossible after find"})
   .
-  L.find (\case{ ClassProcedure ident _ _ _ -> (ident == i)
+  L.find (\case{ ClassProcedure _ ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe ([Parameter' ty a], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe (AccessKind, [Parameter' ty a], a)
 findInterfaceProcedure i
   = fmap
-  (\case {InterfaceProcedure _ ps _ a -> (ps, a)})
+  (\case {InterfaceProcedure ak _ ps _ a -> (ak, ps, a)})
   .
-  L.find (\case{InterfaceProcedure ident _ _ _ -> (ident == i)})
+  L.find (\case{InterfaceProcedure _ ident _ _ _ -> (ident == i)})
 
 findClassViewerOrMethod :: Identifier -> [ ClassMember' ty blk a ] -> Maybe ([Parameter' ty a], Maybe (ty a), a)
 findClassViewerOrMethod i
   = fmap
   (\case {
     ClassViewer _ ps mty _ a -> (ps, mty, a);
-    ClassMethod _ ty _ a -> ([], ty, a);
+    ClassMethod _ _ ty _ a -> ([], ty, a);
     _ -> error "Impossible after find"
   })
   .
   L.find (
     \case{
       ClassViewer ident _ _ _ _ -> (ident == i);
-      ClassMethod ident _ _ _ -> (ident == i);
+      ClassMethod _ ident _ _ _ -> (ident == i);
       _ -> False
     }
   )
@@ -500,17 +500,17 @@ findClassAction :: Identifier -> [ ClassMember' ty blk a ] -> Maybe (Maybe (Para
 findClassAction i
   =  fmap
   (\case {
-    ClassAction _ param rty _ a -> (param, rty, a);
+    ClassAction _ _ param rty _ a -> (param, rty, a);
     _ -> error "Impossible after find"
     })
   .
   L.find (\case{
-    ClassAction ident _ _ _ _ -> (ident == i);
+    ClassAction _ ident _ _ _ _ -> (ident == i);
     _ -> False})
 
 className :: ClassMember' ty blk a -> Identifier
 className (ClassField e)                = fieldIdentifier e
-className (ClassMethod mIdent _ _ _)    = mIdent
-className (ClassProcedure pIdent _ _ _) = pIdent
+className (ClassMethod _ mIdent _ _ _)    = mIdent
+className (ClassProcedure _ pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
-className (ClassAction aIdent _ _ _ _)  = aIdent
+className (ClassAction _ aIdent _ _ _ _)  = aIdent

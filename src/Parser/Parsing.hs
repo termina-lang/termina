@@ -1139,16 +1139,23 @@ classFieldDefinitionParser = do
   _ <- semi
   return $ ClassField (FieldDefinition identifier typeSpecifier (Position current startPos endPos))
 
+selfAccessKindParser :: TerminaParser AccessKind
+selfAccessKindParser =
+  try (reserved "&mut" >> reserved "self" >> return Mutable) <|>
+  try (reserved "&priv" >> reserved "self" >> return Private) <|>
+  (reserved "&self" >> return Immutable) 
+
+
 classMethodParser :: TerminaParser (ClassMember ParserAnn)
 classMethodParser = do
   current <- getState
   startPos <- getPosition
   reserved "method"
   name <- identifierParser
-  parens (reserved "&priv" >> reserved "self")
+  accessKind <- parens selfAccessKindParser
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- blockParser
-  ClassMethod name typeSpec blockRet . Position current startPos <$> getPosition
+  ClassMethod accessKind name typeSpec blockRet . Position current startPos <$> getPosition
 
 classActionParser :: TerminaParser (ClassMember ParserAnn)
 classActionParser = do
@@ -1156,18 +1163,14 @@ classActionParser = do
   startPos <- getPosition
   reserved "action"
   name <- identifierParser
-  param <- parens actionParamParser
+  (ak, param) <- parens $ 
+    do
+      ak <- selfAccessKindParser
+      param <- optionMaybe (comma >> parameterParser)
+      return (ak, param)
   typeSpec <- reservedOp "->" >>  typeSpecifierParser
   blockRet <- blockParser
-  ClassAction name param typeSpec blockRet . Position current startPos <$> getPosition
-
-  where
-
-    actionParamParser :: TerminaParser (Maybe (Parameter ParserAnn))
-    actionParamParser = do
-      _ <- reserved "&priv"
-      _ <- reserved "self"
-      optionMaybe (comma >> parameterParser)
+  ClassAction ak name param typeSpec blockRet . Position current startPos <$> getPosition
 
 classProcedureParser :: TerminaParser (ClassMember ParserAnn)
 classProcedureParser = do
@@ -1175,13 +1178,13 @@ classProcedureParser = do
   startPos <- getPosition
   reserved "procedure"
   name <- identifierParser
-  params <- parens procedureParamsParser
+  (ak, params) <- parens $
+    do
+      ak <- selfAccessKindParser
+      params <- option [] (comma >> sepBy parameterParser comma)
+      return (ak, params)
   blockRet <- blockParser
-  ClassProcedure name params blockRet . Position current startPos <$> getPosition
-  where
-    procedureParamsParser :: TerminaParser [Parameter ParserAnn]
-    procedureParamsParser =
-      reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
+  ClassProcedure ak name params blockRet . Position current startPos <$> getPosition
 
 interfaceProcedureParser :: TerminaParser (InterfaceMember ParserAnn)
 interfaceProcedureParser = do
@@ -1189,15 +1192,15 @@ interfaceProcedureParser = do
   startPos <- getPosition
   reserved "procedure"
   name <- identifierParser
-  params <- parens procedureParamsParser
+  (ak, params) <- parens $
+    do
+      ak <- selfAccessKindParser
+      params <- option [] (comma >> sepBy parameterParser comma)
+      return (ak, params)
   _ <- semi
   -- | TODO: See if we allow modifiers in interface procedures to be set
   -- by the programmers
-  InterfaceProcedure name params [] . Position current startPos <$> getPosition
-  where
-    procedureParamsParser :: TerminaParser [Parameter ParserAnn]
-    procedureParamsParser =
-      reserved "&mut" >> reserved "self" >> option [] (comma >> sepBy parameterParser comma)
+  InterfaceProcedure ak name params [] . Position current startPos <$> getPosition
 
 classViewerParser :: TerminaParser (ClassMember ParserAnn)
 classViewerParser = do

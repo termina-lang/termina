@@ -19,14 +19,14 @@ getObjType (Variable {}) = throwError $ annotateError Internal EInvalidObjectTyp
 getObjType (ArrayIndexExpression _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))    = return ts
 getObjType (ArrayIndexExpression {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (MemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _))            = return ts
-getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _))     = return ts
+getObjType (MemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _))     = return ts
 getObjType (MemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Dereference _ (SemanticAnn (ETy (ObjectType _ ts)) _))               = return ts
 getObjType (Dereference {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (Unbox _ (SemanticAnn (ETy (ObjectType _ ts)) _))                     = return ts
 getObjType (Unbox {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (ObjectType _ ts)) _)) = return ts
-getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ ts)) _)) = return ts
+getObjType (DereferenceMemberAccess _ _ (SemanticAnn (ETy (AccessPortObjType _ _ ts)) _)) = return ts
 getObjType (DereferenceMemberAccess {}) = throwError $ annotateError Internal EInvalidObjectTypeAnnotation
 
 -- | This function returns the type of an expression. The type is extracted from the

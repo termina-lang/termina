@@ -302,13 +302,13 @@ checkActionPaths loc stmts = do
 
 checkExitPathClassMember :: ClassMember SemanticAnn -> BBPathsCheck ()
 checkExitPathClassMember (ClassField {}) = return ()
-checkExitPathClassMember (ClassMethod _name _retType (Block body _) ann) = 
+checkExitPathClassMember (ClassMethod _ak _name _retType (Block body _) ann) = 
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
-checkExitPathClassMember (ClassProcedure _name _args (Block body _) ann) = 
+checkExitPathClassMember (ClassProcedure _ak _name _args (Block body _) ann) = 
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
 checkExitPathClassMember (ClassViewer _name _args _retType (Block body _) ann) =
     void $ setMustExit >> checkBlockPaths (getLocation ann) (reverse body)
-checkExitPathClassMember (ClassAction _name _param _retType (Block body _) ann) = 
+checkExitPathClassMember (ClassAction _ak _name _param _retType (Block body _) ann) = 
     void $ setMustExit >> checkActionPaths (getLocation ann) (reverse body)
 
 checkExitPathTypeDef :: TypeDef SemanticAnn -> BBPathsCheck ()

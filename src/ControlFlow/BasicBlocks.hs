@@ -220,18 +220,18 @@ genBBBlock (SAST.Block stmts blkann) = do
 -- statements are grouped into basic blocks and a new return block is created.
 genBBClassMember :: SAST.ClassMember SemanticAnn -> BBGenerator (ClassMember SemanticAnn)
 genBBClassMember (ClassField field) = return $ ClassField field
-genBBClassMember (ClassMethod name retType body ann) = do
+genBBClassMember (ClassMethod ak name retType body ann) = do
     bRet <- genBBBlock body
-    return $ ClassMethod name retType bRet ann
-genBBClassMember (ClassProcedure name args body ann) = do
+    return $ ClassMethod ak name retType bRet ann
+genBBClassMember (ClassProcedure ak name args body ann) = do
     bRet <- genBBBlock body
-    return $ ClassProcedure name args bRet ann
+    return $ ClassProcedure ak name args bRet ann
 genBBClassMember (ClassViewer name args retType body ann) = do
     bRet <- genBBBlock body
     return $ ClassViewer name args retType bRet ann
-genBBClassMember (ClassAction name param retType body ann) = do
+genBBClassMember (ClassAction ak name param retType body ann) = do
     bRet <- genBBBlock body
-    return $ ClassAction name param retType bRet ann
+    return $ ClassAction ak name param retType bRet ann
 
 -- | This function translates the type definitions from the semantic AST to the
 -- basic block AST.
