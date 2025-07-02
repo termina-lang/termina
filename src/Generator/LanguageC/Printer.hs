@@ -223,11 +223,11 @@ instance CPrint CExpression where
     pprintPrec p (CExprSeqAnd expr1 expr2 _ _) = do
         pexpr1 <- pprintPrec 12 expr1
         pexpr2 <- pprintPrec 13 expr2
-        return $ parenPrec p 12 $ pexpr1 <+> pretty "&&" <+> pexpr2
+        return $ parenPrec p 12 $ align (sep [pexpr1, pretty "&&" <+> pexpr2])
     pprintPrec p (CExprSeqOr expr1 expr2 _ _) = do
         pexpr1 <- pprintPrec 11 expr1
         pexpr2 <- pprintPrec 12 expr2
-        return $ parenPrec p 11 $ pexpr1 <+> pretty "||" <+> pexpr2
+        return $ parenPrec p 11 $ align (sep [pexpr1, pretty "||" <+> pexpr2])
     pprintPrec p (CExprSizeOfType decl _ _) = do
         pdecl <- pprint decl
         return $ parenPrec p 25 $ pretty "sizeof" <> parens pdecl
@@ -451,16 +451,16 @@ instance CPrint CStatement where
                     (Just cond', Nothing) -> do
                         pcond <- pprint cond'
                         return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi) <+> pstat
+                            pretty "for" <+> parens (pfor_init <> semi <+> align (pcond <> semi)) <+> pstat
                     (Nothing, Just step') -> do
                         pstep <- pprint step'
                         return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <> semi <+> pstep) <+> pstat
+                            pretty "for" <+> parens (pfor_init <> semi <> semi <+> align pstep) <+> pstat
                     (Just cond', Just step') -> do
                         pcond <- pprint cond'
                         pstep <- pprint step'
                         return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
-                            pretty "for" <+> parens (pfor_init <> semi <+> pcond <> semi <+> pstep) <+> pstat
+                            pretty "for" <+> parens (align (sep [pfor_init <> semi, pcond <> semi, pstep])) <+> pstat
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSReturn Nothing ann) =
         case itemAnnotation ann of
