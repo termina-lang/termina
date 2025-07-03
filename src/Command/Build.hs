@@ -45,6 +45,8 @@ import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
 import System.Environment
+import qualified Data.ByteString as BS
+import qualified Data.Text.Encoding as TE
 
 -- | Data type for the "new" command arguments
 newtype BuildCmdArgs =
@@ -70,11 +72,11 @@ loadTerminaModule ::
 loadTerminaModule root filePath srcPath = do
   let fullP = root </> filePath <.> "fin"
   -- read it
-  src_code <- TIO.readFile fullP
+  src_code <- TE.decodeUtf8 <$> BS.readFile fullP
   mod_time <- getModificationTime fullP
   -- parse it
   case runParser terminaModuleParser filePath fullP (T.unpack src_code) of
-    Left err -> 
+    Left err ->
       let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
           fileMap = M.singleton fullP src_code
       in
@@ -82,11 +84,11 @@ loadTerminaModule root filePath srcPath = do
     Right term -> do
       mimports <- getModuleImports (Just srcPath) term
       case mimports of
-        Left err -> 
+        Left err ->
           let fileMap = M.singleton fullP src_code in
           TIO.putStrLn (toText err fileMap) >> exitFailure
         Right imports ->
-          return $ TerminaModuleData filePath fullP mod_time imports src_code (ParsingData . frags $ term)
+          return $ TerminaModuleData filePath fullP mod_time imports [] src_code (ParsingData . frags $ term)
 
 -- | Load the modules of the project
 loadModules
@@ -121,24 +123,24 @@ loadModules imported srcPath = do
 
 typeModules :: ParsedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
 typeModules parsedProject =
-  typeModules' M.empty M.empty
+  typeModules' M.empty
 
   where
 
-
-    typeModules' :: TypedProject -> M.Map QualifiedName [QualifiedName] -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
-    typeModules' typedProject _ finalState [] = pure (typedProject, finalState)
-    typeModules' typedProject prevModsMap prevState (m:ms) = do
+    typeModules' :: TypedProject -> Environment -> [QualifiedName] -> IO (TypedProject, Environment)
+    typeModules' typedProject finalState [] = pure (typedProject, finalState)
+    typeModules' typedProject prevState (m:ms) = do
       let parsedModule = parsedProject M.! m
-      let moduleDependencies = S.fromList $ getModuleDependencyList prevModsMap (importedModules parsedModule)
-      let result = runTypeChecking prevState (typeTerminaModule (S.insert  m moduleDependencies) . parsedAST . metadata $ parsedModule)
+      let prevModsMap = M.map visibleModules typedProject
+      let vmods = S.fromList $ getVisibleModules prevModsMap (importedModules parsedModule)
+      let result = runTypeChecking prevState (typeTerminaModule (S.insert m vmods) . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
           -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
-          let sourceFilesMap = 
-                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+          let sourceFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     M.empty parsedProject in
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         (Right (typedProgram, newState)) -> do
@@ -148,10 +150,10 @@ typeModules parsedProject =
                   (fullPath parsedModule)
                   (modificationTime parsedModule)
                   (importedModules parsedModule)
+                  (S.toList vmods)
                   (sourcecode parsedModule)
                   (SemanticData typedProgram)
-          let newModsMap = M.insert m (S.toList moduleDependencies) prevModsMap
-          typeModules' (M.insert m typedModule typedProject) newModsMap newState ms
+          typeModules' (M.insert m typedModule typedProject) newState ms
 
 monadicTypesMapModules :: TypedProject -> MonadicTypes
 monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.elems
@@ -167,8 +169,8 @@ genModules ::
   -> MonadicTypes
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
-genModules params plt initialMonadicTypes =
-  foldM_ printModule initialMonadicTypes . M.elems
+genModules params plt initialMonadicTypes bbProject =
+  foldM_ printModule initialMonadicTypes (M.elems bbProject)
 
   where
 
@@ -185,28 +187,32 @@ genModules params plt initialMonadicTypes =
       if sourceFileExists
         then do
           sourceFileTime <- getModificationTime sourceFile
+          depChanged <- changedDependendencies bbProject sourceFileTime (visibleModules bbModule)
           if sourceFileTime > modificationTime bbModule &&
              sourceFileTime > exeModificationTime &&
-             sourceFileTime > terminaYamlModificationTime
-            then return () 
+             sourceFileTime > terminaYamlModificationTime &&
+             not depChanged
+            then return ()
           else do
             printSource bbModule
       else do
         printSource bbModule
       headerFileExists <- doesFileExist headerFile
-      if headerFileExists 
+      if headerFileExists
         then do
           headerFileTime <- getModificationTime headerFile
+          depChanged <- changedDependendencies bbProject headerFileTime (visibleModules bbModule)
           if headerFileTime > modificationTime bbModule &&
              headerFileTime > exeModificationTime &&
-             headerFileTime > terminaYamlModificationTime
+             headerFileTime > terminaYamlModificationTime &&
+             not depChanged
             then return currentMonadicTypes
           else do
             printHeader currentMonadicTypes bbModule
         else do
           printHeader currentMonadicTypes bbModule
 
-    printSource :: BasicBlocksModule -> IO () 
+    printSource :: BasicBlocksModule -> IO ()
     printSource bbModule = do
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
@@ -216,7 +222,7 @@ genModules params plt initialMonadicTypes =
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
           TIO.writeFile sourceFile $ runCPrinter (profile params == Debug) cSourceFile
-    
+
     printHeader :: MonadicTypes -> BasicBlocksModule -> IO MonadicTypes
     printHeader currentMonadicTypes bbModule = do
       let destinationPath = outputFolder params
@@ -230,38 +236,124 @@ genModules params plt initialMonadicTypes =
           TIO.writeFile headerFile $ runCPrinter (profile params == Debug) cHeaderFile
           return newMonadicTypes
 
-genInitFile :: TerminaConfig -> Platform -> BasicBlocksProject -> IO ()
-genInitFile params plt bbProject = do
-  let destinationPath = outputFolder params
-      initFilePath = destinationPath </> "init" <.> "c"
-      projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-  case runGenInitFile params (getPlatformInterruptMap plt) initFilePath projectModules of
-    Left err -> die . errorMessage $ show err
-    Right cInitFile -> TIO.writeFile initFilePath $ runCPrinter (profile params == Debug) cInitFile
+genInitFile :: TerminaConfig -> Platform -> BasicBlocksProject -> QualifiedName -> IO ()
+genInitFile params plt bbProject appModName = do
+  let appModule = bbProject M.! appModName
+  initFileExists <- doesFileExist initFile
+  if initFileExists then do
+    initFileTime <- getModificationTime initFile
+    exePath <- getExecutablePath
+    exeModificationTime <- getModificationTime exePath
+    terminaYamlModificationTime <- getModificationTime "termina.yaml"
+    depChanged <- changedDependendencies bbProject initFileTime (visibleModules appModule)
+    unless (initFileTime > modificationTime appModule &&
+      initFileTime > exeModificationTime &&
+      initFileTime > terminaYamlModificationTime &&
+      not depChanged) runGenInitFile'
+  else
+    runGenInitFile'
 
-genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
-genOptionHeaderFile params plt monadicTypes = do
-  let destinationPath = outputFolder params
-      optionFilePath = destinationPath </> "include" </> "option" <.> "h"
-  case runGenOptionHeaderFile params (getPlatformInterruptMap plt) optionFilePath monadicTypes of
-    Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile optionFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+  where
 
-genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
-genStatusHeaderFile params plt monadicTypes = do
-  let destinationPath = outputFolder params
-      statusFilePath = destinationPath </> "include" </> "status" <.> "h"
-  case runGenStatusHeaderFile params (getPlatformInterruptMap plt) statusFilePath monadicTypes of
-    Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile statusFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+    destinationPath = outputFolder params
 
-genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> IO ()
-genResultHeaderFile params plt monadicTypes = do
-  let destinationPath = outputFolder params
-      resultFilePath = destinationPath </> "include" </> "result" <.> "h"
-  case runGenResultHeaderFile params (getPlatformInterruptMap plt) resultFilePath monadicTypes of
-    Left err -> die . errorMessage $ show err
-    Right cOptionsFile -> TIO.writeFile resultFilePath $ runCPrinter (profile params == Debug) cOptionsFile
+    initFile = destinationPath </> "init" <.> "c"
+
+    runGenInitFile' :: IO ()
+    runGenInitFile' = do
+      let projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
+      case runGenInitFile params (getPlatformInterruptMap plt) initFile projectModules of
+        Left err -> die . errorMessage $ show err
+        Right cInitFile -> do
+          createDirectoryIfMissing True (takeDirectory initFile)
+          TIO.writeFile initFile $ runCPrinter (profile params == Debug) cInitFile
+
+
+genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genOptionHeaderFile params plt monadicTypes bbProject appModName = do
+  let appModule = bbProject M.! appModName
+  optionFileExists <- doesFileExist optionFile
+  if optionFileExists then do
+    optionFileTime <- getModificationTime optionFile
+    exePath <- getExecutablePath
+    exeModificationTime <- getModificationTime exePath
+    terminaYamlModificationTime <- getModificationTime "termina.yaml"
+    depChanged <- changedDependendencies bbProject optionFileTime (visibleModules appModule)
+    unless (optionFileTime > modificationTime appModule &&
+      optionFileTime > exeModificationTime &&
+      optionFileTime > terminaYamlModificationTime &&
+      not depChanged) runGenOptionHeaderFile'
+  else
+    runGenOptionHeaderFile'
+
+  where
+
+    destinationPath = outputFolder params
+
+    optionFile = destinationPath </> "include" </> "option" <.> "h"
+
+    runGenOptionHeaderFile' :: IO ()
+    runGenOptionHeaderFile' = do
+      case runGenOptionHeaderFile params (getPlatformInterruptMap plt) optionFile monadicTypes of
+        Left err -> die . errorMessage $ show err
+        Right cOptionsFile -> TIO.writeFile optionFile $ runCPrinter (profile params == Debug) cOptionsFile
+
+genStatusHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genStatusHeaderFile params plt monadicTypes bbProject appModName = do
+  let appModule = bbProject M.! appModName
+  statusFileExists <- doesFileExist statusFile
+  if statusFileExists then do
+    statusFileTime <- getModificationTime statusFile
+    exePath <- getExecutablePath
+    exeModificationTime <- getModificationTime exePath
+    terminaYamlModificationTime <- getModificationTime "termina.yaml"
+    depChanged <- changedDependendencies bbProject statusFileTime (visibleModules appModule)
+    unless (statusFileTime > modificationTime appModule &&
+      statusFileTime > exeModificationTime &&
+      statusFileTime > terminaYamlModificationTime &&
+      not depChanged) runGenStatusHeaderFile'
+  else
+    runGenStatusHeaderFile'
+
+  where
+
+    destinationPath = outputFolder params
+
+    statusFile = destinationPath </> "include" </> "status" <.> "h"
+
+    runGenStatusHeaderFile' :: IO ()
+    runGenStatusHeaderFile' = case runGenStatusHeaderFile params (getPlatformInterruptMap plt) statusFile monadicTypes of
+      Left err -> die . errorMessage $ show err
+      Right cOptionsFile -> TIO.writeFile statusFile $ runCPrinter (profile params == Debug) cOptionsFile
+
+genResultHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()
+genResultHeaderFile params plt monadicTypes bbProject appModName = do
+  let appModule = bbProject M.! appModName
+  resultFileExists <- doesFileExist resultFile
+  if resultFileExists then do
+    resultFileTime <- getModificationTime resultFile
+    exePath <- getExecutablePath
+    exeModificationTime <- getModificationTime exePath
+    terminaYamlModificationTime <- getModificationTime "termina.yaml"
+    depChanged <- changedDependendencies bbProject resultFileTime (visibleModules appModule)
+    unless (resultFileTime > modificationTime appModule &&
+      resultFileTime > exeModificationTime &&
+      resultFileTime > terminaYamlModificationTime &&
+      not depChanged) runGenResultHeaderFile'
+  else
+    runGenResultHeaderFile'
+
+  where
+
+    destinationPath = outputFolder params
+
+    resultFile = destinationPath </> "include" </> "result" <.> "h"
+
+    runGenResultHeaderFile' :: IO ()
+    runGenResultHeaderFile' =
+      case runGenResultHeaderFile params (getPlatformInterruptMap plt) resultFile monadicTypes of
+        Left err -> die . errorMessage $ show err
+        Right cOptionsFile -> TIO.writeFile resultFile $ runCPrinter (profile params == Debug) cOptionsFile
 
 genArchitecture :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> [QualifiedName] -> IO (TerminaProgArch SemanticAnn)
 genArchitecture bbProject initialTerminaProgram orderedDependencies = do
@@ -275,83 +367,83 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
       let typedModule = basicBlocksAST . metadata $ bbProject M.! m
       let result = runGenArchitecture tp m typedModule
       case result of
-        Left err -> 
+        Left err ->
           -- | Create the source files map. This map will be used to obtainn the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
-          let sourceFilesMap = 
-                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+          let sourceFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                     M.empty bbProject in
           TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right tp' -> genArchitecture' tp' ms
 
 checkEmitterConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-checkEmitterConnections bbProject progArchitecture = 
+checkEmitterConnections bbProject progArchitecture =
   let result = runCheckEmitterConnections progArchitecture in
   case result of
-    Left err -> 
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkChannelConnections :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-checkChannelConnections bbProject progArchitecture = 
+checkChannelConnections bbProject progArchitecture =
   let result = runCheckChannelConnections progArchitecture in
   case result of
-    Left err -> 
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkResourceUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-checkResourceUsage bbProject progArchitecture = 
+checkResourceUsage bbProject progArchitecture =
   let result = runCheckResourceUsage progArchitecture in
   case result of
-    Left err -> 
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkPoolUsage :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-checkPoolUsage bbProject progArchitecture = 
+checkPoolUsage bbProject progArchitecture =
   let result = runCheckPoolUsage progArchitecture in
   case result of
-    Left err -> 
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 checkProjectBoxSources :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO ()
-checkProjectBoxSources bbProject progArchitecture = 
+checkProjectBoxSources bbProject progArchitecture =
   let result = runCheckBoxSources progArchitecture in
   case result of
-    Left err -> 
+    Left err ->
       -- | Create the source files map. This map will be used to obtainn the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
       -- path of the source file and as element the text of the source file.
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
 constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO BasicBlocksProject
-constFolding bbProject progArchitecture = 
+constFolding bbProject progArchitecture =
   case runConstFolding bbProject progArchitecture of
-    Left err -> 
+    Left err ->
       -- | Create the source files map. This map will be used to obtainn the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
       -- path of the source file and as element the text of the source file.
-      let sourceFilesMap = 
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 M.empty bbProject in
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right bbProject' -> return bbProject'
@@ -405,32 +497,32 @@ buildCommand (BuildCmdArgs chatty) = do
     let monadicTypes = monadicTypesMapModules typedProject
     -- | Obtain the basic blocks AST of the program
     when chatty (putStrLn . debugMessage $ "Obtaining the basic blocks")
-    rawBBProject <- 
+    rawBBProject <-
       either
-        (\err -> 
+        (\err ->
           TIO.putStrLn (toText err M.empty) >> exitFailure)
         return
         $ genBasicBlocks typedProject
     when chatty (putStrLn . debugMessage $ "Checking basic blocks paths")
     case basicBlockPathsCheckModules rawBBProject of
       Nothing -> return ()
-      Just err -> 
-        let sourceFilesMap = 
-              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+      Just err ->
+        let sourceFilesMap =
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     case useDefCheckModules rawBBProject of
       Nothing -> return ()
-      Just err -> 
-        let sourceFilesMap = 
-              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) 
+      Just err ->
+        let sourceFilesMap =
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture rawBBProject (getPlatformInitialProgram config plt) orderedDependencies 
+    programArchitecture <- genArchitecture rawBBProject (getPlatformInitialProgram config plt) orderedDependencies
     checkEmitterConnections rawBBProject programArchitecture
     checkChannelConnections rawBBProject programArchitecture
     checkResourceUsage rawBBProject programArchitecture
@@ -441,21 +533,21 @@ buildCommand (BuildCmdArgs chatty) = do
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes bbProject
-    genInitFile config plt bbProject
-    genPlatformCode config plt bbProject programArchitecture
+    genInitFile config plt bbProject (qualifiedName appModule)
+    genPlatformCode config plt bbProject (qualifiedName appModule) programArchitecture
     unless (S.null (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes
+        }) . optionTypes $ monadicTypes)) $ genOptionHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
     unless (S.null (S.filter (\case {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes
+        }) . statusTypes $ monadicTypes)) $ genStatusHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
     unless (S.null (S.unions . M.elems . M.filterWithKey (\k _ -> case k of {
         TStruct _ -> False;
         TEnum _ -> False;
         _ -> True;
-        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes
+        }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

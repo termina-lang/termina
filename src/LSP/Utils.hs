@@ -33,7 +33,7 @@ import Parser.Types
 import qualified Parser.AST as PAST
 import Modules.Utils
 import Semantic.Environment
-import Command.Utils (getModuleDependencyList)
+import Command.Utils (getVisibleModules)
 import qualified Data.Set as S
 
 filePathToUri :: MonadIO m => FilePath -> m LSP.Uri
@@ -178,7 +178,7 @@ typeModules _srcPath _prevModsMap finalState [] = pure finalState
 typeModules srcPath prevModsMap prevState (m:ms) = do
   parsedProject <- gets project_modules
   let parsedModule = parsedProject M.! m
-  let moduleDependencies = S.fromList $ getModuleDependencyList prevModsMap (importedModules parsedModule)
+  let moduleDependencies = S.fromList $ getVisibleModules prevModsMap (importedModules parsedModule)
   case parsing parsedModule of
     Nothing -> 
       -- This means that the module has not been parsed or that the parsing failed

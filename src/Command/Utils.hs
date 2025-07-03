@@ -28,6 +28,7 @@ import Data.Functor ((<&>))
 import qualified Data.Map as M
 import Extras.Graph (TopSortError(..), topSortFromDepList)
 import Modules.Utils
+import Data.Time (UTCTime)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -42,8 +43,8 @@ debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
-getModuleDependencyList ::  M.Map QualifiedName [QualifiedName] -> [ModuleDependency] -> [QualifiedName]
-getModuleDependencyList prevModsMap importedMods =
+getVisibleModules ::  M.Map QualifiedName [QualifiedName] -> [ModuleDependency] -> [QualifiedName]
+getVisibleModules prevModsMap importedMods =
   let moduleDependencies = (\(ModuleDependency qname _) -> qname) <$> importedMods
       moduleDependencies' = concatMap (\m ->
         case M.lookup m prevModsMap of
@@ -51,6 +52,16 @@ getModuleDependencyList prevModsMap importedMods =
           Just prevMods -> prevMods) moduleDependencies
   in
   moduleDependencies ++ moduleDependencies'
+
+changedDependendencies :: BasicBlocksProject -> UTCTime -> [QualifiedName] -> IO Bool
+changedDependendencies _ _ [] = return False
+changedDependendencies bbProject t (x:xs) = do
+  let dep = bbProject M.! x
+      depModTime = modificationTime dep
+  if depModTime > t then 
+    return True
+  else
+    changedDependendencies bbProject t xs
 
 getModuleImports :: Maybe FilePath -> PAST.TerminaModule ParserAnn -> IO (Either ParsingErrors [ModuleDependency])
 getModuleImports (Just srcPath) m =
@@ -108,6 +119,7 @@ genBasicBlocksModule typedModule = do
             (fullPath typedModule)
             (modificationTime typedModule)
             (importedModules typedModule)
+            (visibleModules typedModule)
             (sourcecode typedModule)
             (BasicBlockData bbAST)
 

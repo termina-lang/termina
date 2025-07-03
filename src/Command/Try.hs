@@ -67,7 +67,7 @@ loadSingleModule filePath = do
             TIO.putStrLn (toText pErr fileMap) >> exitFailure
         Right term -> do
             -- Imported modules are ignored
-            return $ TerminaModuleData noExtension filePath mod_time [] src_code (ParsingData . frags $ term)
+            return $ TerminaModuleData noExtension filePath mod_time [] [] src_code (ParsingData . frags $ term)
 
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
@@ -82,7 +82,7 @@ typeSingleModule parsedModule = do
                     (qualifiedName parsedModule)
                     (fullPath parsedModule)
                     (modificationTime parsedModule)
-                    []
+                    [] []
                     (sourcecode parsedModule)
                     (SemanticData typedProgram)
 

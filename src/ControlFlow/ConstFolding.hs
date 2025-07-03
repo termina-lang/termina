@@ -586,7 +586,7 @@ loadGlobalConstEvironment = do
     ST.modify (\s -> s { globalConstEnv = M.insert identifier constExpr (globalConstEnv s) })) (M.elems glbConstants)
 
 constFoldGlobalEnvironment :: BasicBlocksModule -> ConstFoldMonad ()
-constFoldGlobalEnvironment (TerminaModuleData _ _ _ _ _ (BasicBlockData ast)) = do
+constFoldGlobalEnvironment (TerminaModuleData _ _ _ _ _ _ (BasicBlockData ast)) = do
   mapM_ constFoldGlobalDeclaration ast
 
   where
@@ -629,9 +629,9 @@ evalDefinitions e = return e
 
 evalModuleTypeDefinitions :: BasicBlocksModule -> ConstFoldMonad BasicBlocksModule
 evalModuleTypeDefinitions (TerminaModuleData modQualifiedName modFullPath 
-    modModificationTime modImportedModules modSourcecode (BasicBlockData ast)) =
+    modModificationTime modImportedModules modVisibleModules modSourcecode (BasicBlockData ast)) =
     TerminaModuleData modQualifiedName modFullPath 
-        modModificationTime modImportedModules modSourcecode . BasicBlockData <$> mapM evalDefinitions ast
+        modModificationTime modImportedModules modVisibleModules modSourcecode . BasicBlockData <$> mapM evalDefinitions ast
     
 
 runConstFolding ::
