@@ -29,6 +29,8 @@ data TerminaModuleData a = TerminaModuleData {
   modificationTime :: !UTCTime,
   -- | List of imported modules
   importedModules :: [ModuleDependency],
+  -- | Visible modules
+  visibleModules :: [QualifiedName],
   -- | Source code
   sourcecode :: T.Text,
   -- | Module meta-data (e.g. parsed AST)

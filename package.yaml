@@ -44,6 +44,7 @@ dependencies:
 - lsp
 - co-log-core
 - sorted-list
+- bytestring
 
 ghc-options:
 - -Wall
