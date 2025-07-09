@@ -91,9 +91,9 @@ typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt 
   -- Check the iterator is of numeric type
   unless (numTy it_ty) (throwError $ annotateError anns (EForIteratorInvalidType it_ty))
   -- Both boundaries should have the same numeric type and be a constant
-  typed_fromexpr <- catchMismatch (getAnnotation from_expr) (EForLoopLowerBoundTypeMismatch it_ty)
+  typed_fromexpr <- catchMismatch (getAnnotation from_expr) (EForLoopLowerBoundTypeMismatch (TConstSubtype it_ty))
     (typeExpression (Just (TConstSubtype it_ty)) typeRHSObject from_expr)
-  typed_toexpr <- catchMismatch (getAnnotation to_expr) (EForLoopUpperBoundTypeMismatch it_ty)
+  typed_toexpr <- catchMismatch (getAnnotation to_expr) (EForLoopUpperBoundTypeMismatch (TConstSubtype it_ty))
     (typeExpression (Just (TConstSubtype it_ty)) typeRHSObject to_expr)
   SAST.ForLoopStmt it_id it_ty typed_fromexpr typed_toexpr
     <$> (case mWhile of
