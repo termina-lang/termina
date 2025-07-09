@@ -307,6 +307,9 @@ typeObject getVarTy (ArrayIndexExpression obj idx ann) = do
     TReference ref_ak (TArray ty_elems _vexp) -> do
         idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
         checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann ref_ak ty_elems
+    TFixedLocation (TArray ty_elems _vexp) -> do
+        idx_typed  <- catchMismatch (getAnnotation idx) EArrayIndexNotUSize (typeExpression (Just TUSize) typeRHSObject idx)
+        checkObjectNotMoved ann $ SAST.ArrayIndexExpression typed_obj idx_typed $ buildExpAnnObj ann obj_ak ty_elems
     ty -> throwError $ annotateError ann (EInvalidArrayIndexing ty)
 typeObject _ (MemberAccess obj ident ann) = do
   -- | Attention on deck!
