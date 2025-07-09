@@ -108,6 +108,24 @@ instance CPrint CType where
         pqual <- pprint qual
         ptype <- pprintCTInt size signedness
         return $ pqual <+> ptype
+    pprint (CTPointer (CTArray aTy _) (CQualifier False False False)) = do
+        pATy <- pprint (rootCType aTy)
+        pArraySizes <- pprintCTArray aTy
+        return $ pATy <+> parens (pretty "*") <> pArraySizes
+    pprint (CTPointer (CTArray aTy _) qual) = do
+        pATy <- pprint (rootCType aTy)
+        pqual <- pprint qual
+        pArraySizes <- pprintCTArray aTy
+        return $ pATy <+> parens (pretty "*" <+> pqual) <> pArraySizes
+    pprint (CTPointer (CTFunction rTy params) (CQualifier False False False)) = do
+        prTy <- pprint rTy
+        pparams <- mapM pprint params
+        return $ prTy <+> parens (pretty "*") <> parens (align (fillSep (punctuate comma pparams)))
+    pprint (CTPointer (CTFunction rTy params) qual) = do
+        prTy <- pprint rTy
+        pqual <- pprint qual
+        pparams <- mapM pprint params
+        return $ prTy <+> parens (pretty "*" <+> pqual) <> parens (align (fillSep (punctuate comma pparams)))
     pprint (CTPointer ty (CQualifier False False False)) = do
         ptype <- pprint ty
         return $ ptype <+> pretty "*"
@@ -278,6 +296,15 @@ pprintCTypeDecl ident ty =
             pRootTy <- pprint (rootCType ty)
             pArraySizes <- pprintCTArray ty
             return $ pRootTy <+> pretty ident <> pArraySizes
+        CTPointer (CTArray aTy _) (CQualifier False False False) -> do
+            pATy <- pprint (rootCType aTy)
+            pArraySizes <- pprintCTArray aTy
+            return $ pATy <+> parens (pretty "*" <+> pretty ident) <> pArraySizes
+        CTPointer (CTArray aTy _) qual -> do
+            pATy <- pprint (rootCType aTy)
+            pqual <- pprint qual
+            pArraySizes <- pprintCTArray aTy
+            return $ pATy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> pArraySizes
         CTPointer (CTFunction rTy params) (CQualifier False False False) -> do
             prTy <- pprint rTy
             pparams <- mapM pprint params

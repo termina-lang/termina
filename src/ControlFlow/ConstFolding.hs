@@ -167,6 +167,10 @@ evalExpressionType loc (TArray ty arraySize)= do
 evalExpressionType loc (TAtomicArray ty arraySize) = do
   arraySizeValue <- evalConstExpression arraySize
   return (TAtomicArray ty (Constant arraySizeValue (buildExpAnn loc TUSize)))
+evalExpressionType loc (TFixedLocation (TArray ty arraySize)) = do
+  arraySizeValue <- evalConstExpression arraySize
+  ty' <- evalExpressionType loc ty
+  return (TFixedLocation (TArray ty' (Constant arraySizeValue (buildExpAnn loc TUSize))))
 evalExpressionType _ ty = return ty
 
 evalConstExpression :: Expression SemanticAnn -> ConstFoldMonad (Const SemanticAnn)

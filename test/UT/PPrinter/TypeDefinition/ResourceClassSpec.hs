@@ -100,6 +100,8 @@ classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
     ClassField (FieldDefinition "field0" TUInt32 (buildFieldAnn Internal)),
     ClassField (FieldDefinition "field1" (TFixedLocation TUInt32) (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field2" (TFixedLocation (TArray TUInt32 (buildConstExprTUSize 32))) (buildFieldAnn Internal)),
+    ClassField (FieldDefinition "field3" (TFixedLocation (TArray (TArray TUInt32 (buildConstExprTUSize 32)) (buildConstExprTUSize 8))) (buildFieldAnn Internal)),
     ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] []) (buildTypeAnn Internal)
 
@@ -214,6 +216,8 @@ spec = do
             "    __termina_resource_lock_type_t __lock_type;\n" ++
             "    uint32_t field0;\n" ++
             "    volatile uint32_t * field1;\n" ++
+            "    volatile uint32_t (* field2);\n" ++
+            "    volatile uint32_t (* field3)[32U];\n" ++
             "} Class0;\n" ++
             "\n" ++
             "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
