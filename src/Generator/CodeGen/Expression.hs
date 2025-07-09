@@ -136,6 +136,7 @@ genObject (ArrayIndexExpression obj index ann) = do
     (ty, arraySize) <- case objType of 
         (TArray ty arraySize) -> return (ty, arraySize)
         (TReference _ (TArray ty arraySize)) -> return (ty, arraySize)
+        (TFixedLocation (TArray ty arraySize)) -> return (ty, arraySize)
         _ -> throwError $ InternalError $ "Invalid object type: " ++ show obj ++ ". Expected an array."
     -- Generate the C code for the object
     cObj <- genObject obj
