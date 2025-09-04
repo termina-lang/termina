@@ -290,8 +290,7 @@ findDisPathsInternal graph startNodeK = do
               return ()
             else do
               -- If the next node is not globally visited, continue the DFS.
-              let fullPath = nextNodeK : currentNodeK : path
-              modify (\s -> s { accumulatedPaths = fullPath : accumulatedPaths s })
+              dfs graph' nextNodeK (currentNodeK : path)
 
           Just deps -> do
             -- If there are dependencies, continue the DFS for each dependency.

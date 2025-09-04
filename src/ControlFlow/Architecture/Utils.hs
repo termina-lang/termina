@@ -168,7 +168,10 @@ genResourceLockingsInternal programArchitecture =
                   st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
               Right paths -> do
                 let dest = head <$> paths
-                resLock <- getResLocking dest
+                -- We must filter out the initialization handler, as it does not require locking
+                let filteredDest = filter (not . isInitHandler) dest
+                 -- Determine the locking mechanism based on the access patterns
+                resLock <- getResLocking filteredDest
                 modify (\st ->
                   st { resLockingMap = M.insert resId resLock (resLockingMap st) }) >> return resLock
 
@@ -192,20 +195,11 @@ genResourceLockingsInternal programArchitecture =
     getResLocking [_] = return ResourceLockNone
     getResLocking (ident: ids) = do
         case M.lookup ident (handlers programArchitecture) of
-            Just _ -> do
-              if isInitHandler ident then getResLocking ids
-              else return ResourceLockIrq
+            Just _ -> return ResourceLockIrq
             Nothing -> case M.lookup ident (tasks programArchitecture) of
                 Just tsk -> getResLocking' (getPriority tsk) ids
-                Nothing -> case M.lookup ident (resources programArchitecture) of 
-                  Just (TPResource ident' _ _ _ _ ) -> do
-                    resLock <- processResource ident'
-                    case resLock of
-                      ResourceLockNone -> getResLocking ids
-                      ResourceLockIrq -> return ResourceLockIrq
-                      ResourceLockMutex ceilPrio -> getResLocking' ceilPrio ids
-                  Nothing ->
-                    error $ "Internal error: resource not found in usage map: " ++ ident
+                Nothing -> 
+                  error $ "Internal error: resource not found in usage map: " ++ ident
 
 
     getResLocking' :: TInteger -> [Identifier] -> ResLockingMonad ResourceLock
@@ -215,20 +209,11 @@ genResourceLockingsInternal programArchitecture =
     getResLocking' ceilPrio [] = return $ ResourceLockMutex ceilPrio
     getResLocking' ceilPrio (ident : ids) =
         case M.lookup ident (handlers programArchitecture) of
-            Just _ ->
-              if isInitHandler ident  then getResLocking' ceilPrio ids
-              else return ResourceLockIrq
+            Just _ -> return ResourceLockIrq
             Nothing -> case M.lookup ident (tasks programArchitecture) of
                 Just tsk ->
                     getResLocking' (min ceilPrio (getPriority tsk)) ids
-                Nothing -> case M.lookup ident (resources programArchitecture) of 
-                  Just (TPResource ident' _ _ _ _ ) -> do
-                    resLock <- processResource ident'
-                    case resLock of
-                      ResourceLockNone -> getResLocking ids
-                      ResourceLockIrq -> return ResourceLockIrq
-                      ResourceLockMutex ceilPrio' -> getResLocking' (min ceilPrio ceilPrio') ids
-                  Nothing ->
+                Nothing -> 
                     error $ "Internal error: resource not found in usage map: " ++ ident
 
 
