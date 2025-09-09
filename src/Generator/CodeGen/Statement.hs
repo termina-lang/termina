@@ -763,7 +763,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             concat <$> traverse genBlocks (blockBody blk')
 
         genMatchCaseParams :: CObject -> CType -> MatchCase SemanticAnn -> CGenerator [CCompoundBlockItem]
-        genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann _)) = do
+        genMatchCaseParams cObj cParamsStructType (MatchCase this_variant params _ (SemanticAnn semann loc')) = do
             cParamTypes <- case getMatchCaseTypes semann of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
@@ -772,22 +772,22 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                 [param] ->
                     case head cParamTypes of
                         CTPointer {} ->
-                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> getLocation ann]
+                            return [pre_cr (var param (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> loc']
                         _ ->
-                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann]
+                            return [pre_cr (var param (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> loc']
                 (p : xp) -> do
                     let rest = zipWith3
                             (\sym index cParamType ->
                                 case cParamType of
                                     CTPointer {} ->
-                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> getLocation ann
+                                        no_cr (var sym cParamType @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType)) |>> loc'
                                     _ ->
-                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> getLocation ann) xp [1..] (tail cParamTypes)
+                                        no_cr (var sym cParamType @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (index :: Integer)) @: cParamType) |>> loc') xp [1..] (tail cParamTypes)
                     case head cParamTypes of
                         CTPointer {} ->
-                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) : rest
+                            return $ pre_cr (var p (head cParamTypes) @:= addrOf ((cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes)) |>> loc' : rest
                         _ ->
-                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> getLocation ann : rest
+                            return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> loc' : rest
 
 
 genBlocks (ReturnBlock mExpr ann) =
