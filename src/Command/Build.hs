@@ -266,7 +266,7 @@ genInitFile params plt bbProject appModName = do
         Left err -> die . errorMessage $ show err
         Right cInitFile -> do
           createDirectoryIfMissing True (takeDirectory initFile)
-          TIO.writeFile initFile $ runCPrinter (profile params == Debug) cInitFile
+          TIO.writeFile initFile $ runCPrinter False cInitFile
 
 
 genOptionHeaderFile :: TerminaConfig -> Platform -> MonadicTypes -> BasicBlocksProject -> QualifiedName -> IO ()

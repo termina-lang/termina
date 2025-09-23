@@ -12,7 +12,7 @@ import Text.Parsec.Pos
 import Generator.Utils
 
 data CPrinterConfig = CPrinterConfig
-  { printDebugLines :: Bool,
+  { debug :: Bool,
     printAnnotations :: Bool
   }
 
@@ -430,7 +430,7 @@ instance CPrint CStatement where
     pprint s@(CSDo expr ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pexpr <- pprint expr
                 return $ 
                     prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
@@ -439,7 +439,7 @@ instance CPrint CStatement where
     pprint s@(CSIfThenElse expr stat mestat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pexpr <- pprint expr
                 pstat <- pprint stat
                 pestat <- case mestat of
@@ -458,7 +458,7 @@ instance CPrint CStatement where
     pprint s@(CSSwitch expr stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pexpr <- pprint expr
                 pstat <- pprint stat
                 return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
@@ -468,7 +468,7 @@ instance CPrint CStatement where
     pprint s@(CSFor for_init cond step stat ann) = do
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pfor_init <- either (maybe (return emptyDoc) pprint) pprint for_init
                 pstat <- pprint stat
                 case (cond, step) of
@@ -492,14 +492,14 @@ instance CPrint CStatement where
     pprint s@(CSReturn Nothing ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "return" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
     pprint s@(CSReturn (Just e) ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pe <- pprint e
                 return $ prependLine before . indentStmt expand . addDebugLine debugLines (location ann) $
                     pretty "return" <+> pe <> semi
@@ -517,7 +517,7 @@ instance CPrint CStatement where
     pprint s@(CSBreak ann) =
         case itemAnnotation ann of
             CStatementAnn before expand -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 return $ 
                     prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
                     $ pretty "break" <> semi
@@ -528,7 +528,7 @@ instance CPrint CCompoundBlockItem where
     pprint (CBlockDecl decl ann) = do
         case itemAnnotation ann of 
             CDeclarationAnn before -> do
-                debugLines <- asks printDebugLines
+                debugLines <- asks debug
                 pdecl <- pprint decl
                 return $ prependLine before . addDebugLine debugLines (location ann) $ pdecl <> semi
             _ -> error $ "Invalid annotation: " ++ show ann
@@ -628,4 +628,6 @@ instance CPrint CFile where
         return $ vsep pItems <> line
 
 runCPrinter :: Bool -> CFile -> Text
-runCPrinter debugLines cFile = render $ runReader (pprint cFile) (CPrinterConfig debugLines False)
+runCPrinter dbg cFile = render' $ runReader (pprint cFile) (CPrinterConfig dbg False)
+    where
+        render' = if dbg then unboundedRender else render
