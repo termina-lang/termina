@@ -118,11 +118,11 @@ stdlibGlobalEnv =
       InterfaceProcedure Mutable "print_usize" [Parameter "value" TUSize, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "println_usize" [Parameter "value" TUSize, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
-    -- | SystemAPI interface. This interface extends all the system interfaces.
-    -- We are currently assuming that there is a common implementation of the SystemAPI. In the future
-    -- this approach could allow to have different implementations of the SystemAPI depending on the
-    -- target platform.
-    ("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)
+    ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
+      InterfaceProcedure Mutable "read" [Parameter "size" (TConstSubtype TUSize), 
+          Parameter "str" (TReference Mutable (TArray TChar (AccessObject (Variable "size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize)))))),
+          Parameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn Internal TUnit)
+    ] [])) Internal)
   ]
 
 sysInitGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
@@ -146,6 +146,8 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
   let 
     globalEnv = mconcat [
       stdlibGlobalEnv,
+      -- | The platform specific environment. It should declare its own SystemAPI interface.
+      pltEnvironment,
       [
         env | enableSystemInit config, env <- sysInitGlobalEnv
       ],
@@ -154,7 +156,7 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
       ],
       [
         env | enableSystemExcept config, env <- sysExceptGlobalEnv
-      ], pltEnvironment]
+      ]]
   in
   ExprST (M.fromList globalEnv) M.empty M.empty S.empty
 makeInitialGlobalEnv Nothing pltEnvironment = 

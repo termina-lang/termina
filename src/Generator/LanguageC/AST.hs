@@ -172,6 +172,7 @@ newtype CChar = CChar Char
     deriving Show
 
 instance Pretty CChar where
+  pretty (CChar '\0') = pretty "'\\0'"
   pretty (CChar c) = pretty $ show c
 
 instance Pretty CString where

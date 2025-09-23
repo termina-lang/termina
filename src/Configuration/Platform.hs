@@ -5,6 +5,7 @@ module Configuration.Platform where
 import Data.Yaml
 import qualified Data.Text as T
 import Configuration.Platform.RTEMS5LEON3QEMU
+import Configuration.Platform.POSIXGCC
 
 data Platform = 
     POSIXGCC
@@ -12,19 +13,22 @@ data Platform =
     | TestPlatform
     deriving Eq
 
-newtype PlatformFlags = PlatformFlags {
-    rtems5_leon3_qemu :: RTEMS5LEON3QEMUFlags
+data PlatformFlags = PlatformFlags {
+    rtems5_leon3_qemu :: RTEMS5LEON3QEMUFlags,
+    posix_gcc :: POSIXGCCFlags
 } deriving (Eq, Show)
 
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
-    rtems5_leon3_qemu = defaultRTEMS5LEON3QEMUFlags
+    rtems5_leon3_qemu = defaultRTEMS5LEON3QEMUFlags,
+    posix_gcc = defaultPOSIXGCCFlags
 }
 
 instance FromJSON PlatformFlags where
   parseJSON (Object o) =
     PlatformFlags <$>
-    o .:? "rtems5-leon3-qemu" .!= defaultRTEMS5LEON3QEMUFlags
+    o .:? "rtems5-leon3-qemu" .!= defaultRTEMS5LEON3QEMUFlags <*>
+    o .:? "posix-gcc" .!= defaultPOSIXGCCFlags
   parseJSON _ = fail "Expected configuration object"
 
 instance Show Platform where
@@ -36,8 +40,10 @@ instance ToJSON PlatformFlags where
     toJSON (
         PlatformFlags 
             flagsRTEMSLEON3QEMU
+            flagsPOSIXGCC
         ) = object [
-            "rtems5-leon3-qemu" .= flagsRTEMSLEON3QEMU
+            "rtems5-leon3-qemu" .= flagsRTEMSLEON3QEMU,
+            "posix-gcc" .= flagsPOSIXGCC
         ]
 
 checkPlatform :: T.Text -> Maybe Platform

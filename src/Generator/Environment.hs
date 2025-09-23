@@ -8,9 +8,15 @@ import qualified Data.Map as M
 import ControlFlow.Architecture
 import Configuration.Platform
 import qualified Configuration.Platform.RTEMS5LEON3QEMU as RTEMS5LEON3QEMU.Config
+import qualified Configuration.Platform.POSIXGCC as POSIXGCC.Config
 
 getPlatformInitialGlobalEnv :: TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
-getPlatformInitialGlobalEnv _ POSIXGCC = []
+getPlatformInitialGlobalEnv config POSIXGCC =
+    let platformConfig = posix_gcc . platformFlags $ config in
+    [("kbd_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | POSIXGCC.Config.enableKbdIrq platformConfig] ++
+    -- | SystemAPI interface. This interface extends all the system interfaces.
+    -- Each target platform should declare its own SystemAPI interface.
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint", "SysGetChar"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config RTEMS5LEON3QEMU = 
     let platformConfig = rtems5_leon3_qemu . platformFlags $ config in
     [("irq_0", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq0 platformConfig] ++
@@ -28,11 +34,20 @@ getPlatformInitialGlobalEnv config RTEMS5LEON3QEMU =
     [("irq_12", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq12 platformConfig] ++
     [("irq_13", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq13 platformConfig] ++
     [("irq_14", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq14 platformConfig] ++
-    [("irq_15", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq15 platformConfig]
+    [("irq_15", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3QEMU.Config.enableIrq15 platformConfig] ++
+    -- | SystemAPI interface. This interface extends all the system interfaces.
+    -- Each target platform should declare its own SystemAPI interface.
+    [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)]
 getPlatformInitialGlobalEnv _ TestPlatform = []
 
 getPlatformInitialProgram :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn
-getPlatformInitialProgram config POSIXGCC = emptyTerminaProgArch config
+getPlatformInitialProgram config POSIXGCC = 
+    let platformConfig = posix_gcc . platformFlags $ config
+        initialProgArch = emptyTerminaProgArch config in
+    initialProgArch {
+        emitters = M.union (emitters initialProgArch) . M.fromList $
+        [("kbd_irq", TPInterruptEmittter "kbd_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | POSIXGCC.Config.enableKbdIrq platformConfig] 
+    }
 getPlatformInitialProgram config RTEMS5LEON3QEMU = 
     let platformConfig = rtems5_leon3_qemu . platformFlags $ config
         initialProgArch = emptyTerminaProgArch config in
@@ -58,7 +73,8 @@ getPlatformInitialProgram config RTEMS5LEON3QEMU =
 getPlatformInitialProgram config TestPlatform = emptyTerminaProgArch config
 
 getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
-getPlatformInterruptMap POSIXGCC = M.empty
+getPlatformInterruptMap POSIXGCC =
+    M.fromList [("kbd_irq", 0)]
 getPlatformInterruptMap RTEMS5LEON3QEMU =
     M.fromList [("irq_1", 1), ("irq_2", 2), ("irq_3", 3), ("irq_4", 4), 
                 ("irq_5", 5), ("irq_6", 6), ("irq_7", 7), ("irq_8", 8), 
