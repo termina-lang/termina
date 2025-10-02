@@ -1480,46 +1480,55 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Enum \x1b[31m" <> T.pack enumId <> "\x1b[0m does not have a variant named \x1b[31m" <> T.pack variant <> "\x1b[0m."))
-                EEnumVariantExtraParams (enumId, enumPos@(Position _ enumStart _end)) (variant, params) paramNumber ->
-                    let enumFileName = sourceName enumStart
-                        enumSourceLines = files M.! enumFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Enum variant \x1b[31m" <> T.pack variant <>
-                                "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                                "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            enumSourceLines "The enum is defined here:" enumFileName
-                            enumPos Nothing
-                EEnumVariantMissingParams (enumId, enumPos@(Position _ enumStart _end)) (variant, params) paramNumber ->
-                    let enumFileName = sourceName enumStart
-                        enumSourceLines = files M.! enumFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Enum variant \x1b[31m" <> T.pack variant <>
-                                "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                                "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
-                                "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            enumSourceLines "The enum is defined here:" enumFileName
-                            enumPos Nothing
-                EEnumVariantParamTypeMismatch (enumId, enumPos@(Position _ enumStart _end)) (variant, paramNumber, expectedTy) actualTy ->
-                    let enumFileName = sourceName enumStart
-                        enumSourceLines = files M.! enumFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Parameter \x1b[31m" <> T.pack (show paramNumber) <>
-                                "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <>
-                                "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
-                                "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
-                                "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
-                        pprintSimpleError
-                            enumSourceLines "The enum is defined here:" enumFileName
-                            enumPos Nothing
+                EEnumVariantExtraParams (enumId, enumPos) (variant, params) paramNumber ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Enum variant \x1b[31m" <> T.pack variant <>
+                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                            "\x1b[0m has only \x1b[31m" <> T.pack (show (length params)) <>
+                            "\x1b[0m parameters but you are providing \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
+                    case enumPos of
+                        Position _ enumStart _end ->
+                            let enumFileName = sourceName enumStart
+                                enumSourceLines = files M.! enumFileName
+                            in
+                                pprintSimpleError
+                                    enumSourceLines "The enum is defined here:" enumFileName
+                                    enumPos Nothing
+                        _ -> mempty
+                EEnumVariantMissingParams (enumId, enumPos) (variant, params) paramNumber ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Enum variant \x1b[31m" <> T.pack variant <>
+                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                            "\x1b[0m has \x1b[31m" <> T.pack (show (length params)) <>
+                            "\x1b[0m parameters but you are providing only \x1b[31m" <> T.pack (show paramNumber) <> "\x1b[0m.\n")) <>
+                    case enumPos of 
+                        Position _ enumStart _end ->
+                            let enumFileName = sourceName enumStart
+                                enumSourceLines = files M.! enumFileName
+                            in
+                                pprintSimpleError
+                                    enumSourceLines "The enum is defined here:" enumFileName
+                                    enumPos Nothing
+                        _ -> mempty
+                EEnumVariantParamTypeMismatch (enumId, enumPos) (variant, paramNumber, expectedTy) actualTy ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Parameter \x1b[31m" <> T.pack (show paramNumber) <>
+                            "\x1b[0m of enum variant \x1b[31m" <> T.pack variant <>
+                            "\x1b[0m of enum \x1b[31m" <> T.pack enumId <>
+                            "\x1b[0m is expected to be of type \x1b[31m" <> showText expectedTy <>
+                            "\x1b[0m but it is of type \x1b[31m" <> showText actualTy <> "\x1b[0m.\n")) <>
+                    case enumPos of
+                        Position _ enumStart _end ->
+                            let enumFileName = sourceName enumStart
+                                enumSourceLines = files M.! enumFileName
+                            in
+                                pprintSimpleError
+                                    enumSourceLines "The enum is defined here:" enumFileName
+                                    enumPos Nothing
+                        _ -> mempty
                 EFunctionNotFound ident ->
                     pprintSimpleError
                         sourceLines title fileName pos

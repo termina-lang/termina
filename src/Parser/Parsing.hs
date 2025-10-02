@@ -884,7 +884,7 @@ matchCaseParser = do
   startPos <- getPosition
   reserved "case"
   caseId <- identifierParser
-  args <- try (parens (sepBy identifierParser comma)) <|> return []
+  args <- try (parens (sepBy objectIdentifierParser comma)) <|> return []
   reservedOp "=>"
   caseBlk <- blockParser
   MatchCase caseId args caseBlk . Position current startPos <$> getPosition

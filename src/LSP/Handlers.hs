@@ -105,14 +105,9 @@ documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
       sendNotification SMethod_WindowShowMessage
         (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
     Just filePath -> do
-      modules <- gets project_modules
       cfg <- gets config
-      if M.member filePath modules then do
-        _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
-        typeProject
-      else 
-        sendNotification SMethod_WindowShowMessage
-          (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ filePath))
+      _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
+      typeProject
 
 initialized :: Handlers HandlerM
 initialized = notificationHandler SMethod_Initialized $ \_msg -> do
