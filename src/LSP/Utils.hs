@@ -124,7 +124,7 @@ loadTerminaModule fullP srcPath = do
   esrc_code <- loadVSFile fullP
   case esrc_code of
     Left _err -> do
-      errorM ("Error when loading file: " <> T.pack (show fullP))
+      errorM ("Error when loading file: " <> T.pack (Prelude.show fullP))
       return Nothing
     Right src_code ->
       -- parse it
