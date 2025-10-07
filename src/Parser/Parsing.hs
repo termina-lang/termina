@@ -1152,10 +1152,14 @@ classMethodParser = do
   startPos <- getPosition
   reserved "method"
   name <- identifierParser
-  accessKind <- parens selfAccessKindParser
+  (ak, params) <- parens $
+    do
+      ak <- selfAccessKindParser
+      params <- option [] (comma >> sepBy parameterParser comma)
+      return (ak, params)
   typeSpec <- optionMaybe (reservedOp "->" >> typeSpecifierParser)
   blockRet <- blockParser
-  ClassMethod accessKind name typeSpec blockRet . Position current startPos <$> getPosition
+  ClassMethod ak name params typeSpec blockRet . Position current startPos <$> getPosition
 
 classActionParser :: TerminaParser (ClassMember ParserAnn)
 classActionParser = do

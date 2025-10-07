@@ -158,7 +158,7 @@ selfDepClass
   :: ClassMember a
   -> SelfDepMap a -> SelfDepMap a
 selfDepClass (ClassField {}) = id
-selfDepClass (ClassMethod _ak mId _type bRet _ann) =
+selfDepClass (ClassMethod _ak mId _params _type bRet _ann) =
   M.insert mId (selfInvBlock bRet M.empty)
 selfDepClass (ClassProcedure _ak pId _params bRet _ann) =
   M.insert pId (selfInvBlock bRet M.empty)
@@ -171,7 +171,7 @@ fieldDepClass :: ClassMember a
   -> M.Map Identifier (S.Set Identifier) 
   -> M.Map Identifier (S.Set Identifier)
 fieldDepClass (ClassField {}) = id
-fieldDepClass (ClassMethod _ak _mId _type bRet _ann) = 
+fieldDepClass (ClassMethod _ak _mId _params _type bRet _ann) = 
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 fieldDepClass (ClassProcedure _ak _pId _params bRet _ann) = 
   M.unionWith S.union (fieldDepBlock bRet M.empty)

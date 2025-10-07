@@ -267,7 +267,7 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
             Nothing -> typeClassFieldDefinition S.empty fld);
         _ -> error "Internal Error: not a field";
       }) fls
-    checkClassKind ann ident kind (ty_fls, prcs, acts, mths ++ vws) provides
+    checkClassKind ann ident kind (ty_fls, prcs, acts, mths, vws) provides
 
     -- Map from ClassNames to their definition (usefull after sorting by name and dep)
     let nameClassMap = M.fromList (map (\e -> (className e, e)) elements)
@@ -318,13 +318,18 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
                   return (ps_ty, typed_bret)
               let newPrc = SAST.ClassProcedure ak mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
               return (newPrc : prevMembers)
-            ClassMethod ak mIdent mts mbody mann -> do
+            ClassMethod ak mIdent ps_ts mts mbody mann -> do
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
                   (\ty -> checkReturnType mann ty >> return (Just ty))) mts
-              typed_bret <- localScope $ do 
+              (ps_ty, typed_bret) <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  typeBlock mty mbody
-              let newMth = SAST.ClassMethod ak mIdent mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
+                  ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
+                      typedParam <- typeParameter mann param
+                      insertLocalImmutObj mann paramId (paramType typedParam)
+                      return typedParam)
+                  typed_bret <- typeBlock mty mbody
+                  return (ps_ty, typed_bret)
+              let newMth = SAST.ClassMethod ak mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent ps_ts mts mbody mann -> do
               mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
@@ -433,10 +438,11 @@ checkClassKind :: Location
   -> ([SAST.ClassMember SemanticAnn],
       [ClassMember ParserAnn],
       [ClassMember ParserAnn],
+      [ClassMember ParserAnn],
       [ClassMember ParserAnn])
   -> [Identifier] -> SemanticMonad ()
 -- | Resource class type checking
-checkClassKind anns clsId ResourceClass (fs, prcs, acts, _restMembers) provides = do
+checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) provides = do
   -- A resource must provide at least one interface
   when (null provides) (throwError $ annotateError anns (EResourceClassNoProvides clsId))
   -- Check that the provided interfaces are not duplicated
@@ -446,6 +452,11 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _restMembers) provides 
     [] -> return ()
     (ClassAction _ actionId _ _ _ ann):_  ->
         throwError $ annotateError ann (EResourceClassAction (clsId, anns) actionId)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
+  case viewers of
+    [] -> return ()
+    (ClassViewer viewerId _ _ _ ann):_  ->
+        throwError $ annotateError ann (EResourceClassAction (clsId, anns) viewerId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
@@ -546,7 +557,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _restMembers) provides 
                   Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
-checkClassKind anns clsId TaskClass (_fs, prcs, acts, restMembers) provides = do
+checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, viewers) provides = do
   -- A task must not provide any interface
   unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
   -- A task must not implement any procedures
@@ -555,14 +566,18 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, restMembers) provides = do
     (ClassProcedure _ procId _ _ ann):_  ->
         throwError $ annotateError ann (ETaskClassProcedure (clsId, anns) procId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
+  case methods of
+    [] -> return ()
+    (ClassMethod _ methodId _ _ _ ann):_  ->
+        throwError $ annotateError ann (ETaskClassMethod (clsId, anns) methodId)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A task must implement at least one action
   when (null acts) (throwError $ annotateError anns (ETaskClassNoActions clsId))
   mapM_ (\case {
-    ClassMethod ak ident _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     _ -> return ();
-  }) (acts ++ restMembers)
-checkClassKind anns clsId HandlerClass (fs, prcs, acts, restMembers) provides = do
+  }) acts
+checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, viewers) provides = do
   -- A handler must not provide any interface
   unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
   -- A handler must not implement any procedures
@@ -570,6 +585,11 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts, restMembers) provides = 
     [] -> return ()
     (ClassProcedure _ procId _ _ ann):_  ->
         throwError $ annotateError ann (EHandlerClassProcedure (clsId, anns) procId)
+    _ -> throwError (annotateError Internal EMalformedClassTyping)
+  case methods of
+    [] -> return ()
+    (ClassMethod _ methodId _ _ _ ann):_  ->
+        throwError $ annotateError ann (EHandlerClassMethod (clsId, anns) methodId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- A handler must implement only one action
   case acts of
@@ -581,10 +601,9 @@ checkClassKind anns clsId HandlerClass (fs, prcs, acts, restMembers) provides = 
   -- A handler must have one single sink port and cannot define any in ports
   checkHandlerPorts Nothing fs
   mapM_ (\case {
-    ClassMethod ak ident _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
     ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann HandlerClass ak ident;
     _ -> return ();
-  }) (acts ++ restMembers)
+  }) acts
 
   where
 

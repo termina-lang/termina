@@ -459,14 +459,15 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
                 _ -> genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
             return $ CExtDecl (CEDFunction void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassMethod ak method rts _ _) = do
+        genClassFunctionDeclaration (ClassMethod ak method params rts _ _) = do
+            cParamDecls <- mapM genParameterDeclaration params
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
             cEventParam <- getEventParam
             cSelfParam <- case ak of
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
-            return $ CExtDecl (CEDFunction retType clsFuncName [cEventParam, cSelfParam]) (buildDeclarationAnn ann True)
+            return $ CExtDecl (CEDFunction retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
         genClassFunctionDeclaration (ClassAction ak action param rts _ _) = do
             retType <- genType noqual rts
             cEventParam <- getEventParam
@@ -709,17 +710,18 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
 
-        genClassFunctionDefinition (ClassMethod ak method rts (Block stmts _) ann) = do
+        genClassFunctionDefinition (ClassMethod ak method parameters rts (Block stmts _) ann) = do
             clsFuncName <- genClassFunctionName identifier method
             cRetType <- maybe (return void) (genType noqual) rts
             cEventParam <- getEventParam
             cSelfParam <- case ak of
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
+            cParamDecls <- mapM genParameterDeclaration parameters
             cBody <- foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
-            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName [cEventParam, cSelfParam]
+            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction ak action param rts (Block stmts _) ann) = do

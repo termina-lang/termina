@@ -133,7 +133,7 @@ inOutBasicBlocks (Block blocks _) = mapM_ inOutBasicBlock blocks
 
 inOutClassMember :: M.Map Identifier (FieldDefinition SemanticAnn) -> ClassMember SemanticAnn -> BoxInOutMonad ()
 inOutClassMember _ (ClassField {}) = return ()
-inOutClassMember _ (ClassMethod _ _ _ body _) = inOutBasicBlocks body
+inOutClassMember _ (ClassMethod _ _ _ _ body _) = inOutBasicBlocks body
 inOutClassMember _ (ClassViewer {}) = return ()
 inOutClassMember _ (ClassAction _ _ Nothing _ body _) = inOutBasicBlocks body
 inOutClassMember actionsToPorts (ClassAction _ name (Just input) _ body _ann) = do

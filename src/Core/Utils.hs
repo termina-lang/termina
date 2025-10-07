@@ -484,14 +484,14 @@ findClassViewerOrMethod i
   = fmap
   (\case {
     ClassViewer _ ps mty _ a -> (ps, mty, a);
-    ClassMethod _ _ ty _ a -> ([], ty, a);
+    ClassMethod _ _ ps mty _ a -> (ps, mty, a);
     _ -> error "Impossible after find"
   })
   .
   L.find (
     \case{
       ClassViewer ident _ _ _ _ -> (ident == i);
-      ClassMethod _ ident _ _ _ -> (ident == i);
+      ClassMethod _ ident _ _ _ _ -> (ident == i);
       _ -> False
     }
   )
@@ -510,7 +510,7 @@ findClassAction i
 
 className :: ClassMember' ty blk a -> Identifier
 className (ClassField e)                = fieldIdentifier e
-className (ClassMethod _ mIdent _ _ _)    = mIdent
+className (ClassMethod _ mIdent _ _ _ _)    = mIdent
 className (ClassProcedure _ pIdent _ _ _) = pIdent
 className (ClassViewer vIdent _ _ _ _)  = vIdent
 className (ClassAction _ aIdent _ _ _ _)  = aIdent

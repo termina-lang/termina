@@ -24,8 +24,8 @@ getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
 getMemberFunctions = foldl' (\acc member ->
   case member of
-    ClassMethod _ak identifier mRetTy blk ann  ->
-      M.insert identifier (TPFunction identifier [] mRetTy blk ann)   acc
+    ClassMethod _ak identifier params mRetTy blk ann  ->
+      M.insert identifier (TPFunction identifier params mRetTy blk ann)   acc
     ClassProcedure _ak identifier params blk ann ->
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
     ClassAction _ak identifier Nothing rty blk ann ->

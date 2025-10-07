@@ -259,6 +259,9 @@ data Error
   | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
   | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
   | EProcedureSelfAccessKindMismatch (Identifier, Identifier, AccessKind, Location) AccessKind -- ^ Self reference access kind mismatch in procedure
+  | ETaskClassMethod (Identifier, Location) Identifier -- ^ Task class defines a method
+  | EHandlerClassMethod (Identifier, Location) Identifier -- ^ Handler class defines a method
+  | EResourceClassViewer (Identifier, Location) Identifier -- ^ Resource class defines a viewer
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -471,6 +474,9 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "SE-205"
     errorIdent (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "SE-206"
     errorIdent (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) = "SE-207"
+    errorIdent (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "SE-208"
+    errorIdent (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "SE-209"
+    errorIdent (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "SE-210"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -681,6 +687,9 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "member function with mutable self reference in task class"
     errorTitle (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) =
         "self reference access kind mismatch in procedure"
+    errorTitle (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "task class defines a method"
+    errorTitle (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "handler class defines a method"
+    errorTitle (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "resource class defines a viewer"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2226,6 +2235,132 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         prevSourceLines "The interface procedure is defined here:" prevFileName
                         prevPos Nothing
+                ETaskClassMethod (classId, Position _ startPosClass endPosClass) ident ->
+                    let procStartLine = sourceLine start
+                        procEndLine = sourceLine end
+                        procStartColumn = sourceColumn start
+                        procEndColumn = 
+                            if procStartLine == procEndLine then 
+                                sourceColumn end 
+                            else 
+                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
+                        classStartLine = sourceLine startPosClass
+                        classEndLine = sourceLine endPosClass
+                        classStartColumn = sourceColumn startPosClass
+                        classEndColumn = 
+                            if classStartLine == classEndLine then 
+                                sourceColumn endPosClass 
+                            else 
+                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
+
+                    in
+                        TL.toStrict $ prettyErrors
+                            sourceLines
+                            [
+                                Errata
+                                    (Just title)
+                                    [
+                                        Errata.Block
+                                            fancyRedStyle
+                                            (sourceName start, classStartLine, classStartColumn)
+                                            Nothing
+                                            [
+                                                Pointer classStartLine classStartColumn
+                                                        classEndColumn
+                                                        True Nothing fancyRedPointer,
+                                                Pointer procStartLine procStartColumn procEndColumn
+                                                        True (Just " \x1b[31minvalid method definition\x1b[0m") fancyRedPointer
+                                            ]
+                                            Nothing
+                                    ]
+                                    (Just
+                                        ("Task class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                                        <> "Task classes cannot define methods."))
+                            ]
+                EHandlerClassMethod (classId, Position _ startPosClass endPosClass) ident ->
+                    let procStartLine = sourceLine start
+                        procEndLine = sourceLine end
+                        procStartColumn = sourceColumn start
+                        procEndColumn = 
+                            if procStartLine == procEndLine then 
+                                sourceColumn end 
+                            else 
+                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
+                        classStartLine = sourceLine startPosClass
+                        classEndLine = sourceLine endPosClass
+                        classStartColumn = sourceColumn startPosClass
+                        classEndColumn = 
+                            if classStartLine == classEndLine then 
+                                sourceColumn endPosClass 
+                            else 
+                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
+
+                    in
+                        TL.toStrict $ prettyErrors
+                            sourceLines
+                            [
+                                Errata
+                                    (Just title)
+                                    [
+                                        Errata.Block
+                                            fancyRedStyle
+                                            (sourceName start, classStartLine, classStartColumn)
+                                            Nothing
+                                            [
+                                                Pointer classStartLine classStartColumn
+                                                        classEndColumn
+                                                        True Nothing fancyRedPointer,
+                                                Pointer procStartLine procStartColumn procEndColumn
+                                                        True (Just " \x1b[31minvalid procedure definition\x1b[0m") fancyRedPointer
+                                            ]
+                                            Nothing
+                                    ]
+                                    (Just
+                                        ("Handler class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the method \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                                        <> "Handler classes cannot define methods."))
+                            ]
+                EResourceClassViewer (classId, Position _ startPosClass endPosClass) ident ->
+                    let procStartLine = sourceLine start
+                        procEndLine = sourceLine end
+                        procStartColumn = sourceColumn start
+                        procEndColumn = 
+                            if procStartLine == procEndLine then 
+                                sourceColumn end 
+                            else 
+                                T.length (T.lines sourceLines !! (procStartLine - 1)) + 1
+                        classStartLine = sourceLine startPosClass
+                        classEndLine = sourceLine endPosClass
+                        classStartColumn = sourceColumn startPosClass
+                        classEndColumn = 
+                            if classStartLine == classEndLine then 
+                                sourceColumn endPosClass 
+                            else 
+                                T.length (T.lines sourceLines !! (classStartLine - 1)) + 1
+
+                    in
+                        TL.toStrict $ prettyErrors
+                            sourceLines
+                            [
+                                Errata
+                                    (Just title)
+                                    [
+                                        Errata.Block
+                                            fancyRedStyle
+                                            (sourceName start, classStartLine, classStartColumn)
+                                            Nothing
+                                            [
+                                                Pointer classStartLine classStartColumn
+                                                        classEndColumn
+                                                        True Nothing fancyRedPointer,
+                                                Pointer procStartLine procStartColumn procEndColumn
+                                                        True (Just " \x1b[31minvalid viewer definition\x1b[0m") fancyRedPointer
+                                            ]
+                                            Nothing
+                                    ]
+                                    (Just
+                                        ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
+                                        <> "Resource classes cannot define viewers."))
+                            ]
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

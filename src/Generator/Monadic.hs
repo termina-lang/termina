@@ -112,9 +112,11 @@ mapClassMemberMonadic ::
   ClassMember SemanticAnn
   -> MonadicTypesMonad ()
 mapClassMemberMonadic (ClassField field) = insertMonadicType (fieldTerminaType field)
-mapClassMemberMonadic (ClassMethod _ _ maybeRet blkRet _) =
+mapClassMemberMonadic (ClassMethod _ _ params maybeRet blkRet _) =
   -- | Get the monadic types types from the return type
   mapMaybeMonadic maybeRet >>
+  -- | Get the monadic types types from the parameters
+  mapM_ mapParameterMonadic params >>
   -- | Get the monadic types types from the block return type
   mapM_ mapStatementMonadic (blockBody blkRet)
 mapClassMemberMonadic (ClassProcedure _ _ params blkRet _) =

@@ -135,12 +135,12 @@ type SemanTypeDef a = TypeDef' TerminaType EmptyBlock a
 -- Forgetfull Class member map
 kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a
 kClassMember (ClassField fld) = ClassField fld
-kClassMember (ClassMethod ak idx ps _blk ann) =
-  ClassMethod ak idx ps EmptyBlock ann
+kClassMember (ClassMethod ak idx ps mty _blk ann) =
+  ClassMethod ak idx ps mty EmptyBlock ann
 kClassMember (ClassProcedure ak idx ps _blk ann) =
   ClassProcedure ak idx ps EmptyBlock ann
-kClassMember (ClassViewer idx ps ty _blk ann) =
-  ClassViewer idx ps ty EmptyBlock ann
+kClassMember (ClassViewer idx ps mty _blk ann) =
+  ClassViewer idx ps mty EmptyBlock ann
 kClassMember (ClassAction ak idx ps ty _blk ann) =
   ClassAction ak idx ps ty EmptyBlock ann
 

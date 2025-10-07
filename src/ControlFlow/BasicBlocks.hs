@@ -220,9 +220,9 @@ genBBBlock (SAST.Block stmts blkann) = do
 -- statements are grouped into basic blocks and a new return block is created.
 genBBClassMember :: SAST.ClassMember SemanticAnn -> BBGenerator (ClassMember SemanticAnn)
 genBBClassMember (ClassField field) = return $ ClassField field
-genBBClassMember (ClassMethod ak name retType body ann) = do
+genBBClassMember (ClassMethod ak name args retType body ann) = do
     bRet <- genBBBlock body
-    return $ ClassMethod ak name retType bRet ann
+    return $ ClassMethod ak name args retType bRet ann
 genBBClassMember (ClassProcedure ak name args body ann) = do
     bRet <- genBBBlock body
     return $ ClassProcedure ak name args bRet ann

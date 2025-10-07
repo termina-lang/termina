@@ -220,7 +220,7 @@ defVariable ident loc =
            else throwError $ annotateError loc (ENotUsed ident)
 
 -- Procedures can receive /box/ variables as arguments.
--- Box variables have a special Use, through free or stuff.
+-- Box variables have a special use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- box.
 defArgumentsProc :: Parameter a -> Location -> UDM VarUsageError ()

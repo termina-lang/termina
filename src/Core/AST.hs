@@ -324,6 +324,7 @@ data ClassMember' ty blk a
     | ClassMethod 
       AccessKind  -- ^ access kind (immutable, mutable or private)
       Identifier  -- ^ name of the method
+      [Parameter' ty a] -- ^ list of parameters (possibly empty)
       (Maybe (ty a)) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
