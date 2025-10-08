@@ -24,6 +24,7 @@ import LSP.Modules
 import Generator.Environment (getPlatformInitialGlobalEnv)
 import Data.Functor (void)
 import Semantic.Environment
+import Command.Types (typedAST)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do
@@ -109,6 +110,26 @@ documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
       _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
       typeProject
 
+requestSymbols :: Handlers HandlerM
+requestSymbols = requestHandler SMethod_TextDocumentDocumentSymbol $ \req responder -> do
+  let fileURI = req ^. J.params . J.textDocument . J.uri
+  case uriToFilePath fileURI of 
+    Nothing -> 
+      sendNotification SMethod_WindowShowMessage
+        (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
+    Just filePath -> do
+      typed_modules <- gets project_modules
+      let mLoadedModule = M.lookup filePath typed_modules
+      case mLoadedModule of
+        Nothing -> do
+          responder (Right (InL []))
+        Just loadedModule -> do
+          case semantic loadedModule of
+            Nothing -> responder (Right (InL []))
+            Just semanticData -> do
+              let symbols = getDocumentSymbols fileURI (typedAST semanticData)
+              responder (Right (InL symbols))
+
 initialized :: Handlers HandlerM
 initialized = notificationHandler SMethod_Initialized $ \_msg -> do
   diags <- gets project_modules
@@ -138,6 +159,7 @@ handlers =
         return ()
       , initialized
       , documentChange
+      , requestSymbols
     ]
 
 
