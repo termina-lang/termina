@@ -33,8 +33,9 @@ import ControlFlow.Architecture
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
 import Core.AST
+    ( TerminaModule'(frags), TerminaType'(TEnum, TStruct) )
 import Generator.Environment
-import Generator.Platform
+import Generator.CodeGen.Platform
 import Configuration.Platform
 import Utils.Errors
 import Utils.Annotations

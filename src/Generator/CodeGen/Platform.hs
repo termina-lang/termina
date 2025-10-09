@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Generator.Platform where
+module Generator.CodeGen.Platform where
 
 
 import Configuration.Configuration
