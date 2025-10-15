@@ -41,7 +41,7 @@ data Error =
   | EAtomicArrayConnectionSizeMismatch Integer Integer -- ^ Atomic array connection size mismatch
   | EArrayInitializerSizeMismatch Integer Integer -- ^ Array initializer size mismatch
   | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch
-  | EStringInitializerSizeMismatch Integer Integer -- ^ String initializer size mismatch
+  | EStringInitializerInvalidSize Integer Integer -- ^ String initializer size mismatch
   | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstDivisionByZero -- ^ Constant division by zero
@@ -63,7 +63,7 @@ instance ErrorMessage ConstFoldError where
     errorIdent (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "CPE-001"
     errorIdent (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CPE-002"
     errorIdent (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CPE-003"
-    errorIdent (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CPE-004"
+    errorIdent (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "CPE-004"
     errorIdent (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "CPE-005"
     errorIdent (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "CPE-006"
     errorIdent (AnnotatedError EConstDivisionByZero _pos) = "CPE-007"
@@ -81,7 +81,7 @@ instance ErrorMessage ConstFoldError where
     errorTitle (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "atomic array connection size mismatch"
     errorTitle (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array initializer size mismatch"
     errorTitle (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array expression list initializer size mismatch"
-    errorTitle (AnnotatedError (EStringInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "string initializer size mismatch"
+    errorTitle (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "invalid string initializer size"
     errorTitle (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "constant integer overflow"
     errorTitle (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "constant integer underflow"
     errorTitle (AnnotatedError EConstDivisionByZero _pos) = "constant division by zero"
@@ -117,7 +117,7 @@ instance ErrorMessage ConstFoldError where
                         sourceLines title fileName pos
                         (Just ("The size of the array expression list initializer is \x1b[31m" <> T.pack (show initializerSize) <>
                             "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
-                EStringInitializerSizeMismatch expectedSize initializerSize ->
+                EStringInitializerInvalidSize expectedSize initializerSize ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The size of the string initializer is \x1b[31m" <> T.pack (show initializerSize) <>

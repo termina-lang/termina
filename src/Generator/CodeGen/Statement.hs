@@ -124,8 +124,60 @@ genStringInitialization loc before level cObj value = do
 
     where
 
+        cObjType = getCObjType cObj
+
         genStringItemsInitialization :: Bool -> Integer -> Integer -> String -> CGenerator [CCompoundBlockItem]
-        genStringItemsInitialization _before _level _idx [] = return []
+        genStringItemsInitialization before' level' _idx [] = do
+            case cObjType of
+                CTArray (CTChar _) (CExprConstant (CIntConst (CInteger size _)) _ _) -> do
+                    -- If the array has a fixed size, we need to fill the rest of the array with null characters
+                    if size > (fromIntegral (length value) + 1) then do
+                        -- We need to fill the rest of the array with null characters. We do this with a for loop.
+                        let cSize = dec (size - fromIntegral (length value)) @: size_t |>> loc
+                            iterator = namefy $ "i" ++ show level'
+                            cIteratorExpr = iterator @: size_t |>> loc
+                            initDecl = var iterator size_t @:= dec 0 @: size_t
+                            condExpr = cIteratorExpr @< cSize |>> loc
+                            incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
+                        cObjArrayItemType <- getCArrayItemType cObjType
+                        let expr' = Constant (C '\0') (SemanticAnn (ETy (SimpleType TChar)) loc)
+                        arrayInit <- genArrayInitialization loc False (level' + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
+                        if before' then
+                            return [pre_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
+                        else
+                            return [no_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
+                    else if size == (fromIntegral (length value) + 1) then do
+                        -- If the array has a fixed size and it is exactly the
+                        -- size of the string plus the null character, we just
+                        -- need to add the null character at the end of the
+                        -- string.
+                        let index = fromIntegral (length value)
+                            cIndex = dec index @: size_t |>> loc
+                            cChar = '\0' @: char |>> loc
+                            cAssignment = (cObj @$$ cIndex @: cObjType) @= cChar
+                        if before' then
+                            return [pre_cr cAssignment |>> loc]
+                        else
+                            return [no_cr cAssignment |>> loc]
+                    else
+                        return []
+                CTArray (CTChar _) cArraySize -> do
+                    -- | If we have an array whose size is not a literal constant, i.e., it depends on a constant parameter,
+                    -- we need to fill the rest of the array with null characters. We do this with a for loop.
+                    let cSize = (cArraySize @- (dec (fromIntegral (length value)) @: size_t)) @: size_t
+                        iterator = namefy $ "i" ++ show level'
+                        cIteratorExpr = iterator @: size_t |>> loc
+                        initDecl = var iterator size_t @:= dec 0 @: size_t
+                        condExpr = cIteratorExpr @< cSize |>> loc
+                        incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
+                    cObjArrayItemType <- getCArrayItemType cObjType
+                    let expr' = Constant (C '\0') (SemanticAnn (ETy (SimpleType TChar)) loc)
+                    arrayInit <- genArrayInitialization loc False (level' + 1) (cObj @$$ cIteratorExpr @: cObjArrayItemType) expr'
+                    if before' then
+                        return [pre_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
+                    else
+                        return [no_cr (_for_let initDecl condExpr incrExpr (block arrayInit)) |>> loc]
+                _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show value
         genStringItemsInitialization before' level' idx (x:xs) = do
             rest <- genStringItemsInitialization False level' (idx + 1) xs
             let current = cObj @$$ (dec idx @: size_t) @: char @= x @: char

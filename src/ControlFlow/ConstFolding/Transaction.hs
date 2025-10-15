@@ -55,10 +55,10 @@ constFoldCheckExprType loc (TArray _ arraySize) initExpr@(StringInitializer {}) 
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   case (arraySizeValue, initExprSizeValue) of
     (I (TInteger lhs _) _, I (TInteger rhs _) _) -> do
-      if lhs == rhs then
+      if lhs >= rhs then
         return ()
       else
-        throwError $ annotateError loc (EStringInitializerSizeMismatch lhs rhs)
+        throwError $ annotateError loc (EStringInitializerInvalidSize lhs rhs)
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
 constFoldCheckExprType _ _ (StructInitializer fvas _) = do
   mapM_ constFoldCheckFVAType fvas
