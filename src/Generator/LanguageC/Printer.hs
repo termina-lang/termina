@@ -219,7 +219,7 @@ instance CPrint CExpression where
             -- | Until C23, we do not have a specific suffix for size_t integer
             -- literals.  We should parameterize the suffix to be used for
             -- size_t literals depending on the platform
-            CTSizeT _ -> return $ pretty value <> pretty "U"
+            CTSizeT _ -> return $ pretty i <> pretty "U"
             _ -> pprint i
     pprintPrec _ (CExprConstant c _ _) = pprint c
     pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj

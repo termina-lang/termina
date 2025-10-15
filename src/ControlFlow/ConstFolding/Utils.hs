@@ -8,6 +8,8 @@ import Semantic.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import qualified Data.Map as M
+import Core.Utils
+import Data.Bits
 
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
@@ -144,7 +146,7 @@ followSendMessage progArchitecture currentId portName = do
                     actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
                                     M.lookup targetAction (classMemberFunctions targetTaskCls)
                     return (targetTaskId, actionFunction)
-                Nothing -> error "Cacafuti 3" -- throwError $ annotateError Internal (EUnknownIdentifier currentId)
+                Nothing -> throwError $ annotateError Internal (EUnknownIdentifier currentId)
 
 followProcedureCall :: (MonadError ConstFoldError m) =>
     TerminaProgArch SemanticAnn -> Identifier -> Identifier -> Identifier -> m (Identifier, TPFunction SemanticAnn)
@@ -172,4 +174,111 @@ followProcedureCall progArchitecture ident portName procName = do
                     resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource'))) return $ M.lookup (resourceClass resource') (resourceClasses progArchitecture)
                     resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
                     return (targetResource, resourceProc)
-              Nothing -> error "Cacafuti " -- throwError $ annotateError Internal (EUnknownIdentifier ident)
+              Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
+  
+intReprBinOp :: IntRepr -> IntRepr -> IntRepr
+intReprBinOp DecRepr DecRepr = DecRepr
+intReprBinOp HexRepr HexRepr = HexRepr
+intReprBinOp OctalRepr OctalRepr = OctalRepr
+intReprBinOp _ HexRepr = HexRepr
+intReprBinOp HexRepr _ = HexRepr
+intReprBinOp OctalRepr  _ = OctalRepr
+intReprBinOp _ OctalRepr  = OctalRepr
+
+evalBinOp :: (MonadError ConstFoldError m) => Location
+  -> Op -> Const SemanticAnn
+  -> Const SemanticAnn
+  -> TerminaType SemanticAnn -> m (Const SemanticAnn)
+evalBinOp loc Multiplication (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  let result = lhs * rhs in
+  if memberIntCons result ty then
+    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+  else
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+evalBinOp loc Division (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  if rhs == 0 then
+    throwError $ annotateError loc EConstDivisionByZero
+  else
+  let result = lhs `div` rhs in
+  return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+evalBinOp loc Addition (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  let result = lhs + rhs in
+  if memberIntCons result ty then
+    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+  else
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+evalBinOp loc Subtraction (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  let result = lhs - rhs in
+  if posTy ty && result < 0 then
+    throwError $ annotateError loc (EConstIntegerUnderflow result ty)
+  else
+    return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+evalBinOp loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+  if rhs == 0 then
+    throwError $ annotateError loc EConstDivisionByZero
+  else
+  let result = lhs `mod` rhs in
+  return $ I (TInteger result repr) (Just ty)
+evalBinOp loc BitwiseLeftShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+  let result = lhs `shiftL` fromIntegral rhs in
+  if memberIntCons result ty then
+    return $ I (TInteger result repr) (Just ty)
+  else
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+evalBinOp loc BitwiseRightShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+  let result = lhs `shiftR` fromIntegral rhs in
+  if memberIntCons result ty then
+    return $ I (TInteger result repr) (Just ty)
+  else
+    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+evalBinOp _ RelationalLT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs < rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ RelationalLTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs <= rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ RelationalGT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs > rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ RelationalGTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs >= rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ RelationalEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs == rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ RelationalNotEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+  if lhs /= rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ BitwiseAnd (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty = do
+  let result = lhs .&. rhs
+  return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+evalBinOp _ BitwiseOr (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  let result = lhs .|. rhs in
+  return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+evalBinOp _ BitwiseXor (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+  let result = lhs `xor` rhs in
+  return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
+evalBinOp _ LogicalAnd (B lhs) (B rhs) _ =
+  if lhs && rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ LogicalOr (B lhs) (B rhs) _ =
+  if lhs || rhs then
+    return $ B True
+  else
+    return $ B False
+evalBinOp _ _ _ _ _ =
+  throwError $ annotateError Internal (EInvalidExpression "invalid bin op")

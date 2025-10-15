@@ -41,7 +41,7 @@ import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
-import ControlFlow.ConstFolding (runConstFolding)
+import ControlFlow.ConstFolding (runTransFolding, runConstSimpl)
 import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
@@ -436,9 +436,19 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
+constSimpl :: BasicBlocksProject -> IO BasicBlocksProject
+constSimpl bbProject = do
+  case runConstSimpl bbProject of
+    Left err ->
+      let sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                M.empty bbProject in
+      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    Right bbProject' -> return bbProject'
+
 constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO BasicBlocksProject
 constFolding bbProject progArchitecture =
-  case runConstFolding bbProject progArchitecture of
+  case runTransFolding bbProject progArchitecture of
     Left err ->
       -- | Create the source files map. This map will be used to obtainn the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
@@ -521,16 +531,18 @@ buildCommand (BuildCmdArgs chatty) = do
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    when chatty (putStrLn . debugMessage $ "Performing constant simplification")
+    simplBBProject <- constSimpl rawBBProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture rawBBProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkEmitterConnections rawBBProject programArchitecture
-    checkChannelConnections rawBBProject programArchitecture
-    checkResourceUsage rawBBProject programArchitecture
-    checkPoolUsage rawBBProject programArchitecture
-    checkProjectBoxSources rawBBProject programArchitecture
-    when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    bbProject <- constFolding rawBBProject programArchitecture
+    programArchitecture <- genArchitecture simplBBProject (getPlatformInitialProgram config plt) orderedDependencies
+    checkEmitterConnections simplBBProject programArchitecture
+    checkChannelConnections simplBBProject programArchitecture
+    checkResourceUsage simplBBProject programArchitecture
+    checkPoolUsage simplBBProject programArchitecture
+    checkProjectBoxSources simplBBProject programArchitecture
+    when chatty (putStrLn . debugMessage $ "Performing depth constant folding")
+    bbProject <- constFolding simplBBProject programArchitecture
     -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes bbProject
