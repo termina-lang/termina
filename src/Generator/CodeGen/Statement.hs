@@ -127,16 +127,16 @@ genStringInitialization loc before level cObj value = do
         cObjType = getCObjType cObj
 
         genStringItemsInitialization :: Bool -> Integer -> Integer -> String -> CGenerator [CCompoundBlockItem]
-        genStringItemsInitialization before' level' _idx [] = do
+        genStringItemsInitialization before' level' idx [] = do
             case cObjType of
                 CTArray (CTChar _) (CExprConstant (CIntConst (CInteger size _)) _ _) -> do
                     -- If the array has a fixed size, we need to fill the rest of the array with null characters
                     if size > (fromIntegral (length value) + 1) then do
                         -- We need to fill the rest of the array with null characters. We do this with a for loop.
-                        let cSize = dec (size - fromIntegral (length value)) @: size_t |>> loc
+                        let cSize = dec size @: size_t |>> loc
                             iterator = namefy $ "i" ++ show level'
                             cIteratorExpr = iterator @: size_t |>> loc
-                            initDecl = var iterator size_t @:= dec 0 @: size_t
+                            initDecl = var iterator size_t @:= dec idx @: size_t
                             condExpr = cIteratorExpr @< cSize |>> loc
                             incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
                         cObjArrayItemType <- getCArrayItemType cObjType
@@ -164,11 +164,10 @@ genStringInitialization loc before level cObj value = do
                 CTArray (CTChar _) cArraySize -> do
                     -- | If we have an array whose size is not a literal constant, i.e., it depends on a constant parameter,
                     -- we need to fill the rest of the array with null characters. We do this with a for loop.
-                    let cSize = (cArraySize @- (dec (fromIntegral (length value)) @: size_t)) @: size_t
-                        iterator = namefy $ "i" ++ show level'
+                    let iterator = namefy $ "i" ++ show level'
                         cIteratorExpr = iterator @: size_t |>> loc
-                        initDecl = var iterator size_t @:= dec 0 @: size_t
-                        condExpr = cIteratorExpr @< cSize |>> loc
+                        initDecl = var iterator size_t @:= dec idx @: size_t
+                        condExpr = cIteratorExpr @< cArraySize |>> loc
                         incrExpr = iterator @: size_t @= (cIteratorExpr @+ dec 1 @: size_t) @: size_t |>> loc
                     cObjArrayItemType <- getCArrayItemType cObjType
                     let expr' = Constant (C '\0') (SemanticAnn (ETy (SimpleType TChar)) loc)
