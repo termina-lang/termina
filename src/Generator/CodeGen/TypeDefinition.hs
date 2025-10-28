@@ -384,19 +384,7 @@ genTypeDefinitionDecl (TypeDefinition (Enum identifier variants _) ann) = do
                     _ -> do
                         unionField <- genParameterUnion variantsWithParams
                         return $ pre_cr $ struct identifier [enumField, unionField] [] |>> getLocation ann
-genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface identifier _extends procs _) ann) = do
-    let cThatField = field thatField (ptr void)
-    procedureFields <- mapM genInterfaceProcedureField procs
-    return [pre_cr $ struct identifier (cThatField : procedureFields) [] |>> getLocation ann]
-
-    where
-
-        genInterfaceProcedureField :: InterfaceMember SemanticAnn -> CGenerator CDeclaration
-        genInterfaceProcedureField (InterfaceProcedure _ak procedure params _modifiers _) = do
-            cParamTypes <- mapM (genType noqual . paramType) params
-            let cThisParamType = _const . ptr $ void
-                cFuncPointerType = CTPointer (CTFunction (CTVoid noqual) (cThisParamType : cParamTypes)) noqual
-            return $ CDecl (CTypeSpec cFuncPointerType) (Just procedure) Nothing
+genTypeDefinitionDecl (TypeDefinition (Interface RegularInterface _identifier _extends _procs _mods) _ann) = return []
 
 genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides modifiers) ann) = do
     -- | Classify class members into fields and functions.
