@@ -1,4 +1,4 @@
-# Termina
+# The Termina Programming Language
 
 Termina is a domain-specific language for real-time embedded systems aimed at simplifying their implementation and reducing validation and verification costs.
 
