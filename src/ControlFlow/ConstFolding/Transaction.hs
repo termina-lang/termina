@@ -382,7 +382,7 @@ transFoldBasicBlock (SendMessage obj expr _) = do
       (targetGlb, targetFunction) <- followSendMessage progArchitecture e outPort
       switchInputScope targetGlb $ transFoldFlowTransfer [expr] targetFunction
     Nothing -> throwError $ annotateError Internal (EInvalidExpression "invalid send message")
-transFoldBasicBlock (ProcedureCall obj procName exprs _) = do
+transFoldBasicBlock (ProcedureInvoke obj procName exprs _) = do
   transFoldObject obj
   progArchitecture <- ST.gets progArch
   current <- ST.gets currentElement

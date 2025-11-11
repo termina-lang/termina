@@ -113,7 +113,7 @@ inOutBasicBlock (SendMessage obj arg ann) = do
             boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
             addIOMapSend outPt ann boxSource
         _ -> return ()
-inOutBasicBlock (ProcedureCall obj procId args ann) = do
+inOutBasicBlock (ProcedureInvoke obj procId args ann) = do
     -- | We need to check if we are sending a box as an argument
     argTys <- mapM getExprType args
     zipWithM_ checkArg [0..] argTys

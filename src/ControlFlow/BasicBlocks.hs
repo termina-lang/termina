@@ -103,7 +103,7 @@ genBBlocks acc (stmt : xs) =
                         -- | If the object is an access port of a user-defined interface type, we shall create
                         -- a new procedure call block
                         TAccessPort (TInterface RegularInterface _) ->
-                            genBBlocks (ProcedureCall obj funcName args ann' : acc) xs
+                            genBBlocks (ProcedureInvoke obj funcName args ann' : acc) xs
                         TAccessPort (TInterface SystemInterface _) ->
                             genBBlocks (SystemCall obj funcName args ann' : acc) xs
                         -- | If the object is an access port to an allocator, we shall create a new block

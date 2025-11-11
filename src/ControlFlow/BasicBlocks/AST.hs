@@ -84,8 +84,8 @@ data BasicBlock a =
     | MatchBlock (Expression a) [MatchCase a] (Maybe (DefaultCase a)) a
     -- | Send message
     | SendMessage (Object a) (Expression a) a
-    -- | Call to a resource procedure
-    | ProcedureCall 
+    -- | Invoke a resource procedure
+    | ProcedureInvoke 
         (Object a) -- ^ access port
         Identifier -- ^ name of the procedure
         [Expression a] -- ^ list of arguments

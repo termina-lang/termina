@@ -476,7 +476,7 @@ genStructInitialization loc before level cObj expr = do
 
 genBlocks :: BasicBlock SemanticAnn -> CGenerator [CCompoundBlockItem]
 genBlocks (RegularBlock stmts) = concat <$> traverse genStatement stmts
-genBlocks (ProcedureCall obj ident args ann) = do
+genBlocks (ProcedureInvoke obj ident args ann) = do
     (cFuncType, _) <- case ann of
         SemanticAnn (ETy (AppType pts ts)) _ -> do
             cFuncType <- genProcedureType pts

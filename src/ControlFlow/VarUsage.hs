@@ -256,7 +256,7 @@ useDefBasicBlock (FreeBox obj arg ann)
       let loc = getLocation ann in
       safeMoveBox var loc
     _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
-useDefBasicBlock (ProcedureCall obj _ident args _ann)
+useDefBasicBlock (ProcedureInvoke obj _ident args _ann)
   = useObject obj >> mapM_ useArguments args
 useDefBasicBlock (AtomicLoad obj e _ann)
   = useObject obj >> useExpression e

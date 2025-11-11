@@ -143,9 +143,9 @@ constSimplBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
 constSimplBasicBlock (SendMessage obj expr ann) = do
   expr' <- constSimplExpression expr
   return $ SendMessage obj expr' ann
-constSimplBasicBlock (ProcedureCall obj procName exprs ann) = do
+constSimplBasicBlock (ProcedureInvoke obj procName exprs ann) = do
   exprs' <- mapM constSimplExpression exprs
-  return $ ProcedureCall obj procName exprs' ann
+  return $ ProcedureInvoke obj procName exprs' ann
 constSimplBasicBlock (AtomicLoad obj expr ann) = do
   expr' <- constSimplExpression expr
   return $ AtomicLoad obj expr' ann
