@@ -38,6 +38,7 @@ getPlatformInitialGlobalEnv config RTEMS5LEON3QEMU =
     -- | SystemAPI interface. This interface extends all the system interfaces.
     -- Each target platform should declare its own SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)]
+getPlatformInitialGlobalEnv _ FreeRTOS10STM32L432XX = []
 getPlatformInitialGlobalEnv _ TestPlatform = []
 
 getPlatformInitialProgram :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn
@@ -70,6 +71,7 @@ getPlatformInitialProgram config RTEMS5LEON3QEMU =
         [("irq_14", TPInterruptEmittter "irq_14" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq14 platformConfig] ++
         [("irq_15", TPInterruptEmittter "irq_15" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq15 platformConfig]
     }
+getPlatformInitialProgram config FreeRTOS10STM32L432XX = emptyTerminaProgArch config
 getPlatformInitialProgram config TestPlatform = emptyTerminaProgArch config
 
 getPlatformInterruptMap :: Platform -> M.Map Identifier Integer
@@ -80,4 +82,5 @@ getPlatformInterruptMap RTEMS5LEON3QEMU =
                 ("irq_5", 5), ("irq_6", 6), ("irq_7", 7), ("irq_8", 8), 
                 ("irq_9", 9), ("irq_10", 10), ("irq_11", 11), ("irq_12", 12), 
                 ("irq_13", 13), ("irq_14", 14), ("irq_15", 15)]
+getPlatformInterruptMap FreeRTOS10STM32L432XX = M.empty
 getPlatformInterruptMap TestPlatform = M.empty
