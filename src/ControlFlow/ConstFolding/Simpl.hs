@@ -14,6 +14,9 @@ constSimplFieldAssignment :: FieldAssignment SemanticAnn -> ConstSimplMonad (Fie
 constSimplFieldAssignment (FieldValueAssignment ident expr ann) = do
   expr' <- constSimplExpression expr
   return $ FieldValueAssignment ident expr' ann
+constSimplFieldAssignment (FieldAddressAssignment ident addr ann) = do
+  addr' <- constSimplExpression addr
+  return $ FieldAddressAssignment ident addr' ann
 constSimplFieldAssignment fva = return fva
 
 constSimplType :: TerminaType SemanticAnn -> ConstSimplMonad (TerminaType SemanticAnn)

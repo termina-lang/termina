@@ -278,7 +278,7 @@ structInitializerParser = do
         startPos <- getPosition
         identifier <- identifierParser
         _ <- reservedOp "@"
-        addr <- integerParser
+        addr <- expressionParser
         FieldAddressAssignment identifier addr . Position current startPos <$> getPosition
 
       fieldAccessPortConnectionParser :: TerminaParser (FieldAssignment ParserAnn)

@@ -1336,11 +1336,12 @@ typeFieldAssignment tyDef typeObj (FieldDefinition fid fty _) (FieldValueAssignm
   then
     flip (SAST.FieldValueAssignment faid) (buildExpAnn pann fty) <$> typeAssignmentExpression fty typeObj faexp
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [faid])
-typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
+typeFieldAssignment tyDef typeObj (FieldDefinition fid fty _) (FieldAddressAssignment faid addr pann) =
   if fid == faid
   then
     case fty of
-      TFixedLocation _ -> return $ SAST.FieldAddressAssignment faid addr (buildExpAnn pann fty)
+      TFixedLocation _ -> 
+        flip (SAST.FieldAddressAssignment faid) (buildExpAnn pann fty) <$> typeAssignmentExpression TUSize typeObj addr
       ty -> throwError $ annotateError pann (EFieldNotFixedLocation fid ty)
   else throwError $ annotateError pann (EFieldValueAssignmentUnknownFields tyDef [faid])
 typeFieldAssignment tyDef _ (FieldDefinition fid fty _) (FieldPortConnection InboundPortConnection pid sid pann) =

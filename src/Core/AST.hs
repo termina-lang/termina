@@ -69,9 +69,6 @@ data Modifier' ty a = Modifier Identifier (Maybe (Const' ty a))
 -- | Identifiers as `String`
 type Identifier = String
 
--- | Addresses as `Integer`
-type Address = TInteger
-
 data TypeParameter' expr a =
   -- | Identifier that might be a defined type or a constant
   TypeParamIdentifier Identifier
@@ -370,7 +367,7 @@ data Parameter' ty a = Parameter {
 
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a) a
-  | FieldAddressAssignment Identifier Address a
+  | FieldAddressAssignment Identifier (expr a) a
   | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 

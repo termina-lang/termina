@@ -409,14 +409,14 @@ genStructInitialization loc before level cObj expr = do
                 rest <- genFieldAssignments False xs
                 return $ fieldInit ++ rest
             genFieldAssignments before' (FieldAddressAssignment fld addr (SemanticAnn (ETy (SimpleType ts)) _):xs) = do
-                let cAddress = genInteger addr
+                cAddress <- genExpression addr
                 cTs <- genType noqual ts
                 let fieldObj = cObj @. fld @: cTs
                 rest <- genFieldAssignments False xs
                 if before' then
-                    return $ pre_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
+                    return $ pre_cr (fieldObj @= cast cTs cAddress) : rest
                 else
-                    return $ no_cr (fieldObj @= cast cTs (cAddress @: size_t)) : rest
+                    return $ no_cr (fieldObj @= cast cTs cAddress) : rest
             genFieldAssignments before' (FieldPortConnection OutboundPortConnection fld channel (SemanticAnn (STy (PortConnection (OutPConnTy _))) _) : xs) = do
                 let cMsgQueue = typeDef msgQueue
                 let cPtrMsgQueue = ptr cMsgQueue
