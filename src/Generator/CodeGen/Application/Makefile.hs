@@ -41,7 +41,8 @@ genMakefile params bbProject =
         MakeBlock [
             MVariable MAppend "OBJS" [MFunction "patsubst"
                 [MFragment "%.c", MFragment "%.o", MFunction "patsubst"
-                    [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]],
+                    [MFragment "%.s", MFragment "%.o", MFunction "patsubst"
+                        [MFragment "$(TERMINA_OSAL_DIR)/%", MFragment "$(TARGET_DIR_NAME)/termina/%", MFunction "wildcard" [MFragment "$(OSAL_SRCS)"]]]]],
             MVariable MAppend "OBJS" [MFunction "patsubst" [MFragment "%.c", MFragment "%.o", MFunction "patsubst" [MFragment "$R/%", MFragment "$(TARGET_DIR_NAME)/%", MFragment "$(SRCS)"]]]
         ],
         MakeBlock [
@@ -52,6 +53,11 @@ genMakefile params bbProject =
         ],
         MakeBlock [
             MRule "all" ["$(TARGET)"] [],
+            MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.s"] [
+                MakeCommand False [MFragment "@echo Building $<"],
+                MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],
+                MakeCommand False [MFragment "@$(AS) $(ASMFLAGS) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<"]
+            ],
             MRule "$(TARGET_DIR_NAME)/termina/%.o" ["$(TERMINA_OSAL_DIR)/%.c"] [
                 MakeCommand False [MFragment "@echo Building $<"],
                 MakeCommand False [MFragment "@$(MKDIR) -p $(@D)"],

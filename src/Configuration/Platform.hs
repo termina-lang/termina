@@ -10,6 +10,7 @@ import Configuration.Platform.POSIXGCC
 data Platform = 
     POSIXGCC
     | RTEMS5LEON3QEMU
+    | FreeRTOS10STM32L432XX
     | TestPlatform
     deriving Eq
 
@@ -34,6 +35,7 @@ instance FromJSON PlatformFlags where
 instance Show Platform where
     show POSIXGCC = "posix-gcc"
     show RTEMS5LEON3QEMU = "rtems5-leon3-qemu"
+    show FreeRTOS10STM32L432XX = "freertos-stm32l432xx"
     show TestPlatform = "test-platform"
 
 instance ToJSON PlatformFlags where
@@ -49,10 +51,12 @@ instance ToJSON PlatformFlags where
 checkPlatform :: T.Text -> Maybe Platform
 checkPlatform "posix-gcc" = Just POSIXGCC
 checkPlatform "rtems5-leon3-qemu" = Just RTEMS5LEON3QEMU
+checkPlatform "freertos10-stm32l432xx" = Just FreeRTOS10STM32L432XX
 checkPlatform _ = Nothing
 
 supportedPlatforms :: [(Platform, String)]
 supportedPlatforms = [
         (POSIXGCC, "POSIX on GCC"),
-        (RTEMS5LEON3QEMU, "RTEMS version 5 for LEON3 QEMU simulator")
+        (RTEMS5LEON3QEMU, "RTEMS version 5 for LEON3 QEMU simulator"),
+        (FreeRTOS10STM32L432XX, "FreeRTOS V10 for STM32L432XX microcontroller")
     ]
