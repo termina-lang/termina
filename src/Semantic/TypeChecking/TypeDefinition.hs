@@ -577,7 +577,7 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, viewers) provides
     ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     _ -> return ();
   }) acts
-checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, viewers) provides = do
+checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provides = do
   -- A handler must not provide any interface
   unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
   -- A handler must not implement any procedures

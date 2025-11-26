@@ -43,6 +43,7 @@ data TerminaConfig =
     appFilename :: !FilePath,
     sourceModulesFolder :: !FilePath,
     outputFolder :: !FilePath,
+    efpFolder :: !FilePath,
     profile :: !ProjectProfile,
     enableSystemInit :: !Bool,
     enableSystemPort :: !Bool,
@@ -61,6 +62,7 @@ instance FromJSON TerminaConfig where
     o .:   "app-file"       <*>
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
+    o .:   "efp-folder"     <*>
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
@@ -78,6 +80,7 @@ instance ToJSON TerminaConfig where
             prjAppFilename 
             prjSourceModulesFolder 
             prjOutputFolder
+            prjEFPFolder
             prjProfile
             prjEnableSystemInit
             prjEnableSystemPort
@@ -90,7 +93,8 @@ instance ToJSON TerminaConfig where
             "app-folder" .= prjAppFolder,
             "app-file" .= prjAppFilename,
             "source-modules" .= prjSourceModulesFolder,
-            "output-folder" .= prjOutputFolder
+            "output-folder" .= prjOutputFolder,
+            "efp-folder" .= prjEFPFolder
         ]   -- We only serialize the profile if it is different from the default value
             <> case prjProfile of
                 Debug -> ["profile" .= prjProfile]
@@ -113,6 +117,7 @@ defaultConfig projectName plt = TerminaConfig {
     appFilename = "app",
     sourceModulesFolder = "src",
     outputFolder = "output",
+    efpFolder = "efp",
     profile = Release,
     enableSystemInit = False,
     enableSystemPort = False,

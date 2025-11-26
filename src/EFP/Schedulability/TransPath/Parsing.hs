@@ -20,9 +20,9 @@ lexer = Tok.makeTokenParser langDef
        ,"twcep"]
       ++ 
       -- | Control flow keywords
-      ["ifelif", "match", "for"]
+      ["if", "elif", "else", "case", "for"]
       ++
-      ["block", "send", "invoke", "aload", "astore", "aaload", "aastore", 
+      ["block", "send", "invoke", "call",
        "alloc", "free", "return", "continue", "reboot", "syscall"]
 
     langDef =

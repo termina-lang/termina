@@ -16,8 +16,6 @@ data CPrinterConfig = CPrinterConfig
     printAnnotations :: Bool
   }
 
-newtype CPrinterError = CPrinterError String
-
 type CPrinter = Reader CPrinterConfig DocStyle
 
 -- precedence of C operators

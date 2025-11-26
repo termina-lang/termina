@@ -33,11 +33,15 @@ data WCEPathBlock a
     | WCEPSendMessage 
         Identifier -- ^ Port name
         Location
+    | WCEPathMemberFunctionCall 
+        Identifier -- ^ Function name
+        [Expression a] -- ^ Constant argument expressions
+        Location
     -- | Invoke a resource procedure
     | WCEPProcedureInvoke 
         Identifier -- ^ Port name
         Identifier -- ^ Procedure name 
-        [Expression a] -- ^ Argument expression
+        [Expression a] -- ^ Constant argument expression
         Location
     | WCEPAllocBox 
         Identifier -- ^ Port name

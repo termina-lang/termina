@@ -48,11 +48,14 @@ import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
 import System.Environment
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
+import EFP.Schedulability.TransPath.Generator (genTransactionalWCEPS)
+import EFP.Schedulability.TransPath.Printer
 
 -- | Data type for the "new" command arguments
-newtype BuildCmdArgs =
+data BuildCmdArgs =
     BuildCmdArgs
         Bool -- ^ Verbose mode
+        Bool -- ^ Generate transactional worst-case execution paths
     deriving (Show,Eq)
 
 -- | Parser for the "new" command arguments
@@ -61,6 +64,8 @@ buildCmdArgsParser = BuildCmdArgs
     <$> O.switch (O.long "verbose"
         <> O.short 'v'
         <> O.help "Enable verbose mode")
+    <*> O.switch (O.long "gen-transactional-wceps"
+        <> O.help "Generate transactional worst-case execution paths")  
 
 -- | Load Termina file 
 loadTerminaModule ::
@@ -162,6 +167,26 @@ monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.ele
   where
     monadicTypesMapModule :: MonadicTypes -> TypedModule -> MonadicTypes
     monadicTypesMapModule prevMap typedModule = runMapMonadicTypesAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
+  
+genTWCEPS ::
+  TerminaConfig
+  -> BasicBlocksProject
+  -> IO ()
+genTWCEPS params bbProject = do
+  mapM_ printWCEPModule (M.elems bbProject) 
+
+  where
+
+    printWCEPModule :: BasicBlocksModule -> IO ()
+    printWCEPModule bbModule = do
+      let destinationPath = efpFolder params
+          twcepFile = destinationPath </> qualifiedName bbModule <.> "twcep"
+          bbAST = basicBlocksAST . metadata $ bbModule
+          wceps = genTransactionalWCEPS bbAST
+      createDirectoryIfMissing True (takeDirectory twcepFile)
+      TIO.writeFile twcepFile $ runWCEPathPrinter wceps
+
+
 
 genModules ::
   TerminaConfig
@@ -461,7 +486,7 @@ constFolding bbProject progArchitecture =
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
-buildCommand (BuildCmdArgs chatty) = do
+buildCommand (BuildCmdArgs chatty genTransactionalWCEPs) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -563,4 +588,7 @@ buildCommand (BuildCmdArgs chatty) = do
         TEnum _ -> False;
         _ -> True;
         }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
+    when genTransactionalWCEPs $ 
+      when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
+      genTWCEPS config bbProject
     when chatty (putStrLn . debugMessage $ "Build completed successfully")
