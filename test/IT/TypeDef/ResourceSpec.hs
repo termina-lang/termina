@@ -46,11 +46,6 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* get_tm_sent_packets)(void * const, uint32_t * const);\n" ++
-              "} TMChannelInterface;\n" ++
-              "\n" ++              
-              "typedef struct {\n" ++
               "    __termina_resource_lock_type_t __lock_type;\n" ++
               "    uint32_t tm_sent_packets;\n" ++
               "} TMChannel;\n" ++
@@ -87,11 +82,6 @@ spec = do
               "#define __TEST_H__\n" ++
               "\n" ++
               "#include <termina.h>\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* get_status)(void * const, uint32_t * const);\n" ++
-              "} UARTDriverInterface;\n" ++
               "\n" ++
               "typedef struct {\n" ++
               "    __termina_resource_lock_type_t __lock_type;\n" ++

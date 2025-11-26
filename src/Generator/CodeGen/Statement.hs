@@ -585,15 +585,12 @@ genBlocks (SendMessage obj arg ann) = do
                         no_cr mCall
                     ]
                 ]
-genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
+genBlocks (IfElseBlock (CondIf expr ifBlks _) elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
-    cIfBlk <- concat <$> traverse genBlocks (blockBody ifBlk)
-    cElseBlk <-
-        (case elseBlk of
-            Nothing -> return Nothing
-            Just elseBlk' -> do
-                blks <- concat <$> traverse genBlocks (blockBody elseBlk')
-                return . Just $ (trail_cr . block $ blks) |>> getLocation ann)
+    cIfBlk <- concat <$> traverse genBlocks (blockBody ifBlks)
+    cElseBlk <- maybe (return Nothing) (\elseBlk' -> do
+                    blks <- concat <$> traverse genBlocks (blockBody . condElseBody $ elseBlk')
+                    return . Just $ (trail_cr . block $ blks) |>> getLocation ann) elseBlk
     mAlts <- genAlternatives cElseBlk elifsBlks
     case mAlts of
         Nothing -> return [pre_cr $ _if cExpr (trail_cr . block $ cIfBlk) |>> getLocation ann]
@@ -601,9 +598,9 @@ genBlocks (IfElseBlock expr ifBlk elifsBlks elseBlk ann) = do
 
     where
 
-        genAlternatives :: Maybe CStatement -> [ElseIf SemanticAnn] -> CGenerator (Maybe CStatement)
+        genAlternatives :: Maybe CStatement -> [CondElseIf SemanticAnn] -> CGenerator (Maybe CStatement)
         genAlternatives prev [] = return prev
-        genAlternatives prev (ElseIf expr' blk ann' : xs) = do
+        genAlternatives prev (CondElseIf expr' blk ann' : xs) = do
             cExpr' <- genExpression expr'
             cBlk <- concat <$> traverse genBlocks (blockBody blk)
             mPrev <- genAlternatives prev xs

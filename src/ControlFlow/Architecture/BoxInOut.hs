@@ -82,8 +82,8 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     boxName <- getExprBoxName arg
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
     addIOMapFree outPt ann boxSource
-inOutBasicBlock (IfElseBlock _eCond bTrue elseIfs bFalse _ann) =
-    localInputScope $ mapM_ inOutBasicBlock (blockBody bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . elseIfBody <$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock . blockBody) bFalse
+inOutBasicBlock (IfElseBlock bTrue elseIfs bFalse _ann) =
+    localInputScope $ mapM_ inOutBasicBlock (blockBody . condIfBody $ bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . condElseIfBody<$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock . blockBody . condElseBody) bFalse
 inOutBasicBlock (ForLoopBlock {}) =
     -- | Inside a for loop, there cannot be any box releasing
     return ()

@@ -168,15 +168,15 @@ genBBlocks acc (stmt : xs) =
         SAST.ForLoopStmt iterator typeSpecifier initial final breakCondition (SAST.Block loopStmts blkann) ann -> do
             loopBlocks <- genBBlocks [] (reverse loopStmts)
             genBBlocks (ForLoopBlock iterator typeSpecifier initial final breakCondition (Block loopBlocks blkann) ann : acc) xs
-        SAST.IfElseStmt condition ifBlk elseIfs elseStmts ann -> do
-            ifBlocks <- genBBBlock ifBlk
-            elseIfBlocks <- mapM genElseIfBBlocks elseIfs
-            elseBlocks <- case elseStmts of
+        SAST.IfElseStmt ifCond elseIfs mElse ann -> do
+            ifBlocks <- genIfCondBlocks ifCond
+            elseIfsBlocks <- mapM genElseIfBBlocks elseIfs
+            elseBlocks <- case mElse of
                 Just elseBlk -> do
-                    blocks <- genBBBlock elseBlk
+                    blocks <- genElseBlocks elseBlk
                     return $ Just blocks
                 Nothing -> return Nothing
-            genBBlocks (IfElseBlock condition ifBlocks elseIfBlocks elseBlocks ann : acc) xs
+            genBBlocks (IfElseBlock ifBlocks elseIfsBlocks elseBlocks ann : acc) xs
         SAST.MatchStmt expr matchCases mDefaultCase ann -> do
             matchCasesBlocks <- mapM genMatchCaseBBlocks matchCases
             defaultCase <- maybe (return Nothing) (genDefaultBBlock >=> (return . Just)) mDefaultCase
@@ -187,11 +187,21 @@ genBBlocks acc (stmt : xs) =
 
     where
 
+        genIfCondBlocks :: SAST.CondIf SemanticAnn -> BBGenerator (CondIf SemanticAnn)
+        genIfCondBlocks (SAST.CondIf condition ifBlk ann) = do
+            blocks <- genBBBlock ifBlk
+            return $ CondIf condition blocks ann
+
         -- | This function generates the basic blocks for an else-if block
-        genElseIfBBlocks :: SAST.ElseIf SemanticAnn -> BBGenerator (ElseIf SemanticAnn)
-        genElseIfBBlocks (SAST.ElseIf condition elifBlk ann) = do
+        genElseIfBBlocks :: SAST.CondElseIf SemanticAnn -> BBGenerator (CondElseIf SemanticAnn)
+        genElseIfBBlocks (SAST.CondElseIf condition elifBlk ann) = do
             blocks <- genBBBlock elifBlk
-            return $ ElseIf condition blocks ann
+            return $ CondElseIf condition blocks ann
+        
+        genElseBlocks :: SAST.CondElse SemanticAnn -> BBGenerator (CondElse SemanticAnn)
+        genElseBlocks (SAST.CondElse elseBlk ann) = do
+            blocks <- genBBBlock elseBlk
+            return $ CondElse blocks ann
 
         -- | This function generates the basic blocks for a match case block
         genMatchCaseBBlocks :: SAST.MatchCase SemanticAnn -> BBGenerator (MatchCase SemanticAnn)

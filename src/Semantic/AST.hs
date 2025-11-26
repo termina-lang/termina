@@ -137,11 +137,24 @@ data DefaultCase a = DefaultCase
   a
   deriving (Show, Functor)
 
-data ElseIf a = ElseIf
+data CondIf a = CondIf
   {
-    elseIfCond       :: Expression a
-  , elseIfBody       :: Block a
-  , elseIfAnnotation :: a
+    condIfCond       :: Expression a
+  , condIfBody       :: Block a
+  , condIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElse a = CondElse
+  {
+    condElseBody       :: Block a
+  , condElseAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElseIf a = CondElseIf
+  {
+    condElseIfCond       :: Expression a
+  , condElseIfBody       :: Block a
+  , condElseIfAnnotation :: a
   } deriving (Show, Functor)
 
 data Statement a =
@@ -157,10 +170,9 @@ data Statement a =
     (Expression a) -- ^ assignment expression
     a
   | IfElseStmt
-    (Expression a) -- ^ conditional expression
-    (Block a) -- ^ statements in the if block
-    [ElseIf a] -- ^ list of else if blocks
-    (Maybe (Block a)) -- ^ statements in the else block
+    (CondIf a) -- ^ if condition and body
+    [CondElseIf a] -- ^ list of else if blocks
+    (Maybe (CondElse a)) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt

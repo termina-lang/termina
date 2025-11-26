@@ -83,13 +83,13 @@ mapStatementMonadic ::
   Statement SemanticAnn
   -> MonadicTypesMonad ()
 mapStatementMonadic (Declaration _ _ ts _ _) = insertMonadicType ts
-mapStatementMonadic (IfElseStmt _ (Block stmts _) elseIfs elseBlk _) =
+mapStatementMonadic (IfElseStmt condIf elseIfs elseBlk _) =
   -- | Get the monadic types types from the statements
-  mapM_ mapStatementMonadic stmts >>
+  mapM_ mapStatementMonadic (blockBody . condIfBody $ condIf) >>
   -- | Get the monadic types types from the else if statements
-  mapM_ (\(ElseIf _ (Block stmts' _) _) -> mapM_ mapStatementMonadic stmts') elseIfs >>
+  mapM_ (\(CondElseIf _ (Block stmts' _) _) -> mapM_ mapStatementMonadic stmts') elseIfs >>
   -- | Get the monadic types types from the else statements
-  maybe (return ()) (mapM_ mapStatementMonadic . blockBody) elseBlk
+  maybe (return ()) (mapM_ mapStatementMonadic . blockBody . condElseBody) elseBlk
 mapStatementMonadic (ForLoopStmt _ _ _ _ _ (Block stmts _) _) = mapM_ mapStatementMonadic stmts
 mapStatementMonadic (MatchStmt _ cases mDefaultCase _) = do
   mapM_ (\(MatchCase _ _ (Block stmts _) _) -> mapM_ mapStatementMonadic stmts) cases

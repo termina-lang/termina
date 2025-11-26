@@ -34,10 +34,10 @@ addForwardingBlock action (SendMessage obj _ _) = do
     outPt <- getPortName obj
     addFordwardingPort action outPt
 -- | We may have sending blocks inside the if-else block
-addForwardingBlock action (IfElseBlock _ ifBlock elifs elseBlocks _) = do
-    mapM_ (addForwardingBlock action) (blockBody ifBlock)
-    mapM_ (\(ElseIf _ blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)) elifs
-    maybe (return ()) (mapM_ (addForwardingBlock action) . blockBody) elseBlocks
+addForwardingBlock action (IfElseBlock ifBlock elifs elseBlocks _) = do
+    mapM_ (addForwardingBlock action) (blockBody . condIfBody $ ifBlock)
+    mapM_ (\(CondElseIf _ blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)) elifs
+    maybe (return ()) (mapM_ (addForwardingBlock action) . blockBody . condElseBody) elseBlocks
 -- | We may have sending blocks inside the cases of a match block
 addForwardingBlock action (MatchBlock _ cases mDefaultCase _) = do
     mapM_ (\(MatchCase _ _ blocks _) -> mapM_ (addForwardingBlock action) (blockBody blocks)) cases

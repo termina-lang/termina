@@ -8,6 +8,7 @@ import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
 import EFP.Schedulability.TransPath.AST
+import Semantic.Types
 
 type PathParser = Parsec String FilePath
 
@@ -63,17 +64,14 @@ wspcs = Tok.whiteSpace lexer
 comma :: PathParser String
 comma = Tok.comma lexer
 
-conditionalParser :: PathParser WCEPathBlock
-conditionalParser = do
-    _ <- reserved "cond"
-    
-    return $ WCEPConditional []
+conditionalParser :: PathParser (WCEPathBlock SemanticAnn)
+conditionalParser = undefined
 
-wcepPathBlockParser :: PathParser WCEPathBlock
+wcepPathBlockParser :: PathParser (WCEPathBlock SemanticAnn)
 wcepPathBlockParser =
     try conditionalParser
 
-transactionalWCEPParser :: PathParser TransactionalWCEPath
+transactionalWCEPParser :: PathParser (TransactionalWCEPath SemanticAnn)
 transactionalWCEPParser = do
     _ <- reserved "wcep"
     clsName <- identifierParser
@@ -86,6 +84,6 @@ transactionalWCEPParser = do
     return $ TransactionalWCEPath clsName elementName memberFunction blocks
 
 -- | Top Level parser
-topLevel :: PathParser [TransactionalWCEPath]
+topLevel :: PathParser [TransactionalWCEPath SemanticAnn]
 topLevel = many $
   try transactionalWCEPParser

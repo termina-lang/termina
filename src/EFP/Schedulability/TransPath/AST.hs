@@ -2,51 +2,42 @@ module EFP.Schedulability.TransPath.AST where
 
 import Core.AST
 import Utils.Annotations
-
-data WCEPathCondAltType =
-    WCEPathCondIf
-    | WCEPathCondElseIf
-    | WCEPathCondElse
-    deriving Show
-
-data WCEPathCondAlternative  = 
-    WCEPathCondAlternative
-        WCEPathCondAltType
-        Bool -- ^ Is the else if taken?
-        [WCEPathBlock] -- ^ blocks in the else if block
-        Location
-    deriving Show
-
-data WCEPathCase =
-    WCEPathCase
-        Bool
-        [WCEPathBlock] -- ^ blocks in the case block
-        Location
-    deriving Show
+import ControlFlow.BasicBlocks.AST
 
 -- | Worst-case execution path block
-data WCEPathBlock
+data WCEPathBlock a
     = 
-    -- | If-else-if block
-    WCEPConditional
-        [WCEPathCondAlternative] -- ^ list of alternatives
-    -- | For-loop basic block
-    | WCEPForLoop
-        Integer -- ^ number of iterations in the worst-case
-        [WCEPathBlock] -- ^ blocks in the for loop body.
+    -- | If block
+    WCEPathCondIf
+        [WCEPathBlock a] -- ^ blocks in the if block
         Location
-    -- | Match block
-    | WCEPMatch 
-        [WCEPathCase] -- ^ list of match blocks
+    -- | Else-if block
+    | WCEPathCondElseIf
+        [WCEPathBlock a] -- ^ blocks in the else-if block
+        Location
+    -- | Else block
+    | WCEPathCondElse
+        [WCEPathBlock a] -- ^ blocks in the else block
+        Location
+    -- | For-loop basic block
+    | WCEPathForLoop
+        (Expression a) -- ^ initial value of the iterator
+        (Expression a) -- ^ final value of the iterator
+        [WCEPathBlock a] -- ^ blocks in the for loop body.
+        Location
+    -- | Match case block
+    | WCEPathMatchCase
+        [WCEPathBlock a] -- ^ blocks in the case block
+        Location
     -- | Send message
     | WCEPSendMessage 
-        Identifier -- ^ Task name
-        Identifier -- ^ Action name
+        Identifier -- ^ Port name
         Location
     -- | Invoke a resource procedure
     | WCEPProcedureInvoke 
-        Identifier -- ^ Resource name
+        Identifier -- ^ Port name
         Identifier -- ^ Procedure name 
+        [Expression a] -- ^ Argument expression
         Location
     | WCEPAllocBox 
         Identifier -- ^ Port name
@@ -63,15 +54,15 @@ data WCEPathBlock
         Location
     | WCEPReboot Location
     -- | System call
-    | WCEPSystemCall Location
+    | WCEPSystemCall Identifier Location
     deriving Show
 
-data TransactionalWCEPath
+data TransactionalWCEPath a
     = TransactionalWCEPath 
         Identifier -- ^ task/resource name
         Identifier -- ^ action/procedure name
         Identifier -- ^ path name
-        [WCEPathBlock]
+        [WCEPathBlock a]
     deriving Show
 
 ----------------------------------------
@@ -80,5 +71,5 @@ data TransactionalWCEPath
 newtype PathModuleImport = ModuleImport' [String]
     deriving Show
 
-data PathModule = PathModule PathModuleImport [TransactionalWCEPath]
+data PathModule a = PathModule PathModuleImport [TransactionalWCEPath a]
     deriving Show

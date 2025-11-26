@@ -319,21 +319,25 @@ transFoldStatement (SingleExpStmt expr _) = do
 transFoldBasicBlock :: BasicBlock SemanticAnn -> TransFoldMonad ()
 transFoldBasicBlock (RegularBlock stmts) =
   mapM_ transFoldStatement stmts
-transFoldBasicBlock (IfElseBlock ifCond ifBlk elifs mElse _) = do
-  transFoldBasicBlocks ifBlk
+transFoldBasicBlock (IfElseBlock ifCond elifs mElse _) = do
+  transFoldIfBlock ifCond
   mapM_ transFoldElseIfBlock elifs
-  maybe (return ()) transFoldBasicBlocks mElse
-  condExprType <- getExprType ifCond
-  case condExprType of
-    (TConstSubtype _) -> do
-      value <- evalConstExpression ifCond
-      throwError $ annotateError (getLocation . getAnnotation $ ifCond) (EConstCondition value)
-    _ -> return ()
+  maybe (return ()) transFoldElseBlock mElse
 
   where
 
-    transFoldElseIfBlock :: ElseIf SemanticAnn -> TransFoldMonad ()
-    transFoldElseIfBlock (ElseIf elifCond blk _) = do
+    transFoldIfBlock :: CondIf SemanticAnn -> TransFoldMonad ()
+    transFoldIfBlock (CondIf cond blk _) = do
+      transFoldBasicBlocks blk
+      condExprType <- getExprType cond
+      case condExprType of
+        (TConstSubtype _) -> do
+          value <- evalConstExpression cond
+          throwError $ annotateError (getLocation . getAnnotation $ cond) (EConstCondition value)
+        _ -> return ()
+
+    transFoldElseIfBlock :: CondElseIf SemanticAnn -> TransFoldMonad ()
+    transFoldElseIfBlock (CondElseIf elifCond blk _) = do
       transFoldBasicBlocks blk
       condExprType <- getExprType elifCond
       case condExprType of
@@ -341,6 +345,10 @@ transFoldBasicBlock (IfElseBlock ifCond ifBlk elifs mElse _) = do
           value <- evalConstExpression elifCond
           throwError $ annotateError (getLocation . getAnnotation $ elifCond) (EConstCondition value)
         _ -> return ()
+    
+    transFoldElseBlock :: CondElse SemanticAnn -> TransFoldMonad ()
+    transFoldElseBlock (CondElse blk _) = do
+      transFoldBasicBlocks blk
 
 transFoldBasicBlock (ForLoopBlock _ _ from_expr to_expr mWhile body_stmt ann) = do
   transFoldBasicBlocks body_stmt
