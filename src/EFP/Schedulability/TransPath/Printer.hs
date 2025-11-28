@@ -20,12 +20,12 @@ braces' b = braces (line <> b <> line)
 instance WCEPathPrinter SourcePos where
     pprint pos = pretty (sourceLine pos) <> colon <> pretty (sourceColumn pos)
 
-instance WCEPathPrinter WCEPConstExpression where
-    pprint (WCEPConstInt intVal) =
+instance WCEPathPrinter ConstExpression where
+    pprint (ConstInt intVal) =
         pretty (show intVal)
-    pprint (WCEPConstObject ident) =
+    pprint (ConstObject ident) =
         pretty ident
-    pprint (WCEPConstBinOp op left right) =
+    pprint (ConstBinOp op left right) =
         let ppLeft = pprint left
             ppRight = pprint right
             ppOp = pretty (show op)

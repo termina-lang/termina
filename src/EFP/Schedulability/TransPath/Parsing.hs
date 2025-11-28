@@ -8,7 +8,6 @@ import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
 import EFP.Schedulability.TransPath.AST
-import Core.AST
 import qualified Text.Parsec.Expr as Ex
 import Data.Char
 
@@ -135,23 +134,23 @@ condElseParser = do
     blocks <- braces (sepBy wcepPathBlockParser comma)
     return $ WCEPathCondElse blocks loc
 
-parensConstExprParser :: PathParser WCEPConstExpression
+parensConstExprParser :: PathParser ConstExpression
 parensConstExprParser = parens constExpressionParser
 
-constIntParser :: PathParser WCEPConstExpression
-constIntParser = WCEPConstInt <$> integerParser
+constIntParser :: PathParser ConstExpression
+constIntParser = ConstInt <$> integerParser
 
-constObjectParser :: PathParser WCEPConstExpression
-constObjectParser = WCEPConstObject <$> identifierParser
+constObjectParser :: PathParser ConstExpression
+constObjectParser = ConstObject <$> identifierParser
 
-constExpressionTermParser :: PathParser WCEPConstExpression
+constExpressionTermParser :: PathParser ConstExpression
 constExpressionTermParser =
   try constIntParser
   <|> try constObjectParser
   <|> parensConstExprParser
 
 -- Expression TerminaParser
-constExpressionParser :: PathParser WCEPConstExpression
+constExpressionParser :: PathParser ConstExpression
 constExpressionParser = Ex.buildExpressionParser  -- New parser
     [[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft,
@@ -168,7 +167,7 @@ constExpressionParser = Ex.buildExpressionParser  -- New parser
   where
     binaryInfix s f = Ex.Infix (do
           _ <- reservedOp s
-          return $ \l r -> WCEPConstBinOp f l r)
+          return $ \l r -> ConstBinOp f l r)
 
 
 forLoopParser :: PathParser WCEPathBlock

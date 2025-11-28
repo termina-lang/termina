@@ -28,14 +28,14 @@ mergePath (WCEPRegularBlock newLoc) (WCEPRegularBlock pathLoc : rest) =
     in (WCEPRegularBlock mergedLoc : rest)
 mergePath newPath paths' = newPath : paths'
 
-genConstExpression :: Expression SemanticAnn -> WCEPConstExpression
+genConstExpression :: Expression SemanticAnn -> ConstExpression
 genConstExpression (AccessObject (Variable ident _)) =
-    WCEPConstObject ident
+    ConstObject ident
 genConstExpression (Constant (I tInt _) _) =
-    WCEPConstInt tInt
+    ConstInt tInt
 genConstExpression (BinOp op left right _) =
-    WCEPConstBinOp op (genConstExpression left) (genConstExpression right)
-genConstExpression _ = error "Unsupported constant expression in WCEPConstExpression generation"
+    ConstBinOp op (genConstExpression left) (genConstExpression right)
+genConstExpression _ = error "Unsupported constant expression in ConstExpression generation"
 
 genExpressionPath :: Expression SemanticAnn -> [WCEPathBlock] -> [WCEPathBlock]
 genExpressionPath (MemberFunctionCall _obj ident args ann) acc =

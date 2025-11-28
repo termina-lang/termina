@@ -1,6 +1,8 @@
-module EFP.Schedulability.TransPath.AST where
+module EFP.Schedulability.TransPath.AST
+    (module EFP.Schedulability.TransPath.AST
+    , module EFP.Schedulability.Core.AST) where
 
-import Core.AST
+import EFP.Schedulability.Core.AST
 
 data BlockPosition = BlockPosition
     {
@@ -9,12 +11,6 @@ data BlockPosition = BlockPosition
     ,   blockPosEndLine :: !Integer
     ,   blockPosEndColumn :: !Integer
     } deriving (Show, Eq)
-
-data WCEPConstExpression
-    = WCEPConstInt TInteger
-    | WCEPConstObject Identifier
-    | WCEPConstBinOp Op WCEPConstExpression WCEPConstExpression
-    deriving Show
 
 -- | Worst-case execution path block
 data WCEPathBlock
@@ -33,8 +29,8 @@ data WCEPathBlock
         BlockPosition
     -- | For-loop basic block
     | WCEPathForLoop
-        WCEPConstExpression -- ^ initial value of the iterator
-        WCEPConstExpression -- ^ final value of the iterator
+        ConstExpression -- ^ initial value of the iterator
+        ConstExpression -- ^ final value of the iterator
         [WCEPathBlock] -- ^ blocks in the for loop body.
         BlockPosition
     -- | Match case block
@@ -47,13 +43,13 @@ data WCEPathBlock
         BlockPosition
     | WCEPathMemberFunctionCall 
         Identifier -- ^ Function name
-        [WCEPConstExpression] -- ^ Constant argument expressions
+        [ConstExpression] -- ^ Constant argument expressions
         BlockPosition
     -- | Invoke a resource procedure
     | WCEPProcedureInvoke 
         Identifier -- ^ Port name
         Identifier -- ^ Procedure name 
-        [WCEPConstExpression] -- ^ Constant argument expression
+        [ConstExpression] -- ^ Constant argument expression
         BlockPosition
     | WCEPAllocBox 
         Identifier -- ^ Port name
