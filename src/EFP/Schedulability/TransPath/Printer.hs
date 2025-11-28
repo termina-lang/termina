@@ -2,9 +2,7 @@ module EFP.Schedulability.TransPath.Printer where
 import Generator.Utils
 import EFP.Schedulability.TransPath.AST
 import Prettyprinter
-import Utils.Annotations
 import Text.Parsec.Pos
-import ControlFlow.BasicBlocks.AST (Expression)
 import Data.Text (Text)
 
 class WCEPathPrinter a where
@@ -22,16 +20,23 @@ braces' b = braces (line <> b <> line)
 instance WCEPathPrinter SourcePos where
     pprint pos = pretty (sourceLine pos) <> colon <> pretty (sourceColumn pos)
 
-instance WCEPathPrinter (Expression a) where
-    pprint _ = pretty "<expr>"
+instance WCEPathPrinter WCEPConstExpression where
+    pprint (WCEPConstInt intVal) =
+        pretty (show intVal)
+    pprint (WCEPConstObject ident) =
+        pretty ident
+    pprint (WCEPConstBinOp op left right) =
+        let ppLeft = pprint left
+            ppRight = pprint right
+            ppOp = pretty (show op)
+        in
+            parens (ppLeft <+> ppOp <+> ppRight)
 
-instance WCEPathPrinter Location where
-    pprint (Position _ startPos endPos) =
-        pretty "@" <> parens (pprint startPos <> comma <> pprint endPos)
-    pprint Builtin = pretty "@builtin"
-    pprint Internal = pretty "@internal"
+instance WCEPathPrinter BlockPosition where
+    pprint (BlockPosition startLine startColumn endLine endColumn) =
+        pretty "@" <> parens (pretty startLine <> colon <> pretty startColumn <> comma <> pretty endLine <> colon <> pretty endColumn)
 
-instance WCEPathPrinter (WCEPathBlock a) where
+instance WCEPathPrinter WCEPathBlock where
 
     pprint (WCEPRegularBlock loc) =
         pretty "block" <> pprint loc
@@ -87,11 +92,13 @@ instance WCEPathPrinter (WCEPathBlock a) where
     pprint (WCEPFreeBox portName loc) =
         pretty "free" <> parens (pretty portName) <> pprint loc
 
-instance WCEPathPrinter (TransactionalWCEPath a) where
-    pprint (TransactionalWCEPath taskName actionName pathName blocks) =
-        let pBlocks = map ((<> comma) . pprint) blocks in
-        pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <+> pretty "=" <+> 
+instance WCEPathPrinter TransactionalWCEPath where
+    pprint (TransactionalWCEPath taskName actionName pathName constParams blocks) =
+        let pBlocks = map ((<> comma) . pprint) blocks
+            pParams = map pretty constParams
+        in
+        pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <> parens (align (fillSep (punctuate comma pParams))) <+> pretty "=" <+> 
             braces' ((indentTab . align) (vsep pBlocks)) <> line
 
-runWCEPathPrinter :: [TransactionalWCEPath a] -> Text
+runWCEPathPrinter :: [TransactionalWCEPath] -> Text
 runWCEPathPrinter wceps = render $ line <> vsep (map pprint wceps)

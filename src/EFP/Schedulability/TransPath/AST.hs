@@ -1,72 +1,85 @@
 module EFP.Schedulability.TransPath.AST where
 
 import Core.AST
-import Utils.Annotations
-import ControlFlow.BasicBlocks.AST
+
+data BlockPosition = BlockPosition
+    {
+        blockPosStartLine :: !Integer
+    ,   blockPosStartColumn :: !Integer
+    ,   blockPosEndLine :: !Integer
+    ,   blockPosEndColumn :: !Integer
+    } deriving (Show, Eq)
+
+data WCEPConstExpression
+    = WCEPConstInt TInteger
+    | WCEPConstObject Identifier
+    | WCEPConstBinOp Op WCEPConstExpression WCEPConstExpression
+    deriving Show
 
 -- | Worst-case execution path block
-data WCEPathBlock a
+data WCEPathBlock
     = 
     -- | If block
     WCEPathCondIf
-        [WCEPathBlock a] -- ^ blocks in the if block
-        Location
+        [WCEPathBlock] -- ^ blocks in the if block
+        BlockPosition
     -- | Else-if block
     | WCEPathCondElseIf
-        [WCEPathBlock a] -- ^ blocks in the else-if block
-        Location
+        [WCEPathBlock] -- ^ blocks in the else-if block
+        BlockPosition
     -- | Else block
     | WCEPathCondElse
-        [WCEPathBlock a] -- ^ blocks in the else block
-        Location
+        [WCEPathBlock] -- ^ blocks in the else block
+        BlockPosition
     -- | For-loop basic block
     | WCEPathForLoop
-        (Expression a) -- ^ initial value of the iterator
-        (Expression a) -- ^ final value of the iterator
-        [WCEPathBlock a] -- ^ blocks in the for loop body.
-        Location
+        WCEPConstExpression -- ^ initial value of the iterator
+        WCEPConstExpression -- ^ final value of the iterator
+        [WCEPathBlock] -- ^ blocks in the for loop body.
+        BlockPosition
     -- | Match case block
     | WCEPathMatchCase
-        [WCEPathBlock a] -- ^ blocks in the case block
-        Location
+        [WCEPathBlock] -- ^ blocks in the case block
+        BlockPosition
     -- | Send message
     | WCEPSendMessage 
         Identifier -- ^ Port name
-        Location
+        BlockPosition
     | WCEPathMemberFunctionCall 
         Identifier -- ^ Function name
-        [Expression a] -- ^ Constant argument expressions
-        Location
+        [WCEPConstExpression] -- ^ Constant argument expressions
+        BlockPosition
     -- | Invoke a resource procedure
     | WCEPProcedureInvoke 
         Identifier -- ^ Port name
         Identifier -- ^ Procedure name 
-        [Expression a] -- ^ Constant argument expression
-        Location
+        [WCEPConstExpression] -- ^ Constant argument expression
+        BlockPosition
     | WCEPAllocBox 
         Identifier -- ^ Port name
-        Location
+        BlockPosition
     -- | Call to the free procedure of a memory allocator 
     | WCEPFreeBox 
         Identifier -- ^ Port name
-        Location
+        BlockPosition
     -- | Regular block (list of statements)
-    | WCEPRegularBlock Location
-    | WCEPReturn Location
+    | WCEPRegularBlock BlockPosition
+    | WCEPReturn BlockPosition
     | WCEPContinue 
         Identifier -- ^ Action name
-        Location
-    | WCEPReboot Location
+        BlockPosition
+    | WCEPReboot BlockPosition
     -- | System call
-    | WCEPSystemCall Identifier Location
+    | WCEPSystemCall Identifier BlockPosition
     deriving Show
 
-data TransactionalWCEPath a
+data TransactionalWCEPath
     = TransactionalWCEPath 
         Identifier -- ^ task/resource name
         Identifier -- ^ action/procedure name
         Identifier -- ^ path name
-        [WCEPathBlock a]
+        [Identifier] -- ^ constant parameters
+        [WCEPathBlock]
     deriving Show
 
 ----------------------------------------
@@ -75,5 +88,5 @@ data TransactionalWCEPath a
 newtype PathModuleImport = ModuleImport' [String]
     deriving Show
 
-data PathModule a = PathModule PathModuleImport [TransactionalWCEPath a]
+data PathModule a = PathModule PathModuleImport [TransactionalWCEPath]
     deriving Show
