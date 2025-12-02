@@ -32,6 +32,7 @@ import Parser.Types
 import Semantic.TypeChecking.Statement
 import Semantic.TypeChecking.Global
 import Semantic.TypeChecking.TypeDefinition
+    ( typeParameter, typeTypeDefinition )
 import Semantic.TypeChecking.Expression
 import Data.Bifunctor
 import Semantic.Environment

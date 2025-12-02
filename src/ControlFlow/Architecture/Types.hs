@@ -29,6 +29,8 @@ data TPClass a = TPClass {
     -- | Class member functions
     classMemberFunctions :: M.Map Identifier (TPFunction a),
 
+    accessPorts :: M.Map Identifier (Identifier, a),
+
     -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
     -- the port and the name of the action that is executed when a message is
@@ -50,9 +52,7 @@ data TPClass a = TPClass {
     -- the box was originated.
     classBoxIOMaps :: BoxOutputInputMaps a,
 
-    -- | Map between the actions and the output ports through which the action
-    -- sends messages.
-    actionForwardingMap :: ActionForwardingMap
+    classAnns :: a -- ^ annotations
 
 } deriving Show
 

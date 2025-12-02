@@ -14,7 +14,6 @@ import Semantic.Types
 import Utils.Annotations
 import qualified Data.Map as M
 import ControlFlow.Architecture.BoxInOut
-import ControlFlow.Architecture.Forwarding
 import Configuration.Configuration
 
 type ArchitectureMonad = ExceptT ArchitectureError (ST.State (TerminaProgArch SemanticAnn))
@@ -71,9 +70,10 @@ addChannelSource ident pname channel ann = do
           channelSources = M.insert channel ((ident, pname, ann) : s) channelSrcs
         }
 
-genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
-genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
+genArchTypeDef :: SemanticAnn -> TypeDef SemanticAnn -> ArchitectureMonad ()
+genArchTypeDef ann tydef@(Class TaskClass ident _ _ _) = do
   let members = getClassMembers tydef
+      accessPs = getAccessPorts members
       inPs = getInputPorts members
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
@@ -82,17 +82,14 @@ genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  forwardingMap <-
-    case runGetForwardingMap members of
-      Left err -> throwError err
-      Right m -> return m
-  let tskCls = TPClass ident TaskClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
+  let tskCls = TPClass ident TaskClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
     }
-genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
+genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
   let members = getClassMembers tydef
+      accessPs = getAccessPorts members
       inPs = M.empty
       sinkPs = getSinkPorts members
       outputPs = getOutputPorts members
@@ -101,17 +98,14 @@ genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  forwardingMap <-
-    case runGetForwardingMap members of
-      Left err -> throwError err
-      Right m -> return m
-  let hdlCls = TPClass ident HandlerClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
+  let hdlCls = TPClass ident HandlerClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
-genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
+genArchTypeDef ann tydef@(Class ResourceClass ident _ _ _) = do
   let members = getClassMembers tydef
+      accessPs = getAccessPorts members
       inPs = M.empty
       sinkPs = M.empty
       outputPs = M.empty
@@ -121,12 +115,12 @@ genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
       Left err -> throwError err
       Right boxMap -> return boxMap
   -- | Resources do not have forwarding actions
-  let resCls = TPClass ident ResourceClass memberFunctions inPs sinkPs outputPs outBoxMap M.empty
+  let resCls = TPClass ident ResourceClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
     }
-genArchTypeDef _ = return ()
+genArchTypeDef _ _ = return ()
 
 genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal _ (Const identifier ty expr _ ann) = do
@@ -294,7 +288,7 @@ genArchElement _ (Function identifier params mRet block _ ann) =
       functions = M.insert identifier (TPFunction identifier params mRet block ann) (functions tp)
     }
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
-genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
+genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 
 emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
 emptyTerminaProgArch config = TerminaProgArch {

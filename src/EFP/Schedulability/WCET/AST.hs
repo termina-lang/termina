@@ -4,11 +4,11 @@ module EFP.Schedulability.WCET.AST
 
 import EFP.Schedulability.Core.AST
 
-data TransactionalWCET
+data TransactionalWCET a
     = TransactionalWCET
         Identifier -- ^ class name
         Identifier -- ^ action/procedure name
         Identifier -- ^ path name
         [Identifier] -- ^ constant parameters
-        ConstExpression -- ^ WCET expression
+        (ConstExpression a) -- ^ WCET expression
     deriving Show
