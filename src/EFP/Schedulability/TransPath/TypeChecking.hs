@@ -17,8 +17,6 @@ import Utils.Monad
 ----------------------------------------
 -- Termina Programs definitions
 
-type TransPathsMap a = M.Map (Identifier, Identifier) [TransactionalWCEPath a]
-
 type TPGlobalConstsEnv = M.Map Identifier Location
 type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (TransactionalWCEPath a))
 
@@ -150,7 +148,7 @@ typePath (TransactionalWCEPath classId functionId pathName constParams blks ann)
             case M.lookup pathName functionPaths of
                 Nothing -> return ()
                 Just (TransactionalWCEPath _ _ _ _ _ ann') ->
-                    throwError . annotateError (getLocation ann) $ EDuplicatePathName pathName (classId, functionId, getLocation ann')
+                    throwError . annotateError (getLocation ann) $ EDuplicatedPathName pathName (classId, functionId, getLocation ann')
             let funcConstParams = [name | Parameter name (TConstSubtype _) <- params]
             if length funcConstParams /= length constParams then
                 throwError . annotateError (getLocation ann) $ 

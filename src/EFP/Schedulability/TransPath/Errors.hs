@@ -21,7 +21,7 @@ data Error
     EInvalidAccessPortAnnotation
     | EUnknownClass Identifier
     | EUnknownMemberFunction Identifier (Identifier, Location)
-    | EDuplicatePathName  Identifier (Identifier, Identifier, Location)
+    | EDuplicatedPathName  Identifier (Identifier, Identifier, Location)
     | EUnknownAccessPort Identifier (Identifier, Location)
     | EUnknownVariable Identifier
     | EUnknownOutputPort Identifier (Identifier, Location)
@@ -40,7 +40,7 @@ instance ErrorMessage TransPathErrors where
 
     errorIdent (AnnotatedError (EUnknownClass _id) _pos) = "TPE-001"
     errorIdent (AnnotatedError (EUnknownMemberFunction _id _clsId) _pos) = "TPE-002"
-    errorIdent (AnnotatedError (EDuplicatePathName _pathName (_classId, _functionId, _prevPos)) _pos) = "TPE-003"
+    errorIdent (AnnotatedError (EDuplicatedPathName _pathName (_classId, _functionId, _prevPos)) _pos) = "TPE-003"
     errorIdent (AnnotatedError (EUnknownAccessPort _id (_clsId, _clsIdPos)) _pos) = "TPE-004"
     errorIdent (AnnotatedError (EUnknownVariable _id) _pos) = "TPE-005"
     errorIdent (AnnotatedError (EUnknownOutputPort _id (_clsId, _clsIdPos)) _pos) = "TPE-006"
@@ -54,7 +54,7 @@ instance ErrorMessage TransPathErrors where
 
     errorTitle (AnnotatedError (EUnknownClass _id) _pos) = "unknown class"
     errorTitle (AnnotatedError (EUnknownMemberFunction _id (_classId, _classIdPos)) _pos) = "unknown member function"
-    errorTitle (AnnotatedError (EDuplicatePathName _pathName (_classId, _functionId, _prevPos)) _pos) = "duplicate path name"
+    errorTitle (AnnotatedError (EDuplicatedPathName _pathName (_classId, _functionId, _prevPos)) _pos) = "duplicate path name"
     errorTitle (AnnotatedError (EUnknownAccessPort _id (_clsId, _clsIdPos)) _pos) = "unknown access port"
     errorTitle (AnnotatedError (EUnknownVariable _id) _pos) = "unknown variable"
     errorTitle (AnnotatedError (EUnknownOutputPort _id (_clsId, _clsIdPos)) _pos) = "unknown output port"
@@ -88,7 +88,7 @@ instance ErrorMessage TransPathErrors where
                         pprintSimpleError
                             clsSourceLines "The class is defined here:" clsFileName
                             clsIdPos Nothing
-                EDuplicatePathName pathName (classId, functionId, prevPos@(Position _ prevStart _)) ->
+                EDuplicatedPathName pathName (classId, functionId, prevPos@(Position _ prevStart _)) ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
                     in
