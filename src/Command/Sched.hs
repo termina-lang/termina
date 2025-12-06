@@ -98,13 +98,13 @@ loadPathModules bbProject efpPath = do
 typePathModules :: TerminaProgArch STYPES.SemanticAnn 
   -> BasicBlocksProject
   -> TransPathProject 
-  -> IO (TransPathMap TTYPES.SemanticAnn)
+  -> IO (TTYPES.TransPathMap TTYPES.SemanticAnn)
 typePathModules arch bbProject pathProject =
   foldM typePathModules' M.empty (M.elems pathProject)
 
   where
 
-    typePathModules' :: TransPathMap TTYPES.SemanticAnn -> TransPathModule -> IO (TransPathMap TTYPES.SemanticAnn)
+    typePathModules' :: TTYPES.TransPathMap TTYPES.SemanticAnn -> TransPathModule -> IO (TTYPES.TransPathMap TTYPES.SemanticAnn)
     typePathModules' transPathMap transPathModule = do
       let result = runTransPathTypeChecking arch transPathMap (transPathAST . metadata $ transPathModule)
       case result of
@@ -130,7 +130,7 @@ schedCommand (SchedCmdArgs chatty) = do
             \err -> TIO.putStrLn (T.pack $ show err) >> exitFailure
           ) return
     -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (platform config)
+    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
@@ -205,6 +205,6 @@ schedCommand (SchedCmdArgs chatty) = do
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")
     transPathProject <- loadPathModules bbProject (efpFolder config)
-    transPathMap <- typePathModules programArchitecture bbProject transPathProject
+    trPathMap <- typePathModules programArchitecture bbProject transPathProject
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution paths type checked successfully")
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

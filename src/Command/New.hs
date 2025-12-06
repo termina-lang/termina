@@ -57,7 +57,7 @@ newCommand (NewCmdArgs project pltName chatty) = do
     plt <- maybe (
             putStrLn (errorMessage $ "Unsupported platform: " ++ show pname) >>
             showSupportedPlatforms >> exitFailure
-        ) return $ checkPlatform pname
+        ) return $ checkPlatform (T.unpack pname)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     when chatty (putStrLn . debugMessage $ "Creating new project: " ++ project)
     -- Check if the directory already exists

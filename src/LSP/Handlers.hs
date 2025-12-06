@@ -37,7 +37,7 @@ initializeHandler _req = do
         -- We have loaded the configuration file. Then we must check that the platform is OK
         -- Decode the selected platform field
         infoM "Loaded termina.yaml"
-        case checkPlatform (platform cfg) of
+        case checkPlatform (T.unpack (platform cfg)) of
           Nothing ->
             errorM $ "Unsupported platform: \"" <> T.pack (show (platform cfg)) <> "\""
           Just plt -> do
@@ -87,7 +87,7 @@ typeProject = do
     (\orderedDependencies -> do
       let pltInitialGlbEnv = case cfg of
             Nothing -> []
-            Just cfg' -> case checkPlatform (platform cfg') of 
+            Just cfg' -> case checkPlatform (T.unpack (platform cfg')) of 
               Nothing -> []
               Just plt -> getPlatformInitialGlobalEnv cfg' plt
       let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv

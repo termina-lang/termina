@@ -286,7 +286,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs) = do
             \err -> TIO.putStrLn (T.pack $ show err) >> exitFailure
           ) return
     -- | Decode the selected platform field
-    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (platform config)
+    plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack (platform config))
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
     -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)

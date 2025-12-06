@@ -18,14 +18,14 @@ import Utils.Monad
 -- Termina Programs definitions
 
 type TPGlobalConstsEnv = M.Map Identifier Location
-type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (TransactionalWCEPath a))
+
 
 data TransPathState = TransPathState
     {
         progArch :: TerminaProgArch STYPES.SemanticAnn
         , globalConsts :: TPGlobalConstsEnv
         , localConsts :: S.Set Identifier
-        , transPaths :: TransPathMap TTYPES.SemanticAnn
+        , transPaths :: TTYPES.TransPathMap TTYPES.SemanticAnn
     } deriving Show
 
 type TransPathMonad = ExceptT TransPathErrors (ST.State TransPathState)
@@ -171,9 +171,9 @@ typeTransPaths paths = do
             transPaths = M.insertWith M.union (classId, functionId) (M.singleton pathName path) (transPaths s) }
     
 runTransPathTypeChecking :: (Located a) => TerminaProgArch STYPES.SemanticAnn
-    -> TransPathMap TTYPES.SemanticAnn
+    -> TTYPES.TransPathMap TTYPES.SemanticAnn
     -> [TransactionalWCEPath a]
-    -> Either TransPathErrors (TransPathMap TTYPES.SemanticAnn)
+    -> Either TransPathErrors (TTYPES.TransPathMap TTYPES.SemanticAnn)
 runTransPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch gConsts S.empty prevMap in

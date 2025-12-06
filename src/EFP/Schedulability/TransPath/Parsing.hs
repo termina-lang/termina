@@ -1,7 +1,8 @@
-module EFP.Schedulability.TransPath.Parsing where
+module EFP.Schedulability.TransPath.Parsing 
+  (terminaTransPathsParser) where
 
 -- Importing parser combinators
-import           Text.Parsec hiding (Error, Ok)
+import Text.Parsec hiding (Error, Ok)
 
 -- Importing tokenizer
 import qualified Text.Parsec.Language as Lang

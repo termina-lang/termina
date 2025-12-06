@@ -11,4 +11,12 @@ data TransactionalWCET a
         Identifier -- ^ path name
         [Identifier] -- ^ constant parameters
         (ConstExpression a) -- ^ WCET expression
+        a -- ^ annotation
+    deriving Show
+
+data WCETPlatformAssignment a
+    = WCETPlatformAssignment
+        Identifier -- ^ platform name
+        [TransactionalWCET a] -- ^ WCETs assigned to this platform
+        a -- ^ annotation
     deriving Show
