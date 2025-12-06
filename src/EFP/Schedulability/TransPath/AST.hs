@@ -3,7 +3,6 @@ module EFP.Schedulability.TransPath.AST
     , module EFP.Schedulability.Core.AST) where
 
 import EFP.Schedulability.Core.AST
-import qualified Data.Map as M
 
 data BlockPosition = BlockPosition
     {
@@ -94,14 +93,3 @@ data TransactionalWCEPath a
         [WCEPathBlock a]
         a
     deriving Show
-
-----------------------------------------
--- Termina Programs definitions
-
-newtype PathModuleImport = ModuleImport' [String]
-    deriving Show
-
-data PathModule a = PathModule PathModuleImport [TransactionalWCEPath a]
-    deriving Show
-
-type TransPathsMap a = M.Map Identifier [TransactionalWCEPath a]

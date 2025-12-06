@@ -37,12 +37,12 @@ getMemberFunctions = foldl' (\acc member ->
     _ -> acc
   ) M.empty
 
-getAccessPorts :: [ClassMember a] -> M.Map Identifier (Identifier, a)
+getAccessPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, a)
 getAccessPorts = foldl' (\acc member ->
   case member of
     ClassField (FieldDefinition fid fty ann) ->
       case fty of
-        TAccessPort (TInterface _ak ident) -> M.insert fid (ident, ann) acc
+        TAccessPort ty -> M.insert fid (ty, ann) acc
         _ -> acc
     _ -> acc
   ) M.empty

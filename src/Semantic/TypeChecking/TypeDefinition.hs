@@ -557,7 +557,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
                   Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
-checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, viewers) provides = do
+checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers) provides = do
   -- A task must not provide any interface
   unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
   -- A task must not implement any procedures

@@ -4,6 +4,8 @@ import EFP.Schedulability.TransPath.AST
 import Prettyprinter
 import Text.Parsec.Pos
 import Data.Text (Text)
+import Data.Char
+import Numeric
 
 class WCEPathPrinter a where
     pprint :: a -> DocStyle
@@ -14,15 +16,21 @@ d1 <::> d2 = d1 <> pretty "::" <> d2
 indentTab :: DocStyle -> DocStyle
 indentTab = indent 4
 
-braces' :: DocStyle -> DocStyle
-braces' b = braces (line <> b <> line)
+brackets' :: DocStyle -> DocStyle
+brackets' b = brackets (line <> b <> line)
 
 instance WCEPathPrinter SourcePos where
     pprint pos = pretty (sourceLine pos) <> colon <> pretty (sourceColumn pos)
 
+instance WCEPathPrinter TInteger where
+
+    pprint (TInteger i DecRepr) = pretty i
+    pprint (TInteger i HexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
+    pprint (TInteger i OctalRepr) = pretty "0" <> pretty (showOct i "")
+
 instance WCEPathPrinter (ConstExpression a) where
     pprint (ConstInt intVal _) =
-        pretty (show intVal)
+        pprint intVal
     pprint (ConstObject ident _) =
         pretty ident
     pprint (ConstBinOp op left right _) =
@@ -56,26 +64,26 @@ instance WCEPathPrinter (WCEPathBlock a) where
     pprint (WCEPathCondIf blocks loc _) =
         let ppBlocks = fmap pprint blocks
         in
-            pretty "if" <> pprint loc <> braces' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
+            pretty "if" <> pprint loc <> brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
     pprint (WCEPathCondElseIf blocks loc _) =
         let ppBlocks = fmap pprint blocks
         in
-            pretty "elif" <> pprint loc <> braces' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
+            pretty "elif" <> pprint loc <> brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
     pprint (WCEPathCondElse blocks loc _) =
         let ppBlocks = fmap pprint blocks
         in
-            pretty "else" <> pprint loc <> braces' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
+            pretty "else" <> pprint loc <> brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
     pprint (WCEPathForLoop initExpr finalExpr blocks loc _) =
         let ppBlocks = fmap pprint blocks
             ppInitExpr = pprint initExpr
             ppFinalExpr = pprint finalExpr
         in 
-            pretty "for" <> parens (ppInitExpr <> pretty " to " <> ppFinalExpr) <> pprint loc <>
-                braces' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
+            pretty "for" <> parens (ppInitExpr <> pretty ".." <> ppFinalExpr) <> pprint loc <>
+                brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks)))
     pprint (WCEPathMatchCase blocks loc _) =
         let ppBlocks = fmap pprint blocks
         in
-            pretty "case" <> pprint loc <> braces' ((indentTab . align) (vsep (punctuate comma ppBlocks))) 
+            pretty "case" <> pprint loc <> brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks))) 
     pprint (WCEPSendMessage portName loc _) =
         pretty "send" <> parens (pretty portName) <> pprint loc
     pprint (WCEPathMemberFunctionCall funcName argExprs loc _) =
@@ -99,11 +107,11 @@ instance WCEPathPrinter (WCEPathBlock a) where
 
 instance WCEPathPrinter (TransactionalWCEPath a) where
     pprint (TransactionalWCEPath taskName actionName pathName constParams blocks _) =
-        let pBlocks = map ((<> comma) . pprint) blocks
+        let ppBlocks = map pprint blocks
             pParams = map pretty constParams
         in
         pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <> parens (align (fillSep (punctuate comma pParams))) <+> pretty "=" <+> 
-            braces' ((indentTab . align) (vsep pBlocks)) <> line
+            brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks))) <> line
 
 runWCEPathPrinter :: [TransactionalWCEPath a] -> Text
 runWCEPathPrinter wceps = render $ line <> vsep (map pprint wceps)

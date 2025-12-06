@@ -18,28 +18,7 @@ type PathParser = Parsec String FilePath
 lexer :: Tok.TokenParser FilePath
 lexer = Tok.makeTokenParser langDef
   where
-    reservedNames =
-      ["import"
-       ,"twcep"]
-      ++
-      -- | Control flow keywords
-      -- | Control flow keywords
-      -- | Control flow keywords
-      -- | Control flow keywords
-
-      -- | Control flow keywords
-
-      -- | Control flow keywords
-      
-      -- | Control flow keywords
-      -- | Control flow keywords
-
-      -- | Control flow keywords
-      ["if", "elif", "else", "case", "for"]
-      ++
-      ["block", "send", "invoke", "call",
-       "alloc", "free", "return", "continue", "reboot", "syscall"]
-
+    reservedNames = []
     langDef =
       Lang.emptyDef{ Tok.commentStart = "/*"
                    , Tok.commentEnd = "*/"
@@ -72,9 +51,6 @@ identifierParser = Tok.identifier lexer
 
 brackets :: PathParser a -> PathParser a
 brackets = Tok.brackets lexer
-
-braces :: PathParser a -> PathParser a
-braces = Tok.braces lexer
 
 parens :: PathParser a -> PathParser a
 parens = Tok.parens lexer
@@ -133,7 +109,7 @@ condIfParser = do
     startPos <- getPosition
     _ <- reserved "if"
     loc <- blockPositionParser
-    blocks <- braces (sepBy wcepPathBlockParser comma)
+    blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondIf blocks loc . Position current startPos <$> getPosition
 
 condElseIfParser :: PathParser (WCEPathBlock ParserAnn)
@@ -142,7 +118,7 @@ condElseIfParser = do
     startPos <- getPosition
     _ <- reserved "elif"
     loc <- blockPositionParser
-    blocks <- braces (sepBy wcepPathBlockParser comma)
+    blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondElseIf blocks loc . Position current startPos <$> getPosition
 
 condElseParser :: PathParser (WCEPathBlock ParserAnn)
@@ -151,7 +127,7 @@ condElseParser = do
     startPos <- getPosition
     _ <- reserved "else"
     loc <- blockPositionParser
-    blocks <- braces (sepBy wcepPathBlockParser comma)
+    blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondElse blocks loc . Position current startPos <$> getPosition
 
 parensConstExprParser :: PathParser (ConstExpression ParserAnn)
@@ -218,7 +194,7 @@ forLoopParser = do
         finalE <- constExpressionParser
         return (initE, finalE)
     loc <- blockPositionParser
-    blocks <- braces (sepBy wcepPathBlockParser comma)
+    blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathForLoop initExpr finalExpr blocks loc . Position current startPos <$> getPosition
 
 matchCaseParser :: PathParser (WCEPathBlock ParserAnn)
@@ -227,7 +203,7 @@ matchCaseParser = do
     startPos <- getPosition
     _ <- reserved "case"
     loc <- blockPositionParser
-    blocks <- braces (sepBy wcepPathBlockParser comma)
+    blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathMatchCase blocks loc . Position current startPos <$> getPosition
 
 sendMessageParser :: PathParser (WCEPathBlock ParserAnn)
@@ -245,7 +221,7 @@ memberFunctionCallParser = do
     startPos <- getPosition
     _ <- reserved "call"
     funcName <- parens identifierParser
-    argExprs <- parens (sepBy constExpressionParser comma)
+    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
     WCEPathMemberFunctionCall funcName argExprs loc . Position current startPos <$> getPosition
 
@@ -259,7 +235,7 @@ procedureInvokeParser = do
         _ <- reservedOp "."
         prName <- identifierParser
         return (pName, prName)
-    argExprs <- parens (sepBy constExpressionParser comma)
+    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
     WCEPProcedureInvoke portName procName argExprs loc . Position current startPos <$> getPosition
 
@@ -320,9 +296,9 @@ systemCallParser = do
     startPos <- getPosition
     _ <- reserved "syscall"
     sysCallName <- parens identifierParser
-    constArgs <- parens (sepBy constExpressionParser comma)
+    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
-    WCEPSystemCall sysCallName constArgs loc . Position current startPos <$> getPosition
+    WCEPSystemCall sysCallName argExprs loc . Position current startPos <$> getPosition
 
 wcepPathBlockParser :: PathParser (WCEPathBlock ParserAnn)
 wcepPathBlockParser =
@@ -361,3 +337,9 @@ transactionalWCEPParser = do
 topLevel :: PathParser [TransactionalWCEPath ParserAnn]
 topLevel = many $
   try transactionalWCEPParser
+
+contents :: PathParser a -> PathParser a
+contents p = wspcs *> p <* eof
+
+terminaTransPathsParser :: PathParser [TransactionalWCEPath ParserAnn]
+terminaTransPathsParser = contents topLevel

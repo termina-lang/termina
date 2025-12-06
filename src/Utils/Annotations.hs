@@ -32,6 +32,10 @@ instance Located (LocatedElement a) where
   getLocation = location
   updateLocation le loc = le { location = loc }
 
+instance Located Location where
+  getLocation = id
+  updateLocation _ = id
+
 locate :: Location -> a -> LocatedElement a
 locate = flip LocatedElement
 
@@ -56,3 +60,9 @@ annotateError = flip AnnotatedError
 
 withLocation :: Functor m => b -> ExceptT e m a -> ExceptT (AnnotatedError e b) m a
 withLocation ann = withExceptT (annotateError ann)
+
+sameSource :: Location -> Location -> Bool
+sameSource Builtin Builtin = True
+sameSource Internal Internal = True
+sameSource (Position f1 _ _) (Position f2 _ _) = f1 == f2
+sameSource _ _ = False

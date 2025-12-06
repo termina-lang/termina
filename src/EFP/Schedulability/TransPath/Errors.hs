@@ -9,6 +9,7 @@ import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
 import Utils.Errors
+import Modules.Utils
 
 
 --------------------------------------------------
@@ -28,6 +29,8 @@ data Error
     | EConstVarAlreadyDefined (Identifier, Location)
     | EConstParamAlreadyDefined Identifier
     | EUnknownProcedure Identifier Identifier Identifier
+    | EInvalidAccessToAllocator Identifier Identifier
+    | EClassPathMismatch Identifier (Location, Location)
     deriving Show
 
 type TransPathErrors = AnnotatedError Error Location
@@ -45,6 +48,8 @@ instance ErrorMessage TransPathErrors where
     errorIdent (AnnotatedError (EConstVarAlreadyDefined _identLoc) _pos) = "TPE-008"
     errorIdent (AnnotatedError (EConstParamAlreadyDefined _ident) _pos) = "TPE-009"
     errorIdent (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "TPE-010"
+    errorIdent (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "TPE-011"
+    errorIdent (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "TPE-012"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownClass _id) _pos) = "unknown class"
@@ -57,6 +62,8 @@ instance ErrorMessage TransPathErrors where
     errorTitle (AnnotatedError (EConstVarAlreadyDefined _identLoc) _pos) = "constant variable already defined"
     errorTitle (AnnotatedError (EConstParamAlreadyDefined _ident) _pos) = "constant parameter already defined"
     errorTitle (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "unknown procedure"
+    errorTitle (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "invalid access to allocator"
+    errorTitle (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "class path mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -69,8 +76,9 @@ instance ErrorMessage TransPathErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Unknown class \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EUnknownMemberFunction ident (classId, clsIdPos@(Position clsFileName _ _)) ->
-                    let clsSourceLines = files M.! clsFileName
+                EUnknownMemberFunction ident (classId, clsIdPos@(Position _ clsStart _)) ->
+                    let clsFileName = sourceName clsStart
+                        clsSourceLines = files M.! clsFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
@@ -80,8 +88,9 @@ instance ErrorMessage TransPathErrors where
                         pprintSimpleError
                             clsSourceLines "The class is defined here:" clsFileName
                             clsIdPos Nothing
-                EDuplicatePathName pathName (classId, functionId, prevPos@(Position prevFileName _ _)) ->
-                    let prevSourceLines = files M.! prevFileName
+                EDuplicatePathName pathName (classId, functionId, prevPos@(Position _ prevStart _)) ->
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
@@ -92,14 +101,15 @@ instance ErrorMessage TransPathErrors where
                         pprintSimpleError
                             prevSourceLines "The previous definition is here:" prevFileName
                             prevPos Nothing
-                EUnknownAccessPort ident (classId, clsIdPos@(Position clsFileName _ _)) ->
-                    let clsSourceLines = files M.! clsFileName
+                EUnknownAccessPort ident (classId, clsIdPos@(Position _ clsStart _)) ->
+                    let clsFileName = sourceName clsStart
+                        clsSourceLines = files M.! clsFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
                             (Just ("Class \x1b[31m" <> T.pack classId <>
                                 "\x1b[0m does not have an access port called \x1b[31m" <>
-                                T.pack ident <> "\x1b[0m.")) <>
+                                T.pack ident <> "\x1b[0m.\n")) <>
                         pprintSimpleError
                             clsSourceLines "The class is defined here:" clsFileName
                             clsIdPos Nothing
@@ -107,8 +117,9 @@ instance ErrorMessage TransPathErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Unknown variable \x1b[31m" <> T.pack ident <> "\x1b[0m."))
-                EUnknownOutputPort ident (classId, clsIdPos@(Position clsFileName _ _)) ->
-                    let clsSourceLines = files M.! clsFileName
+                EUnknownOutputPort ident (classId, clsIdPos@(Position _ clsStart _)) ->
+                    let clsFileName = sourceName clsStart
+                        clsSourceLines = files M.! clsFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
@@ -118,8 +129,9 @@ instance ErrorMessage TransPathErrors where
                         pprintSimpleError
                             clsSourceLines "The class is defined here:" clsFileName
                             clsIdPos Nothing
-                EConstParamsNumMismatch classId functionId expected got functionPos@(Position funcFileName _ _) ->
-                    let funcSourceLines = files M.! funcFileName
+                EConstParamsNumMismatch classId functionId expected got functionPos@(Position _ funcStart _) ->
+                    let funcFileName = sourceName funcStart
+                        funcSourceLines = files M.! funcFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
@@ -132,8 +144,9 @@ instance ErrorMessage TransPathErrors where
                         pprintSimpleError
                             funcSourceLines "The member function is defined here:" funcFileName
                             functionPos Nothing 
-                EConstVarAlreadyDefined (ident, identLoc@(Position identFileName _ _)) ->
-                    let identSourceLines = files M.! identFileName
+                EConstVarAlreadyDefined (ident, identLoc@(Position _ identStart _)) ->
+                    let identFileName = sourceName identStart
+                        identSourceLines = files M.! identFileName
                     in
                         pprintSimpleError
                             sourceLines title fileName pos
@@ -155,6 +168,19 @@ instance ErrorMessage TransPathErrors where
                             "\x1b[0m of access port \x1b[31m" <> T.pack portName <>
                             "\x1b[0m does not have a procedure called \x1b[31m" <> T.pack procName <>
                             "\x1b[0m."))
+                EInvalidAccessToAllocator procName portName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Cannot access allocator port \x1b[31m" <> T.pack portName <>
+                            "\x1b[0m to invoke procedure \x1b[31m" <> T.pack procName <>
+                            "\x1b[0m\n." <> "Allocator port accesses must be done via 'alloc' and 'free' operations."))
+                EClassPathMismatch classId (Position clsSource _ _, Position pathSource _ _) ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The transactional path is defined in a different module than the class.\nClass \x1b[31m" <> 
+                            T.pack classId <> "\x1b[0m is defined in module \x1b[31m" <> T.pack (qualifiedToModuleName clsSource) <>
+                            "\x1b[0m, but the transactional path is defined in module \x1b[31m" <>
+                            T.pack (qualifiedToModuleName pathSource) <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

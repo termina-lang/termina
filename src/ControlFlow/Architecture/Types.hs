@@ -29,7 +29,7 @@ data TPClass a = TPClass {
     -- | Class member functions
     classMemberFunctions :: M.Map Identifier (TPFunction a),
 
-    accessPorts :: M.Map Identifier (Identifier, a),
+    accessPorts :: M.Map Identifier (TerminaType a, a),
 
     -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
