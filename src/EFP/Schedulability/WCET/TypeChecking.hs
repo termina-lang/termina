@@ -131,12 +131,12 @@ typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
             s { 
                 transWCETs = M.insertWith (M.unionWith M.union) plt newPath (transWCETs s) }
     
-runTransPathTypeChecking :: (Located a) => TerminaProgArch STYPES.SemanticAnn
+runWCETTypeChecking :: (Located a) => TerminaProgArch STYPES.SemanticAnn
     -> TTYPES.TransPathMap TTYPES.SemanticAnn
     -> WTYPES.WCETimesMap WTYPES.SemanticAnn
     -> [WCETPlatformAssignment a]
     -> Either TransPathErrors (WTYPES.WCETimesMap WTYPES.SemanticAnn)
-runTransPathTypeChecking arch trPathMap prevMap wcetPltAssig =
+runWCETTypeChecking arch trPathMap prevMap wcetPltAssig =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch trPathMap gConsts S.empty prevMap in
     case ST.runState (runExceptT (mapM_ typeWCETPlatformAssignment wcetPltAssig)) initialState of

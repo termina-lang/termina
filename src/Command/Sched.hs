@@ -34,6 +34,9 @@ import EFP.Schedulability.TransPath.TypeChecking
 import qualified Semantic.Types as STYPES
 import qualified EFP.Schedulability.TransPath.Types as TTYPES
 import ControlFlow.Architecture.Types
+import EFP.Schedulability.WCET.Parsing (terminaWCETParser)
+import EFP.Schedulability.WCET.TypeChecking
+import qualified EFP.Schedulability.WCET.Types as WTYPES
 
 -- | Data type for the "sched" command arguments
 newtype SchedCmdArgs =
@@ -49,6 +52,77 @@ schedCmdArgsParser = SchedCmdArgs
         <> O.short 'v'
         <> O.help "Enable verbose mode")
 
+-- | Load the files containing the transactional worst-case execution paths
+loadWCETModules
+  :: BasicBlocksProject
+    -> FilePath
+  -> IO WCETProject
+loadWCETModules bbProject efpPath = do
+  foldM loadWCETModules' M.empty (M.elems bbProject)
+
+  where
+
+  loadWCETModules' :: WCETProject
+    -- Module whose transactional worst-case execution paths are being loaded
+    -> BasicBlocksModule
+    -> IO WCETProject
+  loadWCETModules' fsLoaded bbModule = do
+    let fullP = efpPath </> (qualifiedName bbModule <.> "wcet")
+        filePath = qualifiedName bbModule
+    sourceFileExists <- doesFileExist fullP
+    -- If the file containing the transactional worst-case execution paths
+    -- for the module does not exist, skip it
+    if not sourceFileExists
+      then return fsLoaded
+      else do
+        loadedModule <- loadWCETModule fullP filePath
+        pure $ M.insert (qualifiedName loadedModule) loadedModule fsLoaded
+
+  -- | Load file containing transactional worst-case execution paths
+  loadWCETModule ::
+    FilePath
+    -> FilePath
+    -> IO WCETModule
+  loadWCETModule fullP filePath = do
+    -- read it
+    src_code <- TE.decodeUtf8 <$> BS.readFile fullP
+    mod_time <- getModificationTime fullP
+    -- parse it
+    case runParser terminaWCETParser filePath fullP (T.unpack src_code) of
+      Left err ->
+        let pErr = annotateError (Position filePath (errorPos err) (errorPos err)) (EParseError err)
+            fileMap = M.singleton fullP src_code
+        in
+        TIO.putStrLn (toText pErr fileMap) >> exitFailure
+      Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
+
+-- | Type check the transactional worst-case execution paths of the project modules
+typeWCETModules :: TerminaProgArch STYPES.SemanticAnn 
+  -> TTYPES.TransPathMap TTYPES.SemanticAnn
+  -> BasicBlocksProject
+  -> WCETProject 
+  -> IO (WTYPES.WCETimesMap WTYPES.SemanticAnn)
+typeWCETModules arch trPathMap bbProject wcetProject =
+  foldM typeWCETModules' M.empty (M.elems wcetProject)
+
+  where
+
+    typeWCETModules' :: WTYPES.WCETimesMap WTYPES.SemanticAnn -> WCETModule -> IO (WTYPES.WCETimesMap WTYPES.SemanticAnn)
+    typeWCETModules' wcetTimesMap wcetModule = do
+      let result = runWCETTypeChecking arch trPathMap wcetTimesMap (wcetAST . metadata $ wcetModule)
+      case result of
+        (Left err) ->
+          -- | Create the source files map. This map will be used to obtain the source files that
+          -- will be feed to the error pretty printer. The source files map must use as key the
+          -- path of the source file and as element the text of the source file.
+          let sourceFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                    M.empty bbProject
+              pathFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                    sourceFilesMap wcetProject in
+          TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+        (Right newMap) -> return newMap
 
 -- | Load the files containing the transactional worst-case execution paths
 loadPathModules
@@ -105,8 +179,8 @@ typePathModules arch bbProject pathProject =
   where
 
     typePathModules' :: TTYPES.TransPathMap TTYPES.SemanticAnn -> TransPathModule -> IO (TTYPES.TransPathMap TTYPES.SemanticAnn)
-    typePathModules' transPathMap transPathModule = do
-      let result = runTransPathTypeChecking arch transPathMap (transPathAST . metadata $ transPathModule)
+    typePathModules' trPathMap transPathModule = do
+      let result = runTransPathTypeChecking arch trPathMap (transPathAST . metadata $ transPathModule)
       case result of
         (Left err) ->
           -- | Create the source files map. This map will be used to obtain the source files that
@@ -207,4 +281,9 @@ schedCommand (SchedCmdArgs chatty) = do
     transPathProject <- loadPathModules bbProject (efpFolder config)
     trPathMap <- typePathModules programArchitecture bbProject transPathProject
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution paths type checked successfully")
+    -- | Load the transactional worst-case execution times
+    when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution times")
+    wcetProject <- loadWCETModules bbProject (efpFolder config)
+    _wcetTimesMap <- typeWCETModules programArchitecture trPathMap bbProject wcetProject
+    when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")
