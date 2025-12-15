@@ -818,7 +818,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             cParamTypes <- case getMatchCaseTypes semann of
                 Just ts -> traverse (genType noqual) ts
                 Nothing -> throwError $ InternalError "Match case without types"
-            case params of
+            case [used | used@(x : _) <- params, x /= '_' ] of
                 [] -> return []
                 [param] ->
                     case head cParamTypes of
