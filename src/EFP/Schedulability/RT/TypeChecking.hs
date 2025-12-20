@@ -133,7 +133,7 @@ typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nex
         -- | No expected continuations and no next step: ok
         ([], Nothing) -> return Nothing
         -- | Expected continuations but no next step: error
-        (continuations, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName continuations
+        (cs, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName cs
         -- | No expected continuations but next step provided: error
         ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
@@ -185,7 +185,7 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
     continuations <- getPathContinuations targetTask outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
         ([], Nothing) -> return Nothing
-        (continuations, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName continuations
+        (cs, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName cs
         ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) targetAction pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
     return $ RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTYPES.SemanticAnn (getLocation ann))        
