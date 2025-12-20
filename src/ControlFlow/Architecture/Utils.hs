@@ -21,19 +21,46 @@ getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 
-getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
-getMemberFunctions = foldl' (\acc member ->
+classMemberFunctions :: TPClass a -> M.Map Identifier (TPFunction a)
+classMemberFunctions tpClass =
+  M.unions [
+    classMethods tpClass,
+    classProcedures tpClass,
+    classViewers tpClass,
+    classActions tpClass
+  ]
+
+getViewers :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getViewers = foldl' (\acc member ->
+  case member of
+    ClassViewer identifier params mRetTy blk ann ->
+      M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getMethods :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getMethods = foldl' (\acc member ->
   case member of
     ClassMethod _ak identifier params mRetTy blk ann  ->
       M.insert identifier (TPFunction identifier params mRetTy blk ann)   acc
+    _ -> acc
+  ) M.empty
+
+getProcedures :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getProcedures = foldl' (\acc member ->
+  case member of
     ClassProcedure _ak identifier params blk ann ->
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getActions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getActions = foldl' (\acc member ->
+  case member of
     ClassAction _ak identifier Nothing rty blk ann ->
       M.insert identifier (TPFunction identifier [] (Just rty) blk ann) acc
     ClassAction _ak identifier (Just param) rty blk ann ->
       M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
-    ClassViewer identifier params mRetTy blk ann ->
-      M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
     _ -> acc
   ) M.empty
 

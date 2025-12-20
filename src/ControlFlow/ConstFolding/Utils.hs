@@ -10,6 +10,7 @@ import ControlFlow.Architecture.Types
 import qualified Data.Map as M
 import Core.Utils
 import Data.Bits
+import ControlFlow.Architecture.Utils (classMemberFunctions)
 
 -- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
@@ -128,7 +129,7 @@ followSendMessage progArchitecture currentId portName = do
             targetAction <- maybe (throwError $ annotateError Internal (EUnknownInputPort targetTaskId targetPort)) (return . snd) $ 
                             M.lookup targetPort (inputPorts targetTaskCls)
             actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
-                            M.lookup targetAction (classMemberFunctions targetTaskCls)
+                            M.lookup targetAction (classActions targetTaskCls)
             return (targetTaskId, actionFunction)
         Nothing -> 
             case M.lookup currentId (handlers progArchitecture) of
@@ -144,7 +145,7 @@ followSendMessage progArchitecture currentId portName = do
                     targetAction <- maybe (throwError $ annotateError Internal (EUnknownInputPort targetTaskId targetPort)) (return . snd) $ 
                                     M.lookup targetPort (inputPorts targetTaskCls)
                     actionFunction <- maybe (throwError $ annotateError Internal (EUnknownMemberFunction targetAction)) return $ 
-                                    M.lookup targetAction (classMemberFunctions targetTaskCls)
+                                    M.lookup targetAction (classActions targetTaskCls)
                     return (targetTaskId, actionFunction)
                 Nothing -> throwError $ annotateError Internal (EUnknownIdentifier currentId)
 
@@ -156,7 +157,7 @@ followProcedureCall progArchitecture ident portName procName = do
         (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (taskAPConnections task)
         resource <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
         resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))) return $ M.lookup (resourceClass resource) (resourceClasses progArchitecture)
-        resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+        resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classProcedures resourceCls)
         return (targetResource, resourceProc)
     Nothing -> 
       case M.lookup ident (handlers progArchitecture) of
@@ -164,7 +165,7 @@ followProcedureCall progArchitecture ident portName procName = do
             (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (handlerAPConnections handler)
             resource <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
             resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource))) return $ M.lookup (resourceClass resource) (resourceClasses progArchitecture)
-            resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+            resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classProcedures resourceCls)
             return (targetResource, resourceProc)
         Nothing ->
             case M.lookup ident (resources progArchitecture) of
@@ -172,7 +173,7 @@ followProcedureCall progArchitecture ident portName procName = do
                     (targetResource, _) <- maybe (throwError $ annotateError Internal (EUnknownAccessPort ident portName)) return $ M.lookup portName (resAPConnections resource)
                     resource' <- maybe (throwError $ annotateError Internal (EUnknownResource targetResource)) return $ M.lookup targetResource (resources progArchitecture)
                     resourceCls <- maybe (throwError $ annotateError Internal (EUnknownResourceClass (resourceClass resource'))) return $ M.lookup (resourceClass resource') (resourceClasses progArchitecture)
-                    resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classMemberFunctions resourceCls)
+                    resourceProc <- maybe (throwError $ annotateError Internal (EUnknownResourceProcedure targetResource procName)) return $ M.lookup procName (classProcedures resourceCls)
                     return (targetResource, resourceProc)
               Nothing -> throwError $ annotateError Internal (EUnknownIdentifier ident)
   

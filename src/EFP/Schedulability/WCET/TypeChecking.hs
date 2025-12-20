@@ -15,6 +15,7 @@ import qualified Data.Set as S
 import Control.Monad
 import Utils.Monad
 import Configuration.Platform
+import ControlFlow.Architecture.Utils
 
 ----------------------------------------
 -- Termina Programs definitions
@@ -74,6 +75,15 @@ typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
     right' <- typeConstExpression right
     return $ ConstBinOp op left' right' (WTYPES.SemanticAnn (getLocation ann))
+typeConstExpression (ConstStructInitializer fieldAssignments ann) = do
+    fieldAssignments' <- mapM typeFieldAssignment fieldAssignments
+    return $ ConstStructInitializer fieldAssignments' (WTYPES.SemanticAnn (getLocation ann))
+    
+    where
+
+    typeFieldAssignment (ConstFieldAssignment field identExpr) = do
+        identExpr' <- typeConstExpression identExpr
+        return $ ConstFieldAssignment field identExpr'
 
 typeWCET :: (Located a) => Identifier -> TransactionalWCET a -> TransPathMonad (TransactionalWCET WTYPES.SemanticAnn)
 typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann) = do

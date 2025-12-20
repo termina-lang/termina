@@ -37,10 +37,15 @@ import ControlFlow.Architecture.Types
 import EFP.Schedulability.WCET.Parsing (terminaWCETParser)
 import EFP.Schedulability.WCET.TypeChecking
 import qualified EFP.Schedulability.WCET.Types as WTYPES
+import Options.Applicative
+import EFP.Schedulability.RT.Parsing (terminaRTParser)
+import EFP.Schedulability.RT.TypeChecking
+import qualified EFP.Schedulability.RT.Types as RTTypes
 
 -- | Data type for the "sched" command arguments
-newtype SchedCmdArgs =
+data SchedCmdArgs =
     SchedCmdArgs
+        String -- ^ Path to the RT model file
         Bool -- ^ Verbose mode
     deriving (Show,Eq)
 
@@ -48,9 +53,52 @@ newtype SchedCmdArgs =
 -- | Parser for the "sched" command arguments
 schedCmdArgsParser :: O.Parser SchedCmdArgs
 schedCmdArgsParser = SchedCmdArgs
-    <$> O.switch (O.long "verbose"
+    <$> argument str (metavar "RT_MODEL_FILE"
+        <> help "Path to the RT model file")
+    <*> O.switch (O.long "verbose"
         <> O.short 'v'
         <> O.help "Enable verbose mode")
+
+loadRTModule :: FilePath -> IO RTModule
+loadRTModule rtModelFile = do
+  -- | Check RT model file extension
+  when (takeExtension rtModelFile /= ".rt") $
+      die . errorMessage $ "RT model file must have .rt extension"
+  -- | Check that RT model file exists
+  sourceFileExists <- doesFileExist rtModelFile
+  unless sourceFileExists (die . errorMessage $ "RT model file \"" ++ rtModelFile ++ "\" does not exist")
+  src_code <- TE.decodeUtf8 <$> BS.readFile rtModelFile
+  mod_time <- getModificationTime rtModelFile
+  -- parse it
+  case runParser terminaRTParser rtModelFile rtModelFile (T.unpack src_code) of
+    Left err ->
+      let pErr = annotateError (Position rtModelFile (errorPos err) (errorPos err)) (EParseError err)
+          fileMap = M.singleton rtModelFile src_code
+      in
+      TIO.putStrLn (toText pErr fileMap) >> exitFailure
+    Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (RTData term)
+
+typeRTModule :: TerminaProgArch STYPES.SemanticAnn 
+  -> TTYPES.TransPathMap TTYPES.SemanticAnn
+  -> BasicBlocksProject
+  -> TransPathProject
+  -> RTModule -> IO (RTTypes.RTTransactionMap RTTypes.SemanticAnn, RTTypes.RTSituationMap RTTypes.SemanticAnn)
+typeRTModule arch trPathMap bbProject transPathProject rtModule = do
+  let result = runRTTypeChecking arch trPathMap (rtAST . metadata $ rtModule)
+  case result of
+    (Left err) ->
+      -- | Create the source files map. This map will be used to obtain the source files that
+      -- will be feed to the error pretty printer. The source files map must use as key the
+      -- path of the source file and as element the text of the source file.
+      let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule)
+          sourceFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                fileMap bbProject
+          pathFilesMap =
+            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                sourceFilesMap transPathProject in
+      TIO.putStrLn (toText err pathFilesMap) >> exitFailure
+    (Right (trMap, stMap)) -> return (trMap, stMap)
 
 -- | Load the files containing the transactional worst-case execution paths
 loadWCETModules
@@ -197,7 +245,7 @@ typePathModules arch bbProject pathProject =
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
-schedCommand (SchedCmdArgs chatty) = do
+schedCommand (SchedCmdArgs rtModelFile chatty) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -285,5 +333,8 @@ schedCommand (SchedCmdArgs chatty) = do
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution times")
     wcetProject <- loadWCETModules bbProject (efpFolder config)
     _wcetTimesMap <- typeWCETModules programArchitecture trPathMap bbProject wcetProject
+    when chatty (putStrLn . debugMessage $ "Loading RT model")
+    rtModule <- loadRTModule rtModelFile
+    (_trMap, _stMap) <- typeRTModule programArchitecture trPathMap bbProject transPathProject rtModule
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

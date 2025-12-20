@@ -6,7 +6,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Utils.Annotations
 
--- This module contains the function thhat will be used to generate
+-- This module contains the function that will be used to generate
 -- map of the architecture of the program.
 
 data TPFunction a = TPFunction
@@ -26,8 +26,11 @@ data TPClass a = TPClass {
     -- It can be either a task, a handler, or a resource
     classKind :: ClassKind,
     
-    -- | Class member functions
-    classMemberFunctions :: M.Map Identifier (TPFunction a),
+    -- | Member functions
+    classActions :: M.Map Identifier (TPFunction a),
+    classMethods :: M.Map Identifier (TPFunction a),
+    classProcedures :: M.Map Identifier (TPFunction a),
+    classViewers :: M.Map Identifier (TPFunction a),
 
     accessPorts :: M.Map Identifier (TerminaType a, a),
 

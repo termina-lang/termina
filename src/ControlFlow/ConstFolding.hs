@@ -12,6 +12,7 @@ import Command.Types
 import ControlFlow.ConstFolding.Monad
 import ControlFlow.ConstFolding.Transaction
 import ControlFlow.ConstFolding.Simpl
+import ControlFlow.Architecture.Utils
 
 loadGlobalConstEvironment :: TransFoldMonad ()
 loadGlobalConstEvironment = do

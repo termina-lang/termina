@@ -3,6 +3,7 @@ module EFP.Schedulability.TransPath.AST
     , module EFP.Schedulability.Core.AST) where
 
 import EFP.Schedulability.Core.AST
+import Utils.Annotations
 
 data BlockPosition = BlockPosition
     {
@@ -93,3 +94,8 @@ data TransactionalWCEPath a
         [WCEPathBlock a]
         a
     deriving Show
+
+instance Annotated TransactionalWCEPath where
+    getAnnotation (TransactionalWCEPath _ _ _ _ _ a) = a
+    updateAnnotation (TransactionalWCEPath tName aName pName constParams blocks _) =
+        TransactionalWCEPath tName aName pName constParams blocks

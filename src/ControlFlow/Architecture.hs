@@ -73,49 +73,73 @@ addChannelSource ident pname channel ann = do
 genArchTypeDef :: SemanticAnn -> TypeDef SemanticAnn -> ArchitectureMonad ()
 genArchTypeDef ann tydef@(Class TaskClass ident _ _ _) = do
   let members = getClassMembers tydef
-      accessPs = getAccessPorts members
-      inPs = getInputPorts members
-      sinkPs = getSinkPorts members
-      outputPs = getOutputPorts members
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  let tskCls = TPClass ident TaskClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
+  let tskCls = TPClass {
+    classIdentifier = ident,
+    classKind = TaskClass,
+    classActions = getActions members,
+    classMethods = M.empty,
+    classProcedures = M.empty,
+    classViewers = getViewers members,
+    accessPorts = getAccessPorts members,
+    inputPorts = getInputPorts members,
+    sinkPorts = getSinkPorts members,
+    outputPorts = getOutputPorts members,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  }
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
     }
 genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
   let members = getClassMembers tydef
-      accessPs = getAccessPorts members
-      inPs = M.empty
-      sinkPs = getSinkPorts members
-      outputPs = getOutputPorts members
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  let hdlCls = TPClass ident HandlerClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
+  let hdlCls = TPClass {
+    classIdentifier = ident,
+    classKind = HandlerClass,
+    classActions = getActions members,
+    classMethods = M.empty,
+    classProcedures = M.empty,
+    classViewers = getViewers members,
+    accessPorts = getAccessPorts members,
+    inputPorts = M.empty,
+    sinkPorts = getSinkPorts members,
+    outputPorts = getOutputPorts members,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  }
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
 genArchTypeDef ann tydef@(Class ResourceClass ident _ _ _) = do
   let members = getClassMembers tydef
-      accessPs = getAccessPorts members
-      inPs = M.empty
-      sinkPs = M.empty
-      outputPs = M.empty
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
   -- | Resources do not have forwarding actions
-  let resCls = TPClass ident ResourceClass memberFunctions accessPs inPs sinkPs outputPs outBoxMap ann
+  let resCls = TPClass {
+    classIdentifier = ident,
+    classKind = ResourceClass,
+    classActions = M.empty,
+    classMethods = getMethods members,
+    classProcedures = getProcedures members,
+    classViewers = M.empty,
+    accessPorts = getAccessPorts members,
+    inputPorts = M.empty,
+    sinkPorts = M.empty,
+    outputPorts = M.empty,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  } 
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)

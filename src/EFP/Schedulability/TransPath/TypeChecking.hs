@@ -13,6 +13,7 @@ import EFP.Schedulability.TransPath.AST
 import qualified Data.Set as S
 import Control.Monad
 import Utils.Monad
+import ControlFlow.Architecture.Utils
 
 ----------------------------------------
 -- Termina Programs definitions
@@ -71,6 +72,17 @@ typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
     right' <- typeConstExpression right
     return $ ConstBinOp op left' right' (TTYPES.SemanticAnn (getLocation ann))
+typeConstExpression (ConstStructInitializer fieldAssignments ann) = do
+    fieldAssignments' <- mapM typeFieldAssignment fieldAssignments
+    return $ ConstStructInitializer fieldAssignments' (TTYPES.SemanticAnn (getLocation ann))
+    
+    where
+
+    typeFieldAssignment (ConstFieldAssignment field identExpr) = do
+        identExpr' <- typeConstExpression identExpr
+        return $ ConstFieldAssignment field identExpr'
+
+
 
 typePathBlock :: (Located a) => TPClass STYPES.SemanticAnn -> WCEPathBlock a -> TransPathMonad (WCEPathBlock TTYPES.SemanticAnn)
 typePathBlock tpCls (WCEPathCondIf blks pos ann) = do
@@ -95,7 +107,7 @@ typePathBlock tpCls (WCEPSendMessage portName pos _ann) = do
         Nothing -> throwError . annotateError (getLocation _ann) $ EUnknownOutputPort portName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
         Just _ -> return $ WCEPSendMessage portName pos (TTYPES.SemanticAnn (getLocation _ann))
 typePathBlock tpCls (WCEPathMemberFunctionCall funcName argExprs pos ann) = do
-    case M.lookup funcName (classMemberFunctions tpCls) of
+    case M.lookup funcName (M.union (classMethods tpCls) (classViewers tpCls)) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction funcName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
         Just _ -> do
             tyArgExprs <- mapM typeConstExpression argExprs
@@ -121,7 +133,7 @@ typePathBlock tpCls (WCEPFreeBox portName pos ann) = do
 typePathBlock _tpCls (WCEPRegularBlock pos ann) = return $ WCEPRegularBlock pos (TTYPES.SemanticAnn (getLocation ann))
 typePathBlock _tpCls (WCEPReturn pos ann) = return $ WCEPReturn pos (TTYPES.SemanticAnn (getLocation ann))
 typePathBlock tpCls (WCEPContinue actionName pos ann) = do
-    case M.lookup actionName (classMemberFunctions tpCls) of
+    case M.lookup actionName (classActions tpCls) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction actionName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
         Just _ -> return $ WCEPContinue actionName pos (TTYPES.SemanticAnn (getLocation ann))
 typePathBlock _tpCls (WCEPReboot pos ann) = return $ WCEPReboot pos (TTYPES.SemanticAnn (getLocation ann))

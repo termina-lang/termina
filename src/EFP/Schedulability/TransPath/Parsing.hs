@@ -36,6 +36,26 @@ lexer = Tok.makeTokenParser langDef
                       "::" -- Scoping
                       ,"@" -- Location specifier
                       ,"=" -- Assignment
+                      ,"(" -- Parens
+                      ,")" -- Parens
+                      ,"*" -- Multiplication
+                      ,"/" -- Division
+                      ,"+" -- Addition
+                      ,"-" -- Substraction
+                      ,"%" -- Modulo
+                      ,"<<" -- BitwiseLeftShift
+                      ,">>" -- BitwiseRightShift
+                      ,"<" -- RelationalLT
+                      ,"<=" -- RelationalLTE
+                      ,">" -- RelationalGT
+                      ,">=" -- RelationalGTE
+                      ,"==" -- RelationalEqual
+                      ,"!=" -- RelationalNotEqual
+                      ,"&" -- BitwiseAnd / reference creation
+                      ,"|" -- BitwiseOr
+                      ,"^" -- BitwiseXor
+                      ,"&&" -- LogicalAnd
+                      ,"||" -- LogicalOr
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True

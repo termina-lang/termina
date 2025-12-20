@@ -1,5 +1,5 @@
-module EFP.Schedulability.WCET.Parsing 
-  (terminaWCETParser) where
+module EFP.Schedulability.RT.Parsing
+  (terminaRTParser) where
 
 -- Importing parser combinators
 import Text.Parsec hiding (Error, Ok)
@@ -8,13 +8,13 @@ import Text.Parsec hiding (Error, Ok)
 import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
-import EFP.Schedulability.WCET.AST
+import EFP.Schedulability.RT.AST
 import qualified Text.Parsec.Expr as Ex
 import Data.Char
-import EFP.Schedulability.WCET.Types
+import EFP.Schedulability.RT.Types
 import Utils.Annotations
 
-type WCETParser = Parsec String FilePath
+type RTParser = Parsec String FilePath
 
 lexer :: Tok.TokenParser FilePath
 lexer = Tok.makeTokenParser langDef
@@ -28,15 +28,17 @@ lexer = Tok.makeTokenParser langDef
                    -- | Here we define that identifiers being with a letter
                    , Tok.identStart = letter
                    -- | Rest of identifiers accepted characters
-                   , Tok.identLetter = alphaNum <|> char '_' <|> char '-'
+                   , Tok.identLetter = alphaNum <|> char '_'
                    -- | Operators begin with
                    , Tok.opStart = oneOf "="
                    , Tok.reservedNames = reservedNames
                    , Tok.reservedOpNames = [
                       "::" -- Scoping
+                      ,"#" -- Label specifier
                       ,"=" -- Assignment
                       ,"(" -- Parens
                       ,")" -- Parens
+                      ,"->" -- Step continuation
                       ,"*" -- Multiplication
                       ,"/" -- Division
                       ,"+" -- Addition
@@ -55,87 +57,134 @@ lexer = Tok.makeTokenParser langDef
                       ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
+                      ,"{|" -- multicast start"
+                      ,"|}" -- multicast end
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
                    }
 
-reserved :: String -> WCETParser ()
+reserved :: String -> RTParser ()
 reserved = Tok.reserved lexer
 
-reservedOp :: String -> WCETParser ()
+reservedOp :: String -> RTParser ()
 reservedOp = Tok.reservedOp lexer
 
-identifierParser :: WCETParser String
+identifierParser :: RTParser String
 identifierParser = Tok.identifier lexer
 
-parens :: WCETParser a -> WCETParser a
-parens = Tok.parens lexer
+angles :: RTParser a -> RTParser a
+angles = Tok.angles lexer
 
-wspcs :: WCETParser ()
-wspcs = Tok.whiteSpace lexer
-
-comma :: WCETParser String
-comma = Tok.comma lexer
-
-braces :: WCETParser a -> WCETParser a
+braces :: RTParser a -> RTParser a
 braces = Tok.braces lexer
 
-number :: Integer -> WCETParser Char -> WCETParser Integer
+parens :: RTParser a -> RTParser a
+parens = Tok.parens lexer
+
+wspcs :: RTParser ()
+wspcs = Tok.whiteSpace lexer
+
+comma :: RTParser String
+comma = Tok.comma lexer
+
+semi :: RTParser String
+semi = Tok.semi lexer
+
+number :: Integer -> RTParser Char -> RTParser Integer
 number base baseDigit = do
     digits <- many1 baseDigit
     let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
     seq n (return n)
 
-sign :: WCETParser (Integer -> Integer)
+sign :: RTParser (Integer -> Integer)
 sign = (char '-' >> return negate)
   <|> (char '+' >> return id)
   <|> return id
 
 -- | TerminaParser for integer decimal numbers
 -- This parser is used when defining regular integer literals
-decimal :: WCETParser Integer
+decimal :: RTParser Integer
 decimal =  Tok.lexeme lexer $ do
   f <- Tok.lexeme lexer sign
   n <- number 10 digit
   return (f n)
 
-hexadecimal :: WCETParser Integer
+hexadecimal :: RTParser Integer
 hexadecimal = Tok.lexeme lexer $
   char '0' >> oneOf "xX" >> number 16 hexDigit
 
-integerParser :: WCETParser TInteger
+integerParser :: RTParser TInteger
 integerParser = try hexParser <|> decParser
   where
     hexParser = flip TInteger HexRepr <$> hexadecimal
     decParser = flip TInteger DecRepr <$> decimal
 
-parensConstExprParser :: WCETParser (ConstExpression ParserAnn)
+transStepActionParser :: RTParser (RTTransStep ParserAnn)
+transStepActionParser = do
+    current <- getState
+    startPos <- getPosition
+    lbl <- identifierParser
+    _ <- reservedOp "#"
+    componentIdentifier <- identifierParser
+    _ <- reservedOp "."
+    actionIdentifier <- identifierParser
+    _ <- reservedOp "::"
+    pathIdentifier <- identifierParser
+    nextStep <-  optionMaybe (reservedOp "->" >> nextStepParser)
+    RTTransStepAction lbl componentIdentifier actionIdentifier pathIdentifier nextStep . Position current startPos <$> getPosition
+
+rtTransStepMulticastParser :: RTParser (RTTransStep ParserAnn)
+rtTransStepMulticastParser = do
+    current <- getState
+    startPos <- getPosition
+    _ <- reservedOp "{|"
+    steps <- many1 nextStepParser
+    _ <- reservedOp "|}"
+    RTTransStepMuticast steps . Position current startPos <$> getPosition
+
+rtTransStepConditionalParser :: RTParser (RTTransStep ParserAnn)
+rtTransStepConditionalParser = do
+    current <- getState
+    startPos <- getPosition
+    branches <- angles (sepBy conditionalBranchParser comma)
+    RTTransStepConditional branches . Position current startPos <$> getPosition
+
+  where
+
+    conditionalBranchParser :: RTParser (ConstExpression ParserAnn, RTTransStep ParserAnn)
+    conditionalBranchParser = do
+        times <- constExpressionParser
+        _ <- reservedOp "!"
+        step <- nextStepParser
+        return (times, step)
+
+parensConstExprParser :: RTParser (ConstExpression ParserAnn)
 parensConstExprParser = parens constExpressionParser
 
-constIntParser :: WCETParser (ConstExpression ParserAnn)
+constIntParser :: RTParser (ConstExpression ParserAnn)
 constIntParser = do
   current <- getState
   pos <- getPosition
   tInteger <- integerParser
   ConstInt tInteger . Position current pos <$> getPosition
 
-constObjectParser :: WCETParser (ConstExpression ParserAnn)
+constObjectParser :: RTParser (ConstExpression ParserAnn)
 constObjectParser = do
   current <- getState
   pos <- getPosition
   ident <- identifierParser
   ConstObject ident . Position current pos <$> getPosition
 
-constExpressionTermParser :: WCETParser (ConstExpression ParserAnn)
+constExpressionTermParser :: RTParser (ConstExpression ParserAnn)
 constExpressionTermParser =
   try constIntParser
   <|> try constObjectParser
   <|> parensConstExprParser
 
 -- Expression TerminaParser
-constExpressionParser :: WCETParser (ConstExpression ParserAnn)
-constExpressionParser = Ex.buildExpressionParser  -- New parser
+constExpressionParser' :: RTParser (ConstExpression ParserAnn)
+constExpressionParser' = Ex.buildExpressionParser  -- New parser
     [[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft,
       binaryInfix "%" Modulo Ex.AssocLeft]
@@ -162,37 +211,61 @@ constExpressionParser = Ex.buildExpressionParser  -- New parser
     getEndPosition (Position _ _ endPos) = endPos
     getEndPosition _ = error "Internal error: expected Position annotation (this should not happen)"
 
-transactionalWCETParser :: WCETParser (TransactionalWCET ParserAnn)
-transactionalWCETParser = do
-    current <- getState
-    startPos <- getPosition
-    clsName <- identifierParser
-    _ <- reservedOp "::"
-    elementName <- identifierParser
-    _ <- reservedOp "::"
-    memberFunction <- identifierParser
-    constParams <- parens (sepBy identifierParser comma)
-    _ <- reservedOp "="
-    wcet <- constExpressionParser
-    TransactionalWCET clsName elementName memberFunction constParams wcet . Position current startPos <$> getPosition
+constExpressionParser :: RTParser (ConstExpression ParserAnn)
+constExpressionParser = try structInitializerParser
+  <|> constExpressionParser'
 
-platformAssignmentParser :: WCETParser (WCETPlatformAssignment ParserAnn)
-platformAssignmentParser = do
+nextStepParser :: RTParser (RTTransStep ParserAnn)
+nextStepParser =
+    try transStepActionParser
+    <|> try rtTransStepMulticastParser
+    <|> rtTransStepConditionalParser
+
+rtTransactionParser :: RTParser (RTElement ParserAnn)
+rtTransactionParser = do
     current <- getState
     startPos <- getPosition
-    _ <- reserved "wcet"
-    platformName <- identifierParser
+    _ <- reserved "transaction"
+    transName <- identifierParser
     _ <- reservedOp "="
-    wcets <- braces (sepBy transactionalWCETParser comma)
-    WCETPlatformAssignment platformName wcets . Position current startPos <$> getPosition
+    firstStep <- nextStepParser
+    _ <- semi
+    RTTransaction transName firstStep . Position current startPos <$> getPosition
+
+structInitializerParser :: RTParser (ConstExpression ParserAnn)
+structInitializerParser = do
+    current <- getState
+    startPos <- getPosition
+    fieldAssignments <- braces (sepBy fieldAssignmentParser comma)
+    ConstStructInitializer fieldAssignments . Position current startPos <$> getPosition
+
+  where
+
+    fieldAssignmentParser :: RTParser (ConstFieldAssignment ParserAnn)
+    fieldAssignmentParser = do
+        fieldName <- identifierParser
+        _ <- reservedOp "="
+        ConstFieldAssignment fieldName <$> constExpressionParser
+
+rtSituationParser :: RTParser (RTElement ParserAnn)
+rtSituationParser = do
+    current <- getState
+    startPos <- getPosition
+    _ <- reserved "rts"
+    rtsName <- identifierParser
+    _ <- reservedOp "="
+    initializerExpr <- constExpressionParser
+    _ <- semi
+    RTSituation rtsName initializerExpr . Position current startPos <$> getPosition
 
 -- | Top Level parser
-topLevel :: WCETParser [WCETPlatformAssignment ParserAnn]
+topLevel :: RTParser [RTElement ParserAnn]
 topLevel = many $
-  try platformAssignmentParser
+  try rtTransactionParser
+  <|> rtSituationParser
 
-contents :: WCETParser a -> WCETParser a
+contents :: RTParser a -> RTParser a
 contents p = wspcs *> p <* eof
 
-terminaWCETParser :: WCETParser [WCETPlatformAssignment ParserAnn]
-terminaWCETParser = contents topLevel
+terminaRTParser :: RTParser [RTElement ParserAnn]
+terminaRTParser = contents topLevel
