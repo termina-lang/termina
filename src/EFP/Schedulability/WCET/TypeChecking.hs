@@ -2,9 +2,10 @@
 module EFP.Schedulability.WCET.TypeChecking where
 
 import qualified Data.Map as M
-import qualified Semantic.Types as STYPES
-import qualified EFP.Schedulability.TransPath.Types as TTYPES
-import qualified EFP.Schedulability.WCET.Types as WTYPES
+
+import Semantic.Types
+import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCET.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Control.Monad.Except
@@ -16,6 +17,7 @@ import Control.Monad
 import Utils.Monad
 import Configuration.Platform
 import ControlFlow.Architecture.Utils
+import EFP.Schedulability.Core.Types
 
 ----------------------------------------
 -- Termina Programs definitions
@@ -25,11 +27,11 @@ type TPGlobalConstsEnv = M.Map Identifier Location
 
 data TransPathState = TransPathState
     {
-        progArch :: TerminaProgArch STYPES.SemanticAnn
-        , transPathMap :: TTYPES.TransPathMap TTYPES.SemanticAnn
+        progArch :: TerminaProgArch SemanticAnn
+        , transPathMap :: TransPathMap TRPSemAnn 
         , globalConsts :: TPGlobalConstsEnv
         , localConsts :: S.Set Identifier
-        , transWCETs :: WTYPES.WCETimesMap WTYPES.SemanticAnn
+        , transWCETs :: WCETimesMap WCETSemAnn
     } deriving Show
 
 type TransPathMonad = ExceptT TransPathErrors (ST.State TransPathState)
@@ -46,7 +48,7 @@ insertConstParameter loc ident = do
             throwError $ annotateError loc $ EConstParamAlreadyDefined ident
         ST.modify (\s -> s{localConsts = S.insert ident (localConsts s)})
 
-getTPClass :: Location -> Identifier -> TransPathMonad (TPClass STYPES.SemanticAnn)
+getTPClass :: Location -> Identifier -> TransPathMonad (TPClass SemanticAnn)
 getTPClass loc classId = do
     taskClss <- ST.gets (taskClasses . progArch)
     case M.lookup classId taskClss of
@@ -61,31 +63,30 @@ getTPClass loc classId = do
                         Just resourceCls -> return resourceCls
                         Nothing -> throwError . annotateError loc $ EUnknownClass classId
 
-typeConstExpression :: (Located a) => ConstExpression a -> TransPathMonad (ConstExpression WTYPES.SemanticAnn)
+typeConstExpression :: ConstExpression ParserAnn -> TransPathMonad (ConstExpression WCETSemAnn)
 typeConstExpression (ConstInt i ann) = 
-    return $ ConstInt i (WTYPES.SemanticAnn (getLocation ann))
+    return $ ConstInt i (WCETExprTy TConstInt (getLocation ann))
+typeConstExpression (ConstDouble d ann) = 
+    return $ ConstDouble d (WCETExprTy TConstDouble (getLocation ann))
 typeConstExpression (ConstObject ident ann) = do
     isGlobalConst <- ST.gets (M.member ident . globalConsts)
     unless isGlobalConst $ do
         isLocalConst <- ST.gets (S.member ident . localConsts)
         unless isLocalConst $
             throwError . annotateError (getLocation ann) $ EUnknownVariable ident
-    return $ ConstObject ident (WTYPES.SemanticAnn (getLocation ann))
+    -- | For now, all constants are of integer type: Termina does not support other constant types yet.
+    return $ ConstObject ident (WCETExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
     right' <- typeConstExpression right
-    return $ ConstBinOp op left' right' (WTYPES.SemanticAnn (getLocation ann))
-typeConstExpression (ConstStructInitializer fieldAssignments ann) = do
-    fieldAssignments' <- mapM typeFieldAssignment fieldAssignments
-    return $ ConstStructInitializer fieldAssignments' (WTYPES.SemanticAnn (getLocation ann))
-    
-    where
+    case (getAnnotation left', getAnnotation right') of
+        (WCETExprTy t1 _, WCETExprTy t2 _) -> do
+            unless (t1 == t2) $ 
+                throwError . annotateError (getLocation ann) $ EConstExpressionTypeMismatch t1 t2
+            return $ ConstBinOp op left' right' (WCETExprTy t1 (getLocation ann))
+        _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
-    typeFieldAssignment (ConstFieldAssignment field identExpr) = do
-        identExpr' <- typeConstExpression identExpr
-        return $ ConstFieldAssignment field identExpr'
-
-typeWCET :: (Located a) => Identifier -> TransactionalWCET a -> TransPathMonad (TransactionalWCET WTYPES.SemanticAnn)
+typeWCET :: Identifier -> TransactionalWCET ParserAnn -> TransPathMonad (TransactionalWCET WCETSemAnn)
 typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann) = do
     tpClass <- getTPClass (getLocation ann) classId
     let clsLoc = getLocation . classAnns $ tpClass
@@ -122,9 +123,9 @@ typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann
                 tyWCET <- localScope $ 
                     mapM_ (insertConstParameter (getLocation ann)) constParams >>
                     typeConstExpression wcet
-                return $ TransactionalWCET classId functionId pathName constParams tyWCET (WTYPES.SemanticAnn (getLocation ann))
+                return $ TransactionalWCET classId functionId pathName constParams tyWCET (WCETTy (getLocation ann))
 
-typeWCETPlatformAssignment :: (Located a) => WCETPlatformAssignment a -> TransPathMonad ()
+typeWCETPlatformAssignment :: WCETPlatformAssignment ParserAnn -> TransPathMonad ()
 typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
     case checkPlatform plt of
         Nothing -> throwError . annotateError (getLocation ann) $ EInvalidPlatform plt
@@ -141,11 +142,11 @@ typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
             s { 
                 transWCETs = M.insertWith (M.unionWith M.union) plt newPath (transWCETs s) }
     
-runWCETTypeChecking :: (Located a) => TerminaProgArch STYPES.SemanticAnn
-    -> TTYPES.TransPathMap TTYPES.SemanticAnn
-    -> WTYPES.WCETimesMap WTYPES.SemanticAnn
-    -> [WCETPlatformAssignment a]
-    -> Either TransPathErrors (WTYPES.WCETimesMap WTYPES.SemanticAnn)
+runWCETTypeChecking :: TerminaProgArch SemanticAnn
+    -> TransPathMap TRPSemAnn
+    -> WCETimesMap WCETSemAnn
+    -> [WCETPlatformAssignment ParserAnn]
+    -> Either TransPathErrors (WCETimesMap WCETSemAnn)
 runWCETTypeChecking arch trPathMap prevMap wcetPltAssig =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch trPathMap gConsts S.empty prevMap in

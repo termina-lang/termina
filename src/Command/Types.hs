@@ -11,13 +11,11 @@ import qualified EFP.Schedulability.TransPath.AST as TPAST
 
 import qualified Parser.Types as PTYPES
 import qualified Semantic.Types as STYPES
-import qualified EFP.Schedulability.TransPath.Types as TTYPES
 
 import Modules.Modules
 import Utils.Annotations
-import qualified EFP.Schedulability.WCET.Types as WTYPES
 import qualified EFP.Schedulability.WCET.AST as WTAST
-import qualified EFP.Schedulability.RT.Types as RTTYPES
+import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
 import qualified EFP.Schedulability.RT.AST as RTPAST
 
 newtype ParsingData = ParsingData {
@@ -33,15 +31,15 @@ newtype BasicBlocksData = BasicBlockData {
 } deriving (Show)
 
 newtype TransPathData = TransPathData {
-  transPathAST :: [TPAST.TransactionalWCEPath TTYPES.ParserAnn]
+  transPathAST :: [TPAST.TransactionalWCEPath SCHEDTYPES.ParserAnn]
 } deriving (Show)
 
 newtype WCETData = WCETData {
-  wcetAST :: [WTAST.WCETPlatformAssignment WTYPES.ParserAnn]
+  wcetAST :: [WTAST.WCETPlatformAssignment SCHEDTYPES.ParserAnn]
 } deriving (Show)
 
 newtype RTData = RTData {
-  rtAST :: [RTPAST.RTElement RTTYPES.ParserAnn]
+  rtAST :: [RTPAST.RTElement SCHEDTYPES.ParserAnn]
 } deriving (Show)
 
 type ParsedModule = TerminaModuleData ParsingData

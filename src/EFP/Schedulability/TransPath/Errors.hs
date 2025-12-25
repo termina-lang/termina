@@ -18,19 +18,21 @@ import Modules.Utils
 
 data Error
   = 
-    EInvalidAccessPortAnnotation
-    | EUnknownClass Identifier
-    | EUnknownMemberFunction Identifier (Identifier, Location)
-    | EDuplicatedPathName  Identifier (Identifier, Identifier, Location)
-    | EUnknownAccessPort Identifier (Identifier, Location)
-    | EUnknownVariable Identifier
-    | EUnknownOutputPort Identifier (Identifier, Location)
-    | EConstParamsNumMismatch Identifier Identifier Integer Integer Location
-    | EConstVarAlreadyDefined (Identifier, Location)
-    | EConstParamAlreadyDefined Identifier
-    | EUnknownProcedure Identifier Identifier Identifier
-    | EInvalidAccessToAllocator Identifier Identifier
-    | EClassPathMismatch Identifier (Location, Location)
+    EInvalidAccessPortAnnotation -- ^ Invalid access port annotation (internal)
+    | EInvalidConstExpressionOperandTypes -- ^ Invalid constant expression operand types (internal)
+    | EUnknownClass Identifier -- ^ Unknown class
+    | EUnknownMemberFunction Identifier (Identifier, Location) -- ^ Unknown member function
+    | EDuplicatedPathName  Identifier (Identifier, Identifier, Location) -- ^ Duplicated path name
+    | EUnknownAccessPort Identifier (Identifier, Location) -- ^ Unknown access port
+    | EUnknownVariable Identifier -- ^ Unknown variable
+    | EUnknownOutputPort Identifier (Identifier, Location) -- ^ Unknown output port
+    | EConstParamsNumMismatch Identifier Identifier Integer Integer Location -- ^ Constant parameters number mismatch
+    | EConstVarAlreadyDefined (Identifier, Location) -- ^ Constant variable already defined
+    | EConstParamAlreadyDefined Identifier -- ^ Constant parameter already defined
+    | EUnknownProcedure Identifier Identifier Identifier -- ^ Unknown procedure
+    | EInvalidAccessToAllocator Identifier Identifier -- ^ Invalid access to allocator 
+    | EClassPathMismatch Identifier (Location, Location) -- ^ Class path mismatch
+    | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Constant expression type mismatch
     deriving Show
 
 type TransPathErrors = AnnotatedError Error Location
@@ -50,11 +52,12 @@ instance ErrorMessage TransPathErrors where
     errorIdent (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "TPE-010"
     errorIdent (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "TPE-011"
     errorIdent (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "TPE-012"
+    errorIdent (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "TPE-013"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownClass _id) _pos) = "unknown class"
     errorTitle (AnnotatedError (EUnknownMemberFunction _id (_classId, _classIdPos)) _pos) = "unknown member function"
-    errorTitle (AnnotatedError (EDuplicatedPathName _pathName (_classId, _functionId, _prevPos)) _pos) = "duplicate path name"
+    errorTitle (AnnotatedError (EDuplicatedPathName _pathName (_classId, _functionId, _prevPos)) _pos) = "duplicated path name"
     errorTitle (AnnotatedError (EUnknownAccessPort _id (_clsId, _clsIdPos)) _pos) = "unknown access port"
     errorTitle (AnnotatedError (EUnknownVariable _id) _pos) = "unknown variable"
     errorTitle (AnnotatedError (EUnknownOutputPort _id (_clsId, _clsIdPos)) _pos) = "unknown output port"
@@ -64,6 +67,7 @@ instance ErrorMessage TransPathErrors where
     errorTitle (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "unknown procedure"
     errorTitle (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "invalid access to allocator"
     errorTitle (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "class path mismatch"
+    errorTitle (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "constant expression type mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -181,6 +185,10 @@ instance ErrorMessage TransPathErrors where
                             T.pack classId <> "\x1b[0m is defined in module \x1b[31m" <> T.pack (qualifiedToModuleName clsSource) <>
                             "\x1b[0m, but the transactional path is defined in module \x1b[31m" <>
                             T.pack (qualifiedToModuleName pathSource) <> "\x1b[0m."))
+                EConstExpressionTypeMismatch t1 t2 ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Constant expression type mismatch: found \x1b[31m" <> showText t1 <> "\x1b[0m and \x1b[31m" <> showText t2 <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

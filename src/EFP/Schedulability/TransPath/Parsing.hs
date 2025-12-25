@@ -4,114 +4,13 @@ module EFP.Schedulability.TransPath.Parsing
 -- Importing parser combinators
 import Text.Parsec hiding (Error, Ok)
 
--- Importing tokenizer
-import qualified Text.Parsec.Language as Lang
-import qualified Text.Parsec.Token    as Tok
-
 import EFP.Schedulability.TransPath.AST
-import qualified Text.Parsec.Expr as Ex
-import Data.Char
-import EFP.Schedulability.TransPath.Types
 import Utils.Annotations
+import EFP.Schedulability.Core.Parsing
+import EFP.Schedulability.Core.Types
 
-type PathParser = Parsec String FilePath
 
-lexer :: Tok.TokenParser FilePath
-lexer = Tok.makeTokenParser langDef
-  where
-    reservedNames = []
-    langDef =
-      Lang.emptyDef{ Tok.commentStart = "/*"
-                   , Tok.commentEnd = "*/"
-                   , Tok.commentLine = "//"
-                   , Tok.nestedComments = False
-                   -- | Here we define that identifiers being with a letter
-                   , Tok.identStart = letter
-                   -- | Rest of identifiers accepted characters
-                   , Tok.identLetter = alphaNum <|> char '_'
-                   -- | Operators begin with
-                   , Tok.opStart = oneOf "="
-                   , Tok.reservedNames = reservedNames
-                   , Tok.reservedOpNames = [
-                      "::" -- Scoping
-                      ,"@" -- Location specifier
-                      ,"=" -- Assignment
-                      ,"(" -- Parens
-                      ,")" -- Parens
-                      ,"*" -- Multiplication
-                      ,"/" -- Division
-                      ,"+" -- Addition
-                      ,"-" -- Substraction
-                      ,"%" -- Modulo
-                      ,"<<" -- BitwiseLeftShift
-                      ,">>" -- BitwiseRightShift
-                      ,"<" -- RelationalLT
-                      ,"<=" -- RelationalLTE
-                      ,">" -- RelationalGT
-                      ,">=" -- RelationalGTE
-                      ,"==" -- RelationalEqual
-                      ,"!=" -- RelationalNotEqual
-                      ,"&" -- BitwiseAnd / reference creation
-                      ,"|" -- BitwiseOr
-                      ,"^" -- BitwiseXor
-                      ,"&&" -- LogicalAnd
-                      ,"||" -- LogicalOr
-                    ]
-                   -- | Is the language case sensitive? It should be
-                   , Tok.caseSensitive = True
-                   }
-
-reserved :: String -> PathParser ()
-reserved = Tok.reserved lexer
-
-reservedOp :: String -> PathParser ()
-reservedOp = Tok.reservedOp lexer
-
-identifierParser :: PathParser String
-identifierParser = Tok.identifier lexer
-
-brackets :: PathParser a -> PathParser a
-brackets = Tok.brackets lexer
-
-parens :: PathParser a -> PathParser a
-parens = Tok.parens lexer
-
-wspcs :: PathParser ()
-wspcs = Tok.whiteSpace lexer
-
-comma :: PathParser String
-comma = Tok.comma lexer
-
-number :: Integer -> PathParser Char -> PathParser Integer
-number base baseDigit = do
-    digits <- many1 baseDigit
-    let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
-    seq n (return n)
-
-sign :: PathParser (Integer -> Integer)
-sign = (char '-' >> return negate)
-  <|> (char '+' >> return id)
-  <|> return id
-
--- | TerminaParser for integer decimal numbers
--- This parser is used when defining regular integer literals
-decimal :: PathParser Integer
-decimal =  Tok.lexeme lexer $ do
-  f <- Tok.lexeme lexer sign
-  n <- number 10 digit
-  return (f n)
-
-hexadecimal :: PathParser Integer
-hexadecimal = Tok.lexeme lexer $
-  char '0' >> oneOf "xX" >> number 16 hexDigit
-
-integerParser :: PathParser TInteger
-integerParser = try hexParser <|> decParser
-  where
-    hexParser = flip TInteger HexRepr <$> hexadecimal
-    decParser = flip TInteger DecRepr <$> decimal
-
-blockPositionParser :: PathParser BlockPosition
+blockPositionParser :: SchedParser BlockPosition
 blockPositionParser = do
     _ <- reservedOp "@("
     startLine <- decimal
@@ -124,7 +23,7 @@ blockPositionParser = do
     _ <- reservedOp ")"
     return $ BlockPosition startLine startCol endLine endCol
 
-condIfParser :: PathParser (WCEPathBlock ParserAnn)
+condIfParser :: SchedParser (WCEPathBlock ParserAnn)
 condIfParser = do
     current <- getState
     startPos <- getPosition
@@ -133,7 +32,7 @@ condIfParser = do
     blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondIf blocks loc . Position current startPos <$> getPosition
 
-condElseIfParser :: PathParser (WCEPathBlock ParserAnn)
+condElseIfParser :: SchedParser (WCEPathBlock ParserAnn)
 condElseIfParser = do
     current <- getState
     startPos <- getPosition
@@ -142,7 +41,7 @@ condElseIfParser = do
     blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondElseIf blocks loc . Position current startPos <$> getPosition
 
-condElseParser :: PathParser (WCEPathBlock ParserAnn)
+condElseParser :: SchedParser (WCEPathBlock ParserAnn)
 condElseParser = do
     current <- getState
     startPos <- getPosition
@@ -151,60 +50,7 @@ condElseParser = do
     blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathCondElse blocks loc . Position current startPos <$> getPosition
 
-parensConstExprParser :: PathParser (ConstExpression ParserAnn)
-parensConstExprParser = parens constExpressionParser
-
-constIntParser :: PathParser (ConstExpression ParserAnn)
-constIntParser = do
-  current <- getState
-  pos <- getPosition
-  tInteger <- integerParser
-  ConstInt tInteger . Position current pos <$> getPosition
-
-constObjectParser :: PathParser (ConstExpression ParserAnn)
-constObjectParser = do
-  current <- getState
-  pos <- getPosition
-  ident <- identifierParser
-  ConstObject ident . Position current pos <$> getPosition
-
-constExpressionTermParser :: PathParser (ConstExpression ParserAnn)
-constExpressionTermParser =
-  try constIntParser
-  <|> try constObjectParser
-  <|> parensConstExprParser
-
--- Expression TerminaParser
-constExpressionParser :: PathParser (ConstExpression ParserAnn)
-constExpressionParser = Ex.buildExpressionParser  -- New parser
-    [[binaryInfix "*" Multiplication Ex.AssocLeft,
-      binaryInfix "/" Division Ex.AssocLeft,
-      binaryInfix "%" Modulo Ex.AssocLeft]
-    ,[binaryInfix "+" Addition Ex.AssocLeft,
-      binaryInfix "-" Subtraction Ex.AssocLeft]
-    ,[binaryInfix "<<" BitwiseLeftShift Ex.AssocLeft,
-      binaryInfix ">>" BitwiseRightShift Ex.AssocLeft]
-    ,[binaryInfix "&" BitwiseAnd Ex.AssocLeft]
-    ,[binaryInfix "|" BitwiseOr Ex.AssocLeft]
-    ,[binaryInfix "^" BitwiseXor Ex.AssocLeft]
-    ]
-    constExpressionTermParser
-  where
-    binaryInfix s f = Ex.Infix (do
-          current <- getState
-          _ <- reservedOp s
-          return $ \l r -> ConstBinOp f l r (Position current (getStartPosition (getAnnotation l)) (getEndPosition (getAnnotation r))))
-
-    getStartPosition :: ParserAnn -> SourcePos
-    getStartPosition (Position _ startPos _) = startPos
-    getStartPosition _ = error "Internal error: expected Position annotation (this should not happen)"
-
-    getEndPosition :: ParserAnn -> SourcePos
-    getEndPosition (Position _ _ endPos) = endPos
-    getEndPosition _ = error "Internal error: expected Position annotation (this should not happen)"
-
-
-forLoopParser :: PathParser (WCEPathBlock ParserAnn)
+forLoopParser :: SchedParser (WCEPathBlock ParserAnn)
 forLoopParser = do
     current <- getState
     startPos <- getPosition
@@ -218,7 +64,7 @@ forLoopParser = do
     blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathForLoop initExpr finalExpr blocks loc . Position current startPos <$> getPosition
 
-matchCaseParser :: PathParser (WCEPathBlock ParserAnn)
+matchCaseParser :: SchedParser (WCEPathBlock ParserAnn)
 matchCaseParser = do
     current <- getState
     startPos <- getPosition
@@ -227,7 +73,7 @@ matchCaseParser = do
     blocks <- brackets (sepBy wcepPathBlockParser comma)
     WCEPathMatchCase blocks loc . Position current startPos <$> getPosition
 
-sendMessageParser :: PathParser (WCEPathBlock ParserAnn)
+sendMessageParser :: SchedParser (WCEPathBlock ParserAnn)
 sendMessageParser = do
     current <- getState
     startPos <- getPosition
@@ -236,7 +82,7 @@ sendMessageParser = do
     loc <- blockPositionParser
     WCEPSendMessage portName loc . Position current startPos <$> getPosition
 
-memberFunctionCallParser :: PathParser (WCEPathBlock ParserAnn)
+memberFunctionCallParser :: SchedParser (WCEPathBlock ParserAnn)
 memberFunctionCallParser = do
     current <- getState
     startPos <- getPosition
@@ -246,7 +92,7 @@ memberFunctionCallParser = do
     loc <- blockPositionParser
     WCEPathMemberFunctionCall funcName argExprs loc . Position current startPos <$> getPosition
 
-procedureInvokeParser :: PathParser (WCEPathBlock ParserAnn)
+procedureInvokeParser :: SchedParser (WCEPathBlock ParserAnn)
 procedureInvokeParser = do
     current <- getState
     startPos <- getPosition
@@ -260,7 +106,7 @@ procedureInvokeParser = do
     loc <- blockPositionParser
     WCEPProcedureInvoke portName procName argExprs loc . Position current startPos <$> getPosition
 
-allocBoxParser :: PathParser (WCEPathBlock ParserAnn)
+allocBoxParser :: SchedParser (WCEPathBlock ParserAnn)
 allocBoxParser = do
     current <- getState
     startPos <- getPosition
@@ -269,7 +115,7 @@ allocBoxParser = do
     loc <- blockPositionParser
     WCEPAllocBox portName loc . Position current startPos <$> getPosition
 
-freeBoxParser :: PathParser (WCEPathBlock ParserAnn)
+freeBoxParser :: SchedParser (WCEPathBlock ParserAnn)
 freeBoxParser = do
     current <- getState
     startPos <- getPosition
@@ -278,7 +124,7 @@ freeBoxParser = do
     loc <- blockPositionParser
     WCEPFreeBox portName loc . Position current startPos <$> getPosition
 
-regularBlockParser :: PathParser (WCEPathBlock ParserAnn)
+regularBlockParser :: SchedParser (WCEPathBlock ParserAnn)
 regularBlockParser = do
     current <- getState
     startPos <- getPosition
@@ -286,7 +132,7 @@ regularBlockParser = do
     loc <- blockPositionParser
     WCEPRegularBlock loc . Position current startPos <$> getPosition
 
-returnParser :: PathParser (WCEPathBlock ParserAnn)
+returnParser :: SchedParser (WCEPathBlock ParserAnn)
 returnParser = do
     current <- getState
     startPos <- getPosition
@@ -294,7 +140,7 @@ returnParser = do
     loc <- blockPositionParser
     WCEPReturn loc . Position current startPos <$> getPosition
 
-continueParser :: PathParser (WCEPathBlock ParserAnn)
+continueParser :: SchedParser (WCEPathBlock ParserAnn)
 continueParser = do
     current <- getState
     startPos <- getPosition
@@ -303,7 +149,7 @@ continueParser = do
     loc <- blockPositionParser
     WCEPContinue actionName loc . Position current startPos <$> getPosition
 
-rebootParser :: PathParser (WCEPathBlock ParserAnn)
+rebootParser :: SchedParser (WCEPathBlock ParserAnn)
 rebootParser = do
     current <- getState
     startPos <- getPosition
@@ -311,7 +157,7 @@ rebootParser = do
     loc <- blockPositionParser
     WCEPReboot loc . Position current startPos <$> getPosition
 
-systemCallParser :: PathParser (WCEPathBlock ParserAnn)
+systemCallParser :: SchedParser (WCEPathBlock ParserAnn)
 systemCallParser = do
     current <- getState
     startPos <- getPosition
@@ -321,7 +167,7 @@ systemCallParser = do
     loc <- blockPositionParser
     WCEPSystemCall sysCallName argExprs loc . Position current startPos <$> getPosition
 
-wcepPathBlockParser :: PathParser (WCEPathBlock ParserAnn)
+wcepPathBlockParser :: SchedParser (WCEPathBlock ParserAnn)
 wcepPathBlockParser =
     try regularBlockParser
     <|> try returnParser
@@ -339,7 +185,7 @@ wcepPathBlockParser =
     <|> try allocBoxParser
     <|> freeBoxParser
 
-transactionalWCEPParser :: PathParser (TransactionalWCEPath ParserAnn)
+transactionalWCEPParser :: SchedParser (TransactionalWCEPath ParserAnn)
 transactionalWCEPParser = do
     current <- getState
     startPos <- getPosition
@@ -355,12 +201,9 @@ transactionalWCEPParser = do
     TransactionalWCEPath clsName elementName memberFunction constParams blocks . Position current startPos <$> getPosition
 
 -- | Top Level parser
-topLevel :: PathParser [TransactionalWCEPath ParserAnn]
+topLevel :: SchedParser [TransactionalWCEPath ParserAnn]
 topLevel = many $
   try transactionalWCEPParser
 
-contents :: PathParser a -> PathParser a
-contents p = wspcs *> p <* eof
-
-terminaTransPathsParser :: PathParser [TransactionalWCEPath ParserAnn]
+terminaTransPathsParser :: SchedParser [TransactionalWCEPath ParserAnn]
 terminaTransPathsParser = contents topLevel

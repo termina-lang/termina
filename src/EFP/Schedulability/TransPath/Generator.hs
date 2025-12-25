@@ -5,7 +5,7 @@ import qualified Semantic.Types as STYPES
 import EFP.Schedulability.TransPath.AST
 import Utils.Annotations
 import Text.Parsec.Pos
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.Core.Types
 
 
 mergeLocations :: BlockPosition -> BlockPosition -> BlockPosition

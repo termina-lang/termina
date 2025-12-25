@@ -5,17 +5,19 @@ import Utils.Annotations
 import qualified Data.Map as M
 import EFP.Schedulability.TransPath.AST
 
--- | Type of the annotations used when parsing WCE path files.
-type ParserAnn = Location
-
--- | Type of the annotations used when generating WCE path files.
-data GeneratorAnn = Generated
-
-newtype SemanticAnn = SemanticAnn Location
+data TRPSemAnn = 
+    TRExprTy ConstExprType Location
+    | TRBlock Location
+    | TRWCEPTy Location
     deriving Show
 
-instance Located SemanticAnn where
-    getLocation (SemanticAnn loc)= loc
-    updateLocation _ = SemanticAnn
+instance Located TRPSemAnn where
+    getLocation (TRExprTy _ loc)= loc
+    getLocation (TRBlock loc) = loc
+    getLocation (TRWCEPTy loc) = loc
+
+    updateLocation (TRExprTy t _) loc = TRExprTy t loc
+    updateLocation (TRBlock _) loc = TRBlock loc
+    updateLocation (TRWCEPTy _) loc = TRWCEPTy loc
 
 type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (TransactionalWCEPath a))

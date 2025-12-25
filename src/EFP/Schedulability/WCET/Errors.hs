@@ -18,7 +18,8 @@ import Modules.Utils
 
 data Error
   = 
-    EUnknownClass Identifier
+    EInvalidConstExpressionOperandTypes -- ^ Invalid constant expression operand types (internal)
+    | EUnknownClass Identifier
     | EUnknownMemberFunction Identifier (Identifier, Location)
     | EDuplicatedWCETAssignment  Identifier Identifier (Identifier, Identifier, Location)
     | EUnknownVariable Identifier
@@ -28,6 +29,7 @@ data Error
     | EClassPathMismatch Identifier (Location, Location)
     | EInvalidPlatform Identifier
     | EUnknownTransactionalPath Identifier Identifier Identifier
+    | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Constant expression type mismatch
     deriving Show
 
 type TransPathErrors = AnnotatedError Error Location
@@ -45,6 +47,9 @@ instance ErrorMessage TransPathErrors where
     errorIdent (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "TPE-008"
     errorIdent (AnnotatedError (EInvalidPlatform _plt) _pos) = "PE-009"
     errorIdent (AnnotatedError (EUnknownTransactionalPath _functionId _classId _pathName) _pos) = "PE-010"
+    errorIdent (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "PE-011"
+    errorIdent _ = "Internal"
+
 
     errorTitle (AnnotatedError (EUnknownClass _id) _pos) = "unknown class"
     errorTitle (AnnotatedError (EUnknownMemberFunction _id (_classId, _classIdPos)) _pos) = "unknown member function"
@@ -56,6 +61,8 @@ instance ErrorMessage TransPathErrors where
     errorTitle (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "class path mismatch"
     errorTitle (AnnotatedError (EInvalidPlatform _plt) _pos) = "invalid platform"
     errorTitle (AnnotatedError (EUnknownTransactionalPath _functionId _classId _pathName) _pos) = "unknown transactional path"
+    errorTitle (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "constant expression type mismatch"
+    errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
@@ -146,6 +153,10 @@ instance ErrorMessage TransPathErrors where
                         (Just ("Unknown transactional path \x1b[31m" <> T.pack pathName <>
                             "\x1b[0m for member function \x1b[31m" <> T.pack functionId <>
                             "\x1b[0m of class \x1b[31m" <> T.pack classId <> "\x1b[0m."))
+                EConstExpressionTypeMismatch t1 t2 ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Constant expression type mismatch: found \x1b[31m" <> showText t1 <> "\x1b[0m and \x1b[31m" <> showText t2 <> "\x1b[0m."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

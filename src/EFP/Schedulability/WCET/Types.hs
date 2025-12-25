@@ -5,14 +5,19 @@ import Utils.Annotations
 import qualified Data.Map as M
 import EFP.Schedulability.WCET.AST
 
--- | Type of the annotations used when parsing WCE path files.
-type ParserAnn = Location
-
-newtype SemanticAnn = SemanticAnn Location
+data WCETSemAnn = 
+    WCETExprTy ConstExprType Location
+    | WCETTy Location
+    | WCETPltAssignmentTy Location
     deriving Show
 
-instance Located SemanticAnn where
-    getLocation (SemanticAnn loc)= loc
-    updateLocation _ = SemanticAnn
+instance Located WCETSemAnn where
+    getLocation (WCETExprTy _ loc)= loc
+    getLocation (WCETTy loc) = loc
+    getLocation (WCETPltAssignmentTy loc) = loc
+
+    updateLocation (WCETExprTy t _) loc = WCETExprTy t loc
+    updateLocation (WCETTy _) loc = WCETTy loc
+    updateLocation (WCETPltAssignmentTy _) loc = WCETPltAssignmentTy loc
 
 type WCETimesMap a = M.Map Identifier (M.Map (Identifier, Identifier) (M.Map Identifier (TransactionalWCET a)))

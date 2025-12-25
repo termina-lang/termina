@@ -5,6 +5,25 @@ module EFP.Schedulability.RT.AST
 import EFP.Schedulability.Core.AST
 import Utils.Annotations
 
+data ConstFieldValue a =
+    ConstStructFieldValue (ConstStructInitializer a)
+    | ConstStructSimpleValue (ConstExpression a)
+    deriving Show
+
+data ConstFieldAssignment a = 
+    ConstFieldAssignment {
+        cfaFieldName :: Identifier -- ^ Field name
+        , cfaValue :: ConstFieldValue a -- ^ Value
+        , cfaAnnotation :: a -- ^ Annotation
+    }
+    deriving Show
+
+data ConstStructInitializer a = 
+    ConstStructInitializer
+        [ConstFieldAssignment a] -- ^ Initial value of each field identifier
+        a
+    deriving Show
+
 data RTTransStep a = 
     RTTransStepAction
         Identifier -- ^ Step name
@@ -38,7 +57,7 @@ data RTElement a =
         a -- ^ Annotation
     | RTSituation 
         Identifier
-        (ConstExpression a) -- ^ Initializer expression
+        (ConstStructInitializer a) -- ^ Initializer expression
         a -- ^ Annotation
     deriving Show
 

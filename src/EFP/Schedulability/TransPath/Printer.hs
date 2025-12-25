@@ -28,13 +28,11 @@ instance WCEPathPrinter TInteger where
     pprint (TInteger i HexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
     pprint (TInteger i OctalRepr) = pretty "0" <> pretty (showOct i "")
 
-instance WCEPathPrinter (ConstFieldAssignment a) where
-    pprint (ConstFieldAssignment field expr) =
-        pretty field <+> pretty "=" <+> pprint expr
-
 instance WCEPathPrinter (ConstExpression a) where
     pprint (ConstInt intVal _) =
         pprint intVal
+    pprint (ConstDouble d _) =
+        pretty (show d)
     pprint (ConstObject ident _) =
         pretty ident
     pprint (ConstBinOp op left right _) =
@@ -43,10 +41,6 @@ instance WCEPathPrinter (ConstExpression a) where
             ppOp = pretty (show op)
         in
             parens (ppLeft <+> ppOp <+> ppRight)
-    pprint (ConstStructInitializer fieldAssignments _) =
-        let ppFieldAssignments = fmap pprint fieldAssignments
-        in
-            braces (hsep (punctuate comma ppFieldAssignments))
 
 instance WCEPathPrinter BlockPosition where
     pprint (BlockPosition startLine startColumn endLine endColumn) =

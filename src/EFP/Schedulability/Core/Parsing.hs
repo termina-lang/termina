@@ -1,6 +1,5 @@
-module EFP.Schedulability.WCET.Parsing 
-  (terminaWCETParser) where
-
+module EFP.Schedulability.Core.Parsing where
+ 
 -- Importing parser combinators
 import Text.Parsec hiding (Error, Ok)
 
@@ -8,13 +7,13 @@ import Text.Parsec hiding (Error, Ok)
 import qualified Text.Parsec.Language as Lang
 import qualified Text.Parsec.Token    as Tok
 
-import EFP.Schedulability.WCET.AST
 import qualified Text.Parsec.Expr as Ex
 import Data.Char
 import Utils.Annotations
+import EFP.Schedulability.Core.AST
 import EFP.Schedulability.Core.Types
 
-type WCETParser = Parsec String FilePath
+type SchedParser = Parsec String FilePath
 
 lexer :: Tok.TokenParser FilePath
 lexer = Tok.makeTokenParser langDef
@@ -28,15 +27,17 @@ lexer = Tok.makeTokenParser langDef
                    -- | Here we define that identifiers being with a letter
                    , Tok.identStart = letter
                    -- | Rest of identifiers accepted characters
-                   , Tok.identLetter = alphaNum <|> char '_' <|> char '-'
+                   , Tok.identLetter = alphaNum <|> char '_'
                    -- | Operators begin with
                    , Tok.opStart = oneOf "="
                    , Tok.reservedNames = reservedNames
                    , Tok.reservedOpNames = [
                       "::" -- Scoping
+                      ,"#" -- Label specifier
                       ,"=" -- Assignment
                       ,"(" -- Parens
                       ,")" -- Parens
+                      ,"->" -- Step continuation
                       ,"*" -- Multiplication
                       ,"/" -- Division
                       ,"+" -- Addition
@@ -55,59 +56,102 @@ lexer = Tok.makeTokenParser langDef
                       ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
+                      ,"{|" -- multicast start"
+                      ,"|}" -- multicast end
                     ]
                    -- | Is the language case sensitive? It should be
                    , Tok.caseSensitive = True
                    }
 
-reserved :: String -> WCETParser ()
+reserved :: String -> SchedParser ()
 reserved = Tok.reserved lexer
 
-reservedOp :: String -> WCETParser ()
+reservedOp :: String -> SchedParser ()
 reservedOp = Tok.reservedOp lexer
 
-identifierParser :: WCETParser String
+identifierParser :: SchedParser String
 identifierParser = Tok.identifier lexer
 
-parens :: WCETParser a -> WCETParser a
-parens = Tok.parens lexer
+angles :: SchedParser a -> SchedParser a
+angles = Tok.angles lexer
 
-wspcs :: WCETParser ()
-wspcs = Tok.whiteSpace lexer
-
-comma :: WCETParser String
-comma = Tok.comma lexer
-
-braces :: WCETParser a -> WCETParser a
+braces :: SchedParser a -> SchedParser a
 braces = Tok.braces lexer
 
-number :: Integer -> WCETParser Char -> WCETParser Integer
+brackets :: SchedParser a -> SchedParser a
+brackets = Tok.brackets lexer
+
+parens :: SchedParser a -> SchedParser a
+parens = Tok.parens lexer
+
+wspcs :: SchedParser ()
+wspcs = Tok.whiteSpace lexer
+
+comma :: SchedParser String
+comma = Tok.comma lexer
+
+semi :: SchedParser String
+semi = Tok.semi lexer
+
+number :: Integer -> SchedParser Char -> SchedParser Integer
 number base baseDigit = do
     digits <- many1 baseDigit
     let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
     seq n (return n)
 
-sign :: WCETParser (Integer -> Integer)
+sign :: SchedParser (Integer -> Integer)
 sign = (char '-' >> return negate)
   <|> (char '+' >> return id)
   <|> return id
 
-hexadecimal :: WCETParser Integer
+hexadecimal :: SchedParser Integer
 hexadecimal = Tok.lexeme lexer $
   char '0' >> oneOf "xX" >> number 16 hexDigit
 
-parensConstExprParser :: WCETParser (ConstExpression ParserAnn)
+decimal :: SchedParser Integer
+decimal = Tok.natural lexer
+
+parensConstExprParser :: SchedParser (ConstExpression ParserAnn)
 parensConstExprParser = parens constExpressionParser
 
-constNumberParser :: WCETParser (ConstExpression ParserAnn)
-constNumberParser = Tok.lexeme lexer $ do
+decIntOrFloat :: SchedParser (Either Integer Double)
+decIntOrFloat = try float <|> (Left <$> decimal)
+  where
+    digits1 = many1 digit
+
+    exponentPart = do
+      e <- oneOf "eE"
+      s <- option "" (fmap (:[]) (oneOf "+-"))
+      ds <- digits1
+      return $ e : s ++ ds
+
+    float = do
+      intp <- decimal  -- parses the integer part
+      try (do _ <- char '.'
+              notFollowedBy (char '.')     -- prevents consuming '..'
+              frac <- option "" digits1
+              expn <- option "" exponentPart
+              let s = show intp ++ "." ++ frac ++ expn
+              case reads s of
+                [(d,"")] -> return $ Right d
+                _        -> fail "invalid float")
+        <|>
+      -- Case: int exponent (e.g., 1e3)
+        (do expn <- exponentPart
+            let s = show intp ++ expn
+            case reads s of
+              [(d,"")] -> pure (Right d)
+              _        -> fail "invalid float")
+
+constNumberParser :: SchedParser (ConstExpression ParserAnn)
+constNumberParser = do
   current <- getState
   pos <- getPosition
   try (do i <- hexadecimal
           ConstInt (TInteger i HexRepr) . Position current pos <$> getPosition)
     <|> do
           f <- sign
-          x <- Tok.naturalOrFloat lexer
+          x <- decIntOrFloat
           case x of
             Left  i -> ConstInt (TInteger (f i) DecRepr) . Position current pos <$> getPosition
             Right d -> ConstDouble (applySign f d) . Position current pos <$> getPosition
@@ -116,22 +160,22 @@ constNumberParser = Tok.lexeme lexer $ do
       -- g is either id or negate; apply to Double without pattern matching
       if g 1 == (-1) then negate d else d
 
-constObjectParser :: WCETParser (ConstExpression ParserAnn)
+constObjectParser :: SchedParser (ConstExpression ParserAnn)
 constObjectParser = do
   current <- getState
   pos <- getPosition
   ident <- identifierParser
   ConstObject ident . Position current pos <$> getPosition
 
-constExpressionTermParser :: WCETParser (ConstExpression ParserAnn)
+constExpressionTermParser :: SchedParser (ConstExpression ParserAnn)
 constExpressionTermParser =
   try constNumberParser
   <|> try constObjectParser
   <|> parensConstExprParser
 
 -- Expression TerminaParser
-constExpressionParser :: WCETParser (ConstExpression ParserAnn)
-constExpressionParser = Ex.buildExpressionParser  -- New parser
+constExpressionParser' :: SchedParser (ConstExpression ParserAnn)
+constExpressionParser' = Ex.buildExpressionParser  -- New parser
     [[binaryInfix "*" Multiplication Ex.AssocLeft,
       binaryInfix "/" Division Ex.AssocLeft,
       binaryInfix "%" Modulo Ex.AssocLeft]
@@ -158,37 +202,8 @@ constExpressionParser = Ex.buildExpressionParser  -- New parser
     getEndPosition (Position _ _ endPos) = endPos
     getEndPosition _ = error "Internal error: expected Position annotation (this should not happen)"
 
-transactionalWCETParser :: WCETParser (TransactionalWCET ParserAnn)
-transactionalWCETParser = do
-    current <- getState
-    startPos <- getPosition
-    clsName <- identifierParser
-    _ <- reservedOp "::"
-    elementName <- identifierParser
-    _ <- reservedOp "::"
-    memberFunction <- identifierParser
-    constParams <- parens (sepBy identifierParser comma)
-    _ <- reservedOp "="
-    wcet <- constExpressionParser
-    TransactionalWCET clsName elementName memberFunction constParams wcet . Position current startPos <$> getPosition
+constExpressionParser :: SchedParser (ConstExpression ParserAnn)
+constExpressionParser = constExpressionParser'
 
-platformAssignmentParser :: WCETParser (WCETPlatformAssignment ParserAnn)
-platformAssignmentParser = do
-    current <- getState
-    startPos <- getPosition
-    _ <- reserved "wcet"
-    platformName <- identifierParser
-    _ <- reservedOp "="
-    wcets <- braces (sepBy transactionalWCETParser comma)
-    WCETPlatformAssignment platformName wcets . Position current startPos <$> getPosition
-
--- | Top Level parser
-topLevel :: WCETParser [WCETPlatformAssignment ParserAnn]
-topLevel = many $
-  try platformAssignmentParser
-
-contents :: WCETParser a -> WCETParser a
+contents :: SchedParser a -> SchedParser a
 contents p = wspcs *> p <* eof
-
-terminaWCETParser :: WCETParser [WCETPlatformAssignment ParserAnn]
-terminaWCETParser = contents topLevel

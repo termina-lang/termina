@@ -31,16 +31,16 @@ import qualified Data.Text.Encoding as TE
 import Command.Common
 import EFP.Schedulability.TransPath.Parsing
 import EFP.Schedulability.TransPath.TypeChecking
-import qualified Semantic.Types as STYPES
-import qualified EFP.Schedulability.TransPath.Types as TTYPES
+import Semantic.Types
+import EFP.Schedulability.TransPath.Types
 import ControlFlow.Architecture.Types
 import EFP.Schedulability.WCET.Parsing (terminaWCETParser)
 import EFP.Schedulability.WCET.TypeChecking
-import qualified EFP.Schedulability.WCET.Types as WTYPES
+import EFP.Schedulability.WCET.Types
 import Options.Applicative
 import EFP.Schedulability.RT.Parsing (terminaRTParser)
 import EFP.Schedulability.RT.TypeChecking
-import qualified EFP.Schedulability.RT.Types as RTTypes
+import EFP.Schedulability.RT.Types
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -78,11 +78,11 @@ loadRTModule rtModelFile = do
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
     Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (RTData term)
 
-typeRTModule :: TerminaProgArch STYPES.SemanticAnn 
-  -> TTYPES.TransPathMap TTYPES.SemanticAnn
+typeRTModule :: TerminaProgArch SemanticAnn 
+  -> TransPathMap TRPSemAnn
   -> BasicBlocksProject
   -> TransPathProject
-  -> RTModule -> IO (RTTypes.RTTransactionMap RTTypes.SemanticAnn, RTTypes.RTSituationMap RTTypes.SemanticAnn)
+  -> RTModule -> IO (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
 typeRTModule arch trPathMap bbProject transPathProject rtModule = do
   let result = runRTTypeChecking arch trPathMap (rtAST . metadata $ rtModule)
   case result of
@@ -145,17 +145,17 @@ loadWCETModules bbProject efpPath = do
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
-typeWCETModules :: TerminaProgArch STYPES.SemanticAnn 
-  -> TTYPES.TransPathMap TTYPES.SemanticAnn
+typeWCETModules :: TerminaProgArch SemanticAnn 
+  -> TransPathMap TRPSemAnn
   -> BasicBlocksProject
   -> WCETProject 
-  -> IO (WTYPES.WCETimesMap WTYPES.SemanticAnn)
+  -> IO (WCETimesMap WCETSemAnn)
 typeWCETModules arch trPathMap bbProject wcetProject =
   foldM typeWCETModules' M.empty (M.elems wcetProject)
 
   where
 
-    typeWCETModules' :: WTYPES.WCETimesMap WTYPES.SemanticAnn -> WCETModule -> IO (WTYPES.WCETimesMap WTYPES.SemanticAnn)
+    typeWCETModules' :: WCETimesMap WCETSemAnn -> WCETModule -> IO (WCETimesMap WCETSemAnn)
     typeWCETModules' wcetTimesMap wcetModule = do
       let result = runWCETTypeChecking arch trPathMap wcetTimesMap (wcetAST . metadata $ wcetModule)
       case result of
@@ -217,16 +217,16 @@ loadPathModules bbProject efpPath = do
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (TransPathData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
-typePathModules :: TerminaProgArch STYPES.SemanticAnn 
+typePathModules :: TerminaProgArch SemanticAnn 
   -> BasicBlocksProject
   -> TransPathProject 
-  -> IO (TTYPES.TransPathMap TTYPES.SemanticAnn)
+  -> IO (TransPathMap TRPSemAnn)
 typePathModules arch bbProject pathProject =
   foldM typePathModules' M.empty (M.elems pathProject)
 
   where
 
-    typePathModules' :: TTYPES.TransPathMap TTYPES.SemanticAnn -> TransPathModule -> IO (TTYPES.TransPathMap TTYPES.SemanticAnn)
+    typePathModules' :: TransPathMap TRPSemAnn -> TransPathModule -> IO (TransPathMap TRPSemAnn)
     typePathModules' trPathMap transPathModule = do
       let result = runTransPathTypeChecking arch trPathMap (transPathAST . metadata $ transPathModule)
       case result of

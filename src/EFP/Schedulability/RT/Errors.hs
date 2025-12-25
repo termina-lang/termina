@@ -21,9 +21,14 @@ data Error
     | EChannelNotConnected Identifier -- ^ Channel not connected (internal)
     | EInvalidTransactionMap -- ^ Invalid transaction map (internal)
     | EInvalidRTElementDefinition -- ^ Invalid RT element definition (internal)
+    | EInvalidTransaction -- ^ Invalid transaction (internal)
     | EInvalidTask Identifier -- ^ Invalid task (internal)
     | EInvalidTaskClass Identifier -- ^ Invalid task class (internal)
-    | EInvalidTargetPort Identifier -- ^ Invalid target port (internal)
+    | EInvalidHandlerClass Identifier -- ^ Invalid handler class (internal)
+    | EInvalidTargetPort Identifier -- ^ Invalid target port (internal)
+    | EInvalidConstExpressionOperandTypes -- ^ Invalid constant expression operand types (internal)
+    | EInvalidEventEmitter Identifier -- ^ Invalid event emitter (internal)
+    | EInvalidSinkPort Identifier -- ^ Invalid sink port (internal)
     | EUnknownComponent Identifier -- ^ Unknown component
     | EDuplicatedStepName Identifier Location -- ^ Duplicated step name
     | EUnknownAction Identifier (Identifier, Location) -- ^ Unknown action in a component class
@@ -43,6 +48,22 @@ data Error
     | EExpectedMulticastContinuation [Continuation] -- ^ Expected multicast continuation
     | EPreviousTransactionWithSameName Identifier Location -- ^ Previous transaction with same name
     | EPreviousSituationWithSameName Identifier Location -- ^ Previous situation with same name
+    | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Constant expression type mismatch
+    | EConditionalStepsMustHaveMultipleBranches -- ^ Conditional steps must have multiple branches
+    | EMissingEventField Identifier -- ^ Missing event field
+    | EInvalidEventFieldType Identifier -- ^ Invalid event field type
+    | EUnknownTransaction Identifier -- ^ Unknown transaction
+    | EUnknownTransactionStep Identifier (Identifier, Location) -- ^ Unknown transaction step
+    | EDuplicateEventField Identifier Location -- ^ Duplicate event field
+    | EDuplicateEventDefinition Identifier Location -- ^ Duplicate event definition
+    | EEmitterTargetMismatch Identifier Identifier Identifier -- ^ Emitter target mismatch
+    | EUnknownEventEmitter Identifier -- ^ Unknown event emitter
+    | EInvalidEventDefinitionType -- ^ Invalid event definition type
+    | EInvalidTransactionFieldType -- ^ Invalid transaction field type
+    | EUnsupportedEmitterType -- ^ Unsupported emitter type
+    | EInvalidDeadlineFieldType -- ^ Invalid deadline field type
+    | EInvalidEventField Identifier [Identifier] -- ^ Invalid event field name
+    | EEmitterActionMismatch Identifier Identifier Identifier (Identifier, Identifier, Location) -- ^ Emitter action mismatch
     deriving Show
 
 type RTErrors = AnnotatedError Error Location
@@ -69,6 +90,22 @@ instance ErrorMessage RTErrors where
     errorIdent (AnnotatedError (EExpectedMulticastContinuation {}) _pos) = "RTE-017"
     errorIdent (AnnotatedError (EPreviousTransactionWithSameName {}) _pos) = "RTE-018"
     errorIdent (AnnotatedError (EPreviousSituationWithSameName {}) _pos) = "RTE-019"
+    errorIdent (AnnotatedError (EConstExpressionTypeMismatch {}) _pos) = "RTE-020"
+    errorIdent (AnnotatedError (EConditionalStepsMustHaveMultipleBranches {}) _pos) = "RTE-021"
+    errorIdent (AnnotatedError (EMissingEventField {}) _pos) = "RTE-022"
+    errorIdent (AnnotatedError (EInvalidEventFieldType {}) _pos) = "RTE-023"
+    errorIdent (AnnotatedError (EUnknownTransaction {}) _pos) = "RTE-024"
+    errorIdent (AnnotatedError (EUnknownTransactionStep {}) _pos) = "RTE-025"
+    errorIdent (AnnotatedError (EDuplicateEventField {}) _pos) = "RTE-026"
+    errorIdent (AnnotatedError (EDuplicateEventDefinition {}) _pos) = "RTE-027"
+    errorIdent (AnnotatedError (EEmitterTargetMismatch {}) _pos) = "RTE-028"
+    errorIdent (AnnotatedError (EUnknownEventEmitter {}) _pos) = "RTE-029"
+    errorIdent (AnnotatedError (EInvalidEventDefinitionType {}) _pos) = "RTE-030"
+    errorIdent (AnnotatedError (EInvalidTransactionFieldType {}) _pos) = "RTE-031"
+    errorIdent (AnnotatedError (EUnsupportedEmitterType {}) _pos) = "RTE-032"
+    errorIdent (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "RTE-033"
+    errorIdent (AnnotatedError (EInvalidEventField {}) _pos) = "RTE-034"
+    errorIdent (AnnotatedError (EEmitterActionMismatch {}) _pos) = "RTE-035"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownComponent {}) _pos) = "unknown component"
@@ -90,6 +127,22 @@ instance ErrorMessage RTErrors where
     errorTitle (AnnotatedError (EExpectedMulticastContinuation {}) _pos) = "expected multicast continuation"
     errorTitle (AnnotatedError (EPreviousTransactionWithSameName {}) _pos) = "previous transaction with same name"
     errorTitle (AnnotatedError (EPreviousSituationWithSameName {}) _pos) = "previous situation with same name"
+    errorTitle (AnnotatedError (EConstExpressionTypeMismatch {}) _pos) = "constant expression type mismatch"
+    errorTitle (AnnotatedError (EConditionalStepsMustHaveMultipleBranches {}) _pos) = "conditional steps must have multiple branches"
+    errorTitle (AnnotatedError (EMissingEventField {}) _pos) = "missing event field"
+    errorTitle (AnnotatedError (EInvalidEventFieldType {}) _pos) = "invalid event field type"
+    errorTitle (AnnotatedError (EUnknownTransaction {}) _pos) = "unknown transaction"
+    errorTitle (AnnotatedError (EUnknownTransactionStep {}) _pos) = "unknown transaction step"
+    errorTitle (AnnotatedError (EDuplicateEventField {}) _pos) = "duplicate event field"
+    errorTitle (AnnotatedError (EDuplicateEventDefinition {}) _pos) = "duplicate event definition"
+    errorTitle (AnnotatedError (EEmitterTargetMismatch {}) _pos) = "emitter target mismatch"
+    errorTitle (AnnotatedError (EUnknownEventEmitter {}) _pos) = "unknown event emitter"
+    errorTitle (AnnotatedError (EInvalidEventDefinitionType {}) _pos) = "invalid event definition type"
+    errorTitle (AnnotatedError (EInvalidTransactionFieldType {}) _pos) = "invalid transaction field type"
+    errorTitle (AnnotatedError (EUnsupportedEmitterType {}) _pos) = "unsupported emitter type"
+    errorTitle (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "invalid deadline field type"
+    errorTitle (AnnotatedError (EInvalidEventField {}) _pos) = "invalid event field"
+    errorTitle (AnnotatedError (EEmitterActionMismatch {}) _pos) = "emitter action mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -227,6 +280,89 @@ instance ErrorMessage RTErrors where
                         pprintSimpleError
                             prevSourceLines "The previous situation is defined here:" prevFileName
                             prevLoc Nothing
+                EConstExpressionTypeMismatch t1 t2 ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Constant expression type mismatch: found \x1b[31m" <> showText t1 <> "\x1b[0m and \x1b[31m" <> showText t2 <> "\x1b[0m."))
+                EConditionalStepsMustHaveMultipleBranches ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Conditional steps must have multiple branches.")
+                EMissingEventField fieldName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Missing event field \x1b[31m" <> T.pack fieldName <> "\x1b[0m."))
+                EInvalidEventFieldType fieldName ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid type for field \x1b[31m" <> T.pack fieldName <> "\x1b[0m."))
+                EUnknownTransaction ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Unknown transaction \x1b[31m" <> T.pack ident <> "\x1b[0m."))
+                EUnknownTransactionStep stepId (transId, transLoc@(Position _ transStart _transEnd)) ->
+                    let transFileName = sourceName transStart
+                        transSourceLines = files M.! transFileName
+                    in
+                        pprintSimpleError
+                            sourceLines title fileName pos
+                            (Just ("Unknown step \x1b[31m" <> T.pack stepId <> "\x1b[0m in transaction \x1b[34m" <> T.pack transId <> "\x1b[0m.\n")) <>
+                        pprintSimpleError
+                            transSourceLines "The transaction is defined here:" transFileName
+                            transLoc Nothing
+                EDuplicateEventField fieldName fieldLoc@(Position _ fieldStart _fieldEnd) ->
+                    let fieldFileName = sourceName fieldStart
+                        fieldSourceLines = files M.! fieldFileName
+                    in
+                        pprintSimpleError
+                            sourceLines title fileName pos
+                            (Just ("The event field \x1b[34m" <> T.pack fieldName <> "\x1b[0m is duplicated in the current event definition.\n")) <> 
+                        pprintSimpleError
+                            fieldSourceLines "The field was previously defined here:" fieldFileName
+                            fieldLoc Nothing
+                EEmitterTargetMismatch emitterId targetCmp actualCmp ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to component \x1b[31m" <> T.pack actualCmp <>
+                            "\x1b[0m, but the target component is \x1b[31m" <> T.pack targetCmp <> "\x1b[0m."))
+                EUnknownEventEmitter emitterId ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Unknown event emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m."))
+                EInvalidEventDefinitionType ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Invalid event definition type. Expected a multiple field assignment.")
+                EInvalidTransactionFieldType ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Invalid transaction field type. Expected a transaction identifier.")
+                EUnsupportedEmitterType ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Unsupported emitter type. Only interrupt and periodic timer emitters are supported.")
+                EInvalidDeadlineFieldType ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Invalid deadline field type. Expected a multiple field assignment.")
+                EInvalidEventField fieldName validNames ->
+                    let validNamesText = T.intercalate ", " [ "\x1b[34m" <> T.pack name <> "\x1b[0m" | name <- validNames ]
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid event field name \x1b[31m" <> T.pack fieldName <> "\x1b[0m. Valid field names are: " <> validNamesText <> "."))
+                EEmitterActionMismatch emitterId targetCmp targetAction (port, act, clsLoc@(Position _ clsStart _clsEnd)) ->
+                    let clsFileName = sourceName clsStart
+                        clsSourceLines = files M.! clsFileName
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Emitter \x1b[31m" <> T.pack emitterId <> "\x1b[0m is connected to port \x1b[31m" <> T.pack port <>
+                            "\x1b[0m that triggers action \x1b[31m" <> T.pack act <> "\x1b[0m in component \x1b[31m" <> T.pack targetCmp <>
+                            "\x1b[0m, but the starting action of the transaction is \x1b[31m" <> T.pack targetAction <> "\x1b[0m.\n")) <>
+                    pprintSimpleError
+                        clsSourceLines "The component class is defined here:" clsFileName
+                        clsLoc Nothing
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 
