@@ -41,6 +41,8 @@ import Options.Applicative
 import EFP.Schedulability.RT.Parsing (terminaRTParser)
 import EFP.Schedulability.RT.TypeChecking
 import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Flatten
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -78,7 +80,7 @@ loadRTModule rtModelFile = do
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
     Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (RTData term)
 
-typeRTModule :: TerminaProgArch SemanticAnn 
+typeRTModule :: TerminaProgArch SemanticAnn
   -> TransPathMap TRPSemAnn
   -> BasicBlocksProject
   -> TransPathProject
@@ -99,6 +101,19 @@ typeRTModule arch trPathMap bbProject transPathProject rtModule = do
                 sourceFilesMap transPathProject in
       TIO.putStrLn (toText err pathFilesMap) >> exitFailure
     (Right (trMap, stMap)) -> return (trMap, stMap)
+
+flattenTransaction :: RTModule
+  -> RTElement RTSemAnn -> IO (RTElement RTSemAnn)
+flattenTransaction rtModule transaction = do
+    let flattenResult = runFlattenTransaction transaction
+    case flattenResult of
+        Left err ->
+            -- | Create the source files map. This map will be used to obtain the source files that
+            -- will be feed to the error pretty printer. The source files map must use as key the
+            -- path of the source file and as element the text of the source file.
+            let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule) in
+            TIO.putStrLn (toText err fileMap) >> exitFailure
+        Right flatTransaction -> return flatTransaction
 
 -- | Load the files containing the transactional worst-case execution paths
 loadWCETModules
@@ -145,10 +160,10 @@ loadWCETModules bbProject efpPath = do
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
-typeWCETModules :: TerminaProgArch SemanticAnn 
+typeWCETModules :: TerminaProgArch SemanticAnn
   -> TransPathMap TRPSemAnn
   -> BasicBlocksProject
-  -> WCETProject 
+  -> WCETProject
   -> IO (WCETimesMap WCETSemAnn)
 typeWCETModules arch trPathMap bbProject wcetProject =
   foldM typeWCETModules' M.empty (M.elems wcetProject)
@@ -217,9 +232,9 @@ loadPathModules bbProject efpPath = do
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (TransPathData term)
 
 -- | Type check the transactional worst-case execution paths of the project modules
-typePathModules :: TerminaProgArch SemanticAnn 
+typePathModules :: TerminaProgArch SemanticAnn
   -> BasicBlocksProject
-  -> TransPathProject 
+  -> TransPathProject
   -> IO (TransPathMap TRPSemAnn)
 typePathModules arch bbProject pathProject =
   foldM typePathModules' M.empty (M.elems pathProject)
@@ -333,8 +348,12 @@ schedCommand (SchedCmdArgs rtModelFile chatty) = do
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution times")
     wcetProject <- loadWCETModules bbProject (efpFolder config)
     _wcetTimesMap <- typeWCETModules programArchitecture trPathMap bbProject wcetProject
+    when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
     when chatty (putStrLn . debugMessage $ "Loading RT model")
     rtModule <- loadRTModule rtModelFile
-    (_trMap, _stMap) <- typeRTModule programArchitecture trPathMap bbProject transPathProject rtModule
-    when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
+    (trMap, _stMap) <- typeRTModule programArchitecture trPathMap bbProject transPathProject rtModule
+    when chatty (putStrLn . debugMessage $ "RT model type checked successfully")
+    when chatty (putStrLn . debugMessage $ "Flattening RT model transactions")
+    _flatTrMap <- mapM (flattenTransaction rtModule) trMap
+     -- | At this point, all the necessary data structures have been generated
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

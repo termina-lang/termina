@@ -25,3 +25,5 @@ data RTState = RTState
     } deriving Show
 
 type RTMonad = ExceptT RTErrors (ST.State RTState)
+
+type RTFlatMonad = Except RTErrors

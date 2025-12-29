@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module EFP.Schedulability.RT.TypeChecking.ConstExpression where
 import EFP.Schedulability.Core.AST
 import EFP.Schedulability.Core.Types

@@ -29,6 +29,9 @@ data Error
     | EInvalidConstExpressionOperandTypes -- ^ Invalid constant expression operand types (internal)
     | EInvalidEventEmitter Identifier -- ^ Invalid event emitter (internal)
     | EInvalidSinkPort Identifier -- ^ Invalid sink port (internal)
+    | EInvalidConstExpressionOperand Op -- ^ Invalid constant expression operand (internal)
+    | EInvalidFlatteningTarget -- ^ Invalid flattening target (internal)
+    | EInvalidConditionalExpressionType -- ^ Invalid conditional expression type
     | EUnknownComponent Identifier -- ^ Unknown component
     | EDuplicatedStepName Identifier Location -- ^ Duplicated step name
     | EUnknownAction Identifier (Identifier, Location) -- ^ Unknown action in a component class
@@ -64,6 +67,10 @@ data Error
     | EInvalidDeadlineFieldType -- ^ Invalid deadline field type
     | EInvalidEventField Identifier [Identifier] -- ^ Invalid event field name
     | EEmitterActionMismatch Identifier Identifier Identifier (Identifier, Identifier, Location) -- ^ Emitter action mismatch
+    | EConditionalExpressionNotInteger -- ^ Conditional expression is not an integer
+    | EConditionalExpressionOutOfRange Integer -- ^ Conditional expression out of range
+    | EFlatConditionalExpressionOutOfRange Integer Location -- ^ Conditional expression out of range in flattening
+    | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression
     deriving Show
 
 type RTErrors = AnnotatedError Error Location
@@ -106,6 +113,10 @@ instance ErrorMessage RTErrors where
     errorIdent (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "RTE-033"
     errorIdent (AnnotatedError (EInvalidEventField {}) _pos) = "RTE-034"
     errorIdent (AnnotatedError (EEmitterActionMismatch {}) _pos) = "RTE-035"
+    errorIdent (AnnotatedError (EConditionalExpressionNotInteger {}) _pos) = "RTE-036"
+    errorIdent (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "RTE-037"
+    errorIdent (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "RTE-038"
+    errorIdent (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "RTE-039"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownComponent {}) _pos) = "unknown component"
@@ -143,6 +154,10 @@ instance ErrorMessage RTErrors where
     errorTitle (AnnotatedError (EInvalidDeadlineFieldType {}) _pos) = "invalid deadline field type"
     errorTitle (AnnotatedError (EInvalidEventField {}) _pos) = "invalid event field"
     errorTitle (AnnotatedError (EEmitterActionMismatch {}) _pos) = "emitter action mismatch"
+    errorTitle (AnnotatedError (EConditionalExpressionNotInteger {}) _pos) = "conditional expression not integer"
+    errorTitle (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range"
+    errorTitle (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range in flattening"
+    errorTitle (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "constant expression division by zero"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -363,6 +378,28 @@ instance ErrorMessage RTErrors where
                     pprintSimpleError
                         clsSourceLines "The component class is defined here:" clsFileName
                         clsLoc Nothing
+                EConditionalExpressionNotInteger ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Conditional expression must evaluate to an integer between 1 and 100.")
+                EConditionalExpressionOutOfRange value ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Conditional expression value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100."))
+                EFlatConditionalExpressionOutOfRange value loc@(Position _ locStart _locEnd) ->
+                    let locFileName = sourceName locStart
+                        locSourceLines = files M.! locFileName
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Error when flattening conditional expression: the resulting value \x1b[31m" <> T.pack (show value) <> "\x1b[0m is out of range. Expected an integer between 1 and 100.")) <>
+                    pprintSimpleError
+                        locSourceLines "The inner conditional expression is defined here:" locFileName
+                        loc Nothing
+                EConstExpressionDivisionByZero ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Division by zero in constant expression.")
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 
