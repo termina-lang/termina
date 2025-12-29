@@ -4,7 +4,7 @@ module EFP.Schedulability.WCET.TypeChecking where
 import qualified Data.Map as M
 
 import Semantic.Types
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCEPath.Types
 import EFP.Schedulability.WCET.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types

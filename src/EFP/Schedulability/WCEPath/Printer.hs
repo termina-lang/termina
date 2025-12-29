@@ -1,6 +1,6 @@
-module EFP.Schedulability.TransPath.Printer where
+module EFP.Schedulability.WCEPath.Printer where
 import Generator.Utils
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 import Prettyprinter
 import Text.Parsec.Pos
 import Data.Text (Text)
@@ -107,13 +107,13 @@ instance WCEPathPrinter (WCEPathBlock a) where
     pprint (WCEPFreeBox portName loc _) =
         pretty "free" <> parens (pretty portName) <> pprint loc
 
-instance WCEPathPrinter (TransactionalWCEPath a) where
-    pprint (TransactionalWCEPath taskName actionName pathName constParams blocks _) =
+instance WCEPathPrinter (WCEPath a) where
+    pprint (WCEPath taskName actionName pathName constParams blocks _) =
         let ppBlocks = map pprint blocks
             pParams = map pretty constParams
         in
         pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <> parens (align (fillSep (punctuate comma pParams))) <+> pretty "=" <+> 
             brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks))) <> line
 
-runWCEPathPrinter :: [TransactionalWCEPath a] -> Text
+runWCEPathPrinter :: [WCEPath a] -> Text
 runWCEPathPrinter wceps = render $ line <> vsep (map pprint wceps)

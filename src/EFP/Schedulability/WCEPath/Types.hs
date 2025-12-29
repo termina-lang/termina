@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeSynonymInstances #-}
-module EFP.Schedulability.TransPath.Types where
+module EFP.Schedulability.WCEPath.Types where
 
 import Utils.Annotations
 import qualified Data.Map as M
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 
 data TRPSemAnn = 
     TRExprTy ConstExprType Location
@@ -20,4 +20,4 @@ instance Located TRPSemAnn where
     updateLocation (TRBlock _) loc = TRBlock loc
     updateLocation (TRWCEPTy _) loc = TRWCEPTy loc
 
-type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (TransactionalWCEPath a))
+type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (WCEPath a))

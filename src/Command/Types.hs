@@ -7,7 +7,7 @@ import qualified Data.Map as M
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
 import qualified ControlFlow.BasicBlocks.AST as CFAST
-import qualified EFP.Schedulability.TransPath.AST as TPAST
+import qualified EFP.Schedulability.WCEPath.AST as TPAST
 
 import qualified Parser.Types as PTYPES
 import qualified Semantic.Types as STYPES
@@ -31,7 +31,7 @@ newtype BasicBlocksData = BasicBlockData {
 } deriving (Show)
 
 newtype TransPathData = TransPathData {
-  transPathAST :: [TPAST.TransactionalWCEPath SCHEDTYPES.ParserAnn]
+  transPathAST :: [TPAST.WCEPath SCHEDTYPES.ParserAnn]
 } deriving (Show)
 
 newtype WCETData = WCETData {

@@ -37,8 +37,8 @@ import qualified Data.Set as S
 import Generator.CodeGen.Application.Status (runGenStatusHeaderFile)
 import Generator.CodeGen.Application.Result (runGenResultHeaderFile)
 import System.Environment
-import EFP.Schedulability.TransPath.Generator (genTransactionalWCEPS)
-import EFP.Schedulability.TransPath.Printer
+import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
+import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 
 -- | Data type for the "new" command arguments

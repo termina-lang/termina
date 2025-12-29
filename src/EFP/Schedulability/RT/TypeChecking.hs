@@ -11,7 +11,7 @@ import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Errors
 import EFP.Schedulability.RT.AST
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCEPath.Types
 import Utils.Monad
 import EFP.Schedulability.Core.Types
 import EFP.Schedulability.RT.Monad

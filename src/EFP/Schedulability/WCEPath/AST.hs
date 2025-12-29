@@ -1,5 +1,5 @@
-module EFP.Schedulability.TransPath.AST
-    (module EFP.Schedulability.TransPath.AST
+module EFP.Schedulability.WCEPath.AST
+    (module EFP.Schedulability.WCEPath.AST
     , module EFP.Schedulability.Core.AST) where
 
 import EFP.Schedulability.Core.AST
@@ -85,8 +85,8 @@ data WCEPathBlock a
         a
     deriving Show
 
-data TransactionalWCEPath a
-    = TransactionalWCEPath 
+data WCEPath a
+    = WCEPath 
         Identifier -- ^ task/resource name
         Identifier -- ^ action/procedure name
         Identifier -- ^ path name
@@ -95,7 +95,7 @@ data TransactionalWCEPath a
         a
     deriving Show
 
-instance Annotated TransactionalWCEPath where
-    getAnnotation (TransactionalWCEPath _ _ _ _ _ a) = a
-    updateAnnotation (TransactionalWCEPath tName aName pName constParams blocks _) =
-        TransactionalWCEPath tName aName pName constParams blocks
+instance Annotated WCEPath where
+    getAnnotation (WCEPath _ _ _ _ _ a) = a
+    updateAnnotation (WCEPath tName aName pName constParams blocks _) =
+        WCEPath tName aName pName constParams blocks

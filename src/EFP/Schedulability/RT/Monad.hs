@@ -4,7 +4,7 @@ import EFP.Schedulability.RT.AST
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Semantic.Types
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCEPath.Types
 import EFP.Schedulability.RT.Types
 import Control.Monad.Except
 import EFP.Schedulability.RT.Errors

@@ -29,10 +29,10 @@ import Semantic.Environment
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
 import Command.Common
-import EFP.Schedulability.TransPath.Parsing
-import EFP.Schedulability.TransPath.TypeChecking
+import EFP.Schedulability.WCEPath.Parsing
+import EFP.Schedulability.WCEPath.TypeChecking
 import Semantic.Types
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCEPath.Types
 import ControlFlow.Architecture.Types
 import EFP.Schedulability.WCET.Parsing (terminaWCETParser)
 import EFP.Schedulability.WCET.TypeChecking

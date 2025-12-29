@@ -1,8 +1,8 @@
-module EFP.Schedulability.TransPath.Generator where
+module EFP.Schedulability.WCEPath.Generator where
 
 import ControlFlow.BasicBlocks.AST
 import qualified Semantic.Types as STYPES
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations
 import Text.Parsec.Pos
 import EFP.Schedulability.Core.Types
@@ -239,33 +239,33 @@ genWCEPaths paths (blk : xs) =
     in
     genWCEPaths appendedPaths xs
 
-genClassMemberWCEPs :: Identifier -> ClassMember STYPES.SemanticAnn -> [TransactionalWCEPath GeneratorAnn]
+genClassMemberWCEPs :: Identifier -> ClassMember STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
 genClassMemberWCEPs className (ClassMethod _ak ident params _mrty blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk)
         constParams = [name | Parameter name (TConstSubtype _) <- params] in
     zipWith (\pathName path -> 
-        TransactionalWCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName constParams path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs className (ClassProcedure _ak ident params blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk)
         constParams = [name | Parameter name (TConstSubtype _) <- params] in
     zipWith (\pathName path -> 
-        TransactionalWCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName constParams path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs className (ClassAction _ak ident _param _mrty blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
-        TransactionalWCEPath className ident pathName [] path Generated) 
+        WCEPath className ident pathName [] path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs className (ClassViewer ident _params _mrty blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk)
         constParams = [name | Parameter name (TConstSubtype _) <- _params] in
     zipWith (\pathName path -> 
-        TransactionalWCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName constParams path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs _ _ = []
 
-genTransactionalWCEPS :: AnnotatedProgram STYPES.SemanticAnn -> [TransactionalWCEPath GeneratorAnn]
+genTransactionalWCEPS :: AnnotatedProgram STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
 genTransactionalWCEPS (TypeDefinition (Class _kind ident members _ _) _ : xs) =
     let classWCEPs = concatMap (genClassMemberWCEPs ident) members
     in

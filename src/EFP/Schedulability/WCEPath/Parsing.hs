@@ -1,10 +1,10 @@
-module EFP.Schedulability.TransPath.Parsing 
+module EFP.Schedulability.WCEPath.Parsing 
   (terminaTransPathsParser) where
 
 -- Importing parser combinators
 import Text.Parsec hiding (Error, Ok)
 
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations
 import EFP.Schedulability.Core.Parsing
 import EFP.Schedulability.Core.Types
@@ -185,7 +185,7 @@ wcepPathBlockParser =
     <|> try allocBoxParser
     <|> freeBoxParser
 
-transactionalWCEPParser :: SchedParser (TransactionalWCEPath ParserAnn)
+transactionalWCEPParser :: SchedParser (WCEPath ParserAnn)
 transactionalWCEPParser = do
     current <- getState
     startPos <- getPosition
@@ -198,12 +198,12 @@ transactionalWCEPParser = do
     constParams <- parens (sepBy identifierParser comma)
     _ <- reservedOp "="
     blocks <- brackets (sepBy wcepPathBlockParser comma)
-    TransactionalWCEPath clsName elementName memberFunction constParams blocks . Position current startPos <$> getPosition
+    WCEPath clsName elementName memberFunction constParams blocks . Position current startPos <$> getPosition
 
 -- | Top Level parser
-topLevel :: SchedParser [TransactionalWCEPath ParserAnn]
+topLevel :: SchedParser [WCEPath ParserAnn]
 topLevel = many $
   try transactionalWCEPParser
 
-terminaTransPathsParser :: SchedParser [TransactionalWCEPath ParserAnn]
+terminaTransPathsParser :: SchedParser [WCEPath ParserAnn]
 terminaTransPathsParser = contents topLevel

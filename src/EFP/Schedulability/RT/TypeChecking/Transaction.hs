@@ -10,7 +10,7 @@ import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Errors
 import EFP.Schedulability.RT.AST
 import Control.Monad
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 import qualified Data.Set as S
 import EFP.Schedulability.Core.Types
 import EFP.Schedulability.RT.Monad
@@ -18,8 +18,8 @@ import EFP.Schedulability.RT.TypeChecking.ConstExpression
 import EFP.Schedulability.RT.Utils
 
 
-getPathContinuations :: Identifier -> M.Map Identifier (Identifier, a) -> TransactionalWCEPath b -> RTMonad [Continuation]
-getPathContinuations componentName outputConns (TransactionalWCEPath _ _ _ _ blocks _) =
+getPathContinuations :: Identifier -> M.Map Identifier (Identifier, a) -> WCEPath b -> RTMonad [Continuation]
+getPathContinuations componentName outputConns (WCEPath _ _ _ _ blocks _) =
     foldM extractContinuations [] blocks
 
     where

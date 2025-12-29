@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module EFP.Schedulability.TransPath.Errors where
+module EFP.Schedulability.WCEPath.Errors where
 import Utils.Annotations
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.AST
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP

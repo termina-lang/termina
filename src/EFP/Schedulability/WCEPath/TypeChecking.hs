@@ -1,16 +1,16 @@
 {-# LANGUAGE FlexibleContexts #-}
-module EFP.Schedulability.TransPath.TypeChecking where
+module EFP.Schedulability.WCEPath.TypeChecking where
 
 import qualified Data.Map as M
 
 import Semantic.Types
-import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.WCEPath.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Control.Monad.Except
 import qualified Control.Monad.State as ST
-import EFP.Schedulability.TransPath.Errors
-import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.WCEPath.Errors
+import EFP.Schedulability.WCEPath.AST
 import qualified Data.Set as S
 import Control.Monad
 import Utils.Monad
@@ -140,8 +140,8 @@ typePathBlock _tpCls (WCEPSystemCall sysCallName argExprs pos ann) = do
     tyArgExprs <- mapM typeConstExpression argExprs
     return $ WCEPSystemCall sysCallName tyArgExprs pos (TRBlock (getLocation ann))
 
-typePath :: TransactionalWCEPath ParserAnn -> TransPathMonad (TransactionalWCEPath TRPSemAnn)
-typePath (TransactionalWCEPath classId functionId pathName constParams blks ann) = do
+typePath :: WCEPath ParserAnn -> TransPathMonad (WCEPath TRPSemAnn)
+typePath (WCEPath classId functionId pathName constParams blks ann) = do
     tpClass <- getTPClass (getLocation ann) classId
     let clsLoc = getLocation . classAnns $ tpClass
     if sameSource clsLoc (getLocation ann) then
@@ -158,7 +158,7 @@ typePath (TransactionalWCEPath classId functionId pathName constParams blks ann)
             -- | Check that there is no other path with the same name for the same function
             case M.lookup pathName functionPaths of
                 Nothing -> return ()
-                Just (TransactionalWCEPath _ _ _ _ _ ann') ->
+                Just (WCEPath _ _ _ _ _ ann') ->
                     throwError . annotateError (getLocation ann) $ EDuplicatedPathName pathName (classId, functionId, getLocation ann')
             let funcConstParams = [name | Parameter name (TConstSubtype _) <- params]
             if length funcConstParams /= length constParams then
@@ -168,22 +168,22 @@ typePath (TransactionalWCEPath classId functionId pathName constParams blks ann)
                 tyBlks <- localScope $ 
                     mapM_ (insertConstParameter (getLocation ann)) constParams >>
                     mapM (typePathBlock tpClass) blks
-                return $ TransactionalWCEPath classId functionId pathName constParams tyBlks (TRWCEPTy (getLocation ann))
+                return $ WCEPath classId functionId pathName constParams tyBlks (TRWCEPTy (getLocation ann))
 
-typeTransPaths :: [TransactionalWCEPath ParserAnn] -> TransPathMonad ()
+typeTransPaths :: [WCEPath ParserAnn] -> TransPathMonad ()
 typeTransPaths paths = do
     tyPaths <- mapM typePath paths
     mapM_ insertTypedPath tyPaths
 
     where 
 
-    insertTypedPath path@(TransactionalWCEPath classId functionId pathName _ _ _) =
+    insertTypedPath path@(WCEPath classId functionId pathName _ _ _) =
         ST.modify $ \s -> s { 
             transPaths = M.insertWith M.union (classId, functionId) (M.singleton pathName path) (transPaths s) }
     
 runTransPathTypeChecking :: TerminaProgArch SemanticAnn
     -> TransPathMap TRPSemAnn
-    -> [TransactionalWCEPath ParserAnn]
+    -> [WCEPath ParserAnn]
     -> Either TransPathErrors (TransPathMap TRPSemAnn)
 runTransPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
