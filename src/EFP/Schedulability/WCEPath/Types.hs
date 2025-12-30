@@ -20,4 +20,4 @@ instance Located TRPSemAnn where
     updateLocation (TRBlock _) loc = TRBlock loc
     updateLocation (TRWCEPTy _) loc = TRWCEPTy loc
 
-type TransPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (WCEPath a))
+type WCEPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (WCEPath a))

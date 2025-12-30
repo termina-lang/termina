@@ -28,10 +28,10 @@ data TransPathState = TransPathState
         progArch :: TerminaProgArch SemanticAnn
         , globalConsts :: TPGlobalConstsEnv
         , localConsts :: S.Set Identifier
-        , transPaths :: TransPathMap TRPSemAnn
+        , transPaths :: WCEPathMap TRPSemAnn
     } deriving Show
 
-type TransPathMonad = ExceptT TransPathErrors (ST.State TransPathState)
+type TransPathMonad = ExceptT WCEPathErrors (ST.State TransPathState)
 
 -- | Insert immutable object (variable) in local scope.
 insertConstParameter :: Location -> Identifier -> TransPathMonad ()
@@ -182,9 +182,9 @@ typeTransPaths paths = do
             transPaths = M.insertWith M.union (classId, functionId) (M.singleton pathName path) (transPaths s) }
     
 runTransPathTypeChecking :: TerminaProgArch SemanticAnn
-    -> TransPathMap TRPSemAnn
+    -> WCEPathMap TRPSemAnn
     -> [WCEPath ParserAnn]
-    -> Either TransPathErrors (TransPathMap TRPSemAnn)
+    -> Either WCEPathErrors (WCEPathMap TRPSemAnn)
 runTransPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch gConsts S.empty prevMap in

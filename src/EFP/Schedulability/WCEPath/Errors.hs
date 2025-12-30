@@ -12,9 +12,9 @@ import Utils.Errors
 import Modules.Utils
 
 
---------------------------------------------------
--- Transactional Path type checker error handling
---------------------------------------------------
+---------------------------------------------------------
+-- Worst-Case Execution Path type checker error handling
+---------------------------------------------------------
 
 data Error
   = 
@@ -35,9 +35,9 @@ data Error
     | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Constant expression type mismatch
     deriving Show
 
-type TransPathErrors = AnnotatedError Error Location
+type WCEPathErrors = AnnotatedError Error Location
 
-instance ErrorMessage TransPathErrors where
+instance ErrorMessage WCEPathErrors where
 
 
     errorIdent (AnnotatedError (EUnknownClass _id) _pos) = "TPE-001"

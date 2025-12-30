@@ -81,7 +81,7 @@ loadRTModule rtModelFile = do
     Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (RTData term)
 
 typeRTModule :: TerminaProgArch SemanticAnn
-  -> TransPathMap TRPSemAnn
+  -> WCEPathMap TRPSemAnn
   -> BasicBlocksProject
   -> TransPathProject
   -> RTModule -> IO (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
@@ -161,7 +161,7 @@ loadWCETModules bbProject efpPath = do
 
 -- | Type check the transactional worst-case execution paths of the project modules
 typeWCETModules :: TerminaProgArch SemanticAnn
-  -> TransPathMap TRPSemAnn
+  -> WCEPathMap TRPSemAnn
   -> BasicBlocksProject
   -> WCETProject
   -> IO (WCETimesMap WCETSemAnn)
@@ -235,13 +235,13 @@ loadPathModules bbProject efpPath = do
 typePathModules :: TerminaProgArch SemanticAnn
   -> BasicBlocksProject
   -> TransPathProject
-  -> IO (TransPathMap TRPSemAnn)
+  -> IO (WCEPathMap TRPSemAnn)
 typePathModules arch bbProject pathProject =
   foldM typePathModules' M.empty (M.elems pathProject)
 
   where
 
-    typePathModules' :: TransPathMap TRPSemAnn -> TransPathModule -> IO (TransPathMap TRPSemAnn)
+    typePathModules' :: WCEPathMap TRPSemAnn -> TransPathModule -> IO (WCEPathMap TRPSemAnn)
     typePathModules' trPathMap transPathModule = do
       let result = runTransPathTypeChecking arch trPathMap (transPathAST . metadata $ transPathModule)
       case result of

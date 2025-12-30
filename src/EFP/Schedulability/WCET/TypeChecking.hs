@@ -28,13 +28,13 @@ type TPGlobalConstsEnv = M.Map Identifier Location
 data TransPathState = TransPathState
     {
         progArch :: TerminaProgArch SemanticAnn
-        , transPathMap :: TransPathMap TRPSemAnn 
+        , transPathMap :: WCEPathMap TRPSemAnn 
         , globalConsts :: TPGlobalConstsEnv
         , localConsts :: S.Set Identifier
         , transWCETs :: WCETimesMap WCETSemAnn
     } deriving Show
 
-type TransPathMonad = ExceptT TransPathErrors (ST.State TransPathState)
+type TransPathMonad = ExceptT WCEPathErrors (ST.State TransPathState)
 
 -- | Insert immutable object (variable) in local scope.
 insertConstParameter :: Location -> Identifier -> TransPathMonad ()
@@ -143,10 +143,10 @@ typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
                 transWCETs = M.insertWith (M.unionWith M.union) plt newPath (transWCETs s) }
     
 runWCETTypeChecking :: TerminaProgArch SemanticAnn
-    -> TransPathMap TRPSemAnn
+    -> WCEPathMap TRPSemAnn
     -> WCETimesMap WCETSemAnn
     -> [WCETPlatformAssignment ParserAnn]
-    -> Either TransPathErrors (WCETimesMap WCETSemAnn)
+    -> Either WCEPathErrors (WCETimesMap WCETSemAnn)
 runWCETTypeChecking arch trPathMap prevMap wcetPltAssig =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch trPathMap gConsts S.empty prevMap in

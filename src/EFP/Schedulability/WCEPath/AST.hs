@@ -87,8 +87,8 @@ data WCEPathBlock a
 
 data WCEPath a
     = WCEPath 
-        Identifier -- ^ task/resource name
-        Identifier -- ^ action/procedure name
+        Identifier -- ^ task/handler/resource name
+        Identifier -- ^ action/procedure/method name
         Identifier -- ^ path name
         [Identifier] -- ^ constant parameters
         [WCEPathBlock a]
