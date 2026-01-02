@@ -66,19 +66,21 @@ data TransPathBlock a
 data TransPathActivity a
     =
     TRPTaskActivity
+        Identifier -- ^ step name
         Identifier -- ^ task name
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        [TransPathActivity a] -- ^ Continuation activities
+        (Maybe (TransPathActivity a)) -- ^ Continuation activity
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPHandlerActivity
+        Identifier -- ^ step name
         Identifier -- ^ handler name
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        [TransPathActivity a] -- ^ Continuation activities
+        (Maybe (TransPathActivity a)) -- ^ Continuation activity
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPResourceActivity
