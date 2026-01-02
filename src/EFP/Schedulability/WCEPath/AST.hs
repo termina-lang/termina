@@ -5,13 +5,6 @@ module EFP.Schedulability.WCEPath.AST
 import EFP.Schedulability.Core.AST
 import Utils.Annotations
 
-data BlockPosition = BlockPosition
-    {
-        blockPosStartLine :: !Integer
-    ,   blockPosStartColumn :: !Integer
-    ,   blockPosEndLine :: !Integer
-    ,   blockPosEndColumn :: !Integer
-    } deriving (Show, Eq)
 
 -- | Worst-case execution path block
 data WCEPathBlock a

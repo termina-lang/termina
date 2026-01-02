@@ -18,7 +18,7 @@ type TPGlobalConstsEnv = M.Map Identifier Location
 data RTState = RTState
     {
         progArch :: TerminaProgArch SemanticAnn
-        , transPaths :: WCEPathMap TRPSemAnn
+        , transPaths :: WCEPathMap WCEPSemAnn
         , currentSteps :: M.Map Identifier Location
         , transactions :: RTTransactionMap RTSemAnn
         , situations :: RTSituationMap RTSemAnn

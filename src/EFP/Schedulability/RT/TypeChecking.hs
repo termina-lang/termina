@@ -50,7 +50,7 @@ typeRTElement (RTSituation sitId sitInitializer ann) = do
 
 
 runRTTypeChecking :: TerminaProgArch SemanticAnn
-    -> WCEPathMap TRPSemAnn
+    -> WCEPathMap WCEPSemAnn
     -> [RTElement ParserAnn]
     -> Either RTErrors (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
 runRTTypeChecking arch transPath elements =

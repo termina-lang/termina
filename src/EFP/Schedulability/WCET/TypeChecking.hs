@@ -28,7 +28,7 @@ type TPGlobalConstsEnv = M.Map Identifier Location
 data TransPathState = TransPathState
     {
         progArch :: TerminaProgArch SemanticAnn
-        , transPathMap :: WCEPathMap TRPSemAnn 
+        , transPathMap :: WCEPathMap WCEPSemAnn 
         , globalConsts :: TPGlobalConstsEnv
         , localConsts :: S.Set Identifier
         , transWCETs :: WCETimesMap WCETSemAnn
@@ -143,7 +143,7 @@ typeWCETPlatformAssignment (WCETPlatformAssignment plt wcets ann) = do
                 transWCETs = M.insertWith (M.unionWith M.union) plt newPath (transWCETs s) }
     
 runWCETTypeChecking :: TerminaProgArch SemanticAnn
-    -> WCEPathMap TRPSemAnn
+    -> WCEPathMap WCEPSemAnn
     -> WCETimesMap WCETSemAnn
     -> [WCETPlatformAssignment ParserAnn]
     -> Either WCEPathErrors (WCETimesMap WCETSemAnn)

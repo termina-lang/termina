@@ -2,14 +2,32 @@ module EFP.Schedulability.TransPath.Monad where
 import ControlFlow.Architecture.Types
 import Semantic.Types
 import EFP.Schedulability.WCEPath.Types
-import Control.Monad.Reader
 import Control.Monad.Except
 import EFP.Schedulability.TransPath.Errors
+import qualified Data.Map as M
+import EFP.Schedulability.TransPath.AST
+import qualified Control.Monad.State as ST
+import EFP.Schedulability.TransPath.Types
+import Configuration.Configuration
+import EFP.Schedulability.WCET.Types
+
+type TRPGenEnvironment = M.Map Identifier (ConstExpression TRPSemAnn)
 
 data TRPGenInput = TRPGenInput
     {
         progArch :: TerminaProgArch SemanticAnn
-        , transPaths :: WCEPathMap TRPSemAnn
+        , configParams :: TerminaConfig
+        , transPaths :: WCEPathMap WCEPSemAnn
+        , transWCETs :: WCETimesMap WCETSemAnn
+        , localConstEnv :: TRPGenEnvironment
     } deriving Show
 
-type TRPGenMonad = ExceptT TRPGenErrors (Reader TRPGenInput) 
+type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenInput) 
+
+localInputScope :: TRPGenMonad a -> TRPGenMonad a
+localInputScope comp = do
+  prevst <- ST.get
+  res <- comp
+  currst <- ST.get
+  ST.put (currst { localConstEnv = localConstEnv prevst })
+  return res

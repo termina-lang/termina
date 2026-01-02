@@ -5,19 +5,19 @@ import Utils.Annotations
 import qualified Data.Map as M
 import EFP.Schedulability.WCEPath.AST
 
-data TRPSemAnn = 
-    TRExprTy ConstExprType Location
-    | TRBlock Location
-    | TRWCEPTy Location
+data WCEPSemAnn = 
+    WCEPExprTy ConstExprType Location
+    | WCEPBlock Location
+    | WCEPPathTy Location
     deriving Show
 
-instance Located TRPSemAnn where
-    getLocation (TRExprTy _ loc)= loc
-    getLocation (TRBlock loc) = loc
-    getLocation (TRWCEPTy loc) = loc
+instance Located WCEPSemAnn where
+    getLocation (WCEPExprTy _ loc)= loc
+    getLocation (WCEPBlock loc) = loc
+    getLocation (WCEPPathTy loc) = loc
 
-    updateLocation (TRExprTy t _) loc = TRExprTy t loc
-    updateLocation (TRBlock _) loc = TRBlock loc
-    updateLocation (TRWCEPTy _) loc = TRWCEPTy loc
+    updateLocation (WCEPExprTy t _) loc = WCEPExprTy t loc
+    updateLocation (WCEPBlock _) loc = WCEPBlock loc
+    updateLocation (WCEPPathTy _) loc = WCEPPathTy loc
 
 type WCEPathMap a = M.Map (Identifier, Identifier) (M.Map Identifier (WCEPath a))

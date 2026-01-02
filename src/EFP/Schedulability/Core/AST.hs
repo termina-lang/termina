@@ -7,7 +7,16 @@ module EFP.Schedulability.Core.AST
 import Core.AST
 import Utils.Annotations
 import Utils.Errors
-import Data.Text (pack)
+import Data.Text
+
+
+data BlockPosition = BlockPosition
+    {
+        blockPosStartLine :: !Integer
+    ,   blockPosStartColumn :: !Integer
+    ,   blockPosEndLine :: !Integer
+    ,   blockPosEndColumn :: !Integer
+    } deriving (Show, Eq)
 
 data ConstExprType =
     TConstInt

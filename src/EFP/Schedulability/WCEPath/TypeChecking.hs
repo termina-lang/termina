@@ -16,22 +16,9 @@ import Control.Monad
 import Utils.Monad
 import ControlFlow.Architecture.Utils
 import EFP.Schedulability.Core.Types
-
-----------------------------------------
--- Termina Programs definitions
-
-type TPGlobalConstsEnv = M.Map Identifier Location
+import EFP.Schedulability.WCEPath.Monad
 
 
-data TransPathState = TransPathState
-    {
-        progArch :: TerminaProgArch SemanticAnn
-        , globalConsts :: TPGlobalConstsEnv
-        , localConsts :: S.Set Identifier
-        , transPaths :: WCEPathMap TRPSemAnn
-    } deriving Show
-
-type TransPathMonad = ExceptT WCEPathErrors (ST.State TransPathState)
 
 -- | Insert immutable object (variable) in local scope.
 insertConstParameter :: Location -> Identifier -> TransPathMonad ()
@@ -60,11 +47,11 @@ getTPClass loc classId = do
                         Just resourceCls -> return resourceCls
                         Nothing -> throwError . annotateError loc $ EUnknownClass classId
 
-typeConstExpression :: ConstExpression ParserAnn -> TransPathMonad (ConstExpression TRPSemAnn)
+typeConstExpression :: ConstExpression ParserAnn -> TransPathMonad (ConstExpression WCEPSemAnn)
 typeConstExpression (ConstInt i ann) = 
-    return $ ConstInt i (TRExprTy TConstInt (getLocation ann))
+    return $ ConstInt i (WCEPExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstDouble d ann) = 
-    return $ ConstDouble d (TRExprTy TConstDouble (getLocation ann))
+    return $ ConstDouble d (WCEPExprTy TConstDouble (getLocation ann))
 typeConstExpression (ConstObject ident ann) = do
     isGlobalConst <- ST.gets (M.member ident . globalConsts)
     unless isGlobalConst $ do
@@ -72,45 +59,45 @@ typeConstExpression (ConstObject ident ann) = do
         unless isLocalConst $
             throwError . annotateError (getLocation ann) $ EUnknownVariable ident
     -- | For now, all constants are of integer type: Termina does not support other constant types yet.
-    return $ ConstObject ident (TRExprTy TConstInt (getLocation ann))
+    return $ ConstObject ident (WCEPExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
     right' <- typeConstExpression right
     case (getAnnotation left', getAnnotation right') of
-        (TRExprTy t1 _, TRExprTy t2 _) -> do
+        (WCEPExprTy t1 _, WCEPExprTy t2 _) -> do
             unless (t1 == t2) $ 
                 throwError . annotateError (getLocation ann) $ EConstExpressionTypeMismatch t1 t2
-            return $ ConstBinOp op left' right' (TRExprTy t1 (getLocation ann))
+            return $ ConstBinOp op left' right' (WCEPExprTy t1 (getLocation ann))
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
-typePathBlock :: TPClass SemanticAnn -> WCEPathBlock ParserAnn -> TransPathMonad (WCEPathBlock TRPSemAnn)
+typePathBlock :: TPClass SemanticAnn -> WCEPathBlock ParserAnn -> TransPathMonad (WCEPathBlock WCEPSemAnn)
 typePathBlock tpCls (WCEPathCondIf blks pos ann) = do
     tyBlks <-   mapM (typePathBlock tpCls) blks
-    return $ WCEPathCondIf tyBlks pos (TRBlock (getLocation ann))
+    return $ WCEPathCondIf tyBlks pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPathCondElseIf blks pos ann) = do
     tyBlks <-   mapM (typePathBlock tpCls) blks
-    return $ WCEPathCondElseIf tyBlks pos (TRBlock (getLocation ann))
+    return $ WCEPathCondElseIf tyBlks pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPathCondElse blks pos ann) = do
     tyBlks <-  mapM (typePathBlock tpCls) blks
-    return $ WCEPathCondElse tyBlks pos (TRBlock (getLocation ann))
+    return $ WCEPathCondElse tyBlks pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPathForLoop initExpr finalExpr blks pos _ann) = do
     initExpr' <- typeConstExpression initExpr
     finalExpr' <- typeConstExpression finalExpr
     tyBlks <- mapM (typePathBlock tpCls) blks
-    return $ WCEPathForLoop initExpr' finalExpr' tyBlks pos (TRBlock (getLocation _ann))
+    return $ WCEPathForLoop initExpr' finalExpr' tyBlks pos (WCEPBlock (getLocation _ann))
 typePathBlock tpCls (WCEPathMatchCase blks pos ann) = do
     tyBlks <- mapM (typePathBlock tpCls) blks
-    return $ WCEPathMatchCase tyBlks pos (TRBlock (getLocation ann))
+    return $ WCEPathMatchCase tyBlks pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPSendMessage portName pos _ann) = do
     case M.lookup portName (outputPorts tpCls) of
         Nothing -> throwError . annotateError (getLocation _ann) $ EUnknownOutputPort portName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
-        Just _ -> return $ WCEPSendMessage portName pos (TRBlock (getLocation _ann))
+        Just _ -> return $ WCEPSendMessage portName pos (WCEPBlock (getLocation _ann))
 typePathBlock tpCls (WCEPathMemberFunctionCall funcName argExprs pos ann) = do
     case M.lookup funcName (M.union (classMethods tpCls) (classViewers tpCls)) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction funcName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
         Just _ -> do
             tyArgExprs <- mapM typeConstExpression argExprs
-            return $ WCEPathMemberFunctionCall funcName tyArgExprs pos (TRBlock (getLocation ann))
+            return $ WCEPathMemberFunctionCall funcName tyArgExprs pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPProcedureInvoke portName procName argExprs _pos ann) = do
     case M.lookup portName (accessPorts tpCls) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownAccessPort portName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
@@ -118,29 +105,29 @@ typePathBlock tpCls (WCEPProcedureInvoke portName procName argExprs _pos ann) = 
             unless (M.member procName ifacesMap) $ 
                 throwError . annotateError (getLocation ann) $ EUnknownProcedure procName portName iface
             tyArgExprs <- mapM typeConstExpression argExprs
-            return $ WCEPProcedureInvoke portName procName tyArgExprs _pos (TRBlock (getLocation ann))
+            return $ WCEPProcedureInvoke portName procName tyArgExprs _pos (WCEPBlock (getLocation ann))
         Just (TAllocator _, _) -> throwError . annotateError (getLocation ann) $ EInvalidAccessToAllocator procName portName
         Just _ -> throwError . annotateError Internal $ EInvalidAccessPortAnnotation
 typePathBlock tpCls (WCEPAllocBox portName pos ann) = do
     case M.lookup portName (accessPorts tpCls) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownAccessPort portName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
-        Just _ -> return $ WCEPAllocBox portName pos (TRBlock (getLocation ann))
+        Just _ -> return $ WCEPAllocBox portName pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPFreeBox portName pos ann) = do
     case M.lookup portName (accessPorts tpCls) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownAccessPort portName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
-        Just _ -> return $ WCEPFreeBox portName pos (TRBlock (getLocation ann))
-typePathBlock _tpCls (WCEPRegularBlock pos ann) = return $ WCEPRegularBlock pos (TRBlock (getLocation ann))
-typePathBlock _tpCls (WCEPReturn pos ann) = return $ WCEPReturn pos (TRBlock (getLocation ann))
+        Just _ -> return $ WCEPFreeBox portName pos (WCEPBlock (getLocation ann))
+typePathBlock _tpCls (WCEPRegularBlock pos ann) = return $ WCEPRegularBlock pos (WCEPBlock (getLocation ann))
+typePathBlock _tpCls (WCEPReturn pos ann) = return $ WCEPReturn pos (WCEPBlock (getLocation ann))
 typePathBlock tpCls (WCEPContinue actionName pos ann) = do
     case M.lookup actionName (classActions tpCls) of
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownMemberFunction actionName (classIdentifier tpCls, getLocation . classAnns $ tpCls)
-        Just _ -> return $ WCEPContinue actionName pos (TRBlock (getLocation ann))
-typePathBlock _tpCls (WCEPReboot pos ann) = return $ WCEPReboot pos (TRBlock (getLocation ann))
+        Just _ -> return $ WCEPContinue actionName pos (WCEPBlock (getLocation ann))
+typePathBlock _tpCls (WCEPReboot pos ann) = return $ WCEPReboot pos (WCEPBlock (getLocation ann))
 typePathBlock _tpCls (WCEPSystemCall sysCallName argExprs pos ann) = do
     tyArgExprs <- mapM typeConstExpression argExprs
-    return $ WCEPSystemCall sysCallName tyArgExprs pos (TRBlock (getLocation ann))
+    return $ WCEPSystemCall sysCallName tyArgExprs pos (WCEPBlock (getLocation ann))
 
-typePath :: WCEPath ParserAnn -> TransPathMonad (WCEPath TRPSemAnn)
+typePath :: WCEPath ParserAnn -> TransPathMonad (WCEPath WCEPSemAnn)
 typePath (WCEPath classId functionId pathName constParams blks ann) = do
     tpClass <- getTPClass (getLocation ann) classId
     let clsLoc = getLocation . classAnns $ tpClass
@@ -168,7 +155,7 @@ typePath (WCEPath classId functionId pathName constParams blks ann) = do
                 tyBlks <- localScope $ 
                     mapM_ (insertConstParameter (getLocation ann)) constParams >>
                     mapM (typePathBlock tpClass) blks
-                return $ WCEPath classId functionId pathName constParams tyBlks (TRWCEPTy (getLocation ann))
+                return $ WCEPath classId functionId pathName constParams tyBlks (WCEPPathTy (getLocation ann))
 
 typeTransPaths :: [WCEPath ParserAnn] -> TransPathMonad ()
 typeTransPaths paths = do
@@ -182,9 +169,9 @@ typeTransPaths paths = do
             transPaths = M.insertWith M.union (classId, functionId) (M.singleton pathName path) (transPaths s) }
     
 runTransPathTypeChecking :: TerminaProgArch SemanticAnn
-    -> WCEPathMap TRPSemAnn
+    -> WCEPathMap WCEPSemAnn
     -> [WCEPath ParserAnn]
-    -> Either WCEPathErrors (WCEPathMap TRPSemAnn)
+    -> Either WCEPathErrors (WCEPathMap WCEPSemAnn)
 runTransPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch gConsts S.empty prevMap in

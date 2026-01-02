@@ -1,41 +1,91 @@
-module EFP.Schedulability.TransPath.AST where
+module EFP.Schedulability.TransPath.AST
+    (module EFP.Schedulability.Core.AST
+    , module EFP.Schedulability.TransPath.AST) where
 
 import EFP.Schedulability.Core.AST
+
+type WCETime = Double
 
 -- | Worst-case execution path block
 data TransPathBlock a
     = 
+    TPBlockCondIf
+        [TransPathBlock a] -- ^ blocks in the if block
+        BlockPosition
+        a
+    -- | Else-if block
+    | TPBlockCondElseIf
+        [TransPathBlock a] -- ^ blocks in the else-if block
+        BlockPosition
+        a
+    -- | Else block
+    | TPBlockCondElse
+        [TransPathBlock a] -- ^ blocks in the else block
+        BlockPosition
+        a
     -- | For-loop basic block
-    TPBlockForLoop
-        (ConstExpression a) -- ^ initial value of the iterator
-        (ConstExpression a) -- ^ final value of the iterator
+    | TPBlockForLoop
+        Integer -- ^ Number of iterations
         [TransPathBlock a] -- ^ blocks in the for loop body.
+        BlockPosition
+        a
+    -- | Match case block
+    | TPBlockMatchCase
+        [TransPathBlock a] -- ^ blocks in the case block
+        BlockPosition
+        a
     | TPBlockMemberFunctionCall 
         [ConstExpression a] -- ^ Constant argument expressions
-        (TransPathActivity a)
+        (TransPathActivity a) -- ^ Activity being called
+        BlockPosition
+        a
     -- | Invoke a resource procedure
     | TPBlockProcedureInvoke 
         [ConstExpression a] -- ^ Constant argument expression
-        (TransPathActivity a)
+        (TransPathActivity a) -- ^ Activity being called
+        BlockPosition
+        a
     | TPBlockAllocBox 
         Identifier -- ^ Pool resource name
+        BlockPosition
+        a
     -- | Call to the free procedure of a memory allocator 
     | TPBlockFreeBox 
         Identifier -- ^ Pool resource name
-    -- | Regular block
-    | TPBlockRegularBlock
+        BlockPosition
+        a
+    | TPBlockReturn BlockPosition a
+    | TPBlockReboot BlockPosition a
     | TPBlockSystemCall 
         Identifier
         [ConstExpression a] -- ^ Constant argument expression
+        BlockPosition
+        a
     deriving Show
 
 data TransPathActivity a
     =
-    TransPathActivity
-        Identifier -- ^ component name
-        Identifier -- ^ action/procedure/method name
+    TRPTaskActivity
+        Identifier -- ^ task name
+        Identifier -- ^ action name
         Identifier -- ^ path name
-        [Identifier] -- ^ constant parameters
         [TransPathBlock a] -- ^ Blocks in the activity
         [TransPathActivity a] -- ^ Continuation activities
+        WCETime -- ^ Worst-case execution time
+        a -- ^ Annotation
+    | TRPHandlerActivity
+        Identifier -- ^ handler name
+        Identifier -- ^ action name
+        Identifier -- ^ path name
+        [TransPathBlock a] -- ^ Blocks in the activity
+        [TransPathActivity a] -- ^ Continuation activities
+        WCETime -- ^ Worst-case execution time
+        a -- ^ Annotation
+    | TRPResourceActivity
+        Identifier -- ^ resource name
+        Identifier -- ^ procedure/method name
+        Identifier -- ^ path name
+        [TransPathBlock a] -- ^ Blocks in the activity
+        WCETime -- ^ Worst-case execution time
+        a -- ^ Annotation
     deriving Show
