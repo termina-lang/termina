@@ -90,6 +90,7 @@ genExpressionPath expr acc =
     let loc = loc2BlockPos . getLocation . getAnnotation $ expr
     in
         mergePath (WCEPRegularBlock loc Generated) acc
+
 genRegularBlockPath :: [WCEPathBlock GeneratorAnn] -> [Statement STYPES.SemanticAnn] -> [WCEPathBlock GeneratorAnn]
 genRegularBlockPath acc [] = acc
 genRegularBlockPath acc (Declaration _ _ _ expr _ : xs) =
@@ -102,6 +103,12 @@ genRegularBlockPath acc (SingleExpStmt expr _ : xs) =
     let exprPath = genExpressionPath expr acc
     in genRegularBlockPath exprPath xs
 
+uniqueRegularBlocks :: [WCEPathBlock GeneratorAnn] -> [WCEPathBlock GeneratorAnn]
+uniqueRegularBlocks [] = []
+uniqueRegularBlocks (WCEPRegularBlock loc ann : xs) =
+    WCEPRegularBlock loc ann : filter (\case WCEPRegularBlock _ _ -> False; _ -> True) xs
+uniqueRegularBlocks (x : xs) = x : uniqueRegularBlocks xs
+
 genPaths :: BasicBlock STYPES.SemanticAnn -> [WCEPathBlock GeneratorAnn]
 genPaths (RegularBlock stmts) =
     genRegularBlockPath [] stmts
@@ -109,68 +116,63 @@ genPaths (RegularBlock stmts) =
 genPaths (IfElseBlock ifBlk elifs mElse ann) =
     let ifPaths = 
             let paths = genWCEPaths [] (blockBody . condIfBody $ ifBlk) in
-            map (\p -> WCEPathCondIf (reverse p) (loc2BlockPos . getLocation . condIfAnnotation $ ifBlk) Generated) paths
-        elifPaths = map (
+            map (\p -> 
+                case p of
+                    [WCEPRegularBlock {}] -> 
+                        WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                    _ ->  WCEPathCondIf (reverse p) (loc2BlockPos . getLocation . condIfAnnotation $ ifBlk) Generated) paths
+        elifPaths = concatMap (
             \(CondElseIf _ elifBlk ann') ->
                 let paths = genWCEPaths [] (blockBody elifBlk) in
-                map (\p -> WCEPathCondElseIf (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
+                map (\p -> 
+                    case p of
+                        [WCEPRegularBlock {}] -> 
+                            WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                        _ -> WCEPathCondElseIf (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
             ) elifs
         elsePaths = case mElse of
             Just elseBlk -> 
                 let paths = genWCEPaths [] (blockBody . condElseBody $ elseBlk) in
-                    map (\p -> WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated) paths
+                    map (\p -> 
+                        case p of
+                            [WCEPRegularBlock {}] -> 
+                                WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                            _ ->
+                                WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated) paths
             Nothing -> []
     in
-        case (ifPaths, elifPaths, elsePaths) of
-            -- | If the path on if branch only contains one sinlge regular block,
-            -- we can merge it into the current path
-            ([WCEPathCondIf [WCEPRegularBlock {}] _ _], [], []) ->
-                [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
-            -- | If the paths on if and else branches only contain one sinlge regular block,
-            -- we can merge them into the current path
-            ([WCEPathCondIf [WCEPRegularBlock {}] _ _], [], [WCEPathCondElse [WCEPRegularBlock  _ _] _ _]) ->
-                [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
-            -- | If the paths on all branches only contain one sinlge regular block, 
-            -- we can merge them into the current path
-            ([WCEPathCondIf [WCEPRegularBlock _ _] _ _], _, [WCEPathCondElse [WCEPRegularBlock _ _] _ _]) ->
-                let allElifRegular = all (\case [WCEPathCondElseIf [WCEPRegularBlock _ _] _ _] -> True;
-                                                _ -> False) elifPaths in
-                if allElifRegular then
-                    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
-                else
-                    ifPaths ++ concat elifPaths ++ elsePaths
-            _ -> ifPaths ++ concat elifPaths ++ elsePaths
-
+        uniqueRegularBlocks (ifPaths ++ elifPaths ++ elsePaths)
+    
 genPaths (ForLoopBlock _ _ lower upper _ blk ann) =
     let paths = genWCEPaths [] (blockBody blk)
         loopPaths =
-            map (\p -> WCEPathForLoop (genConstExpression lower) (genConstExpression upper) (reverse p) 
+            map (\p -> case p of
+                    [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                    _ -> WCEPathForLoop (genConstExpression lower) (genConstExpression upper) (reverse p) 
                             (loc2BlockPos . getLocation $ ann) Generated) paths
     in
-    case loopPaths of
-        -- | If the path on loop body only contains one sinlge regular block,
-        -- we can merge it into the current path
-        [WCEPathForLoop _ _ [WCEPRegularBlock _ _] _ _] ->
-            [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
-        _ -> loopPaths
+        uniqueRegularBlocks loopPaths
+    
 genPaths (MatchBlock _ cases mDefaultCase ann) =
     let casePaths = map (
             \(MatchCase _ _ caseBlk ann') ->
                 let paths = genWCEPaths [] (blockBody caseBlk) in
-                map (\p -> WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
+                map (\p -> case p of
+                    [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                    _ ->
+                        WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths
             ) cases
         defaultPaths = case mDefaultCase of
             Just (DefaultCase defBlk ann') ->
                 let paths = genWCEPaths [] (blockBody defBlk) in
-                [map (\p -> WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths]
+                [map (\p -> case p of
+                    [WCEPRegularBlock {}] -> WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                    _ ->
+                        WCEPathMatchCase (reverse p) (loc2BlockPos . getLocation $ ann') Generated) paths]
             Nothing -> []
-        allCasesRegular = all (\case [WCEPathMatchCase [WCEPRegularBlock _ _] _ _] -> True;
-                                      _ -> False) (casePaths ++ defaultPaths)
     in
-        if allCasesRegular then
-            [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
-        else
-            concat $ casePaths ++ defaultPaths
+        uniqueRegularBlocks (concat casePaths ++ concat defaultPaths)
+
 genPaths (SendMessage obj _ ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId
