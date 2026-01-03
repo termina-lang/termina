@@ -25,6 +25,7 @@ data Error
     | EInvalidWCETExpression -- ^ Invalid worst-case execution time expression (internal)
     | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression (internal)
     | EInvalidConstExpressionOperand Op -- ^ Invalid operand for constant expression (internal)
+    | EInvalidRTElementForTransPath -- ^ Invalid RT element provided for transactional path generation (internal)
     | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Type mismatch in constant expression (internal)
     | EInvalidConstExpressionOperandTypes -- ^ Invalid operand types for constant expression (internal)
     | EUnknownConstant Identifier -- ^ Unknown constant in constant expression (internal)

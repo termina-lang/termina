@@ -13,7 +13,7 @@ import EFP.Schedulability.WCET.Types
 
 type TRPGenEnvironment = M.Map Identifier (ConstExpression TRPSemAnn)
 
-data TRPGenInput = TRPGenInput
+data TRPGenState = TRPGenState
     {
         progArch :: TerminaProgArch SemanticAnn
         , configParams :: TerminaConfig
@@ -22,7 +22,7 @@ data TRPGenInput = TRPGenInput
         , localConstEnv :: TRPGenEnvironment
     } deriving Show
 
-type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenInput) 
+type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenState) 
 
 localInputScope :: TRPGenMonad a -> TRPGenMonad a
 localInputScope comp = do

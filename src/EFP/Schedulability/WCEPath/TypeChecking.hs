@@ -168,11 +168,11 @@ typeTransPaths paths = do
         ST.modify $ \s -> s { 
             transPaths = M.insertWith M.union (classId, functionId) (M.singleton pathName path) (transPaths s) }
     
-runTransPathTypeChecking :: TerminaProgArch SemanticAnn
+runWCEPathTypeChecking :: TerminaProgArch SemanticAnn
     -> WCEPathMap WCEPSemAnn
     -> [WCEPath ParserAnn]
     -> Either WCEPathErrors (WCEPathMap WCEPSemAnn)
-runTransPathTypeChecking arch prevMap paths =
+runWCEPathTypeChecking arch prevMap paths =
     let gConsts = getLocation . constantAnn <$> globalConstants arch
         initialState = TransPathState arch gConsts S.empty prevMap in
     case ST.runState (runExceptT (typeTransPaths paths)) initialState of

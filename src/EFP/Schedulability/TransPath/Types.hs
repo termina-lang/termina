@@ -5,4 +5,5 @@ data TRPSemAnn =
     TRPExprTy ConstExprType
     | TRPBlockTy
     | TRPActivityTy
+    | TRPTransactionsPathTy
     deriving Show

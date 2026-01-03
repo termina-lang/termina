@@ -52,7 +52,7 @@ type RTModule = TerminaModuleData RTData
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule
 type BasicBlocksProject = M.Map QualifiedName BasicBlocksModule
-type TransPathProject = M.Map QualifiedName TransPathModule
+type WCEPProject = M.Map QualifiedName TransPathModule
 type WCETProject = M.Map QualifiedName WCETModule
 
 type ProjectDependencies = M.Map QualifiedName [ModuleDependency]

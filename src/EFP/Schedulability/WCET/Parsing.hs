@@ -78,6 +78,9 @@ wspcs = Tok.whiteSpace lexer
 comma :: WCETParser String
 comma = Tok.comma lexer
 
+semi :: WCETParser String
+semi = Tok.semi lexer
+
 braces :: WCETParser a -> WCETParser a
 braces = Tok.braces lexer
 
@@ -180,6 +183,7 @@ platformAssignmentParser = do
     platformName <- identifierParser
     _ <- reservedOp "="
     wcets <- braces (sepBy transactionalWCETParser comma)
+    _ <- semi
     WCETPlatformAssignment platformName wcets . Position current startPos <$> getPosition
 
 -- | Top Level parser

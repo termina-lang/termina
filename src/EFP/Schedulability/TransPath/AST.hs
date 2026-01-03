@@ -71,7 +71,7 @@ data TransPathActivity a
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        (Maybe (TransPathActivity a)) -- ^ Continuation activity
+        [TransPathActivity a] -- ^ Continuation activities
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPHandlerActivity
@@ -80,7 +80,7 @@ data TransPathActivity a
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        (Maybe (TransPathActivity a)) -- ^ Continuation activity
+        [TransPathActivity a] -- ^ Continuation activities
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPResourceActivity
@@ -91,3 +91,13 @@ data TransPathActivity a
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     deriving Show
+
+data TransactionPath a =
+    SimpleTransactionPath
+        Identifier -- ^ Transaction path identifier
+        (TransPathActivity a) -- ^ Initial activity
+        a -- ^ Annotation
+    | CondTransactionPath
+        Identifier -- ^ Transaction path identifier
+        [(ConstExpression a, TransPathActivity a)] -- ^ Conditional branches
+        a -- ^ Annotation
