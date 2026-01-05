@@ -32,3 +32,7 @@ localInputScope comp = do
   currst <- ST.get
   ST.put (currst { localConstEnv = localConstEnv prevst })
   return res
+
+newActivityMap :: TRPGenMonad ()
+newActivityMap = do
+    ST.modify (\s -> s { activityMap = M.empty })

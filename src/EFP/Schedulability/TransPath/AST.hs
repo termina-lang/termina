@@ -101,6 +101,5 @@ data TransactionPath a =
         (TRPActivityMap a) -- ^ Map of activities
         a -- ^ Annotation
     | CondTransactionPath
-        [(ConstExpression a, Identifier)] -- ^ Conditional branches
-        (TRPActivityMap a) -- ^ Map of activities
+        [(ConstExpression a, Identifier, TRPActivityMap a)] -- ^ Conditional branches
         a -- ^ Annotation

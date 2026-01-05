@@ -1,4 +1,5 @@
-module EFP.Schedulability.TransPath.Generator where
+module EFP.Schedulability.TransPath.Generator
+    (runTransPathGenerator) where
 
 import EFP.Schedulability.RT.AST
 import EFP.Schedulability.TransPath.AST
@@ -156,36 +157,6 @@ getWCETForPath loc platformId componentClass memberName pathId = do
                                 ConstDouble val _ -> return val
                                 _ -> throwError . annotateError Internal $ EInvalidWCETExpression
 
--- | Generates transaction path blocks from a worst-case execution path block.
---
--- This function transforms a single WCE path block into one or more transaction
--- path blocks, each paired with its execution time. It handles various block types
--- including loops, function calls, conditionals, and system operations.
---
--- For blocks that contain nested structures (like loops or conditionals), this
--- function recursively generates paths for the inner blocks. For invocations,
--- it resolves target components and integrates their paths.
---
--- ==== Parameters
--- * 'componentName' - Name of the component containing this block
--- * Block pattern - The specific type of WCE path block to process
---
--- ==== Returns
--- A list of tuples, each containing:
--- * The worst-case execution time for the path
--- * The corresponding transaction path block
---
--- ==== Block Types Handled
--- * For loops: Multiplies inner path times by iteration count
--- * Member function calls: Integrates callee's paths with arguments
--- * Procedure invokes: Follows access ports and integrates remote procedure paths
--- * Conditionals (if/else-if/else): Generates paths for each branch
--- * Match cases: Generates paths for pattern branches
--- * Message sends: Returns empty (handled by user-defined continuations)
--- * Box allocation/deallocation: Creates corresponding transaction blocks
--- * System calls: Creates blocks with evaluated arguments
--- * Regular blocks: Returns empty (no contribution to transaction path)
--- * Return/Continue/Reboot: Creates corresponding terminal blocks
 genPaths :: Identifier
     -> WCEPathBlock WCEPSemAnn
     -> TRPGenMonad [(WCETime, TransPathBlock TRPSemAnn)]
@@ -290,33 +261,6 @@ genPaths _ (WCEPContinue _actionName _pos _ann) =
     return []
 genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockTy)]
 
--- | Recursively generates complete transaction paths from a list of WCE path blocks.
---
--- This function processes a sequence of WCE path blocks and accumulates all possible
--- transaction paths. It works by generating paths for each block and merging them
--- with previously accumulated paths, effectively computing the Cartesian product
--- of all possible execution paths through the sequence.
---
--- The accumulator contains tuples of (total WCET, list of blocks in reverse order).
--- For each new block, all its possible paths are merged with all existing accumulated
--- paths, creating a comprehensive set of possible execution paths.
---
--- ==== Parameters
--- * 'componentName' - Name of the component containing these blocks
--- * 'acc' - Accumulated paths so far (WCET and block lists in reverse order)
--- * Block list - Remaining WCE path blocks to process
---
--- ==== Returns
--- A list of all possible transaction paths, each containing:
--- * Total worst-case execution time for the path
--- * Complete list of transaction path blocks (in reverse order)
---
--- ==== Algorithm
--- 1. Base case: If no blocks remain, return the accumulator
--- 2. Recursive case:
---    a. Generate all paths for the first block
---    b. Merge each new path with each existing accumulated path
---    c. Recursively process remaining blocks with updated accumulator
 genTPaths :: Identifier -> [(WCETime, [TransPathBlock TRPSemAnn])]
     -> [WCEPathBlock WCEPSemAnn]
     -> TRPGenMonad [(WCETime, [TransPathBlock TRPSemAnn])]
@@ -354,7 +298,7 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
                         paths <- genTPaths componentName [(wcet, [])] innerBlocks
                         isTaskComponent <- isTask componentName
                         let mk = if isTaskComponent then TRPTaskActivity else TRPHandlerActivity
-                        let createActivity (wcet', blocks) = 
+                        let createActivity (wcet', blocks) =
                                 mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' TRPActivityTy
                         return $ map createActivity paths
                     -- | Store generated activities in the map
@@ -370,67 +314,6 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
 
 genTPActivitiesFromAction _ = throwError . annotateError Internal $ EInvalidTransStepType
 
--- | Generates transaction path activities from conditional branches.
---
--- This function processes a conditional transaction step, where execution
--- can take different paths based on runtime conditions. For each branch,
--- it evaluates the condition expression and generates the corresponding
--- transaction path activities.
---
--- ==== Parameters
--- * 'RTTransStepConditional' - The conditional step containing:
---   * 'branches' - List of (condition, action) pairs
---   * '_ann' - Semantic annotation
---
--- ==== Returns
--- A nested list structure where:
--- * Outer list - One element per branch
--- * Inner list - Alternative activities for that branch
--- * Each tuple contains the evaluated condition and its corresponding activity
---
--- ==== Errors
--- Throws an error if:
--- * The transaction step type is not conditional
--- * Condition expression evaluation fails
--- * Activity generation fails for any branch
-genTPActivitiesFromCond :: RTTransStep RTSemAnn -> TRPGenMonad [(ConstExpression TRPSemAnn, Identifier)]
-genTPActivitiesFromCond (RTTransStepConditional branches _ann) =
-    forM branches $ \case 
-            (condExpr, step@(RTTransStepAction stepName _ _ _ _ _)) -> do
-                evalConstExpr <- evalConstExpression condExpr
-                genTPActivitiesFromAction step
-                return (evalConstExpr, stepName)
-            _ -> throwError . annotateError Internal $ EInvalidTransStepType
-genTPActivitiesFromCond _ = throwError . annotateError Internal $ EInvalidTransStepType
-
--- | Executes the transaction path generator for a real-time transaction.
---
--- This is the main entry point for generating transaction paths from a real-time
--- transaction element. It sets up the generation environment with the program
--- architecture, configuration, WCE paths, and WCET data, then generates all
--- possible transaction paths based on the transaction's initial step.
---
--- The function handles two types of transactions:
--- * Simple transactions - Start with an action step, produce SimpleTransactionPath
--- * Conditional transactions - Start with conditional branches, produce CondTransactionPath
---
--- ==== Parameters
--- * 'arch' - Program architecture containing tasks, handlers, and resources
--- * 'config' - Termina configuration including platform information
--- * 'wcepMap' - Map of worst-case execution paths for all components
--- * 'wcetMap' - Map of worst-case execution times for all paths
--- * 'RTElement' - The real-time transaction element to process
---
--- ==== Returns
--- Either a list of transaction paths (Right) or generation errors (Left).
--- Each transaction path is uniquely named and contains the complete activity chain.
---
--- ==== Errors
--- Returns Left with errors if:
--- * The RT element is not a transaction
--- * The transaction structure is invalid
--- * Activity generation fails for any reason
--- * Path or WCET lookups fail
 runTransPathGenerator :: TerminaProgArch SemanticAnn
     -> TerminaConfig
     -> WCEPathMap WCEPSemAnn
@@ -442,10 +325,21 @@ runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(
     case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
         (Left err, _) -> Left err
         (_, st) -> Right $ SimpleTransactionPath stepName (activityMap st) TRPTransactionsPathTy
-runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepConditional {}) _) =
-    let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty in
-    case ST.runState (runExceptT (genTPActivitiesFromCond initialStep)) initialState of
-        (Left err, _) -> Left err
-        (Right conds, st) -> Right $ CondTransactionPath conds (activityMap st) TRPTransactionsPathTy
+runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ (RTTransStepConditional branches _) _) =
+    flip CondTransactionPath TRPTransactionsPathTy <$> generateBranches branches
+
+    where
+
+        generateBranches ::
+            [(ConstExpression RTSemAnn, RTTransStep RTSemAnn)]
+            -> Either TRPGenErrors [(ConstExpression TRPSemAnn, Identifier, TRPActivityMap TRPSemAnn)]
+        generateBranches [] = Right []
+        generateBranches ((constExpr, initialStep@(RTTransStepAction stepName _ _ _ _ _)) : xs) = do
+            rest <- generateBranches xs
+            let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty
+            case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
+                (Left err, _) -> Left err
+                (Right _, st) -> Right $ (TRPExprTy TConstInt <$ constExpr, stepName, activityMap st) : rest
+        generateBranches (_ : _) = Left $ annotateError Internal EInvalidRTElementForTransPath
 runTransPathGenerator _ _ _ _ _ =
     Left $ annotateError Internal EInvalidRTElementForTransPath

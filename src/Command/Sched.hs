@@ -48,6 +48,7 @@ import EFP.Schedulability.TransPath.Types
 import EFP.Schedulability.TransPath.AST
 import EFP.Schedulability.TransPath.PlantUML
 import EFP.Schedulability.PlantUML.Printer
+import Text.Printf
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -299,11 +300,15 @@ genPlantUMLModel emitterId transName (SimpleTransactionPath initialStep actMap _
             Right diagram -> do
               let targetFile = base </> transName </> target <.> "plantuml"
               createDirectoryIfMissing True (takeDirectory targetFile)
-              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) ["trpath" ++ show idx | idx <- [(0 :: Integer) ..]]
-genPlantUMLModel emitterId transName (CondTransactionPath conds actMap _) = do
+              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) ["trpath__" ++ show idx | idx <- [(0 :: Integer) ..]]
+genPlantUMLModel emitterId transName (CondTransactionPath conds _) = do
   let destinationPath = "plantuml"
       base = destinationPath </> emitterId
-  zipWithM_ (\(_condExpr, initialStep) condName -> zipWithM_ (\stMap target -> do
+      width_cond = length (show (max 0 (length conds - 1)))
+  zipWithM_ (\(_condExpr, initialStep, actMap) condName -> do
+      let total = product (map length (M.elems actMap))
+          width_trpath = length (show (max 0 (total - 1)))
+      zipWithM_ (\stMap target -> do
           let result = runPlantUMLGenerator emitterId initialStep stMap
           case result of
             Left err ->
@@ -312,8 +317,8 @@ genPlantUMLModel emitterId transName (CondTransactionPath conds actMap _) = do
               let targetFile = base </> transName </> target <.> "plantuml"
               createDirectoryIfMissing True (takeDirectory targetFile)
               TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) 
-                [condName ++ "__trpath" ++ show idx | idx <- [(0 :: Integer) ..]])
-              conds ["cond" ++ show idx | idx <- [(0 :: Integer) ..]]
+                [condName ++ "_trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]])
+                conds ["cond" ++ printf "%0*d" width_cond idx | idx <- [(0 :: Integer) ..]]
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
