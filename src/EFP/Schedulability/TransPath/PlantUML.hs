@@ -55,14 +55,18 @@ genBlock currentCmp acc (TPBlockProcedureInvoke args called _pos _) = do
     return $ acc ++ stepStmts
 genBlock currentCmp acc (TPBlockAllocBox poolName _pos _) = do
     let startMsg = PlantUMLSeqMessage currentCmp poolName (Just (T.pack "alloc"))
-    let endMsg = PlantUMLSeqMessage poolName currentCmp Nothing
+        activate = PlantUMLSeqActivationStart currentCmp
+        endMsg = PlantUMLSeqMessage poolName currentCmp Nothing
+        deactivate = PlantUMLSeqActivationEnd currentCmp
     ST.modify $ \s -> s { participants = M.insert poolName (PlantUMLDatabase poolName 30) (participants s) }
-    return $ acc ++ [startMsg] ++ [endMsg]
+    return $ acc ++ [startMsg, activate, endMsg, deactivate]
 genBlock currentCmp acc (TPBlockFreeBox poolName _pos _) = do
     let startMsg = PlantUMLSeqMessage currentCmp poolName (Just (T.pack "free"))
-    let endMsg = PlantUMLSeqMessage poolName currentCmp Nothing
+        activate = PlantUMLSeqActivationStart currentCmp
+        endMsg = PlantUMLSeqMessage poolName currentCmp Nothing
+        deactivate = PlantUMLSeqActivationEnd currentCmp
     ST.modify $ \s -> s { participants = M.insert poolName (PlantUMLDatabase poolName 30) (participants s) }
-    return $ acc ++ [startMsg] ++ [endMsg]
+    return $ acc ++ [startMsg, activate, endMsg, deactivate]
 genBlock _currentCmp acc (TPBlockReturn {}) = do
     return acc 
 genBlock _currentCmp acc (TPBlockReboot {}) = do
