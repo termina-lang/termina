@@ -22,7 +22,7 @@ import Data.Maybe
 import Parser.Types
 import Utils.Monad
 import Semantic.TypeChecking.Expression
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 typeBlock :: Maybe (SAST.TerminaType SemanticAnn) -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock rTy (Block stmts loc) = do

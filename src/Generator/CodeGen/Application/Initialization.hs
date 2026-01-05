@@ -8,7 +8,7 @@ import System.FilePath
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Generator.CodeGen.Statement
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
 import Generator.LanguageC.Embedded

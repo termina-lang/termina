@@ -8,7 +8,7 @@ import qualified Language.LSP.Protocol.Types as LSP
 import Utils.Errors
 import EFP.Schedulability.Core.AST
 import Text.Parsec
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 --------------------------------------------------
 -- Transactional Path Generator error handling

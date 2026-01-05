@@ -20,7 +20,7 @@ import Generator.CodeGen.Application.Makefile
 import Generator.Makefile.Printer
 import Generator.CodeGen.Application.Config
 import Utils.Annotations
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import System.Directory
 import System.Environment
 import Modules.Modules

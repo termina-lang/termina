@@ -3,7 +3,7 @@ module ControlFlow.Architecture.Types where
 import Data.Map
 import ControlFlow.BasicBlocks.AST
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 
 -- This module contains the function that will be used to generate

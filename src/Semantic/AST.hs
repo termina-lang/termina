@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor  #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Semantic.AST
   ( module Semantic.AST
@@ -8,6 +9,8 @@ module Semantic.AST
 
 import Utils.Annotations
 import Core.AST
+import Utils.Printer
+import qualified Data.Text as T
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
@@ -28,6 +31,17 @@ data Object a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
   | Unbox (Object a) a
   deriving (Show, Functor)
+
+instance ShowText (Object a) where
+    showText (Variable ident _) = T.pack ident
+    showText (ArrayIndexExpression obj expr _) = 
+        showText obj <> "[" <> showText expr <> "]"
+    showText (MemberAccess obj ident _) = 
+        showText obj <> "." <> T.pack ident
+    showText (Dereference obj _) = "*" <> showText obj
+    showText (DereferenceMemberAccess obj ident _) = 
+        "*" <> showText obj <> "." <> T.pack ident
+    showText (Unbox obj _) = "unbox " <> showText obj
 
 -- | First AST after parsing
 data Expression
@@ -71,6 +85,37 @@ data Expression
   | ArraySliceExpression AccessKind (Object a) (Expression a) (Expression a) a
   -- ^ TArray slice. This is a reference to an slisce of an array.
   deriving (Show, Functor)
+
+instance ShowText (Expression a) where
+    showText (AccessObject obj) = showText obj
+    showText (Constant c _) = showText c
+    showText (BinOp op lhe rhe _) = showText lhe <> " " <> showText op <> " " <> showText rhe
+    showText (ReferenceExpression ak obj _) = "&" <> showText ak <> " " <> showText obj
+    showText (Casting e ty _) = "(" <> showText ty <> ") " <> showText e
+    showText (FunctionCall ident args _) = 
+        T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (MemberFunctionCall obj ident args _) =
+        showText obj <> "." <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (DerefMemberFunctionCall obj ident args _) = 
+        showText obj <> "->" <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (ArrayInitializer value size _) =
+        "[" <> showText value <> "; " <> showText size <> "]"
+    showText (ArrayExprListInitializer exprs _) = 
+        "{" <> T.intercalate ", " (map showText exprs) <> "}"
+    showText (StructInitializer fs _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "}"
+    showText (EnumVariantInitializer ident variant args _) = 
+        T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (MonadicVariantInitializer ov _) = 
+        "Some(" <> showText ov <> ")"
+    showText (StringInitializer str _) = 
+        "\"" <> T.pack str <> "\""
+    showText (IsEnumVariantExpression obj ident variant _) = 
+        showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
+    showText (IsMonadicVariantExpression obj variant _) = 
+        showText obj <> " is " <> showText variant
+    showText (ArraySliceExpression ak obj lower upper _) = 
+         showText ak <> " " <> showText obj <> "[" <> showText lower <> ".." <> showText upper <> "]"
 
 instance Annotated Object where
   getAnnotation (Variable _ a)                = a

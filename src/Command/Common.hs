@@ -12,7 +12,7 @@ import System.Directory
 import Parser.Parsing (terminaModuleParser)
 import Parser.Errors
 import Text.Parsec (runParser)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Semantic.Types (SemanticAnn)
 import Modules.Modules
 import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)

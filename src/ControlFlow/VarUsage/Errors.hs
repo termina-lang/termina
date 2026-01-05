@@ -11,8 +11,9 @@ import ControlFlow.VarUsage.Types
 import Utils.Errors
 import qualified Data.Text as T
 import Text.Parsec
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Language.LSP.Protocol.Types as LSP
+import Utils.Printer
 
 data Error
   = ESetMaxBound -- ^ The set has reached its maximum bound (Internal)  

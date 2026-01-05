@@ -4,7 +4,7 @@ module Semantic.Utils where
     
 import Core.AST
 import Parser.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Extras.Graph
 import qualified Data.Set as S
 import qualified Semantic.AST as SAST

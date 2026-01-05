@@ -7,7 +7,7 @@ import Control.Monad.Reader
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Utils
 import Semantic.Types
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 
 type ConnectionsCheckMonad = ExceptT ArchitectureError (Reader (TerminaProgArch SemanticAnn))

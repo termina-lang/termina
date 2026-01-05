@@ -3,8 +3,11 @@ module EFP.Schedulability.TransPath.AST
     , module EFP.Schedulability.TransPath.AST) where
 
 import EFP.Schedulability.Core.AST
+import qualified Data.Map.Strict as M
 
 type WCETime = Double
+type TRPActivityMap a = M.Map Identifier [TransPathActivity a]
+type TRPStepMap a = M.Map Identifier (TransPathActivity a)
 
 -- | Worst-case execution path block
 data TransPathBlock a
@@ -71,7 +74,7 @@ data TransPathActivity a
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        [TransPathActivity a] -- ^ Continuation activities
+        [Identifier] -- ^ Continuation activities
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPHandlerActivity
@@ -80,7 +83,7 @@ data TransPathActivity a
         Identifier -- ^ action name
         Identifier -- ^ path name
         [TransPathBlock a] -- ^ Blocks in the activity
-        [TransPathActivity a] -- ^ Continuation activities
+        [Identifier] -- ^ Continuation activities
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     | TRPResourceActivity
@@ -94,10 +97,10 @@ data TransPathActivity a
 
 data TransactionPath a =
     SimpleTransactionPath
-        Identifier -- ^ Transaction path identifier
-        (TransPathActivity a) -- ^ Initial activity
+        Identifier -- ^ Initial step identifier
+        (TRPActivityMap a) -- ^ Map of activities
         a -- ^ Annotation
     | CondTransactionPath
-        Identifier -- ^ Transaction path identifier
-        [(ConstExpression a, TransPathActivity a)] -- ^ Conditional branches
+        [(ConstExpression a, Identifier)] -- ^ Conditional branches
+        (TRPActivityMap a) -- ^ Map of activities
         a -- ^ Annotation

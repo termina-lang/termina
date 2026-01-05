@@ -7,7 +7,7 @@ import Semantic.AST
 import Semantic.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Core.Utils
 import Data.Bits
 import ControlFlow.Architecture.Utils (classMemberFunctions)

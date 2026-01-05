@@ -2,12 +2,16 @@
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Module defining core AST
 
 module Core.AST where
 
 import Utils.Annotations
+import Utils.Printer
+import qualified Data.Text as T
+import Numeric
 
 -- | Integer representation.  
 -- A value of this type is used to indicate the representation in which the
@@ -20,6 +24,11 @@ data IntRepr = DecRepr | HexRepr | OctalRepr
 -- A Termina integer is defined by its value and its numeric representation.
 data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
+
+instance ShowText TInteger where
+    showText (TInteger value DecRepr) = T.pack $ show value
+    showText (TInteger value HexRepr) = T.toUpper . T.pack $ "0x" <> showHex value ""
+    showText (TInteger value OctalRepr) = T.pack ("0" <> showOct value "")
 
 -- | Annotated AST element
 data AnnASTElement' ty blk expr a =
@@ -58,7 +67,6 @@ data ModuleImport' pf a = ModuleImport
   , moduleAnn :: a
   }
   deriving (Functor, Show)
-
 
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
@@ -171,8 +179,51 @@ instance Ord (TerminaType' expr a) where
   TConstSubtype t `compare` TConstSubtype t' = t `compare` t'
   _ `compare` _ = LT
 
+instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
+
+    showText TUInt8 = "u8"
+    showText TUInt16 = "u16"
+    showText TUInt32 = "u32"
+    showText TUInt64 = "u64"
+    showText TInt8 = "i8"
+    showText TInt16 = "i16"
+    showText TInt32 = "i32"
+    showText TInt64 = "i64"
+    showText TUSize = "usize"
+    showText TBool = "bool"
+    showText TChar = "char"
+    showText (TConstSubtype ts) = "const " <> showText ts
+    showText (TStruct ident) = T.pack ident
+    showText (TEnum ident) = T.pack ident
+    showText (TInterface _ ident) = T.pack ident
+    showText (TGlobal _ ident) = T.pack ident
+    showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (TOption ty) = "Option<" <> showText ty <> ">"
+    showText (TResult tyOk tyError) = "Result<" <> showText tyOk <> "; " <> showText tyError <> ">"
+    showText (TStatus ty) = "Status<" <> showText ty <> ">"
+    showText (TMsgQueue ts size) = "MsgQueue<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TPool ts size) = "Pool<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TAllocator ts) = "Allocator<" <> showText ts <> ">"
+    showText (TAtomicAccess ts) = "AtomicAccess<" <> showText ts <> ">"
+    showText (TAtomicArrayAccess ts size) = "AtomicArrayAccess<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TAtomic ts) = "Atomic<" <> showText ts <> ">"
+    showText (TAtomicArray ts size) = "AtomicArray<" <> showText ts <> "; " <> showText size <> ">"
+    showText (TReference ak ts) = "&" <> showText ak <> showText ts
+    showText (TBoxSubtype ts) = "box " <> showText ts
+    showText (TFixedLocation ts) = "loc " <> showText ts
+    showText (TAccessPort ts) = "access " <> showText ts
+    showText (TSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (TInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (TOutPort ts) = "out " <> showText ts
+    showText TUnit = "unit"
+
 data AccessKind = Immutable | Mutable | Private
   deriving (Show, Ord, Eq)
+
+instance ShowText AccessKind where
+    showText Mutable = "mut "
+    showText Private = "priv "
+    showText Immutable = ""
 
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
   deriving (Show, Ord, Eq) 
@@ -198,14 +249,50 @@ data Op
   | LogicalOr
   deriving Show
 
+instance ShowText Op where
+    showText Addition = "+"
+    showText Subtraction = "-"
+    showText Multiplication = "*"
+    showText Division = "/"
+    showText Modulo = "%"
+    showText BitwiseAnd = "&"
+    showText BitwiseOr = "|"
+    showText BitwiseXor = "^"
+    showText BitwiseLeftShift = "<<"
+    showText BitwiseRightShift = ">>"
+    showText RelationalLT = "<"
+    showText RelationalLTE = "<="
+    showText RelationalGT = ">"
+    showText RelationalGTE = ">="
+    showText RelationalEqual = "=="
+    showText RelationalNotEqual = "!="
+    showText LogicalAnd = "&&"
+    showText LogicalOr = "||"
+
 data MonadicVariant' expr a = 
   None | Some (expr a) 
   | Ok (expr a) | Error (expr a) 
   | Success | Failure (expr a)
   deriving (Show, Functor)
 
+instance (ShowText (expr a)) => ShowText (MonadicVariant' expr a) where
+    showText (Some e) = "Some(" <> showText e <> ")"
+    showText None = "None"
+    showText (Ok e) = "Ok(" <> showText e <> ")"
+    showText (Error e) = "Error(" <> showText e <> ")"
+    showText Success = "Success"
+    showText (Failure e) = "Failure(" <> showText e <> ")"
+
 data MonadicVariantLabel = NoneLabel | SomeLabel | OkLabel | ErrorLabel | SuccessLabel | FailureLabel
   deriving (Show)
+
+instance ShowText MonadicVariantLabel where
+    showText SomeLabel = "Some"
+    showText NoneLabel = "None"
+    showText OkLabel = "Ok"
+    showText ErrorLabel = "Error"
+    showText SuccessLabel = "Success"
+    showText FailureLabel = "Failure"
 
 ----------------------------------------
 -- | Datatype representing Global Declarations.
@@ -293,6 +380,17 @@ data TypeDef' ty blk a
   | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty a] [Modifier' ty a]
   deriving (Show, Functor)
 
+instance ShowText (TypeDef' ty blk a) where
+    showText (Struct ident _ _) = T.pack $ "struct " <> ident
+    showText (Enum ident _ _) = T.pack $ "enum " <> ident
+    showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
+    showText (Class ResourceClass ident _ _ _) = T.pack $ "resource class " <> ident
+    showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
+    showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
+    showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
+    showText (Interface RegularInterface ident _ _ _) = T.pack $ "interface " <> ident
+    showText (Interface SystemInterface ident _ _ _) = T.pack $ "system interface " <> ident
+
 data InterfaceKind = RegularInterface | SystemInterface
   deriving (Show, Ord, Eq)
 
@@ -374,6 +472,18 @@ data FieldAssignment' expr a =
   | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
+instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
+    showText (FieldValueAssignment ident expr _) = 
+        T.pack ident <> " = " <> showText expr
+    showText (FieldAddressAssignment ident addr _) = 
+        T.pack ident <> " @ " <> showText addr
+    showText (FieldPortConnection InboundPortConnection ident glb _) = 
+        T.pack ident <> " <- " <> T.pack glb
+    showText (FieldPortConnection OutboundPortConnection ident glb _) =
+        T.pack ident <> " -> " <> T.pack glb
+    showText (FieldPortConnection AccessPortConnection ident glb _) =
+        T.pack ident <> " <-> " <> T.pack glb
+
 data FieldDefinition' ty a = FieldDefinition {
   fieldIdentifier      :: Identifier
   , fieldTerminaType :: ty a
@@ -391,6 +501,15 @@ data EnumVariant' ty a = EnumVariant {
 -- - Characters
 data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | C Char | Null
   deriving (Show, Functor)
+
+
+instance (ShowText (ty a)) => ShowText (Const' ty a) where
+    showText (I i Nothing) = showText i
+    showText (I i (Just ts)) = showText i <> " : " <> showText ts
+    showText (B True) = "true"
+    showText (B False) = "false"
+    showText (C c) = T.pack [c]
+    showText Null = "null"
 
 ----------------------------------------
 -- Termina Programs definitions

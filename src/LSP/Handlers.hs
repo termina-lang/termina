@@ -18,7 +18,7 @@ import System.Directory
 import qualified Data.Text as T
 import Command.Utils
 import LSP.Utils
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import System.FilePath
 import LSP.Modules
 import Generator.Environment (getPlatformInitialGlobalEnv)

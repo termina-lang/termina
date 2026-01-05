@@ -21,7 +21,7 @@ import Control.Monad
 import Control.Monad.Except
 
 import Data.Maybe
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Control.Monad.State as ST
 
 -- AST to work with.

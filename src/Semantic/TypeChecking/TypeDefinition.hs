@@ -7,7 +7,7 @@ import Core.Utils
 import Semantic.Utils
 
 -- Top Sort
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 -- Termina Semantic AST
 import qualified Semantic.AST as SAST

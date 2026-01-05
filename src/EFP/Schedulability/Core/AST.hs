@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module EFP.Schedulability.Core.AST
     (module EFP.Schedulability.Core.AST
@@ -8,6 +9,7 @@ import Core.AST
 import Utils.Annotations
 import Utils.Errors
 import Data.Text
+import Utils.Printer
 
 
 data BlockPosition = BlockPosition
@@ -17,6 +19,10 @@ data BlockPosition = BlockPosition
     ,   blockPosEndLine :: !Integer
     ,   blockPosEndColumn :: !Integer
     } deriving (Show, Eq)
+
+instance ShowText BlockPosition where
+    showText (BlockPosition sl sc el ec) =
+        pack $ "@(" ++ show sl ++ ":" ++ show sc ++ "," ++ show el ++ ":" ++ show ec ++ ")"
 
 data ConstExprType =
     TConstInt
@@ -32,7 +38,7 @@ data ConstExpression a
     | ConstDouble Double a
     | ConstObject Identifier a
     | ConstBinOp Op (ConstExpression a) (ConstExpression a) a
-    deriving Show
+    deriving (Show, Functor)
 
 instance ShowText (ConstExpression a) where
     showText (ConstObject ident _) = pack ident

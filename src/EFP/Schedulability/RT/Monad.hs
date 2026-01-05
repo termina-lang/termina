@@ -1,5 +1,5 @@
 module EFP.Schedulability.RT.Monad where
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.RT.AST
 import Utils.Annotations
 import ControlFlow.Architecture.Types

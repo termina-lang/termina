@@ -4,7 +4,7 @@ import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
 import ControlFlow.Architecture.Types
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import ControlFlow.Architecture
 import Configuration.Platform
 import qualified Configuration.Platform.RTEMS5LEON3QEMU as RTEMS5LEON3QEMU.Config

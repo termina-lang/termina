@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module EFP.Schedulability.WCEPath.TypeChecking where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import Semantic.Types
 import EFP.Schedulability.WCEPath.Types

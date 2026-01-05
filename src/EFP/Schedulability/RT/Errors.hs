@@ -4,12 +4,13 @@
 module EFP.Schedulability.RT.Errors where
 import Utils.Annotations
 import EFP.Schedulability.RT.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
 import Utils.Errors
 import EFP.Schedulability.RT.Types
+import Utils.Printer
 
 --------------------------------------------------
 -- Real-time type checker error handling

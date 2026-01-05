@@ -1,6 +1,6 @@
 module EFP.Schedulability.WCEPath.Monad where
     
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.WCEPath.AST
 import Utils.Annotations
 import ControlFlow.Architecture.Types

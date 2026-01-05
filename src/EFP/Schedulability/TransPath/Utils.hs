@@ -4,7 +4,7 @@ import EFP.Schedulability.TransPath.Monad
 import Control.Monad.Except
 import Utils.Annotations
 import Control.Monad.State
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.TransPath.Types
 import Data.Bits
 import EFP.Schedulability.TransPath.Errors

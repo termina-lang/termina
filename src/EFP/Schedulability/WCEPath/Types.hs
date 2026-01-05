@@ -2,7 +2,7 @@
 module EFP.Schedulability.WCEPath.Types where
 
 import Utils.Annotations
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.WCEPath.AST
 
 data WCEPSemAnn = 

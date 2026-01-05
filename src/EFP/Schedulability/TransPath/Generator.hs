@@ -8,7 +8,7 @@ import Control.Monad
 import EFP.Schedulability.TransPath.Errors
 import Control.Monad.Except
 import Utils.Annotations
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.WCEPath.Types
 import ControlFlow.Architecture.Types
 import Control.Monad.State
@@ -194,7 +194,7 @@ genPaths componentName (WCEPathForLoop initExpr finalExpr innerBlocks pos _ann) 
     iterationCount <- evalConstExpression iterations >>= \case
         ConstInt (TInteger val _) _ -> return val
         _ -> throwError . annotateError Internal $ EInvalidForLoop
-    innerPaths <- genTPaths componentName [] innerBlocks
+    innerPaths <- genTPaths componentName [(0, [])] innerBlocks
     return $ map (\(wcet, blocks) -> (wcet * fromIntegral iterationCount, TPBlockForLoop iterationCount (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathMemberFunctionCall memberName constArgs pos ann) = do
     -- | Get current platform
@@ -243,17 +243,26 @@ genPaths componentName (WCEPProcedureInvoke portName procedureName constArgs pos
             <&> concat
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass procedureName
 genPaths componentName (WCEPathCondIf innerBlocks pos _ann) = do
-    innerPaths <- genTPaths componentName [] innerBlocks
-    return $ map (\(wcet, blocks) -> (wcet, TPBlockCondIf (reverse blocks) pos TRPBlockTy)) innerPaths
+    innerPaths <- genTPaths componentName [(0, [])] innerBlocks
+    case innerPaths of
+        [(0, [])] -> return []
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondIf (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathCondElseIf innerBlocks pos _ann) = do
-    innerPaths <- genTPaths componentName [] innerBlocks
-    return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElseIf (reverse blocks) pos TRPBlockTy)) innerPaths
+    innerPaths <- genTPaths componentName [(0, [])] innerBlocks
+    case innerPaths of
+        [(0, [])] -> return []
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElseIf (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathCondElse innerBlocks pos _ann) = do
-    innerPaths <- genTPaths componentName [] innerBlocks
-    return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElse (reverse blocks) pos TRPBlockTy)) innerPaths
+    innerPaths <- genTPaths componentName [(0, [])] innerBlocks
+    case innerPaths of
+        [(0, [])] -> return []
+        _ ->
+            return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElse (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathMatchCase innerBlocks pos _ann) = do
-    innerPaths <- genTPaths componentName [] innerBlocks
-    return $ map (\(wcet, blocks) -> (wcet, TPBlockMatchCase (reverse blocks) pos TRPBlockTy)) innerPaths
+    innerPaths <- genTPaths componentName [(0, [])] innerBlocks
+    case innerPaths of
+        [(0, [])] -> return []
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockMatchCase (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths _ (WCEPSendMessage _portName _pos _ann) =
     -- | Continuations are directly defined by the user when defining the transaction
     return []
@@ -314,43 +323,22 @@ genTPaths :: Identifier -> [(WCETime, [TransPathBlock TRPSemAnn])]
 genTPaths _ acc []  = return acc
 genTPaths componentName paths (block : remainingBlocks) = do
     newPaths <- genPaths componentName block
-    let appendedPaths = concatMap (\prevPath -> map (`mergeTPath` prevPath) newPaths) paths
-    genTPaths componentName appendedPaths remainingBlocks
+    if null newPaths then genTPaths componentName paths remainingBlocks
+    else do
+        let appendedPaths = if null paths then map (\(nwcet, nblocks) -> (nwcet, [nblocks])) newPaths else
+                concatMap (\prevPath -> map (`mergeTPath` prevPath) newPaths) paths
+        genTPaths componentName appendedPaths remainingBlocks
 
--- | Generates transaction path activities from an action step in a real-time transaction.
---
--- This function transforms a real-time transaction step into one or more transaction
--- path activities. It handles different continuation patterns:
---
--- * Terminal actions (no continuation)
--- * Sequential actions (single continuation)
--- * Multicast actions (multiple parallel continuations)
---
--- For each action, it retrieves the corresponding WCE path, computes the WCET,
--- generates the transaction path blocks, and creates the appropriate activity type
--- (task or handler) based on the component type.
---
--- ==== Parameters
--- * 'RTTransStepAction' - The action step to process, which may have:
---   * 'stepName' - Unique identifier for this step
---   * 'componentName' - Component executing the action
---   * 'actionName' - Name of the action to execute
---   * 'pathName' - Specific execution path to follow
---   * Continuation - Optional next step (Nothing, single action, or multicast)
---   * 'ann' - Semantic annotation for error reporting
---
--- ==== Returns
--- A list of transaction path activities representing all possible execution paths.
--- Each activity includes the complete path blocks and WCET for that path.
---
--- ==== Errors
--- Throws an error if:
--- * The component class or action is not found in the path map
--- * The specified path name doesn't exist
--- * WCET computation fails
--- * The transaction step type is invalid (not an action)
-genTPActivitiesFromAction :: RTTransStep RTSemAnn -> TRPGenMonad [TransPathActivity TRPSemAnn]
-genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName Nothing ann) = do
+genTPActivitiesFromAction :: RTTransStep RTSemAnn -> TRPGenMonad ()
+genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName mNextSteps ann) = do
+    nextStepNames <- case mNextSteps of
+        Nothing -> return []
+        Just nextStep@(RTTransStepAction nextStepName _ _ _ _ _) ->
+            genTPActivitiesFromAction nextStep >> return [nextStepName]
+        Just (RTTransStepMuticast multicastSteps _) -> do
+            mapM_ genTPActivitiesFromAction multicastSteps
+            getNextStepNames multicastSteps
+        _ -> throwError . annotateError Internal $ EInvalidTransStepType
     -- | Get current platform
     platformId <- gets (T.unpack . platform . configParams)
     transPathsMap <- gets transPaths
@@ -360,69 +348,26 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
         Just pathsMap ->
             case M.lookup pathName pathsMap of
                 Just (WCEPath _ _ _ _ innerBlocks _) -> do
-                    localInputScope $ do
+                    activities <- localInputScope $ do
                         -- | Obtain the worst-case execution time for the path
                         wcet <- getWCETForPath (getLocation ann) platformId componentClass actionName pathName
                         paths <- genTPaths componentName [(wcet, [])] innerBlocks
                         isTaskComponent <- isTask componentName
-                        let createActivity = if isTaskComponent
-                                then \(wcet', blocks) -> TRPTaskActivity stepName componentName actionName pathName (reverse blocks) [] wcet' TRPActivityTy
-                                else \(wcet', blocks) -> TRPHandlerActivity stepName componentName actionName pathName (reverse blocks) [] wcet' TRPActivityTy
+                        let mk = if isTaskComponent then TRPTaskActivity else TRPHandlerActivity
+                        let createActivity (wcet', blocks) = 
+                                mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' TRPActivityTy
                         return $ map createActivity paths
+                    -- | Store generated activities in the map
+                    ST.modify (\st -> st { activityMap = M.insert stepName activities (activityMap st) })
                 Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass pathName
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass actionName
-genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName (Just nextStep@(RTTransStepAction {})) ann) = do
-    nextActivities <- genTPActivitiesFromAction nextStep
-    -- | Get current platform
-    platformId <- gets (T.unpack . platform . configParams)
-    transPathsMap <- gets transPaths
-    componentClass <- getComponentClass componentName
-    -- | Find the path and generate the activities
-    case M.lookup (componentClass, actionName) transPathsMap of
-        Just pathsMap ->
-            case M.lookup pathName pathsMap of
-                Just (WCEPath _ _ _ _ innerBlocks _) -> do
-                    localInputScope $ do
-                        -- | Obtain the worst-case execution time for the path
-                        wcet <- getWCETForPath (getLocation ann) platformId componentClass actionName pathName
-                        paths <- genTPaths componentName [(wcet, [])] innerBlocks
-                        isTaskComponent <- isTask componentName
-                        let createActivity = if isTaskComponent
-                                then \(wcet', blocks) -> map (\altAct -> 
-                                    TRPTaskActivity stepName componentName actionName pathName 
-                                        (reverse blocks) [altAct] wcet' TRPActivityTy) nextActivities
-                                else \(wcet', blocks) -> map (\altAct ->
-                                    TRPHandlerActivity stepName componentName actionName pathName 
-                                        (reverse blocks) [altAct] wcet' TRPActivityTy) nextActivities
-                        return $ concatMap createActivity paths
-                Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass pathName
-        Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass actionName
-genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName (Just (RTTransStepMuticast multicastSteps _)) ann) = do
-    nextActivities <- sequence <$> mapM genTPActivitiesFromAction multicastSteps
-    -- | Get current platform
-    platformId <- gets (T.unpack . platform . configParams)
-    transPathsMap <- gets transPaths
-    componentClass <- getComponentClass componentName
-    -- | Find the path and generate the activities
-    case M.lookup (componentClass, actionName) transPathsMap of
-        Just pathsMap ->
-            case M.lookup pathName pathsMap of
-                Just (WCEPath _ _ _ _ innerBlocks _) -> do
-                    localInputScope $ do
-                        -- | Obtain the worst-case execution time for the path
-                        wcet <- getWCETForPath (getLocation ann) platformId componentClass actionName pathName
-                        paths <- genTPaths componentName [(wcet, [])] innerBlocks
-                        isTaskComponent <- isTask componentName
-                        let createActivity = if isTaskComponent
-                                then \(wcet', blocks) -> map (\altActs -> 
-                                    TRPTaskActivity stepName componentName actionName pathName 
-                                        (reverse blocks) altActs wcet' TRPActivityTy) nextActivities
-                                else \(wcet', blocks) -> map (\altActs ->
-                                    TRPHandlerActivity stepName componentName actionName pathName 
-                                        (reverse blocks) altActs wcet' TRPActivityTy) nextActivities
-                        return $ concatMap createActivity paths
-                Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass pathName
-        Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass actionName
+
+    where
+
+        getNextStepNames = mapM (\case
+            (RTTransStepAction n _ _ _ _ _) -> return n
+            _ -> throwError . annotateError Internal $ EInvalidTransStepType)
+
 genTPActivitiesFromAction _ = throwError . annotateError Internal $ EInvalidTransStepType
 
 -- | Generates transaction path activities from conditional branches.
@@ -448,12 +393,14 @@ genTPActivitiesFromAction _ = throwError . annotateError Internal $ EInvalidTran
 -- * The transaction step type is not conditional
 -- * Condition expression evaluation fails
 -- * Activity generation fails for any branch
-genTPActivitiesFromCond :: RTTransStep RTSemAnn -> TRPGenMonad [[(ConstExpression TRPSemAnn, TransPathActivity TRPSemAnn)]]
-genTPActivitiesFromCond (RTTransStepConditional branches _ann) = 
-    forM branches $ \(condExpr, step) -> do
-        evalConstExpr <- evalConstExpression condExpr
-        activities <- genTPActivitiesFromAction step
-        return $ map (evalConstExpr,) activities
+genTPActivitiesFromCond :: RTTransStep RTSemAnn -> TRPGenMonad [(ConstExpression TRPSemAnn, Identifier)]
+genTPActivitiesFromCond (RTTransStepConditional branches _ann) =
+    forM branches $ \case 
+            (condExpr, step@(RTTransStepAction stepName _ _ _ _ _)) -> do
+                evalConstExpr <- evalConstExpression condExpr
+                genTPActivitiesFromAction step
+                return (evalConstExpr, stepName)
+            _ -> throwError . annotateError Internal $ EInvalidTransStepType
 genTPActivitiesFromCond _ = throwError . annotateError Internal $ EInvalidTransStepType
 
 -- | Executes the transaction path generator for a real-time transaction.
@@ -489,22 +436,16 @@ runTransPathGenerator :: TerminaProgArch SemanticAnn
     -> WCEPathMap WCEPSemAnn
     -> WCETimesMap WCETSemAnn
     -> RTElement RTSemAnn
-    -> Either TRPGenErrors [TransactionPath TRPSemAnn]
-runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepAction {}) _) =
-    let initialState = TRPGenState arch config wcepMap wcetMap M.empty in
-    case ST.evalState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of 
-        Right activities -> 
-            Right $ zipWith (\trPathName act -> 
-                SimpleTransactionPath trPathName act TRPTransactionsPathTy) 
-                ["trpath" ++ show idx | idx <- [(0 :: Integer) ..]] activities
-        Left err -> Left err
+    -> Either TRPGenErrors (TransactionPath TRPSemAnn)
+runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepAction stepName _ _ _ _ _) _) =
+    let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty in
+    case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
+        (Left err, _) -> Left err
+        (_, st) -> Right $ SimpleTransactionPath stepName (activityMap st) TRPTransactionsPathTy
 runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepConditional {}) _) =
-    let initialState = TRPGenState arch config wcepMap wcetMap M.empty in
-    case ST.evalState (runExceptT (genTPActivitiesFromCond initialStep)) initialState of 
-        Right activities -> 
-            Right $ zipWith (\trPathName act -> 
-                CondTransactionPath trPathName act TRPTransactionsPathTy) 
-                ["trpath" ++ show idx | idx <- [(0 :: Integer) ..]] (sequence activities)
-        Left err -> Left err
+    let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty in
+    case ST.runState (runExceptT (genTPActivitiesFromCond initialStep)) initialState of
+        (Left err, _) -> Left err
+        (Right conds, st) -> Right $ CondTransactionPath conds (activityMap st) TRPTransactionsPathTy
 runTransPathGenerator _ _ _ _ _ =
     Left $ annotateError Internal EInvalidRTElementForTransPath

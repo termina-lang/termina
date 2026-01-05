@@ -11,7 +11,7 @@ import Generator.CodeGen.Common
 import ControlFlow.Architecture.Types
 import Semantic.Types
 import Generator.LanguageC.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Expression
 import Generator.CodeGen.Types

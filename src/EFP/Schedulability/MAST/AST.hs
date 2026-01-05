@@ -1,6 +1,6 @@
 module EFP.Schedulability.MAST.AST where
 import EFP.Schedulability.Core.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 type NormalizedExecutionTime = Double
 type Time = Double
@@ -62,10 +62,10 @@ data MASTOperation =
         [Identifier] -- ^ Shared resources to unlock
     | MASTCompositeOperation
         Identifier -- ^ Operation's name
-        [MASTOperation] -- ^ Sub-operations
+        [Identifier] -- ^ Sub-operations
     | MASTEnclosingOperation
         Identifier -- ^ Operation's name
-        [MASTOperation] -- ^ Enclosed operations
+        [Identifier] -- ^ Enclosed operations
     deriving Show
 
 data MASTExternalEvent =

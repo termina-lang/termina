@@ -1,6 +1,6 @@
 module ControlFlow.ConstFolding where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Semantic.Types
 import Control.Monad.Except
 import ControlFlow.ConstFolding.Errors

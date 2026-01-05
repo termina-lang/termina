@@ -1,11 +1,11 @@
 module EFP.Schedulability.WCEPath.Printer where
-import Generator.Utils
 import EFP.Schedulability.WCEPath.AST
 import Prettyprinter
 import Text.Parsec.Pos
 import Data.Text (Text)
 import Data.Char
 import Numeric
+import Utils.Printer
 
 class WCEPathPrinter a where
     pprint :: a -> DocStyle

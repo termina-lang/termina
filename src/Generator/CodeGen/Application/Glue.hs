@@ -5,7 +5,7 @@
 module Generator.CodeGen.Application.Glue where
 
 import Generator.LanguageC.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Generator.CodeGen.Common
 import Semantic.Types
 import ControlFlow.Architecture.Types

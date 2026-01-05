@@ -4,12 +4,13 @@
 module EFP.Schedulability.WCEPath.Errors where
 import Utils.Annotations
 import EFP.Schedulability.WCEPath.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
 import Utils.Errors
 import Modules.Utils
+import Utils.Printer
 
 
 ---------------------------------------------------------

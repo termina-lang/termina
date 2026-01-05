@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Command.Types where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST

@@ -17,7 +17,7 @@ import System.FilePath
 import System.Exit
 import System.Directory
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Modules.Modules
 import Generator.Monadic
 import Data.List (foldl')

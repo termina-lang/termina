@@ -4,7 +4,7 @@ import Test.Hspec
 import Semantic.AST
 import Data.Text
 import Semantic.Types
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.Monadic
 

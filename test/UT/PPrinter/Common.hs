@@ -11,7 +11,7 @@ import Configuration.Platform
 import Generator.Utils
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Semantic.AST
 import Data.Text

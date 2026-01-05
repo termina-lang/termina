@@ -4,7 +4,7 @@ import Semantic.Types
 import EFP.Schedulability.WCEPath.Types
 import Control.Monad.Except
 import EFP.Schedulability.TransPath.Errors
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import EFP.Schedulability.TransPath.AST
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.TransPath.Types
@@ -20,6 +20,7 @@ data TRPGenState = TRPGenState
         , transPaths :: WCEPathMap WCEPSemAnn
         , transWCETs :: WCETimesMap WCETSemAnn
         , localConstEnv :: TRPGenEnvironment
+        , activityMap :: TRPActivityMap TRPSemAnn
     } deriving Show
 
 type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenState) 

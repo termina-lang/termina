@@ -11,7 +11,7 @@ import ControlFlow.Architecture.Types
 import Semantic.Types
 import Utils.Annotations
 import Core.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 -- | This module provides functionality to verify the correctness of box sources
 -- in a Termina program architecture. It ensures that boxes are allocated, 

@@ -4,7 +4,7 @@ module ControlFlow.BasicBlocks.Checks.ExitPaths.Errors where
 import Utils.Annotations
 import Utils.Errors
 import Text.Parsec
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Text as T
 

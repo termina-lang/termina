@@ -18,7 +18,7 @@ import System.Exit
 import System.Directory
 import Parser.Errors
 import Text.Parsec (runParser)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Modules.Modules
 import Generator.Environment
 import Configuration.Platform
@@ -44,14 +44,17 @@ import EFP.Schedulability.RT.Types
 import EFP.Schedulability.RT.AST
 import EFP.Schedulability.RT.Flatten
 import EFP.Schedulability.TransPath.Generator (runTransPathGenerator)
-import EFP.Schedulability.TransPath.AST (TransactionPath)
 import EFP.Schedulability.TransPath.Types
+import EFP.Schedulability.TransPath.AST
+import EFP.Schedulability.TransPath.PlantUML
+import EFP.Schedulability.PlantUML.Printer
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
     SchedCmdArgs
         String -- ^ Path to the RT model file
         Bool -- ^ Verbose mode
+        Bool -- ^ Generate PlantUML diagrams
     deriving (Show,Eq)
 
 
@@ -63,6 +66,8 @@ schedCmdArgsParser = SchedCmdArgs
     <*> O.switch (O.long "verbose"
         <> O.short 'v'
         <> O.help "Enable verbose mode")
+    <*> O.switch (O.long "gen-plantuml"
+        <> O.help "Generate PlantUML diagrams for the transactional worst-case execution paths")
 
 loadRTModule :: FilePath -> IO RTModule
 loadRTModule rtModelFile = do
@@ -124,7 +129,7 @@ genTransPath :: RTModule
   -> TerminaConfig
   -> WCEPathMap WCEPSemAnn
   -> WCETimesMap WCETSemAnn
-  -> RTElement RTSemAnn -> IO [TransactionPath TRPSemAnn]
+  -> RTElement RTSemAnn -> IO (TransactionPath TRPSemAnn)
 genTransPath rtModule pathProject arch config wcepMap wcetMap transaction = do
     let transPathResult = runTransPathGenerator arch config wcepMap wcetMap transaction
     case transPathResult of
@@ -282,9 +287,37 @@ typeWCEPathModules arch bbProject pathProject =
           TIO.putStrLn (toText err pathFilesMap) >> exitFailure
         (Right newMap) -> return newMap
 
+genPlantUMLModel :: Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
+genPlantUMLModel emitterId transName (SimpleTransactionPath initialStep actMap _) = do
+  let destinationPath = "plantuml"
+      base = destinationPath </> emitterId
+  zipWithM_ (\stMap target -> do
+          let result = runPlantUMLGenerator emitterId initialStep stMap
+          case result of
+            Left err ->
+              TIO.putStrLn err >> exitFailure
+            Right diagram -> do
+              let targetFile = base </> transName </> target <.> "plantuml"
+              createDirectoryIfMissing True (takeDirectory targetFile)
+              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) ["trpath" ++ show idx | idx <- [(0 :: Integer) ..]]
+genPlantUMLModel emitterId transName (CondTransactionPath conds actMap _) = do
+  let destinationPath = "plantuml"
+      base = destinationPath </> emitterId
+  zipWithM_ (\(_condExpr, initialStep) condName -> zipWithM_ (\stMap target -> do
+          let result = runPlantUMLGenerator emitterId initialStep stMap
+          case result of
+            Left err ->
+              TIO.putStrLn err >> exitFailure
+            Right diagram -> do
+              let targetFile = base </> transName </> target <.> "plantuml"
+              createDirectoryIfMissing True (takeDirectory targetFile)
+              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) 
+                [condName ++ "__trpath" ++ show idx | idx <- [(0 :: Integer) ..]])
+              conds ["cond" ++ show idx | idx <- [(0 :: Integer) ..]]
+
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
-schedCommand (SchedCmdArgs rtModelFile chatty) = do
+schedCommand (SchedCmdArgs rtModelFile chatty plantUML) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -381,5 +414,5 @@ schedCommand (SchedCmdArgs rtModelFile chatty) = do
     flatTrMap <- mapM (flattenTransaction rtModule) trMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
     _trPathMap <- mapM (genTransPath rtModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
-     -- | At this point, all the necessary data structures have been generated
+    when plantUML (M.foldMapWithKey (genPlantUMLModel "hk_fdir_timer") _trPathMap)
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

@@ -8,8 +8,8 @@ import Data.Text (Text)
 import Control.Monad.Reader
 import Utils.Annotations
 import Text.Parsec.Pos
+import Utils.Printer
 
-import Generator.Utils
 
 data CPrinterConfig = CPrinterConfig
   { debug :: Bool,

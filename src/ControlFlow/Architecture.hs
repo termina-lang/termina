@@ -12,7 +12,7 @@ import Data.Maybe
 import ControlFlow.Architecture.Utils
 import Semantic.Types
 import Utils.Annotations
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.BoxInOut
 import Configuration.Configuration
 

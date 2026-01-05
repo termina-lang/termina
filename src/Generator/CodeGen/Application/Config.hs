@@ -1,7 +1,7 @@
 module Generator.CodeGen.Application.Config where
 
 import Generator.LanguageC.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
 import Control.Monad.Except (MonadError(throwError), runExceptT)
@@ -10,7 +10,6 @@ import Data.Text (unpack)
 import Generator.LanguageC.Printer
 import Semantic.Types
 import ControlFlow.Architecture.Types
-import Generator.Utils
 import ControlFlow.Architecture.Utils
 import Generator.CodeGen.Application.Utils
 import Configuration.Configuration
@@ -21,6 +20,7 @@ import Generator.Monadic
 import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
+import Utils.Printer
 
 genConfigFile ::
     QualifiedName

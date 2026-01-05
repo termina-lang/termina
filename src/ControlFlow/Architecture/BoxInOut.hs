@@ -7,7 +7,7 @@ import Control.Monad
 import qualified Control.Monad.State.Strict as ST
 import Control.Monad.Except
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.Errors
 import Semantic.Types
 import ControlFlow.Architecture.Utils
