@@ -14,14 +14,20 @@ import qualified Data.Set as S
 import EFP.Schedulability.Core.Types
 import EFP.Schedulability.RT.Monad
 import EFP.Schedulability.RT.TypeChecking.ConstExpression
+import EFP.Schedulability.RT.Utils
 
-typeSituationInitializer :: ConstStructInitializer ParserAnn -> RTMonad (RTEventMap RTSemAnn)
+
+typeSituationInitializer :: ConstStructInitializer ParserAnn -> RTMonad (RTEventMap RTSemAnn, ConstStructInitializer RTSemAnn)
 typeSituationInitializer (ConstStructInitializer fields ann) = do
-    foldM typeEventDefinition M.empty fields 
+    evMap <- foldM typeEventDefinition M.empty fields 
+    -- | Return the typed situation initializer
+    -- We empty the fields as they are not needed anymore
+    let typedSitInit = map genTypedStructInitializer (M.toList evMap)
+    return (evMap, ConstStructInitializer typedSitInit (RTStructInitTy (getLocation ann)))
 
     where
 
-    typeEventDefinition :: M.Map Identifier (RTEvent RTSemAnn) -> ConstFieldAssignment ParserAnn -> RTMonad (M.Map Identifier (RTEvent RTSemAnn))
+    typeEventDefinition :: RTEventMap RTSemAnn -> ConstFieldAssignment ParserAnn -> RTMonad (RTEventMap RTSemAnn)
     typeEventDefinition acc (ConstFieldAssignment emitterId (ConstStructFieldValue evInit) ann') = do
         -- | Check that the field has not been initialized before
         case M.lookup emitterId acc of

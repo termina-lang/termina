@@ -56,7 +56,7 @@ data RTElement a =
         (RTTransStep a) -- ^ First step
         a -- ^ Annotation
     | RTSituation 
-        Identifier
+        Identifier -- ^ Situation identifier
         (ConstStructInitializer a) -- ^ Initializer expression
         a -- ^ Annotation
     deriving Show

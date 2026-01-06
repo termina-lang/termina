@@ -49,6 +49,7 @@ import EFP.Schedulability.TransPath.AST
 import EFP.Schedulability.TransPath.PlantUML
 import EFP.Schedulability.PlantUML.Printer
 import Text.Printf
+import EFP.Schedulability.RT.Printer
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -56,6 +57,7 @@ data SchedCmdArgs =
         String -- ^ Path to the RT model file
         Bool -- ^ Verbose mode
         Bool -- ^ Generate PlantUML diagrams
+        Bool -- ^ Generate intermediate RT model
     deriving (Show,Eq)
 
 
@@ -69,8 +71,10 @@ schedCmdArgsParser = SchedCmdArgs
         <> O.help "Enable verbose mode")
     <*> O.switch (O.long "gen-plantuml"
         <> O.help "Generate PlantUML diagrams for the transactional worst-case execution paths")
+    <*> O.switch (O.long "gen-intermediate-rt"
+        <> O.help "Generate intermediate RT model after type checking and flattening")
 
-loadRTModule :: FilePath -> IO RTModule
+loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
   -- | Check RT model file extension
   when (takeExtension rtModelFile /= ".rt") $
@@ -87,15 +91,15 @@ loadRTModule rtModelFile = do
           fileMap = M.singleton rtModelFile src_code
       in
       TIO.putStrLn (toText pErr fileMap) >> exitFailure
-    Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (RTData term)
+    Right term -> return $ TerminaModuleData rtModelFile rtModelFile mod_time [] [] src_code (ParsingRTData term)
 
 typeRTModule :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
   -> BasicBlocksProject
   -> WCEPProject
-  -> RTModule -> IO (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
+  -> ParsedRTModule -> IO TypedRTModule
 typeRTModule arch trPathMap bbProject pathProject rtModule = do
-  let result = runRTTypeChecking arch trPathMap (rtAST . metadata $ rtModule)
+  let result = runRTTypeChecking arch trPathMap (parsedRTAST . metadata $ rtModule)
   case result of
     (Left err) ->
       -- | Create the source files map. This map will be used to obtain the source files that
@@ -109,12 +113,20 @@ typeRTModule arch trPathMap bbProject pathProject rtModule = do
             M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
                 sourceFilesMap pathProject in
       TIO.putStrLn (toText err pathFilesMap) >> exitFailure
-    (Right (trMap, stMap)) -> return (trMap, stMap)
+    (Right tyElems) -> return $ TerminaModuleData
+        (qualifiedName rtModule)
+        (fullPath rtModule)
+        (modificationTime rtModule)
+        []
+        []
+        (sourcecode rtModule)
+        (SemanticRTData tyElems)
 
-flattenTransaction :: RTModule
-  -> RTElement RTSemAnn -> IO (RTElement RTSemAnn)
-flattenTransaction rtModule transaction = do
-    let flattenResult = runFlattenTransaction transaction
+flattenRTModule :: TerminaProgArch SemanticAnn 
+  -> WCEPathMap WCEPSemAnn
+  -> TypedRTModule -> IO (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
+flattenRTModule arch wcepMap rtModule = do
+    let flattenResult = runFlattenModule arch wcepMap (typedRTAST . metadata $ rtModule)
     case flattenResult of
         Left err ->
             -- | Create the source files map. This map will be used to obtain the source files that
@@ -122,9 +134,9 @@ flattenTransaction rtModule transaction = do
             -- path of the source file and as element the text of the source file.
             let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule) in
             TIO.putStrLn (toText err fileMap) >> exitFailure
-        Right flatTransaction -> return flatTransaction
+        Right result -> return result
 
-genTransPath :: RTModule
+genTransPath :: TypedRTModule
   -> WCEPProject
   -> TerminaProgArch SemanticAnn
   -> TerminaConfig
@@ -320,9 +332,20 @@ genPlantUMLModel emitterId transName (CondTransactionPath conds _) = do
                 [condName ++ "_trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]])
                 conds ["cond" ++ printf "%0*d" width_cond idx | idx <- [(0 :: Integer) ..]]
 
+printIntermediateRT :: String
+  -> TerminaConfig
+  -> RTTransactionMap RTSemAnn
+  -> RTSituationMap RTSemAnn
+  -> IO ()
+printIntermediateRT rtModelFile config flatTrMap sitMap = do
+    let destinationPath = outputFolder config </> efpFolder config
+        targetFile = destinationPath </> "flat__" ++ takeBaseName rtModelFile <.> "rt"
+    createDirectoryIfMissing True (takeDirectory targetFile)
+    TIO.writeFile targetFile (runRTPrinter (M.elems flatTrMap ++ M.elems sitMap))
+
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
-schedCommand (SchedCmdArgs rtModelFile chatty plantUML) = do
+schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -413,11 +436,13 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML) = do
     when chatty (putStrLn . debugMessage $ "Transactional worst-case execution times type checked successfully")
     when chatty (putStrLn . debugMessage $ "Loading RT model")
     rtModule <- loadRTModule rtModelFile
-    (trMap, _stMap) <- typeRTModule programArchitecture wcepMap bbProject pathProject rtModule
+    typedRTModule <- typeRTModule programArchitecture wcepMap bbProject pathProject rtModule
     when chatty (putStrLn . debugMessage $ "RT model type checked successfully")
     when chatty (putStrLn . debugMessage $ "Flattening RT model transactions")
-    flatTrMap <- mapM (flattenTransaction rtModule) trMap
+    (flatTrMap, sitMap) <- flattenRTModule programArchitecture wcepMap typedRTModule
+    when chatty (putStrLn . debugMessage $ "RT model flattened successfully")
+    when genIntermediateRT $ printIntermediateRT rtModelFile config flatTrMap sitMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
-    _trPathMap <- mapM (genTransPath rtModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
+    _trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
     when plantUML (M.foldMapWithKey (genPlantUMLModel "hk_fdir_timer") _trPathMap)
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

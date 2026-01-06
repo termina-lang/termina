@@ -17,6 +17,7 @@ import Utils.Annotations
 import qualified EFP.Schedulability.WCET.AST as WTAST
 import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
 import qualified EFP.Schedulability.RT.AST as RTPAST
+import qualified EFP.Schedulability.RT.Types as RTTYPES
 
 newtype ParsingData = ParsingData {
   parsedAST :: PAST.AnnotatedProgram PTYPES.ParserAnn
@@ -38,8 +39,12 @@ newtype WCETData = WCETData {
   wcetAST :: [WTAST.WCETPlatformAssignment SCHEDTYPES.ParserAnn]
 } deriving (Show)
 
-newtype RTData = RTData {
-  rtAST :: [RTPAST.RTElement SCHEDTYPES.ParserAnn]
+newtype ParsingRTData = ParsingRTData {
+  parsedRTAST :: [RTPAST.RTElement SCHEDTYPES.ParserAnn]
+} deriving (Show)
+
+newtype SemanticRTData = SemanticRTData {
+  typedRTAST :: [RTPAST.RTElement RTTYPES.RTSemAnn]
 } deriving (Show)
 
 type ParsedModule = TerminaModuleData ParsingData
@@ -47,7 +52,8 @@ type TypedModule = TerminaModuleData SemanticData
 type BasicBlocksModule = TerminaModuleData BasicBlocksData
 type TransPathModule = TerminaModuleData TransPathData
 type WCETModule = TerminaModuleData WCETData
-type RTModule = TerminaModuleData RTData
+type ParsedRTModule = TerminaModuleData ParsingRTData
+type TypedRTModule = TerminaModuleData SemanticRTData
 
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule

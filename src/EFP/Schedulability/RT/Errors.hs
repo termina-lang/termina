@@ -31,7 +31,9 @@ data Error
     | EInvalidEventEmitter Identifier -- ^ Invalid event emitter (internal)
     | EInvalidSinkPort Identifier -- ^ Invalid sink port (internal)
     | EInvalidConstExpressionOperand Op -- ^ Invalid constant expression operand (internal)
-    | EInvalidFlatteningTarget -- ^ Invalid flattening target (internal)
+    | EInvalidArrivalExpressionType -- ^ Invalid arrival expression type (internal)
+    | EInvalidSituationAnnotation -- ^ Invalid situation annotation (internal)
+    | EFlatArrivalExpressionNegative -- ^ Arrival expression evaluated to negative in flattening (internal)
     | EInvalidConditionalExpressionType -- ^ Invalid conditional expression type
     | EUnknownComponent Identifier -- ^ Unknown component
     | EDuplicatedStepName Identifier Location -- ^ Duplicated step name

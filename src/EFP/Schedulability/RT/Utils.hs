@@ -7,6 +7,7 @@ import Control.Monad ()
 import Control.Monad.Except
 import EFP.Schedulability.RT.Errors
 import Data.Bits
+import qualified Data.Map as M
 
 isConditional :: RTTransStep RTSemAnn -> Bool
 isConditional (RTTransStepConditional _ _) = True
@@ -82,3 +83,26 @@ evalConstExpression (ConstBinOp op left right ann) = do
     right' <- evalConstExpression right
     -- | Now perform the operation
     evalBinOp ann op left' right'
+
+    
+genDeadlinesInitializer :: RTDeadlineMap -> ConstStructInitializer RTSemAnn
+genDeadlinesInitializer deadlinesMap =
+    ConstStructInitializer
+        (map (\(stepId, expr) -> 
+            ConstFieldAssignment stepId (ConstStructSimpleValue expr) (RTStructFieldAssignTy (getLocation . getAnnotation $ expr))) 
+            (M.toList deadlinesMap))
+        (RTStructInitTy Internal)
+
+genTypedStructInitializer :: (Identifier, RTEvent RTSemAnn) -> ConstFieldAssignment RTSemAnn
+genTypedStructInitializer (emitterId, RTEventInterrupt transactionName interval arrivals deadlines ann') =
+    ConstFieldAssignment emitterId (ConstStructFieldValue $ ConstStructInitializer [
+            ConstFieldAssignment "transaction" (ConstStructSimpleValue (ConstObject transactionName ann')) (RTStructFieldAssignTy (getLocation ann')),
+            ConstFieldAssignment "interval" (ConstStructSimpleValue interval) (RTStructFieldAssignTy (getLocation ann')),
+            ConstFieldAssignment "arrivals" (ConstStructSimpleValue arrivals) (RTStructFieldAssignTy (getLocation ann')),
+            ConstFieldAssignment "deadlines" (ConstStructFieldValue (genDeadlinesInitializer deadlines)) (RTStructFieldAssignTy (getLocation ann'))
+        ] (RTStructInitTy (getLocation ann'))) (RTStructFieldAssignTy (getLocation ann'))
+genTypedStructInitializer (emitterId, RTEventPeriodic transactionName deadlines ann') =
+    ConstFieldAssignment emitterId (ConstStructFieldValue $ ConstStructInitializer [
+            ConstFieldAssignment "transaction" (ConstStructSimpleValue (ConstObject transactionName ann')) (RTStructFieldAssignTy (getLocation ann')),
+            ConstFieldAssignment "deadlines" (ConstStructFieldValue (genDeadlinesInitializer deadlines)) (RTStructFieldAssignTy (getLocation ann'))
+        ] (RTStructInitTy (getLocation ann'))) (RTStructFieldAssignTy (getLocation ann'))
