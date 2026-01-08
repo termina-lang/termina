@@ -1,7 +1,7 @@
 module EFP.Schedulability.TransPath.Generator
     (runTransPathGenerator) where
 
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Semantic.AST
 import EFP.Schedulability.TransPath.AST
 import EFP.Schedulability.TransPath.Monad
 import EFP.Schedulability.WCEPath.AST
@@ -15,7 +15,7 @@ import ControlFlow.Architecture.Types
 import Control.Monad.State
 import EFP.Schedulability.TransPath.Types
 import EFP.Schedulability.TransPath.Utils
-import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.Semantic.Types
 import Configuration.Configuration
 import qualified Data.Text as T
 import EFP.Schedulability.WCET.AST
@@ -185,7 +185,7 @@ genPaths componentName (WCEPathMemberFunctionCall memberName constArgs pos ann) 
                     wcet <- getWCETForPath (getLocation ann) platformId componentClass memberName pathId
                     paths <- genTPaths componentName [(wcet, [])] innerBlocks
                     return $ map (\(wcet', blocks) ->
-                        let act = TRPResourceActivity componentName memberName pathId (reverse blocks) wcet' TRPActivityTy
+                        let act = TRPResourceOperation componentName memberName pathId (reverse blocks) wcet' TRPOperationTy
                         in
                             (wcet', TPBlockMemberFunctionCall evaluatedArgs act pos TRPBlockTy)) paths)
             <&> concat
@@ -208,7 +208,7 @@ genPaths componentName (WCEPProcedureInvoke portName procedureName constArgs pos
                     wcet <- getWCETForPath (getLocation ann) platformId componentClass procedureName pathId
                     paths <- genTPaths targetComponent [(wcet, [])] innerBlocks
                     return $ map (\(wcet', blocks) ->
-                        let act = TRPResourceActivity targetComponent procedureName pathId (reverse blocks) wcet' TRPActivityTy
+                        let act = TRPResourceOperation targetComponent procedureName pathId (reverse blocks) wcet' TRPOperationTy
                         in
                             (wcet', TPBlockProcedureInvoke evaluatedArgs act pos TRPBlockTy)) paths)
             <&> concat
@@ -287,22 +287,22 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
     platformId <- gets (T.unpack . platform . configParams)
     transPathsMap <- gets transPaths
     componentClass <- getComponentClass componentName
-    -- | Find the path and generate the activities
+    -- | Find the path and generate the operations
     case M.lookup (componentClass, actionName) transPathsMap of
         Just pathsMap ->
             case M.lookup pathName pathsMap of
                 Just (WCEPath _ _ _ _ innerBlocks _) -> do
-                    activities <- localInputScope $ do
+                    operations <- localInputScope $ do
                         -- | Obtain the worst-case execution time for the path
                         wcet <- getWCETForPath (getLocation ann) platformId componentClass actionName pathName
                         paths <- genTPaths componentName [(wcet, [])] innerBlocks
                         isTaskComponent <- isTask componentName
-                        let mk = if isTaskComponent then TRPTaskActivity else TRPHandlerActivity
+                        let mk = if isTaskComponent then TRPTaskOperation else TRPHandlerOperation
                         let createActivity (wcet', blocks) =
-                                mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' TRPActivityTy
+                                mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' TRPOperationTy
                         return $ map createActivity paths
-                    -- | Store generated activities in the map
-                    ST.modify (\st -> st { activityMap = M.insert stepName activities (activityMap st) })
+                    -- | Store generated operations in the map
+                    ST.modify (\st -> st { operationMap = M.insert stepName operations (operationMap st) })
                 Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass pathName
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass actionName
 
@@ -324,22 +324,22 @@ runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(
     let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty in
     case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
         (Left err, _) -> Left err
-        (_, st) -> Right $ SimpleTransactionPath stepName (activityMap st) TRPTransactionsPathTy
+        (_, st) -> Right $ SimpleTransactionPath stepName (operationMap st) TRPTransactionsPathTy
 runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ (RTTransStepConditional branches _) _) =
     flip CondTransactionPath TRPTransactionsPathTy <$> generateBranches branches
 
     where
 
         generateBranches ::
-            [(ConstExpression RTSemAnn, RTTransStep RTSemAnn)]
-            -> Either TRPGenErrors [(ConstExpression TRPSemAnn, Identifier, TRPActivityMap TRPSemAnn)]
+            [(TInteger, RTTransStep RTSemAnn)]
+            -> Either TRPGenErrors [(TInteger, Identifier, TRPOperationMap TRPSemAnn)]
         generateBranches [] = Right []
-        generateBranches ((constExpr, initialStep@(RTTransStepAction stepName _ _ _ _ _)) : xs) = do
+        generateBranches ((condExpr, initialStep@(RTTransStepAction stepName _ _ _ _ _)) : xs) = do
             rest <- generateBranches xs
             let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty
             case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
                 (Left err, _) -> Left err
-                (Right _, st) -> Right $ (TRPExprTy TConstInt <$ constExpr, stepName, activityMap st) : rest
+                (Right _, st) -> Right $ (condExpr, stepName, operationMap st) : rest
         generateBranches (_ : _) = Left $ annotateError Internal EInvalidRTElementForTransPath
 runTransPathGenerator _ _ _ _ _ =
     Left $ annotateError Internal EInvalidRTElementForTransPath

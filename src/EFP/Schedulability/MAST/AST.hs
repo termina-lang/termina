@@ -1,4 +1,7 @@
-module EFP.Schedulability.MAST.AST where
+module EFP.Schedulability.MAST.AST 
+    (module EFP.Schedulability.Core.AST
+    , module EFP.Schedulability.MAST.AST) where
+
 import EFP.Schedulability.Core.AST
 import qualified Data.Map.Strict as M
 
@@ -65,6 +68,7 @@ data MASTOperation =
         [Identifier] -- ^ Sub-operations
     | MASTEnclosingOperation
         Identifier -- ^ Operation's name
+        NormalizedExecutionTime -- ^ Operation's WCET
         [Identifier] -- ^ Enclosed operations
     deriving Show
 
@@ -80,7 +84,6 @@ data MASTExternalEvent =
 
 data MASTTimingRequirement =
     MASTGlobalDeadline
-        Identifier -- ^ Requirement's name
         Time -- ^ Deadline
         Identifier -- ^ Referenced event
     deriving Show
@@ -88,7 +91,7 @@ data MASTTimingRequirement =
 data MASTInternalEvent =
     MASTRegularInternalEvent
         Identifier -- ^ Event's name
-        MASTTimingRequirement -- ^ Timing requirement
+        (Maybe MASTTimingRequirement) -- ^ Timing requirement
     deriving Show
 
 data MASTEventHandler =
@@ -113,6 +116,7 @@ data MASTTransaction =
 data MASTModel = MASTModel
     { mastModelName :: Identifier
     , mastProcessingResources :: M.Map Identifier MASTProcessingResource
+    , mastSchedulers :: M.Map Identifier MASTScheduler
     , mastSchedServers :: M.Map Identifier MASTSchedulingServer
     , mastSharedResources :: M.Map Identifier MASTSharedResource
     , mastOperations :: M.Map Identifier MASTOperation

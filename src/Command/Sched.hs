@@ -40,8 +40,8 @@ import EFP.Schedulability.WCET.Types
 import Options.Applicative
 import EFP.Schedulability.RT.Parsing (terminaRTParser)
 import EFP.Schedulability.RT.TypeChecking
-import EFP.Schedulability.RT.Types
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Semantic.Types
+import EFP.Schedulability.RT.Semantic.AST
 import EFP.Schedulability.RT.Flatten
 import EFP.Schedulability.TransPath.Generator (runTransPathGenerator)
 import EFP.Schedulability.TransPath.Types
@@ -54,7 +54,7 @@ import EFP.Schedulability.RT.Printer
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
     SchedCmdArgs
-        String -- ^ Path to the RT model file
+        FilePath -- ^ Path to the RT model file
         Bool -- ^ Verbose mode
         Bool -- ^ Generate PlantUML diagrams
         Bool -- ^ Generate intermediate RT model
@@ -300,39 +300,45 @@ typeWCEPathModules arch bbProject pathProject =
           TIO.putStrLn (toText err pathFilesMap) >> exitFailure
         (Right newMap) -> return newMap
 
-genPlantUMLModel :: Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
-genPlantUMLModel emitterId transName (SimpleTransactionPath initialStep actMap _) = do
-  let destinationPath = "plantuml"
-      base = destinationPath </> emitterId
-  zipWithM_ (\stMap target -> do
-          let result = runPlantUMLGenerator emitterId initialStep stMap
-          case result of
-            Left err ->
-              TIO.putStrLn err >> exitFailure
-            Right diagram -> do
-              let targetFile = base </> transName </> target <.> "plantuml"
-              createDirectoryIfMissing True (takeDirectory targetFile)
-              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) ["trpath__" ++ show idx | idx <- [(0 :: Integer) ..]]
-genPlantUMLModel emitterId transName (CondTransactionPath conds _) = do
-  let destinationPath = "plantuml"
-      base = destinationPath </> emitterId
-      width_cond = length (show (max 0 (length conds - 1)))
-  zipWithM_ (\(_condExpr, initialStep, actMap) condName -> do
-      let total = product (map length (M.elems actMap))
-          width_trpath = length (show (max 0 (total - 1)))
-      zipWithM_ (\stMap target -> do
-          let result = runPlantUMLGenerator emitterId initialStep stMap
-          case result of
-            Left err ->
-              TIO.putStrLn err >> exitFailure
-            Right diagram -> do
-              let targetFile = base </> transName </> target <.> "plantuml"
-              createDirectoryIfMissing True (takeDirectory targetFile)
-              TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA actMap) 
-                [condName ++ "_trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]])
-                conds ["cond" ++ printf "%0*d" width_cond idx | idx <- [(0 :: Integer) ..]]
+genPlantUMLModels :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
+genPlantUMLModels config sitMap trPathMap = do
+  forM_ (M.elems sitMap) $ \case
+    RTSituation situationName evMap (RTSitTy _) ->
+      forM_ (M.elems evMap) $ \case 
+          (RTEventBursty eventId _ transactionName _ _ _ _ ) -> do
+            case M.lookup transactionName trPathMap of
+              Just trPath -> genPlantUMLModelForTransaction config situationName eventId transactionName trPath
+              Nothing -> 
+                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+                    <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+          (RTEventPeriodic eventId _ transactionName _ _ ) -> do
+            case M.lookup transactionName trPathMap of
+              Just trPath -> genPlantUMLModelForTransaction config situationName eventId transactionName trPath
+              Nothing -> 
+                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+                    <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+    _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating PlantUML diagrams for transactional paths" >> exitFailure
 
-printIntermediateRT :: String
+genPlantUMLModelForTransaction :: TerminaConfig -> Identifier -> Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
+genPlantUMLModelForTransaction config situationName eventId transactionName (SimpleTransactionPath initialStep opMap _) = do
+  let destinationPath = outputFolder config </> efpFolder config
+      base = destinationPath </> situationName
+      total = product (map length (M.elems opMap))
+      width_trpath = length (show (max 0 (total - 1)))
+  zipWithM_ (\stMap target -> do
+      let result = runPlantUMLGenerator eventId initialStep stMap
+      case result of
+        Left err ->
+          TIO.putStrLn err >> exitFailure
+        Right diagram -> do
+          let targetFile = base </> transactionName </> target <.> "plantuml"
+          createDirectoryIfMissing True (takeDirectory targetFile)
+          TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA opMap) [transactionName ++ "__trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]]
+genPlantUMLModelForTransaction _ situationName _ transactionName _ = 
+  TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactionalPath for transaction " 
+      <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+
+printIntermediateRT :: FilePath
   -> TerminaConfig
   -> RTTransactionMap RTSemAnn
   -> RTSituationMap RTSemAnn
@@ -443,6 +449,6 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
     when chatty (putStrLn . debugMessage $ "RT model flattened successfully")
     when genIntermediateRT $ printIntermediateRT rtModelFile config flatTrMap sitMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
-    _trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
-    when plantUML (M.foldMapWithKey (genPlantUMLModel "hk_fdir_timer") _trPathMap)
+    trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
+    when plantUML (genPlantUMLModels config sitMap trPathMap)
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")

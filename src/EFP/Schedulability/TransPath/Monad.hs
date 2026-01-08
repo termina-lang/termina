@@ -20,7 +20,7 @@ data TRPGenState = TRPGenState
         , transPaths :: WCEPathMap WCEPSemAnn
         , transWCETs :: WCETimesMap WCETSemAnn
         , localConstEnv :: TRPGenEnvironment
-        , activityMap :: TRPActivityMap TRPSemAnn
+        , operationMap :: TRPOperationMap TRPSemAnn
     } deriving Show
 
 type TRPGenMonad = ExceptT TRPGenErrors (ST.State TRPGenState) 
@@ -35,4 +35,4 @@ localInputScope comp = do
 
 newActivityMap :: TRPGenMonad ()
 newActivityMap = do
-    ST.modify (\s -> s { activityMap = M.empty })
+    ST.modify (\s -> s { operationMap = M.empty })

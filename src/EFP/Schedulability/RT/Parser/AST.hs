@@ -1,28 +1,10 @@
-module EFP.Schedulability.RT.AST 
-    (module EFP.Schedulability.RT.AST
+{-# LANGUAGE InstanceSigs #-}
+module EFP.Schedulability.RT.Parser.AST 
+    (module EFP.Schedulability.RT.Parser.AST
     , module EFP.Schedulability.Core.AST) where
 
 import EFP.Schedulability.Core.AST
 import Utils.Annotations
-
-data ConstFieldValue a =
-    ConstStructFieldValue (ConstStructInitializer a)
-    | ConstStructSimpleValue (ConstExpression a)
-    deriving Show
-
-data ConstFieldAssignment a = 
-    ConstFieldAssignment {
-        cfaFieldName :: Identifier -- ^ Field name
-        , cfaValue :: ConstFieldValue a -- ^ Value
-        , cfaAnnotation :: a -- ^ Annotation
-    }
-    deriving Show
-
-data ConstStructInitializer a = 
-    ConstStructInitializer
-        [ConstFieldAssignment a] -- ^ Initial value of each field identifier
-        a
-    deriving Show
 
 data RTTransStep a = 
     RTTransStepAction
@@ -50,6 +32,36 @@ instance Annotated RTTransStep where
     updateAnnotation (RTTransStepMuticast steps _) = RTTransStepMuticast steps
     updateAnnotation (RTTransStepConditional conds _) = RTTransStepConditional conds
 
+data ConstFieldValue a =
+    ConstStructFieldValue (ConstStructInitializer a)
+    | ConstStructSimpleValue (ConstExpression a)
+    deriving Show
+
+data ConstFieldAssignment a = 
+    ConstFieldAssignment {
+        cfaFieldName :: Identifier -- ^ Field name
+        , cfaValue :: ConstFieldValue a -- ^ Value
+        , cfaAnnotation :: a -- ^ Annotation
+    }
+    deriving Show
+
+data ConstStructInitializer a = 
+    ConstStructInitializer
+        [ConstFieldAssignment a] -- ^ Initial value of each field identifier
+        a
+    deriving Show
+
+data RTEvent a =
+    RTEventBursty 
+        Identifier -- ^ Event identifier
+        (ConstStructInitializer a) -- ^ Initializer expression
+        a -- ^ Annotation
+    | RTEventPeriodic
+        Identifier -- ^ Event identifier
+        (ConstStructInitializer a) -- ^ Initializer expression
+        a -- ^ Annotation
+    deriving Show
+
 data RTElement a =
     RTTransaction 
         Identifier -- ^ Transaction identifier
@@ -57,11 +69,12 @@ data RTElement a =
         a -- ^ Annotation
     | RTSituation 
         Identifier -- ^ Situation identifier
-        (ConstStructInitializer a) -- ^ Initializer expression
+        [RTEvent a] -- ^ Associated events
         a -- ^ Annotation
     deriving Show
 
 instance Annotated RTElement where
+    getAnnotation :: RTElement a -> a
     getAnnotation (RTTransaction _ _ a) = a
     getAnnotation (RTSituation _ _ a) = a
 

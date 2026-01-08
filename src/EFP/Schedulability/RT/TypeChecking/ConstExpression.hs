@@ -3,7 +3,7 @@ module EFP.Schedulability.RT.TypeChecking.ConstExpression where
 import EFP.Schedulability.Core.AST
 import EFP.Schedulability.Core.Types
 import EFP.Schedulability.RT.Monad
-import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.Semantic.Types
 import Utils.Annotations
 import Control.Monad.Except
 import EFP.Schedulability.RT.Errors

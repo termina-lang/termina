@@ -4,7 +4,7 @@ module EFP.Schedulability.RT.Parsing
 -- Importing parser combinators
 import Text.Parsec hiding (Error, Ok)
 
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Parser.AST
 
 import Utils.Annotations
 import EFP.Schedulability.Core.Parsing
@@ -85,6 +85,29 @@ structInitializerParser = do
                <|> (ConstStructSimpleValue <$> constExpressionParser)
         ConstFieldAssignment fieldName fva . Position current startPos <$> getPosition
 
+rtEventBurstyParser :: SchedParser (RTEvent ParserAnn)
+rtEventBurstyParser = do
+    current <- getState
+    startPos <- getPosition
+    _ <- reserved "bursty"
+    eventName <- identifierParser
+    _ <- reservedOp "="
+    initializerExpr <- structInitializerParser
+    RTEventBursty eventName initializerExpr . Position current startPos <$> getPosition
+
+rtEventPeriodicParser :: SchedParser (RTEvent ParserAnn)
+rtEventPeriodicParser = do
+    current <- getState
+    startPos <- getPosition
+    _ <- reserved "periodic"
+    eventName <- identifierParser
+    _ <- reservedOp "="
+    initializerExpr <- structInitializerParser
+    RTEventPeriodic eventName initializerExpr . Position current startPos <$> getPosition
+
+rtEventParser :: SchedParser (RTEvent ParserAnn)
+rtEventParser = try rtEventBurstyParser <|> rtEventPeriodicParser
+
 rtSituationParser :: SchedParser (RTElement ParserAnn)
 rtSituationParser = do
     current <- getState
@@ -92,9 +115,9 @@ rtSituationParser = do
     _ <- reserved "rts"
     rtsName <- identifierParser
     _ <- reservedOp "="
-    initializerExpr <- structInitializerParser
+    events <- braces (sepBy rtEventParser comma)
     _ <- semi
-    RTSituation rtsName initializerExpr . Position current startPos <$> getPosition
+    RTSituation rtsName events . Position current startPos <$> getPosition
 
 -- | Top Level parser
 topLevel :: SchedParser [RTElement ParserAnn]

@@ -6,8 +6,8 @@ import EFP.Schedulability.Core.AST
 import qualified Data.Map.Strict as M
 
 type WCETime = Double
-type TRPActivityMap a = M.Map Identifier [TransPathActivity a]
-type TRPStepMap a = M.Map Identifier (TransPathActivity a)
+type TRPOperationMap a = M.Map Identifier [TRPOperation a]
+type TRPStepMap a = M.Map Identifier (TRPOperation a)
 
 -- | Worst-case execution path block
 data TransPathBlock a
@@ -39,13 +39,13 @@ data TransPathBlock a
         a
     | TPBlockMemberFunctionCall 
         [ConstExpression a] -- ^ Constant argument expressions
-        (TransPathActivity a) -- ^ Activity being called
+        (TRPOperation a) -- ^ Operation being called
         BlockPosition
         a
     -- | Invoke a resource procedure
     | TPBlockProcedureInvoke 
         [ConstExpression a] -- ^ Constant argument expression
-        (TransPathActivity a) -- ^ Activity being called
+        (TRPOperation a) -- ^ Operation being called
         BlockPosition
         a
     | TPBlockAllocBox 
@@ -66,31 +66,31 @@ data TransPathBlock a
         a
     deriving Show
 
-data TransPathActivity a
+data TRPOperation a
     =
-    TRPTaskActivity
+    TRPTaskOperation
         Identifier -- ^ step name
         Identifier -- ^ task name
         Identifier -- ^ action name
         Identifier -- ^ path name
-        [TransPathBlock a] -- ^ Blocks in the activity
-        [Identifier] -- ^ Continuation activities
+        [TransPathBlock a] -- ^ Blocks in the operation
+        [Identifier] -- ^ Continuation operations
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
-    | TRPHandlerActivity
+    | TRPHandlerOperation
         Identifier -- ^ step name
         Identifier -- ^ handler name
         Identifier -- ^ action name
         Identifier -- ^ path name
-        [TransPathBlock a] -- ^ Blocks in the activity
-        [Identifier] -- ^ Continuation activities
+        [TransPathBlock a] -- ^ Blocks in the operation
+        [Identifier] -- ^ Continuation operations
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
-    | TRPResourceActivity
+    | TRPResourceOperation
         Identifier -- ^ resource name
         Identifier -- ^ procedure/method name
         Identifier -- ^ path name
-        [TransPathBlock a] -- ^ Blocks in the activity
+        [TransPathBlock a] -- ^ Blocks in the operation
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     deriving Show
@@ -98,8 +98,8 @@ data TransPathActivity a
 data TransactionPath a =
     SimpleTransactionPath
         Identifier -- ^ Initial step identifier
-        (TRPActivityMap a) -- ^ Map of activities
+        (TRPOperationMap a) -- ^ Map of operations
         a -- ^ Annotation
     | CondTransactionPath
-        [(ConstExpression a, Identifier, TRPActivityMap a)] -- ^ Conditional branches
+        [(TInteger, Identifier, TRPOperationMap a)] -- ^ Conditional branches
         a -- ^ Annotation

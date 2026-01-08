@@ -1,19 +1,16 @@
 module EFP.Schedulability.RT.Monad where
 import qualified Data.Map.Strict as M
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Semantic.AST
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Semantic.Types
 import EFP.Schedulability.WCEPath.Types
-import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.Semantic.Types
 import Control.Monad.Except
 import EFP.Schedulability.RT.Errors
 import qualified Control.Monad.State as ST
 
-
-
 type TPGlobalConstsEnv = M.Map Identifier Location
-
 
 data RTState = RTState
     {

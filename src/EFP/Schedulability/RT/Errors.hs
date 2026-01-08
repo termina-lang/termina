@@ -3,13 +3,13 @@
 
 module EFP.Schedulability.RT.Errors where
 import Utils.Annotations
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.Core.AST
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
 import Utils.Errors
-import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.Semantic.Types
 import Utils.Printer
 
 --------------------------------------------------
@@ -34,6 +34,9 @@ data Error
     | EInvalidArrivalExpressionType -- ^ Invalid arrival expression type (internal)
     | EInvalidSituationAnnotation -- ^ Invalid situation annotation (internal)
     | EFlatArrivalExpressionNegative -- ^ Arrival expression evaluated to negative in flattening (internal)
+    | EInvalidDeadlineExpression -- ^ Invalid deadline expression (internal)
+    | EInvalidArrivalsExpression -- ^ Invalid arrivals expression (internal)
+    | EInvalidConditionalExpression -- ^ Invalid conditional expression (internal)
     | EInvalidConditionalExpressionType -- ^ Invalid conditional expression type
     | EUnknownComponent Identifier -- ^ Unknown component
     | EDuplicatedStepName Identifier Location -- ^ Duplicated step name
@@ -73,7 +76,13 @@ data Error
     | EConditionalExpressionNotInteger -- ^ Conditional expression is not an integer
     | EConditionalExpressionOutOfRange Integer -- ^ Conditional expression out of range
     | EFlatConditionalExpressionOutOfRange Integer Location -- ^ Conditional expression out of range in flattening
-    | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression
+    | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression
+    | EInvalidEmitterFieldType -- ^ Invalid emitter field type
+    | EInvalidIntervalValue Integer -- ^ Invalid interval value
+    | EInvalidIntervalExpression -- ^ Invalid interval expression
+    | EInvalidArrivalsValue Integer -- ^ Invalid arrivals value
+    | EInvalidDeadlineValue Double -- ^ Invalid deadline value
+
     deriving Show
 
 type RTErrors = AnnotatedError Error Location
@@ -120,6 +129,10 @@ instance ErrorMessage RTErrors where
     errorIdent (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "RTE-037"
     errorIdent (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "RTE-038"
     errorIdent (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "RTE-039"
+    errorIdent (AnnotatedError (EInvalidEmitterFieldType {}) _pos) = "RTE-040"
+    errorIdent (AnnotatedError (EInvalidIntervalValue {}) _pos) = "RTE-041"
+    errorIdent (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "RTE-042"
+    errorIdent (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "RTE-043"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownComponent {}) _pos) = "unknown component"
@@ -161,6 +174,10 @@ instance ErrorMessage RTErrors where
     errorTitle (AnnotatedError (EConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range"
     errorTitle (AnnotatedError (EFlatConditionalExpressionOutOfRange {}) _pos) = "conditional expression out of range in flattening"
     errorTitle (AnnotatedError (EConstExpressionDivisionByZero {}) _pos) = "constant expression division by zero"
+    errorTitle (AnnotatedError (EInvalidEmitterFieldType {}) _pos) = "invalid emitter field type"
+    errorTitle (AnnotatedError (EInvalidIntervalValue {}) _pos) = "invalid interval value"
+    errorTitle (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "invalid arrivals value"
+    errorTitle (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "invalid deadline value"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -338,6 +355,16 @@ instance ErrorMessage RTErrors where
                         pprintSimpleError
                             fieldSourceLines "The field was previously defined here:" fieldFileName
                             fieldLoc Nothing
+                EDuplicateEventDefinition eventId eventLoc@(Position _ eventStart _eventEnd) ->
+                    let eventFileName = sourceName eventStart
+                        eventSourceLines = files M.! eventFileName
+                    in
+                        pprintSimpleError
+                            sourceLines title fileName pos
+                            (Just ("An event with name \x1b[34m" <> T.pack eventId <> "\x1b[0m already exists in the current situation.\n")) <>
+                        pprintSimpleError
+                            eventSourceLines "The event was previously defined here:" eventFileName
+                            eventLoc Nothing
                 EEmitterTargetMismatch emitterId targetCmp actualCmp ->
                     pprintSimpleError
                         sourceLines title fileName pos
@@ -403,6 +430,22 @@ instance ErrorMessage RTErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just "Division by zero in constant expression.")
+                EInvalidEmitterFieldType ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "Invalid emitter field type. Expected a multiple field assignment.")
+                EInvalidIntervalValue value ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid interval value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Interval must be a positive integer."))
+                EInvalidArrivalsValue value ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid arrivals value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Arrivals must be a positive integer."))
+                EInvalidDeadlineValue value ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Invalid deadline value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Deadline must be a positive number."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

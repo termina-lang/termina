@@ -2,13 +2,14 @@ module EFP.Schedulability.RT.TypeChecking.Transaction where
 
 import qualified Data.Map.Strict as M
 
-import EFP.Schedulability.RT.Types
+import EFP.Schedulability.RT.Semantic.Types
 import Utils.Annotations
 import ControlFlow.Architecture.Types
 import Control.Monad.Except
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Errors
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Parser.AST
+import qualified EFP.Schedulability.RT.Semantic.AST as SAST
 import Control.Monad
 import EFP.Schedulability.WCEPath.AST
 import qualified Data.Set as S
@@ -74,7 +75,14 @@ checkStepNameUnique stepName loc = do
             -- Insert the step name in the current context
             ST.modify (\s -> s { currentSteps = M.insert stepName loc (currentSteps s) })
 
-typeTransStep :: [Continuation]-> RTTransStep ParserAnn -> RTMonad (RTTransStep RTSemAnn)
+typeCondExpression :: ConstExpression RTSemAnn -> RTMonad TInteger
+typeCondExpression (ConstInt i@(TInteger intVal _) ann) = do
+    unless (intVal > 0 && intVal <= 100) $
+        throwError . annotateError (getLocation ann) $ EConditionalExpressionOutOfRange intVal
+    return i
+typeCondExpression expr = throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidConditionalExpression
+
+typeTransStep :: [Continuation]-> RTTransStep ParserAnn -> RTMonad (SAST.RTTransStep RTSemAnn)
 typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nextStep ann) = do
     -- Check that the step name is unique in the current context
     checkStepNameUnique stepName (getLocation ann)
@@ -110,28 +118,23 @@ typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nex
         -- | No expected continuations but next step provided: error
         ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
-    return $ RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
+    return $ SAST.RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [] (RTTransStepConditional (c:cs) ann) =
     case c of
         (condExpr, step@(RTTransStepAction _ componentName actionId _ _ _)) -> do
-            typedCondExpr <- typeConstExpression condExpr
+            typedCondExpr <- typeConstExpression condExpr >>= evalConstExpression >>= typeCondExpression
             typedStep <- typeTransStep [] step
             typedCondTransSteps <- forM cs $ \(condExpr', step') -> do
-                tyCondExpr' <- typeConstExpression condExpr'
-                -- | Check that the conditional expression is an integer inside the range (0, 100]
-                unless (isIntegerExpr tyCondExpr') $
-                    throwError . annotateError (getLocation ann) $ EConditionalExpressionNotInteger
-                evalCondExpr <- evalConstExpression tyCondExpr'
-                checkConditionalExprRange evalCondExpr
+                tyCondExpr' <- typeConstExpression condExpr' >>= evalConstExpression >>= typeCondExpression
                 case step' of
                     RTTransStepAction _ componentName' actionId' _ _ _ -> do
                         unless (componentName == componentName' && actionId == actionId') $
                             throwError . annotateError (getLocation ann) $ EConditionalComponentMismatch (componentName, actionId) (componentName', actionId')
                         typedStep' <- typeTransStep [] step'
-                        return (evalCondExpr, typedStep')
+                        return (tyCondExpr', typedStep')
                     _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
             -- | TODO: Check that the sum of all conditions is 100 and that they are all non-negative integer expressions
-            return $ RTTransStepConditional ((typedCondExpr, typedStep) : typedCondTransSteps) (RTStepTy (getLocation ann))
+            return $ SAST.RTTransStepConditional ((typedCondExpr, typedStep) : typedCondTransSteps) (RTStepTy (getLocation ann))
         _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
 typeTransStep [] (RTTransStepMuticast _ ann) = throwError . annotateError (getLocation ann) $ EInvalidInitialStepMulticast
 typeTransStep [cont] (RTTransStepMuticast _ ann) = throwError . annotateError (getLocation ann) $ EInvalidMulticastSingleContinuation cont
@@ -166,13 +169,13 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
         (cs, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName cs
         ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) targetAction pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
-    return $ RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
+    return $ SAST.RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
     -- | Check that there are at least two branches
     when (length condTransSteps < 2) $
         throwError . annotateError (getLocation ann) $ EConditionalStepsMustHaveMultipleBranches
     typedCondTransSteps <- forM condTransSteps $ \(condExpr, step) -> do
-        tyCondExpr <- typeConstExpression condExpr
+        tyCondExpr <- typeConstExpression condExpr >>= evalConstExpression >>= typeCondExpression
         case step of
             RTTransStepAction {} -> do
                 typedStep <- typeTransStep [cont] step
@@ -180,17 +183,17 @@ typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
             RTTransStepConditional {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
             RTTransStepMuticast {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
     -- TODO: Check that the sum of all conditions is 100
-    return $ RTTransStepConditional typedCondTransSteps (RTStepTy (getLocation ann))
+    return $ SAST.RTTransStepConditional typedCondTransSteps (RTStepTy (getLocation ann))
 typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
     (_, _, typedTransSteps) <- foldM typeMultiCastStep (S.fromList validContinuations, M.empty, []) transSteps
-    return $ RTTransStepMuticast typedTransSteps (RTStepTy (getLocation ann))
+    return $ SAST.RTTransStepMuticast typedTransSteps (RTStepTy (getLocation ann))
 
     where
 
         typeMultiCastStep ::
-            (S.Set Continuation, M.Map Continuation Location, [RTTransStep RTSemAnn])
+            (S.Set Continuation, M.Map Continuation Location, [SAST.RTTransStep RTSemAnn])
             -> RTTransStep ParserAnn
-            -> RTMonad (S.Set Continuation, M.Map Continuation Location, [RTTransStep RTSemAnn])
+            -> RTMonad (S.Set Continuation, M.Map Continuation Location, [SAST.RTTransStep RTSemAnn])
         typeMultiCastStep (contSet, visitedSteps, typedTransSteps) step =
             case step of
                 RTTransStepAction _ targetTask targetAction _ _ stepAnn ->

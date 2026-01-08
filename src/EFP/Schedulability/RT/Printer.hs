@@ -1,12 +1,12 @@
 module EFP.Schedulability.RT.Printer where
 
-import EFP.Schedulability.RT.AST
+import EFP.Schedulability.RT.Semantic.AST
 import Prettyprinter
-import Text.Parsec.Pos
 import Data.Text (Text)
 import Data.Char
 import Numeric
 import Utils.Printer
+import qualified Data.Map.Strict as M
 
 class RTPrinter a where
     pprint :: a -> DocStyle
@@ -22,9 +22,6 @@ brackets' b = brackets (line <> b <> line)
 
 braces' :: DocStyle -> DocStyle
 braces' b = braces (line <> b <> line)
-
-instance RTPrinter SourcePos where
-    pprint pos = pretty (sourceLine pos) <> colon <> pretty (sourceColumn pos)
 
 instance RTPrinter TInteger where
 
@@ -46,46 +43,48 @@ instance RTPrinter (ConstExpression a) where
         in
             parens (ppLeft <+> ppOp <+> ppRight)
 
-instance RTPrinter BlockPosition where
-    pprint (BlockPosition startLine startColumn endLine endColumn) =
-        pretty "@" <> parens (pretty startLine <> colon <> pretty startColumn <> comma <> pretty endLine <> colon <> pretty endColumn)
+pprintDeadline :: (Identifier, Double) -> DocStyle
+pprintDeadline (pathId, deadlineExpr) =
+    pretty pathId <+> pretty "=" <+> pretty deadlineExpr
 
-instance RTPrinter (ConstFieldValue a) where
+instance RTPrinter (RTEvent a) where
 
-    pprint (ConstStructFieldValue structInit) =
-        pprint structInit
-    pprint (ConstStructSimpleValue expr) =
-        pprint expr
-
-instance RTPrinter (ConstFieldAssignment a) where
-
-    pprint (ConstFieldAssignment fieldName fieldValue _) =
-        pretty fieldName <+> pretty "=" <+> pprint fieldValue
-
-instance RTPrinter (ConstStructInitializer a) where
-
-    pprint (ConstStructInitializer fieldAssignments _) =
-        let ppAssignments = map pprint fieldAssignments
-        in
-            braces' $ (indentTab . align) (vsep (punctuate comma ppAssignments))
+    pprint (RTEventBursty eventId emitterId transId interval arrivals deadlines _) =
+        pretty "bursty" <+> pretty eventId <+> pretty "=" <+>
+            braces' ((indentTab . align) (vsep (punctuate comma [
+                pretty "emitter" <+> pretty "=" <+> pretty emitterId,
+                pretty "transaction" <+> pretty "=" <+> pretty transId,
+                pretty "interval" <+> pretty "=" <+> pprint interval,
+                pretty "arrivals" <+> pretty "=" <+> pprint arrivals,
+                pretty "deadlines" <+> braces' ((indentTab . align) (vsep (map pprintDeadline (M.toList deadlines))))
+            ])))
+    pprint (RTEventPeriodic eventId emitterId transId deadlines _) =
+        pretty "periodic" <+> pretty eventId <+> pretty "=" <+>
+            braces' ((indentTab . align) (vsep (punctuate comma [
+                pretty "emitter" <+> pretty "=" <+> pretty emitterId,
+                pretty "transaction" <+> pretty "=" <+> pretty transId,
+                pretty "deadlines" <+> braces' ((indentTab . align) (vsep (map pprintDeadline (M.toList deadlines))))
+            ])))
 
 instance RTPrinter (RTElement a) where
 
-    pprint (RTTransaction transName firstStep _) = 
+    pprint (RTTransaction transName firstStep _) =
         pretty "transaction" <+> pretty transName <+> pretty "=" <> line <>
             (indentTab . align) (pprint firstStep) <> pretty ";" <> line
-    pprint (RTSituation sitName initializer _) =
-        pretty "rts" <+> pretty sitName <+> pretty "=" <+> pprint initializer <> pretty ";" <> line
+    pprint (RTSituation sitName evMap _) =
+        pretty "rts" <+> pretty sitName <+> pretty "=" <+> 
+            braces' ((indentTab . align) (vsep (punctuate comma (map pprint (M.elems evMap)))))
+            <> pretty ";" <> line
 
 instance RTPrinter (RTTransStep a) where
 
     pprint (RTTransStepAction stepName taskName actionName pathName nextStep _) =
-        case nextStep of 
-            Just step -> 
-                pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName 
+        case nextStep of
+            Just step ->
+                pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName
                 <> line <> pretty "->" <+> pprint step
             Nothing -> pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName
-            
+
     pprint (RTTransStepMuticast steps _) =
         let ppSteps = map pprint steps
         in
