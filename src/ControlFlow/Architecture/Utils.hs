@@ -16,8 +16,8 @@ import Extras.Graph (findDisjointPaths, reverseGraph)
 import Control.Monad.State
 
 getEmitterIdentifier :: TPEmitter a -> Identifier
-getEmitterIdentifier (TPInterruptEmittter ident _) = ident
-getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
+getEmitterIdentifier (TPInterruptEmitter ident _) = ident
+getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 
@@ -158,14 +158,14 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
 
 newtype ResLockingSt = ResLockingSt
   { 
-    resLockingMap :: M.Map Identifier ResourceLock
+    resLockingMap :: ResourceLockingMap
   }
 
 -- Monad to compute.
 -- Error TopSortError and State TopSt
 type ResLockingMonad = State ResLockingSt
 
-genResourceLockings :: TerminaProgArch a -> M.Map Identifier ResourceLock
+genResourceLockings :: TerminaProgArch a -> ResourceLockingMap
 genResourceLockings programArchitecture =
   evalState (genResourceLockingsInternal programArchitecture >> gets resLockingMap) (ResLockingSt M.empty)
 
@@ -393,7 +393,7 @@ getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident id
 getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPInterruptEmittter identifier _ ->
+        TPInterruptEmitter identifier _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
                 Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of
@@ -406,7 +406,7 @@ getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
 getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPPeriodicTimerEmitter identifier _ _ ->
+        TPPeriodicTimerEmitter identifier _ _ _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
                 Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of

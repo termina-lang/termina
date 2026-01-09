@@ -17,7 +17,15 @@ data Error
     EUnknownComponent Identifier -- ^ Unknown component referenced in transactional step (internal)
     | EUnknownPlatform Identifier -- ^ Unknown platform specified in configuration (internal)
     | EUnknownEmitter Identifier -- ^ Unknown emitter ID (internal)
+    | EUnknownResource Identifier -- ^ Unknown resource referenced in transactional step (internal)
     | EUnknownSinkPort Identifier Identifier -- ^ Unknown sink port referenced in transactional step (internal)
+    | EUnknownStep Identifier -- ^ Unknown step referenced in transactional step (internal)
+    | EInvalidInitialStep Identifier -- ^ Invalid initial step identifier for MAST generation (internal)
+    | EInvalidStepType Identifier -- ^ Invalid step type for transactional step (internal)
+    | EUnsupportedConstExpression -- ^ Unsupported constant expression in operation postfix (internal)
+    | EUnsupportedSystemCall Identifier -- ^ Unsupported system call in transactional step (internal)
+    | EInvalidTimerPeriodExpression -- ^ Invalid timer period expression in periodic timer emitter (internal)
+    | EInvalidEmitterType -- ^ Invalid emitter type for MAST code generation (internal)
     | EUnsupportedPlatform Identifier -- ^ Unsupported platform for MAST code generation
     | EUnsupportedSystemInitEmitter -- ^ System initialization emitter is not supported for MAST code generation
     | EUnsupportedSystemExceptEmitter -- ^ System exception emitter is not supported for MAST code generation

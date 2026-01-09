@@ -52,9 +52,8 @@ data MASTSchedulingServer =
 
 data MASTSharedResource =
     MASTImmediateCeilingResource
-    { resourceName :: Identifier
-      , resourceCeilingPriority :: AnyPriority
-    }
+        Identifier -- ^ Resource name
+        AnyPriority -- ^ Ceiling priority
     deriving Show
 
 data MASTOperation =
@@ -95,7 +94,12 @@ data MASTInternalEvent =
     deriving Show
 
 data MASTEventHandler =
-    MASTActivityEventHandler
+    MASTTimedActivityEventHandler
+        Identifier -- ^ Input event
+        Identifier -- ^ Output event
+        Identifier -- ^ Operation
+        Identifier -- ^ Scheduling server
+    | MASTActivityEventHandler
         Identifier -- ^ Input event
         Identifier -- ^ Output event
         Identifier -- ^ Operation

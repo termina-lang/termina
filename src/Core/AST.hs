@@ -12,6 +12,7 @@ import Utils.Annotations
 import Utils.Printer
 import qualified Data.Text as T
 import Numeric
+import Data.Bits
 
 -- | Integer representation.  
 -- A value of this type is used to indicate the representation in which the
@@ -24,6 +25,43 @@ data IntRepr = DecRepr | HexRepr | OctalRepr
 -- A Termina integer is defined by its value and its numeric representation.
 data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
+
+instance Num TInteger where
+    (TInteger v1 r1) + (TInteger v2 _) = TInteger (v1 + v2) r1
+    (TInteger v1 r1) - (TInteger v2 _) = TInteger (v1 - v2) r1
+    (TInteger v1 r1) * (TInteger v2 _) = TInteger (v1 * v2) r1
+    abs (TInteger v r) = TInteger (abs v) r
+    signum (TInteger v r) = TInteger (signum v) r
+    fromInteger v = TInteger v DecRepr
+
+instance Real TInteger where
+    toRational (TInteger v _) = toRational v
+
+instance Enum TInteger where
+    toEnum i = TInteger (toEnum i) DecRepr
+    fromEnum (TInteger v _) = fromEnum v
+
+instance Integral TInteger where
+    toInteger (TInteger v _) = v
+    quotRem (TInteger v1 r1) (TInteger v2 _) =
+        let (q, r) = quotRem v1 v2 in
+        (TInteger q r1, TInteger r r1)
+
+instance Bits TInteger where
+    (.&.) (TInteger v1 r1) (TInteger v2 _) = TInteger (v1 .&. v2) r1
+    (.|.) (TInteger v1 r1) (TInteger v2 _) = TInteger (v1 .|. v2) r1
+    xor (TInteger v1 r1) (TInteger v2 _) = TInteger (v1 `xor` v2) r1
+    shiftL (TInteger v r) i = TInteger (shiftL v i) r
+    shiftR (TInteger v r) i = TInteger (shiftR v i) r
+    rotateL (TInteger v r) i = TInteger (rotateL v i) r
+    rotateR (TInteger v r) i = TInteger (rotateR v i) r
+    complement (TInteger v r) = TInteger (complement v) r
+    bitSizeMaybe _ = Nothing
+    bitSize _ = error "bitSize: TInteger is of infinite size"
+    isSigned _ = True
+    bit i = TInteger (bit i) DecRepr
+    popCount (TInteger v _) = popCount v
+    testBit (TInteger v _) = testBit v
 
 instance ShowText TInteger where
     showText (TInteger value DecRepr) = T.pack $ show value
@@ -84,26 +122,26 @@ data TypeParameter' expr a =
   -- | Identifier that might be a defined type or a constant
   TypeParamIdentifier Identifier
   | TypeParamTypeSpec (TypeSpecifier' expr a)
-  | TypeParamSize (expr a)
+  | TypeParamSize (expr a)
   deriving (Show, Ord, Eq, Functor)
 
 data TypeSpecifier' expr a
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
-  | TSBool | TSChar 
-  | TSConstSubtype (TypeSpecifier' expr a)
-  | TSDefinedType Identifier [TypeParameter' expr a]
+  | TSBool | TSChar
+  | TSConstSubtype (TypeSpecifier' expr a)
+  | TSDefinedType Identifier [TypeParameter' expr a]
   | TSArray (TypeSpecifier' expr a) (expr a)
   -- Non-primitive types
-  | TSReference AccessKind (TypeSpecifier' expr a)
+  | TSReference AccessKind (TypeSpecifier' expr a)
   | TSBoxSubtype (TypeSpecifier' expr a)
   -- | Fixed-location types
   | TSLocation (TypeSpecifier' expr a)
   -- | Port types
   | TSAccessPort (TypeSpecifier' expr a)
   | TSSinkPort (TypeSpecifier' expr a) Identifier
-  | TSInPort (TypeSpecifier' expr a) Identifier
-  | TSOutPort (TypeSpecifier' expr a)  
+  | TSInPort (TypeSpecifier' expr a) Identifier
+  | TSOutPort (TypeSpecifier' expr a)
   | TSUnit
   deriving (Show, Ord, Eq, Functor)
 
@@ -120,7 +158,7 @@ data TerminaType' expr a
   -- Built-in polymorphic types
   | TOption (TerminaType' expr a)
   | TResult (TerminaType' expr a) (TerminaType' expr a)
-  | TStatus (TerminaType' expr a)
+  | TStatus (TerminaType' expr a)
   | TMsgQueue (TerminaType' expr a) (expr a) -- Message queues
   | TPool (TerminaType' expr a) (expr a) -- Memory pools
   | TAtomic (TerminaType' expr a) -- TAtomic variables
@@ -226,7 +264,7 @@ instance ShowText AccessKind where
     showText Immutable = ""
 
 data PortConnectionKind = InboundPortConnection | OutboundPortConnection | AccessPortConnection
-  deriving (Show, Ord, Eq) 
+  deriving (Show, Ord, Eq)
 
 data Op
   = Multiplication
@@ -269,9 +307,9 @@ instance ShowText Op where
     showText LogicalAnd = "&&"
     showText LogicalOr = "||"
 
-data MonadicVariant' expr a = 
-  None | Some (expr a) 
-  | Ok (expr a) | Error (expr a) 
+data MonadicVariant' expr a =
+  None | Some (expr a)
+  | Ok (expr a) | Error (expr a)
   | Success | Failure (expr a)
   deriving (Show, Functor)
 
@@ -394,13 +432,13 @@ instance ShowText (TypeDef' ty blk a) where
 data InterfaceKind = RegularInterface | SystemInterface
   deriving (Show, Ord, Eq)
 
-data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass 
+data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | ChannelClass
   deriving (Show, Ord, Eq)
 
 -------------------------------------------------
 -- Interface Member
 data InterfaceMember' ty a
-  = 
+  =
     -- | Procedure
     InterfaceProcedure
       AccessKind -- ^ access kind (immutable, mutable)
@@ -413,13 +451,13 @@ data InterfaceMember' ty a
 -------------------------------------------------
 -- Class Member
 data ClassMember' ty blk a
-  = 
+  =
     -- | Fields. They form the state  of the object
-    ClassField 
+    ClassField
       (FieldDefinition' ty a) -- ^ the field
     -- | Methods. Methods are internal functions that can access the
     -- state of the object and call other methods of the same class.
-    | ClassMethod 
+    | ClassMethod
       AccessKind  -- ^ access kind (immutable, mutable or private)
       Identifier  -- ^ name of the method
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
@@ -429,19 +467,19 @@ data ClassMember' ty blk a
     -- | Procedures. They can only be used on shared resources, and constitute their
     -- interface with the outside world. They define a list of parameters and a block
     -- of statements. They do not return any value.
-    | ClassProcedure
+    | ClassProcedure
       AccessKind -- ^ access kind (immutable, mutable or private)
       Identifier -- ^ name of the procedure
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
-    | ClassViewer
+    | ClassViewer
       Identifier -- ^ name of the viewer
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
       (Maybe (ty a)) -- ^ return type of the viewer
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
-    | ClassAction 
+    | ClassAction
       AccessKind  -- ^ access kind (immutable or private)
       Identifier  -- ^ name of the method
       (Maybe (Parameter' ty a)) -- ^ input parameter
@@ -468,16 +506,16 @@ data Parameter' ty a = Parameter {
 
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a) a
-  | FieldAddressAssignment Identifier Address a
-  | FieldPortConnection PortConnectionKind Identifier Identifier a
+  | FieldAddressAssignment Identifier Address a
+  | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
 instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
-    showText (FieldValueAssignment ident expr _) = 
+    showText (FieldValueAssignment ident expr _) =
         T.pack ident <> " = " <> showText expr
-    showText (FieldAddressAssignment ident addr _) = 
+    showText (FieldAddressAssignment ident addr _) =
         T.pack ident <> " @ " <> showText addr
-    showText (FieldPortConnection InboundPortConnection ident glb _) = 
+    showText (FieldPortConnection InboundPortConnection ident glb _) =
         T.pack ident <> " <- " <> T.pack glb
     showText (FieldPortConnection OutboundPortConnection ident glb _) =
         T.pack ident <> " -> " <> T.pack glb

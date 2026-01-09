@@ -21,8 +21,17 @@ transStepActionParser = do
     actionIdentifier <- identifierParser
     _ <- reservedOp "::"
     pathIdentifier <- identifierParser
-    nextStep <-  optionMaybe (reservedOp "->" >> nextStepParser)
+    nextStep <-  reservedOp "->" >> nextStepParser
     RTTransStepAction lbl componentIdentifier actionIdentifier pathIdentifier nextStep . Position current startPos <$> getPosition
+
+transEndStepParser :: SchedParser (RTTransStep ParserAnn)
+transEndStepParser = do
+    current <- getState
+    startPos <- getPosition
+    lbl <- identifierParser
+    _ <- reservedOp "#"
+    _ <- reserved "end"
+    RTTransStepEnd lbl . Position current startPos <$> getPosition
 
 rtTransStepMulticastParser :: SchedParser (RTTransStep ParserAnn)
 rtTransStepMulticastParser = do
@@ -52,6 +61,7 @@ rtTransStepConditionalParser = do
 nextStepParser :: SchedParser (RTTransStep ParserAnn)
 nextStepParser =
     try transStepActionParser
+    <|> try transEndStepParser
     <|> try rtTransStepMulticastParser
     <|> rtTransStepConditionalParser
 

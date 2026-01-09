@@ -79,7 +79,8 @@ genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blo
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
-            Nothing -> throwError $ T.pack $ "Activity not found in step map: " ++ actId
+            Nothing -> -- | It is an end step and it does not have further operations
+                return []
             Just act -> genOperation taskName act []
         ) nextSteps
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName
@@ -91,7 +92,8 @@ genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathNa
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
-            Nothing -> throwError $ T.pack $ "Activity not found in step map: " ++ actId
+            Nothing -> -- | It is an end step and it does not have further operations
+                return []
             Just act -> genOperation handlerName act []
         ) nextSteps
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName

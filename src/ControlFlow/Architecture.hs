@@ -155,16 +155,19 @@ genArchGlobal _ (Const identifier ty expr _ ann) = do
 -- | Const expressions have been already substituted by the type checker
 -- | Nothing to do here
 genArchGlobal _ (ConstExpr {}) = return ()
-genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
+genArchGlobal modName (Emitter ident emitterCls mExpr _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
       tp {
-        emitters = M.insert ident (TPInterruptEmittter ident ann) (emitters tp)
+        emitters = M.insert ident (TPInterruptEmitter ident ann) (emitters tp)
       }
-    (TGlobal EmitterClass "PeriodicTimer") -> ST.modify $ \tp ->
-      tp {
-        emitters = M.insert ident (TPPeriodicTimerEmitter ident modName ann) (emitters tp)
-       }
+    (TGlobal EmitterClass "PeriodicTimer") -> 
+      case mExpr of
+        Just expr -> ST.modify $ \tp ->
+          tp {
+            emitters = M.insert ident (TPPeriodicTimerEmitter ident expr modName ann) (emitters tp)
+          }
+        Nothing -> throwError $ annotateError Internal EMissingPeriodicTimerInitializer
     (TGlobal EmitterClass "SystemInit") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)

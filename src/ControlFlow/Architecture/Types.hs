@@ -102,11 +102,12 @@ instance Annotated TPTask where
   updateAnnotation t a = t { taskAnns = a }
 
 data TPEmitter a = 
-  TPInterruptEmittter 
+  TPInterruptEmitter 
     Identifier -- ^ emitter identifier
     a -- ^ annotations
   | TPPeriodicTimerEmitter 
     Identifier -- ^ emitter identifier
+    (Expression a) -- ^ initializer expression for period field
     QualifiedName -- ^ Module that instantiates the timer
     a -- ^ annotations
   | TPSystemInitEmitter
@@ -118,13 +119,13 @@ data TPEmitter a =
   deriving Show
 
 instance Annotated TPEmitter where
-  getAnnotation (TPInterruptEmittter _ a) = a
-  getAnnotation (TPPeriodicTimerEmitter _ _ a) = a
+  getAnnotation (TPInterruptEmitter _ a) = a
+  getAnnotation (TPPeriodicTimerEmitter _ _ _ a) = a
   getAnnotation (TPSystemInitEmitter _ a) = a
   getAnnotation (TPSystemExceptEmitter _ a) = a
 
-  updateAnnotation (TPInterruptEmittter i _) = TPInterruptEmittter i
-  updateAnnotation (TPPeriodicTimerEmitter i m _) = TPPeriodicTimerEmitter i m
+  updateAnnotation (TPInterruptEmitter i _) = TPInterruptEmitter i
+  updateAnnotation (TPPeriodicTimerEmitter i sec m  _) = TPPeriodicTimerEmitter i sec m
   updateAnnotation (TPSystemInitEmitter i _) = TPSystemInitEmitter i
   updateAnnotation (TPSystemExceptEmitter i _) = TPSystemExceptEmitter i
 
@@ -134,6 +135,8 @@ data ResourceLock
     | ResourceLockMutex TInteger -- ^ Mutex-based locking with priority ceiling
     | ResourceLockIrq -- ^ The resource is shared between one or more tasks and one or more handlers
   deriving Show
+
+type ResourceLockingMap = M.Map Identifier ResourceLock
 
 data TPResource a = TPResource {
 

@@ -59,11 +59,11 @@ typeEmitterObjectExpr expr =
 
 -- | This function recursively extracts all step names from a transaction step
 extractStepNames :: S.Set Identifier -> SAST.RTTransStep RTSemAnn -> S.Set Identifier
+extractStepNames acc (SAST.RTTransStepEnd stepName _) =
+    S.insert stepName acc
 extractStepNames acc (SAST.RTTransStepAction stepName _ _ _ nextStep _) =
     let acc' = S.insert stepName acc in
-    case nextStep of
-        Just next -> extractStepNames acc' next
-        Nothing -> acc'
+    extractStepNames acc' nextStep
 extractStepNames acc (SAST.RTTransStepMuticast transSteps _) =
     foldl extractStepNames acc transSteps
 extractStepNames acc (SAST.RTTransStepConditional condSteps _) =

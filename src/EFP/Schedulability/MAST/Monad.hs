@@ -9,22 +9,25 @@ import EFP.Schedulability.RT.Semantic.Types
 import qualified Data.Map.Strict as M
 import EFP.Schedulability.MAST.AST
 import qualified Control.Monad.State as ST
+import EFP.Schedulability.RT.Semantic.AST
 
 type MASTProcessingResourceMap = M.Map Identifier MASTProcessingResource
 type MASTOperationMap = M.Map Identifier MASTOperation
 type MASTSchedulingServerMap = M.Map Identifier MASTSchedulingServer
 type MASTSharedResourceMap = M.Map Identifier MASTSharedResource
-
+type MASTTransactionMap = M.Map Identifier MASTTransaction
 
 data MASTGenEnv = MASTGenEnv
     {
         progArch :: TerminaProgArch SemanticAnn
         , configParams :: TerminaConfig
+        , resourceLockingMap :: ResourceLockingMap
         , stepMap :: TRPStepMap RTSemAnn
-        , processingResources :: MASTProcessingResourceMap
+        , deadlinesMap :: RTDeadlineMap RTSemAnn
         , operations :: MASTOperationMap
         , schedulingServers :: MASTSchedulingServerMap
         , sharedResources :: MASTSharedResourceMap
+        , transactions :: MASTTransactionMap
     }
 
 type MASTGenMonad = ExceptT MASTGenErrors (ST.State MASTGenEnv)

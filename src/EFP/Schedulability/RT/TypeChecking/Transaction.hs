@@ -112,12 +112,12 @@ typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nex
             getPathContinuations componentName outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
         -- | No expected continuations and no next step: ok
-        ([], Nothing) -> return Nothing
+        ([], RTTransStepEnd stId ann') -> return $ SAST.RTTransStepEnd stId (RTStepTy (getLocation ann'))
         -- | Expected continuations but no next step: error
-        (cs, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName cs
+        (cs, RTTransStepEnd {}) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName cs
         -- | No expected continuations but next step provided: error
-        ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
-        (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
+        ([], _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
+        (validContinuations, next) -> typeTransStep validContinuations next
     return $ SAST.RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [] (RTTransStepConditional (c:cs) ann) =
     case c of
@@ -165,10 +165,10 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
     -- | Get all possible continuations from the transactional path
     continuations <- getPathContinuations targetTask outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
-        ([], Nothing) -> return Nothing
-        (cs, Nothing) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName cs
-        ([], Just _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) targetAction pathName (getLocation . getAnnotation $ trPath)
-        (validContinuations, Just next) -> Just <$> typeTransStep validContinuations next
+        ([], RTTransStepEnd stName ann') -> return $ SAST.RTTransStepEnd stName (RTStepTy (getLocation ann'))
+        (cs, RTTransStepEnd {}) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) targetAction pathName cs
+        ([], _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) targetAction pathName (getLocation . getAnnotation $ trPath)
+        (validContinuations, next) -> typeTransStep validContinuations next
     return $ SAST.RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
     -- | Check that there are at least two branches
@@ -182,6 +182,7 @@ typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
                 return (tyCondExpr, typedStep)
             RTTransStepConditional {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
             RTTransStepMuticast {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
+            RTTransStepEnd {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
     -- TODO: Check that the sum of all conditions is 100
     return $ SAST.RTTransStepConditional typedCondTransSteps (RTStepTy (getLocation ann))
 typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
@@ -230,6 +231,9 @@ typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
                     throwError . annotateError (getLocation ann) $ EConditionalStepsMustHaveMultipleBranches
                 -- | If the step is a multicast, throw an error
                 RTTransStepMuticast {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
+                RTTransStepEnd {} -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
 
 typeTransStep validContinuations (RTTransStepAction _ _ _ _ _ ann) = throwError . annotateError (getLocation ann) $ EExpectedMulticastContinuation validContinuations
 typeTransStep validContinuations (RTTransStepConditional _ ann) = throwError . annotateError (getLocation ann) $ EExpectedMulticastContinuation validContinuations
+typeTransStep [] (RTTransStepEnd _ ann) = throwError . annotateError (getLocation ann) $ EInvalidInitialEndStep
+typeTransStep _ (RTTransStepEnd {}) = throwError . annotateError Internal $ EUnexpectedEndStep

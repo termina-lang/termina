@@ -46,29 +46,29 @@ getPlatformInitialProgram config POSIXGCC =
         initialProgArch = emptyTerminaProgArch config in
     initialProgArch {
         emitters = M.union (emitters initialProgArch) . M.fromList $
-        [("kbd_irq", TPInterruptEmittter "kbd_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | POSIXGCC.Config.enableKbdIrq platformConfig] 
+        [("kbd_irq", TPInterruptEmitter "kbd_irq" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | POSIXGCC.Config.enableKbdIrq platformConfig] 
     }
 getPlatformInitialProgram config RTEMS5LEON3QEMU = 
     let platformConfig = rtems5_leon3_qemu . platformFlags $ config
         initialProgArch = emptyTerminaProgArch config in
     initialProgArch {
         emitters = M.union (emitters initialProgArch) . M.fromList $ 
-        [("irq_0", TPInterruptEmittter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq0 platformConfig] ++
-        [("irq_1", TPInterruptEmittter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq1 platformConfig] ++
-        [("irq_2", TPInterruptEmittter "irq_2" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq2 platformConfig] ++
-        [("irq_3", TPInterruptEmittter "irq_3" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq3 platformConfig] ++
-        [("irq_4", TPInterruptEmittter "irq_4" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq4 platformConfig] ++
-        [("irq_5", TPInterruptEmittter "irq_5" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq5 platformConfig] ++
-        [("irq_6", TPInterruptEmittter "irq_6" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq6 platformConfig] ++
-        [("irq_7", TPInterruptEmittter "irq_7" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq7 platformConfig] ++
-        [("irq_8", TPInterruptEmittter "irq_8" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq8 platformConfig] ++
-        [("irq_9", TPInterruptEmittter "irq_9" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq9 platformConfig] ++
-        [("irq_10", TPInterruptEmittter "irq_10" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq10 platformConfig] ++
-        [("irq_11", TPInterruptEmittter "irq_11" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq11 platformConfig] ++
-        [("irq_12", TPInterruptEmittter "irq_12" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq12 platformConfig] ++
-        [("irq_13", TPInterruptEmittter "irq_13" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq13 platformConfig] ++
-        [("irq_14", TPInterruptEmittter "irq_14" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq14 platformConfig] ++
-        [("irq_15", TPInterruptEmittter "irq_15" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq15 platformConfig]
+        [("irq_0", TPInterruptEmitter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq0 platformConfig] ++
+        [("irq_1", TPInterruptEmitter "irq_1" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq1 platformConfig] ++
+        [("irq_2", TPInterruptEmitter "irq_2" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq2 platformConfig] ++
+        [("irq_3", TPInterruptEmitter "irq_3" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq3 platformConfig] ++
+        [("irq_4", TPInterruptEmitter "irq_4" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq4 platformConfig] ++
+        [("irq_5", TPInterruptEmitter "irq_5" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq5 platformConfig] ++
+        [("irq_6", TPInterruptEmitter "irq_6" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq6 platformConfig] ++
+        [("irq_7", TPInterruptEmitter "irq_7" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq7 platformConfig] ++
+        [("irq_8", TPInterruptEmitter "irq_8" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq8 platformConfig] ++
+        [("irq_9", TPInterruptEmitter "irq_9" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq9 platformConfig] ++
+        [("irq_10", TPInterruptEmitter "irq_10" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq10 platformConfig] ++
+        [("irq_11", TPInterruptEmitter "irq_11" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq11 platformConfig] ++
+        [("irq_12", TPInterruptEmitter "irq_12" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq12 platformConfig] ++
+        [("irq_13", TPInterruptEmitter "irq_13" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq13 platformConfig] ++
+        [("irq_14", TPInterruptEmitter "irq_14" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq14 platformConfig] ++
+        [("irq_15", TPInterruptEmitter "irq_15" (SemanticAnn (GTy (TGlobal EmitterClass "Interrupt")) Internal)) | RTEMS5LEON3QEMU.Config.enableIrq15 platformConfig]
     }
 getPlatformInitialProgram config TestPlatform = emptyTerminaProgArch config
 

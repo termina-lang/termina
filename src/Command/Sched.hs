@@ -50,6 +50,7 @@ import EFP.Schedulability.TransPath.PlantUML
 import EFP.Schedulability.PlantUML.Printer
 import Text.Printf
 import EFP.Schedulability.RT.Printer
+import EFP.Schedulability.MAST.Generator
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -348,6 +349,46 @@ printIntermediateRT rtModelFile config flatTrMap sitMap = do
         targetFile = destinationPath </> "flat__" ++ takeBaseName rtModelFile <.> "rt"
     createDirectoryIfMissing True (takeDirectory targetFile)
     TIO.writeFile targetFile (runRTPrinter (M.elems flatTrMap ++ M.elems sitMap))
+  
+
+genPickedEvents :: TransPathMap RTSemAnn 
+  -> RTEvent RTSemAnn
+  -> IO [SelectedEvent RTSemAnn]
+genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval arrivals deadlines _) =
+  case M.lookup transactionId trPathMap of
+    Just (SimpleTransactionPath initialStep opMap _) ->
+        mapM (\stMap ->
+              return $ SelectedEventBursty eventId emitterId transactionId initialStep stMap interval arrivals deadlines
+            ) (sequenceA opMap)
+    Just _ -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
+          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+    Nothing -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
+  case M.lookup transactionId trPathMap of
+    Just (SimpleTransactionPath initialStep opMap _) ->
+      mapM (\stMap ->
+            return $ SelectedEventPeriodic eventId emitterId transactionId initialStep stMap deadlines
+          ) (sequenceA opMap)
+    Just _ -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
+          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+    Nothing -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+
+{--
+genMASTModel :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap RTSemAnn -> IO ()
+genMASTModel config sitMap trPathMap = do
+  forM_ (M.elems sitMap) $ \case
+    RTSituation situationName evMap (RTSitTy _) -> do
+      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap) 
+      forM_ (sequenceA pickedEvents) $ \peList ->
+        generateMASTModel config situationName peList
+    _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths" >> exitFailure
+--}
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()

@@ -37,6 +37,7 @@ data Error
     | EInvalidDeadlineExpression -- ^ Invalid deadline expression (internal)
     | EInvalidArrivalsExpression -- ^ Invalid arrivals expression (internal)
     | EInvalidConditionalExpression -- ^ Invalid conditional expression (internal)
+    | EUnexpectedEndStep -- ^ Unexpected end step (internal)
     | EInvalidConditionalExpressionType -- ^ Invalid conditional expression type
     | EUnknownComponent Identifier -- ^ Unknown component
     | EDuplicatedStepName Identifier Location -- ^ Duplicated step name
@@ -82,7 +83,7 @@ data Error
     | EInvalidIntervalExpression -- ^ Invalid interval expression
     | EInvalidArrivalsValue Integer -- ^ Invalid arrivals value
     | EInvalidDeadlineValue Double -- ^ Invalid deadline value
-
+    | EInvalidInitialEndStep -- ^ Initial step cannot be an end step
     deriving Show
 
 type RTErrors = AnnotatedError Error Location
@@ -133,6 +134,7 @@ instance ErrorMessage RTErrors where
     errorIdent (AnnotatedError (EInvalidIntervalValue {}) _pos) = "RTE-041"
     errorIdent (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "RTE-042"
     errorIdent (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "RTE-043"
+    errorIdent (AnnotatedError (EInvalidInitialEndStep {}) _pos) = "RTE-044"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownComponent {}) _pos) = "unknown component"
@@ -178,6 +180,7 @@ instance ErrorMessage RTErrors where
     errorTitle (AnnotatedError (EInvalidIntervalValue {}) _pos) = "invalid interval value"
     errorTitle (AnnotatedError (EInvalidArrivalsValue {}) _pos) = "invalid arrivals value"
     errorTitle (AnnotatedError (EInvalidDeadlineValue {}) _pos) = "invalid deadline value"
+    errorTitle (AnnotatedError (EInvalidInitialEndStep {}) _pos) = "invalid initial end step"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -446,6 +449,10 @@ instance ErrorMessage RTErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("Invalid deadline value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Deadline must be a positive number."))
+                EInvalidInitialEndStep ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just "The initial step of a transaction cannot be an end step.")
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

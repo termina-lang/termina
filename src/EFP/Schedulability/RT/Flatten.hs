@@ -26,14 +26,14 @@ productCondExprs (TInteger v1 repr1) (TInteger v2 _repr2) =
     in TInteger result repr1
 
 flattenStep :: RTTransStep RTSemAnn -> RTMonad (RTTransStep RTSemAnn)
-flattenStep st@(RTTransStepAction _name _task _action _path Nothing _ann) = return st
-flattenStep (RTTransStepAction name task action path (Just next) ann) = do
+flattenStep st@(RTTransStepEnd _name _ann) = return st
+flattenStep (RTTransStepAction name task action path next ann) = do
     flatNext <- flattenStep next
     case flatNext of
         RTTransStepConditional conds _ -> 
             flip RTTransStepConditional ann <$> mapM (\(condExpr, condStep) ->
-                    return (condExpr, RTTransStepAction name task action path (Just condStep) ann)) conds
-        _ -> return $ RTTransStepAction name task action path (Just flatNext) ann
+                    return (condExpr, RTTransStepAction name task action path condStep ann)) conds
+        _ -> return $ RTTransStepAction name task action path flatNext ann
 -- | If the next step is a conditional, we need to flatten each branch of the conditional
 flattenStep (RTTransStepConditional conds ann) = do
     flatConds <- forM conds $ \(condExpr, condStep) -> do

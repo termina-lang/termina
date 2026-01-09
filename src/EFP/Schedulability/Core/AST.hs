@@ -7,7 +7,6 @@ module EFP.Schedulability.Core.AST
 
 import Core.AST
 import Utils.Annotations
-import Utils.Errors
 import Data.Text
 import Utils.Printer
 

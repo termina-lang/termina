@@ -79,12 +79,8 @@ instance RTPrinter (RTElement a) where
 instance RTPrinter (RTTransStep a) where
 
     pprint (RTTransStepAction stepName taskName actionName pathName nextStep _) =
-        case nextStep of
-            Just step ->
-                pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName
-                <> line <> pretty "->" <+> pprint step
-            Nothing -> pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName
-
+        pretty stepName <> pretty "#" <> pretty taskName <> pretty "." <> pretty actionName <> pretty "::" <> pretty pathName
+        <> line <> pretty "->" <+> pprint nextStep
     pprint (RTTransStepMuticast steps _) =
         let ppSteps = map pprint steps
         in
@@ -95,6 +91,8 @@ instance RTPrinter (RTTransStep a) where
                 pprint condExpr <> pretty "!" <> pprint step
         in
             angles (align (vsep (punctuate comma ppBranches)))
+    pprint (RTTransStepEnd stepName _) =
+        pretty stepName <> pretty "#" <> pretty "end"
 
 runRTPrinter :: [RTElement a] -> Text
 runRTPrinter wceps = render $ line <> vsep (map pprint wceps)

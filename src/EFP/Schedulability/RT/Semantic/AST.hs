@@ -15,7 +15,7 @@ data RTTransStep a =
         Identifier -- ^ Task or handler name
         Identifier -- ^ Action name
         Identifier -- ^ Path name
-        (Maybe (RTTransStep a)) -- ^ Next step (if any)
+        (RTTransStep a) -- ^ Next step (if any)
         a -- ^ Annotation
     | RTTransStepMuticast 
         [RTTransStep a] -- ^ Steps to multicast to
@@ -23,6 +23,7 @@ data RTTransStep a =
     | RTTransStepConditional
         [(TInteger, RTTransStep a)] -- ^ Condition and corresponding step
         a -- ^ Annotation
+    | RTTransStepEnd Identifier a -- ^ End step
     deriving Show
 
 instance Annotated RTTransStep where
@@ -30,10 +31,12 @@ instance Annotated RTTransStep where
     getAnnotation (RTTransStepAction _ _ _ _ _ a) = a
     getAnnotation (RTTransStepMuticast _ a) = a
     getAnnotation (RTTransStepConditional _ a) = a
+    getAnnotation (RTTransStepEnd _ a) = a
 
     updateAnnotation (RTTransStepAction name task action path next _) = RTTransStepAction name task action path next
     updateAnnotation (RTTransStepMuticast steps _) = RTTransStepMuticast steps
     updateAnnotation (RTTransStepConditional conds _) = RTTransStepConditional conds
+    updateAnnotation (RTTransStepEnd name _) = RTTransStepEnd name
 
 data RTEvent a =
     RTEventBursty 

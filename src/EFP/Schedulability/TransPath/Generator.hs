@@ -274,12 +274,12 @@ genTPaths componentName paths (block : remainingBlocks) = do
         genTPaths componentName appendedPaths remainingBlocks
 
 genTPActivitiesFromAction :: RTTransStep RTSemAnn -> TRPGenMonad ()
-genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName mNextSteps ann) = do
-    nextStepNames <- case mNextSteps of
-        Nothing -> return []
-        Just nextStep@(RTTransStepAction nextStepName _ _ _ _ _) ->
+genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName pathName nextStep ann) = do
+    nextStepNames <- case nextStep of
+        RTTransStepEnd lastStepName _ -> return [lastStepName]
+        (RTTransStepAction nextStepName _ _ _ _ _) ->
             genTPActivitiesFromAction nextStep >> return [nextStepName]
-        Just (RTTransStepMuticast multicastSteps _) -> do
+        (RTTransStepMuticast multicastSteps _) -> do
             mapM_ genTPActivitiesFromAction multicastSteps
             getNextStepNames multicastSteps
         _ -> throwError . annotateError Internal $ EInvalidTransStepType

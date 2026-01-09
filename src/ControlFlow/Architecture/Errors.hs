@@ -27,6 +27,7 @@ data Error =
     | EInvalidResourceConnection -- ^ Invalid resource connection (Internal)
     | EInvalidPoolConnection -- ^ Invalid pool connection (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
+    | EMissingPeriodicTimerInitializer -- ^ Missing initializer expression for periodic timer emitter (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
     | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-003)
