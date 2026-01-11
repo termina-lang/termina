@@ -16,8 +16,11 @@ getProcessingResources = M.fromList [
         { prName = "cpu0"
         , prSpeedFactor = 1.0
         , prWorstISRSwitch = 0.002
-        , prMaxInterruptPriority = 15
-        , prMinInterruptPriority = 0
+        , prMaxInterruptPriority = 256 + 16
+        , prMinInterruptPriority = 1
+        , prSytemTimer = MASTTicker
+            0.002 -- Worst overhead
+            0.01  -- Tick interval
         })
     ]
 
@@ -90,7 +93,7 @@ genIrqUnlockOperation resourceId =
         MASTSimpleOperation
             opId
             0.0001
-            [resourceId] []
+            [] [resourceId]
 
 genIrqSharedResource :: Identifier -> MASTSharedResource
 genIrqSharedResource resourceId =
@@ -114,7 +117,7 @@ genMutexUnlockOperation resourceId =
         MASTSimpleOperation
             opId
             0.0002
-            [resourceId] []
+            [] [resourceId]
 
 genMutexSharedResource :: Identifier -> AnyPriority -> MASTSharedResource
 genMutexSharedResource resourceId ceil = 
@@ -188,13 +191,30 @@ timerTopHalfSchedulingServer =
     MASTRegularSchedulingServer
         timerTopHalfSchedulingServerId
         (MASTFixedPrioPolicy  (256 + 16 - 8))
-        "cpu0"
+        "RTEMS"
 
 irqTopHalfMASTOperation :: Identifier -> MASTOperation
 irqTopHalfMASTOperation emitterId = 
-    let opId = getIrqEmitterTopHalfOperationId emitterId
+    let opId = irqTopHalfMASTOperationId emitterId
     in 
         MASTSimpleOperation
             opId
             0.01
             [] []
+
+genIrqHandlerSchedulingServer :: Identifier -> MASTGenMonad MASTSchedulingServer
+genIrqHandlerSchedulingServer emitterId = 
+    getIrqPriority emitterId >>= \prio ->
+        return $ MASTRegularSchedulingServer
+            (irqHandlerSchedulerServerId emitterId)
+            (MASTIrqFixedPrioPolicy prio)
+            "RTEMS"
+
+genSystemCallMASTOperations :: [(Identifier, MASTOperation)]
+genSystemCallMASTOperations = 
+    [ (getSystemCallMASTOperationId "clock_get_uptime", MASTSimpleOperation
+        (getSystemCallMASTOperationId "clock_get_uptime")
+        0.02
+        [] []
+      )
+    ]

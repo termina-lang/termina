@@ -43,7 +43,7 @@ data RTEvent a =
         Identifier -- ^ Event identifier
         Identifier -- ^ Emitter identifier
         Identifier -- ^ Transaction identifier
-        TInteger -- ^ Interval
+        Double -- ^ Interval
         TInteger -- ^ Arrivals expression
         (RTDeadlineMap a) -- ^ Deadlines map
         a -- ^ Annotation

@@ -139,3 +139,24 @@ genTimerTopHalfSchedulingServer = do
     case plt of
         RTEMS5LEON3QEMU -> return RTEMS5LEON3QEMU.timerTopHalfSchedulingServer
         _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
+
+genIrqTopHalfMASTOperation :: Identifier -> MASTGenMonad MASTOperation
+genIrqTopHalfMASTOperation emitterId = do
+    plt <- getPlatform
+    case plt of
+        RTEMS5LEON3QEMU -> return $ RTEMS5LEON3QEMU.irqTopHalfMASTOperation emitterId
+        _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
+
+genIrqHandlerSchedulingServer :: Identifier -> MASTGenMonad MASTSchedulingServer
+genIrqHandlerSchedulingServer emitterId = do
+    plt <- getPlatform
+    case plt of
+        RTEMS5LEON3QEMU -> RTEMS5LEON3QEMU.genIrqHandlerSchedulingServer emitterId
+        _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)
+
+genSystemCallMASTOperations :: MASTGenMonad (M.Map Identifier MASTOperation)
+genSystemCallMASTOperations = do
+    plt <- getPlatform
+    case plt of
+        RTEMS5LEON3QEMU -> return $ M.fromList RTEMS5LEON3QEMU.genSystemCallMASTOperations
+        _ -> throwError . annotateError Internal $ EUnsupportedPlatform (show plt)

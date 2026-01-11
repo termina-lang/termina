@@ -141,10 +141,10 @@ checkEmitterConnection loc emitterId targetCmp targetAction = do
                         throwError . annotateError loc $ EEmitterActionMismatch emitterId targetCmp targetAction (port, act, getLocation . classAnns $ tpCls)
             return ()
 
-typeIntervalField :: ConstExpression RTSemAnn -> RTMonad TInteger
-typeIntervalField (ConstInt i@(TInteger intVal _) ann) = do
+typeIntervalField :: ConstExpression RTSemAnn -> RTMonad Double
+typeIntervalField (ConstInt (TInteger intVal _) ann) = do
     when (intVal <= 0) $ throwError . annotateError (getLocation ann) $ EInvalidIntervalValue intVal 
-    return i
+    return $ fromIntegral intVal
 typeIntervalField expr = throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidIntervalExpression
 
 typeArrivalsField :: ConstExpression RTSemAnn -> RTMonad TInteger

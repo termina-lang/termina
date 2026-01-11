@@ -16,39 +16,45 @@ import Data.Bits
 (<::>) i1 i2 = i1 ++ "__" ++ i2
 
 getMASTTransactionId :: Identifier -> Identifier -> Identifier -> Identifier
-getMASTTransactionId  eventId emitterId transId = "__trans" <::> eventId <::> emitterId <::> transId
+getMASTTransactionId  eventId emitterId transId = "trans" <::> eventId <::> emitterId <::> transId
 
 getMASTSchedulingServerId :: Identifier -> Identifier
-getMASTSchedulingServerId componentId = "__server" <::> componentId
+getMASTSchedulingServerId componentId = "server" <::> componentId
 
 getMASTExternalEventId :: Identifier -> Identifier -> Identifier
-getMASTExternalEventId eventId emitterId = "__ext_evt" <::> eventId <::> emitterId
+getMASTExternalEventId eventId emitterId = "ext_evt" <::> eventId <::> emitterId
 
 getMASTInternalEventId :: Identifier -> Identifier
-getMASTInternalEventId stepName = "__int_evt" <::> stepName
+getMASTInternalEventId stepName = "int_evt" <::> stepName
+
+genMASTMulticastEventId :: Identifier -> Identifier
+genMASTMulticastEventId stepName = "mc_evt" <::> stepName
 
 getAllocBoxMASTOperationId :: Identifier -> Identifier
-getAllocBoxMASTOperationId poolId = "__alloc_box_op" <::> poolId
+getAllocBoxMASTOperationId poolId = "alloc_box_op" <::> poolId
 
 getFreeBoxMASTOperationId :: Identifier -> Identifier
-getFreeBoxMASTOperationId poolId = "__free_box_op" <::> poolId
+getFreeBoxMASTOperationId poolId = "free_box_op" <::> poolId
 
 getSystemCallMASTOperationId :: Identifier -> Identifier
-getSystemCallMASTOperationId sysCallName = "__syscall_op" <::> sysCallName
+getSystemCallMASTOperationId sysCallName = "syscall_op" <::> sysCallName
 
 timerTopHalfMASTOperationId :: Identifier
-timerTopHalfMASTOperationId = "__timer_top_half__op"
+timerTopHalfMASTOperationId = "timer_top_half__op"
+
+irqTopHalfMASTOperationId :: Identifier -> Identifier
+irqTopHalfMASTOperationId emitterId = "irq_top_half__" <> emitterId <::> "op"
 
 timerTopHalfSchedulingServerId :: Identifier
-timerTopHalfSchedulingServerId = "__timer_top_half__server"
+timerTopHalfSchedulingServerId = "timer_top_half__server"
 
-getIrqEmitterTopHalfOperationId :: Identifier -> Identifier
-getIrqEmitterTopHalfOperationId emitterId = "__irq_top_half_op" <::> emitterId
+irqHandlerSchedulerServerId :: Identifier -> Identifier
+irqHandlerSchedulerServerId emitterId = "irq_handler_" <> emitterId <::> "server"
 
 getResourceMASTOperationId :: Identifier -> Identifier -> Identifier -> [ConstExpression a] -> MASTGenMonad Identifier
 getResourceMASTOperationId targetComponent targetAction targetPath postfix = do
     postfixStr <- concat <$> mapM (showConstExpression >=> return . ("__" ++)) postfix
-    return $ "__op" <::> targetComponent <::> targetAction <::> targetPath <> postfixStr
+    return $ "op" <::> targetComponent <::> targetAction <::> targetPath <> postfixStr
 
     where
 
@@ -77,22 +83,22 @@ bodyMASTOperationId :: Identifier -> Identifier
 bodyMASTOperationId parentOpId = parentOpId <::> "body"
 
 getTaskMASTOperationId :: Identifier -> Identifier -> Identifier -> Identifier
-getTaskMASTOperationId taskId actionId pathId = "__op" <::> taskId <::> actionId <::> pathId
+getTaskMASTOperationId taskId actionId pathId = "op" <::> taskId <::> actionId <::> pathId
 
 getHandlerMASTOperationId :: Identifier -> Identifier -> Identifier -> Identifier
-getHandlerMASTOperationId handlerId actionId pathId = "__op" <::> handlerId <::> actionId <::> pathId
+getHandlerMASTOperationId handlerId actionId pathId = "op" <::> handlerId <::> actionId <::> pathId
 
 getIrqLockMASTOperationId :: Identifier -> Identifier
-getIrqLockMASTOperationId resourceId = "__irq_lock_op" <::> resourceId
+getIrqLockMASTOperationId resourceId = "irq_lock_op" <::> resourceId
 
 getIrqUnlockMASTOperationId :: Identifier -> Identifier
-getIrqUnlockMASTOperationId resourceId = "__irq_unlock_op" <::> resourceId
+getIrqUnlockMASTOperationId resourceId = "irq_unlock_op" <::> resourceId
 
 getMutexLockMASTOperationId :: Identifier -> Identifier
-getMutexLockMASTOperationId resourceId = "__mutex_lock_op" <::> resourceId
+getMutexLockMASTOperationId resourceId = "mutex_lock_op" <::> resourceId
 
 getMutexUnlockMASTOperationId :: Identifier -> Identifier
-getMutexUnlockMASTOperationId resourceId = "__mutex_unlock_op" <::> resourceId
+getMutexUnlockMASTOperationId resourceId = "mutex_unlock_op" <::> resourceId
 
 insertOperation :: MASTOperation -> MASTGenMonad ()
 insertOperation operation = do

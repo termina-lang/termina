@@ -13,23 +13,23 @@ import Utils.Annotations
 import EFP.Schedulability.MAST.Errors
 import EFP.Schedulability.MAST.Utils
 import EFP.Schedulability.MAST.Platform
-import EFP.Schedulability.RT.Semantic.Types
 import EFP.Schedulability.RT.Semantic.AST
 import Configuration.Configuration
 import Semantic.Types
 import ControlFlow.Architecture.Utils
 import qualified Control.Monad.State as ST
+import EFP.Schedulability.TransPath.Types
 
 
 data SelectedEvent a =
-    SelectedEventBursty 
+    SelectedEventBursty
         Identifier -- ^ Event identifier
         Identifier -- ^ Emitter identifier
         Identifier -- ^ Transaction identifier
         Identifier -- ^ Initial step identifier
         (TRPStepMap a) -- ^ Steps map
-        TInteger -- ^ Interval
-        TInteger -- ^ Arrivals expression
+        Time -- ^ Interval
+        Integer -- ^ Arrivals expression
         (RTDeadlineMap a) -- ^ Deadlines map
     | SelectedEventPeriodic
         Identifier -- ^ Event identifier
@@ -50,10 +50,10 @@ getEnclosingOperations acc (TPBlockMatchCase blks _ _) = foldM getEnclosingOpera
 getEnclosingOperations acc (TPBlockMemberFunctionCall args operation _ _) =
     genMASTOperation False args operation >>= \opId ->
         return $ S.insert opId acc
-getEnclosingOperations acc (TPBlockProcedureInvoke args operation _ _) = 
+getEnclosingOperations acc (TPBlockProcedureInvoke args operation _ _) =
     genMASTOperation True args operation >>= \opId ->
         return $ S.insert opId acc
-getEnclosingOperations acc (TPBlockAllocBox poolId _ _) = do 
+getEnclosingOperations acc (TPBlockAllocBox poolId _ _) = do
     let opId = getAllocBoxMASTOperationId poolId
     ops <- gets operations
     case M.lookup opId ops of
@@ -167,28 +167,84 @@ genMASTOperation isInvoke args (TRPResourceOperation resName functionName pathNa
                                 getMutexUnlockMASTOperationId resName
                             ]) >> return opId
                     Nothing -> throwError . annotateError Internal $ EUnknownResource resName
-            else 
+            else
                 genBodyOperation opId (S.toList enclosingOps) wcet
                 >> return opId
 
+genMASTInternalEvent :: Identifier -> Identifier -> MASTGenMonad MASTInternalEvent
+genMASTInternalEvent externalEventId stepName = do
+    dlMap <- gets deadlinesMap
+    let mDeadline = flip MASTGlobalDeadline externalEventId <$> M.lookup stepName dlMap
+    return $ MASTRegularInternalEvent (getMASTInternalEventId stepName) mDeadline
+
 genMASTTransactionStep :: MASTTransaction -> Identifier -> MASTGenMonad MASTTransaction
-genMASTTransactionStep acc stepName = undefined
-
-genMASTTransaction :: SelectedEvent RTSemAnn -> MASTGenMonad MASTTransaction
-genMASTTransaction (SelectedEventBursty eventId emitterId transactionId initialStepId stepMap interval arrivals deadlines) = 
-    undefined
-genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepId stMap deadlines) = do
-    let mastTransactionId = getMASTTransactionId eventId emitterId transId
+genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intEvents evHandlers) stepName = do
     arch <- gets progArch
-    period <- case M.lookup emitterId (emitters arch) of
-        Just (TPPeriodicTimerEmitter _ expr _ _) -> 
-            getTimerPeriod expr
-        _ -> throwError . annotateError Internal $ EInvalidEmitterType
-    emitterTarget <- case M.lookup emitterId (emitterTargets arch) of
-        Just (target, _, _) -> return target
-        Nothing -> throwError . annotateError Internal $ EUnknownEmitter emitterId
+    let externalEventId = case extEvent of
+            MASTBurstyExternalEvent eid _ _ -> eid
+            MASTPeriodicExternalEvent eid _ -> eid
+    -- | First, we need to create the internal event for the step
+    internalEvent <- genMASTInternalEvent externalEventId stepName
+    stMap <- gets stepMap
+    case M.lookup stepName stMap of
+        Just op@(TRPTaskOperation _ taskId _ _ _ continuations _ _) -> do
+            tsk <- case M.lookup taskId (tasks arch) of
+                Just t -> return t
+                Nothing -> throwError . annotateError Internal $ EUnknownTask taskId
+            opId <- genMASTOperation False [] op
+            -- | Now, we need to create the event handler for the operation
+            schServers <- gets schedulingServers
+            unless (M.member taskId schServers) $ genTaskSchedulingServer tsk >>= insertSchedulingServer
 
-    let externalEventHandlerId = getMASTExternalEventId eventId emitterId
+            case continuations of
+                [] -> throwError . annotateError Internal $ EInvalidStepType stepName
+                [c] -> do
+                    let eventHandler = MASTActivityEventHandler
+                            (getMASTInternalEventId stepName) -- ^ event handler id
+                            (getMASTInternalEventId c) -- ^ output event
+                            opId
+                            taskId
+                    let newTransaction = MASTRegularTransaction mastTransactionId [extEvent] 
+                            (internalEvent : intEvents) 
+                            (eventHandler : evHandlers)
+                    genMASTTransactionStep newTransaction c
+                _ -> do
+                    let multicastEventHandler = MASTMulticastEventHandler
+                            (getMASTInternalEventId stepName)
+                            (map getMASTInternalEventId continuations)
+                    let eventHandler = MASTActivityEventHandler
+                            (getMASTInternalEventId stepName) -- ^ event handler id
+                            (genMASTMulticastEventId stepName) -- ^ output event
+                            opId
+                            taskId
+                    foldM genMASTTransactionStep
+                        (MASTRegularTransaction mastTransactionId [extEvent] 
+                            (internalEvent : intEvents) 
+                            (eventHandler : multicastEventHandler : evHandlers))
+                        continuations
+        Just _ -> do
+            throwError . annotateError Internal $ EInvalidStepType stepName
+        Nothing ->
+            -- | If we are here, it means that the step is an end step
+            return $ MASTRegularTransaction mastTransactionId [extEvent] (internalEvent : intEvents) evHandlers
+genMASTTransactionStep _ _ = throwError . annotateError Internal $ EInvalidTransactionStructure
+
+genMASTTransaction :: SelectedEvent TRPSemAnn -> MASTGenMonad MASTTransaction
+genMASTTransaction (SelectedEventBursty eventId emitterId transId initialStepId stMap interval arrivals deadlines) = do
+
+    let externalEventId = getMASTExternalEventId eventId emitterId
+        mastTransactionId = getMASTTransactionId eventId emitterId transId
+    
+    let externalEvent = MASTBurstyExternalEvent
+            externalEventId
+            interval 
+            arrivals
+    
+    ST.modify $ \env -> env
+        { stepMap = stMap
+        , deadlinesMap = deadlines
+        }
+
     ops <- gets operations
     schServers <- gets schedulingServers
 
@@ -196,7 +252,95 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
         Just step -> return step
         Nothing -> throwError . annotateError Internal $ EInvalidInitialStep initialStepId
     
-    case initialOperation of 
+
+    case initialOperation of
+        TRPTaskOperation {} -> do
+            -- | If the timer is connected to a task, we need to generate two event handlers:
+            -- | 1. An external event handler for the timer's top half
+            -- | 2. An internal event handler for the task's activity
+            -- | First, we generate the top half operation in case it does not exist
+            unless (M.member (irqTopHalfMASTOperationId emitterId) ops) $ 
+                genIrqTopHalfMASTOperation emitterId >>= insertOperation
+            unless (M.member (irqHandlerSchedulerServerId emitterId) schServers) $
+                genIrqHandlerSchedulingServer emitterId >>= insertSchedulingServer
+            -- | Now we have to create the external event handler
+            let externalEventHandler = MASTTimedActivityEventHandler
+                    externalEventId -- ^ event handler id
+                    (getMASTInternalEventId initialStepId) -- ^ output event
+                    (irqTopHalfMASTOperationId emitterId) -- ^ operation
+                    (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
+            -- | Now, we need to create the internal event handler for the task activity
+            let initialTransaction = MASTRegularTransaction
+                    mastTransactionId
+                    [externalEvent] []
+                    [externalEventHandler]
+            genMASTTransactionStep initialTransaction initialStepId
+        op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
+            opId <- genMASTOperation False [] op
+            case continuations of
+                [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
+                [c] -> do
+                    unless (M.member (irqHandlerSchedulerServerId emitterId) schServers) $
+                        genIrqHandlerSchedulingServer emitterId >>= insertSchedulingServer
+                    let externalEventHandler = MASTActivityEventHandler
+                            externalEventId -- ^ event handler id
+                            (getMASTInternalEventId c) -- ^ output event
+                            opId -- ^ operation
+                            (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
+                    -- | Now, we need to create the internal event handler for the task activity
+                    let initialTransaction = MASTRegularTransaction
+                            mastTransactionId
+                            [externalEvent] []
+                            [externalEventHandler]
+                    genMASTTransactionStep initialTransaction c
+                _ -> do
+                    let multicastEventHandler = MASTMulticastEventHandler
+                            (getMASTInternalEventId initialStepId)
+                            (map getMASTInternalEventId continuations)
+
+                    unless (M.member (irqHandlerSchedulerServerId emitterId) schServers) $
+                        genIrqHandlerSchedulingServer emitterId >>= insertSchedulingServer
+
+                    let externalEventHandler = MASTActivityEventHandler
+                            externalEventId -- ^ event handler id
+                            (genMASTMulticastEventId initialStepId) -- ^ output event
+                            opId
+                            (irqHandlerSchedulerServerId emitterId)
+                    foldM genMASTTransactionStep
+                        (MASTRegularTransaction externalEventId [externalEvent] 
+                            [] 
+                            [multicastEventHandler, externalEventHandler])
+                        continuations
+        _ -> throwError . annotateError Internal $ EInvalidStepType initialStepId
+    
+genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepId stMap deadlines) = do
+
+    let externalEventId = getMASTExternalEventId eventId emitterId
+        mastTransactionId = getMASTTransactionId eventId emitterId transId
+
+    arch <- gets progArch
+    period <- case M.lookup emitterId (emitters arch) of
+        Just (TPPeriodicTimerEmitter _ expr _ _) ->
+            getTimerPeriod expr
+        _ -> throwError . annotateError Internal $ EInvalidEmitterType
+    
+    let externalEvent = MASTPeriodicExternalEvent
+            externalEventId
+            period
+    
+    ST.modify $ \env -> env
+        { stepMap = stMap
+        , deadlinesMap = deadlines
+        }
+    
+    ops <- gets operations
+    schServers <- gets schedulingServers
+
+    initialOperation <- case M.lookup initialStepId stMap of
+        Just step -> return step
+        Nothing -> throwError . annotateError Internal $ EInvalidInitialStep initialStepId
+    
+    case initialOperation of
         TRPTaskOperation {} -> do
             -- | If the timer is connected to a task, we need to generate two event handlers:
             -- | 1. An external event handler for the timer's top half
@@ -207,50 +351,94 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
             unless (M.member timerTopHalfSchedulingServerId schServers) $ genTimerTopHalfSchedulingServer >>= insertSchedulingServer
             -- | Now we have to create the external event handler
             let externalEventHandler = MASTTimedActivityEventHandler
-                    externalEventHandlerId -- ^ event handler id
+                    externalEventId -- ^ event handler id
                     (getMASTInternalEventId initialStepId) -- ^ output event
                     timerTopHalfMASTOperationId -- ^ operation
                     timerTopHalfSchedulingServerId -- ^ scheduling server
             -- | Now, we need to create the internal event handler for the task activity
             let initialTransaction = MASTRegularTransaction
                     mastTransactionId
-                    [] []
+                    [externalEvent] []
                     [externalEventHandler]
             genMASTTransactionStep initialTransaction initialStepId
-        (TRPHandlerOperation _ _ _ _ _ [] _ _) -> throwError . annotateError Internal $ EInvalidStepType initialStepId
-        op@(TRPHandlerOperation _ _ _ _ _ [c] _ _) -> do
-            opId <- genMASTOperation False [] op
-            -- | If the timer is connected to a handler, we only need to create an external event handler
-            let externalEventHandler = MASTActivityEventHandler
-                    externalEventHandlerId -- ^ event handler id
-                    (getMASTInternalEventId c) -- ^ output event
-                    opId -- ^ operation
-                    timerTopHalfSchedulingServerId -- ^ scheduling server
-            -- | Now, we need to create the internal event handler for the task activity
-            let initialTransaction = MASTRegularTransaction
-                    mastTransactionId
-                    [] []
-                    [externalEventHandler]
-            genMASTTransactionStep initialTransaction c
         op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
             opId <- genMASTOperation False [] op
-            undefined
+            case continuations of
+                [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
+                [c] -> do
+                    unless (M.member timerTopHalfSchedulingServerId schServers) $ 
+                        genTimerTopHalfSchedulingServer >>= insertSchedulingServer
+                    let externalEventHandler = MASTActivityEventHandler
+                            externalEventId -- ^ event handler id
+                            (getMASTInternalEventId c) -- ^ output event
+                            opId -- ^ operation
+                            timerTopHalfSchedulingServerId -- ^ scheduling server
+                    -- | Now, we need to create the internal event handler for the task activity
+                    let initialTransaction = MASTRegularTransaction
+                            mastTransactionId
+                            [externalEvent] []
+                            [externalEventHandler]
+                    genMASTTransactionStep initialTransaction c
+                _ -> do
+                    let multicastEventHandler = MASTMulticastEventHandler
+                            (getMASTInternalEventId initialStepId)
+                            (map getMASTInternalEventId continuations)
+
+                    unless (M.member timerTopHalfSchedulingServerId schServers) $ 
+                        genTimerTopHalfSchedulingServer >>= insertSchedulingServer
+
+                    let externalEventHandler = MASTActivityEventHandler
+                            externalEventId -- ^ event handler id
+                            (genMASTMulticastEventId initialStepId) -- ^ output event
+                            opId
+                            timerTopHalfSchedulingServerId
+                    foldM genMASTTransactionStep
+                        (MASTRegularTransaction mastTransactionId [externalEvent] 
+                            [] 
+                            [multicastEventHandler, externalEventHandler])
+                        continuations
         _ -> throwError . annotateError Internal $ EInvalidStepType initialStepId
-        
-runMASTModelGenerator :: TerminaConfig -> TerminaProgArch SemanticAnn -> [SelectedEvent RTSemAnn] -> Either MASTGenErrors MASTModel
-runMASTModelGenerator cfg arch peList =
+
+genMASTModel :: Identifier -> [SelectedEvent TRPSemAnn] -> MASTGenMonad MASTModel
+genMASTModel modelName peList = do
+    -- | First, we generate the system call operations
+    syscallOps <- genSystemCallMASTOperations
+    -- | Insert them into the operations map
+    ST.modify $ \env -> env { operations = syscallOps }
+    -- | Now, we generate the transactions
+    trans <- mapM genMASTTransaction peList
+    ops <- gets operations
+    schServers <- gets schedulingServers
+    shRes <- gets sharedResources
+    prResources <- getProcessingResources
+    scheds <- getSchedulers
+    return $ MASTModel
+        { 
+          mastModelName = modelName
+        , mastOperations = ops
+        , mastSchedServers = schServers
+        , mastSharedResources = shRes
+        , mastTransactions = M.fromList [(transId, t) | t@(MASTRegularTransaction transId _ _ _) <- trans]
+        , mastProcessingResources = prResources
+        , mastSchedulers = scheds
+        }
+
+runMASTModelGenerator :: TerminaConfig 
+    -> TerminaProgArch SemanticAnn 
+    -> Identifier 
+    -> [SelectedEvent TRPSemAnn] -> Either MASTGenErrors MASTModel
+runMASTModelGenerator cfg arch modelName peList =
     let initialState = MASTGenEnv
             {
                 progArch = arch,
                 configParams = cfg,
                 resourceLockingMap = genResourceLockings arch,
-                stepMap = M.empty,
                 schedulingServers = M.empty,
                 operations = M.empty,
                 sharedResources = M.empty,
-                transactions = M.empty
+                transactions = M.empty,
+                stepMap = M.empty,
+                deadlinesMap = M.empty
             }
     in
-    case ST.runState (runExceptT (mapM_ genMASTTransaction peList)) initialState of 
-        (Left err, _) -> Left err
-        (_, st) -> undefined
+    ST.evalState (runExceptT (genMASTModel modelName peList)) initialState

@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as M
 import EFP.Schedulability.MAST.AST
 import qualified Control.Monad.State as ST
 import EFP.Schedulability.RT.Semantic.AST
+import EFP.Schedulability.TransPath.Types (TRPSemAnn)
 
 type MASTProcessingResourceMap = M.Map Identifier MASTProcessingResource
 type MASTOperationMap = M.Map Identifier MASTOperation
@@ -22,7 +23,7 @@ data MASTGenEnv = MASTGenEnv
         progArch :: TerminaProgArch SemanticAnn
         , configParams :: TerminaConfig
         , resourceLockingMap :: ResourceLockingMap
-        , stepMap :: TRPStepMap RTSemAnn
+        , stepMap :: TRPStepMap TRPSemAnn 
         , deadlinesMap :: RTDeadlineMap RTSemAnn
         , operations :: MASTOperationMap
         , schedulingServers :: MASTSchedulingServerMap

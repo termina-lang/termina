@@ -54,7 +54,7 @@ instance RTPrinter (RTEvent a) where
             braces' ((indentTab . align) (vsep (punctuate comma [
                 pretty "emitter" <+> pretty "=" <+> pretty emitterId,
                 pretty "transaction" <+> pretty "=" <+> pretty transId,
-                pretty "interval" <+> pretty "=" <+> pprint interval,
+                pretty "interval" <+> pretty "=" <+> pretty interval,
                 pretty "arrivals" <+> pretty "=" <+> pprint arrivals,
                 pretty "deadlines" <+> braces' ((indentTab . align) (vsep (map pprintDeadline (M.toList deadlines))))
             ])))

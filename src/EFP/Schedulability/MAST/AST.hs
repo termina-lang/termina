@@ -27,6 +27,12 @@ data MASTScheduler =
         Identifier -- ^ Host processing resource
     deriving Show
 
+data MASTSystemTimer =
+    MASTTicker -- ^ Alarm Clock system timer
+        NormalizedExecutionTime -- ^ Worst overhead
+        Time -- ^ Tick interval
+    deriving Show
+
 data MASTProcessingResource =
     MASTRegularProcessor
     { prName :: Identifier
@@ -34,6 +40,7 @@ data MASTProcessingResource =
     , prWorstISRSwitch :: NormalizedExecutionTime
     , prMaxInterruptPriority :: InterruptPriority
     , prMinInterruptPriority :: InterruptPriority
+    , prSytemTimer :: MASTSystemTimer
     }
     deriving Show
 
@@ -111,7 +118,7 @@ data MASTEventHandler =
 
 data MASTTransaction =
     MASTRegularTransaction
-        Identifier -- ^ Transaction's name
+        Identifier -- ^ External event that triggers the transaction
         [MASTExternalEvent] -- ^ External events
         [MASTInternalEvent] -- ^ Internal events
         [MASTEventHandler] -- ^ Event handlers

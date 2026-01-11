@@ -51,6 +51,7 @@ import EFP.Schedulability.PlantUML.Printer
 import Text.Printf
 import EFP.Schedulability.RT.Printer
 import EFP.Schedulability.MAST.Generator
+import EFP.Schedulability.MAST.Printer
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -351,10 +352,10 @@ printIntermediateRT rtModelFile config flatTrMap sitMap = do
     TIO.writeFile targetFile (runRTPrinter (M.elems flatTrMap ++ M.elems sitMap))
   
 
-genPickedEvents :: TransPathMap RTSemAnn 
+genPickedEvents :: TransPathMap TRPSemAnn 
   -> RTEvent RTSemAnn
-  -> IO [SelectedEvent RTSemAnn]
-genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval arrivals deadlines _) =
+  -> IO [SelectedEvent TRPSemAnn]
+genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) ->
         mapM (\stMap ->
@@ -379,16 +380,28 @@ genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadl
       TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
 
-{--
-genMASTModel :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap RTSemAnn -> IO ()
-genMASTModel config sitMap trPathMap = do
+genMASTModels :: TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
+genMASTModels config arch sitMap trPathMap = do
+  let destinationPath = outputFolder config </> efpFolder config
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
+      let base = destinationPath </> situationName 
       pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap) 
-      forM_ (sequenceA pickedEvents) $ \peList ->
-        generateMASTModel config situationName peList
+      let numPickedEvents = product (map length pickedEvents)
+          width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
+      TIO.putStrLn $
+        "\x1b[34m[info]\x1b[0m: Generating scheduling models for situation " <> T.pack situationName
+        <> " -> event combinations: " <> T.pack (show numPickedEvents)
+      zipWithM_ (\peList modelName ->
+        let result = runMASTModelGenerator config arch modelName peList in
+        case result of
+          Left err -> TIO.putStrLn (toText err M.empty) >> exitFailure
+          Right model -> do
+            let targetFile = base </> modelName <.> "mast"
+            createDirectoryIfMissing True (takeDirectory targetFile)
+            TIO.writeFile targetFile (runMASTPrinter model))
+        (sequenceA pickedEvents) [situationName ++ "__" ++ printf "%0*d" width_pickedEvents idx | idx <- [(0 :: Integer) ..]]
     _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths" >> exitFailure
---}
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
@@ -492,4 +505,6 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
     trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
     when plantUML (genPlantUMLModels config sitMap trPathMap)
+    when chatty (putStrLn . debugMessage $ "Generating scheduling models")
+    genMASTModels config programArchitecture sitMap trPathMap
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")
