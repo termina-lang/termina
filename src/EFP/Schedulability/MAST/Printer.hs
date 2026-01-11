@@ -22,10 +22,10 @@ instance MASTPrint MASTModel where
         pretty "Model_Name" <+> pretty "=>" <+> pretty modelName,
         pretty "Model_Date" <+> pretty "=>" <+> pretty "2025-01-01"
     ])) <> semi <> line <> line <> vsep (map pprint (M.elems processingResources))
-      <> vsep (map pprint (M.elems schedulers))
-      <> vsep (map pprint (M.elems schedServers))
-      <> vsep (map pprint (M.elems sharedResources))
-      <> vsep (map pprint (M.elems operations))
+      <> vsep (map pprint (M.elems schedulers)) <> line
+      <> vsep (map pprint (M.elems schedServers)) <> line
+      <> vsep (map pprint (M.elems sharedResources)) <> line
+      <> vsep (map pprint (M.elems operations)) <> line
       <> vsep (map pprint (M.elems transactions)) <> line
 
 instance MASTPrint MASTProcessingResource where

@@ -15,14 +15,11 @@ import Data.Bits
 (<::>) :: Identifier -> Identifier -> Identifier
 (<::>) i1 i2 = i1 ++ "__" ++ i2
 
-getMASTTransactionId :: Identifier -> Identifier -> Identifier -> Identifier
-getMASTTransactionId  eventId emitterId transId = "trans" <::> eventId <::> emitterId <::> transId
-
 getMASTSchedulingServerId :: Identifier -> Identifier
 getMASTSchedulingServerId componentId = "server" <::> componentId
 
-getMASTExternalEventId :: Identifier -> Identifier -> Identifier
-getMASTExternalEventId eventId emitterId = "ext_evt" <::> eventId <::> emitterId
+getMASTExternalEventId :: Identifier -> Identifier
+getMASTExternalEventId eventId = "ext_evt" <::> eventId
 
 getMASTInternalEventId :: Identifier -> Identifier
 getMASTInternalEventId stepName = "int_evt" <::> stepName
@@ -51,10 +48,12 @@ timerTopHalfSchedulingServerId = "timer_top_half__server"
 irqHandlerSchedulerServerId :: Identifier -> Identifier
 irqHandlerSchedulerServerId emitterId = "irq_handler_" <> emitterId <::> "server"
 
-getResourceMASTOperationId :: Identifier -> Identifier -> Identifier -> [ConstExpression a] -> MASTGenMonad Identifier
-getResourceMASTOperationId targetComponent targetAction targetPath postfix = do
+getResourceMASTOperationId :: Identifier 
+    -> Identifier
+    -> Identifier -> Identifier -> Identifier -> [ConstExpression a] -> MASTGenMonad Identifier
+getResourceMASTOperationId transactionId stepId targetComponent targetAction targetPath postfix = do
     postfixStr <- concat <$> mapM (showConstExpression >=> return . ("__" ++)) postfix
-    return $ "op" <::> targetComponent <::> targetAction <::> targetPath <> postfixStr
+    return $ "op" <::> transactionId <::> stepId <::> targetComponent <::> targetAction <::> targetPath <> postfixStr
 
     where
 
@@ -82,11 +81,17 @@ getMASTOperationId (MASTEnclosingOperation opId _ _) = opId
 bodyMASTOperationId :: Identifier -> Identifier
 bodyMASTOperationId parentOpId = parentOpId <::> "body"
 
-getTaskMASTOperationId :: Identifier -> Identifier -> Identifier -> Identifier
-getTaskMASTOperationId taskId actionId pathId = "op" <::> taskId <::> actionId <::> pathId
+getTaskMASTOperationId :: Identifier 
+    -> Identifier 
+    -> Identifier
+    -> Identifier -> Identifier -> Identifier
+getTaskMASTOperationId transactionId stepId taskId actionId pathId = "op" <::> transactionId <::> stepId <::> taskId <::> actionId <::> pathId
 
-getHandlerMASTOperationId :: Identifier -> Identifier -> Identifier -> Identifier
-getHandlerMASTOperationId handlerId actionId pathId = "op" <::> handlerId <::> actionId <::> pathId
+getHandlerMASTOperationId :: Identifier 
+    -> Identifier 
+    -> Identifier
+    -> Identifier -> Identifier -> Identifier
+getHandlerMASTOperationId transactionId stepId handlerId actionId pathId = "op" <::> transactionId <::> stepId <::> handlerId <::> actionId <::> pathId
 
 getIrqLockMASTOperationId :: Identifier -> Identifier
 getIrqLockMASTOperationId resourceId = "irq_lock_op" <::> resourceId

@@ -41,19 +41,21 @@ data SelectedEvent a =
     deriving Show
 
 
-getEnclosingOperations :: S.Set Identifier -> TransPathBlock a -> MASTGenMonad (S.Set Identifier)
-getEnclosingOperations acc (TPBlockCondIf blks _ _) = foldM getEnclosingOperations acc blks
-getEnclosingOperations acc (TPBlockCondElseIf blks _ _) = foldM getEnclosingOperations acc blks
-getEnclosingOperations acc (TPBlockCondElse blks _ _) = foldM getEnclosingOperations acc blks
-getEnclosingOperations acc (TPBlockForLoop _ blks _ _) = foldM getEnclosingOperations acc blks
-getEnclosingOperations acc (TPBlockMatchCase blks _ _) = foldM getEnclosingOperations acc blks
-getEnclosingOperations acc (TPBlockMemberFunctionCall args operation _ _) =
-    genMASTOperation False args operation >>= \opId ->
+getEnclosingOperations :: Identifier 
+    -> Identifier 
+    -> S.Set Identifier -> TransPathBlock a -> MASTGenMonad (S.Set Identifier)
+getEnclosingOperations transactionId stepId acc (TPBlockCondIf blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
+getEnclosingOperations transactionId stepId acc (TPBlockCondElseIf blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
+getEnclosingOperations transactionId stepId acc (TPBlockCondElse blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
+getEnclosingOperations transactionId stepId acc (TPBlockForLoop _ blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
+getEnclosingOperations transactionId stepId acc (TPBlockMatchCase blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
+getEnclosingOperations transactionId stepId acc (TPBlockMemberFunctionCall args operation _ _) =
+    genMASTOperation transactionId stepId False args operation >>= \opId ->
         return $ S.insert opId acc
-getEnclosingOperations acc (TPBlockProcedureInvoke args operation _ _) =
-    genMASTOperation True args operation >>= \opId ->
+getEnclosingOperations transactionId stepId acc (TPBlockProcedureInvoke args operation _ _) =
+    genMASTOperation transactionId stepId True args operation >>= \opId ->
         return $ S.insert opId acc
-getEnclosingOperations acc (TPBlockAllocBox poolId _ _) = do
+getEnclosingOperations _transactionId _stepId acc (TPBlockAllocBox poolId _ _) = do
     let opId = getAllocBoxMASTOperationId poolId
     ops <- gets operations
     case M.lookup opId ops of
@@ -72,7 +74,7 @@ getEnclosingOperations acc (TPBlockAllocBox poolId _ _) = do
                     >> return (S.insert opId acc)
                 Nothing -> throwError . annotateError Internal $ EUnknownResource poolId
 
-getEnclosingOperations acc (TPBlockFreeBox poolId _ _) = do
+getEnclosingOperations _transactionId _stepId acc (TPBlockFreeBox poolId _ _) = do
     let opId = getFreeBoxMASTOperationId poolId
     ops <- gets operations
     case M.lookup opId ops of
@@ -90,13 +92,13 @@ getEnclosingOperations acc (TPBlockFreeBox poolId _ _) = do
                     genMutexLockSharedPool poolId ceil
                     >> return (S.insert opId acc)
                 Nothing -> throwError . annotateError Internal $ EUnknownResource poolId
-getEnclosingOperations acc (TPBlockSystemCall systemCallName _ _ _) = do
+getEnclosingOperations _transactionId _stepId acc (TPBlockSystemCall systemCallName _ _ _) = do
     let opId = getSystemCallMASTOperationId systemCallName
     ops <- gets operations
     case M.lookup opId ops of
         Just _ -> return $ S.insert opId acc
         Nothing -> throwError . annotateError Internal $ EUnsupportedSystemCall systemCallName
-getEnclosingOperations acc _ = return acc
+getEnclosingOperations _ _ acc _ = return acc
 
 genBodyOperation :: Identifier -> [Identifier] -> WCETime -> MASTGenMonad ()
 genBodyOperation bodyOpId [] wcet = do
@@ -111,35 +113,35 @@ genBodyOperation bodyOpId enclosingOps wcet = do
             enclosingOps
     insertOperation operation
 
-genMASTOperation :: Bool -> [ConstExpression a] -> TRPOperation a -> MASTGenMonad Identifier
-genMASTOperation _isInvoke _args (TRPTaskOperation _stepName taskId actionId pathId blks _ wcet _) = do
+genMASTOperation :: Identifier -> Identifier -> Bool -> [ConstExpression a] -> TRPOperation a -> MASTGenMonad Identifier
+genMASTOperation transactionId stepId _isInvoke _args (TRPTaskOperation _stepName taskId actionId pathId blks _ wcet _) = do
     -- | The operation identifier is the name of the step defined in the transaction
-    let opId = getTaskMASTOperationId taskId actionId pathId
+    let opId = getTaskMASTOperationId transactionId stepId taskId actionId pathId
     ops <- gets operations
     case M.lookup opId ops of
         Just _ -> return opId
         Nothing -> do
-            enclosingOps <- foldM getEnclosingOperations S.empty blks
+            enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
             genBodyOperation opId (S.toList enclosingOps) wcet
             >> return opId
-genMASTOperation _isInvoke _args (TRPHandlerOperation _stepName handlerId actionId pathId blks _ wcet _) = do
-    let opId = getHandlerMASTOperationId handlerId actionId pathId
+genMASTOperation transactionId stepId _isInvoke _args (TRPHandlerOperation _stepName handlerId actionId pathId blks _ wcet _) = do
+    let opId = getHandlerMASTOperationId transactionId stepId handlerId actionId pathId
     ops <- gets operations
     case M.lookup opId ops of
         Just _ -> return opId
         Nothing -> do
-            enclosingOps <- foldM getEnclosingOperations S.empty blks
+            enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
             genBodyOperation opId (S.toList enclosingOps) wcet
             >> return opId
-genMASTOperation isInvoke args (TRPResourceOperation resName functionName pathName blks wcet _) = do
+genMASTOperation transactionId stepId isInvoke args (TRPResourceOperation resName functionName pathName blks wcet _) = do
     -- | First, we need to check if the resource operation has already been generated
-    opId <- getResourceMASTOperationId resName functionName pathName args
+    opId <- getResourceMASTOperationId transactionId stepId resName functionName pathName args
     ops <- gets operations
     case M.lookup opId ops of
         Just _ -> return opId
         Nothing -> do
             -- | Generate the MAST operation
-            enclosingOps <- foldM getEnclosingOperations S.empty blks
+            enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
             -- | If the operation is an invoke, we need to check the resource locking mechanism
             if isInvoke then do
                 rlockingMap <- gets resourceLockingMap
@@ -178,7 +180,7 @@ genMASTInternalEvent externalEventId stepName = do
     return $ MASTRegularInternalEvent (getMASTInternalEventId stepName) mDeadline
 
 genMASTTransactionStep :: MASTTransaction -> Identifier -> MASTGenMonad MASTTransaction
-genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intEvents evHandlers) stepName = do
+genMASTTransactionStep (MASTRegularTransaction transactionId [extEvent] intEvents evHandlers) stepName = do
     arch <- gets progArch
     let externalEventId = case extEvent of
             MASTBurstyExternalEvent eid _ _ -> eid
@@ -191,7 +193,7 @@ genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intE
             tsk <- case M.lookup taskId (tasks arch) of
                 Just t -> return t
                 Nothing -> throwError . annotateError Internal $ EUnknownTask taskId
-            opId <- genMASTOperation False [] op
+            opId <- genMASTOperation transactionId stepName False [] op
             -- | Now, we need to create the event handler for the operation
             schServers <- gets schedulingServers
             unless (M.member taskId schServers) $ genTaskSchedulingServer tsk >>= insertSchedulingServer
@@ -204,7 +206,7 @@ genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intE
                             (getMASTInternalEventId c) -- ^ output event
                             opId
                             taskId
-                    let newTransaction = MASTRegularTransaction mastTransactionId [extEvent] 
+                    let newTransaction = MASTRegularTransaction transactionId [extEvent] 
                             (internalEvent : intEvents) 
                             (eventHandler : evHandlers)
                     genMASTTransactionStep newTransaction c
@@ -218,7 +220,7 @@ genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intE
                             opId
                             taskId
                     foldM genMASTTransactionStep
-                        (MASTRegularTransaction mastTransactionId [extEvent] 
+                        (MASTRegularTransaction transactionId [extEvent] 
                             (internalEvent : intEvents) 
                             (eventHandler : multicastEventHandler : evHandlers))
                         continuations
@@ -226,14 +228,13 @@ genMASTTransactionStep (MASTRegularTransaction mastTransactionId [extEvent] intE
             throwError . annotateError Internal $ EInvalidStepType stepName
         Nothing ->
             -- | If we are here, it means that the step is an end step
-            return $ MASTRegularTransaction mastTransactionId [extEvent] (internalEvent : intEvents) evHandlers
+            return $ MASTRegularTransaction transactionId [extEvent] (internalEvent : intEvents) evHandlers
 genMASTTransactionStep _ _ = throwError . annotateError Internal $ EInvalidTransactionStructure
 
 genMASTTransaction :: SelectedEvent TRPSemAnn -> MASTGenMonad MASTTransaction
-genMASTTransaction (SelectedEventBursty eventId emitterId transId initialStepId stMap interval arrivals deadlines) = do
+genMASTTransaction (SelectedEventBursty eventId emitterId transactionId initialStepId stMap interval arrivals deadlines) = do
 
-    let externalEventId = getMASTExternalEventId eventId emitterId
-        mastTransactionId = getMASTTransactionId eventId emitterId transId
+    let externalEventId = getMASTExternalEventId eventId 
     
     let externalEvent = MASTBurstyExternalEvent
             externalEventId
@@ -271,12 +272,12 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transId initialStepId 
                     (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
             -- | Now, we need to create the internal event handler for the task activity
             let initialTransaction = MASTRegularTransaction
-                    mastTransactionId
+                    transactionId
                     [externalEvent] []
                     [externalEventHandler]
             genMASTTransactionStep initialTransaction initialStepId
         op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
-            opId <- genMASTOperation False [] op
+            opId <- genMASTOperation transactionId initialStepId False [] op
             case continuations of
                 [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
                 [c] -> do
@@ -289,7 +290,7 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transId initialStepId 
                             (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
                     -- | Now, we need to create the internal event handler for the task activity
                     let initialTransaction = MASTRegularTransaction
-                            mastTransactionId
+                            transactionId
                             [externalEvent] []
                             [externalEventHandler]
                     genMASTTransactionStep initialTransaction c
@@ -313,10 +314,9 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transId initialStepId 
                         continuations
         _ -> throwError . annotateError Internal $ EInvalidStepType initialStepId
     
-genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepId stMap deadlines) = do
+genMASTTransaction (SelectedEventPeriodic eventId emitterId transactionId initialStepId stMap deadlines) = do
 
-    let externalEventId = getMASTExternalEventId eventId emitterId
-        mastTransactionId = getMASTTransactionId eventId emitterId transId
+    let externalEventId = getMASTExternalEventId eventId
 
     arch <- gets progArch
     period <- case M.lookup emitterId (emitters arch) of
@@ -341,7 +341,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
         Nothing -> throwError . annotateError Internal $ EInvalidInitialStep initialStepId
     
     case initialOperation of
-        TRPTaskOperation {} -> do
+        TRPTaskOperation {}  -> do
             -- | If the timer is connected to a task, we need to generate two event handlers:
             -- | 1. An external event handler for the timer's top half
             -- | 2. An internal event handler for the task's activity
@@ -357,12 +357,12 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
                     timerTopHalfSchedulingServerId -- ^ scheduling server
             -- | Now, we need to create the internal event handler for the task activity
             let initialTransaction = MASTRegularTransaction
-                    mastTransactionId
+                    transactionId
                     [externalEvent] []
                     [externalEventHandler]
             genMASTTransactionStep initialTransaction initialStepId
         op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
-            opId <- genMASTOperation False [] op
+            opId <- genMASTOperation transactionId initialStepId False [] op
             case continuations of
                 [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
                 [c] -> do
@@ -375,7 +375,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
                             timerTopHalfSchedulingServerId -- ^ scheduling server
                     -- | Now, we need to create the internal event handler for the task activity
                     let initialTransaction = MASTRegularTransaction
-                            mastTransactionId
+                            transactionId
                             [externalEvent] []
                             [externalEventHandler]
                     genMASTTransactionStep initialTransaction c
@@ -393,7 +393,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transId initialStepI
                             opId
                             timerTopHalfSchedulingServerId
                     foldM genMASTTransactionStep
-                        (MASTRegularTransaction mastTransactionId [externalEvent] 
+                        (MASTRegularTransaction transactionId [externalEvent] 
                             [] 
                             [multicastEventHandler, externalEventHandler])
                         continuations
