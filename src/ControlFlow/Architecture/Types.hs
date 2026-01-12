@@ -136,6 +136,22 @@ data ResourceLock
     | ResourceLockIrq -- ^ The resource is shared between one or more tasks and one or more handlers
   deriving Show
 
+instance Eq ResourceLock where
+    ResourceLockNone == ResourceLockNone = True
+    ResourceLockIrq == ResourceLockIrq = True
+    (ResourceLockMutex p1) == (ResourceLockMutex p2) = p1 == p2
+    _ == _ = False
+
+instance Ord ResourceLock where
+    ResourceLockNone `compare` ResourceLockNone = EQ
+    -- Any other lock is greater than None
+    ResourceLockNone `compare` _ = LT
+    _ `compare` ResourceLockNone = GT
+    ResourceLockIrq `compare` ResourceLockIrq = EQ
+    ResourceLockIrq `compare` _ = GT
+    _ `compare` ResourceLockIrq = LT
+    (ResourceLockMutex p1) `compare` (ResourceLockMutex p2) = p1 `compare` p2
+
 type ResourceLockingMap = M.Map Identifier ResourceLock
 
 data TPResource a = TPResource {

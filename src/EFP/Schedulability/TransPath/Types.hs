@@ -1,10 +1,12 @@
 module EFP.Schedulability.TransPath.Types where
 import EFP.Schedulability.TransPath.AST
 import qualified Data.Map.Strict as M
+import ControlFlow.Architecture.Types
 
 data TRPSemAnn = 
     TRPExprTy ConstExprType
-    | TRPBlockTy
+    | TRPBlockRegularTy
+    | TRPBlockAccessTy ResourceLock
     | TRPOperationTy
     | TRPTransactionsPathTy
     deriving Show

@@ -8,6 +8,8 @@ import qualified Data.Map.Strict as M
 import EFP.Schedulability.TransPath.Types
 import Data.Bits
 import EFP.Schedulability.TransPath.Errors
+import ControlFlow.Architecture.Types
+import Data.Foldable
 
 evalBinOp :: 
     Op 
@@ -104,3 +106,23 @@ passArguments (argName:argNames) (argValue:argValues) = do
         st { localConstEnv = M.insert argName argValue (localConstEnv st) }
     passArguments argNames argValues
 passArguments _ _ = throwError . annotateError Internal $ EInvalidArgumentPassing
+
+greatestResourceLock ::
+    ResourceLock 
+    -> TransPathBlock TRPSemAnn 
+    -> ResourceLock
+greatestResourceLock currentLock (TPBlockProcedureInvoke _ _ _ (TRPBlockAccessTy lock)) =
+    max currentLock lock
+greatestResourceLock currentLock (TPBlockMemberFunctionCall _ _ _ (TRPBlockAccessTy lock)) =
+    max currentLock lock
+greatestResourceLock currentLock (TPBlockForLoop _ blks _ _) =
+    foldl' greatestResourceLock currentLock blks
+greatestResourceLock currentLock (TPBlockCondIf blks _ _) =
+    foldl' greatestResourceLock currentLock blks
+greatestResourceLock currentLock (TPBlockCondElseIf blks _ _) =
+    foldl' greatestResourceLock currentLock blks
+greatestResourceLock currentLock (TPBlockCondElse blks _ _) =
+    foldl' greatestResourceLock currentLock blks
+greatestResourceLock currentLock (TPBlockMatchCase blks _ _) =
+    foldl' greatestResourceLock currentLock blks
+greatestResourceLock currentLock _ = currentLock
