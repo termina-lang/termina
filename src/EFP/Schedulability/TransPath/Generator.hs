@@ -23,6 +23,7 @@ import Data.Functor
 import Semantic.Types
 import EFP.Schedulability.WCET.Types
 import qualified Control.Monad.State as ST
+import ControlFlow.Architecture.Utils
 
 -- | Follows an access port invocation to determine the target component.
 --
@@ -264,7 +265,36 @@ genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockTy)]
 genTPaths :: Identifier -> [(WCETime, [TransPathBlock TRPSemAnn])]
     -> [WCEPathBlock WCEPSemAnn]
     -> TRPGenMonad [(WCETime, [TransPathBlock TRPSemAnn])]
-genTPaths _ acc []  = return acc
+genTPaths _ acc []  = do
+    -- | No more blocks to process. Now we need to check there is no path that
+    -- contains an invoke to a procedure of a resource that is locked.
+    -- If there is no such path, we can return only the path with the maximum WCET.
+    resLockMap <- gets resourceLockingMap
+    nonBlockingPaths <- filterM (isNonBlockingPath resLockMap) acc
+    if null nonBlockingPaths then
+        return $ findMaxWCETPath acc
+    else
+        return acc
+    
+    where
+
+        isNonBlockingPath :: ResourceLockingMap
+            -> (WCETime, [TransPathBlock TRPSemAnn])
+            -> TRPGenMonad Bool
+        isNonBlockingPath _ (_wcet, []) = return True
+        isNonBlockingPath resLockMap (_wcet, TPBlockProcedureInvoke _ (TRPResourceOperation res _ _  _ _ _) _ _  : remainingBlocks) =
+            case M.lookup res resLockMap of
+                Just ResourceLockNone -> isNonBlockingPath resLockMap (_wcet, remainingBlocks)
+                _ -> return False
+        isNonBlockingPath resLockMap (_wcet, _ : remainingBlocks) =
+            isNonBlockingPath resLockMap (_wcet, remainingBlocks)
+        
+        findMaxWCETPath :: [(WCETime, [TransPathBlock TRPSemAnn])]
+            -> [(WCETime, [TransPathBlock TRPSemAnn])]
+        findMaxWCETPath paths =
+            let maxWCET = maximum $ map fst paths in
+            filter (\(wcet, _) -> wcet == maxWCET) paths
+        
 genTPaths componentName paths (block : remainingBlocks) = do
     newPaths <- genPaths componentName block
     if null newPaths then genTPaths componentName paths remainingBlocks
@@ -321,7 +351,7 @@ runTransPathGenerator :: TerminaProgArch SemanticAnn
     -> RTElement RTSemAnn
     -> Either TRPGenErrors (TransactionPath TRPSemAnn)
 runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ initialStep@(RTTransStepAction stepName _ _ _ _ _) _) =
-    let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty in
+    let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty M.empty in
     case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
         (Left err, _) -> Left err
         (_, st) -> Right $ SimpleTransactionPath stepName (operationMap st) TRPTransactionsPathTy
@@ -336,7 +366,7 @@ runTransPathGenerator arch config wcepMap wcetMap (RTTransaction _ (RTTransStepC
         generateBranches [] = Right []
         generateBranches ((condExpr, initialStep@(RTTransStepAction stepName _ _ _ _ _)) : xs) = do
             rest <- generateBranches xs
-            let initialState = TRPGenState arch config wcepMap wcetMap M.empty M.empty
+            let initialState = TRPGenState arch config (genResourceLockings arch) wcepMap wcetMap M.empty M.empty
             case ST.runState (runExceptT (genTPActivitiesFromAction initialStep)) initialState of
                 (Left err, _) -> Left err
                 (Right _, st) -> Right $ (condExpr, stepName, operationMap st) : rest

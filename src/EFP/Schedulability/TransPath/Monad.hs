@@ -17,6 +17,7 @@ data TRPGenState = TRPGenState
     {
         progArch :: TerminaProgArch SemanticAnn
         , configParams :: TerminaConfig
+        , resourceLockingMap :: ResourceLockingMap
         , transPaths :: WCEPathMap WCEPSemAnn
         , transWCETs :: WCETimesMap WCETSemAnn
         , localConstEnv :: TRPGenEnvironment
