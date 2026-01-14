@@ -15,11 +15,11 @@ getProcessingResources = M.fromList [
     ("cpu0", MASTRegularProcessor
         { prName = "cpu0"
         , prSpeedFactor = 1.0
-        , prWorstISRSwitch = 0.002
+        , prWorstISRSwitch = 1.0E-5
         , prMaxInterruptPriority = 256 + 16
         , prMinInterruptPriority = 1
         , prSytemTimer = MASTTicker
-            0.002 -- Worst overhead
+            1.0E-5 -- Worst overhead
             0.01  -- Tick interval
         })
     ]
@@ -30,7 +30,7 @@ getSchedulers = M.fromList [
             "RTEMS"
             (
                 MASTFixedPriority
-                    0.0005 -- Worst-case context switch time
+                    1.0E-5 -- Worst-case context switch time
                     (256 + 16) -- Maximum priority
                     1      -- Minimum priority
             )
@@ -83,7 +83,7 @@ genIrqLockOperation resourceId =
     in 
         MASTSimpleOperation
             opId
-            0.0001
+            1.0E-5
             [resourceId] []
 
 genIrqUnlockOperation :: Identifier -> MASTOperation
@@ -92,7 +92,7 @@ genIrqUnlockOperation resourceId =
     in 
         MASTSimpleOperation
             opId
-            0.0001
+            1.0E-5
             [] [resourceId]
 
 genIrqSharedResource :: Identifier -> MASTSharedResource
@@ -107,7 +107,7 @@ genMutexLockOperation resourceId =
     in 
         MASTSimpleOperation
             opId
-            0.0002
+            2.0E-5
             [resourceId] []
 
 genMutexUnlockOperation :: Identifier -> MASTOperation
@@ -116,7 +116,7 @@ genMutexUnlockOperation resourceId =
     in 
         MASTSimpleOperation
             opId
-            0.0002
+            2.0E-5
             [] [resourceId]
 
 genMutexSharedResource :: Identifier -> AnyPriority -> MASTSharedResource
@@ -131,7 +131,7 @@ genUnprotectedAllocBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.005
+            1.0E-4
             [] []
 
 genUnprotectedFreeBoxOperation :: Identifier -> MASTOperation
@@ -140,7 +140,7 @@ genUnprotectedFreeBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.005
+            1.0E-4
             [] []
 
 genIrqLockAllocBoxOperation :: Identifier -> MASTOperation
@@ -149,7 +149,7 @@ genIrqLockAllocBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.006
+            1.2E-4
             [poolId] [poolId]
 
 genIrqUnlockFreeBoxOperation :: Identifier -> MASTOperation
@@ -158,7 +158,7 @@ genIrqUnlockFreeBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.006
+            1.2E-4
             [poolId] [poolId]
 
 genMutexLockAllocBoxOperation :: Identifier -> MASTOperation
@@ -167,7 +167,7 @@ genMutexLockAllocBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.007
+            1.2E-4
             [poolId] [poolId]
 
 genMutexUnlockFreeBoxOperation :: Identifier -> MASTOperation
@@ -176,14 +176,14 @@ genMutexUnlockFreeBoxOperation poolId =
     in 
         MASTSimpleOperation
             opId
-            0.007
+            1.2E-4
             [poolId] [poolId]
 
 timerTopHalfMASTOperation :: MASTOperation
 timerTopHalfMASTOperation = 
     MASTSimpleOperation
         timerTopHalfMASTOperationId
-        0.01
+        1.0E-5
         [] []
 
 timerTopHalfSchedulingServer :: MASTSchedulingServer
@@ -199,7 +199,7 @@ irqTopHalfMASTOperation emitterId =
     in 
         MASTSimpleOperation
             opId
-            0.01
+            1.0E-5
             [] []
 
 genIrqHandlerSchedulingServer :: Identifier -> MASTGenMonad MASTSchedulingServer
@@ -214,7 +214,7 @@ genSystemCallMASTOperations :: [(Identifier, MASTOperation)]
 genSystemCallMASTOperations = 
     [ (getSystemCallMASTOperationId "clock_get_uptime", MASTSimpleOperation
         (getSystemCallMASTOperationId "clock_get_uptime")
-        0.02
+        5.0E-5
         [] []
       )
     ]
