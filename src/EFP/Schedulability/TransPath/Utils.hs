@@ -8,8 +8,9 @@ import qualified Data.Map.Strict as M
 import EFP.Schedulability.TransPath.Types
 import Data.Bits
 import EFP.Schedulability.TransPath.Errors
-import ControlFlow.Architecture.Types
 import Data.Foldable
+import qualified Data.Set as S
+import ControlFlow.Architecture.Types
 
 evalBinOp :: 
     Op 
@@ -107,22 +108,78 @@ passArguments (argName:argNames) (argValue:argValues) = do
     passArguments argNames argValues
 passArguments _ _ = throwError . annotateError Internal $ EInvalidArgumentPassing
 
-greatestResourceLock ::
-    ResourceLock 
+getResourceLockSet ::
+    S.Set (Identifier, Identifier, Identifier)
     -> TransPathBlock TRPSemAnn 
-    -> ResourceLock
-greatestResourceLock currentLock (TPBlockProcedureInvoke _ _ _ (TRPBlockAccessTy lock)) =
-    max currentLock lock
-greatestResourceLock currentLock (TPBlockMemberFunctionCall _ _ _ (TRPBlockAccessTy lock)) =
-    max currentLock lock
-greatestResourceLock currentLock (TPBlockForLoop _ blks _ _) =
-    foldl' greatestResourceLock currentLock blks
-greatestResourceLock currentLock (TPBlockCondIf blks _ _) =
-    foldl' greatestResourceLock currentLock blks
-greatestResourceLock currentLock (TPBlockCondElseIf blks _ _) =
-    foldl' greatestResourceLock currentLock blks
-greatestResourceLock currentLock (TPBlockCondElse blks _ _) =
-    foldl' greatestResourceLock currentLock blks
-greatestResourceLock currentLock (TPBlockMatchCase blks _ _) =
-    foldl' greatestResourceLock currentLock blks
-greatestResourceLock currentLock _ = currentLock
+    -> TRPGenMonad (S.Set (Identifier, Identifier, Identifier))
+getResourceLockSet currentLockSet (TPBlockProcedureInvoke _ (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
+    return $ S.union currentLockSet lockSet
+getResourceLockSet currentLockSet (TPBlockMemberFunctionCall _ (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
+    return $ S.union currentLockSet lockSet
+getResourceLockSet currentLockSet (TPBlockForLoop _ blks _ _) =
+    foldlM getResourceLockSet currentLockSet blks
+getResourceLockSet currentLockSet (TPBlockCondIf blks _ _) =
+    foldlM getResourceLockSet currentLockSet blks
+getResourceLockSet currentLockSet (TPBlockCondElseIf blks _ _) =
+    foldlM getResourceLockSet currentLockSet blks
+getResourceLockSet currentLockSet (TPBlockCondElse blks _ _) =
+    foldlM getResourceLockSet currentLockSet blks
+getResourceLockSet currentLockSet (TPBlockMatchCase blks _ _) =
+    foldlM getResourceLockSet currentLockSet blks
+getResourceLockSet currentLockSet (TPBlockAllocBox targetComponent _ _) = do
+    resLockMap <- gets resourceLockingMap
+    isLocked <- case M.lookup targetComponent resLockMap of
+        Just ResourceLockNone -> return False
+        Just _ -> return True
+        Nothing -> throwError . annotateError Internal $ EUnknownComponent targetComponent
+    if isLocked then
+        return $ S.insert (targetComponent, "alloc", "path0") currentLockSet
+    else
+        return currentLockSet
+getResourceLockSet currentLockSet (TPBlockFreeBox targetComponent _ _) = do
+    resLockMap <- gets resourceLockingMap
+    isLocked <- case M.lookup targetComponent resLockMap of
+        Just ResourceLockNone -> return False
+        Just _ -> return True
+        Nothing -> throwError . annotateError Internal $ EUnknownComponent targetComponent
+    if isLocked then
+        return $ S.insert (targetComponent, "free", "path0") currentLockSet
+    else
+        return currentLockSet
+getResourceLockSet currentLockSet _ = return currentLockSet
+
+sameResourceLocking ::
+    TRPOperation TRPSemAnn
+    -> TRPOperation TRPSemAnn
+    -> Bool
+sameResourceLocking prevOp newOp = 
+    case (getAnnotation prevOp, getAnnotation newOp) of
+        (TRPOperationTy resLock1, TRPOperationTy resLock2) ->
+            resLock1 == resLock2
+        _ -> False
+
+filterOperations :: 
+    [TRPOperation TRPSemAnn]
+    -> TRPOperation TRPSemAnn
+    -> [TRPOperation TRPSemAnn]
+filterOperations prevOps newOp@(TRPTaskOperation _ _ _ _ _ _ newWcet _) =
+    let differentOps = filter (not . sameResourceLocking newOp) prevOps
+        matchingOps = filter (sameResourceLocking newOp) prevOps
+    in case matchingOps of
+        [] -> differentOps ++ [newOp]
+        (TRPTaskOperation _ _ _ _ _ _ oldWcet _):_ ->
+            if newWcet > oldWcet
+                then differentOps ++ [newOp]
+                else prevOps
+        _ -> prevOps -- ^ This should not happen (mixed operation types)
+filterOperations prevOps newOp@(TRPHandlerOperation _ _ _ _ _ _ newWcet _) =
+    let differentOps = filter (not . sameResourceLocking newOp) prevOps
+        matchingOps = filter (sameResourceLocking newOp) prevOps
+    in case matchingOps of
+        [] -> differentOps ++ [newOp]
+        (TRPHandlerOperation _ _ _ _ _ _ oldWcet _):_ ->
+            if newWcet > oldWcet
+                then differentOps ++ [newOp]
+                else prevOps
+        _ -> prevOps -- ^ This should not happen (mixed operation types)
+filterOperations prevOps _ = prevOps -- ^ This should not happen

@@ -4,6 +4,7 @@ module EFP.Schedulability.TransPath.AST
 
 import EFP.Schedulability.Core.AST
 import qualified Data.Map.Strict as M
+import Utils.Annotations
 
 type WCETime = Double
 type TRPOperationMap a = M.Map Identifier [TRPOperation a]
@@ -94,6 +95,18 @@ data TRPOperation a
         WCETime -- ^ Worst-case execution time
         a -- ^ Annotation
     deriving Show
+
+instance Annotated TRPOperation where
+    getAnnotation (TRPTaskOperation _ _ _ _ _ _ _ ann) = ann
+    getAnnotation (TRPHandlerOperation _ _ _ _ _ _ _ ann) = ann
+    getAnnotation (TRPResourceOperation _ _ _ _ _ ann) = ann
+
+    updateAnnotation (TRPTaskOperation s t a p blks cont wcet _) ann =
+        TRPTaskOperation s t a p blks cont wcet ann
+    updateAnnotation (TRPHandlerOperation s h a p blks cont wcet _) ann =
+        TRPHandlerOperation s h a p blks cont wcet ann
+    updateAnnotation (TRPResourceOperation r m p blks wcet _) ann =
+        TRPResourceOperation r m p blks wcet ann
 
 data TransactionPath a =
     SimpleTransactionPath
