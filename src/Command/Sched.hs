@@ -52,6 +52,8 @@ import Text.Printf
 import EFP.Schedulability.RT.Printer
 import EFP.Schedulability.MAST.Generator
 import EFP.Schedulability.MAST.Printer
+import Data.Foldable
+import EFP.Schedulability.TransPath.Utils
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -310,7 +312,7 @@ genPlantUMLModels config sitMap trPathMap = do
       let base = destinationPath </> situationName 
       pickedEvents <- concat <$> mapM (genPickedEvents trPathMap) (M.elems evMap) 
       mapM_ (genPlantUMLModelForTransaction base) pickedEvents
-    _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating PlantUML diagrams for transactional paths" >> exitFailure
+    _ -> putStrLn (errorMessage "Unexpected RT element when generating PlantUML diagrams for transactional paths") >> exitFailure
 
 genPlantUMLModelForTransaction :: FilePath -> SelectedEvent TRPSemAnn -> IO ()
 genPlantUMLModelForTransaction base (SelectedEventBursty _ _ transactionId initialStep stMap _ _ _) = do
@@ -350,17 +352,16 @@ genPickedEvents :: TransPathMap TRPSemAnn
 genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
-        let numPickedEvents = product (map length (M.elems opMap))
+        let filteredOpMap = foldl' filterOperations [] <$> opMap
+        let numPickedEvents = product (map length (M.elems filteredOpMap))
             width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
         zipWithM (\stMap idx ->
               return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
-            ) (sequenceA opMap) [0 :: Integer ..]
+            ) (sequenceA filteredOpMap) [0 :: Integer ..]
     Just _ -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
-          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+      putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
     Nothing -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
-          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+      putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
 genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
@@ -370,11 +371,9 @@ genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadl
             return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
           ) (sequenceA opMap) [0 :: Integer ..]
     Just _ -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
-          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+      putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
     Nothing -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
-          <> T.pack transactionId <> " when generating picked events") >> exitFailure
+      putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
 
 genMASTModels :: TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
 genMASTModels config arch sitMap trPathMap = do
@@ -385,9 +384,8 @@ genMASTModels config arch sitMap trPathMap = do
       pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap) 
       let numPickedEvents = product (map length pickedEvents)
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
-      TIO.putStrLn $
-        "\x1b[34m[info]\x1b[0m: Generating scheduling models for situation " <> T.pack situationName
-        <> " -> event combinations: " <> T.pack (show numPickedEvents)
+      putStrLn . infoMessage $ "Generating scheduling models for situation " ++ situationName
+        ++ " -> event combinations: " ++ show numPickedEvents
       zipWithM_ (\peList modelName ->
         let result = runMASTModelGenerator config arch modelName peList in
         case result of
@@ -397,7 +395,7 @@ genMASTModels config arch sitMap trPathMap = do
             createDirectoryIfMissing True (takeDirectory targetFile)
             TIO.writeFile targetFile (runMASTPrinter model))
         (sequenceA pickedEvents) [situationName ++ "__" ++ printf "%0*d" width_pickedEvents idx | idx <- [(0 :: Integer) ..]]
-    _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths" >> exitFailure
+    _ -> putStrLn (errorMessage "Unexpected RT element when generating MAST models for transactional paths") >> exitFailure
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
@@ -500,7 +498,6 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
     when genIntermediateRT $ printIntermediateRT rtModelFile config flatTrMap sitMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
     trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
-    when plantUML (genPlantUMLModels config sitMap trPathMap)
-    when chatty (putStrLn . debugMessage $ "Generating scheduling models")
+    when plantUML (when chatty (putStrLn (debugMessage "Generating PlantUML models") >> genPlantUMLModels config sitMap trPathMap))
     genMASTModels config programArchitecture sitMap trPathMap
     when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")
