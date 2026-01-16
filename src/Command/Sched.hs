@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Command.Sched (
     schedCmdArgsParser, schedCommand, SchedCmdArgs
@@ -10,6 +11,7 @@ import Command.Types
 
 import qualified Options.Applicative as O
 import Control.Monad
+import Control.Concurrent.STM
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
@@ -52,6 +54,16 @@ import Text.Printf
 import EFP.Schedulability.RT.Printer
 import EFP.Schedulability.MAST.Generator
 import EFP.Schedulability.MAST.Printer
+import Control.Concurrent.Async
+import System.Process
+import Control.Concurrent
+import Control.Exception
+import System.IO.Temp
+import System.IO
+import Data.Time
+import EFP.Schedulability.MAST.AST
+import System.IO.Error
+import qualified Data.List as L
 
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
@@ -59,7 +71,8 @@ data SchedCmdArgs =
         FilePath -- ^ Path to the RT model file
         Bool -- ^ Verbose mode
         Bool -- ^ Generate PlantUML diagrams
-        Bool -- ^ Generate intermediate RT model
+        Bool -- ^ Write intermediate RT model
+        Bool -- ^ Write MAST models
     deriving (Show,Eq)
 
 
@@ -73,8 +86,10 @@ schedCmdArgsParser = SchedCmdArgs
         <> O.help "Enable verbose mode")
     <*> O.switch (O.long "gen-plantuml"
         <> O.help "Generate PlantUML diagrams for the transactional worst-case execution paths")
-    <*> O.switch (O.long "gen-intermediate-rt"
-        <> O.help "Generate intermediate RT model after type checking and flattening")
+    <*> O.switch (O.long "write-intermediate-rt"
+        <> O.help "Write intermediate RT model after type checking and flattening")
+    <*> O.switch (O.long "write-mast-models"
+        <> O.help "Write MAST models for all generated scheduling scenarios")
 
 loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
@@ -124,7 +139,7 @@ typeRTModule arch trPathMap bbProject pathProject rtModule = do
         (sourcecode rtModule)
         (SemanticRTData tyElems)
 
-flattenRTModule :: TerminaProgArch SemanticAnn 
+flattenRTModule :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
   -> TypedRTModule -> IO (RTTransactionMap RTSemAnn, RTSituationMap RTSemAnn)
 flattenRTModule arch wcepMap rtModule = do
@@ -306,53 +321,55 @@ genPlantUMLModels :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TR
 genPlantUMLModels config sitMap trPathMap = do
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) ->
-      forM_ (M.elems evMap) $ \case 
+      forM_ (M.elems evMap) $ \case
           (RTEventBursty eventId _ transactionName _ _ _ _ ) -> do
             case M.lookup transactionName trPathMap of
-              Just trPath -> genPlantUMLModelForTransaction config situationName eventId transactionName trPath
-              Nothing -> 
-                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+              Just trPath -> genPlantUMLModelForTransaction situationName eventId transactionName trPath
+              Nothing ->
+                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
                     <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
           (RTEventPeriodic eventId _ transactionName _ _ ) -> do
             case M.lookup transactionName trPathMap of
-              Just trPath -> genPlantUMLModelForTransaction config situationName eventId transactionName trPath
-              Nothing -> 
-                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+              Just trPath -> genPlantUMLModelForTransaction situationName eventId transactionName trPath
+              Nothing ->
+                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
                     <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
     _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating PlantUML diagrams for transactional paths" >> exitFailure
 
-genPlantUMLModelForTransaction :: TerminaConfig -> Identifier -> Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
-genPlantUMLModelForTransaction config situationName eventId transactionName (SimpleTransactionPath initialStep opMap _) = do
-  let destinationPath = outputFolder config </> efpFolder config
-      base = destinationPath </> situationName
-      total = product (map length (M.elems opMap))
-      width_trpath = length (show (max 0 (total - 1)))
-  zipWithM_ (\stMap target -> do
-      let result = runPlantUMLGenerator eventId initialStep stMap
-      case result of
-        Left err ->
-          TIO.putStrLn err >> exitFailure
-        Right diagram -> do
-          let targetFile = base </> transactionName </> target <.> "plantuml"
-          createDirectoryIfMissing True (takeDirectory targetFile)
-          TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA opMap) [transactionName ++ "__trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]]
-genPlantUMLModelForTransaction _ situationName _ transactionName _ = 
-  TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactionalPath for transaction " 
-      <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+  where
 
-printIntermediateRT :: FilePath
+  genPlantUMLModelForTransaction :: Identifier -> Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
+  genPlantUMLModelForTransaction situationName eventId transactionName (SimpleTransactionPath initialStep opMap _) = do
+    let destinationPath = outputFolder config </> efpFolder config
+        base = destinationPath </> situationName
+        total = product (map length (M.elems opMap))
+        width_trpath = length (show (max 0 (total - 1)))
+    zipWithM_ (\stMap target -> do
+        let result = runPlantUMLGenerator eventId initialStep stMap
+        case result of
+          Left err ->
+            TIO.putStrLn err >> exitFailure
+          Right diagram -> do
+            let targetFile = base </> transactionName </> target <.> "plantuml"
+            createDirectoryIfMissing True (takeDirectory targetFile)
+            TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA opMap) [transactionName ++ "__trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]]
+
+  genPlantUMLModelForTransaction situationName _ transactionName _ =
+    TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactionalPath for transaction "
+        <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+
+writeIntermediateRTModel :: FilePath
   -> TerminaConfig
   -> RTTransactionMap RTSemAnn
   -> RTSituationMap RTSemAnn
   -> IO ()
-printIntermediateRT rtModelFile config flatTrMap sitMap = do
+writeIntermediateRTModel rtModelFile config flatTrMap sitMap = do
     let destinationPath = outputFolder config </> efpFolder config
         targetFile = destinationPath </> "flat__" ++ takeBaseName rtModelFile <.> "rt"
     createDirectoryIfMissing True (takeDirectory targetFile)
     TIO.writeFile targetFile (runRTPrinter (M.elems flatTrMap ++ M.elems sitMap))
-  
 
-genPickedEvents :: TransPathMap TRPSemAnn 
+genPickedEvents :: TransPathMap TRPSemAnn
   -> RTEvent RTSemAnn
   -> IO [SelectedEvent TRPSemAnn]
 genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
@@ -361,11 +378,11 @@ genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interva
         mapM (\stMap ->
               return $ SelectedEventBursty eventId emitterId transactionId initialStep stMap interval arrivals deadlines
             ) (sequenceA opMap)
-    Just _ -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
+    Just _ ->
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction "
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
-    Nothing -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+    Nothing ->
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
 genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
@@ -373,21 +390,21 @@ genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadl
       mapM (\stMap ->
             return $ SelectedEventPeriodic eventId emitterId transactionId initialStep stMap deadlines
           ) (sequenceA opMap)
-    Just _ -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
+    Just _ ->
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction "
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
-    Nothing -> 
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction " 
+    Nothing ->
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
 
-genMASTModels :: TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
-genMASTModels config arch sitMap trPathMap = do
+writeMASTModels :: TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
+writeMASTModels config arch sitMap trPathMap = do
   let destinationPath = outputFolder config </> efpFolder config
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
-      let base = destinationPath </> situationName 
-      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap) 
-      let numPickedEvents = product (map length pickedEvents)
+      let base = destinationPath </> situationName
+      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap)
+      let numPickedEvents = numCombos pickedEvents
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
       TIO.putStrLn $
         "\x1b[34m[info]\x1b[0m: Generating scheduling models for situation " <> T.pack situationName
@@ -403,9 +420,220 @@ genMASTModels config arch sitMap trPathMap = do
         (sequenceA pickedEvents) [situationName ++ "__" ++ printf "%0*d" width_pickedEvents idx | idx <- [(0 :: Integer) ..]]
     _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths" >> exitFailure
 
+fmtSec :: Double -> String
+fmtSec s
+  | isInfinite s = "?"
+  | s < 60 = printf "%.0fs" s
+  | s < 3600 =
+      let m = floor (s/60) :: Int
+          r = s - fromIntegral (m*60)
+      in printf "%dm%.0fs" m r
+  | otherwise =
+      let h = floor (s/3600) :: Int
+          r1 = s - fromIntegral (h*3600)
+          m = floor (r1/60) :: Int
+          r2 = r1 - fromIntegral (m*60)
+      in printf "%dh%dm%.0fs" h m r2
+
+-- Total number of combinations of sequenceA pickedEvents, without enumerating.
+numCombos :: [[a]] -> Int
+numCombos = product . map length
+
+--------------------------------------------------------------------------------
+-- Core: streaming producer + bounded worker pool
+--------------------------------------------------------------------------------
+
+-- A job is either "work" or "stop".
+data Job a = Job !Int !a | Stop
+
+runMASTAnalyzer :: FilePath -> String -> MASTModel -> IO ()
+runMASTAnalyzer base modelName model = do
+  let mastText = runMASTPrinter model
+
+  -- temp file + mast-analysis
+  withSystemTempFile "tmp.mast" $ \tmpPath h -> do
+    TIO.hPutStr h mastText
+    hFlush h
+
+    let cmd  = "mast_analysis"   -- or "mast-analysis" depending on your binary name
+        args = ["default", tmpPath]
+
+    eRes <- try (readProcessWithExitCode cmd args "")  -- :: IO (Either IOException (ExitCode,String,String))
+
+    case eRes of
+      Left ioex -> do
+        if isDoesNotExistError ioex
+          then TIO.putStrLn $
+                "\x1b[31m[error]\x1b[0m: Cannot run " <> T.pack cmd
+                <> " (command not found). Is it in your PATH?"
+          else TIO.putStrLn $
+                "\x1b[31m[error]\x1b[0m: Failed to start " <> T.pack cmd
+                <> ": " <> T.pack (show ioex)
+        exitFailure
+
+      Right (ec, out, err) ->
+        case ec of
+          ExitSuccess ->
+            if isSchedulable out
+            then
+              -- OK: schedulable
+              pure ()
+            else do
+              -- NOT schedulable
+              let targetFile = base </> modelName <.> "mast"
+              createDirectoryIfMissing True (takeDirectory targetFile)
+              TIO.writeFile targetFile mastText
+
+              TIO.putStrLn $
+                "\x1b[31m[error]\x1b[0m: System NOT schedulable for "
+                <> T.pack modelName
+                <> " (mast-analysis completed but did not end with DONE)."
+
+              TIO.putStrLn (T.pack out)
+
+              exitFailure
+          ExitFailure code -> do
+            -- Optional: keep failing model for debugging
+            let targetFile = base </> modelName <.> "mast"
+            createDirectoryIfMissing True (takeDirectory targetFile)
+            TIO.writeFile targetFile mastText
+
+            TIO.putStrLn $
+              "\x1b[31m[error]\x1b[0m: Error when running MAST for "
+              <> T.pack modelName <> " (exit " <> T.pack (show code) <> ")."
+
+            unless (null err) $ TIO.putStrLn (T.pack err)
+            unless (null out) $ TIO.putStrLn (T.pack out)
+            exitFailure
+  
+  where
+
+    isSchedulable :: String -> Bool
+    isSchedulable out =
+      case L.dropWhileEnd null (lines out) of
+        []   -> False
+        xs   -> last xs == "Final analysis status: DONE"
+
+genMASTModels
+  :: TerminaConfig
+  -> TerminaProgArch SemanticAnn
+  -> RTSituationMap RTSemAnn
+  -> TransPathMap TRPSemAnn
+  -> IO ()
+genMASTModels config arch sitMap trPathMap = do
+  let destinationPath = outputFolder config </> efpFolder config
+      parN   = 4 --  mastParallelism config          -- <- define this accessor in your config
+      qBound = 16 * parN
+
+  forM_ (M.elems sitMap) $ \case
+    RTSituation situationName evMap (RTSitTy _) -> do
+      let base = destinationPath </> situationName
+
+      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap)
+      let total = numCombos pickedEvents
+          width = length (show (max 0 (total - 1)))
+
+      TIO.putStrLn $
+        "\x1b[34m[info]\x1b[0m: Analyzing scheduling models for situation "
+        <> T.pack situationName
+        <> " -> event combinations: " <> T.pack (show total)
+        <> ", number of workers: " <> T.pack (show parN)
+
+      start   <- getCurrentTime
+      doneVar <- newTVarIO (0 :: Int)
+
+      isTTY <- hIsTerminalDevice stdout
+
+      let reportProgress :: IO ()
+          reportProgress = do
+
+            done <- readTVarIO doneVar
+            now  <- getCurrentTime
+            let elapsed   = realToFrac (diffUTCTime now start) :: Double
+                rate      = if elapsed <= 0 then 0 else fromIntegral done / elapsed
+                remaining = total - done
+                etaSec    = if rate <= 0 then 1 / 0 else fromIntegral remaining / rate
+
+                msg =
+                  "\x1b[34m[info]\x1b[0m: "
+                  <> T.pack situationName
+                  <> " progress "
+                  <> T.pack (show done)
+                  <> "/"
+                  <> T.pack (show total)
+                  <> " | ETA "
+                  <> T.pack (fmtSec etaSec)
+
+            if isTTY
+              then do
+                -- overwrite same line
+                TIO.putStr $ "\r" <> msg
+                hFlush stdout
+              else
+                -- normal logging (one line per update)
+                TIO.putStrLn msg
+
+      -- bounded queue for jobs (backpressure!)
+      q <- newTBQueueIO (fromIntegral qBound)
+
+      -- Producer: streams combinations and enqueues them.
+      -- IMPORTANT: This does NOT build the list of combinations in memory.
+      producer <- async $ do
+        let combos = sequenceA pickedEvents  -- lazy list, generated on demand
+        -- Feed jobs with indices
+        let go !i = \case
+              []      -> pure ()
+              (x:xs)  -> atomically (writeTBQueue q (Job i x)) >> go (i+1) xs
+        go 0 combos
+        -- Send stop tokens (one per worker)
+        atomically $ replicateM_ parN (writeTBQueue q Stop)
+
+      -- Worker action (one model)
+      let runOne :: Int -> [SelectedEvent TRPSemAnn] -> IO ()
+          runOne idx peList = do
+            let modelName =
+                  situationName ++ "__" ++ printf "%0*d" width idx
+
+            case runMASTModelGenerator config arch modelName peList of
+              Left err ->
+                TIO.putStrLn (toText err M.empty) >> exitFailure
+              Right model -> runMASTAnalyzer base modelName model
+
+            -- progress
+            atomically $ modifyTVar' doneVar (+1)
+
+      -- Workers
+      workers <- replicateM parN $ async $
+            let loop = (atomically (readTBQueue q) >>= \case
+                          Stop -> pure ()
+                          Job idx peList -> runOne idx peList >> loop)
+            in loop
+
+      -- Progress ticker (prints every few seconds)
+      ticker <- async $
+            let loop = (threadDelay 1000000 >>
+                  reportProgress >>
+                  readTVarIO doneVar >>= \done ->
+                  when (done < total) loop)
+          in loop
+
+      -- Wait for workers; if any fails it will raise and kill the rest.
+      -- Ensure producer/ticker are stopped.
+      waitAnyCancel workers
+        `finally` do
+          cancel producer
+          cancel ticker
+          reportProgress
+          when isTTY $
+              TIO.putStrLn ""
+
+    _ ->
+      TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating MAST models for transactional paths"
+        >> exitFailure
+
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
-schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
+schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -501,10 +729,14 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML genIntermediateRT) = do
     when chatty (putStrLn . debugMessage $ "Flattening RT model transactions")
     (flatTrMap, sitMap) <- flattenRTModule programArchitecture wcepMap typedRTModule
     when chatty (putStrLn . debugMessage $ "RT model flattened successfully")
-    when genIntermediateRT $ printIntermediateRT rtModelFile config flatTrMap sitMap
+    when writeIntermediateRT $ writeIntermediateRTModel rtModelFile config flatTrMap sitMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
     trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
     when plantUML (genPlantUMLModels config sitMap trPathMap)
-    when chatty (putStrLn . debugMessage $ "Generating scheduling models")
-    genMASTModels config programArchitecture sitMap trPathMap
-    when chatty (putStrLn . debugMessage $ "Scheduling models generated successfully")
+    if writeMAST then (do
+      when chatty (putStrLn . debugMessage $ "Writing MAST models")
+      writeMASTModels config programArchitecture sitMap trPathMap)
+    else (do
+      when chatty (putStrLn . debugMessage $ "Performing schedulability analysis")
+      genMASTModels config programArchitecture sitMap trPathMap 
+      when chatty (putStrLn . debugMessage $ "Schedulability analysis completed"))
