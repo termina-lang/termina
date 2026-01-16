@@ -45,6 +45,10 @@ dependencies:
 - co-log-core
 - sorted-list
 - bytestring
+- stm
+- async
+- process
+- temporary
 
 ghc-options:
 - -Wall

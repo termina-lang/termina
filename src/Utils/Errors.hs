@@ -8,25 +8,11 @@ import qualified Data.Text as T
 import Errata
 import Errata.Styles
 
-import Semantic.AST
-import Numeric
 import Utils.Annotations
 import Text.Parsec.Pos
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Map.Strict as M
 import qualified Data.Text.Lazy as TL
-import qualified Parser.AST as PAST
-
-
-
-
-
-
-
-
-
-
-
 
 
 class ErrorMessage a where
