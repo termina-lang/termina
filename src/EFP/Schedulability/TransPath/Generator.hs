@@ -19,12 +19,12 @@ import EFP.Schedulability.RT.Semantic.Types
 import Configuration.Configuration
 import qualified Data.Text as T
 import EFP.Schedulability.WCET.AST
-import Data.Functor
 import Semantic.Types
 import EFP.Schedulability.WCET.Types
 import qualified Control.Monad.State as ST
 import ControlFlow.Architecture.Utils
 import Data.Foldable
+import qualified Data.Set as S
 
 -- | Follows an access port invocation to determine the target component.
 --
@@ -168,7 +168,7 @@ genPaths componentName (WCEPathForLoop initExpr finalExpr innerBlocks pos _ann) 
         ConstInt (TInteger val _) _ -> return val
         _ -> throwError . annotateError Internal $ EInvalidForLoop
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
-    return $ map (\(wcet, blocks) -> (wcet * fromIntegral iterationCount, TPBlockForLoop iterationCount (reverse blocks) pos TRPBlockRegularTy)) innerPaths
+    return $ map (\(wcet, blocks) -> (wcet * fromIntegral iterationCount, TPBlockForLoop iterationCount (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathMemberFunctionCall memberName constArgs pos ann) = do
     -- | Get current platform
     platformId <- gets (T.unpack . platform . configParams)
@@ -179,34 +179,17 @@ genPaths componentName (WCEPathMemberFunctionCall memberName constArgs pos ann) 
     componentClass <- getComponentClass componentName
     case M.lookup (componentClass, memberName) transPathsMap of
         Just pathsMap -> do
-            paths <- forM (M.elems pathsMap) (\(WCEPath _ _ pathId params innerBlocks _) -> do
+            concat <$> forM (M.elems pathsMap) (\(WCEPath _ _ pathId params innerBlocks _) -> do
                 localInputScope $ do
                     -- | Pass arguments to the called function's local environment
                     passArguments params evaluatedArgs
                     -- | Obtain the worst-case execution time for the path
                     wcet <- getWCETForPath (getLocation ann) platformId componentClass memberName pathId
                     paths <- genTPaths componentName [(wcet, [])] innerBlocks
-                    return $ map (\(wcet', blocks) ->
-                        let act = TRPResourceOperation componentName memberName pathId (reverse blocks) wcet' TRPOperationTy
-                            gLock = foldl' greatestResourceLock ResourceLockNone blocks
-                        in
-                            (wcet', TPBlockMemberFunctionCall evaluatedArgs act pos (TRPBlockAccessTy gLock))) paths) <&> concat
-            let unlockedPaths = filter (\(_wcet, block) ->
-                    case block of
-                        TPBlockMemberFunctionCall _ _ _ (TRPBlockAccessTy lock) ->
-                            lock == ResourceLockNone
-                        _ -> False) paths
-                lockedPaths = filter (\(_wcet, block) ->
-                    case block of
-                        TPBlockMemberFunctionCall _ _ _ (TRPBlockAccessTy lock) ->
-                            lock /= ResourceLockNone
-                        _ -> False) paths
-            if not (null unlockedPaths) then
-                let maxUnlockedPath = maximumBy (\(wcet1, _) (wcet2, _) -> compare wcet1 wcet2) unlockedPaths
-                in
-                    return $ maxUnlockedPath : lockedPaths
-            else
-                return lockedPaths
+                    mapM (\(wcet', blocks) -> do
+                        lockSet <- foldlM getResourceLockSet S.empty blocks
+                        let act = TRPResourceOperation componentName memberName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
+                        return (wcet', TPBlockMemberFunctionCall evaluatedArgs act pos TRPBlockTy)) paths)
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass memberName
 genPaths componentName (WCEPProcedureInvoke portName procedureName constArgs pos ann) = do
     resLockMap <- gets resourceLockingMap
@@ -216,62 +199,49 @@ genPaths componentName (WCEPProcedureInvoke portName procedureName constArgs pos
     evaluatedArgs <- mapM evalConstExpression constArgs
     transPathsMap <- gets transPaths
     targetComponent <- followInvoke componentName portName
-    targetCmpLock <- case M.lookup targetComponent resLockMap of
-        Just lock -> return lock
+    isLocked <- case M.lookup targetComponent resLockMap of
+        Just ResourceLockNone -> return False
+        Just _ -> return True
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownComponent targetComponent
     componentClass <- getComponentClass targetComponent
     case M.lookup (componentClass, procedureName) transPathsMap of
         Just pathsMap -> do
-            paths <- forM (M.elems pathsMap) (\(WCEPath _ _ pathId params innerBlocks _) -> do
+            concat <$> forM (M.elems pathsMap) (\(WCEPath _ _ pathId params innerBlocks _) -> do
                 localInputScope $ do
                     -- | Pass arguments to the called function's local environment
                     passArguments params evaluatedArgs
                     -- | Obtain the worst-case execution time for the path
                     wcet <- getWCETForPath (getLocation ann) platformId componentClass procedureName pathId
                     paths <- genTPaths targetComponent [(wcet, [])] innerBlocks
-                    return $ map (\(wcet', blocks) ->
-                        let act = TRPResourceOperation targetComponent procedureName pathId (reverse blocks) wcet' TRPOperationTy
-                            gLock = foldl' greatestResourceLock targetCmpLock blocks
-                        in
-                            (wcet', TPBlockProcedureInvoke evaluatedArgs act pos (TRPBlockAccessTy gLock))) paths) <&> concat
-            let unlockedPaths = filter (\(_wcet, block) ->
-                    case block of
-                        TPBlockProcedureInvoke _ _ _ (TRPBlockAccessTy lock) ->
-                            lock == ResourceLockNone
-                        _ -> False) paths
-                lockedPaths = filter (\(_wcet, block) ->
-                    case block of
-                        TPBlockProcedureInvoke _ _ _ (TRPBlockAccessTy lock) ->
-                            lock /= ResourceLockNone
-                        _ -> False) paths
-            if not (null unlockedPaths) then
-                let maxUnlockedPath = maximumBy (\(wcet1, _) (wcet2, _) -> compare wcet1 wcet2) unlockedPaths
-                in
-                    return $ maxUnlockedPath : lockedPaths
-            else
-                return lockedPaths
+                    mapM (\(wcet', blocks) -> do
+                        let initialLockSet = if isLocked then
+                                S.singleton (targetComponent, procedureName, pathId)
+                            else S.empty
+                        lockSet <- foldlM getResourceLockSet initialLockSet blocks
+                        let act = TRPResourceOperation targetComponent procedureName pathId (reverse blocks) wcet' (TRPOperationTy lockSet)
+                        return (wcet', TPBlockProcedureInvoke evaluatedArgs act pos TRPBlockTy)) paths)
         Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass procedureName
 genPaths componentName (WCEPathCondIf innerBlocks pos _ann) = do
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
     case innerPaths of
         [(0, [])] -> return []
-        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondIf (reverse blocks) pos TRPBlockRegularTy)) innerPaths
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondIf (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathCondElseIf innerBlocks pos _ann) = do
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
     case innerPaths of
         [(0, [])] -> return []
-        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElseIf (reverse blocks) pos TRPBlockRegularTy)) innerPaths
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElseIf (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathCondElse innerBlocks pos _ann) = do
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
     case innerPaths of
         [(0, [])] -> return []
         _ ->
-            return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElse (reverse blocks) pos TRPBlockRegularTy)) innerPaths
+            return $ map (\(wcet, blocks) -> (wcet, TPBlockCondElse (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths componentName (WCEPathMatchCase innerBlocks pos _ann) = do
     innerPaths <- genTPaths componentName [(0, [])] innerBlocks
     case innerPaths of
         [(0, [])] -> return []
-        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockMatchCase (reverse blocks) pos TRPBlockRegularTy)) innerPaths
+        _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockMatchCase (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths _ (WCEPSendMessage _portName _pos _ann) =
     -- | Continuations are directly defined by the user when defining the transaction
     return []
@@ -280,10 +250,10 @@ genPaths componentName (WCEPAllocBox portName pos _ann) = do
     -- | TODO: We set the wcet to 0 for the time being.
     -- We should later obtain the WCET of the allocation operation from the
     -- platform model.
-    return [(0, TPBlockAllocBox targetComponent pos TRPBlockRegularTy)]
+    return [(0, TPBlockAllocBox targetComponent pos TRPBlockTy)]
 genPaths componentName (WCEPFreeBox poolName pos _ann) = do
     targetComponent <- followInvoke componentName poolName
-    return [(0, TPBlockFreeBox targetComponent pos TRPBlockRegularTy)]
+    return [(0, TPBlockFreeBox targetComponent pos TRPBlockTy)]
 genPaths _ (WCEPRegularBlock _pos _ann) =
     -- | Regular blocks do not contribute to the transitional path
     return []
@@ -292,12 +262,12 @@ genPaths _ (WCEPSystemCall sysCallName constArgs pos _ann) = do
     -- | TODO: We set the wcet to 0 for the time being.
     -- We should later obtain the WCET of the system call from the
     -- platform model.
-    return [(0, TPBlockSystemCall sysCallName evaluatedArgs pos TRPBlockRegularTy)]
-genPaths _ (WCEPReturn pos _ann) = return [(0, TPBlockReturn pos TRPBlockRegularTy)]
+    return [(0, TPBlockSystemCall sysCallName evaluatedArgs pos TRPBlockTy)]
+genPaths _ (WCEPReturn pos _ann) = return [(0, TPBlockReturn pos TRPBlockTy)]
 genPaths _ (WCEPContinue _actionName _pos _ann) =
     -- | Continuations are directly defined by the user when defining the transaction
     return []
-genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockRegularTy)]
+genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockTy)]
 
 genTPaths :: Identifier -> [(WCETime, [TransPathBlock TRPSemAnn])]
     -> [WCEPathBlock WCEPSemAnn]
@@ -336,9 +306,10 @@ genTPActivitiesFromAction (RTTransStepAction stepName componentName actionName p
                         paths <- genTPaths componentName [(wcet, [])] innerBlocks
                         isTaskComponent <- isTask componentName
                         let mk = if isTaskComponent then TRPTaskOperation else TRPHandlerOperation
-                        let createActivity (wcet', blocks) =
-                                mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' TRPOperationTy
-                        return $ map createActivity paths
+                        let createOperation (wcet', blocks) = (do
+                                lockSet <- foldlM getResourceLockSet S.empty blocks
+                                return $ mk stepName componentName actionName pathName (reverse blocks) nextStepNames wcet' (TRPOperationTy lockSet))
+                        mapM createOperation paths
                     -- | Store generated operations in the map
                     ST.modify (\st -> st { operationMap = M.insert stepName operations (operationMap st) })
                 Nothing -> throwError . annotateError (getLocation ann) $ ENoPathsFound componentClass pathName

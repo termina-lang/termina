@@ -319,44 +319,33 @@ typeWCEPathModules arch bbProject pathProject =
 
 genPlantUMLModels :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
 genPlantUMLModels config sitMap trPathMap = do
+  let destinationPath = outputFolder config </> efpFolder config
   forM_ (M.elems sitMap) $ \case
-    RTSituation situationName evMap (RTSitTy _) ->
-      forM_ (M.elems evMap) $ \case
-          (RTEventBursty eventId _ transactionName _ _ _ _ ) -> do
-            case M.lookup transactionName trPathMap of
-              Just trPath -> genPlantUMLModelForTransaction situationName eventId transactionName trPath
-              Nothing ->
-                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
-                    <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
-          (RTEventPeriodic eventId _ transactionName _ _ ) -> do
-            case M.lookup transactionName trPathMap of
-              Just trPath -> genPlantUMLModelForTransaction situationName eventId transactionName trPath
-              Nothing ->
-                TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
-                    <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+    RTSituation situationName evMap (RTSitTy _) -> do
+      let base = destinationPath </> situationName 
+      pickedEvents <- concat <$> mapM (genPickedEvents trPathMap) (M.elems evMap) 
+      mapM_ (genPlantUMLModelForTransaction base) pickedEvents
     _ -> TIO.putStrLn "\x1b[31m[error]\x1b[0m: Unexpected RT element when generating PlantUML diagrams for transactional paths" >> exitFailure
 
-  where
-
-  genPlantUMLModelForTransaction :: Identifier -> Identifier -> Identifier -> TransactionPath TRPSemAnn -> IO ()
-  genPlantUMLModelForTransaction situationName eventId transactionName (SimpleTransactionPath initialStep opMap _) = do
-    let destinationPath = outputFolder config </> efpFolder config
-        base = destinationPath </> situationName
-        total = product (map length (M.elems opMap))
-        width_trpath = length (show (max 0 (total - 1)))
-    zipWithM_ (\stMap target -> do
-        let result = runPlantUMLGenerator eventId initialStep stMap
-        case result of
-          Left err ->
-            TIO.putStrLn err >> exitFailure
-          Right diagram -> do
-            let targetFile = base </> transactionName </> target <.> "plantuml"
-            createDirectoryIfMissing True (takeDirectory targetFile)
-            TIO.writeFile targetFile (runPlantUMLPrinter diagram)) (sequenceA opMap) [transactionName ++ "__trpath_" ++ printf "%0*d" width_trpath idx | idx <- [(0 :: Integer) ..]]
-
-  genPlantUMLModelForTransaction situationName _ transactionName _ =
-    TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactionalPath for transaction "
-        <> T.pack transactionName <> " in situation " <> T.pack situationName) >> exitFailure
+genPlantUMLModelForTransaction :: FilePath -> SelectedEvent TRPSemAnn -> IO ()
+genPlantUMLModelForTransaction base (SelectedEventBursty _ _ transactionId initialStep stMap _ _ _) = do
+  let result = runPlantUMLGenerator transactionId initialStep stMap
+  case result of
+    Left err ->
+      TIO.putStrLn err >> exitFailure
+    Right diagram -> do
+      let targetFile = base </> "plantuml" </> transactionId <.> "plantuml"
+      createDirectoryIfMissing True (takeDirectory targetFile)
+      TIO.writeFile targetFile (runPlantUMLPrinter diagram)
+genPlantUMLModelForTransaction base (SelectedEventPeriodic _ _ transactionId initialStep stMap _) = do
+  let result = runPlantUMLGenerator transactionId initialStep stMap
+  case result of
+    Left err ->
+      TIO.putStrLn err >> exitFailure
+    Right diagram -> do
+      let targetFile = base </> "plantuml" </> transactionId <.> "plantuml"
+      createDirectoryIfMissing True (takeDirectory targetFile)
+      TIO.writeFile targetFile (runPlantUMLPrinter diagram)
 
 writeIntermediateRTModel :: FilePath
   -> TerminaConfig
@@ -374,24 +363,28 @@ genPickedEvents :: TransPathMap TRPSemAnn
   -> IO [SelectedEvent TRPSemAnn]
 genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
   case M.lookup transactionId trPathMap of
-    Just (SimpleTransactionPath initialStep opMap _) ->
-        mapM (\stMap ->
-              return $ SelectedEventBursty eventId emitterId transactionId initialStep stMap interval arrivals deadlines
-            ) (sequenceA opMap)
-    Just _ ->
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction "
+    Just (SimpleTransactionPath initialStep opMap _) -> do
+        let numPickedEvents = product (map length (M.elems opMap))
+            width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
+        zipWithM (\stMap idx ->
+              return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
+            ) (sequenceA opMap) [0 :: Integer ..]
+    Just _ -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
     Nothing ->
       TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
 genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
-    Just (SimpleTransactionPath initialStep opMap _) ->
-      mapM (\stMap ->
-            return $ SelectedEventPeriodic eventId emitterId transactionId initialStep stMap deadlines
-          ) (sequenceA opMap)
-    Just _ ->
-      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction "
+    Just (SimpleTransactionPath initialStep opMap _) -> do
+      let numPickedEvents = product (map length (M.elems opMap))
+          width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
+      zipWithM (\stMap idx ->
+            return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
+          ) (sequenceA opMap) [0 :: Integer ..]
+    Just _ -> 
+      TIO.putStrLn ("\x1b[31m[error]\x1b[0m: Invalid transactional path for transaction " 
           <> T.pack transactionId <> " when generating picked events") >> exitFailure
     Nothing ->
       TIO.putStrLn ("\x1b[31m[error]\x1b[0m: No transactional path found for transaction "
