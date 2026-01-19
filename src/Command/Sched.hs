@@ -49,7 +49,7 @@ import EFP.Schedulability.TransPath.Generator (runTransPathGenerator)
 import EFP.Schedulability.TransPath.Types
 import EFP.Schedulability.TransPath.AST
 import EFP.Schedulability.TransPath.PlantUML
-import EFP.Schedulability.PlantUML.Printer
+import Extras.PlantUML.Printer
 import Text.Printf
 import EFP.Schedulability.RT.Printer
 import EFP.Schedulability.MAST.Generator

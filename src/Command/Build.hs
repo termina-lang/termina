@@ -40,13 +40,26 @@ import System.Environment
 import EFP.Schedulability.WCEPath.Generator (genTransactionalWCEPS)
 import EFP.Schedulability.WCEPath.Printer
 import Command.Common
+import ControlFlow.Architecture.Types
+import ControlFlow.Architecture.PlantUML
+import Extras.PlantUML.Printer
+import Text.Read
+import Data.Char
+
+
+data CmpDiagramParam = 
+  CmpDiagramParamRange CmpDiagramRange 
+  | CmpDiagramParamFlag 
+   deriving Show
+
 
 -- | Data type for the "new" command arguments
 data BuildCmdArgs =
     BuildCmdArgs
         Bool -- ^ Verbose mode
         Bool -- ^ Generate transactional worst-case execution paths
-    deriving (Show,Eq)
+        (Maybe CmpDiagramParam)
+    deriving Show
 
 -- | Parser for the "new" command arguments
 buildCmdArgsParser :: O.Parser BuildCmdArgs
@@ -55,7 +68,73 @@ buildCmdArgsParser = BuildCmdArgs
         <> O.short 'v'
         <> O.help "Enable verbose mode")
     <*> O.switch (O.long "gen-transactional-wceps"
-        <> O.help "Generate transactional worst-case execution paths")  
+        <> O.help "Generate transactional worst-case execution paths")
+    <*> O.optional paramParser
+
+  where
+
+    paramParser :: O.Parser CmpDiagramParam
+    paramParser =
+      paramFlagOnly
+      O.<|> paramWithValue
+
+    paramWithValue :: O.Parser CmpDiagramParam
+    paramWithValue =
+          O.option (O.eitherReader (fmap CmpDiagramParamRange . parseCmpDiagramParam))
+            ( O.long "gen-component-diagram"
+          <> O.metavar "RNG"
+          <> O.help "Use --gen-component-diagram=[list][:depth]]"
+            )
+
+    paramFlagOnly :: O.Parser CmpDiagramParam
+    paramFlagOnly =
+          O.flag' CmpDiagramParamFlag
+            ( O.long "gen-component-diagram"
+          <> O.help "Use --gen-component-diagram"
+            )
+    
+    parseCmpDiagramParam :: String -> Either String CmpDiagramRange
+    parseCmpDiagramParam s =
+      case break (== ':') (trim s) of
+        (left, "") ->
+          -- no ':': either a pure integer OR a comma list
+          case readMaybe left of
+            Just n  -> Right (CmpDiagramRange [] (Just n))
+            Nothing ->
+              let xs = parseItems left
+              in if null xs
+                  then Left "Expected an integer (e.g. 1) or a non-empty list (e.g. a,b)"
+                  else Right (CmpDiagramRange xs Nothing)
+
+        (left, ':' : right) -> do
+          -- has ':': must be list on left, int on right
+          let xs = parseItems left
+          if null xs
+            then Left "Expected a non-empty list before ':' (e.g. a,b:2)"
+            else case readMaybe (trim right) of
+                  Nothing -> Left "Expected an integer after ':' (e.g. a,b:2)"
+                  Just n  -> 
+                    if n <= 0
+                      then Left "Depth must be a positive integer"
+                      else Right (CmpDiagramRange xs (Just n))
+
+        _ -> Left "Invalid format"
+
+    parseItems :: String -> [String]
+    parseItems =
+      filter (not . null) . map trim . splitBy ',' . trim
+
+    splitBy :: Char -> String -> [String]
+    splitBy _ "" = []
+    splitBy c s  =
+      let (a, rest) = break (== c) s
+      in a : case rest of
+              []     -> []
+              (_:xs) -> splitBy c xs
+
+    trim :: String -> String
+    trim = f . f
+      where f = reverse . dropWhile isSpace
 
 monadicTypesMapModules :: TypedProject -> MonadicTypes
 monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.elems
@@ -64,11 +143,11 @@ monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.ele
     monadicTypesMapModule :: MonadicTypes -> TypedModule -> MonadicTypes
     monadicTypesMapModule prevMap typedModule = runMapMonadicTypesAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
   
-genTWCEPS ::
+genTWCEPFiles ::
   TerminaConfig
   -> BasicBlocksProject
   -> IO ()
-genTWCEPS params bbProject = do
+genTWCEPFiles params bbProject = do
   mapM_ printWCEPModule (M.elems bbProject) 
 
   where
@@ -82,7 +161,22 @@ genTWCEPS params bbProject = do
       createDirectoryIfMissing True (takeDirectory twcepFile)
       TIO.writeFile twcepFile $ runWCEPathPrinter wceps
 
-
+genComponentDiagramFile ::
+  TerminaConfig
+  -> TerminaProgArch a
+  -> CmpDiagramParam
+  -> IO ()
+genComponentDiagramFile params progArch param = do
+    let destinationPath = outputFolder params
+        cmpFile = destinationPath </> T.unpack (name params) <.> "plantuml"
+        result = runPlantUMLCmpGenerator progArch $ case param of
+            CmpDiagramParamFlag -> Nothing
+            CmpDiagramParamRange range -> Just range
+    case result of
+        Left err -> die . errorMessage $ T.unpack err
+        Right diagram -> do
+            createDirectoryIfMissing True (takeDirectory cmpFile)
+            TIO.writeFile cmpFile $ runPlantUMLPrinter diagram
 
 genModules ::
   TerminaConfig
@@ -279,7 +373,7 @@ genResultHeaderFile params plt monadicTypes bbProject appModName = do
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
-buildCommand (BuildCmdArgs chatty genTransactionalWCEPs) = do
+buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -383,5 +477,10 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs) = do
         }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
     when genTransactionalWCEPs $ 
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
-      genTWCEPS config bbProject
+      genTWCEPFiles config bbProject
+    case genCmpDiag of
+      Nothing -> return ()
+      Just param ->
+        when chatty (putStrLn . debugMessage $ "Generating component diagram") >>
+        genComponentDiagramFile config programArchitecture param
     when chatty (putStrLn . debugMessage $ "Build completed successfully")

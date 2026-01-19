@@ -4,7 +4,7 @@ module EFP.Schedulability.TransPath.PlantUML where
 import EFP.Schedulability.TransPath.AST
 import qualified Data.Map.Strict as M
 import EFP.Schedulability.TransPath.Types
-import EFP.Schedulability.PlantUML.AST
+import Extras.PlantUML.AST
 import qualified Data.Text as T
 import Control.Monad.Except
 import qualified Control.Monad.State as ST
@@ -14,14 +14,14 @@ import Utils.Printer
 data PlantUMLGenState = PlantUMLGenState
     {
         stepMap :: TRPStepMap TRPSemAnn
-        , participants :: M.Map Identifier PlantUMLParticipant
+        , participants :: M.Map Identifier PlantUMLSeqDiagParticipant
     } deriving Show
 
 type PlantUMLGenError = T.Text
 
 type PlantUMLGenMonad = ExceptT PlantUMLGenError (ST.State PlantUMLGenState) 
 
-genBlock :: Identifier -> [PlantUMLSeqDiagramStatement]  -> TransPathBlock a -> PlantUMLGenMonad [PlantUMLSeqDiagramStatement]
+genBlock :: Identifier -> [PlantUMLSeqDiagStatement]  -> TransPathBlock a -> PlantUMLGenMonad [PlantUMLSeqDiagStatement]
 genBlock currentCmp acc (TPBlockCondIf blocks pos _) = do
     let startGroup = PlantUMLGroupStart (T.pack "if" <> showText pos)  Nothing
     let endGroup = PlantUMLGroupEnd
@@ -74,7 +74,7 @@ genBlock _currentCmp acc (TPBlockReboot {}) = do
 genBlock _currentCmp acc (TPBlockSystemCall {}) = do
     return acc
 
-genOperation :: Identifier -> TRPOperation a -> [ConstExpression a] -> PlantUMLGenMonad [PlantUMLSeqDiagramStatement]
+genOperation :: Identifier -> TRPOperation a -> [ConstExpression a] -> PlantUMLGenMonad [PlantUMLSeqDiagStatement]
 genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blocks nextSteps _ _) _ = do
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
@@ -86,7 +86,7 @@ genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blo
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName
     let startMsg = PlantUMLSeqMessage prevCmp taskName (Just activityName)
     stepStmts <- foldM (genBlock taskName) [] blocks
-    ST.modify $ \s -> s { participants = M.insert taskName (PlantUMLParticipant taskName 20) (participants s) }
+    ST.modify $ \s -> s { participants = M.insert taskName (PlantUMLSeqDiagParticipant taskName 20) (participants s) }
     return $ startMsg : stepStmts ++ concat nextActivities
 genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathName blocks nextSteps _ _) _ = do
     nextActivities <- mapM (\actId -> do
@@ -99,7 +99,7 @@ genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathNa
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName
     let startMsg = PlantUMLSeqMessage prevCmp handlerName (Just activityName)
     stepStmts <- foldM (genBlock handlerName) [] blocks
-    ST.modify $ \s -> s { participants = M.insert handlerName (PlantUMLParticipant handlerName 10) (participants s) }
+    ST.modify $ \s -> s { participants = M.insert handlerName (PlantUMLSeqDiagParticipant handlerName 10) (participants s) }
     return $ startMsg : stepStmts ++ concat nextActivities
 genOperation prevCmp (TRPResourceOperation currentCmp procName pathName blocks _ _) args = do
     let activityName = T.pack procName <> "::" <> T.pack pathName <> "(" <> T.intercalate ", " (map showText args) <> ")"
@@ -122,4 +122,4 @@ runPlantUMLGenerator emitterId initialStep stMap =
                 Left err -> Left err
                 Right stmts -> 
                     let parts = M.elems (participants finalState) ++ [PlantUMLActor emitterId 1]
-                    in Right $ PlantUMLSeqDiagram parts stmts
+                    in Right $ PlantUMLSeqDiag parts stmts

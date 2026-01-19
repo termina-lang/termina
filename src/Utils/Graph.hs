@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Extras.Graph where
+module Utils.Graph where
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M

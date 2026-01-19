@@ -26,7 +26,7 @@ import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
 import qualified Data.Map.Strict as M
-import Extras.Graph (TopSortError(..), topSortFromDepList)
+import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Modules.Utils
 import Data.Time (UTCTime)
 

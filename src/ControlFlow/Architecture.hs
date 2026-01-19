@@ -80,6 +80,7 @@ genArchTypeDef ann tydef@(Class TaskClass ident _ _ _) = do
   let tskCls = TPClass {
     classIdentifier = ident,
     classKind = TaskClass,
+    classProvides = [],
     classActions = getActions members,
     classMethods = M.empty,
     classProcedures = M.empty,
@@ -104,6 +105,7 @@ genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
   let hdlCls = TPClass {
     classIdentifier = ident,
     classKind = HandlerClass,
+    classProvides = [],
     classActions = getActions members,
     classMethods = M.empty,
     classProcedures = M.empty,
@@ -119,7 +121,7 @@ genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
-genArchTypeDef ann tydef@(Class ResourceClass ident _ _ _) = do
+genArchTypeDef ann tydef@(Class ResourceClass ident _ provides _) = do
   let members = getClassMembers tydef
   outBoxMap <-
     case runInOutClass tydef of 
@@ -129,6 +131,7 @@ genArchTypeDef ann tydef@(Class ResourceClass ident _ _ _) = do
   let resCls = TPClass {
     classIdentifier = ident,
     classKind = ResourceClass,
+    classProvides = provides,
     classActions = M.empty,
     classMethods = getMethods members,
     classProcedures = getProcedures members,

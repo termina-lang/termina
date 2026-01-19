@@ -25,6 +25,8 @@ data TPClass a = TPClass {
     -- | Kind of the class
     -- It can be either a task, a handler, or a resource
     classKind :: ClassKind,
+
+    classProvides :: [Identifier], -- ^ List of provided interfaces
     
     -- | Member functions
     classActions :: M.Map Identifier (TPFunction a),

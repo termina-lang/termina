@@ -12,7 +12,7 @@ import Semantic.Types
 import Utils.Annotations
 import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
-import Extras.Graph (findDisjointPaths, reverseGraph)
+import Utils.Graph (findDisjointPaths, reverseGraph)
 import Control.Monad.State
 
 getEmitterIdentifier :: TPEmitter a -> Identifier

@@ -22,7 +22,7 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 
-import Extras.Graph
+import Utils.Graph
 
 ----------------------------------------
 -- Libaries and stuff

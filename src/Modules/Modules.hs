@@ -8,7 +8,7 @@ module Modules.Modules where
 import qualified Data.Text as T
 import Data.Time
 import Utils.Annotations
-import Extras.Graph
+import Utils.Graph
 
 data ModuleDependency = ModuleDependency QualifiedName Location
   deriving Show

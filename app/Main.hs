@@ -13,7 +13,7 @@ data Command =
     | Try TryCmdArgs
     | LSP LSPCmdArgs
     | Sched SchedCmdArgs
-    deriving (Show,Eq)
+    deriving Show
 
 newCommandParser :: Parser Command
 newCommandParser = New
