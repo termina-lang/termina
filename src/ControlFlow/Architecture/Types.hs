@@ -3,10 +3,10 @@ module ControlFlow.Architecture.Types where
 import Data.Map
 import ControlFlow.BasicBlocks.AST
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 
--- This module contains the function thhat will be used to generate
+-- This module contains the function that will be used to generate
 -- map of the architecture of the program.
 
 data TPFunction a = TPFunction
@@ -25,9 +25,16 @@ data TPClass a = TPClass {
     -- | Kind of the class
     -- It can be either a task, a handler, or a resource
     classKind :: ClassKind,
+
+    classProvides :: [Identifier], -- ^ List of provided interfaces
     
-    -- | Class member functions
-    classMemberFunctions :: M.Map Identifier (TPFunction a),
+    -- | Member functions
+    classActions :: M.Map Identifier (TPFunction a),
+    classMethods :: M.Map Identifier (TPFunction a),
+    classProcedures :: M.Map Identifier (TPFunction a),
+    classViewers :: M.Map Identifier (TPFunction a),
+
+    accessPorts :: M.Map Identifier (TerminaType a, a),
 
     -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
@@ -50,9 +57,7 @@ data TPClass a = TPClass {
     -- the box was originated.
     classBoxIOMaps :: BoxOutputInputMaps a,
 
-    -- | Map between the actions and the output ports through which the action
-    -- sends messages.
-    actionForwardingMap :: ActionForwardingMap
+    classAnns :: a -- ^ annotations
 
 } deriving Show
 
@@ -99,11 +104,12 @@ instance Annotated TPTask where
   updateAnnotation t a = t { taskAnns = a }
 
 data TPEmitter a = 
-  TPInterruptEmittter 
+  TPInterruptEmitter 
     Identifier -- ^ emitter identifier
     a -- ^ annotations
   | TPPeriodicTimerEmitter 
     Identifier -- ^ emitter identifier
+    (Expression a) -- ^ initializer expression for period field
     QualifiedName -- ^ Module that instantiates the timer
     a -- ^ annotations
   | TPSystemInitEmitter
@@ -115,13 +121,13 @@ data TPEmitter a =
   deriving Show
 
 instance Annotated TPEmitter where
-  getAnnotation (TPInterruptEmittter _ a) = a
-  getAnnotation (TPPeriodicTimerEmitter _ _ a) = a
+  getAnnotation (TPInterruptEmitter _ a) = a
+  getAnnotation (TPPeriodicTimerEmitter _ _ _ a) = a
   getAnnotation (TPSystemInitEmitter _ a) = a
   getAnnotation (TPSystemExceptEmitter _ a) = a
 
-  updateAnnotation (TPInterruptEmittter i _) = TPInterruptEmittter i
-  updateAnnotation (TPPeriodicTimerEmitter i m _) = TPPeriodicTimerEmitter i m
+  updateAnnotation (TPInterruptEmitter i _) = TPInterruptEmitter i
+  updateAnnotation (TPPeriodicTimerEmitter i sec m  _) = TPPeriodicTimerEmitter i sec m
   updateAnnotation (TPSystemInitEmitter i _) = TPSystemInitEmitter i
   updateAnnotation (TPSystemExceptEmitter i _) = TPSystemExceptEmitter i
 
@@ -131,6 +137,24 @@ data ResourceLock
     | ResourceLockMutex TInteger -- ^ Mutex-based locking with priority ceiling
     | ResourceLockIrq -- ^ The resource is shared between one or more tasks and one or more handlers
   deriving Show
+
+instance Eq ResourceLock where
+    ResourceLockNone == ResourceLockNone = True
+    ResourceLockIrq == ResourceLockIrq = True
+    (ResourceLockMutex p1) == (ResourceLockMutex p2) = p1 == p2
+    _ == _ = False
+
+instance Ord ResourceLock where
+    ResourceLockNone `compare` ResourceLockNone = EQ
+    -- Any other lock is greater than None
+    ResourceLockNone `compare` _ = LT
+    _ `compare` ResourceLockNone = GT
+    ResourceLockIrq `compare` ResourceLockIrq = EQ
+    ResourceLockIrq `compare` _ = GT
+    _ `compare` ResourceLockIrq = LT
+    (ResourceLockMutex p1) `compare` (ResourceLockMutex p2) = p1 `compare` p2
+
+type ResourceLockingMap = M.Map Identifier ResourceLock
 
 data TPResource a = TPResource {
 

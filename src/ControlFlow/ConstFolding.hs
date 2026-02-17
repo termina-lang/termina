@@ -1,6 +1,6 @@
 module ControlFlow.ConstFolding where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Semantic.Types
 import Control.Monad.Except
 import ControlFlow.ConstFolding.Errors
@@ -12,6 +12,7 @@ import Command.Types
 import ControlFlow.ConstFolding.Monad
 import ControlFlow.ConstFolding.Transaction
 import ControlFlow.ConstFolding.Simpl
+import ControlFlow.Architecture.Utils
 
 loadGlobalConstEvironment :: TransFoldMonad ()
 loadGlobalConstEvironment = do

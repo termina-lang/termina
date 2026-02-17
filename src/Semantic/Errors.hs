@@ -8,7 +8,7 @@ module Semantic.Errors where
 import Semantic.AST
 import Utils.Annotations
 import Utils.Errors
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
@@ -18,6 +18,7 @@ import Errata.Styles
 import Semantic.Types
 import qualified Parser.AST as PAST
 import Parser.Types
+import Utils.Printer
 
 ----------------------------------------
 -- Type checker error handling

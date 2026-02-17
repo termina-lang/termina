@@ -20,7 +20,7 @@ doesBlockExit :: BasicBlock SemanticAnn -> Bool
 doesBlockExit (ReturnBlock {}) = True
 doesBlockExit (ContinueBlock {}) = True
 doesBlockExit (RebootBlock {}) = True
-doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
+doesBlockExit (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) =
     let
         -- | Check the exit of the if block
         ifBlocksExit = not (null (blockBody ifBlocks)) && doesBlockExit (last (blockBody ifBlocks))
@@ -29,7 +29,7 @@ doesBlockExit (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) =
         -- If the if block exits, then we must check the else if blocks
         -- and the else block (if present) 
         (ifBlocksExit &&
-            (let elseIfsExit = foldl' (\prevState (ElseIf _ elifBlocks _) ->
+            (let elseIfsExit = foldl' (\prevState (CondElseIf _ elifBlocks _) ->
                     prevState && not (null (blockBody elifBlocks)) && doesBlockExit (last (blockBody elifBlocks))) ifBlocksExit elseIfBlocks in
                 (elseIfsExit && not (null (blockBody elseBlocks)) && doesBlockExit (last (blockBody elseBlocks)))))
 doesBlockExit (MatchBlock _ cases mDefaultCase _) =
@@ -68,14 +68,14 @@ checkBlockPaths loc stmts = do
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidContinue
                 (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidReboot
-                (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
+                (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just elseBlocks) _ : xb) -> 
                     checkBlockPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_
-                        (\(ElseIf _ elifBlocks ann') -> 
+                        (\(CondElseIf _ elifBlocks ann') -> 
                             checkBlockPaths (getLocation ann') (reverse (blockBody elifBlocks))) elseIfBlocks >>
-                    checkBlockPaths loc (reverse (blockBody elseBlocks)) >>
+                    checkBlockPaths loc (reverse (blockBody (condElseBody elseBlocks))) >>
                     checkBlockPaths loc xb
-                (IfElseBlock _ ifBlocks _ _ _ : xb) ->
+                (IfElseBlock (CondIf _ ifBlocks _) _ _ _ : xb) ->
                     checkBlockPaths loc (reverse (blockBody ifBlocks)) >>
                     checkBlockPaths loc xb
                 (MatchBlock _ cases mDefaultCase _ : xb) -> do
@@ -116,19 +116,19 @@ checkActionPaths loc stmts = do
                         RebootBlock {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
-                        blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) ann) ->
+                        blk@(IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) ann) ->
                             if not (doesBlockExit blk) then
                                 throwError $ annotateError (getLocation ann) EEActionIfBlockShallExit
                             else do
                                 stateIfBlock <- localScope (checkActionPaths loc (reverse (blockBody ifBlocks)))
                                 stateElseIfs <- foldM
-                                    (\prevState (ElseIf _ elifBlocks ann') -> do
+                                    (\prevState (CondElseIf _ elifBlocks ann') -> do
                                         elseIfState <- localScope (checkActionPaths (getLocation ann') (reverse (blockBody elifBlocks)))
                                         return (max elseIfState prevState)) stateIfBlock elseIfBlocks
                                 elseBlockState <- localScope (checkActionPaths loc (reverse (blockBody elseBlocks)))
                                 put (max elseBlockState stateElseIfs)
                                 checkActionPaths loc xb
-                        IfElseBlock _ _ _ _ ann ->
+                        IfElseBlock _ _ _ ann ->
                             throwError $ annotateError (getLocation ann) EEActionIfBlockMissingElseExit
                         blk@(MatchBlock _ cases mDefaultCase ann) ->
                             if not (doesBlockExit blk) then
@@ -158,19 +158,19 @@ checkActionPaths loc stmts = do
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
-                        blk@(IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
+                        blk@(IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) -> do
                             if doesBlockExit blk then
                                 throwError $ annotateError loc EEActionIfBlockShallNotExit
                             else do
                                 stateIfBlock <- localScope (setAllowedContinue >> checkActionPaths loc (reverse (blockBody ifBlocks)))
                                 stateElseIfs <- foldM
-                                    (\prevState (ElseIf _ elifBlocks ann') -> do
+                                    (\prevState (CondElseIf _ elifBlocks ann') -> do
                                         elseIfState <- localScope (setAllowedContinue >> checkActionPaths (getLocation ann') (reverse (blockBody elifBlocks)))
                                         return (max elseIfState prevState)) stateIfBlock elseIfBlocks
                                 elseBlockState <- localScope (setAllowedContinue >> checkActionPaths loc (reverse (blockBody elseBlocks)))
                                 put (max elseBlockState stateElseIfs)
                                 checkActionPaths loc xb
-                        IfElseBlock _ ifBlocks _ _ _ ->
+                        IfElseBlock (CondIf _ ifBlocks _) _ _ _ ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
                         blk@(MatchBlock _ cases mDefaultCase _) ->
@@ -205,16 +205,16 @@ checkActionPaths loc stmts = do
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             setAllowedSend >> checkActionPaths loc xb
-                        (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
+                        (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) -> do
                             stateIfBlock <- localScope (checkActionPaths loc (reverse (blockBody ifBlocks)))
                             stateElseIfs <- foldM
-                                (\prevState (ElseIf _ elifBlocks ann') -> do
+                                (\prevState (CondElseIf _ elifBlocks ann') -> do
                                     elseIfState <- localScope (checkActionPaths (getLocation ann') (reverse (blockBody elifBlocks)))
                                     return (max elseIfState prevState)) stateIfBlock elseIfBlocks
                             elseBlockState <- localScope (checkActionPaths loc (reverse (blockBody elseBlocks)))
                             put (max elseBlockState stateElseIfs)
                             checkActionPaths loc xb
-                        (IfElseBlock _ ifBlocks _ _ _) ->
+                        (IfElseBlock (CondIf _ ifBlocks _) _ _ _) ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
                         (MatchBlock _ cases mDefaultCase _) -> do
@@ -242,16 +242,16 @@ checkActionPaths loc stmts = do
                         SendMessage {} ->
                             -- | The rest of the blocks shall not exit
                             checkActionPaths loc xb
-                        (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _) -> do
+                        (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) -> do
                             stateIfBlock <- localScope (checkActionPaths loc (reverse (blockBody ifBlocks)))
                             stateElseIfs <- foldM
-                                (\prevState (ElseIf _ elifBlocks ann') -> do
+                                (\prevState (CondElseIf _ elifBlocks ann') -> do
                                     elseIfState <- localScope (checkActionPaths (getLocation ann') (reverse (blockBody elifBlocks)))
                                     return (max elseIfState prevState)) stateIfBlock elseIfBlocks
                             elseBlockState <- localScope (checkActionPaths loc (reverse (blockBody elseBlocks)))
                             put (max elseBlockState stateElseIfs)
                             checkActionPaths loc xb
-                        (IfElseBlock _ ifBlocks _ _ _) ->
+                        (IfElseBlock (CondIf _ ifBlocks _) _ _ _) ->
                             checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                             checkActionPaths loc xb
                         (MatchBlock _ cases mDefaultCase _) -> do
@@ -277,14 +277,14 @@ checkActionPaths loc stmts = do
                 (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidContinue
                 (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEActionInvalidReboot
-                (IfElseBlock _ ifBlocks elseIfBlocks (Just elseBlocks) _ : xb) -> 
+                (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _ : xb) -> 
                     checkActionPaths loc (reverse (blockBody ifBlocks)) >> 
                     mapM_
-                        (\(ElseIf _ elifBlocks ann') -> 
+                        (\(CondElseIf _ elifBlocks ann') -> 
                             checkActionPaths (getLocation ann') (reverse (blockBody elifBlocks))) elseIfBlocks >>
                     checkActionPaths loc (reverse (blockBody elseBlocks)) >>
                     checkActionPaths loc xb
-                (IfElseBlock _ ifBlocks _ _ _ : xb) ->
+                (IfElseBlock (CondIf _ ifBlocks _) _ _ _ : xb) ->
                     checkActionPaths loc (reverse (blockBody ifBlocks)) >>
                     checkActionPaths loc xb
                 (MatchBlock _ cases mDefaultCases _ : xb) -> do

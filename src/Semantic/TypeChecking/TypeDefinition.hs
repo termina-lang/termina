@@ -7,7 +7,7 @@ import Core.Utils
 import Semantic.Utils
 
 -- Top Sort
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 -- Termina Semantic AST
 import qualified Semantic.AST as SAST
@@ -22,7 +22,7 @@ import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
 
-import Extras.Graph
+import Utils.Graph
 
 ----------------------------------------
 -- Libaries and stuff
@@ -557,7 +557,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
                   Just Nothing -> throwError $ annotateError anns (EResourceInterfacePreviouslyExtended x extendedIface)
                   Nothing -> return $ M.insert extendedIface (Just x) acc') (M.insert x Nothing accxs) extendedIfaces
 
-checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, viewers) provides = do
+checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, _viewers) provides = do
   -- A task must not provide any interface
   unless (null provides) (throwError $ annotateError anns (ETaskClassProvides clsId))
   -- A task must not implement any procedures
@@ -577,7 +577,7 @@ checkClassKind anns clsId TaskClass (_fs, prcs, acts, methods, viewers) provides
     ClassAction ak ident _ _ _ ann -> checkMemberFunctionAccessKind ann TaskClass ak ident;
     _ -> return ();
   }) acts
-checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, viewers) provides = do
+checkClassKind anns clsId HandlerClass (fs, prcs, acts, methods, _viewers) provides = do
   -- A handler must not provide any interface
   unless (null provides) (throwError $ annotateError anns (EHandlerClassProvides clsId))
   -- A handler must not implement any procedures

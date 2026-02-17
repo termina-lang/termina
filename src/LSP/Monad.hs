@@ -8,7 +8,7 @@ import Configuration.Configuration
 import Control.Monad.State
 import Control.Concurrent.MVar
 import Control.Monad.Reader
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import LSP.Modules 
 
 import Utils.Annotations

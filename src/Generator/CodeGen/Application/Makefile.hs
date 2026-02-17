@@ -6,7 +6,7 @@ import Generator.Makefile.AST
 import System.FilePath
 import qualified Data.Text as T
 import Configuration.Configuration
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 

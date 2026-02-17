@@ -7,7 +7,7 @@ import Semantic.AST
 import Core.Utils
 import Utils.Annotations
 import Data.Maybe
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 ----------------------------------------
 -- Semantic interpretation of types.

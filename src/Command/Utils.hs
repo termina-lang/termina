@@ -25,8 +25,8 @@ import ControlFlow.BasicBlocks.Errors (BBGeneratorError)
 import Parser.Errors
 import Control.Monad.IO.Class
 import Data.Functor ((<&>))
-import qualified Data.Map as M
-import Extras.Graph (TopSortError(..), topSortFromDepList)
+import qualified Data.Map.Strict as M
+import Utils.Graph (TopSortError(..), topSortFromDepList)
 import Modules.Utils
 import Data.Time (UTCTime)
 
@@ -40,8 +40,15 @@ errorMessage msg = "\x1b[31m[error]\x1b[0m: " ++ msg
 debugMessage :: String -> String
 debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 
+-- | Warning message formatter
+-- Prints warning messages in the form "[warning] <message>"
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
+
+-- | Info message formatter
+-- Prints info messages in the form "[info] <message>"
+infoMessage :: String -> String
+infoMessage msg = "\x1b[34m[info]\x1b[0m " ++ msg
 
 getVisibleModules ::  M.Map QualifiedName [QualifiedName] -> [ModuleDependency] -> [QualifiedName]
 getVisibleModules prevModsMap importedMods =

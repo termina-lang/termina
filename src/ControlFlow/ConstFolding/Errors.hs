@@ -6,11 +6,12 @@ module ControlFlow.ConstFolding.Errors where
 import Semantic.AST
 import Utils.Annotations
 import Utils.Errors
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Language.LSP.Protocol.Types as LSP
 import Text.Parsec
 import Semantic.Types
+import Utils.Printer
 
 
 data Error =

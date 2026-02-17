@@ -11,7 +11,7 @@ import System.FilePath
 import System.Exit
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Parser.Parsing (terminaModuleParser)
 import Text.Parsec (runParser)
 import Generator.LanguageC.Printer (runCPrinter)

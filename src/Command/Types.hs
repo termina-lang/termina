@@ -2,35 +2,64 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Command.Types where
 
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import qualified Parser.AST as PAST
 import qualified Semantic.AST as SAST
 import qualified ControlFlow.BasicBlocks.AST as CFAST
+import qualified EFP.Schedulability.WCEPath.AST as TPAST
 
-import Semantic.Types
-import Parser.Types
+import qualified Parser.Types as PTYPES
+import qualified Semantic.Types as STYPES
 
 import Modules.Modules
 import Utils.Annotations
+import qualified EFP.Schedulability.WCET.AST as WTAST
+import qualified EFP.Schedulability.Core.Types as SCHEDTYPES
+import qualified EFP.Schedulability.RT.Parser.AST as RTPAST
+import qualified EFP.Schedulability.RT.Semantic.AST as RTSAST
+import qualified EFP.Schedulability.RT.Semantic.Types as RTTYPES
 
 newtype ParsingData = ParsingData {
-  parsedAST :: PAST.AnnotatedProgram ParserAnn
+  parsedAST :: PAST.AnnotatedProgram PTYPES.ParserAnn
 } deriving (Show)
 
 newtype SemanticData = SemanticData {
-  typedAST :: SAST.AnnotatedProgram SemanticAnn
+  typedAST :: SAST.AnnotatedProgram STYPES.SemanticAnn
 } deriving (Show)
 
 newtype BasicBlocksData = BasicBlockData {
-  basicBlocksAST :: CFAST.AnnotatedProgram SemanticAnn
+  basicBlocksAST :: CFAST.AnnotatedProgram STYPES.SemanticAnn
+} deriving (Show)
+
+newtype TransPathData = TransPathData {
+  transPathAST :: [TPAST.WCEPath SCHEDTYPES.ParserAnn]
+} deriving (Show)
+
+newtype WCETData = WCETData {
+  wcetAST :: [WTAST.WCETPlatformAssignment SCHEDTYPES.ParserAnn]
+} deriving (Show)
+
+newtype ParsingRTData = ParsingRTData {
+  parsedRTAST :: [RTPAST.RTElement SCHEDTYPES.ParserAnn]
+} deriving (Show)
+
+newtype SemanticRTData = SemanticRTData {
+  typedRTAST :: [RTSAST.RTElement RTTYPES.RTSemAnn]
 } deriving (Show)
 
 type ParsedModule = TerminaModuleData ParsingData
 type TypedModule = TerminaModuleData SemanticData
 type BasicBlocksModule = TerminaModuleData BasicBlocksData
+type TransPathModule = TerminaModuleData TransPathData
+type WCETModule = TerminaModuleData WCETData
+type ParsedRTModule = TerminaModuleData ParsingRTData
+type TypedRTModule = TerminaModuleData SemanticRTData
+
 type ParsedProject = M.Map QualifiedName ParsedModule
 type TypedProject = M.Map QualifiedName TypedModule
 type BasicBlocksProject = M.Map QualifiedName BasicBlocksModule
+type WCEPProject = M.Map QualifiedName TransPathModule
+type WCETProject = M.Map QualifiedName WCETModule
 
 type ProjectDependencies = M.Map QualifiedName [ModuleDependency]

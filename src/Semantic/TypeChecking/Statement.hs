@@ -22,7 +22,7 @@ import Data.Maybe
 import Parser.Types
 import Utils.Monad
 import Semantic.TypeChecking.Expression
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 typeBlock :: Maybe (SAST.TerminaType SemanticAnn) -> Block ParserAnn -> SemanticMonad (SAST.Block SemanticAnn)
 typeBlock rTy (Block stmts loc) = do
@@ -61,20 +61,14 @@ typeStatement _retTy (AssignmentStmt lhs_o rhs_expr anns) = do
   rhs_expr_typed <- maybe (return rhs_expr_typed') (\_ -> unBoxExp rhs_expr_typed') (isBox type_rhs')
   ety <- mustBeTy lhs_o_type rhs_expr_typed
   return $ SAST.AssignmentStmt lhs_o_typed ety $ buildStmtAnn anns
-typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns) = do
+typeStatement retTy (IfElseStmt condIf elifs condElse anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
-  when (not (null elifs) && isNothing otherwise_branch) (throwError $ annotateError anns EIfElseNoOtherwise)
+  when (not (null elifs) && isNothing condElse) (throwError $ annotateError anns EIfElseNoOtherwise)
   SAST.IfElseStmt
     -- | Check that the condition is a boolean expression
-    <$> typeCondExpr cond_expr
-    <*> localScope (typeBlock retTy tt_branch)
-    <*> mapM (\case {
-                ElseIf eCond eBd ann ->
-                  SAST.ElseIf <$> typeCondExpr eCond
-                         <*> localScope (typeBlock retTy eBd)
-                         <*> return (buildStmtAnn ann)
-                  }) elifs
-    <*> maybe (return Nothing) (fmap Just . localScope . typeBlock retTy) otherwise_branch
+    <$> typeCondIf condIf
+    <*> mapM typeCondElseIf elifs
+    <*> maybe (return Nothing) (fmap Just . typeCondElse) condElse
     <*> return (buildStmtAnn anns)
   where
     typeCondExpr :: Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)
@@ -83,6 +77,26 @@ typeStatement retTy (IfElseStmt cond_expr tt_branch elifs otherwise_branch anns)
         EMismatch TBool ty -> throwError $ annotateError (getAnnotation err) $ EIfElseIfCondNotBool ty
         _ -> throwError err
       )
+
+    typeCondIf :: CondIf ParserAnn -> SemanticMonad (SAST.CondIf SemanticAnn)
+    typeCondIf (CondIf eC bIf ann') =
+      SAST.CondIf
+        <$> typeCondExpr eC
+        <*> localScope (typeBlock retTy bIf)
+        <*> return (buildStmtAnn ann')
+
+    typeCondElseIf :: CondElseIf ParserAnn -> SemanticMonad (SAST.CondElseIf SemanticAnn)
+    typeCondElseIf (CondElseIf cond blk ann') =
+      SAST.CondElseIf
+        <$> typeCondExpr cond
+        <*> localScope (typeBlock retTy blk)
+        <*> return (buildStmtAnn ann')
+
+    typeCondElse :: CondElse ParserAnn -> SemanticMonad (SAST.CondElse SemanticAnn)
+    typeCondElse (CondElse bEl ann') =
+      SAST.CondElse
+        <$> localScope (typeBlock retTy bEl)
+        <*> return (buildStmtAnn ann')
 -- Here we could implement some abstract interpretation analysis
 typeStatement retTy (ForLoopStmt it_id it_ts from_expr to_expr mWhile body_stmt anns) = do
   it_ty <- typeTypeSpecifier anns typeRHSObject it_ts
@@ -130,7 +144,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                 casesIdents = matchIdentifier <$> cases
                 variantMap = M.fromList (map (\variant@(EnumVariant vId _) -> (vId, variant)) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
               \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
             typedCases <- mapM (typeMatchCase ident eloc caseMap variantMap) casesIdents
             when (not total && (length flsDefIdents == length casesIdents)) $
@@ -147,10 +161,10 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
                 -- | The parameters will now be refernces to the the actual objects
                 -- inside the enum
                 variantMap = M.fromList (
-                  map (\(EnumVariant vId variantParams) -> 
+                  map (\(EnumVariant vId variantParams) ->
                     (vId, EnumVariant vId (TReference refKind <$> variantParams))) flsDef)
                 caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+            when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
               \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
             typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase ident eloc caseMap variantMap) casesIdents)
             when (not total && (length flsDefIdents == length casesIdents)) $
@@ -162,9 +176,9 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TOption t -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [t])] 
+          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Option" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -173,9 +187,9 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
     TReference refKind (TOption t) -> do
       let flsDefIdents = ["None", "Some"]
           casesIdents = matchIdentifier <$> cases
-          variantMap = M.fromList [("None", EnumVariant "None"[]), ("Some", EnumVariant "Some" [TReference refKind t])] 
+          variantMap = M.fromList [("None", EnumVariant "None" []), ("Some", EnumVariant "Some" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Option" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -186,7 +200,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           casesIdents = matchIdentifier <$> cases
           variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Status" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -197,7 +211,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           casesIdents = matchIdentifier <$> cases
           variantMap = M.fromList [("Success", EnumVariant "Success" []), ("Failure", EnumVariant "Failure" [TReference refKind t])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Status" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -208,7 +222,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           casesIdents = matchIdentifier <$> cases
           variantMap = M.fromList [("Ok", EnumVariant "Ok" [okTy]), ("Error", EnumVariant "Error" [errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- mapM (typeMatchCase "Result" Internal caseMap variantMap) casesIdents
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -219,7 +233,7 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
           casesIdents = matchIdentifier <$> cases
           variantMap = M.fromList [("Ok", EnumVariant "Ok" [TReference refKind okTy]), ("Error", EnumVariant "Error" [TReference refKind errorTy])]
           caseMap = M.fromList (map (\c@(MatchCase i _ _ _) -> (i, c)) cases)
-      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>= 
+      when total (foldM (checkMissingCase caseMap) [] flsDefIdents >>=
         \case { [] -> return (); cs -> throwError $ annotateError ann (EMatchMissingCases cs); })
       typedCases <- localScope (moveExpression typed_matchE >> mapM (typeMatchCase "Result" Internal caseMap variantMap) casesIdents)
       when (not total && (length flsDefIdents == length casesIdents)) $
@@ -240,17 +254,17 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
       checkCaseDuplicates :: [MatchCase ParserAnn] -> SemanticMonad ()
       checkCaseDuplicates = foldM_ checkCaseDuplicates' M.empty
 
-      checkCaseDuplicates' :: 
-        M.Map Identifier Location 
-        -> MatchCase ParserAnn 
+      checkCaseDuplicates' ::
+        M.Map Identifier Location
+        -> MatchCase ParserAnn
         -> SemanticMonad (M.Map Identifier Location)
       checkCaseDuplicates' acc (MatchCase i _ _ loc) =
         case M.lookup i acc of
           Nothing -> return $ M.insert i loc acc
           Just prevLoc -> throwError $ annotateError loc (EMatchCaseDuplicate i prevLoc)
-      
-      checkMissingCase :: 
-        M.Map Identifier a 
+
+      checkMissingCase ::
+        M.Map Identifier a
         -> [Identifier]
         -> Identifier -> SemanticMonad [Identifier]
       checkMissingCase m acc i =
@@ -261,21 +275,21 @@ typeStatement retTy (MatchStmt matchE cases mDefaultCase ann) = do
       typeMatchCase :: Identifier -> Location -> M.Map Identifier (MatchCase ParserAnn)
         -> M.Map Identifier (SAST.EnumVariant SemanticAnn)
         -> Identifier -> SemanticMonad (SAST.MatchCase SemanticAnn)
-      typeMatchCase enumId loc caseMap variantMap caseId = 
-        case M.lookup caseId variantMap of 
+      typeMatchCase enumId loc caseMap variantMap caseId =
+        case M.lookup caseId variantMap of
           Nothing -> throwError $ annotateError ann (EMatchCaseUnknownVariant caseId)
           Just (EnumVariant _ vData) ->  typeMatchCase' c vData
 
         where
 
           c = caseMap M.! caseId
-          
+
           typeMatchCase' (MatchCase cIdent bVars bd mcann) tVars =
               let psLen = length tVars
                   asLen = length bVars in
               if psLen == asLen then
-              flip (SAST.MatchCase cIdent bVars) 
-                  (buildStmtMatchCaseAnn (matchAnnotation c) tVars) 
+              flip (SAST.MatchCase cIdent bVars)
+                  (buildStmtMatchCaseAnn (matchAnnotation c) tVars)
                   <$> localScope (
                         mapM_ (uncurry $ insertLocalImmutObj mcann) (zip bVars tVars) >>
                         typeBlock retTy bd

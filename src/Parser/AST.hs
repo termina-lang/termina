@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveFunctor  #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Module defining AST after parsing.
 -- The parsing module defines a function |SourceCode -> AnnotatedProgram
@@ -14,6 +16,8 @@ module Parser.AST
 -- From |CoreAST| we get all basic blocks.
 import Utils.Annotations
 import Core.AST
+import Utils.Printer
+import qualified Data.Text as T
 
 ----------------------------------------
 -- | Assignable and /accessable/ values. LHS, referencable and accessable.
@@ -38,6 +42,18 @@ data Object a
   -- |cEx| is an expression for the lower bound
   -- |cEx| is an expression for the upper bound
   deriving (Show, Functor)
+
+instance ShowText (Object a) where
+    showText (Variable ident _) = T.pack ident
+    showText (ArrayIndexExpression obj expr _) = 
+        showText obj <> "[" <> showText expr <> "]"
+    showText (MemberAccess obj ident _) = 
+        showText obj <> "." <> T.pack ident
+    showText (Dereference obj _) = "*" <> showText obj
+    showText (DereferenceMemberAccess obj ident _) = 
+        "*" <> showText obj <> "." <> T.pack ident
+    showText (ArraySlice obj expr1 expr2 _) = 
+        showText obj <> "[" <> showText expr1 <> ".." <> showText expr2 <> "]"
 
   -- | First AST after parsing
 data Expression
@@ -80,6 +96,37 @@ data Expression
     MonadicVariantLabel -- ^ Variant label
     a
   deriving (Show, Functor)
+
+instance ShowText (Expression a) where
+    showText (AccessObject obj) = showText obj
+    showText (Constant c _) = showText c
+    showText (BinOp op lhe rhe _) = showText lhe <> " " <> showText op <> " " <> showText rhe
+    showText (ReferenceExpression ak obj _) = "&" <> showText ak <> " " <> showText obj
+    showText (Casting e ty _) = "(" <> showText ty <> ") " <> showText e
+    showText (FunctionCall ident args _) = 
+        T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (MemberFunctionCall obj ident args _) =
+        showText obj <> "." <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (DerefMemberFunctionCall obj ident args _) = 
+        showText obj <> "->" <> T.pack ident <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (ArrayInitializer value size _) =
+        "[" <> showText value <> "; " <> showText size <> "]"
+    showText (ArrayExprListInitializer exprs _) = 
+        "{" <> T.intercalate ", " (map showText exprs) <> "}"
+    showText (StructInitializer fs Nothing _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "}"
+    showText (StructInitializer fs (Just ty) _) = 
+        "{" <> T.intercalate ", " (map showText fs) <> "} : " <> showText ty
+    showText (EnumVariantInitializer ident variant args _) = 
+        T.pack ident <> "::" <> T.pack variant <> "(" <> T.intercalate ", " (map showText args) <> ")"
+    showText (MonadicVariantInitializer ov _) = 
+        "Some(" <> showText ov <> ")"
+    showText (StringInitializer str _) = 
+        "\"" <> T.pack str <> "\""
+    showText (IsEnumVariantExpression obj ident variant _) = 
+        showText obj <> " is " <> T.pack ident <> "::" <> T.pack variant
+    showText (IsMonadicVariantExpression obj variant _) = 
+        showText obj <> " is " <> showText variant
 
 instance Annotated Object where
   getAnnotation (Variable _ a)                  = a
@@ -144,11 +191,24 @@ data DefaultCase a = DefaultCase
   a
   deriving (Show, Functor)
 
-data ElseIf a = ElseIf
+data CondIf a = CondIf
   {
-    elseIfCond       :: Expression a
-  , elseIfBody       :: Block a
-  , elseIfAnnotation :: a
+    condIfCond       :: Expression a
+  , condIfBody       :: Block a
+  , condIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElse a = CondElse
+  {
+    condElseBody       :: Block a
+  , condElseAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElseIf a = CondElseIf
+  {
+    condElseIfCond       :: Expression a
+  , condElseIfBody       :: Block a
+  , condElseIfAnnotation :: a
   } deriving (Show, Functor)
 
 data Statement a =
@@ -164,10 +224,9 @@ data Statement a =
     (Expression a) -- ^ assignment expression
     a
   | IfElseStmt
-    (Expression a) -- ^ conditional expression
-    (Block a) -- ^ statements in the if block
-    [ElseIf a] -- ^ list of else if blocks
-    (Maybe (Block a)) -- ^ statements in the else block
+    (CondIf a) -- ^ if condition and body
+    [CondElseIf a] -- ^ list of else if blocks
+    (Maybe (CondElse a)) -- ^ statements in the else block
     a
   -- | For loop
   | ForLoopStmt
@@ -206,7 +265,39 @@ data Block a
 
 ----------------------------------------
 type TypeParameter = TypeParameter' Expression
+
+instance ShowText (TypeParameter a) where
+    showText (TypeParamIdentifier ident) = T.pack ident
+    showText (TypeParamTypeSpec ts) = showText ts
+    showText (TypeParamSize size) = showText size
+
 type TypeSpecifier = TypeSpecifier' Expression
+
+instance ShowText (TypeSpecifier a) where
+    showText TSUInt8 = "u8"
+    showText TSUInt16 = "u16"
+    showText TSUInt32 = "u32"
+    showText TSUInt64 = "u64"
+    showText TSInt8 = "i8"
+    showText TSInt16 = "i16"
+    showText TSInt32 = "i32"
+    showText TSInt64 = "i64"
+    showText TSUSize = "usize"
+    showText TSBool = "bool"
+    showText TSChar = "char"
+    showText (TSConstSubtype ts) = "const " <> showText ts
+    showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (TSBoxSubtype ts) = "box " <> showText ts
+    showText (TSLocation ts) = "loc " <> showText ts
+    showText (TSAccessPort ts) = "access " <> showText ts
+    showText (TSSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSOutPort ts) = "out " <> showText ts
+    showText (TSReference ak ts) = "&" <> showText ak <> showText ts
+    showText (TSDefinedType ident []) = T.pack ident
+    showText (TSDefinedType ident tsps) = T.pack ident <> "<" <> T.intercalate "; " (map showText tsps) <> ">"
+    showText TSUnit = "unit"
+
 type Parameter = Parameter' TypeSpecifier
 type Const = Const' TypeSpecifier
 type Modifier = Modifier' TypeSpecifier

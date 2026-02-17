@@ -8,7 +8,7 @@ import Text.Parsec
 import Utils.Errors
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Text as T
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Text.Parsec.Error
 
 ----------------------------------------

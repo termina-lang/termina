@@ -41,11 +41,24 @@ data DefaultCase a = DefaultCase
   a
   deriving (Show, Functor)
 
-data ElseIf a = ElseIf
+data CondIf a = CondIf
   {
-    elseIfCond       :: Expression a
-  , elseIfBody       :: Block a
-  , elseIfAnnotation :: a
+    condIfCond       :: Expression a
+  , condIfBody       :: Block a
+  , condIfAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElse a = CondElse
+  {
+    condElseBody       :: Block a
+  , condElseAnnotation :: a
+  } deriving (Show, Functor)
+
+data CondElseIf a = CondElseIf
+  {
+    condElseIfCond       :: Expression a
+  , condElseIfBody       :: Block a
+  , condElseIfAnnotation :: a
   } deriving (Show, Functor)
 
 data Statement a =
@@ -68,10 +81,9 @@ data Statement a =
 data BasicBlock a =
     -- | If-else-if basic block
     IfElseBlock 
-        (Expression a) -- ^ conditional expression
-        (Block a) -- ^ basic blocks in the if block
-        [ElseIf a] -- ^ list of else if blocks (possibly empty)
-        (Maybe (Block a)) a -- ^ basic blocks in the else
+        (CondIf a) -- ^ if condition and body
+        [CondElseIf a] -- ^ list of else if blocks
+        (Maybe (CondElse a)) a -- ^ statements in the else block
     -- | For-loop basic block
     | ForLoopBlock 
         Identifier -- ^ name of the iterator variable
@@ -143,6 +155,18 @@ data Block a
     blockAnnotation :: a
   }
   deriving (Show, Functor)
+
+instance Annotated Statement where
+  getAnnotation (Declaration _ _ _ _ ann) = ann
+  getAnnotation (AssignmentStmt _ _ ann) = ann
+  getAnnotation (SingleExpStmt _ ann) = ann
+
+  updateAnnotation (Declaration idk ak t expr _) =
+    Declaration idk ak t expr
+  updateAnnotation (AssignmentStmt obj expr _) =
+    AssignmentStmt obj expr
+  updateAnnotation (SingleExpStmt expr _) =
+    SingleExpStmt expr
 
 type AnnASTElement = AnnASTElement' TerminaType Block Expression
 type FieldAssignment = FieldAssignment' Expression

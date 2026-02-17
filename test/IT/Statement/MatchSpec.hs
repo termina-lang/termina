@@ -83,11 +83,6 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* match_test0)(void * const, __option_box_t);\n" ++
-              "} test_iface;\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
               "    __termina_resource_lock_type_t __lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++
@@ -134,11 +129,6 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* match_test1)(void * const, __option_box_t);\n" ++
-              "} test_iface;\n" ++
-              "\n" ++              
               "typedef struct {\n" ++
               "    __termina_resource_lock_type_t __lock_type;\n" ++
               "} id0;\n" ++

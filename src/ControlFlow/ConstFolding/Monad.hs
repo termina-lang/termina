@@ -1,5 +1,5 @@
 module ControlFlow.ConstFolding.Monad where
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Semantic.AST
 import Semantic.Types
 import ControlFlow.Architecture.Types

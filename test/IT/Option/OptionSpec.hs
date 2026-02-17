@@ -5,7 +5,7 @@ import IT.Common
 import Test.Hspec
 import Data.Text
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Core.AST
 import Generator.Monadic
 

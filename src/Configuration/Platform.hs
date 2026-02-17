@@ -3,7 +3,6 @@
 module Configuration.Platform where
 
 import Data.Yaml
-import qualified Data.Text as T
 import Configuration.Platform.RTEMS5LEON3QEMU
 import Configuration.Platform.POSIXGCC
 
@@ -48,7 +47,7 @@ instance ToJSON PlatformFlags where
             "posix-gcc" .= flagsPOSIXGCC
         ]
 
-checkPlatform :: T.Text -> Maybe Platform
+checkPlatform :: String -> Maybe Platform
 checkPlatform "posix-gcc" = Just POSIXGCC
 checkPlatform "rtems5-leon3-qemu" = Just RTEMS5LEON3QEMU
 checkPlatform "freertos10-stm32l432xx" = Just FreeRTOS10STM32L432XX

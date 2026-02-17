@@ -5,7 +5,7 @@
 module Generator.CodeGen.Application.Glue where
 
 import Generator.LanguageC.AST
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Generator.CodeGen.Common
 import Semantic.Types
 import ControlFlow.Architecture.Types
@@ -93,7 +93,7 @@ genInitEmitters progArchitecture = do
     where
 
         genEmitterConnection :: TPEmitter a -> CGenerator [CCompoundBlockItem]
-        genEmitterConnection (TPPeriodicTimerEmitter timer _ _) = do
+        genEmitterConnection (TPPeriodicTimerEmitter timer _ _ _) = do
             timerId <- genDefineTimerIdLabel timer
             emitterId <- genDefineEmitterIdLabel timer
             -- | Obtain the identifier of the target entity and the port to which the
@@ -151,7 +151,7 @@ genInitEmitters progArchitecture = do
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
-        genEmitterConnection (TPInterruptEmittter irq _) = do
+        genEmitterConnection (TPInterruptEmitter irq _) = do
             emitterId <- genDefineEmitterIdLabel irq
             irqMap <- gets interruptsMap
             irqVector <- case M.lookup irq irqMap of
@@ -221,7 +221,7 @@ genInitEmitters progArchitecture = do
             return $
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ periodicTimerConnection
-        genOSALEmitterInit irq@(TPInterruptEmittter {}) = do
+        genOSALEmitterInit irq@(TPInterruptEmitter {}) = do
             interruptConnection <- genEmitterConnection irq
             -- | Obtain the identifier of the target entity and the port to which the
             -- interrupt emitter is connected
@@ -234,7 +234,7 @@ genInitEmitters progArchitecture = do
 -- Init task.  The function initializes the mutexes. The function is called AFTER
 -- the execution of the init handler (if any) and before the initialization of the
 -- resource locking mechanism.
-genInitMutexes :: M.Map Identifier ResourceLock -> CGenerator CFileItem
+genInitMutexes :: ResourceLockingMap -> CGenerator CFileItem
 genInitMutexes mutexes = do
     let mutexesList = M.toList mutexes
     initMutexes <- mapM genOSALMutexInit mutexesList

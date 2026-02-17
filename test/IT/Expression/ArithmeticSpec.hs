@@ -95,11 +95,6 @@ spec = do
               "#include <termina.h>\n" ++
               "\n" ++
               "typedef struct {\n" ++
-              "    void * __that;\n" ++
-              "    void (* test1)(void * const, __termina_box_t);\n" ++
-              "} test_iface;\n" ++
-              "\n" ++
-              "typedef struct {\n" ++
               "    __termina_resource_lock_type_t __lock_type;\n" ++
               "} id0;\n" ++
               "\n" ++

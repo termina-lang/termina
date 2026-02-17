@@ -12,9 +12,8 @@ import Data.Maybe
 import ControlFlow.Architecture.Utils
 import Semantic.Types
 import Utils.Annotations
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import ControlFlow.Architecture.BoxInOut
-import ControlFlow.Architecture.Forwarding
 import Configuration.Configuration
 
 type ArchitectureMonad = ExceptT ArchitectureError (ST.State (TerminaProgArch SemanticAnn))
@@ -71,62 +70,84 @@ addChannelSource ident pname channel ann = do
           channelSources = M.insert channel ((ident, pname, ann) : s) channelSrcs
         }
 
-genArchTypeDef :: TypeDef SemanticAnn -> ArchitectureMonad ()
-genArchTypeDef tydef@(Class TaskClass ident _ _ _) = do
+genArchTypeDef :: SemanticAnn -> TypeDef SemanticAnn -> ArchitectureMonad ()
+genArchTypeDef ann tydef@(Class TaskClass ident _ _ _) = do
   let members = getClassMembers tydef
-      inPs = getInputPorts members
-      sinkPs = getSinkPorts members
-      outputPs = getOutputPorts members
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  forwardingMap <-
-    case runGetForwardingMap members of
-      Left err -> throwError err
-      Right m -> return m
-  let tskCls = TPClass ident TaskClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
+  let tskCls = TPClass {
+    classIdentifier = ident,
+    classKind = TaskClass,
+    classProvides = [],
+    classActions = getActions members,
+    classMethods = M.empty,
+    classProcedures = M.empty,
+    classViewers = getViewers members,
+    accessPorts = getAccessPorts members,
+    inputPorts = getInputPorts members,
+    sinkPorts = getSinkPorts members,
+    outputPorts = getOutputPorts members,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  }
   ST.modify $ \tp ->
     tp {
       taskClasses = M.insert ident tskCls (taskClasses tp)
     }
-genArchTypeDef tydef@(Class HandlerClass ident _ _ _) = do
+genArchTypeDef ann tydef@(Class HandlerClass ident _ _ _) = do
   let members = getClassMembers tydef
-      inPs = M.empty
-      sinkPs = getSinkPorts members
-      outputPs = getOutputPorts members
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  forwardingMap <-
-    case runGetForwardingMap members of
-      Left err -> throwError err
-      Right m -> return m
-  let hdlCls = TPClass ident HandlerClass memberFunctions inPs sinkPs outputPs outBoxMap forwardingMap
+  let hdlCls = TPClass {
+    classIdentifier = ident,
+    classKind = HandlerClass,
+    classProvides = [],
+    classActions = getActions members,
+    classMethods = M.empty,
+    classProcedures = M.empty,
+    classViewers = getViewers members,
+    accessPorts = getAccessPorts members,
+    inputPorts = M.empty,
+    sinkPorts = getSinkPorts members,
+    outputPorts = getOutputPorts members,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  }
   ST.modify $ \tp ->
     tp {
       handlerClasses = M.insert ident hdlCls (handlerClasses tp)
     }
-genArchTypeDef tydef@(Class ResourceClass ident _ _ _) = do
+genArchTypeDef ann tydef@(Class ResourceClass ident _ provides _) = do
   let members = getClassMembers tydef
-      inPs = M.empty
-      sinkPs = M.empty
-      outputPs = M.empty
-      memberFunctions = getMemberFunctions members
   outBoxMap <-
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
   -- | Resources do not have forwarding actions
-  let resCls = TPClass ident ResourceClass memberFunctions inPs sinkPs outputPs outBoxMap M.empty
+  let resCls = TPClass {
+    classIdentifier = ident,
+    classKind = ResourceClass,
+    classProvides = provides,
+    classActions = M.empty,
+    classMethods = getMethods members,
+    classProcedures = getProcedures members,
+    classViewers = M.empty,
+    accessPorts = getAccessPorts members,
+    inputPorts = M.empty,
+    sinkPorts = M.empty,
+    outputPorts = M.empty,
+    classBoxIOMaps = outBoxMap,
+    classAnns = ann
+  } 
   ST.modify $ \tp ->
     tp {
       resourceClasses = M.insert ident resCls (resourceClasses tp)
     }
-genArchTypeDef _ = return ()
+genArchTypeDef _ _ = return ()
 
 genArchGlobal :: QualifiedName -> Global SemanticAnn -> ArchitectureMonad ()
 genArchGlobal _ (Const identifier ty expr _ ann) = do
@@ -137,16 +158,19 @@ genArchGlobal _ (Const identifier ty expr _ ann) = do
 -- | Const expressions have been already substituted by the type checker
 -- | Nothing to do here
 genArchGlobal _ (ConstExpr {}) = return ()
-genArchGlobal modName (Emitter ident emitterCls _ _ ann) = do
+genArchGlobal modName (Emitter ident emitterCls mExpr _ ann) = do
   case emitterCls of
     (TGlobal EmitterClass "Interrupt") -> ST.modify $ \tp ->
       tp {
-        emitters = M.insert ident (TPInterruptEmittter ident ann) (emitters tp)
+        emitters = M.insert ident (TPInterruptEmitter ident ann) (emitters tp)
       }
-    (TGlobal EmitterClass "PeriodicTimer") -> ST.modify $ \tp ->
-      tp {
-        emitters = M.insert ident (TPPeriodicTimerEmitter ident modName ann) (emitters tp)
-       }
+    (TGlobal EmitterClass "PeriodicTimer") -> 
+      case mExpr of
+        Just expr -> ST.modify $ \tp ->
+          tp {
+            emitters = M.insert ident (TPPeriodicTimerEmitter ident expr modName ann) (emitters tp)
+          }
+        Nothing -> throwError $ annotateError Internal EMissingPeriodicTimerInitializer
     (TGlobal EmitterClass "SystemInit") -> ST.modify $ \tp ->
       tp {
         emitters = M.insert ident (TPSystemInitEmitter ident ann) (emitters tp)
@@ -294,7 +318,7 @@ genArchElement _ (Function identifier params mRet block _ ann) =
       functions = M.insert identifier (TPFunction identifier params mRet block ann) (functions tp)
     }
 genArchElement modName (GlobalDeclaration glb) = genArchGlobal modName glb
-genArchElement _ (TypeDefinition typeDef _) = genArchTypeDef typeDef
+genArchElement _ (TypeDefinition typeDef ann) = genArchTypeDef ann typeDef
 
 emptyTerminaProgArch :: TerminaConfig -> TerminaProgArch SemanticAnn
 emptyTerminaProgArch config = TerminaProgArch {

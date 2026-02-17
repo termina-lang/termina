@@ -11,7 +11,7 @@ import Generator.CodeGen.Global
 import Generator.CodeGen.Function
 import Data.Text (unpack, pack, intercalate, replace, toUpper)
 import System.FilePath
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Control.Monad.Except
 import Configuration.Configuration

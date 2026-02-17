@@ -8,7 +8,7 @@ import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
 import Control.Monad (zipWithM, foldM)

@@ -1,8 +1,8 @@
 module Generator.Makefile.Printer where
-import Generator.Utils
 import Generator.Makefile.AST
 import Prettyprinter
 import Data.Text (Text)
+import Utils.Printer
 
 
 class MakePrint a where

@@ -109,20 +109,30 @@ constSimplStatement (SingleExpStmt expr ann) = do
 constSimplBasicBlock :: BasicBlock SemanticAnn -> ConstSimplMonad (BasicBlock SemanticAnn)
 constSimplBasicBlock (RegularBlock stmts) =
   RegularBlock <$> mapM constSimplStatement stmts
-constSimplBasicBlock (IfElseBlock ifCond ifBlk elifs mElse ann) = do
-  ifCond' <- constSimplExpression ifCond
-  ifBlk' <- constSimplBasicBlocks ifBlk
+constSimplBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
+  ifCond' <- consSimplIfBlock ifCond
   elifs' <- mapM constSimplElseIfBlock elifs
-  mElse' <- maybe (return Nothing) (fmap Just . constSimplBasicBlocks) mElse
-  return $ IfElseBlock ifCond' ifBlk' elifs' mElse' ann
+  mElse' <- maybe (return Nothing) (fmap Just . constSimplElseBlock) mElse
+  return $ IfElseBlock ifCond' elifs' mElse' ann
 
   where
 
-    constSimplElseIfBlock :: ElseIf SemanticAnn -> ConstSimplMonad (ElseIf SemanticAnn)
-    constSimplElseIfBlock (ElseIf elifCond blk ann') = do
+    consSimplIfBlock :: CondIf SemanticAnn -> ConstSimplMonad (CondIf SemanticAnn)
+    consSimplIfBlock (CondIf cond blk ann') = do
+      cond' <- constSimplExpression cond
+      blk' <- constSimplBasicBlocks blk
+      return $ CondIf cond' blk' ann'
+    
+    constSimplElseIfBlock :: CondElseIf SemanticAnn -> ConstSimplMonad (CondElseIf SemanticAnn)
+    constSimplElseIfBlock (CondElseIf elifCond blk ann') = do
       blk' <- constSimplBasicBlocks blk
       elifCond' <- constSimplExpression elifCond
-      return $ ElseIf elifCond' blk' ann'
+      return $ CondElseIf elifCond' blk' ann'
+    
+    constSimplElseBlock :: CondElse SemanticAnn -> ConstSimplMonad (CondElse SemanticAnn)
+    constSimplElseBlock (CondElse blk ann') = do
+      blk' <- constSimplBasicBlocks blk
+      return $ CondElse blk' ann'
 
 constSimplBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann) = do
   from_expr' <- constSimplExpression from_expr

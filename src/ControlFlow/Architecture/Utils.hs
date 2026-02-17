@@ -12,28 +12,65 @@ import Semantic.Types
 import Utils.Annotations
 import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
-import Extras.Graph (findDisjointPaths, reverseGraph)
+import Utils.Graph (findDisjointPaths, reverseGraph)
 import Control.Monad.State
 
 getEmitterIdentifier :: TPEmitter a -> Identifier
-getEmitterIdentifier (TPInterruptEmittter ident _) = ident
-getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _) = ident
+getEmitterIdentifier (TPInterruptEmitter ident _) = ident
+getEmitterIdentifier (TPPeriodicTimerEmitter ident _ _ _) = ident
 getEmitterIdentifier (TPSystemInitEmitter ident _) = ident
 getEmitterIdentifier (TPSystemExceptEmitter ident _) = ident
 
-getMemberFunctions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
-getMemberFunctions = foldl' (\acc member ->
+classMemberFunctions :: TPClass a -> M.Map Identifier (TPFunction a)
+classMemberFunctions tpClass =
+  M.unions [
+    classMethods tpClass,
+    classProcedures tpClass,
+    classViewers tpClass,
+    classActions tpClass
+  ]
+
+getViewers :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getViewers = foldl' (\acc member ->
+  case member of
+    ClassViewer identifier params mRetTy blk ann ->
+      M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getMethods :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getMethods = foldl' (\acc member ->
   case member of
     ClassMethod _ak identifier params mRetTy blk ann  ->
       M.insert identifier (TPFunction identifier params mRetTy blk ann)   acc
+    _ -> acc
+  ) M.empty
+
+getProcedures :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getProcedures = foldl' (\acc member ->
+  case member of
     ClassProcedure _ak identifier params blk ann ->
       M.insert identifier (TPFunction identifier params Nothing blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getActions :: [ClassMember a] -> M.Map Identifier (TPFunction a)
+getActions = foldl' (\acc member ->
+  case member of
     ClassAction _ak identifier Nothing rty blk ann ->
       M.insert identifier (TPFunction identifier [] (Just rty) blk ann) acc
     ClassAction _ak identifier (Just param) rty blk ann ->
       M.insert identifier (TPFunction identifier [param] (Just rty) blk ann) acc
-    ClassViewer identifier params mRetTy blk ann ->
-      M.insert identifier (TPFunction identifier params mRetTy blk ann) acc
+    _ -> acc
+  ) M.empty
+
+getAccessPorts :: [ClassMember a] -> M.Map Identifier (TerminaType a, a)
+getAccessPorts = foldl' (\acc member ->
+  case member of
+    ClassField (FieldDefinition fid fty ann) ->
+      case fty of
+        TAccessPort ty -> M.insert fid (ty, ann) acc
+        _ -> acc
     _ -> acc
   ) M.empty
 
@@ -121,14 +158,14 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
 
 newtype ResLockingSt = ResLockingSt
   { 
-    resLockingMap :: M.Map Identifier ResourceLock
+    resLockingMap :: ResourceLockingMap
   }
 
 -- Monad to compute.
 -- Error TopSortError and State TopSt
 type ResLockingMonad = State ResLockingSt
 
-genResourceLockings :: TerminaProgArch a -> M.Map Identifier ResourceLock
+genResourceLockings :: TerminaProgArch a -> ResourceLockingMap
 genResourceLockings programArchitecture =
   evalState (genResourceLockingsInternal programArchitecture >> gets resLockingMap) (ResLockingSt M.empty)
 
@@ -356,7 +393,7 @@ getInBox (InOptionBoxProcedureCall ident idx _ann) = InBoxProcedureCall ident id
 getInterruptEmittersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPInterruptEmittter identifier _ ->
+        TPInterruptEmitter identifier _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
                 Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of
@@ -369,7 +406,7 @@ getInterruptEmittersToTasks progArchitecture = foldl (\acc emitter ->
 getPeriodicTimersToTasks :: TerminaProgArch a -> [TPEmitter a]
 getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
     case emitter of
-        TPPeriodicTimerEmitter identifier _ _ ->
+        TPPeriodicTimerEmitter identifier _ _ _ ->
             case M.lookup identifier (emitterTargets progArchitecture) of
                 Just (entity, _port, _) ->
                     case M.lookup entity (tasks progArchitecture) of

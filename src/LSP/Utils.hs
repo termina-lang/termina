@@ -16,7 +16,7 @@ import Parser.Parsing
 import qualified Data.Text as T
 import Utils.Annotations
 import Parser.Errors
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Utils.Errors (ErrorMessage(toDiagnostics))
 import Control.Monad.State
 import Parser.AST

@@ -21,7 +21,7 @@ import Control.Monad
 import Control.Monad.Except
 
 import Data.Maybe
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Control.Monad.State as ST
 
 -- AST to work with.
@@ -171,9 +171,9 @@ useDefStatements :: [Statement SemanticAnn] -> UDM VarUsageError ()
 useDefStatements = mapM_ useDefStmt . reverse
 
 useDefBasicBlock :: BasicBlock SemanticAnn -> UDM VarUsageError ()
-useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse _ann)
+useDefBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
   = do
-  let blocks = bTrue : map elseIfBody elseIfs ++ maybeToList bFalse
+  let blocks = condIfBody condIf : map condElseIfBody elseIfs ++ (condElseBody <$> maybeToList bFalse)
       bodiesWithLocs = map (\b -> (blockBody b, getLocation (blockAnnotation b))) blocks
   prevSt <- ST.get
   -- All sets generated for all different branches.
@@ -185,9 +185,9 @@ useDefBasicBlock (IfElseBlock eCond bTrue elseIfs bFalse _ann)
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
    -- Use the else-ifs conditional expressions
-  mapM_ (useExpression . elseIfCond) elseIfs
+  mapM_ (useExpression . condElseIfCond) elseIfs
   -- Finally, use the if conditional expression
-  useExpression eCond
+  useExpression (condIfCond condIf)
 useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     prevSt <- ST.get
     -- What happens inside the body of a for, may not happen at all.

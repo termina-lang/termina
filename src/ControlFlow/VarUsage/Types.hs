@@ -2,7 +2,7 @@
 
 module ControlFlow.VarUsage.Types where
 import Utils.Annotations
-import Utils.Errors
+import Utils.Printer
 
 -- Special variables go from |Defined| -> |Allocated| -> |Used|.
 -- Unless the method is a /procedure/, in which case, it can take boxes as

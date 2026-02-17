@@ -16,7 +16,7 @@ import Control.Monad.Except
 import Semantic.Errors
 -- Semantic Monad
 import Semantic.Monad
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 ----------------------------------------
 -- Libaries and stuff

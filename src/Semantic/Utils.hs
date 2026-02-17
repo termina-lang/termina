@@ -4,8 +4,8 @@ module Semantic.Utils where
     
 import Core.AST
 import Parser.AST
-import qualified Data.Map as M
-import Extras.Graph
+import qualified Data.Map.Strict as M
+import Utils.Graph
 import qualified Data.Set as S
 import qualified Semantic.AST as SAST
 
@@ -55,16 +55,20 @@ selfInv _ prevMap  = prevMap
 selfInvStmt :: Statement a -> SelfInvocation a -> SelfInvocation a
 selfInvStmt (Declaration _vident _accK _type e _ann) prevMap = selfInv e prevMap
 selfInvStmt (AssignmentStmt _obj e _ann) prevMap = selfInv e prevMap
-selfInvStmt (IfElseStmt eC (Block bIfStmts _) bEls bEl _ann) prevMap =
-  selfInv eC .
-  flip (foldr selfInvStmt) bIfStmts .
-  flip (foldr selfInvElseIf) bEls $ 
-    maybe prevMap (foldr selfInvStmt prevMap . blockBody) bEl
+selfInvStmt (IfElseStmt ifCond elifs mElse _ann) prevMap =
+  selfInvIf ifCond .
+  flip (foldr selfInvElseIf) elifs $ 
+    maybe prevMap (\(CondElse bEl _) -> foldr selfInvStmt prevMap . blockBody $ bEl) mElse
 
   where
 
-    selfInvElseIf :: ElseIf a -> SelfInvocation a -> SelfInvocation a
-    selfInvElseIf (ElseIf cond blk _) prevMap' =
+    selfInvIf :: CondIf a -> SelfInvocation a -> SelfInvocation a
+    selfInvIf (CondIf eC (Block bIfStmts _) _) =
+      selfInv eC .
+      flip (foldr selfInvStmt) bIfStmts
+
+    selfInvElseIf :: CondElseIf a -> SelfInvocation a -> SelfInvocation a
+    selfInvElseIf (CondElseIf cond blk _) prevMap' =
       selfInv cond $ foldr selfInvStmt prevMap' (blockBody blk)
 
 selfInvStmt (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts _) _ann) prevMap =
@@ -93,16 +97,20 @@ selfInvStmt (RebootStmt _ann) prevMap = prevMap
 fieldDepStmt :: Statement a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
 fieldDepStmt (Declaration _vident _accK _type e _ann) prevMap = fieldDepExpr e prevMap
 fieldDepStmt (AssignmentStmt _obj e _ann) prevMap = fieldDepExpr e prevMap
-fieldDepStmt (IfElseStmt eC (Block bIfStmts _) bEls bEl _ann) prevMap =
-  fieldDepExpr eC .
-  flip (foldr fieldDepStmt) bIfStmts .
-  flip (foldr fieldDepElseIf) bEls $ 
-    maybe prevMap (foldr fieldDepStmt prevMap . blockBody) bEl
+fieldDepStmt (IfElseStmt ifCond elifs mElse _ann) prevMap =
+  fieldDepIf ifCond .
+  flip (foldr fieldDepElseIf) elifs $ 
+    maybe prevMap (\(CondElse bEl _) -> foldr fieldDepStmt prevMap . blockBody $ bEl) mElse
 
   where
 
-    fieldDepElseIf :: ElseIf a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
-    fieldDepElseIf (ElseIf cond blk _) prevMap' =
+    fieldDepIf :: CondIf a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
+    fieldDepIf (CondIf eC (Block bIfStmts _) _) =
+      fieldDepExpr eC .
+      flip (foldr fieldDepStmt) bIfStmts
+
+    fieldDepElseIf :: CondElseIf a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
+    fieldDepElseIf (CondElseIf cond blk _) prevMap' =
       fieldDepExpr cond $ foldr fieldDepStmt prevMap' (blockBody blk)
 
 fieldDepStmt (ForLoopStmt _loopIdent _type _initV _endV cBreak (Block stmts _) _ann) prevMap =

@@ -5,13 +5,15 @@ import Command.New
 import Command.Build
 import Command.Try
 import Command.LSP
+import Command.Sched
 
 data Command =
     New NewCmdArgs
     | Build BuildCmdArgs
     | Try TryCmdArgs
     | LSP LSPCmdArgs
-    deriving (Show,Eq)
+    | Sched SchedCmdArgs
+    deriving Show
 
 newCommandParser :: Parser Command
 newCommandParser = New
@@ -20,6 +22,10 @@ newCommandParser = New
 buildCommandParser :: Parser Command
 buildCommandParser = Build
     <$> buildCmdArgsParser
+
+schedCommandParser :: Parser Command
+schedCommandParser = Sched
+    <$> schedCmdArgsParser
 
 tryCommandParser :: Parser Command
 tryCommandParser = Try
@@ -35,6 +41,7 @@ commandParser = subparser
  <> command "build" (info buildCommandParser ( progDesc "Build current project" ))
  <> command "try" (info tryCommandParser ( progDesc "Translate a single file" ))
  <> command "lsp" (info lspCommandParser ( progDesc "Start language server" ))
+ <> command "sched" (info schedCommandParser ( progDesc "Generate scheduling models" ))
   )
 
 main :: IO ()
@@ -47,3 +54,4 @@ main = do
         Build cmdargs -> buildCommand cmdargs
         Try cmdargs -> tryCommand cmdargs
         LSP cmdargs -> lspCommand cmdargs
+        Sched cmdargs -> schedCommand cmdargs
