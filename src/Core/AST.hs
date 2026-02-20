@@ -189,30 +189,54 @@ instance Eq (TerminaType' expr a) where
   TInt16 == TInt16 = True
   TInt32 == TInt32 = True
   TInt64 == TInt64 = True
+  TUSize == TUSize = True
+  TBool == TBool = True
+  TChar == TChar = True
   TStruct ident == TStruct ident' = ident == ident'
   TEnum ident == TEnum ident' = ident == ident'
-  TBoxSubtype t == TBoxSubtype t' = t == t'
-  TConstSubtype t == TConstSubtype t' = t == t'
+  TUnit == TUnit = True
   _ == _ = False
 
+-- | We define an ordering for Termina types to be able to use them as keys in maps and sets.
+-- The comparison is only supported for basic types, struct and enum types. 
+-- For other types, we return EQ.
 instance Ord (TerminaType' expr a) where
-  TUInt8 `compare` TUInt8 = EQ
-  TUInt16 `compare` TUInt16 = EQ
-  TUInt32 `compare` TUInt32 = EQ
-  TUInt64 `compare` TUInt64 = EQ
-  TInt8 `compare` TInt8 = EQ
-  TInt16 `compare` TInt16 = EQ
-  TInt32 `compare` TInt32 = EQ
-  TInt64 `compare` TInt64 = EQ
-  TUSize `compare` TUSize = EQ
-  TStruct ident `compare` TStruct ident' = ident `compare` ident'
-  TEnum ident `compare` TEnum ident' = ident `compare` ident'
-  TOption ty `compare` TOption ty' = ty `compare` ty'
-  TStatus ty `compare` TStatus ty' = ty `compare` ty'
-  TResult okTy errorTy `compare` TResult okTy' errorTy' = okTy `compare` okTy' <> errorTy `compare` errorTy'
-  TBoxSubtype t `compare` TBoxSubtype t' = t `compare` t'
-  TConstSubtype t `compare` TConstSubtype t' = t `compare` t'
-  _ `compare` _ = LT
+  compare t1 t2 = compare (typeTag t1) (typeTag t2) <> compareSame t1 t2
+    where
+
+      typeTag :: TerminaType' expr a -> Int
+      typeTag TUInt8 = 0
+      typeTag TUInt16 = 1
+      typeTag TUInt32 = 2
+      typeTag TUInt64 = 3
+      typeTag TInt8 = 4
+      typeTag TInt16 = 5
+      typeTag TInt32 = 6
+      typeTag TInt64 = 7
+      typeTag TUSize = 8
+      typeTag TBool = 9
+      typeTag TChar = 10
+      typeTag (TStruct _) = 11
+      typeTag (TEnum _) = 12
+      typeTag TUnit = 13
+      typeTag _ = 14
+
+      compareSame :: TerminaType' expr a -> TerminaType' expr a -> Ordering
+      compareSame TUInt8 TUInt8 = EQ
+      compareSame TUInt16 TUInt16 = EQ
+      compareSame TUInt32 TUInt32 = EQ
+      compareSame TUInt64 TUInt64 = EQ
+      compareSame TInt8 TInt8 = EQ
+      compareSame TInt16 TInt16 = EQ
+      compareSame TInt32 TInt32 = EQ
+      compareSame TInt64 TInt64 = EQ
+      compareSame TUSize TUSize = EQ
+      compareSame TBool TBool = EQ
+      compareSame TChar TChar = EQ
+      compareSame (TStruct id1) (TStruct id2) = compare id1 id2
+      compareSame (TEnum id1) (TEnum id2) = compare id1 id2
+      compareSame TUnit TUnit = EQ
+      compareSame _ _ = EQ  -- Different constructors, already handled by typeTag
 
 instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
 
