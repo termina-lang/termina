@@ -62,7 +62,7 @@ instance FromJSON TerminaConfig where
     o .:   "app-file"       <*>
     o .:   "source-modules" <*>
     o .:   "output-folder"  <*>
-    o .:   "efp-folder"     <*>
+    o .:?  "efp-folder" .!= "efp" <*>
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
