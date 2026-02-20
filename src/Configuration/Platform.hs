@@ -5,6 +5,7 @@ module Configuration.Platform where
 import Data.Yaml
 import Configuration.Platform.RTEMS5LEON3QEMU
 import Configuration.Platform.POSIXGCC
+import Configuration.Platform.FreeRTOS10STM32L432XX
 
 data Platform = 
     POSIXGCC
@@ -14,21 +15,24 @@ data Platform =
     deriving Eq
 
 data PlatformFlags = PlatformFlags {
-    rtems5_leon3_qemu :: RTEMS5LEON3QEMUFlags,
-    posix_gcc :: POSIXGCCFlags
+    rtems5_leon3_qemu        :: RTEMS5LEON3QEMUFlags,
+    posix_gcc                :: POSIXGCCFlags,
+    freertos10_stm32l432xx   :: FreeRTOS10STM32L432XXFlags
 } deriving (Eq, Show)
 
 defaultPlatformFlags :: PlatformFlags
 defaultPlatformFlags = PlatformFlags {
-    rtems5_leon3_qemu = defaultRTEMS5LEON3QEMUFlags,
-    posix_gcc = defaultPOSIXGCCFlags
+    rtems5_leon3_qemu      = defaultRTEMS5LEON3QEMUFlags,
+    posix_gcc              = defaultPOSIXGCCFlags,
+    freertos10_stm32l432xx = defaultFreeRTOS10STM32L432XXFlags
 }
 
 instance FromJSON PlatformFlags where
   parseJSON (Object o) =
     PlatformFlags <$>
-    o .:? "rtems5-leon3-qemu" .!= defaultRTEMS5LEON3QEMUFlags <*>
-    o .:? "posix-gcc" .!= defaultPOSIXGCCFlags
+    o .:? "rtems5-leon3-qemu"      .!= defaultRTEMS5LEON3QEMUFlags <*>
+    o .:? "posix-gcc"              .!= defaultPOSIXGCCFlags <*>
+    o .:? "freertos10-stm32l432xx" .!= defaultFreeRTOS10STM32L432XXFlags
   parseJSON _ = fail "Expected configuration object"
 
 instance Show Platform where
@@ -39,12 +43,14 @@ instance Show Platform where
 
 instance ToJSON PlatformFlags where
     toJSON (
-        PlatformFlags 
+        PlatformFlags
             flagsRTEMSLEON3QEMU
             flagsPOSIXGCC
+            flagsFreeRTOS10STM32L432XX
         ) = object [
-            "rtems5-leon3-qemu" .= flagsRTEMSLEON3QEMU,
-            "posix-gcc" .= flagsPOSIXGCC
+            "rtems5-leon3-qemu"      .= flagsRTEMSLEON3QEMU,
+            "posix-gcc"              .= flagsPOSIXGCC,
+            "freertos10-stm32l432xx" .= flagsFreeRTOS10STM32L432XX
         ]
 
 checkPlatform :: String -> Maybe Platform
