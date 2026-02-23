@@ -7,7 +7,7 @@ module EFP.Schedulability.Core.AST
 
 import Core.AST
 import Utils.Annotations
-import Data.Text
+import qualified Data.Text as T
 import Utils.Printer
 
 
@@ -21,7 +21,7 @@ data BlockPosition = BlockPosition
 
 instance ShowText BlockPosition where
     showText (BlockPosition sl sc el ec) =
-        pack $ "@(" ++ show sl ++ ":" ++ show sc ++ "," ++ show el ++ ":" ++ show ec ++ ")"
+        T.pack $ "@(" ++ show sl ++ ":" ++ show sc ++ "," ++ show el ++ ":" ++ show ec ++ ")"
 
 data ConstExprType =
     TConstInt
@@ -40,9 +40,9 @@ data ConstExpression a
     deriving (Show, Functor)
 
 instance ShowText (ConstExpression a) where
-    showText (ConstObject ident _) = pack ident
+    showText (ConstObject ident _) = T.pack ident
     showText (ConstInt c _) = showText c
-    showText (ConstDouble d _) = pack (show d)
+    showText (ConstDouble d _) = T.pack (show d)
     showText (ConstBinOp op lhe rhe _) = showText lhe <> " " <> showText op <> " " <> showText rhe
 
 instance Annotated ConstExpression where
