@@ -132,14 +132,17 @@ genPaths (IfElseBlock ifBlk elifs mElse ann) =
             ) elifs
         elsePaths = case mElse of
             Just elseBlk -> 
-                let paths = genWCEPaths [] (blockBody . condElseBody $ elseBlk) in
-                    map (\p -> 
-                        case p of
-                            [WCEPRegularBlock {}] -> 
-                                WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
-                            _ ->
-                                WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated) paths
-            Nothing -> []
+                if null (blockBody . condElseBody $ elseBlk) then
+                    [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
+                else
+                    let paths = genWCEPaths [] (blockBody . condElseBody $ elseBlk) in
+                        map (\p -> 
+                            case p of
+                                [WCEPRegularBlock {}] -> 
+                                    WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated
+                                _ ->
+                                    WCEPathCondElse (reverse p) (loc2BlockPos . getLocation . condElseAnnotation $ elseBlk) Generated) paths
+            Nothing -> [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
     in
         uniqueRegularBlocks (ifPaths ++ elifPaths ++ elsePaths)
     
