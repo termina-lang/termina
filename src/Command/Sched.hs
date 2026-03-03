@@ -54,7 +54,6 @@ import Text.Printf
 import EFP.Schedulability.RT.Printer
 import EFP.Schedulability.MAST.Generator
 import EFP.Schedulability.MAST.Printer
-import Data.Foldable
 import EFP.Schedulability.TransPath.Utils
 import Control.Concurrent.Async
 import System.Process
@@ -366,9 +365,11 @@ genPickedEvents :: TransPathMap TRPSemAnn
 genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
-        let filteredOpMap = foldl' filterOperations [] <$> opMap
+        let totalEvents = product (map length (M.elems opMap))
+        let filteredOpMap = mergeComparable <$> opMap
         let numPickedEvents = product (map length (M.elems filteredOpMap))
             width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
+        putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
         zipWithM (\stMap idx ->
               return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
             ) (sequenceA filteredOpMap) [0 :: Integer ..]
@@ -379,11 +380,14 @@ genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interva
 genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
-      let numPickedEvents = product (map length (M.elems opMap))
+      let totalEvents = product (map length (M.elems opMap))
+      let filteredOpMap = mergeComparable <$> opMap
+      let numPickedEvents = product (map length (M.elems filteredOpMap))
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
+      putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
       zipWithM (\stMap idx ->
             return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
-          ) (sequenceA opMap) [0 :: Integer ..]
+          ) (sequenceA filteredOpMap) [0 :: Integer ..]
     Just _ -> 
       putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
     Nothing -> 

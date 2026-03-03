@@ -12,22 +12,22 @@ import Data.Foldable
 import qualified Data.Set as S
 import ControlFlow.Architecture.Types
 
-evalBinOp :: 
-    Op 
-    -> ConstExpression TRPSemAnn 
-    -> ConstExpression TRPSemAnn 
+evalBinOp ::
+    Op
+    -> ConstExpression TRPSemAnn
+    -> ConstExpression TRPSemAnn
     -> TRPGenMonad (ConstExpression TRPSemAnn)
-evalBinOp op (ConstInt (TInteger v1 repr1) _) (ConstInt (TInteger v2 _repr2) _) = 
+evalBinOp op (ConstInt (TInteger v1 repr1) _) (ConstInt (TInteger v2 _repr2) _) =
     case op of
         Addition -> return $ ConstInt (TInteger (v1 + v2) repr1) (TRPExprTy TConstInt)
         Subtraction -> return $ ConstInt (TInteger (v1 - v2) repr1) (TRPExprTy TConstInt)
         Multiplication -> return $ ConstInt (TInteger (v1 * v2) repr1) (TRPExprTy TConstInt)
-        Division -> 
+        Division ->
             if v2 == 0 then
                 throwError . annotateError Internal $ EConstExpressionDivisionByZero
             else
                 return $ ConstInt (TInteger (v1 `div` v2) repr1) (TRPExprTy TConstInt)
-        Modulo -> 
+        Modulo ->
             if v2 == 0 then
                 throwError . annotateError Internal $ EConstExpressionDivisionByZero
             else
@@ -44,12 +44,12 @@ evalBinOp op (ConstInt (TInteger v1 repr1) _) (ConstInt (TInteger v2 _repr2) _) 
             return $ ConstInt (TInteger (v1 `xor` v2) repr1) (TRPExprTy TConstInt)
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperand op
 -- | Both operands are floating-point
-evalBinOp op (ConstDouble v1 _) (ConstDouble v2 _) = 
+evalBinOp op (ConstDouble v1 _) (ConstDouble v2 _) =
     case op of
         Addition -> return $ ConstDouble (v1 + v2) (TRPExprTy TConstDouble)
         Subtraction -> return $ ConstDouble (v1 - v2) (TRPExprTy TConstDouble)
         Multiplication -> return $ ConstDouble (v1 * v2) (TRPExprTy TConstDouble)
-        Division -> 
+        Division ->
             if v2 == 0 then
                 throwError . annotateError Internal $ EConstExpressionDivisionByZero
             else
@@ -61,7 +61,7 @@ evalBinOp op (ConstDouble v1 _) (ConstInt (TInteger v2 _repr2) _) =
         Addition -> return $ ConstDouble (v1 + fromInteger v2) (TRPExprTy TConstDouble)
         Subtraction -> return $ ConstDouble (v1 - fromInteger v2) (TRPExprTy TConstDouble)
         Multiplication -> return $ ConstDouble (v1 * fromInteger v2) (TRPExprTy TConstDouble)
-        Division -> 
+        Division ->
             if v2 == 0 then
                 throwError . annotateError Internal $ EConstExpressionDivisionByZero
             else
@@ -72,17 +72,17 @@ evalBinOp op (ConstInt (TInteger v1 _repr1) _) (ConstDouble v2 _) =
         Addition -> return $ ConstDouble (fromInteger v1 + v2) (TRPExprTy TConstDouble)
         Subtraction -> return $ ConstDouble (fromInteger v1 - v2) (TRPExprTy TConstDouble)
         Multiplication -> return $ ConstDouble (fromInteger v1 * v2) (TRPExprTy TConstDouble)
-        Division -> 
+        Division ->
             if v2 == 0 then
                 throwError . annotateError Internal $ EConstExpressionDivisionByZero
             else
                 return $ ConstDouble (fromInteger v1 / v2) (TRPExprTy TConstDouble)
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperand op
-evalBinOp _ _ _ = 
+evalBinOp _ _ _ =
     throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
 -- | Evaluate a constant expression
-evalConstExpression :: 
+evalConstExpression ::
     ConstExpression a -> TRPGenMonad (ConstExpression TRPSemAnn)
 evalConstExpression (ConstInt val _) = return $ ConstInt val (TRPExprTy TConstInt)
 evalConstExpression (ConstDouble val _) = return $ ConstDouble val (TRPExprTy TConstDouble)
@@ -98,19 +98,19 @@ evalConstExpression (ConstBinOp op left right _ann) = do
     -- | Now perform the operation
     evalBinOp op left' right'
 
-passArguments :: 
-    [Identifier] 
+passArguments ::
+    [Identifier]
     -> [ConstExpression TRPSemAnn] -> TRPGenMonad ()
 passArguments [] [] = return ()
 passArguments (argName:argNames) (argValue:argValues) = do
-    modify $ \st -> 
+    modify $ \st ->
         st { localConstEnv = M.insert argName argValue (localConstEnv st) }
     passArguments argNames argValues
 passArguments _ _ = throwError . annotateError Internal $ EInvalidArgumentPassing
 
 getResourceLockSet ::
     S.Set (Identifier, Identifier, Identifier)
-    -> TransPathBlock TRPSemAnn 
+    -> TransPathBlock TRPSemAnn
     -> TRPGenMonad (S.Set (Identifier, Identifier, Identifier))
 getResourceLockSet currentLockSet (TPBlockProcedureInvoke _ (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
     return $ S.union currentLockSet lockSet
@@ -148,38 +148,49 @@ getResourceLockSet currentLockSet (TPBlockFreeBox targetComponent _ _) = do
         return currentLockSet
 getResourceLockSet currentLockSet _ = return currentLockSet
 
-sameResourceLocking ::
-    TRPOperation TRPSemAnn
-    -> TRPOperation TRPSemAnn
-    -> Bool
-sameResourceLocking prevOp newOp = 
-    case (getAnnotation prevOp, getAnnotation newOp) of
-        (TRPOperationTy resLock1, TRPOperationTy resLock2) ->
-            resLock1 == resLock2
-        _ -> False
+getOpSet :: TRPOperation TRPSemAnn -> S.Set (Identifier, Identifier, Identifier)
+getOpSet = \case
+    TRPTaskOperation _ _ _ _ _ _ _ (TRPOperationTy lockSet) -> lockSet
+    TRPHandlerOperation _ _ _ _ _ _ _ (TRPOperationTy lockSet) -> lockSet
+    op -> error $ "getOpSet: unsupported operation type for extracting resource locking set: " ++ show op
 
-filterOperations :: 
-    [TRPOperation TRPSemAnn]
-    -> TRPOperation TRPSemAnn
-    -> [TRPOperation TRPSemAnn]
-filterOperations prevOps newOp@(TRPTaskOperation _ _ _ _ _ _ newWcet _) =
-    let differentOps = filter (not . sameResourceLocking newOp) prevOps
-        matchingOps = filter (sameResourceLocking newOp) prevOps
-    in case matchingOps of
-        [] -> differentOps ++ [newOp]
-        (TRPTaskOperation _ _ _ _ _ _ oldWcet _):_ ->
-            if newWcet > oldWcet
-                then differentOps ++ [newOp]
-                else prevOps
-        _ -> prevOps -- ^ This should not happen (mixed operation types)
-filterOperations prevOps newOp@(TRPHandlerOperation _ _ _ _ _ _ newWcet _) =
-    let differentOps = filter (not . sameResourceLocking newOp) prevOps
-        matchingOps = filter (sameResourceLocking newOp) prevOps
-    in case matchingOps of
-        [] -> differentOps ++ [newOp]
-        (TRPHandlerOperation _ _ _ _ _ _ oldWcet _):_ ->
-            if newWcet > oldWcet
-                then differentOps ++ [newOp]
-                else prevOps
-        _ -> prevOps -- ^ This should not happen (mixed operation types)
-filterOperations prevOps _ = prevOps -- ^ This should not happen
+getOpWCET :: TRPOperation TRPSemAnn -> WCETime
+getOpWCET (TRPTaskOperation _ _ _ _ _ _ wcet _) = wcet
+getOpWCET (TRPHandlerOperation _ _ _ _ _ _ wcet _) = wcet
+getOpWCET op = error $ "getOpWCET: unsupported operation type for extracting WCET: " ++ show op
+
+setOpWCET :: WCETime -> TRPOperation TRPSemAnn -> TRPOperation TRPSemAnn
+setOpWCET newWcet (TRPTaskOperation s t a p blks cont _ ann) = TRPTaskOperation s t a p blks cont newWcet ann
+setOpWCET newWcet (TRPHandlerOperation s h a p blks cont _ ann) = TRPHandlerOperation s h a p blks cont newWcet ann
+setOpWCET _ op = error $ "setOpWCET: unsupported operation type for setting WCET: " ++ show op
+
+getOpStepName :: TRPOperation TRPSemAnn -> Identifier
+getOpStepName (TRPTaskOperation stepName _ _ _ _ _ _ _) = stepName
+getOpStepName (TRPHandlerOperation stepName _ _ _ _ _ _ _) = stepName
+getOpStepName op = error $ "getOpStepName: unsupported operation type for extracting step name: " ++ show op
+
+mergeComparable :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
+mergeComparable = foldl' insertOrMerge []
+  where
+
+    insertOrMerge acc x =
+      case extractComparable x acc of
+        Nothing           -> x : acc
+        Just (match, rest) -> insertOrMerge rest (merge x match)
+
+    extractComparable _ [] = Nothing
+    extractComparable x (y:ys)
+      | comparable x y = Just (y, ys)
+      | otherwise = case extractComparable x ys of
+          Nothing        -> Nothing
+          Just (m, rest) -> Just (m, y : rest)
+
+    comparable a b =
+      let sa = getOpSet a
+          sb = getOpSet b
+      in  sa `S.isSubsetOf` sb || sb `S.isSubsetOf` sa
+
+    merge a b =
+      let bigger = if getOpSet a `S.isSubsetOf` getOpSet b then b else a
+          maxWCET = max (getOpWCET a) (getOpWCET b)
+      in  setOpWCET maxWCET bigger
