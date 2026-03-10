@@ -517,8 +517,6 @@ genMASTModels
   -> IO ()
 genMASTModels config arch sitMap trPathMap = do
   let destinationPath = outputFolder config </> efpFolder config
-      parN   = 4 --  mastParallelism config          -- <- define this accessor in your config
-      qBound = 16 * parN
 
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
@@ -527,6 +525,8 @@ genMASTModels config arch sitMap trPathMap = do
       pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap)
       let total = numCombos pickedEvents
           width = length (show (max 0 (total - 1)))
+          parN   = min 4 total
+          qBound = 16 * parN
 
       TIO.putStrLn $
         "\x1b[34m[info]\x1b[0m: Analyzing scheduling models for situation "
