@@ -209,12 +209,15 @@ actionParamTy (TConstSubtype ty) = constTy ty
 actionParamTy _                = False
 
 classFieldTy :: TerminaType' expr a -> Bool
-classFieldTy (TSinkPort {})    = True
-classFieldTy (TInPort {})      = True
-classFieldTy (TOutPort {})     = True
-classFieldTy (TAccessPort {})  = True
 classFieldTy (TFixedLocation _) = True
-classFieldTy ty                = fieldTy ty
+classFieldTy ty                 = portTy ty || fieldTy ty
+
+portTy :: TerminaType' expr a -> Bool
+portTy (TSinkPort {})    = True
+portTy (TInPort {})      = True
+portTy (TOutPort {})     = True
+portTy (TAccessPort {})  = True
+portTy _                 = False
 
 fieldTy :: TerminaType' expr a -> Bool
 fieldTy = arrayTy

@@ -263,6 +263,7 @@ data Error
   | ETaskClassMethod (Identifier, Location) Identifier -- ^ Task class defines a method
   | EHandlerClassMethod (Identifier, Location) Identifier -- ^ Handler class defines a method
   | EResourceClassViewer (Identifier, Location) Identifier -- ^ Resource class defines a viewer
+  | EUnprotectedResourceWithRegularFields (Identifier, Location) -- ^ Unprotected resource with regular fields
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -478,6 +479,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "SE-208"
     errorIdent (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "SE-209"
     errorIdent (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "SE-210"
+    errorIdent (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "SE-211"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -691,6 +693,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "task class defines a method"
     errorTitle (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "handler class defines a method"
     errorTitle (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "resource class defines a viewer"
+    errorTitle (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "unprotected resource with regular fields"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2362,6 +2365,17 @@ instance ErrorMessage SemanticErrors where
                                         ("Resource class \x1b[31m" <> T.pack classId <> "\x1b[0m defines the viewer \x1b[31m" <> T.pack ident <> "\x1b[0m.\n"
                                         <> "Resource classes cannot define viewers."))
                             ]
+                EUnprotectedResourceWithRegularFields (clsId, prevPos@(Position _ prevStart _)) ->
+                    let prevFileName = sourceName prevStart
+                        prevSourceLines = files M.! prevFileName
+                    in
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Resource class \x1b[31m" <> T.pack clsId <> "\x1b[0m defines regular fields but the resource is defined as unprotected.\n" <>
+                               "Unprotected resources cannot define regular fields.\n")) <>
+                    pprintSimpleError
+                        prevSourceLines "The resource class is defined here:" prevFileName
+                        prevPos Nothing
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

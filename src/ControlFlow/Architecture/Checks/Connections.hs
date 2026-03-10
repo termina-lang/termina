@@ -36,5 +36,5 @@ checkPoolUsage = do
 checkResourceUsage :: ConnectionsCheckMonad ()
 checkResourceUsage = do
     tp <- ask
-    mapM_ (\(TPResource resId _ _ _ ann) ->
+    mapM_ (\(TPResource resId _ _ _ _ ann) ->
         when (resId `M.notMember` resourceSources tp) (throwError $ annotateError (getLocation ann) (EUnusedResource resId))) . M.elems . resources $ tp

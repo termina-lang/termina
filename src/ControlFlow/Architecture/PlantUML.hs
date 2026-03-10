@@ -180,7 +180,7 @@ genTargetResource currentDepth targetId = do
         Just target -> genResource currentDepth target
 
 genResource :: Int -> TPResource a -> PlantUMLCmpGenMonad a ()
-genResource currentDepth (TPResource resourceId resourceCls apConns _ _) = do
+genResource currentDepth (TPResource resourceId resourceCls apConns _ _ _) = do
     let cmp = PlantUMLCmpComponent resourceId (Just . T.pack $ resourceCls) (Just $ PlantUMLColorName "LightYellow")
     -- | Insert the new participant
     ST.modify $ \s -> s {

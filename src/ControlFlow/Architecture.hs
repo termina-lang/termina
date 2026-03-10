@@ -229,11 +229,11 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
 -- | Task declaration without struct initializer or a proper type specifier
 -- This should not happen, since a task must define at least one inbound port
 genArchGlobal _ (Task {}) = error "Internal error: invalid task declaration"
-genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _ rann) =
+genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer modifiers rann) =
   case initializer of
     Nothing -> ST.modify $ \tp ->
       tp {
-        resources = M.insert ident (TPResource ident rcls M.empty (Just modName) rann) (resources tp)
+        resources = M.insert ident (TPResource ident rcls M.empty modifiers (Just modName) rann) (resources tp)
       }
     Just (StructInitializer assignments _) -> do
       apConns <- foldM (\accps assignment -> do
@@ -245,7 +245,7 @@ genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer _
         ) M.empty assignments
       ST.modify $ \tp ->
         tp {
-          resources = M.insert ident (TPResource ident rcls apConns (Just modName) rann) (resources tp)
+          resources = M.insert ident (TPResource ident rcls apConns modifiers (Just modName) rann) (resources tp)
         }
     -- | Resource initializer is not a struct initializer
     -- This should not happen, since the type checker must not allow initializing a
@@ -334,7 +334,7 @@ emptyTerminaProgArch config = TerminaProgArch {
   handlers = M.empty,
   resourceClasses = M.empty,
   resources = if enableSystemPort config then M.fromList [
-    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
+    ("system_entry", TPResource "system_entry" "SystemEntry" M.empty [] Nothing (SemanticAnn (GTy (TGlobal ResourceClass "SystemEntry")) Internal))
   ] else M.empty,
   pools = M.empty,
   atomics = M.empty,

@@ -88,9 +88,9 @@ stdlibGlobalEnv =
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure Immutable "clock_get_uptime" [Parameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [Modifier "unprotected" Nothing] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Immutable "clock_get_uptime" [Parameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit),
       -- | procedure delay_in (&mut self, delay : &TimeVal)
-      InterfaceProcedure Mutable "delay_in" [Parameter "delay" (TReference Immutable (TStruct "TimeVal"))] [Modifier "unprotected" Nothing] (buildExpAnn Internal TUnit)
+      InterfaceProcedure Mutable "delay_in" [Parameter "delay" (TReference Immutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [

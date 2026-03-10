@@ -56,7 +56,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
   checkTerminaType anns ty
   case ty of
     -- | User-defined resources
-    TGlobal ResourceClass _ -> do
+    TGlobal ResourceClass clsId -> do
       exprty <-
         case mexpr of
           -- If it has an initial value great
@@ -64,6 +64,14 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           -- If it has not, we need to check that the type has actually NO fields
           Nothing -> Just <$> typeAssignmentExpression ty typeGlobalObject (StructInitializer [] Nothing anns)
       tyMods <- mapM (typeModifier anns typeGlobalObject) mods
+      -- Check if the resource is unprotected, and if it is, check that it has no regular fields
+      when (isUnprotected tyMods) $ 
+          getGlobalTypeDef anns clsId >>= \case{
+              LocatedElement (Class _clsKind _ident members _provides _mods) clsLoc ->
+                let fields = [fld | ClassField fld@(FieldDefinition _ fty _) <- members, (not . portTy) fty] in
+                unless (null fields) $ throwError $ annotateError anns (EUnprotectedResourceWithRegularFields (clsId, clsLoc));
+              _ -> throwError $ annotateError Internal EExpectedClassType;
+            } 
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     -- | Memory pools 
     TPool {} -> do
@@ -90,6 +98,14 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
       tyMods <- mapM (typeModifier anns typeGlobalObject) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
     _ -> throwError $ annotateError anns (EInvalidResourceType ty)
+  
+  where
+
+    isUnprotected :: [SAST.Modifier a] -> Bool
+    isUnprotected [] = False
+    isUnprotected ((Modifier "unprotected" Nothing) : _) = True
+    isUnprotected (_ : xs) = isUnprotected xs
+
 typeGlobal (Emitter ident ts mexpr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty

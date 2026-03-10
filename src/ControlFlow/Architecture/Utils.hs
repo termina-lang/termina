@@ -133,9 +133,17 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
             map (, S.empty) (M.keys (pools progArchitecture)) ++
             map (, S.empty) (M.keys (atomics progArchitecture)) ++
             map (, S.empty) (M.keys (atomicArrays progArchitecture))
-          resoucesGraph = foldr (\(TPResource identifier _ aps _ _) acc ->
-              M.insert identifier (S.fromList (fst <$> M.elems aps)) acc
-            ) initialMap (M.elems (resources progArchitecture))
+          unprotectedResources = M.filter isUnprotected (resources progArchitecture)
+          protectedResources = M.filter (not . isUnprotected) (resources progArchitecture)
+          resoucesGraph = foldr (\(TPResource identifier _ aps _ _ _) acc ->
+              let usedResources = concatMap (\(usedRes, _) ->
+                    case M.lookup usedRes unprotectedResources of
+                      Just (TPResource _ _ usedAps _ _ _) ->
+                        fst <$> M.elems usedAps
+                      Nothing ->
+                        [usedRes]) aps
+              in
+                M.insert identifier (S.fromList usedResources) acc) initialMap (M.elems protectedResources)
           tasksGraph = foldr (\(TPTask identifier _ _ _ _ apConns _ _ _) acc ->
               M.insert identifier (S.fromList (fst <$> M.elems apConns)) acc
             ) resoucesGraph (M.elems (tasks progArchitecture))
@@ -157,7 +165,7 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
 -- 3. The priority levels of tasks accessing the resource
 
 newtype ResLockingSt = ResLockingSt
-  { 
+  {
     resLockingMap :: ResourceLockingMap
   }
 
@@ -188,7 +196,7 @@ genResourceLockingsInternal programArchitecture =
       case M.lookup resId resLockMap of
         Just resLock -> return resLock
         Nothing ->
-          if isAtomic resId then
+          if isAtomic resId || isUnprotectedResource resId then
               -- Atomic resources don't need locking
               let resLock = ResourceLockNone in
               modify (\st ->
@@ -198,7 +206,7 @@ genResourceLockingsInternal programArchitecture =
             case findDisjointPaths reversedGraph resId of
               Left err -> error $ "error findDisjointPaths: " ++ show reversedGraph ++ " " ++ show resId ++ " " ++ show err
               Right [] -> error $ "Internal error: no paths found for resource " ++ resId
-              Right [_] -> 
+              Right [_] ->
                 -- Atomic resources don't need locking
                 let resLock = ResourceLockNone in
                 modify (\st ->
@@ -219,6 +227,10 @@ genResourceLockingsInternal programArchitecture =
             Just _ -> True
             Nothing -> isJust $ M.lookup identifier (atomicArrays programArchitecture)
 
+    isUnprotectedResource :: Identifier -> Bool
+    isUnprotectedResource identifier =
+        maybe False isUnprotected (M.lookup identifier (resources programArchitecture))
+
     -- | Checks if a handler is the system initialization handler
     isInitHandler :: Identifier -> Bool
     isInitHandler ident =
@@ -235,7 +247,7 @@ genResourceLockingsInternal programArchitecture =
             Just _ -> return ResourceLockIrq
             Nothing -> case M.lookup ident (tasks programArchitecture) of
                 Just tsk -> getResLocking' (getPriority tsk) ids
-                Nothing -> 
+                Nothing ->
                   error $ "Internal error: resource not found in usage map: " ++ ident
 
 
@@ -250,7 +262,7 @@ genResourceLockingsInternal programArchitecture =
             Nothing -> case M.lookup ident (tasks programArchitecture) of
                 Just tsk ->
                     getResLocking' (min ceilPrio (getPriority tsk)) ids
-                Nothing -> 
+                Nothing ->
                     error $ "Internal error: resource not found in usage map: " ++ ident
 
 
@@ -441,8 +453,8 @@ getStackSize = getStackSize' . taskModifiers
     getStackSize' ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
     getStackSize' (_ : modifiers) = getStackSize' modifiers
 
-isUnprotected :: ProcedureSeman a -> Bool
-isUnprotected (ProcedureSeman _ _ modifiers)= isUnprotected' modifiers
+isUnprotected :: TPResource a -> Bool
+isUnprotected (TPResource _ _ _ modifiers _ _) = isUnprotected' modifiers
 
   where
 

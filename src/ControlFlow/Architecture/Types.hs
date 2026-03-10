@@ -169,6 +169,9 @@ data TPResource a = TPResource {
     -- that is connected to the port.
     resAPConnections :: Map Identifier (Identifier, a),
 
+    -- | List of the modifiers of the resource
+    resModifiers :: [Modifier a],
+
     -- | Name of the module that instantiates the resource or 
     -- Nothing if it is an internal resource
     resourceModule :: Maybe QualifiedName,
