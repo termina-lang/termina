@@ -169,28 +169,55 @@ getOpStepName (TRPTaskOperation stepName _ _ _ _ _ _ _) = stepName
 getOpStepName (TRPHandlerOperation stepName _ _ _ _ _ _ _) = stepName
 getOpStepName op = error $ "getOpStepName: unsupported operation type for extracting step name: " ++ show op
 
-mergeComparable :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
-mergeComparable = foldl' insertOrMerge []
-  where
+filterOperations :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
+filterOperations = foldl' filterOp []
 
-    insertOrMerge acc x =
-      case extractComparable x acc of
-        Nothing           -> x : acc
-        Just (match, rest) -> insertOrMerge rest (merge x match)
+    where
 
-    extractComparable _ [] = Nothing
-    extractComparable x (y:ys)
-      | comparable x y = Just (y, ys)
-      | otherwise = case extractComparable x ys of
-          Nothing        -> Nothing
-          Just (m, rest) -> Just (m, y : rest)
+        filterOp acc x =
+            case extractEqual x acc of
+                Nothing -> x : acc
+                Just (match, rest) -> 
+                    let matchWcet = getOpWCET match 
+                        newWcet = getOpWCET x
+                        newOp = if newWcet > matchWcet then x else match
+                    in
+                        newOp : rest
 
-    comparable a b =
-      let sa = getOpSet a
-          sb = getOpSet b
-      in  sa `S.isSubsetOf` sb || sb `S.isSubsetOf` sa
+        extractEqual _ [] = Nothing
+        extractEqual x (y:ys) =
+            if sameResourceLocking x y then Just (y, ys)
+            else 
+                case extractEqual x ys of
+                    Nothing        -> Nothing
+                    Just (m, rest) -> Just (m, y : rest)
 
-    merge a b =
-      let bigger = if getOpSet a `S.isSubsetOf` getOpSet b then b else a
-          maxWCET = max (getOpWCET a) (getOpWCET b)
-      in  setOpWCET maxWCET bigger
+        sameResourceLocking op1 op2 = getOpSet op1 == getOpSet op2
+
+mergeOperations :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
+mergeOperations = foldl' insertOrMerge []
+
+    where
+
+        insertOrMerge acc x =
+            case extractComparable x acc of
+                Nothing           -> x : acc
+                Just (match, rest) -> insertOrMerge rest (merge x match)
+
+        extractComparable _ [] = Nothing
+        extractComparable x (y:ys) =
+            if comparable x y then Just (y, ys)
+            else 
+                case extractComparable x ys of
+                    Nothing        -> Nothing
+                    Just (m, rest) -> Just (m, y : rest)
+
+        comparable a b =
+            let sa = getOpSet a
+                sb = getOpSet b
+            in  sa `S.isSubsetOf` sb || sb `S.isSubsetOf` sa
+
+        merge a b =
+            let bigger = if getOpSet a `S.isSubsetOf` getOpSet b then b else a
+                maxWCET = max (getOpWCET a) (getOpWCET b)
+            in  setOpWCET maxWCET bigger

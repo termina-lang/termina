@@ -66,6 +66,12 @@ import EFP.Schedulability.MAST.AST
 import System.IO.Error
 import qualified Data.List as L
 
+data MASTModelOptimization =
+    NoOptimization
+    | FilterOperations
+    | MergeOperations
+    deriving (Show, Eq)
+
 -- | Data type for the "sched" command arguments
 data SchedCmdArgs =
     SchedCmdArgs
@@ -74,8 +80,14 @@ data SchedCmdArgs =
         Bool -- ^ Generate PlantUML diagrams
         Bool -- ^ Write intermediate RT model
         Bool -- ^ Write MAST models
+        MASTModelOptimization
     deriving (Show,Eq)
 
+parseOptimization :: String -> Either String MASTModelOptimization
+parseOptimization "none" = Right NoOptimization
+parseOptimization "filter" = Right FilterOperations
+parseOptimization "merge" = Right MergeOperations
+parseOptimization _ = Left "Invalid optimization option"
 
 -- | Parser for the "sched" command arguments
 schedCmdArgsParser :: O.Parser SchedCmdArgs
@@ -91,6 +103,12 @@ schedCmdArgsParser = SchedCmdArgs
         <> O.help "Write intermediate RT model after type checking and flattening")
     <*> O.switch (O.long "write-mast-models"
         <> O.help "Write MAST models for all generated scheduling scenarios")
+    <*> O.option (O.eitherReader parseOptimization)
+         (O.long "optimization"
+         <> O.short 'o'
+         <> O.value NoOptimization
+         <> O.showDefaultWith (const "none")
+         <> O.help "Specify the type of optimization to apply (none, filter, merge)")
 
 loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
@@ -318,13 +336,13 @@ typeWCEPathModules arch bbProject pathProject =
           TIO.putStrLn (toText err pathFilesMap) >> exitFailure
         (Right newMap) -> return newMap
 
-genPlantUMLModels :: TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
-genPlantUMLModels config sitMap trPathMap = do
+genPlantUMLModels :: MASTModelOptimization -> TerminaConfig -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
+genPlantUMLModels optimization config sitMap trPathMap = do
   let destinationPath = outputFolder config </> efpFolder config
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
       let base = destinationPath </> situationName 
-      pickedEvents <- concat <$> mapM (genPickedEvents trPathMap) (M.elems evMap) 
+      pickedEvents <- concat <$> mapM (genPickedEvents optimization trPathMap) (M.elems evMap) 
       mapM_ (genPlantUMLModelForTransaction base) pickedEvents
     _ -> putStrLn (errorMessage "Unexpected RT element when generating PlantUML diagrams for transactional paths") >> exitFailure
 
@@ -359,47 +377,54 @@ writeIntermediateRTModel rtModelFile config flatTrMap sitMap = do
     createDirectoryIfMissing True (takeDirectory targetFile)
     TIO.writeFile targetFile (runRTPrinter (M.elems flatTrMap ++ M.elems sitMap))
 
-genPickedEvents :: TransPathMap TRPSemAnn
+genPickedEvents :: MASTModelOptimization
+  -> TransPathMap TRPSemAnn
   -> RTEvent RTSemAnn
   -> IO [SelectedEvent TRPSemAnn]
-genPickedEvents trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
+genPickedEvents optimization trPathMap (RTEventBursty eventId emitterId transactionId interval (TInteger arrivals _) deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
         let totalEvents = product (map length (M.elems opMap))
-        let filteredOpMap = mergeComparable <$> opMap
-        let numPickedEvents = product (map length (M.elems filteredOpMap))
+        let finalOpMap = case optimization of
+                            NoOptimization -> opMap
+                            FilterOperations -> filterOperations <$> opMap
+                            MergeOperations -> mergeOperations <$> opMap
+        let numPickedEvents = product (map length (M.elems finalOpMap))
             width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
         putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
         zipWithM (\stMap idx ->
               return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
-            ) (sequenceA filteredOpMap) [0 :: Integer ..]
+            ) (sequenceA finalOpMap) [0 :: Integer ..]
     Just _ -> 
       putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
     Nothing -> 
       putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
-genPickedEvents trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
+genPickedEvents optimization trPathMap (RTEventPeriodic eventId emitterId transactionId deadlines _) =
   case M.lookup transactionId trPathMap of
     Just (SimpleTransactionPath initialStep opMap _) -> do
       let totalEvents = product (map length (M.elems opMap))
-      let filteredOpMap = mergeComparable <$> opMap
-      let numPickedEvents = product (map length (M.elems filteredOpMap))
+      let finalOpMap = case optimization of
+                          NoOptimization -> opMap
+                          FilterOperations -> filterOperations <$> opMap
+                          MergeOperations -> mergeOperations <$> opMap
+      let numPickedEvents = product (map length (M.elems finalOpMap))
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
       putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
       zipWithM (\stMap idx ->
             return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
-          ) (sequenceA filteredOpMap) [0 :: Integer ..]
+          ) (sequenceA finalOpMap) [0 :: Integer ..]
     Just _ -> 
       putStrLn (errorMessage $ "Invalid transactional path for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
     Nothing -> 
       putStrLn (errorMessage $ "No transactional path found for transaction " ++ transactionId ++ " when generating picked events") >> exitFailure
 
-writeMASTModels :: TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
-writeMASTModels config arch sitMap trPathMap = do
+writeMASTModels :: MASTModelOptimization -> TerminaConfig -> TerminaProgArch SemanticAnn -> RTSituationMap RTSemAnn -> TransPathMap TRPSemAnn -> IO ()
+writeMASTModels optimization config arch sitMap trPathMap = do
   let destinationPath = outputFolder config </> efpFolder config
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
       let base = destinationPath </> situationName
-      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap)
+      pickedEvents <- mapM (genPickedEvents optimization trPathMap) (M.elems evMap)
       let numPickedEvents = numCombos pickedEvents
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
       putStrLn . infoMessage $ "Generating scheduling models for situation " ++ situationName
@@ -510,19 +535,21 @@ runMASTAnalyzer base modelName model = do
         xs   -> last xs == "Final analysis status: DONE"
 
 genMASTModels
-  :: TerminaConfig
+  :: 
+  MASTModelOptimization
+  -> TerminaConfig
   -> TerminaProgArch SemanticAnn
   -> RTSituationMap RTSemAnn
   -> TransPathMap TRPSemAnn
   -> IO ()
-genMASTModels config arch sitMap trPathMap = do
+genMASTModels optimization config arch sitMap trPathMap = do
   let destinationPath = outputFolder config </> efpFolder config
 
   forM_ (M.elems sitMap) $ \case
     RTSituation situationName evMap (RTSitTy _) -> do
       let base = destinationPath </> situationName
 
-      pickedEvents <- mapM (genPickedEvents trPathMap) (M.elems evMap)
+      pickedEvents <- mapM (genPickedEvents optimization trPathMap) (M.elems evMap)
       let total = numCombos pickedEvents
           width = length (show (max 0 (total - 1)))
           parN   = min 4 total
@@ -628,7 +655,7 @@ genMASTModels config arch sitMap trPathMap = do
 
 -- | Command handler for the "sched" command
 schedCommand :: SchedCmdArgs -> IO ()
-schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST) = do
+schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT writeMAST optimization) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -727,11 +754,11 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     when writeIntermediateRT $ writeIntermediateRTModel rtModelFile config flatTrMap sitMap
     when chatty (putStrLn . debugMessage $ "Generating transactional paths")
     trPathMap <- mapM (genTransPath typedRTModule pathProject programArchitecture config wcepMap wcetMap) flatTrMap
-    when plantUML (genPlantUMLModels config sitMap trPathMap)
+    when plantUML (genPlantUMLModels optimization config sitMap trPathMap)
     if writeMAST then (do
       when chatty (putStrLn . debugMessage $ "Writing MAST models")
-      writeMASTModels config programArchitecture sitMap trPathMap)
+      writeMASTModels optimization config programArchitecture sitMap trPathMap)
     else (do
       when chatty (putStrLn . debugMessage $ "Performing schedulability analysis")
-      genMASTModels config programArchitecture sitMap trPathMap 
+      genMASTModels optimization config programArchitecture sitMap trPathMap 
       when chatty (putStrLn . debugMessage $ "Schedulability analysis completed"))
