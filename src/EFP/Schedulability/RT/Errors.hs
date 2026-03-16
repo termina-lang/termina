@@ -79,7 +79,7 @@ data Error
     | EFlatConditionalExpressionOutOfRange Integer Location -- ^ Conditional expression out of range in flattening
     | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression
     | EInvalidEmitterFieldType -- ^ Invalid emitter field type
-    | EInvalidIntervalValue Integer -- ^ Invalid interval value
+    | EInvalidIntervalValue -- ^ Invalid interval value
     | EInvalidIntervalExpression -- ^ Invalid interval expression
     | EInvalidArrivalsValue Integer -- ^ Invalid arrivals value
     | EInvalidDeadlineValue Double -- ^ Invalid deadline value
@@ -437,10 +437,10 @@ instance ErrorMessage RTErrors where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just "Invalid emitter field type. Expected a multiple field assignment.")
-                EInvalidIntervalValue value ->
+                EInvalidIntervalValue ->
                     pprintSimpleError
                         sourceLines title fileName pos
-                        (Just ("Invalid interval value \x1b[31m" <> T.pack (show value) <> "\x1b[0m. Interval must be a positive integer."))
+                        (Just "Invalid interval value. Interval must be a positive number.")
                 EInvalidArrivalsValue value ->
                     pprintSimpleError
                         sourceLines title fileName pos

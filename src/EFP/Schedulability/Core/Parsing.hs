@@ -115,7 +115,7 @@ parensConstExprParser :: SchedParser (ConstExpression ParserAnn)
 parensConstExprParser = parens constExpressionParser
 
 decIntOrFloat :: SchedParser (Either Integer Double)
-decIntOrFloat = try float <|> (Left <$> decimal)
+decIntOrFloat = try (float <* wspcs) <|> (Left <$> decimal)
   where
     digits1 = many1 digit
 
