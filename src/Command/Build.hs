@@ -47,9 +47,9 @@ import Text.Read
 import Data.Char
 
 
-data CmpDiagramParam = 
-  CmpDiagramParamRange CmpDiagramRange 
-  | CmpDiagramParamFlag 
+data CmpDiagramParam =
+  CmpDiagramParamRange CmpDiagramRange
+  | CmpDiagramParamFlag
    deriving Show
 
 
@@ -92,7 +92,7 @@ buildCmdArgsParser = BuildCmdArgs
             ( O.long "gen-component-diagram"
           <> O.help "Use --gen-component-diagram"
             )
-    
+
     parseCmpDiagramParam :: String -> Either String CmpDiagramRange
     parseCmpDiagramParam s =
       case break (== ':') (trim s) of
@@ -113,7 +113,7 @@ buildCmdArgsParser = BuildCmdArgs
             then Left "Expected a non-empty list before ':' (e.g. a,b:2)"
             else case readMaybe (trim right) of
                   Nothing -> Left "Expected an integer after ':' (e.g. a,b:2)"
-                  Just n  -> 
+                  Just n  ->
                     if n <= 0
                       then Left "Depth must be a positive integer"
                       else Right (CmpDiagramRange xs (Just n))
@@ -142,24 +142,25 @@ monadicTypesMapModules = foldl' monadicTypesMapModule emptyMonadicTypes  . M.ele
   where
     monadicTypesMapModule :: MonadicTypes -> TypedModule -> MonadicTypes
     monadicTypesMapModule prevMap typedModule = runMapMonadicTypesAnnotatedProgram prevMap (typedAST . metadata $ typedModule)
-  
+
 genTWCEPFiles ::
   TerminaConfig
   -> BasicBlocksProject
   -> IO ()
 genTWCEPFiles params bbProject = do
-  mapM_ printWCEPModule (M.elems bbProject) 
+  mapM_ printWCEPModule (M.elems bbProject)
 
   where
 
     printWCEPModule :: BasicBlocksModule -> IO ()
-    printWCEPModule bbModule = do
-      let destinationPath = efpFolder params
-          twcepFile = destinationPath </> qualifiedName bbModule <.> "twcep"
-          bbAST = basicBlocksAST . metadata $ bbModule
-          wceps = genTransactionalWCEPS bbAST
-      createDirectoryIfMissing True (takeDirectory twcepFile)
-      TIO.writeFile twcepFile $ runWCEPathPrinter wceps
+    printWCEPModule bbModule =
+      let bbAST = basicBlocksAST . metadata $ bbModule
+          wceps = genTransactionalWCEPS bbAST in
+      (unless (null wceps) $ do
+        let destinationPath = efpFolder params
+            twcepFile = destinationPath </> qualifiedName bbModule <.> "twcep"
+        createDirectoryIfMissing True (takeDirectory twcepFile)
+        TIO.writeFile twcepFile $ runWCEPathPrinter wceps)
 
 genComponentDiagramFile ::
   TerminaConfig
@@ -475,7 +476,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         TEnum _ -> False;
         _ -> True;
         }) . resultTypes $ monadicTypes)) $ genResultHeaderFile config plt monadicTypes bbProject (qualifiedName appModule)
-    when genTransactionalWCEPs $ 
+    when genTransactionalWCEPs $
       when chatty (putStrLn . debugMessage $ "Generating transactional worst-case execution paths") >>
       genTWCEPFiles config bbProject
     case genCmpDiag of
