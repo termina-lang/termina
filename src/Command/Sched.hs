@@ -68,7 +68,7 @@ import qualified Data.List as L
 
 data MASTModelReduction =
     NoReduction
-    | FilterOperations
+    | GroupOperations
     | MergeOperations
     deriving (Show, Eq)
 
@@ -85,7 +85,7 @@ data SchedCmdArgs =
 
 parseReduction :: String -> Either String MASTModelReduction
 parseReduction "none" = Right NoReduction
-parseReduction "filter" = Right FilterOperations
+parseReduction "group" = Right GroupOperations
 parseReduction "merge" = Right MergeOperations
 parseReduction _ = Left "Invalid reduction option"
 
@@ -108,7 +108,7 @@ schedCmdArgsParser = SchedCmdArgs
          <> O.short 'r'
          <> O.value NoReduction
          <> O.showDefaultWith (const "none")
-         <> O.help "Specify the type of reduction to apply (none, filter, merge)")
+         <> O.help "Specify the type of reduction to apply (none, group, merge)")
 
 loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
@@ -387,7 +387,7 @@ genPickedEvents reduction trPathMap (RTEventBursty eventId emitterId transaction
         let totalEvents = product (map length (M.elems opMap))
         let finalOpMap = case reduction of
                             NoReduction -> opMap
-                            FilterOperations -> filterOperations <$> opMap
+                            GroupOperations -> groupOperations <$> opMap
                             MergeOperations -> mergeOperations <$> opMap
         let numPickedEvents = product (map length (M.elems finalOpMap))
             width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
@@ -408,7 +408,7 @@ genPickedEvents reduction trPathMap (RTEventPeriodic eventId emitterId transacti
       let totalEvents = product (map length (M.elems opMap))
       let finalOpMap = case reduction of
                           NoReduction -> opMap
-                          FilterOperations -> filterOperations <$> opMap
+                          GroupOperations -> groupOperations <$> opMap
                           MergeOperations -> mergeOperations <$> opMap
       let numPickedEvents = product (map length (M.elems finalOpMap))
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))

@@ -169,8 +169,8 @@ getOpStepName (TRPTaskOperation stepName _ _ _ _ _ _ _) = stepName
 getOpStepName (TRPHandlerOperation stepName _ _ _ _ _ _ _) = stepName
 getOpStepName op = error $ "getOpStepName: unsupported operation type for extracting step name: " ++ show op
 
-filterOperations :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
-filterOperations = foldl' filterOp []
+groupOperations :: [TRPOperation TRPSemAnn] -> [TRPOperation TRPSemAnn]
+groupOperations = foldl' filterOp []
 
     where
 
