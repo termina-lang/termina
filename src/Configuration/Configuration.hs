@@ -106,7 +106,7 @@ instance ToJSON TerminaConfig where
             <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
             -- We only serialize the platform flags corresponding to the selected platform
             <> case prjPlatform of
-                "rtems5-leon3-qemu"      -> ["platform-flags" .= object ["rtems5-leon3-qemu"      .= rtems5_leon3_qemu      prjPlatformFlags]]
+                "rtems5-leon3-nexysa7"      -> ["platform-flags" .= object ["rtems5-leon3-nexysa7"      .= rtems5_leon3_nexysa7      prjPlatformFlags]]
                 "freertos10-stm32l432xx" -> ["platform-flags" .= object ["freertos10-stm32l432xx" .= freertos10_stm32l432xx prjPlatformFlags]]
                 _ -> []
 
