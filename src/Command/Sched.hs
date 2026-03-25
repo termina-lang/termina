@@ -391,7 +391,10 @@ genPickedEvents reduction trPathMap (RTEventBursty eventId emitterId transaction
                             MergeOperations -> mergeOperations <$> opMap
         let numPickedEvents = product (map length (M.elems finalOpMap))
             width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
-        putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
+            reductionMsg = case reduction of
+                            NoReduction -> ""
+                            _ -> ", after reduction: " ++ show numPickedEvents
+        putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ reductionMsg
         zipWithM (\stMap idx ->
               return $ SelectedEventBursty eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap interval arrivals deadlines
             ) (sequenceA finalOpMap) [0 :: Integer ..]
@@ -409,7 +412,10 @@ genPickedEvents reduction trPathMap (RTEventPeriodic eventId emitterId transacti
                           MergeOperations -> mergeOperations <$> opMap
       let numPickedEvents = product (map length (M.elems finalOpMap))
           width_pickedEvents = length (show (max 0 (numPickedEvents - 1)))
-      putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ ", after filtering: " ++ show numPickedEvents
+          reductionMsg = case reduction of
+                          NoReduction -> ""
+                          _ -> ", after reduction: " ++ show numPickedEvents
+      putStrLn $ "Generating picked events for transaction " ++ transactionId ++ " -> total combinations: " ++ show totalEvents ++ reductionMsg
       zipWithM (\stMap idx ->
             return $ SelectedEventPeriodic eventId emitterId (transactionId ++ "__" ++ printf "%0*d" width_pickedEvents idx) initialStep stMap deadlines
           ) (sequenceA finalOpMap) [0 :: Integer ..]
