@@ -537,83 +537,83 @@ typeTypeSpecifier :: Location
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -> PAST.TypeSpecifier ParserAnn 
   -> SemanticMonad (SAST.TerminaType SemanticAnn)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Allocator" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TAllocator <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAllocator <$> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Allocator" [typeArg]) = 
+  case typeArg of
+    TypeArgIdentifier ident -> TAllocator <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> TAllocator <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicAccess" [typeParam]) =
-  case typeParam of
-    TypeParamIdentifier ident -> TAtomicAccess <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAtomicAccess <$> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicAccess" [typeArg]) =
+  case typeArg of
+    TypeArgIdentifier ident -> TAtomicAccess <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> TAtomicAccess <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArrayAccess" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArrayAccess" [typeArg, sizeArg]) = do
+  tyTypeArg <- case typeArg of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
-    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  tySizeArg <- case sizeArg of
+    TypeArgIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeArgSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TAtomicArrayAccess tyTypeParam tySizeParam
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Atomic" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TAtomic <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TAtomic <$> typeTypeSpecifier loc typeObj ts'
+  return $ TAtomicArrayAccess tyTypeArg tySizeArg
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Atomic" [typeArg]) = 
+  case typeArg of
+    TypeArgIdentifier ident -> TAtomic <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> TAtomic <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArray" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "AtomicArray" [typeArg, sizeArg]) = do
+  tyTypeArg <- case typeArg of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
-    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  tySizeArg <- case sizeArg of
+    TypeArgIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeArgSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TAtomicArray tyTypeParam tySizeParam
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Option" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TOption <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TOption <$> typeTypeSpecifier loc typeObj ts'
+  return $ TAtomicArray tyTypeArg tySizeArg
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Option" [typeArg]) = 
+  case typeArg of
+    TypeArgIdentifier ident -> TOption <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> TOption <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Result" [typeParamOk, typeParamError]) = do
-  tyOk <- case typeParamOk of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Result" [typeArgOk, typeArgError]) = do
+  tyOk <- case typeArgOk of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tyError <- case typeParamError of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+  tyError <- case typeArgError of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
   return $ TResult tyOk tyError  
 typeTypeSpecifier loc _ ts@(TSDefinedType "Result" _) =
   throwError $ annotateError loc (EInvalidResultTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Status" [typeParam]) = 
-  case typeParam of
-    TypeParamIdentifier ident -> TStatus <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> TStatus <$> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Status" [typeArg]) = 
+  case typeArg of
+    TypeArgIdentifier ident -> TStatus <$> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> TStatus <$> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "MsgQueue" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "MsgQueue" [typeArg, sizeArg]) = do
+  tyTypeArg <- case typeArg of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
-    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  tySizeArg <- case sizeArg of
+    TypeArgIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeArgSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TMsgQueue tyTypeParam tySizeParam
-typeTypeSpecifier loc typeObj ts@(TSDefinedType "Pool" [typeParam, sizeParam]) = do
-  tyTypeParam <- case typeParam of
-    TypeParamIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
-    TypeParamTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
+  return $ TMsgQueue tyTypeArg tySizeArg
+typeTypeSpecifier loc typeObj ts@(TSDefinedType "Pool" [typeArg, sizeArg]) = do
+  tyTypeArg <- case typeArg of
+    TypeArgIdentifier ident -> typeTypeSpecifier loc typeObj (TSDefinedType ident [])
+    TypeArgTypeSpec ts' -> typeTypeSpecifier loc typeObj ts'
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  tySizeParam <- case sizeParam of
-    TypeParamIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
-    TypeParamSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
+  tySizeArg <- case sizeArg of
+    TypeArgIdentifier ident ->  typeExpression (Just (TConstSubtype TUSize)) typeObj (AccessObject (Variable ident loc))
+    TypeArgSize s -> typeExpression (Just (TConstSubtype TUSize)) typeObj s
     _ -> throwError $ annotateError loc (EInvalidTypeSpecifier ts)
-  return $ TPool tyTypeParam tySizeParam
+  return $ TPool tyTypeArg tySizeArg
 typeTypeSpecifier loc typeObj (TSArray ts s) = do
   ty <- typeTypeSpecifier loc typeObj ts
   arraySize <- catchMismatch loc EArrayIndexNotUSize 

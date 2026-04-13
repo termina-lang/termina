@@ -264,12 +264,12 @@ data Block a
   deriving (Show, Functor)
 
 ----------------------------------------
-type TypeParameter = TypeParameter' Expression
+type TypeArgument = TypeArgument' Expression
 
-instance ShowText (TypeParameter a) where
-    showText (TypeParamIdentifier ident) = T.pack ident
-    showText (TypeParamTypeSpec ts) = showText ts
-    showText (TypeParamSize size) = showText size
+instance ShowText (TypeArgument a) where
+    showText (TypeArgIdentifier ident) = T.pack ident
+    showText (TypeArgTypeSpec ts) = showText ts
+    showText (TypeArgSize size) = showText size
 
 type TypeSpecifier = TypeSpecifier' Expression
 

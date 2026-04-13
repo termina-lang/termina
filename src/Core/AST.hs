@@ -115,11 +115,11 @@ data Modifier' ty a = Modifier Identifier (Maybe (Const' ty a))
 -- | Identifiers as `String`
 type Identifier = String
 
-data TypeParameter' expr a =
+data TypeArgument' expr a =
   -- | Identifier that might be a defined type or a constant
-  TypeParamIdentifier Identifier
-  | TypeParamTypeSpec (TypeSpecifier' expr a)
-  | TypeParamSize (expr a)
+  TypeArgIdentifier Identifier
+  | TypeArgTypeSpec (TypeSpecifier' expr a)
+  | TypeArgSize (expr a)
   deriving (Show, Ord, Eq, Functor)
 
 data TypeSpecifier' expr a
@@ -127,7 +127,7 @@ data TypeSpecifier' expr a
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
   | TSBool | TSChar
   | TSConstSubtype (TypeSpecifier' expr a)
-  | TSDefinedType Identifier [TypeParameter' expr a]
+  | TSDefinedType Identifier [TypeArgument' expr a]
   | TSArray (TypeSpecifier' expr a) (expr a)
   -- Non-primitive types
   | TSReference AccessKind (TypeSpecifier' expr a)

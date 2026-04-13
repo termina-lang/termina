@@ -209,18 +209,17 @@ hexadecimal = Tok.lexeme lexer $
 -- TerminaParser
 ----------------------------------------
 
-typeParamParser :: TerminaParser (TypeParameter ParserAnn)
-typeParamParser = do
-  TypeParamIdentifier <$> identifierParser
-  <|> TypeParamTypeSpec <$> typeSpecifierParser
-  <|> TypeParamSize <$> expressionTermParser
+typeArgParser :: TerminaParser (TypeArgument ParserAnn)
+typeArgParser = do
+  TypeArgIdentifier <$> identifierParser
+  <|> TypeArgTypeSpec <$> typeSpecifierParser
+  <|> TypeArgSize <$> expressionTermParser
 
---  (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi)  semi)
 definedTypeParser :: TerminaParser (TypeSpecifier ParserAnn)
 definedTypeParser = do
   name <- identifierParser
-  typeParams <- option [] (angles (sepBy (wspcs *> typeParamParser <* wspcs) semi))
-  return $ TSDefinedType name typeParams
+  typeArgs <- option [] (angles (sepBy (wspcs *> typeArgParser <* wspcs) semi))
+  return $ TSDefinedType name typeArgs
 
 -- | Types
 typeSpecifierParser :: TerminaParser (TypeSpecifier ParserAnn)
