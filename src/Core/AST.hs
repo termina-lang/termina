@@ -85,7 +85,7 @@ data AnnASTElement' ty blk expr a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' ty blk a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' ty blk expr a) -- ^ the type definition (struct, union, etc.)
     a
   deriving (Show, Functor)
 
@@ -122,6 +122,20 @@ data TypeArgument' expr a =
   | TypeArgSize (expr a)
   deriving (Show, Ord, Eq, Functor)
 
+instance (ShowText (expr a)) => ShowText (TypeArgument' expr a) where
+    showText (TypeArgIdentifier ident) = T.pack ident
+    showText (TypeArgTypeSpec ts) = showText ts
+    showText (TypeArgSize size) = showText size
+
+data TypeParameter' expr a =
+  TypeParamIdentifier Identifier
+  | TypeParamTypeSpec (TypeSpecifier' expr a)
+  deriving (Show, Ord, Eq, Functor)
+
+instance (ShowText (expr a)) => ShowText (TypeParameter' expr a) where
+    showText (TypeParamIdentifier ident) = T.pack ident
+    showText (TypeParamTypeSpec ts) = showText ts
+
 data TypeSpecifier' expr a
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
@@ -142,15 +156,40 @@ data TypeSpecifier' expr a
   | TSUnit
   deriving (Show, Ord, Eq, Functor)
 
+instance (ShowText (expr a)) => ShowText (TypeSpecifier' expr a) where
+    showText TSUInt8 = "u8"
+    showText TSUInt16 = "u16"
+    showText TSUInt32 = "u32"
+    showText TSUInt64 = "u64"
+    showText TSInt8 = "i8"
+    showText TSInt16 = "i16"
+    showText TSInt32 = "i32"
+    showText TSInt64 = "i64"
+    showText TSUSize = "usize"
+    showText TSBool = "bool"
+    showText TSChar = "char"
+    showText (TSConstSubtype ts) = "const " <> showText ts
+    showText (TSDefinedType ident []) = T.pack ident
+    showText (TSDefinedType ident args) = T.pack ident <> "<" <> T.intercalate ", " (map showText args) <> ">"
+    showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
+    showText (TSReference ak ts) = "&" <> showText ak <> showText ts
+    showText (TSBoxSubtype ts) = "box " <> showText ts
+    showText (TSLocation ts) = "loc " <> showText ts
+    showText (TSAccessPort ts) = "access " <> showText ts
+    showText (TSSinkPort ts ident) = "sink " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSInPort ts ident) = "in " <> showText ts <> " triggers " <> T.pack ident
+    showText (TSOutPort ts) = "out " <> showText ts
+    showText TSUnit = "unit"
+
 -- | Termina types
 data TerminaType' expr a
   -- Primitive types
   = TUInt8 | TUInt16 | TUInt32 | TUInt64
   | TInt8 | TInt16 | TInt32 | TInt64 | TUSize
   | TBool | TChar
-  | TStruct Identifier
-  | TEnum Identifier
-  | TInterface InterfaceKind Identifier
+  | TStruct Identifier [TypeArgument' expr a]
+  | TEnum Identifier [TypeArgument' expr a]
+  | TInterface InterfaceKind Identifier [TypeArgument' expr a]
   | TArray (TerminaType' expr a) (expr a)
   -- Built-in polymorphic types
   | TOption (TerminaType' expr a)
@@ -177,10 +216,10 @@ data TerminaType' expr a
   -- | Unit type
   | TUnit
   -- | Global object types
-  | TGlobal ClassKind Identifier
+  | TGlobal ClassKind Identifier [TypeArgument' expr a]
   deriving (Show, Functor)
 
-instance Eq (TerminaType' expr a) where
+instance Eq (expr a) => Eq (TerminaType' expr a) where
   TUInt8 == TUInt8 = True
   TUInt16 == TUInt16 = True
   TUInt32 == TUInt32 = True
@@ -192,15 +231,19 @@ instance Eq (TerminaType' expr a) where
   TUSize == TUSize = True
   TBool == TBool = True
   TChar == TChar = True
-  TStruct ident == TStruct ident' = ident == ident'
-  TEnum ident == TEnum ident' = ident == ident'
+  TStruct ident largs == TStruct ident' rargs = 
+    ident == ident' && 
+    -- Compare type arguments pairwise, ensuring they are of the same length and all corresponding arguments are equal
+    length largs == length rargs && 
+    all (uncurry (==)) (zip largs rargs)
+  TEnum ident largs == TEnum ident' rargs = ident == ident' && largs == rargs
   TUnit == TUnit = True
   _ == _ = False
 
 -- | We define an ordering for Termina types to be able to use them as keys in maps and sets.
 -- The comparison is only supported for basic types, struct and enum types. 
 -- For other types, we return EQ.
-instance Ord (TerminaType' expr a) where
+instance  Ord (expr a) => Ord (TerminaType' expr a) where
   compare t1 t2 = compare (typeTag t1) (typeTag t2) <> compareSame t1 t2
     where
 
@@ -216,12 +259,13 @@ instance Ord (TerminaType' expr a) where
       typeTag TUSize = 8
       typeTag TBool = 9
       typeTag TChar = 10
-      typeTag (TStruct _) = 11
-      typeTag (TEnum _) = 12
-      typeTag TUnit = 13
-      typeTag _ = 14
+      typeTag (TStruct _ _) = 11
+      typeTag (TEnum _ _) = 12
+      typeTag (TInterface {}) = 13
+      typeTag TUnit = 14
+      typeTag _ = 15
 
-      compareSame :: TerminaType' expr a -> TerminaType' expr a -> Ordering
+      compareSame :: Ord (expr a) => TerminaType' expr a -> TerminaType' expr a -> Ordering
       compareSame TUInt8 TUInt8 = EQ
       compareSame TUInt16 TUInt16 = EQ
       compareSame TUInt32 TUInt32 = EQ
@@ -233,8 +277,12 @@ instance Ord (TerminaType' expr a) where
       compareSame TUSize TUSize = EQ
       compareSame TBool TBool = EQ
       compareSame TChar TChar = EQ
-      compareSame (TStruct id1) (TStruct id2) = compare id1 id2
-      compareSame (TEnum id1) (TEnum id2) = compare id1 id2
+      compareSame (TStruct id1 largs) (TStruct id2 rargs) = 
+        compare id1 id2 <> 
+        -- Compare type arguments pairwise, ensuring they are of the same length
+        compare (length largs) (length rargs) <>
+        mconcat (zipWith compare largs rargs)
+      compareSame (TEnum id1 _) (TEnum id2 _) = compare id1 id2
       compareSame TUnit TUnit = EQ
       compareSame _ _ = EQ  -- Different constructors, already handled by typeTag
 
@@ -252,10 +300,14 @@ instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
     showText TBool = "bool"
     showText TChar = "char"
     showText (TConstSubtype ts) = "const " <> showText ts
-    showText (TStruct ident) = T.pack ident
-    showText (TEnum ident) = T.pack ident
-    showText (TInterface _ ident) = T.pack ident
-    showText (TGlobal _ ident) = T.pack ident
+    showText (TStruct ident []) = T.pack ident
+    showText (TStruct ident args) = T.pack ident <> "<" <> T.intercalate ", " (map showText args) <> ">"
+    showText (TEnum ident []) = T.pack ident
+    showText (TEnum ident args) = T.pack ident <> "<" <> T.intercalate ", " (map showText args) <> ">"
+    showText (TInterface _ ident []) = T.pack ident
+    showText (TInterface _ ident args) = T.pack ident <> "<" <> T.intercalate ", " (map showText args) <> ">"
+    showText (TGlobal _ ident []) = T.pack ident
+    showText (TGlobal _ ident args) = T.pack ident <> "<" <> T.intercalate ", " (map showText args) <> ">"
     showText (TArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TOption ty) = "Option<" <> showText ty <> ">"
     showText (TResult tyOk tyError) = "Result<" <> showText tyOk <> "; " <> showText tyError <> ">"
@@ -432,23 +484,23 @@ instance Annotated (Global' ty expr) where
   updateAnnotation (ConstExpr n t i m _) = ConstExpr n t i m
 
 -- Extremelly internal type definition
-data TypeDef' ty blk a
-  = Struct Identifier [FieldDefinition' ty a]  [Modifier' ty a]
-  | Enum Identifier [EnumVariant' ty a] [Modifier' ty a]
-  | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty a]
-  | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty a] [Modifier' ty a]
+data TypeDef' ty blk expr a
+  = Struct Identifier [TypeParameter' expr a] [FieldDefinition' ty a]  [Modifier' ty a]
+  | Enum Identifier [TypeParameter' expr a] [EnumVariant' ty a] [Modifier' ty a]
+  | Class ClassKind Identifier [TypeParameter' expr a] [ClassMember' ty blk a] [Identifier] [Modifier' ty a]
+  | Interface InterfaceKind Identifier [TypeParameter' expr a] [Identifier] [InterfaceMember' ty a] [Modifier' ty a]
   deriving (Show, Functor)
 
-instance ShowText (TypeDef' ty blk a) where
-    showText (Struct ident _ _) = T.pack $ "struct " <> ident
-    showText (Enum ident _ _) = T.pack $ "enum " <> ident
-    showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
-    showText (Class ResourceClass ident _ _ _) = T.pack $ "resource class " <> ident
-    showText (Class HandlerClass ident _ _ _) = T.pack $ "handler class " <> ident
-    showText (Class EmitterClass ident _ _ _) = T.pack $ "emitter class " <> ident
-    showText (Class ChannelClass ident _ _ _) = T.pack $ "channel class " <> ident
-    showText (Interface RegularInterface ident _ _ _) = T.pack $ "interface " <> ident
-    showText (Interface SystemInterface ident _ _ _) = T.pack $ "system interface " <> ident
+instance ShowText (TypeDef' ty blk expr a) where
+    showText (Struct ident _ _ _) = T.pack $ "struct " <> ident
+    showText (Enum ident _ _ _) = T.pack $ "enum " <> ident
+    showText (Class TaskClass ident _ _ _ _) = T.pack $ "task class " <> ident
+    showText (Class ResourceClass ident _ _ _ _) = T.pack $ "resource class " <> ident
+    showText (Class HandlerClass ident _ _ _ _) = T.pack $ "handler class " <> ident
+    showText (Class EmitterClass ident _ _ _ _) = T.pack $ "emitter class " <> ident
+    showText (Class ChannelClass ident _ _ _ _) = T.pack $ "channel class " <> ident
+    showText (Interface RegularInterface ident _ _ _ _) = T.pack $ "interface " <> ident
+    showText (Interface SystemInterface ident _ _ _ _) = T.pack $ "system interface " <> ident
 
 data InterfaceKind = RegularInterface | SystemInterface
   deriving (Show, Ord, Eq)

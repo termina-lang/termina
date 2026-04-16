@@ -17,8 +17,8 @@ copyTy TInt64           = True
 copyTy TUSize           = True
 copyTy TBool            = True
 copyTy TChar            = True
-copyTy (TStruct _)      = True
-copyTy (TEnum _)        = True
+copyTy (TStruct _ _)    = True
+copyTy (TEnum _ _)      = True
 copyTy (TResult _ _)    = True
 copyTy (TStatus _)      = True
 copyTy (TOption (TBoxSubtype {})) = False
@@ -39,8 +39,8 @@ statusTy TInt64           = True
 statusTy TUSize           = True
 statusTy TBool            = True
 statusTy TChar            = True
-statusTy (TStruct _)      = True
-statusTy (TEnum _)        = True
+statusTy (TStruct _ _)    = True
+statusTy (TEnum _ _)      = True
 statusTy _                = False 
 
 resultTy :: TerminaType' expr a -> Bool
@@ -55,8 +55,8 @@ resultTy TInt64           = True
 resultTy TUSize           = True
 resultTy TBool            = True
 resultTy TChar            = True
-resultTy (TStruct _)      = True
-resultTy (TEnum _)        = True
+resultTy (TStruct _ _)    = True
+resultTy (TEnum _ _)      = True
 resultTy _                = False 
 
 optionTy :: TerminaType' expr a -> Bool
@@ -71,32 +71,32 @@ optionTy TInt64           = True
 optionTy TUSize           = True
 optionTy TBool            = True
 optionTy TChar            = True
-optionTy (TStruct _)      = True
-optionTy (TEnum _)        = True
+optionTy (TStruct _ _)    = True
+optionTy (TEnum _ _)      = True
 optionTy (TBoxSubtype ty) = boxTy ty
 optionTy _                = False 
 
 -- | Predicate defining when a |TerminaType| is a declaration type.
 -- This is used to determine if a type can be used in a declaration.
 declTy :: TerminaType' expr a -> Bool
-declTy TUInt8      = True
-declTy TUInt16     = True
-declTy TUInt32     = True
-declTy TUInt64     = True
-declTy TInt8       = True
-declTy TInt16      = True
-declTy TInt32      = True
-declTy TInt64      = True
-declTy TUSize      = True
-declTy TBool       = True
-declTy TChar       = True
-declTy (TArray {}) = True
-declTy (TStruct _) = True
-declTy (TEnum _)   = True
-declTy (TOption _) = True
+declTy TUInt8        = True
+declTy TUInt16       = True
+declTy TUInt32       = True
+declTy TUInt64       = True
+declTy TInt8         = True
+declTy TInt16        = True
+declTy TInt32        = True
+declTy TInt64        = True
+declTy TUSize        = True
+declTy TBool         = True
+declTy TChar         = True
+declTy (TArray {})   = True
+declTy (TStruct _ _) = True
+declTy (TEnum _ _)   = True
+declTy (TOption _)   = True
 declTy (TResult _ _) = True
-declTy (TStatus _) = True
-declTy _           = False 
+declTy (TStatus _)   = True
+declTy _             = False 
 
 arrayTy :: TerminaType' expr a -> Bool
 arrayTy TUInt8           = True
@@ -111,8 +111,8 @@ arrayTy TUSize           = True
 arrayTy TBool            = True
 arrayTy TChar            = True
 arrayTy (TArray ty _)    = arrayTy ty
-arrayTy (TStruct _)      = True
-arrayTy (TEnum _)        = True
+arrayTy (TStruct _ _)    = True
+arrayTy (TEnum _ _)      = True
 arrayTy (TResult _ _)    = True
 arrayTy (TStatus _)      = True
 arrayTy (TOption (TBoxSubtype _)) = False
@@ -131,8 +131,8 @@ parameterTy TInt64            = True
 parameterTy TUSize            = True
 parameterTy TBool             = True
 parameterTy TChar             = True
-parameterTy (TStruct _)       = True
-parameterTy (TEnum _)         = True
+parameterTy (TStruct _ _)       = True
+parameterTy (TEnum _ _)         = True
 parameterTy (TResult _ _)     = True
 parameterTy (TStatus _)       = True
 parameterTy (TReference _ (TOption (TBoxSubtype _))) = False
@@ -154,8 +154,8 @@ viewerParamTy TInt64            = True
 viewerParamTy TUSize            = True
 viewerParamTy TBool             = True
 viewerParamTy TChar             = True
-viewerParamTy (TStruct _)       = True
-viewerParamTy (TEnum _)         = True
+viewerParamTy (TStruct _ _)       = True
+viewerParamTy (TEnum _ _)         = True
 viewerParamTy (TResult _ _)     = True
 viewerParamTy (TStatus _)       = True
 viewerParamTy (TReference _ (TOption (TBoxSubtype _))) = False
@@ -178,8 +178,8 @@ procedureParamTy TInt64            = True
 procedureParamTy TUSize            = True
 procedureParamTy TBool             = True
 procedureParamTy TChar             = True
-procedureParamTy (TStruct _)       = True
-procedureParamTy (TEnum _)         = True
+procedureParamTy (TStruct _ _)       = True
+procedureParamTy (TEnum _ _)         = True
 procedureParamTy (TResult _ _)     = True
 procedureParamTy (TStatus _)       = True
 procedureParamTy (TReference _ ty) = refTy ty
@@ -200,8 +200,8 @@ actionParamTy TInt64           = True
 actionParamTy TUSize           = True
 actionParamTy TBool            = True
 actionParamTy TChar            = True
-actionParamTy (TStruct _)      = True
-actionParamTy (TEnum _)        = True
+actionParamTy (TStruct _ _)      = True
+actionParamTy (TEnum _ _)        = True
 actionParamTy (TResult _ _)    = True
 actionParamTy (TStatus _)      = True
 actionParamTy (TBoxSubtype ty) = boxTy ty
@@ -237,15 +237,15 @@ boxTy TInt64      = True
 boxTy TUSize      = True
 boxTy TBool       = True
 boxTy TChar       = True
-boxTy (TStruct _) = True
-boxTy (TEnum _)   = True
+boxTy (TStruct _ _) = True
+boxTy (TEnum _ _)   = True
 boxTy _           = False
 
 allocTy :: TerminaType' expr a -> Bool
 allocTy = boxTy
 
 accessPortTy :: TerminaType' expr a -> Bool
-accessPortTy (TInterface _ _)        = True
+accessPortTy (TInterface {})        = True
 accessPortTy (TAllocator _)          = True
 accessPortTy (TAtomicAccess _)       = True
 accessPortTy (TAtomicArrayAccess {}) = True
@@ -264,8 +264,8 @@ msgTy TInt64           = True
 msgTy TUSize           = True
 msgTy TBool            = True
 msgTy TChar            = True
-msgTy (TStruct _)      = True
-msgTy (TEnum _)        = True
+msgTy (TStruct _ _)      = True
+msgTy (TEnum _ _)        = True
 msgTy (TBoxSubtype {}) = True
 msgTy _               = False
 
@@ -281,8 +281,8 @@ refTy TInt64           = True
 refTy TUSize           = True
 refTy TBool            = True
 refTy TChar            = True
-refTy (TStruct _)      = True
-refTy (TEnum _)        = True
+refTy (TStruct _ _)      = True
+refTy (TEnum _ _)        = True
 refTy (TResult _ _)    = True
 refTy (TStatus _)      = True
 refTy (TOption _)      = True
@@ -362,11 +362,11 @@ memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons i (TConstSubtype ty) = memberIntCons i ty
 memberIntCons _ _      = False
 
-getTypeIdentifier :: TypeDef' ty blk a -> Identifier
-getTypeIdentifier (Struct ident _ _)        = ident
-getTypeIdentifier (Enum ident _ _)          = ident
-getTypeIdentifier (Class _ ident _ _ _)     = ident
-getTypeIdentifier (Interface _ ident _ _ _) = ident
+getTypeIdentifier :: TypeDef' ty blk expr a -> Identifier
+getTypeIdentifier (Struct ident _ _ _)        = ident
+getTypeIdentifier (Enum ident _ _ _)          = ident
+getTypeIdentifier (Class _ ident _ _ _ _)     = ident
+getTypeIdentifier (Interface _ ident _ _ _ _) = ident
 
 getGlobalIdentifier :: Global' ty expr a -> Identifier
 getGlobalIdentifier (Task ident _ _ _ _)     = ident
@@ -438,11 +438,11 @@ sameTy  (TReference Mutable tyspecl) (TReference Mutable tyspecr) = sameTy tyspe
 sameTy  (TReference Immutable tyspecl) (TReference Immutable tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TBoxSubtype tyspecl) (TBoxSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TArray typespecl _sizel) (TArray typespecr _sizer) = sameTy typespecl typespecr
-sameTy  (TStruct idl) (TStruct idr) = idl == idr
-sameTy  (TEnum idl) (TEnum idr) = idl == idr
-sameTy  (TGlobal _ idl) (TGlobal _ idr) = idl == idr
-sameTy  (TInterface RegularInterface idl) (TInterface RegularInterface idr) = idl == idr
-sameTy  (TInterface SystemInterface idl) (TInterface SystemInterface idr) = idl == idr
+sameTy  (TStruct idl _) (TStruct idr _) = idl == idr
+sameTy  (TEnum idl _) (TEnum idr _) = idl == idr
+sameTy  (TGlobal _ idl _) (TGlobal _ idr _) = idl == idr
+sameTy  (TInterface RegularInterface idl _) (TInterface RegularInterface idr _) = idl == idr
+sameTy  (TInterface SystemInterface idl _) (TInterface SystemInterface idr _) = idl == idr
 sameTy  (TAtomic tyl) (TAtomic tyr) = sameTy tyl tyr 
 sameTy  (TAtomicArray tyl _sizel) (TAtomicArray tyr _sizer) = sameTy tyl tyr
 -- TFixedLocation subtypes
