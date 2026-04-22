@@ -205,10 +205,12 @@ transFoldExpression expr@(BinOp op lhs rhs ann) = do
 transFoldExpression (ReferenceExpression _ obj _) = transFoldObject obj
 transFoldExpression (Casting expr _ _) = transFoldExpression expr
 transFoldExpression (FunctionCall ident args _) = do
+  mapM_ transFoldExpression args
   progArchitecture <- ST.gets progArch
   let func = functions progArchitecture M.! ident
   transFoldFlowTransfer args func
 transFoldExpression (MemberFunctionCall obj ident args _) = do
+  mapM_ transFoldExpression args
   progArchitecture <- ST.gets progArch
   current <- ST.gets currentElement
   case current of
@@ -221,6 +223,7 @@ transFoldExpression (MemberFunctionCall obj ident args _) = do
         Nothing -> throwError $ annotateError Internal (EInvalidExpression "invalid member function call")
     Nothing -> throwError $ annotateError Internal (EInvalidExpression "invalid member function call no current member")
 transFoldExpression (DerefMemberFunctionCall obj ident args _) = do
+  mapM_ transFoldExpression args
   progArchitecture <- ST.gets progArch
   current <- ST.gets currentElement
   case current of
@@ -238,22 +241,24 @@ transFoldExpression expr@(ArraySliceExpression _ obj lower upper ann) = do
   transFoldObject obj
   transFoldExpression lower
   transFoldExpression upper
-  exprType <- getExprType expr
+  exprTy <- getExprType expr
+  objTy <- getObjType obj
   lowerType <- getExprType lower
   upperType <- getExprType upper
-  case (exprType, lowerType, upperType) of
+  case (exprTy, objTy, lowerType, upperType) of
     -- | If both lower and upper are constant expressions, check if the slice is valid.
-    (TArray _ arraySize, TConstSubtype _, TConstSubtype _) -> do
+    (TReference _ (TArray _ expectedSliceSize), TArray _ arraySize, TConstSubtype _, TConstSubtype _) -> do
       arraySizeValue <- evalConstExpression arraySize
+      expectedSliceSizeValue <- evalConstExpression expectedSliceSize
       lowerValue <- evalConstExpression lower
       upperValue <- evalConstExpression upper
-      case (arraySizeValue, lowerValue, upperValue) of
-        (I (TInteger size _) _, I (TInteger lowerIndex _) _, I (TInteger upperIndex _) _) -> do
-          if upperIndex >= size then
-            throwError $ annotateError (getLocation ann) (EArraySliceOutOfBounds size upperIndex)
+      case (expectedSliceSizeValue, arraySizeValue, lowerValue, upperValue) of
+        (I (TInteger sSlice _) _, I (TInteger sArray _) _, I (TInteger lowerIndex _) _, I (TInteger upperIndex _) _) -> do
+          if upperIndex > sArray then
+            throwError $ annotateError (getLocation ann) (EArraySliceOutOfBounds sArray upperIndex)
           else if lowerIndex > upperIndex then
             throwError $ annotateError (getLocation ann) (EArraySliceNegativeRange lowerIndex upperIndex)
-          else when (size /= (upperIndex - lowerIndex)) $ throwError $ annotateError (getLocation ann) (EArraySliceInvalidRange size lowerIndex upperIndex)
+          else when (sSlice /= (upperIndex - lowerIndex)) $ throwError $ annotateError (getLocation ann) (EArraySliceInvalidRange sSlice lowerIndex upperIndex)
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
 
