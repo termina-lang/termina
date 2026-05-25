@@ -1,7 +1,7 @@
 name:                termina
-version:             0.3.0.0
+version:             0.3.1.0
 github:              "termina-lang/termina"
-license:             BSD3
+license:             MIT
 author:              "The Termina Project Contributors"
 maintainer:          "team@termina-lang.org"
 copyright:           "The Termina Project Contributors"
