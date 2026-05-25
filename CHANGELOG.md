@@ -13,6 +13,14 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-05-25
+
+### Changed
+
+- Stack snapshot bumped from LTS-22.43 (GHC 9.6.6) to LTS-22.44 (GHC 9.6.7),
+  the latest in the LTS-22 series. Package versions are essentially the
+  same; only the patch level of GHC moves forward.
+
 ## [0.3.1] - 2026-05-25
 
 ### Fixed

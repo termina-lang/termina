@@ -1,10 +1,10 @@
 # Stack configuration for the Termina transpiler.
 #
-# Snapshot LTS-22.43 pins GHC 9.6.6 and a curated set of Hackage package
+# Snapshot LTS-22.44 pins GHC 9.6.7 and a curated set of Hackage package
 # versions tested together by Stackage.
 
 snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/43.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/44.yaml
 
 packages:
 - .
