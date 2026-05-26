@@ -135,20 +135,29 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
             map (, S.empty) (M.keys (atomicArrays progArchitecture))
           unprotectedResources = M.filter isUnprotected (resources progArchitecture)
           protectedResources = M.filter (not . isUnprotected) (resources progArchitecture)
+
+          -- | Resolve a set of access-port connections to the resources they
+          -- ultimately depend on. A connection to an unprotected resource is
+          -- replaced by the resources that the unprotected resource itself
+          -- accesses, because unprotected resources are not nodes of the
+          -- dependency graph. This must be applied to the access ports of
+          -- resources, tasks and handlers alike, so that a resource reached
+          -- only through an unprotected resource is not left without a path
+          -- to the entity that uses it.
+          inlineUnprotected aps = concatMap (\(usedRes, _) ->
+                case M.lookup usedRes unprotectedResources of
+                  Just (TPResource _ _ usedAps _ _ _) ->
+                    fst <$> M.elems usedAps
+                  Nothing ->
+                    [usedRes]) (M.elems aps)
+
           resoucesGraph = foldr (\(TPResource identifier _ aps _ _ _) acc ->
-              let usedResources = concatMap (\(usedRes, _) ->
-                    case M.lookup usedRes unprotectedResources of
-                      Just (TPResource _ _ usedAps _ _ _) ->
-                        fst <$> M.elems usedAps
-                      Nothing ->
-                        [usedRes]) aps
-              in
-                M.insert identifier (S.fromList usedResources) acc) initialMap (M.elems protectedResources)
+                M.insert identifier (S.fromList (inlineUnprotected aps)) acc) initialMap (M.elems protectedResources)
           tasksGraph = foldr (\(TPTask identifier _ _ _ _ apConns _ _ _) acc ->
-              M.insert identifier (S.fromList (fst <$> M.elems apConns)) acc
+              M.insert identifier (S.fromList (inlineUnprotected apConns)) acc
             ) resoucesGraph (M.elems (tasks progArchitecture))
           handlersGraph = foldr (\(TPHandler identifier _ _ _ apConns _ _ _) acc ->
-              M.insert identifier (S.fromList (fst <$> M.elems apConns)) acc
+              M.insert identifier (S.fromList (inlineUnprotected apConns)) acc
             ) tasksGraph (M.elems (handlers progArchitecture))
 
       in
