@@ -16,9 +16,35 @@ Termina adheres to the following core principles:
 - **Deterministic dynamic memory management**. Termina only allows the use of memory pools as a dynamic memory management mechanism.
 - **Provision of memory-safety properties**. Termina implements a type system that guarantees that no error arises from memory management. In particular, the absence of access errors, null-pointer de-references and memory leaks.
 
+## Quick start (Docker)
+
+The fastest way to try Termina is the prebuilt Docker image, which bundles
+the transpiler, the OSAL and the embedded cross-toolchains, so nothing has to be
+installed on the host but Docker. Open a shell in the image with the current
+directory mounted:
+
+```bash
+docker run --rm -it -v "$PWD":/work -w /work \
+    ghcr.io/termina-lang/docker-termina:latest bash
+```
+
+The toolchain is then ready inside the container. A project is created with
+`termina new` and its application is written under `app/` and `src/`. Once the
+source is in place, transpiling it to C and compiling the result is done with:
+
+```bash
+termina build         # transpile the project to C, into output/
+cd output && make     # compile the generated C
+```
+
+For installation options and a guided first program, see the [Termina
+book](https://termina-lang.github.io/termina-book/).
+
 ## Documentation
 
-The main source of documentation of this project is the [Termina book](https://termina-lang.github.io/termina-book/). It contains installation instructions and documentation on the syntax and use of the language.
+The main source of documentation of this project is the [Termina
+book](https://termina-lang.github.io/termina-book/). It contains installation
+instructions and documentation on the syntax and use of the language.
 
 ## Status
 
