@@ -13,6 +13,16 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-05-26
+
+### Fixed
+
+- Avoid an internal error (`findDisjointPaths`) that aborted the build when a
+  resource was accessed only through an `#[unprotected]` resource. Unprotected
+  resources are now inlined in the dependency graph of tasks and handlers, as
+  was already done for other resources.
+
+
 ## [0.3.2] - 2026-05-25
 
 ### Changed
