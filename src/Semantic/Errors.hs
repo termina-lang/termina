@@ -257,13 +257,13 @@ data Error
   | EInvalidViewerParameterType (TerminaType SemanticAnn) -- ^ Invalid viewer parameter type
   | EInvalidAccessToProcedureFromImmutableSelfReference -- ^ Invalid access to procedure from immutable self reference
   | EInvalidAccessToOutPortFromImmutableSelfReference -- ^ Invalid access to out port from immutable self reference
-  | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
-  | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
   | EProcedureSelfAccessKindMismatch (Identifier, Identifier, AccessKind, Location) AccessKind -- ^ Self reference access kind mismatch in procedure
   | ETaskClassMethod (Identifier, Location) Identifier -- ^ Task class defines a method
   | EHandlerClassMethod (Identifier, Location) Identifier -- ^ Handler class defines a method
   | EResourceClassViewer (Identifier, Location) Identifier -- ^ Resource class defines a viewer
   | EUnprotectedResourceWithRegularFields (Identifier, Location) -- ^ Unprotected resource with regular fields
+  | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
+  | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -480,6 +480,8 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "SE-209"
     errorIdent (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "SE-210"
     errorIdent (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "SE-211"
+    errorIdent (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "SE-212"
+    errorIdent (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "SE-213"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EInvalidArrayIndexing _ty) _pos) = "invalid array indexing"
@@ -686,14 +688,14 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EInvalidViewerParameterType _ty) _pos) = "invalid viewer parameter type"
     errorTitle (AnnotatedError EInvalidAccessToProcedureFromImmutableSelfReference _pos) = "invalid access to procedure from immutable self reference"
     errorTitle (AnnotatedError EInvalidAccessToOutPortFromImmutableSelfReference _pos) = "invalid access to out port from immutable self reference"
-    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "mutable member function in task class"
-    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "member function with mutable self reference in task class"
     errorTitle (AnnotatedError (EProcedureSelfAccessKindMismatch (_ifaceId, _procId, _expectedAccessKind, _loc) _accessKind) _pos) =
         "self reference access kind mismatch in procedure"
     errorTitle (AnnotatedError (ETaskClassMethod (_ident, _loc) _methodName) _pos) = "task class defines a method"
     errorTitle (AnnotatedError (EHandlerClassMethod (_ident, _loc) _methodName) _pos) = "handler class defines a method"
     errorTitle (AnnotatedError (EResourceClassViewer (_ident, _loc) _viewerName) _pos) = "resource class defines a viewer"
     errorTitle (AnnotatedError (EUnprotectedResourceWithRegularFields (_ident, _loc)) _pos) = "unprotected resource with regular fields"
+    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInTaskClass _ident) _pos) = "mutable member function in task class"
+    errorTitle (AnnotatedError (EMemberFunctionWithMutableSelfInHandlerClass _ident) _pos) = "mutable member function in handler class"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start end)) files =
@@ -2216,18 +2218,6 @@ instance ErrorMessage SemanticErrors where
                         sourceLines title fileName pos
                         (Just ("You are trying to access an outbound port from an immutable self reference. " <>
                                "Immutable self references cannot access outbound ports."))
-                EMemberFunctionWithMutableSelfInTaskClass ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
-                            "Member functions in task classes cannot define mutable self references\n" <>
-                            "Only immutable or private self references are allowed."))
-                EMemberFunctionWithMutableSelfInHandlerClass ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
-                            "Member functions in handler classes cannot define mutable self references\n" <>
-                            "Only immutable or private self references are allowed."))
                 EProcedureSelfAccessKindMismatch (ifaceId, procId, expectedAccessKind, prevPos@(Position _ prevStart _)) accessKind ->
                     let prevFileName = sourceName prevStart
                         prevSourceLines = files M.! prevFileName
@@ -2376,6 +2366,18 @@ instance ErrorMessage SemanticErrors where
                     pprintSimpleError
                         prevSourceLines "The resource class is defined here:" prevFileName
                         prevPos Nothing
+                EMemberFunctionWithMutableSelfInTaskClass ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
+                            "Member functions in task classes cannot define mutable self references\n" <>
+                            "Only immutable or private self references are allowed."))
+                EMemberFunctionWithMutableSelfInHandlerClass ident ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
+                            "Member functions in handler classes cannot define mutable self references\n" <>
+                            "Only immutable or private self references are allowed."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 
