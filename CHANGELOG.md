@@ -13,6 +13,15 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-05-27
+
+### Fixed
+
+- Report a proper error code when an action declares a mutable self reference in
+  a task or handler class. This previously surfaced as an internal error; it is
+  now reported as SE-212 (task) or SE-213 (handler).
+
+
 ## [0.3.3] - 2026-05-26
 
 ### Fixed
