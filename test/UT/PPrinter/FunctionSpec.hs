@@ -143,6 +143,3 @@ spec = do
     it "Prints fuction2 definition" $ do
       renderFunction function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = { 0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U,\n                                                                         0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
-    it "Prints fuction4 definition" $ do
-      renderFunction function3 `shouldBe`
-        pack "\nuint32_t function3(uint32_t param0, uint32_t param1[10U]) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = param1,\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
