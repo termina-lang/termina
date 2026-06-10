@@ -138,9 +138,19 @@ typeGlobal (Channel ident ts mexpr mods anns) = do
 typeGlobal (Const ident ts expr mods anns) = do
   ty <- typeTypeSpecifier anns typeGlobalObject ts
   checkTerminaType anns ty
-  constTyOrFail anns ty
-  let constType = TConstSubtype ty
-  typed_expr <- typeExpression (Just constType) typeGlobalObject expr
+  globalConstTyOrFail anns ty
+  -- | Scalar consts are wrapped in TConstSubtype so they can be used in
+  -- constant contexts (e.g. array sizes). Array consts keep their bare type:
+  -- they cannot appear in such contexts and the array initializer typing
+  -- expects a bare TArray. They are emitted as C initializer lists.
+  (constType, typed_expr) <- case ty of
+    TArray {} -> do
+      te <- typeAssignmentExpression ty typeGlobalObject expr
+      return (ty, te)
+    _ -> do
+      let ct = TConstSubtype ty
+      te <- typeExpression (Just ct) typeGlobalObject expr
+      return (ct, te)
   tyMods <- mapM (typeModifier anns typeGlobalObject) mods
   return (SAST.Const ident constType typed_expr tyMods (buildGlobalAnn anns constType), LocatedElement (GConst constType typed_expr) anns)
 typeGlobal (ConstExpr ident ts expr mods anns) = do

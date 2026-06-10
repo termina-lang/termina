@@ -333,7 +333,15 @@ constTy TBool            = True
 constTy TChar            = True
 constTy TFloat32         = True
 constTy TFloat64         = True
-constTy _                = False  
+constTy _                = False
+
+-- | Type that a global `const` may hold: either a scalar constant type
+-- (constTy) or an array of such, recursively. Unlike constTy (which also
+-- gates constant parameters, restricted to scalars), arrays are allowed here
+-- because a const array is emitted as a C initializer list.
+globalConstTy :: TerminaType' expr a -> Bool
+globalConstTy (TArray ty _) = globalConstTy ty
+globalConstTy ty            = constTy ty
 
 -- | Predicate definining when a |TerminaType| is numeric.
 intTy :: TerminaType' expr a -> Bool

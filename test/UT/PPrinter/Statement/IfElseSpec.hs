@@ -80,9 +80,7 @@ spec = do
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_box_t option0;\n" ++
-          "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = box_var0;\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
           "\n" ++
           "}")
     it "Prints an if-else statement" $ do
@@ -95,14 +93,11 @@ spec = do
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_box_t option0;\n" ++
-          "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = box_var0;\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option_box_t option1;\n" ++
-          "    option1.__variant = None;\n" ++
+          "    __option_box_t option1 = { .__variant = None };\n" ++
           "\n" ++
           "}")
     it "Prints an if-else-if-else statement" $ do
@@ -115,9 +110,7 @@ spec = do
           "        array1[__i0] = array0[__i0];\n" ++
           "    }\n" ++
           "\n" ++
-          "    __option_box_t option0;\n" ++
-          "    option0.__variant = Some;\n" ++
-          "    option0.Some.__0 = box_var0;\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
           "\n" ++
           "} else if (foo0 == 0U) {\n" ++
           "    \n" ++
@@ -125,7 +118,6 @@ spec = do
           "\n" ++
           "} else {\n" ++
           "    \n" ++
-          "    __option_box_t option1;\n" ++
-          "    option1.__variant = None;\n" ++
+          "    __option_box_t option1 = { .__variant = None };\n" ++
           "\n" ++
           "}")

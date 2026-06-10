@@ -74,8 +74,7 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret;\n" ++
-              "    ret.__variant = Success;\n" ++
+              "    __status_int32_t ret = { .__variant = Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++
@@ -179,8 +178,7 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret;\n" ++
-              "    ret.__variant = Success;\n" ++
+              "    __status_int32_t ret = { .__variant = Success };\n" ++
               "\n" ++
               "    uint32_t local = 0U;\n" ++
               "\n" ++

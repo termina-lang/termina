@@ -65,7 +65,7 @@ genGlobal (GlobalDeclaration (Emitter identifier ts _ _ ann)) = do
         (Just identifier) Nothing)) (buildDeclarationAnn ann True)] 
 genGlobal (GlobalDeclaration (Const identifier ts expr _ ann)) = do
     cTs <- genType constqual ts
-    cExpr <- genExpression expr
+    cExpr <- genInitializerExpr expr
     return [
             pre_cr . global $ identifier @: cTs @:= cExpr |>> getLocation ann
         ]

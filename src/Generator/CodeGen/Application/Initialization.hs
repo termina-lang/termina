@@ -35,7 +35,7 @@ genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
                 @= "__termina_resource_lock_type__none" @: enumFieldType
     case mexpr of
         Just expr -> do
-            strInitialization <- genStructInitialization loc False 0 cObj expr
+            strInitialization <- genStructAssign loc False 0 cObj expr
             if before
                 then return $ pre_cr cLockNone : strInitialization
                 else return $ no_cr cLockNone : strInitialization
@@ -46,13 +46,13 @@ genInitializeObj loc before (Resource identifier _ mexpr _ _) = do
                 else return [no_cr cLockNone]
 genInitializeObj loc before (Task identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization loc before 0 cObj expr
+    genStructAssign loc before 0 cObj expr
 genInitializeObj loc before (Handler identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization loc before 0 cObj expr
+    genStructAssign loc before 0 cObj expr
 genInitializeObj loc before (Emitter identifier _ (Just expr) _ _) = do
     let cObj = identifier @: typeDef identifier
-    genStructInitialization loc before 0 cObj expr
+    genStructAssign loc before 0 cObj expr
 genInitializeObj _ _ _ = return []
 
 genInitFile :: QualifiedName -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> CGenerator CFile

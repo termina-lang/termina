@@ -5,6 +5,7 @@ import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
+import Control.Monad (zipWithM)
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
@@ -380,3 +381,72 @@ genExpression expr@(ArraySliceExpression _ak obj lower upper ann) = do
             return $ addrOf (cObj @$$ cFunctionCall @: cType) |>> getLocation ann
         (ty, _,  _, _) -> throwError $ InternalError $ "Unsupported object. Not a reference to an array: " ++ show ty
 genExpression o = throwError $ InternalError $ "Unsupported expression: " ++ show o
+
+-- | Lowers an array or string initializer to a C initializer list { ... }.
+-- These forms are not expressions (typeExpression rejects their use as such):
+-- they appear only as the initializer of a declaration or const, so they get
+-- their own lowering instead of living in genExpression. Nested array/string
+-- elements recurse; scalar elements fall back to genExpression.
+genInitializerExpr :: Expression SemanticAnn -> CGenerator CExpression
+genInitializerExpr e@(ArrayExprListInitializer exprs ann) = do
+    cType <- getExprType e >>= genType noqual
+    cElems <- mapM genInitializerExpr exprs
+    return $ CExprArrayInitializer cElems cType (buildGenericAnn ann)
+genInitializerExpr e@(ArrayInitializer iexpr _size ann) = do
+    -- | A fill [e; N] nested in an initializer position must be expanded to an
+    -- explicit list { e, ..., e } (N copies): a C initializer list cannot hold
+    -- a loop. Top-level fills are still emitted as for loops (see genStatement).
+    cType <- getExprType e >>= genType noqual
+    case cType of
+        CTArray _ (CExprConstant (CIntConst (CInteger n _)) _ _) -> do
+            cElem <- genInitializerExpr iexpr
+            return $ CExprArrayInitializer (replicate (fromIntegral n) cElem) cType (buildGenericAnn ann)
+        _ -> throwError $ InternalError $ "array fill initializer with non-literal size: " ++ show cType
+genInitializerExpr e@(StringInitializer value ann) = do
+    -- | In initializer position C accepts a string literal for a char array
+    -- (char s[N] = "..."), which fills the excess bytes with zeros (and adds
+    -- no null terminator on an exact fit). This is only valid here, not in the
+    -- element-wise assignment path (see genStringAssign).
+    cType <- getExprType e >>= genType noqual
+    return $ CExprConstant (CStrConst (CString value)) cType (buildGenericAnn ann)
+genInitializerExpr e@(StructInitializer fas ann) = do
+    cType <- getExprType e >>= genType noqual
+    cFields <- mapM genFieldInit fas
+    return $ CExprDesignatedInitializer cFields cType (buildGenericAnn ann)
+    where
+        genFieldInit (FieldValueAssignment fld fexpr _) = do
+            ce <- genInitializerExpr fexpr
+            return (fld, ce)
+        genFieldInit (FieldAddressAssignment fld addr (SemanticAnn (ETy (SimpleType ts)) _)) = do
+            cTs <- genType noqual ts
+            cAddr <- genExpression addr
+            return (fld, cast cTs cAddr)
+        genFieldInit fa = throwError $ InternalError $ "Unsupported field in data struct initializer: " ++ show fa
+genInitializerExpr e@(MonadicVariantInitializer mv ann) = do
+    cType <- getExprType e >>= genType noqual
+    let cAnn = buildGenericAnn ann
+        variantTag name = name @: enumFieldType |>> getLocation ann
+        singlePayload tagName v = do
+            cv <- genInitializerExpr v
+            let inner = CExprDesignatedInitializer [(namefy "0", cv)] cType cAnn
+            return $ CExprDesignatedInitializer [(variant, variantTag tagName), (tagName, inner)] cType cAnn
+        noPayload tagName =
+            return $ CExprDesignatedInitializer [(variant, variantTag tagName)] cType cAnn
+    case mv of
+        Some v -> singlePayload optionSomeVariant v
+        None -> noPayload optionNoneVariant
+        Success -> noPayload statusSuccessVariant
+        Failure v -> singlePayload statusFailureVariant v
+        Ok v -> singlePayload resultOkVariant v
+        Error v -> singlePayload resultErrorVariant v
+genInitializerExpr e@(EnumVariantInitializer ts this_variant params ann) = do
+    cType <- getExprType e >>= genType noqual
+    let cAnn = buildGenericAnn ann
+        tagExpr = CExprValOf (CVar (ts <::> this_variant) enumFieldType) enumFieldType cAnn
+    cParams <- zipWithM (\p i -> do
+        cp <- genInitializerExpr p
+        return (namefy (show (i :: Integer)), cp)) params [0..]
+    let designators = (variant, tagExpr) :
+            [(this_variant, CExprDesignatedInitializer cParams cType cAnn) | not (null cParams)]
+    return $ CExprDesignatedInitializer designators cType cAnn
+genInitializerExpr e = genExpression e

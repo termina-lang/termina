@@ -112,13 +112,11 @@ spec = do
               "    \n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
-              "    __status_int32_t ret;\n" ++
-              "    ret.__variant = Success;\n" ++
+              "    __status_int32_t ret = { .__variant = Success };\n" ++
               "\n" ++
               "    self->interval = self->interval + 1U;\n" ++
               "\n" ++
-              "    __option_box_t alloc_msg;\n" ++
-              "    alloc_msg.__variant = None;\n" ++
+              "    __option_box_t alloc_msg = { .__variant = None };\n" ++
               "\n" ++
               "    self->message_pool.alloc(__ev, self->message_pool.__that, &alloc_msg);\n"  ++
               "\n"  ++

@@ -98,8 +98,7 @@ spec = do
               "    __termina_lock_t __lock = __termina_resource__lock(&__ev->owner,\n" ++
               "                                                       &self->__lock_type);\n" ++
               "\n" ++
-              "    __option_box_t opt;\n" ++
-              "    opt.__variant = None;\n" ++
+              "    __option_box_t opt = { .__variant = None };\n" ++
               "\n" ++
               "    opt.__variant = Some;\n" ++
               "    opt.Some.__0 = box_var0;\n" ++

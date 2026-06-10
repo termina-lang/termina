@@ -300,6 +300,11 @@ instance CPrint CExpression where
     pprintPrec _ (CExprArrayInitializer exprs _ _) = do
         pexprs <- mapM (pprintPrec 2) exprs
         return $ braces (space <> align (fillSep (punctuate comma pexprs)) <> space)
+    pprintPrec _ (CExprDesignatedInitializer fields _ _) = do
+        pfields <- mapM (\(f, e) -> do
+            pe <- pprintPrec 2 e
+            return $ pretty "." <> pretty f <+> pretty "=" <+> pe) fields
+        return $ braces (space <> align (fillSep (punctuate comma pfields)) <> space)
 
 prependLine :: Bool -> DocStyle -> DocStyle
 prependLine True doc = line <> doc

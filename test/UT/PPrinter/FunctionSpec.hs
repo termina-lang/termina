@@ -136,77 +136,13 @@ spec = do
   describe "Pretty printing function definitions" $ do
     it "Prints fuction0 definition" $ do
       renderFunction function0 `shouldBe`
-        pack ("\nvoid function0() {\n" ++
-              "    \n" ++
-              "    TMDescriptor struct0;\n" ++
-              "    struct0.field0 = 0U;\n" ++
-              "    struct0.field1.field_a = 0U;\n" ++
-              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-              "        struct0.field1.field_b[__i0] = 0U;\n" ++
-              "    }\n" ++
-              "    struct0.field1.field_c = 4294901760U;\n" ++
-              "\n" ++
-              "    TMDescriptor struct1 = struct0;\n" ++
-              "\n" ++
-              "    struct0.field0 = struct0.field0 + 1024U;\n" ++
-              "\n" ++
-              "    return;\n" ++
-              "\n" ++
-              "}")
+        pack "\nvoid function0() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return;\n\n}"
     it "Prints fuction1 definition" $ do
       renderFunction function1 `shouldBe`
-        pack ("\nuint32_t function1() {\n" ++
-              "    \n" ++
-              "    TMDescriptor struct0;\n" ++
-              "    struct0.field0 = 0U;\n" ++
-              "    struct0.field1.field_a = 0U;\n" ++
-              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-              "        struct0.field1.field_b[__i0] = 0U;\n" ++
-              "    }\n" ++
-              "    struct0.field1.field_c = 4294901760U;\n" ++
-              "\n" ++
-              "    TMDescriptor struct1 = struct0;\n" ++
-              "\n" ++
-              "    struct0.field0 = struct0.field0 + 1024U;\n" ++
-              "\n" ++
-              "    return struct0.field0;\n" ++
-              "\n" ++
-              "}")
+        pack "\nuint32_t function1() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
     it "Prints fuction2 definition" $ do
       renderFunction function2 `shouldBe`
-        pack ("\nuint32_t function2(uint32_t param0) {\n" ++
-              "    \n" ++
-              "    TMDescriptor struct0;\n" ++
-              "    struct0.field0 = 0U;\n" ++
-              "    struct0.field1.field_a = param0;\n" ++
-              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-              "        struct0.field1.field_b[__i0] = 0U;\n" ++
-              "    }\n" ++
-              "    struct0.field1.field_c = 4294901760U;\n" ++
-              "\n" ++
-              "    TMDescriptor struct1 = struct0;\n" ++
-              "\n" ++
-              "    struct0.field0 = struct0.field0 + 1024U;\n" ++
-              "\n" ++
-              "    return struct0.field0;\n" ++
-              "\n" ++
-              "}")
+        pack "\nuint32_t function2(uint32_t param0) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = { 0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U,\n                                                                         0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
     it "Prints fuction4 definition" $ do
       renderFunction function3 `shouldBe`
-        pack ("\nuint32_t function3(uint32_t param0, uint32_t param1[10U]) {\n" ++
-              "    \n" ++
-              "    TMDescriptor struct0;\n" ++
-              "    struct0.field0 = 0U;\n" ++
-              "    struct0.field1.field_a = param0;\n" ++
-              "    for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-              "        struct0.field1.field_b[__i0] = param1[__i0];\n" ++
-              "    }\n" ++
-              "    struct0.field1.field_c = 4294901760U;\n" ++
-              "\n" ++
-              "    TMDescriptor struct1 = struct0;\n" ++
-              "\n" ++
-              "    struct0.field0 = struct0.field0 + 1024U;\n" ++
-              "\n" ++
-              "    return struct0.field0;\n" ++
-              "\n" ++
-              "}")
+        pack "\nuint32_t function3(uint32_t param0, uint32_t param1[10U]) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = param1,\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"

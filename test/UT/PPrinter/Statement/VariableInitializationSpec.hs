@@ -103,39 +103,21 @@ spec = do
   describe "Pretty printing option variable declarations" $ do
     it "Prints the statement var option0 : TOption <'box u32> = Some(box_var0);" $ do
       renderStatement option0 `shouldBe`
-        pack (
-          "\n__option_box_t option0;\n" ++
-          "option0.__variant = Some;\n" ++
-          "option0.Some.__0 = box_var0;")
+        pack "\n__option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };"
     it "Prints the statement var option1 : TOption <'box u32> = None;" $ do
       renderStatement option1 `shouldBe`
-        pack (
-          "\n__option_box_t option1;\n" ++
-          "option1.__variant = None;")
+        pack "\n__option_box_t option1 = { .__variant = None };"
   describe "Pretty printing enum variable declarations" $ do
     it "Prints the statement var enum0 : Message = Message::Reset;" $ do
       renderStatement enum0 `shouldBe`
-        pack (
-          "\nMessage enum0;\n" ++
-          "enum0.__variant = Message__Reset;")
+        pack "\nMessage enum0 = { .__variant = Message__Reset };"
     it "Prints the statement var enum1 : Message = Message::In(0 : u32, 0 : u32);" $ do
       renderStatement enum1 `shouldBe`
-        pack (
-          "\nMessage enum1;\n" ++
-          "enum1.__variant = Message__In;\n" ++
-          "enum1.In.__0 = 0U;\n" ++
-          "enum1.In.__1 = 0U;")
+        pack "\nMessage enum1 = { .__variant = Message__In, .In = { .__0 = 0U, .__1 = 0U } };"
   describe "Pretty printing struct variable declarations" $ do
     it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000U} : StructA} : TMDescriptor;" $ do
       renderStatement struct0 `shouldBe`
-        pack (
-        "\nTMDescriptor struct0;\n" ++
-        "struct0.field0 = 0U;\n" ++
-        "struct0.field1.field_a = 0U;\n" ++
-        "for (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
-        "    struct0.field1.field_b[__i0] = 0U;\n" ++
-        "}\n" ++
-        "struct0.field1.field_c = 4294901760U;")
+        pack "\nTMDescriptor struct0 = { .field0 = 0U, .field1 = { .field_a = 0U,\n                                                   .field_b = { 0U, 0U, 0U, 0U,\n                                                                0U, 0U, 0U, 0U,\n                                                                0U, 0U },\n                                                   .field_c = 4294901760U } };"
     it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
       renderStatement struct1 `shouldBe`
         pack "\nTMDescriptor struct1 = struct0;"

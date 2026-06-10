@@ -132,10 +132,7 @@ spec = do
               "\n" ++
               "void test_array() {\n" ++
               "    \n" ++
-              "    float32_t arr[3U];\n" ++
-              "    arr[0U] = 1.0f;\n" ++
-              "    arr[1U] = 2.0f;\n" ++
-              "    arr[2U] = 3.0f;\n" ++
+              "    float32_t arr[3U] = { 1.0f, 2.0f, 3.0f };\n" ++
               "\n" ++
               "    arr[1U] = arr[0U] + 1.0f;\n" ++
               "\n" ++
@@ -149,8 +146,7 @@ spec = do
               "\n" ++
               "void test_option() {\n" ++
               "    \n" ++
-              "    __option_float32_t o;\n" ++
-              "    o.__variant = None;\n" ++
+              "    __option_float32_t o = { .__variant = None };\n" ++
               "\n" ++
               "    o.__variant = Some;\n" ++
               "    o.Some.__0 = 1.5f;\n" ++

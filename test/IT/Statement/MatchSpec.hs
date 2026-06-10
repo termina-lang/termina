@@ -211,10 +211,8 @@ spec = do
               "    \n" ++
               "    uint32_t ret = 0U;\n" ++
               "\n" ++
-              "    Message msg;\n" ++
-              "    msg.__variant = Message__In;\n" ++
-              "    msg.In.__0 = 10U;\n" ++
-              "    msg.In.__1 = 10U;\n" ++
+              "    Message msg = { .__variant = Message__In, .In = { .__0 = 10U,\n" ++
+              "                                                      .__1 = 10U } };\n" ++
               "\n" ++
               "    if (msg.__variant == Message__In) {\n" ++
               "        \n" ++

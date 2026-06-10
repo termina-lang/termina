@@ -334,6 +334,9 @@ floatTyOrFail pann ty = unless (floatTy ty) (throwError (annotateError pann (EEx
 constTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EInvalidConstType ty)))
 
+globalConstTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
+globalConstTyOrFail pann ty = unless (globalConstTy ty) (throwError (annotateError pann (EInvalidConstType ty)))
+
 optionTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 optionTyOrFail pann ty = unless (optionTy ty) (throwError (annotateError pann (EInvalidOptionType ty)))
 
