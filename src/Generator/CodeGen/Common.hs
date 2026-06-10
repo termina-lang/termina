@@ -102,6 +102,8 @@ genTypeSpecName TInt16 = return "int16"
 genTypeSpecName TInt32 = return "int32"
 genTypeSpecName TInt64 = return "int64"
 genTypeSpecName TUSize = return "size"
+genTypeSpecName TFloat32 = return "float32"
+genTypeSpecName TFloat64 = return "float64"
 genTypeSpecName (TStruct ident) = return ident
 genTypeSpecName (TEnum ident) = return ident
 genTypeSpecName ts' = throwError $ InternalError $ "invalid option type specifier: " ++ show ts'
@@ -289,6 +291,10 @@ genInteger :: TInteger -> CInteger
 genInteger (TInteger i DecRepr) = CInteger i CDecRepr
 genInteger (TInteger i HexRepr) = CInteger i CHexRepr
 genInteger (TInteger i OctalRepr) = CInteger i COctalRepr
+
+genFloat :: TFloat -> CFloat
+genFloat (TFloat d FPDecimal)    = CFloat d CFloatDec
+genFloat (TFloat d FPScientific) = CFloat d CFloatSci
 
 getCArrayItemType :: (MonadError CGeneratorError m) => CType -> m CType
 getCArrayItemType (CTArray ty _) = return ty

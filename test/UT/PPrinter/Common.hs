@@ -8,7 +8,6 @@ import Control.Monad.Except
 import Generator.CodeGen.Expression
 import Configuration.Configuration
 import Configuration.Platform
-import Generator.Utils
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
 import qualified Data.Map.Strict as M
@@ -23,6 +22,7 @@ import Generator.Environment
 import Generator.Monadic
 
 import Prettyprinter
+import Utils.Printer
 
 objSemAnn :: AccessKind -> TerminaType SemanticAnn -> SemanticAnn
 objSemAnn ak ts = SemanticAnn (ETy (ObjectType ak ts)) Internal

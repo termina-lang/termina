@@ -168,15 +168,15 @@ instance Annotated Statement where
   updateAnnotation (SingleExpStmt expr _) =
     SingleExpStmt expr
 
-type AnnASTElement = AnnASTElement' TerminaType Block Expression
+type AnnASTElement = AnnASTElement' TerminaType Expression Block
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TerminaType Expression
 
-type TypeDef = TypeDef' TerminaType Block
+type TypeDef = TypeDef' TerminaType Expression Block
 
 type ClassMember = ClassMember' TerminaType Block
 
-type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
+type AnnotatedProgram a = [AnnASTElement' TerminaType Expression Block a]
 
 type ModuleImport = ModuleImport' QualifiedName
-type TerminaModule = TerminaModule' TerminaType Block Expression QualifiedName 
+type TerminaModule = TerminaModule' TerminaType Expression Block QualifiedName 

@@ -99,6 +99,11 @@ instance TypeElement CInteger CExpression where
         let cAnn = internalAnn CGenericAnn in
         CExprConstant (CIntConst cInteger) cType cAnn
 
+instance TypeElement CFloat CExpression where
+    (@:) cFloat cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprConstant (CFloatConst cFloat) cType cAnn
+
 instance TypeElement Char CExpression where
     (@:) chr cType =
         let cAnn = internalAnn CGenericAnn in
@@ -184,6 +189,7 @@ instance ConstType CType where
     _const (CTEnum ident qual) = CTEnum ident qual{qual_const = True}
     _const (CTSizeT qual) = CTSizeT qual{qual_const = True}
     _const (CTBool qual) = CTBool qual{qual_const = True}
+    _const (CTFloat sz qual) = CTFloat sz qual{qual_const = True}
     _const (CTTypeDef ident qual) = CTTypeDef ident qual{qual_const = True}
 
 instance ConstType Ident where

@@ -45,16 +45,26 @@ checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTerminaType loc type_c >>
   -- | Check that the constant is well-typed
-  catchExpectedNum loc EInvalidNumericConstantType (numTyOrFail loc type_c) >>
+  catchExpectedNum loc EInvalidNumericConstantType (intTyOrFail loc type_c) >>
   -- | Check that the explicit type matches the expected type
   sameTyOrError loc expected_type type_c >>
   -- | Check that the constant is in the range of the type
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
-  -- | Check that the expected type is a number
-  catchExpectedNum loc EUnexpectedNumericConstant (numTyOrFail loc expected_type) >>
+  -- | Check that the expected type is a valid type for an integer constant
+  catchExpectedNum loc EUnexpectedNumericConstant (intTyOrFail loc expected_type) >>
   -- | Check that the constant is in the range of the type
   checkIntConstant loc expected_type ti
+checkConstant loc expected_type (F _ (Just type_c)) =
+  -- | |type_c| is correct
+  checkTerminaType loc type_c >>
+  -- | Check that the explicit type is a floating-point type
+  catchExpectedNum loc EInvalidNumericConstantType (floatTyOrFail loc type_c) >>
+  -- | Check that the explicit type matches the expected type
+  sameTyOrError loc expected_type type_c
+checkConstant loc expected_type (F _ Nothing) =
+  -- | Check that the expected type is a floating-point type
+  catchExpectedNum loc EUnexpectedNumericConstant (floatTyOrFail loc expected_type)
 checkConstant loc expected_type (B {}) =
   sameTyOrError loc expected_type TBool
 checkConstant loc expected_type (C {}) =
@@ -134,20 +144,20 @@ checkTerminaType loc (TAllocator ty) =
   allocTyOrFail loc ty
 checkTerminaType loc (TAtomicAccess ty) = 
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicAccessInvalidType (numTyOrFail loc ty)
+  catchExpectedNum loc EAtomicAccessInvalidType (intTyOrFail loc ty)
 checkTerminaType loc (TAtomicArrayAccess ty s) = 
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicArrayAccessInvalidType (numTyOrFail loc ty) >>
+  catchExpectedNum loc EAtomicArrayAccessInvalidType (intTyOrFail loc ty) >>
   getExprType s >>= \case { 
     TConstSubtype _ -> return ();
     _ -> throwError $ annotateError loc EExpressionNotConstant
   }
 checkTerminaType loc (TAtomic ty) = 
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicInvalidType (numTyOrFail loc ty)
+  catchExpectedNum loc EAtomicInvalidType (intTyOrFail loc ty)
 checkTerminaType loc (TAtomicArray ty s) =
   checkTerminaType loc ty >>
-  catchExpectedNum loc EAtomicArrayInvalidType (numTyOrFail loc ty) >>
+  catchExpectedNum loc EAtomicArrayInvalidType (intTyOrFail loc ty) >>
   getExprType s >>= \case { 
     TConstSubtype _ -> return ();
     _ -> throwError $ annotateError loc EExpressionNotConstant
@@ -516,9 +526,9 @@ typeModifier :: Location
   -> SemanticMonad (SAST.Modifier SemanticAnn)
 typeModifier _loc _typeObj (Modifier ident Nothing) =
   return $ SAST.Modifier ident Nothing
-typeModifier loc typeObj (Modifier ident (Just constant)) = do
-  typed_const <- typeConstant loc typeObj constant
-  return $ SAST.Modifier ident (Just typed_const)
+typeModifier _loc typeObj (Modifier ident (Just expr)) = do
+  typed_expr <- typeExpression (Just (TConstSubtype TUInt32)) typeObj expr
+  return $ SAST.Modifier ident (Just typed_expr)
 
 typeConstant :: Location 
   -> (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
@@ -528,6 +538,10 @@ typeConstant _loc _typeObj (I tInt Nothing) = return $ SAST.I tInt Nothing
 typeConstant loc typeObj (I tInt (Just ts)) = do
   ty <- typeTypeSpecifier loc typeObj ts
   return $ SAST.I tInt (Just ty)
+typeConstant _loc _typeObj (F tFloat Nothing) = return $ SAST.F tFloat Nothing
+typeConstant loc typeObj (F tFloat (Just ts)) = do
+  ty <- typeTypeSpecifier loc typeObj ts
+  return $ SAST.F tFloat (Just ty)
 typeConstant _loc _typeObj (B tBool) = return $ SAST.B tBool
 typeConstant _loc _typeObj (C tChar) = return $ SAST.C tChar
 typeConstant _loc _typeObj Null = return SAST.Null
@@ -671,6 +685,8 @@ typeTypeSpecifier _ _ TSInt64  = return TInt64
 typeTypeSpecifier _ _ TSUSize  = return TUSize
 typeTypeSpecifier _ _ TSChar   = return TChar
 typeTypeSpecifier _ _ TSBool   = return TBool
+typeTypeSpecifier _ _ TSFloat32 = return TFloat32
+typeTypeSpecifier _ _ TSFloat64 = return TFloat64
 typeTypeSpecifier _ _ TSUnit   = return TUnit
 typeTypeSpecifier loc _ ts = throwError $ annotateError loc (EInvalidTypeSpecifier ts)
 
@@ -951,6 +967,21 @@ typeExpression Nothing typeObj (Constant c@(I _ (Just ts)) pann) = do
 -- This is an error, since we cannot infer the type of the constant.
 typeExpression Nothing _ (Constant (I tInt Nothing) pann) = do
   throwError $ annotateError pann $ EConstantWithoutKnownType (SAST.I tInt Nothing)
+-- | Float literals without an expected type but with a known type.
+typeExpression Nothing typeObj (Constant c@(F _ (Just ts)) pann) = do
+  typed_c <- typeConstant pann typeObj c
+  typedTS <- typeTypeSpecifier pann typeObj ts
+  case typedTS of
+    TConstSubtype ty -> do
+      checkConstant pann ty typed_c
+      return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype ty))
+    ty -> do
+      checkConstant pann ty typed_c
+      return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype ty))
+-- | Float literals without an expected type and without a known type.
+-- This is an error, since we cannot infer the type of the constant.
+typeExpression Nothing _ (Constant (F tFloat Nothing) pann) = do
+  throwError $ annotateError pann $ EConstantWithoutKnownType (SAST.F tFloat Nothing)
 -- | Boolean literals without an expected type.
 typeExpression Nothing typeObj (Constant c@(B {}) pann) = do
   typed_c <- typeConstant pann typeObj c
@@ -978,22 +1009,22 @@ typeExpression expectedType typeObj (Casting e nts pann) = do
 typeExpression expectedType typeObj (BinOp op le re pann) = do
 
   case op of
-    Addition -> sameNumType
-    Subtraction -> sameNumType
-    Multiplication -> sameNumType
-    Division -> sameNumType
-    Modulo -> sameNumType
+    Addition -> sameArithType
+    Subtraction -> sameArithType
+    Multiplication -> sameArithType
+    Division -> sameArithType
+    Modulo -> sameIntType
     BitwiseLeftShift -> leftNumRightPosType
     BitwiseRightShift -> leftNumRightPosType
     RelationalEqual -> sameEquatableTyBool
     RelationalNotEqual -> sameEquatableTyBool
-    RelationalLT -> sameNumTyBool
-    RelationalLTE -> sameNumTyBool
-    RelationalGT -> sameNumTyBool
-    RelationalGTE -> sameNumTyBool
-    BitwiseAnd -> sameNumType
-    BitwiseOr  -> sameNumType
-    BitwiseXor -> sameNumType
+    RelationalLT -> sameNumTyBool arithTy
+    RelationalLTE -> sameNumTyBool arithTy
+    RelationalGT -> sameNumTyBool arithTy
+    RelationalGTE -> sameNumTyBool arithTy
+    BitwiseAnd -> sameIntType
+    BitwiseOr  -> sameIntType
+    BitwiseXor -> sameIntType
     LogicalAnd -> sameBoolType
     LogicalOr  -> sameBoolType
 
@@ -1044,18 +1075,32 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     -- equal to the expected type (if any) and that the expected type is
     -- a numeric type. This function is used to check the
     -- binary expressions multiplication, division, addition and subtraction.
-    sameNumType :: SemanticMonad (SAST.Expression SemanticAnn)
-    sameNumType =
+    -- | Specialization for + - * / : operands may be integer or float (arithTy).
+    sameArithType :: SemanticMonad (SAST.Expression SemanticAnn)
+    sameArithType = sameNumType arithTy
+      EBinOpExpectedTypeNotArith EBinOpLeftTypeNotArith EBinOpRightTypeNotArith
+
+    -- | Specialization for % & | ^ : operands must be integer (intTy).
+    sameIntType :: SemanticMonad (SAST.Expression SemanticAnn)
+    sameIntType = sameNumType intTy
+      EBinOpExpectedTypeNotInt EBinOpLeftTypeNotInt EBinOpRightTypeNotInt
+
+    sameNumType :: (SAST.TerminaType SemanticAnn -> Bool)
+      -> (Op -> SAST.TerminaType SemanticAnn -> Error) -- ^ error if the expected result type is invalid
+      -> (Op -> SAST.TerminaType SemanticAnn -> Error) -- ^ error if the left operand type is invalid
+      -> (Op -> SAST.TerminaType SemanticAnn -> Error) -- ^ error if the right operand type is invalid
+      -> SemanticMonad (SAST.Expression SemanticAnn)
+    sameNumType isValid eExpected eLeft eRight =
       case expectedType of
         ty@(Just (TConstSubtype ty')) -> do
-          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          unless (isValid ty') (throwError $ annotateError pann (eExpected op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           tyre <- catchMismatch (getAnnotation re) (EBinOpExpectedTypeRight op ty')
             (typeExpression ty typeObj re)
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype ty'))
         ty@(Just ty') -> do
-          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          unless (isValid ty') (throwError $ annotateError pann (eExpected op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           tyre <- catchMismatch (getAnnotation re) (EBinOpExpectedTypeRight op ty')
@@ -1066,7 +1111,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
             (TConstSubtype _, TConstSubtype _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype ty'))
             (_, _) -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
         Nothing -> do
-          (ty, tyle, tyre) <- sameTypeExpressions numTy (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
+          (ty, tyle, tyre) <- sameTypeExpressions isValid (eLeft op) (eRight op) le re
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty)
 
     -- | This function checks that the lhs is equal to the expected type (if any)
@@ -1080,14 +1125,14 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
       unless (posTy tyre_ty) (throwError $ annotateError pann (EBinOpRightTypeNotPos op tyre_ty))
       case expectedType of
         ty@(Just ty'@(TConstSubtype _)) -> do
-          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          unless (intTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotInt op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           case tyre_ty of
             TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann ty')
             _ -> throwError $ annotateError (getAnnotation re) EExpressionNotConstant
         ty@(Just ty') -> do
-          unless (numTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotNum op ty'))
+          unless (intTy ty') (throwError $ annotateError pann (EBinOpExpectedTypeNotInt op ty'))
           tyle <- catchMismatch (getAnnotation le) (EBinOpExpectedTypeLeft op ty')
             (typeExpression ty typeObj le)
           tyle_ty <- getExprType tyle
@@ -1097,7 +1142,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
         Nothing -> do
           tyle <- typeExpression Nothing typeObj le
           tyle_ty <- getExprType tyle
-          unless (numTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotNum op tyle_ty))
+          unless (intTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotInt op tyle_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
@@ -1123,21 +1168,21 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
 
     -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is numeric. This function is used to check the binary expressions <, <=, > and >=.
-    sameNumTyBool :: SemanticMonad (SAST.Expression SemanticAnn)
-    sameNumTyBool =
+    sameNumTyBool :: (SAST.TerminaType SemanticAnn -> Bool) -> SemanticMonad (SAST.Expression SemanticAnn)
+    sameNumTyBool isValid =
       case expectedType of
         (Just TBool) -> do
           (ty, tyle, tyre) <-
-            sameTypeExpressions numTy
-              (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
-          case ty of 
+            sameTypeExpressions isValid
+              (EBinOpLeftTypeNotArith op) (EBinOpRightTypeNotArith op) le re
+          case ty of
             TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
             _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
         Just ty -> throwError $ annotateError pann (EBinOpExpectedTypeNotBool op ty)
         Nothing -> do
           (ty, tyle, tyre) <-
-            sameTypeExpressions numTy
-              (EBinOpLeftTypeNotNum op) (EBinOpRightTypeNotNum op) le re
+            sameTypeExpressions isValid
+              (EBinOpLeftTypeNotArith op) (EBinOpRightTypeNotArith op) le re
           case ty of
             TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
             _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)

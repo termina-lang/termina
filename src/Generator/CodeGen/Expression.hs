@@ -49,6 +49,9 @@ genType qual TInt64 = return (CTInt IntSize64 Signed qual)
 genType qual TUSize = return (CTSizeT qual)
 genType qual TBool = return (CTBool qual)
 genType qual TChar = return (CTChar qual)
+-- | Floating-point types
+genType qual TFloat32 = return (CTFloat FloatSize32 qual)
+genType qual TFloat64 = return (CTFloat FloatSize64 qual)
 -- | Primitive type
 genType qual (TGlobal _ clsIdentifier) = return (CTTypeDef clsIdentifier qual)
 -- | TArray type
@@ -275,6 +278,10 @@ genExpression (BinOp op left right ann) =
                             CTBool _ -> return leftExpr
                             CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) leftExpr |>> getLocation ann
                             CTSizeT _ -> return $ cast (CTSizeT noqual) leftExpr |>> getLocation ann
+                            -- | Float operands need no cast: same-type float arithmetic
+                            -- does not promote (float + float stays float), unlike integer
+                            -- promotion to int. See FLT_EVAL_METHOD note.
+                            CTFloat _ _ -> return leftExpr
                             _ -> throwError $ InternalError $ "Unsupported left expression type: " ++ show leftExprType
                     _ -> return leftExpr)
             cRight <- (do
@@ -286,6 +293,7 @@ genExpression (BinOp op left right ann) =
                             CTBool _ -> return rightExpr
                             CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) rightExpr |>> getLocation ann
                             CTSizeT _ -> return $ cast (CTSizeT noqual) rightExpr |>> getLocation ann
+                            CTFloat _ _ -> return rightExpr
                             _ -> throwError $ InternalError $ "Unsupported right expression type: " ++ show rightExpr
                     _ -> genExpression right)
             return $ CExprBinaryOp (cBinOp op) cLeft cRight (getCExprType cLeft) cAnn
@@ -293,9 +301,12 @@ genExpression (BinOp op left right ann) =
 genExpression e@(Constant c ann) = do
     cType <- getExprType e >>= genType noqual
     case c of
-        (I i _) -> 
+        (I i _) ->
             let cInteger = genInteger i in
             return $ cInteger @: cType |>> getLocation ann
+        (F f _) ->
+            let cFloat = genFloat f in
+            return $ cFloat @: cType |>> getLocation ann
         (B True) -> return $ dec 1 @: cType |>> getLocation ann
         (B False) -> return $ dec 0 @: cType |>> getLocation ann
         (C chr) -> return $ chr @: cType |>> getLocation ann

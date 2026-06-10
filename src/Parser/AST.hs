@@ -285,6 +285,8 @@ instance ShowText (TypeSpecifier a) where
     showText TSUSize = "usize"
     showText TSBool = "bool"
     showText TSChar = "char"
+    showText TSFloat32 = "f32"
+    showText TSFloat64 = "f64"
     showText (TSConstSubtype ts) = "const " <> showText ts
     showText (TSArray ts size) = "[" <> showText ts <> "; "  <> showText size <> "]"
     showText (TSBoxSubtype ts) = "box " <> showText ts
@@ -300,21 +302,21 @@ instance ShowText (TypeSpecifier a) where
 
 type Parameter = Parameter' TypeSpecifier
 type Const = Const' TypeSpecifier
-type Modifier = Modifier' TypeSpecifier
+type Modifier = Modifier' Expression
 type FieldDefinition = FieldDefinition' TypeSpecifier
 type EnumVariant = EnumVariant' TypeSpecifier
 type MonadicVariant = MonadicVariant' Expression
 
-type AnnASTElement = AnnASTElement' TypeSpecifier Block Expression
+type AnnASTElement = AnnASTElement' TypeSpecifier Expression Block
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TypeSpecifier Expression
 
-type TypeDef = TypeDef' TypeSpecifier Block
+type TypeDef = TypeDef' TypeSpecifier Expression Block
 
-type InterfaceMember = InterfaceMember' TypeSpecifier
+type InterfaceMember = InterfaceMember' TypeSpecifier Expression
 type ClassMember = ClassMember' TypeSpecifier Block
 
-type AnnotatedProgram a = [AnnASTElement' TypeSpecifier Block Expression a]
+type AnnotatedProgram a = [AnnASTElement' TypeSpecifier Expression Block a]
 
 type ModuleImport = ModuleImport' [String]
-type TerminaModule a = TerminaModule' TypeSpecifier Block Expression [String] a
+type TerminaModule a = TerminaModule' TypeSpecifier Expression Block [String] a

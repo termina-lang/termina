@@ -83,6 +83,7 @@ pprintCTInt size signedness = do
 
 instance CPrint CConstant where
     pprint (CIntConst i) = return $ pretty i
+    pprint (CFloatConst f) = return $ pretty f
     pprint (CCharConst c) = return $ pretty c
     pprint (CStrConst s) = return $ pretty s
 
@@ -166,6 +167,14 @@ instance CPrint CType where
     pprint (CTBool qual) = do
         pqual <- pprint qual
         return $ pqual <+> pretty "_Bool"
+    pprint (CTFloat FloatSize32 (CQualifier False False False)) = return $ pretty "float32_t"
+    pprint (CTFloat FloatSize64 (CQualifier False False False)) = return $ pretty "float64_t"
+    pprint (CTFloat FloatSize32 qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "float32_t"
+    pprint (CTFloat FloatSize64 qual) = do
+        pqual <- pprint qual
+        return $ pqual <+> pretty "float64_t"
     pprint (CTTypeDef ident (CQualifier False False False)) = return $ pretty ident
     pprint (CTTypeDef ident qual) = do
         pqual <- pprint qual
@@ -228,6 +237,12 @@ instance CPrint CExpression where
             -- size_t literals depending on the platform
             CTSizeT _ -> return $ pretty i <> pretty "U"
             _ -> pprint i
+    pprintPrec _ (CExprConstant (CFloatConst f) ty _) =
+        case ty of
+            -- | f32 literals carry the 'f' suffix (single precision); f64
+            -- literals carry no suffix (double is the default in C).
+            CTFloat FloatSize32 _ -> return $ pretty f <> pretty "f"
+            _ -> return $ pretty f
     pprintPrec _ (CExprConstant c _ _) = pprint c
     pprintPrec p (CExprValOf obj _ _) = pprintPrec p obj
     pprintPrec p (CExprAddrOf obj _ _) = do
@@ -282,6 +297,9 @@ instance CPrint CExpression where
         pexpr <- pprintPrec 26 expr
         pargs <- mapM (pprintPrec 2) args
         return $ parenPrec p 26 $ pexpr <> parens (align (fillSep (punctuate comma pargs)))
+    pprintPrec _ (CExprArrayInitializer exprs _ _) = do
+        pexprs <- mapM (pprintPrec 2) exprs
+        return $ braces (space <> align (fillSep (punctuate comma pexprs)) <> space)
 
 prependLine :: Bool -> DocStyle -> DocStyle
 prependLine True doc = line <> doc
@@ -414,9 +432,9 @@ instance CPrint CEnum where
 instance CPrint CDeclaration where
     pprint (CDecl (CTypeSpec ty) (Just ident) Nothing)  = pprintCTypeDecl ident ty
     pprint (CDecl (CTypeSpec ty) (Just ident) (Just expr)) = do
-        pty <- pprint ty
+        ptydecl <- pprintCTypeDecl ident ty
         pexpr <- pprint expr
-        return $ pty <+> pretty ident <+> pretty "=" <+> pexpr
+        return $ ptydecl <+> pretty "=" <+> pexpr
     pprint (CDecl (CTSStructUnion stu) Nothing Nothing) = pprint stu
     pprint (CDecl (CTSStructUnion stu) (Just ident) Nothing) = do
         pstruct <- pprint stu

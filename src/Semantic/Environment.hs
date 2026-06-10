@@ -36,6 +36,13 @@ getEntry = element
 stdlibGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
 stdlibGlobalEnv =
   [
+    -- | Floating-point bit reinterpretation. These are Prelude functions whose
+    -- body is provided by the OSAL (memcpy-based static inline). They lower to a
+    -- direct C call of the same name.
+    ("f32_to_bits", LocatedElement (GFun (FunctionSeman [Parameter "value" TFloat32] TUInt32)) Internal),
+    ("f32_from_bits", LocatedElement (GFun (FunctionSeman [Parameter "bits" TUInt32] TFloat32)) Internal),
+    ("f64_to_bits", LocatedElement (GFun (FunctionSeman [Parameter "value" TFloat64] TUInt64)) Internal),
+    ("f64_from_bits", LocatedElement (GFun (FunctionSeman [Parameter "bits" TUInt64] TFloat64)) Internal),
     ("TimeVal", LocatedElement (GType (Struct "TimeVal" [FieldDefinition "tv_sec" TUInt32 (buildExpAnn Internal TUInt32), FieldDefinition "tv_usec" TUInt32 (buildExpAnn Internal TUInt32)] [])) Internal),
     ("Interrupt", LocatedElement (GType (Class EmitterClass "Interrupt" [] [] [])) Internal),
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
@@ -116,7 +123,11 @@ stdlibGlobalEnv =
       InterfaceProcedure Mutable "print_i64" [Parameter "value" TInt64, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "println_i64" [Parameter "value" TInt64, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "print_usize" [Parameter "value" TUSize, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println_usize" [Parameter "value" TUSize, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit)
+      InterfaceProcedure Mutable "println_usize" [Parameter "value" TUSize, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "print_f32" [Parameter "value" TFloat32] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "println_f32" [Parameter "value" TFloat32] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "print_f64" [Parameter "value" TFloat64] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "println_f64" [Parameter "value" TFloat64] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
     ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
       InterfaceProcedure Mutable "read" [Parameter "size" (TConstSubtype TUSize), 

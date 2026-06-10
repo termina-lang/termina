@@ -104,6 +104,11 @@ data CIntSize =
     | IntSize128
     deriving Show
 
+data CFloatSize =
+    FloatSize32
+    | FloatSize64
+    deriving Show
+
 data CType = 
     -- | The void type
     CTVoid CQualifier
@@ -122,8 +127,10 @@ data CType =
     | CTEnum Ident CQualifier
     -- | size_t type 
     | CTSizeT CQualifier
-    -- | _Bool type  
+    -- | _Bool type
     | CTBool CQualifier
+    -- | Floating-point types
+    | CTFloat CFloatSize CQualifier
     -- | typedef name
     | CTTypeDef Ident CQualifier
     deriving Show
@@ -193,8 +200,20 @@ instance Pretty CInteger where
   pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
   pretty (CInteger i COctalRepr) = pretty "0" <> pretty (showOct i "")
 
+data CFloatRepr = CFloatDec | CFloatSci
+    deriving Show
+
+data CFloat =
+    CFloat !Double !CFloatRepr
+    deriving Show
+
+instance Pretty CFloat where
+  pretty (CFloat d CFloatDec) = pretty (showFFloat Nothing d "")
+  pretty (CFloat d CFloatSci) = pretty (showEFloat Nothing d "")
+
 data CConstant =
   CIntConst   CInteger
+  | CFloatConst CFloat
   | CCharConst  CChar
   | CStrConst   CString
     deriving Show
@@ -222,6 +241,7 @@ data CExpression' a =
     | CExprAssign (CObject' a) (CExpression' a) CType a
     | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
     | CExprCall (CExpression' a) [CExpression' a] CType a
+    | CExprArrayInitializer [CExpression' a] CType a -- ^ array initializer list { e0, e1, ... }
     deriving Show
 
 instance Annotated CExpression' where
@@ -239,6 +259,7 @@ instance Annotated CExpression' where
   getAnnotation (CExprAssign _ _ _ a) = a
   getAnnotation (CExprComma _ _ _ a) = a
   getAnnotation (CExprCall _ _ _ a) = a
+  getAnnotation (CExprArrayInitializer _ _ a) = a
 
   updateAnnotation (CExprConstant c t _) = CExprConstant c t
   updateAnnotation (CExprValOf o t _) = CExprValOf o t
@@ -254,6 +275,7 @@ instance Annotated CExpression' where
   updateAnnotation (CExprAssign o e t _) = CExprAssign o e t
   updateAnnotation (CExprComma e1 e2 t _) = CExprComma e1 e2 t
   updateAnnotation (CExprCall e es t _) = CExprCall e es t
+  updateAnnotation (CExprArrayInitializer es t _) = CExprArrayInitializer es t
 
 getCExprType :: CExpression' a -> CType
 getCExprType (CExprConstant _ t _) = t
@@ -270,6 +292,7 @@ getCExprType (CExprAlignOfType _ t _) = t
 getCExprType (CExprAssign _ _ t _) = t
 getCExprType (CExprComma _ _ t _) = t
 getCExprType (CExprCall _ _ t _) = t
+getCExprType (CExprArrayInitializer _ t _) = t
 
 getCObjType :: CObject' a -> CType
 getCObjType (CVar _ t) = t
@@ -324,6 +347,7 @@ instance Annotated CStatement' where
 
 instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
+  pretty (CFloatConst f) = pretty f
   pretty (CCharConst c) = pretty c
   pretty (CStrConst s) = pretty s
 

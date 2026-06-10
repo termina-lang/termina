@@ -246,6 +246,18 @@ genMonadicTypeInitialization loc before level cObj expr =
                 return $ no_cr (variantsFieldsObj @= failureVariantExpr |>> getLocation ann) |>> getLocation ann : fieldInitalization
         _ -> throwError $ InternalError $ "Incorrect initialization expression: " ++ show expr
 
+-- | Generates a C array initializer expression { e0, e1, ... } from an array
+-- expression-list initializer. Nested array initializers recurse into nested
+-- braces; scalar elements are generated as plain expressions. This is used to
+-- emit "T arr[N] = { ... };" declarations (required for const arrays).
+genArrayInitializerExpr :: Expression SemanticAnn -> CGenerator CExpression
+genArrayInitializerExpr expr = case expr of
+    (ArrayExprListInitializer exprs ann) -> do
+        cType <- getExprType expr >>= genType noqual
+        cElems <- mapM genArrayInitializerExpr exprs
+        return $ CExprArrayInitializer cElems cType (buildGenericAnn ann)
+    _ -> genExpression expr
+
 genArrayInitialization ::
     Location
     -- | Prepend a line to the initialization expression 
@@ -903,11 +915,18 @@ genStatement (Declaration identifier _ ts expr ann) = do
   cType <- genType noqual ts
   let cObj = CVar identifier cType
   case ts of
-    TArray _ _ -> do
-        arrayInitialization <- genArrayInitialization loc False 0 cObj expr
-        return $
-            pre_cr (var identifier cType) |>> loc
-            : arrayInitialization
+    TArray _ _ -> case expr of
+        -- | Explicit expression-list initializers are emitted as a single
+        -- "T arr[N] = { ... };" declaration. Fill initializers ([e; N]) keep
+        -- the for loop, which is more compact for large arrays.
+        (ArrayExprListInitializer {}) -> do
+            cInit <- genArrayInitializerExpr expr
+            return [pre_cr (var identifier cType @:= cInit) |>> loc]
+        _ -> do
+            arrayInitialization <- genArrayInitialization loc False 0 cObj expr
+            return $
+                pre_cr (var identifier cType) |>> loc
+                : arrayInitialization
     _ -> case expr of
         (StructInitializer {}) -> do
             structInitialization <- genStructInitialization loc False 0 cObj expr

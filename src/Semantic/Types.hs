@@ -130,7 +130,7 @@ data GEntry a
 -- Aux constant type type-constructor
 data EmptyBlock a = EmptyBlock
   deriving (Show, Functor)
-type SemanTypeDef a = TypeDef' TerminaType EmptyBlock a
+type SemanTypeDef a = TypeDef' TerminaType Expression EmptyBlock a
 
 -- Forgetfull Class member map
 kClassMember :: ClassMember' ty blk a -> ClassMember' ty EmptyBlock a
@@ -148,9 +148,9 @@ kClassMember (ClassAction ak idx ps ty _blk ann) =
 -- Subtyping.
 -- This fuction says what types can be casted into others.
 casteableTys :: TerminaType a -> TerminaType a -> Bool
-casteableTys source@(TConstSubtype _) target@(TConstSubtype _) = numTy source && numTy target
+casteableTys source@(TConstSubtype _) target@(TConstSubtype _) = arithTy source && arithTy target
 casteableTys _ (TConstSubtype _) = False
-casteableTys source target = numTy source && numTy target
+casteableTys source target = arithTy source && arithTy target
 
 -- Relation between types
 -- we use to define (box A \subseteq A)

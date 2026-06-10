@@ -80,7 +80,7 @@ alignedClass = TypeDefinition
     ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
       (buildFieldAnn Internal)),
     ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) (buildTypeAnn Internal)
+  ] ["Interface0"] [Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))]) (buildTypeAnn Internal)
 
 packedAndAlignedClass :: AnnASTElement SemanticAnn
 packedAndAlignedClass = TypeDefinition
@@ -92,7 +92,7 @@ packedAndAlignedClass = TypeDefinition
     ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [
       Modifier "packed" Nothing,
-      Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))
+      Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))
     ]) (buildTypeAnn Internal)
 
 classWithFixedLocationField :: AnnASTElement SemanticAnn

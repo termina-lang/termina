@@ -20,7 +20,7 @@ import qualified Data.Set as S
 import Control.Monad.State
 import Core.Utils
 
-filterStructModifiers :: [Modifier a] -> [Modifier a]
+filterStructModifiers :: [Modifier SemanticAnn] -> [Modifier SemanticAnn]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
       Modifier "aligned" _ -> True
@@ -216,26 +216,12 @@ genOptionStruct ts = do
             pre_cr $ struct identifier [some, this_variant] []
         ]
 
-genAttribute :: Modifier a -> CGenerator CAttribute
+genAttribute :: Modifier SemanticAnn -> CGenerator CAttribute
 genAttribute (Modifier name Nothing) = do
     return $ CAttr name []
 genAttribute (Modifier name (Just expr)) = do
-    cExpr <- genConst expr
+    cExpr <- genExpression expr
     return $ CAttr name [cExpr]
-
-    where
-
-        genConst :: (MonadError CGeneratorError m) => Const a -> m CExpression
-        genConst c = do
-            let cAnn = LocatedElement CGenericAnn Internal
-            case c of
-                (I i _) ->
-                    let cInteger = genInteger i in
-                    return $ CExprConstant (CIntConst cInteger) (CTInt IntSize32 Unsigned noqual) cAnn
-                (B True) -> return $ CExprConstant (CIntConst (CInteger 1 CDecRepr)) (CTBool noqual) cAnn
-                (B False) -> return $ CExprConstant (CIntConst (CInteger 0 CDecRepr)) (CTBool noqual) cAnn
-                (C ch) -> return $ CExprConstant (CCharConst (CChar ch)) (CTChar noqual) cAnn
-                Null -> throwError $ InternalError "Null constant should not be translated to C"
 
 genEnumVariantParameterStruct :: SemanticAnn -> Identifier -> EnumVariant SemanticAnn -> CGenerator CFileItem
 genEnumVariantParameterStruct ann identifier (EnumVariant this_variant params) = do

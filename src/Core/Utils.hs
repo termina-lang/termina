@@ -17,6 +17,8 @@ copyTy TInt64           = True
 copyTy TUSize           = True
 copyTy TBool            = True
 copyTy TChar            = True
+copyTy TFloat32         = True
+copyTy TFloat64         = True
 copyTy (TStruct _)      = True
 copyTy (TEnum _)        = True
 copyTy (TResult _ _)    = True
@@ -39,6 +41,8 @@ statusTy TInt64           = True
 statusTy TUSize           = True
 statusTy TBool            = True
 statusTy TChar            = True
+statusTy TFloat32         = True
+statusTy TFloat64         = True
 statusTy (TStruct _)      = True
 statusTy (TEnum _)        = True
 statusTy _                = False 
@@ -55,6 +59,8 @@ resultTy TInt64           = True
 resultTy TUSize           = True
 resultTy TBool            = True
 resultTy TChar            = True
+resultTy TFloat32         = True
+resultTy TFloat64         = True
 resultTy (TStruct _)      = True
 resultTy (TEnum _)        = True
 resultTy _                = False 
@@ -71,6 +77,8 @@ optionTy TInt64           = True
 optionTy TUSize           = True
 optionTy TBool            = True
 optionTy TChar            = True
+optionTy TFloat32         = True
+optionTy TFloat64         = True
 optionTy (TStruct _)      = True
 optionTy (TEnum _)        = True
 optionTy (TBoxSubtype ty) = boxTy ty
@@ -90,6 +98,8 @@ declTy TInt64      = True
 declTy TUSize      = True
 declTy TBool       = True
 declTy TChar       = True
+declTy TFloat32    = True
+declTy TFloat64    = True
 declTy (TArray {}) = True
 declTy (TStruct _) = True
 declTy (TEnum _)   = True
@@ -110,6 +120,8 @@ arrayTy TInt64           = True
 arrayTy TUSize           = True
 arrayTy TBool            = True
 arrayTy TChar            = True
+arrayTy TFloat32         = True
+arrayTy TFloat64         = True
 arrayTy (TArray ty _)    = arrayTy ty
 arrayTy (TStruct _)      = True
 arrayTy (TEnum _)        = True
@@ -131,6 +143,8 @@ parameterTy TInt64            = True
 parameterTy TUSize            = True
 parameterTy TBool             = True
 parameterTy TChar             = True
+parameterTy TFloat32          = True
+parameterTy TFloat64          = True
 parameterTy (TStruct _)       = True
 parameterTy (TEnum _)         = True
 parameterTy (TResult _ _)     = True
@@ -154,6 +168,8 @@ viewerParamTy TInt64            = True
 viewerParamTy TUSize            = True
 viewerParamTy TBool             = True
 viewerParamTy TChar             = True
+viewerParamTy TFloat32          = True
+viewerParamTy TFloat64          = True
 viewerParamTy (TStruct _)       = True
 viewerParamTy (TEnum _)         = True
 viewerParamTy (TResult _ _)     = True
@@ -178,6 +194,8 @@ procedureParamTy TInt64            = True
 procedureParamTy TUSize            = True
 procedureParamTy TBool             = True
 procedureParamTy TChar             = True
+procedureParamTy TFloat32          = True
+procedureParamTy TFloat64          = True
 procedureParamTy (TStruct _)       = True
 procedureParamTy (TEnum _)         = True
 procedureParamTy (TResult _ _)     = True
@@ -200,6 +218,8 @@ actionParamTy TInt64           = True
 actionParamTy TUSize           = True
 actionParamTy TBool            = True
 actionParamTy TChar            = True
+actionParamTy TFloat32         = True
+actionParamTy TFloat64         = True
 actionParamTy (TStruct _)      = True
 actionParamTy (TEnum _)        = True
 actionParamTy (TResult _ _)    = True
@@ -237,6 +257,8 @@ boxTy TInt64      = True
 boxTy TUSize      = True
 boxTy TBool       = True
 boxTy TChar       = True
+boxTy TFloat32    = True
+boxTy TFloat64    = True
 boxTy (TStruct _) = True
 boxTy (TEnum _)   = True
 boxTy _           = False
@@ -264,6 +286,8 @@ msgTy TInt64           = True
 msgTy TUSize           = True
 msgTy TBool            = True
 msgTy TChar            = True
+msgTy TFloat32         = True
+msgTy TFloat64         = True
 msgTy (TStruct _)      = True
 msgTy (TEnum _)        = True
 msgTy (TBoxSubtype {}) = True
@@ -281,6 +305,8 @@ refTy TInt64           = True
 refTy TUSize           = True
 refTy TBool            = True
 refTy TChar            = True
+refTy TFloat32         = True
+refTy TFloat64         = True
 refTy (TStruct _)      = True
 refTy (TEnum _)        = True
 refTy (TResult _ _)    = True
@@ -305,21 +331,37 @@ constTy TInt64           = True
 constTy TUSize           = True
 constTy TBool            = True
 constTy TChar            = True
+constTy TFloat32         = True
+constTy TFloat64         = True
 constTy _                = False  
 
 -- | Predicate definining when a |TerminaType| is numeric.
-numTy :: TerminaType' expr a -> Bool
-numTy TUInt8  = True
-numTy TUInt16 = True
-numTy TUInt32 = True
-numTy TUInt64 = True
-numTy TInt8   = True
-numTy TInt16  = True
-numTy TInt32  = True
-numTy TInt64  = True
-numTy TUSize  = True
-numTy (TConstSubtype ty) = numTy ty
-numTy _      = False
+intTy :: TerminaType' expr a -> Bool
+intTy TUInt8  = True
+intTy TUInt16 = True
+intTy TUInt32 = True
+intTy TUInt64 = True
+intTy TInt8   = True
+intTy TInt16  = True
+intTy TInt32  = True
+intTy TInt64  = True
+intTy TUSize  = True
+intTy (TConstSubtype ty) = intTy ty
+intTy _      = False
+
+-- | Predicate defining when a |TerminaType| is a floating-point type.
+floatTy :: TerminaType' expr a -> Bool
+floatTy TFloat32 = True
+floatTy TFloat64 = True
+floatTy (TConstSubtype ty) = floatTy ty
+floatTy _ = False
+
+-- | Predicate defining the types that support arithmetic (+ - * /) and
+-- relational (< <= > >=) operators: integers and floats. Modulo, bitwise and
+-- shift operators stay restricted to integers (intTy); equality (== !=) stays
+-- restricted to equatable types (eqTy), so it is not allowed on floats.
+arithTy :: TerminaType' expr a -> Bool
+arithTy ty = intTy ty || floatTy ty
 
 posTy :: TerminaType' expr a -> Bool
 posTy TUInt8  = True
@@ -362,7 +404,7 @@ memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons i (TConstSubtype ty) = memberIntCons i ty
 memberIntCons _ _      = False
 
-getTypeIdentifier :: TypeDef' ty blk a -> Identifier
+getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident
 getTypeIdentifier (Enum ident _ _)          = ident
 getTypeIdentifier (Class _ ident _ _ _)     = ident
@@ -426,6 +468,8 @@ sameTy  TUSize  TUSize = True
 sameTy  TBool  TBool = True
 sameTy  TUnit TUnit = True
 sameTy  TChar TChar = True
+sameTy  TFloat32 TFloat32 = True
+sameTy  TFloat64 TFloat64 = True
 sameTy  (TConstSubtype tyspecl) (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
 sameTy  (TConstSubtype _) _ = False
 sameTy  tyspecl (TConstSubtype tyspecr) = sameTy tyspecl tyspecr
@@ -475,7 +519,7 @@ findClassProcedure i
   L.find (\case{ ClassProcedure _ ident _ _ _ -> (ident == i)
                ; _ -> False})
 
-findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty a ] -> Maybe (AccessKind, [Parameter' ty a], a)
+findInterfaceProcedure :: Identifier -> [ InterfaceMember' ty expr a ] -> Maybe (AccessKind, [Parameter' ty a], a)
 findInterfaceProcedure i
   = fmap
   (\case {InterfaceProcedure ak _ ps _ a -> (ak, ps, a)})

@@ -71,7 +71,7 @@ alignedStruct = TypeDefinition
     FieldDefinition "field1" TUInt16 (buildExpAnn Internal TUInt16),
     FieldDefinition "field2" (TArray TUInt32 (buildConstExprTUSize 10))
       (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
-  ] [Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))]) (buildTypeAnn Internal)
+  ] [Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))]) (buildTypeAnn Internal)
 
 packedAndAlignedStruct :: AnnASTElement SemanticAnn
 packedAndAlignedStruct = TypeDefinition
@@ -82,7 +82,7 @@ packedAndAlignedStruct = TypeDefinition
       (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
   ] [
       Modifier "packed" Nothing,
-      Modifier "aligned" (Just (I (TInteger 16 DecRepr) (Just TUInt32)))
+      Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))
     ]) (buildTypeAnn Internal)
 
 spec :: Spec

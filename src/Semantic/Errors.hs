@@ -98,9 +98,12 @@ data Error
   | EBinOpExpectedTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not boolean
   | EBinOpLeftTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the left
   | EBinOpRightTypeNotBool Op (TerminaType SemanticAnn) -- ^ Binary operation expected boolean type on the right
-  | EBinOpExpectedTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not numeric
-  | EBinOpLeftTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the left
-  | EBinOpRightTypeNotNum Op (TerminaType SemanticAnn) -- ^ Binary operation expected numeric type on the right
+  | EBinOpExpectedTypeNotArith Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not arithmetic (integer or float)
+  | EBinOpLeftTypeNotArith Op (TerminaType SemanticAnn) -- ^ Binary operation expected arithmetic type on the left
+  | EBinOpRightTypeNotArith Op (TerminaType SemanticAnn) -- ^ Binary operation expected arithmetic type on the right
+  | EBinOpExpectedTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected result type not integer
+  | EBinOpLeftTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the left
+  | EBinOpRightTypeNotInt Op (TerminaType SemanticAnn) -- ^ Binary operation expected integer type on the right
   | EBinOpRightTypeNotPos Op (TerminaType SemanticAnn) -- ^ Binary operation expected positive numeric type on the right
   | EBinOpLeftTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the left
   | EBinOpRightTypeNotEq Op (TerminaType SemanticAnn) -- ^ Binary operation expected equatable type on the right
@@ -316,9 +319,12 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EBinOpExpectedTypeNotBool _op _ty) _pos) = "SE-044"
     errorIdent (AnnotatedError (EBinOpLeftTypeNotBool _op _ty) _pos) = "SE-045"
     errorIdent (AnnotatedError (EBinOpRightTypeNotBool _op _ty) _pos) = "SE-046"
-    errorIdent (AnnotatedError (EBinOpExpectedTypeNotNum _op _ty) _pos) = "SE-047"
-    errorIdent (AnnotatedError (EBinOpLeftTypeNotNum _op _ty) _pos) = "SE-048"
-    errorIdent (AnnotatedError (EBinOpRightTypeNotNum _op _ty) _pos) = "SE-049"
+    errorIdent (AnnotatedError (EBinOpExpectedTypeNotArith _op _ty) _pos) = "SE-047"
+    errorIdent (AnnotatedError (EBinOpLeftTypeNotArith _op _ty) _pos) = "SE-048"
+    errorIdent (AnnotatedError (EBinOpRightTypeNotArith _op _ty) _pos) = "SE-049"
+    errorIdent (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "SE-214"
+    errorIdent (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "SE-215"
+    errorIdent (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "SE-216"
     errorIdent (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "SE-050"
     errorIdent (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "SE-051"
     errorIdent (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "SE-052"
@@ -530,9 +536,12 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EBinOpExpectedTypeNotBool _op _ty) _pos) = "binary operation expected result type not boolean"
     errorTitle (AnnotatedError (EBinOpLeftTypeNotBool _op _ty) _pos) = "binary operation expected boolean type on the left"
     errorTitle (AnnotatedError (EBinOpRightTypeNotBool _op _ty) _pos) = "binary operation expected boolean type on the right"
-    errorTitle (AnnotatedError (EBinOpExpectedTypeNotNum _op _ty) _pos) = "binary operation expected result type not numeric"
-    errorTitle (AnnotatedError (EBinOpLeftTypeNotNum _op _ty) _pos) = "binary operation expected numeric type on the left"
-    errorTitle (AnnotatedError (EBinOpRightTypeNotNum _op _ty) _pos) = "binary operation expected numeric type on the right"
+    errorTitle (AnnotatedError (EBinOpExpectedTypeNotArith _op _ty) _pos) = "binary operation expected result type not arithmetic"
+    errorTitle (AnnotatedError (EBinOpLeftTypeNotArith _op _ty) _pos) = "binary operation expected arithmetic type on the left"
+    errorTitle (AnnotatedError (EBinOpRightTypeNotArith _op _ty) _pos) = "binary operation expected arithmetic type on the right"
+    errorTitle (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "binary operation expected result type not integer"
+    errorTitle (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the left"
+    errorTitle (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the right"
     errorTitle (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "binary operation expected positive numeric type on the right"
     errorTitle (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the left"
     errorTitle (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the right"
@@ -1269,23 +1278,40 @@ instance ErrorMessage SemanticErrors where
                         (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
                             "\x1b[0m is of type \x1b[31m" <> showText ty <>
                             "\x1b[0m but it is expected to be of type \x1b[31m" <> showText (TBool :: TerminaType a) <> "\x1b[0m."))
-                EBinOpExpectedTypeNotNum op ty ->
+                EBinOpExpectedTypeNotArith op ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The binary operation \x1b[31m" <> showText op <>
-                            "\x1b[0m will result in a numeric value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EBinOpLeftTypeNotNum op ty ->
+                            "\x1b[0m will result in an arithmetic value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EBinOpLeftTypeNotArith op ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
                             "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of numeric type."))
-                EBinOpRightTypeNotNum op ty ->
+                            "\x1b[0m but it is expected to be of arithmetic type (integer or float)."))
+                EBinOpRightTypeNotArith op ty ->
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
                             "\x1b[0m is of type \x1b[31m" <> showText ty <>
-                            "\x1b[0m but it is expected to be of numeric type."))
+                            "\x1b[0m but it is expected to be of arithmetic type (integer or float)."))
+                EBinOpExpectedTypeNotInt op ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The binary operation \x1b[31m" <> showText op <>
+                            "\x1b[0m will result in an integer value but the expected type is \x1b[31m" <> showText ty <> "\x1b[0m."))
+                EBinOpLeftTypeNotInt op ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The left operand of the binary operation \x1b[31m" <> showText op <>
+                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
+                            "\x1b[0m but it is expected to be of integer type."))
+                EBinOpRightTypeNotInt op ty ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The right operand of the binary operation \x1b[31m" <> showText op <>
+                            "\x1b[0m is of type \x1b[31m" <> showText ty <>
+                            "\x1b[0m but it is expected to be of integer type."))
                 EBinOpRightTypeNotPos op ty ->
                     pprintSimpleError
                         sourceLines title fileName pos

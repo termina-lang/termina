@@ -446,7 +446,8 @@ getPriority = getPriority' . taskModifiers
 
     getPriority' :: [Modifier a] -> TInteger
     getPriority' [] = TInteger 255 DecRepr
-    getPriority' ((Modifier "priority" (Just (I priority _))) : _) = priority
+    getPriority' ((Modifier "priority" (Just (Constant (I priority _) _))) : _) = priority
+    getPriority' ((Modifier "priority" _ ) : _) = error "Internal error: invalid priority modifier value"
     getPriority' (_ : modifiers) = getPriority' modifiers
 
 
@@ -459,7 +460,8 @@ getStackSize = getStackSize' . taskModifiers
 
     getStackSize' :: [Modifier a] -> TInteger
     getStackSize' [] = TInteger 4096 DecRepr
-    getStackSize' ((Modifier "stack_size" (Just (I stackSize _))) : _) = stackSize
+    getStackSize' ((Modifier "stack_size" (Just (Constant (I stackSize _) _))) : _) = stackSize
+    getStackSize' ((Modifier "stack_size" _ ) : _) = error "Internal error: invalid stack_size modifier value"
     getStackSize' (_ : modifiers) = getStackSize' modifiers
 
 isUnprotected :: TPResource a -> Bool

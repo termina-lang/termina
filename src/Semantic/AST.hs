@@ -258,18 +258,18 @@ data Block a
 type TerminaType = TerminaType' Expression
 type Parameter = Parameter' TerminaType
 type Const = Const' TerminaType
-type Modifier = Modifier' TerminaType
+type Modifier = Modifier' Expression
 type FieldDefinition = FieldDefinition' TerminaType
 type EnumVariant = EnumVariant' TerminaType
 type MonadicVariant = MonadicVariant' Expression
 
-type AnnASTElement = AnnASTElement' TerminaType Block Expression
+type AnnASTElement = AnnASTElement' TerminaType Expression Block
 type FieldAssignment = FieldAssignment' Expression
 type Global = Global' TerminaType Expression
 
-type TypeDef = TypeDef' TerminaType Block
+type TypeDef = TypeDef' TerminaType Expression Block
 
-type InterfaceMember = InterfaceMember' TerminaType
+type InterfaceMember = InterfaceMember' TerminaType Expression
 type ClassMember = ClassMember' TerminaType Block
 
-type AnnotatedProgram a = [AnnASTElement' TerminaType Block Expression a]
+type AnnotatedProgram a = [AnnASTElement' TerminaType Expression Block a]

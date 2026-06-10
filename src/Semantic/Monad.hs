@@ -325,8 +325,11 @@ catchExpectedConstSubtype ann ferror action = catchError action (\err -> case ge
 copyTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 copyTyOrFail pann ty = unless (copyTy ty) (throwError (annotateError pann (EExpectedCopyType ty)))
 
-numTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
-numTyOrFail pann ty = unless (numTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
+intTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
+intTyOrFail pann ty = unless (intTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
+
+floatTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
+floatTyOrFail pann ty = unless (floatTy ty) (throwError (annotateError pann (EExpectedNumType ty)))
 
 constTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 constTyOrFail pann ty = unless (constTy ty) (throwError (annotateError pann (EInvalidConstType ty)))

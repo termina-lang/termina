@@ -68,15 +68,25 @@ instance ShowText TInteger where
     showText (TInteger value HexRepr) = T.toUpper . T.pack $ "0x" <> showHex value ""
     showText (TInteger value OctalRepr) = T.pack ("0" <> showOct value "")
 
+data FloatRepr = FPDecimal | FPScientific
+  deriving (Show, Eq, Ord)
+
+data TFloat = TFloat Double FloatRepr
+  deriving (Show, Eq, Ord)
+
+instance ShowText TFloat where
+    showText (TFloat value FPDecimal)    = T.pack $ showFFloat Nothing value ""
+    showText (TFloat value FPScientific) = T.pack $ showEFloat Nothing value ""
+
 -- | Annotated AST element
-data AnnASTElement' ty blk expr a =
+data AnnASTElement' ty expr blk a =
   -- | Function constructor
   Function
     Identifier -- ^ function identifier (name)
     [Parameter' ty a] -- ^ list of parameters (possibly empty)
     (Maybe (ty a)) -- ^ type of the return value (optional)
     (blk a) -- ^ statements block (with return)
-    [Modifier' ty a] -- ^ list of possible modifiers
+    [Modifier' expr a] -- ^ list of possible modifiers
     a -- ^ transpiler annotations
 
   -- | Global declaration constructor
@@ -85,17 +95,17 @@ data AnnASTElement' ty blk expr a =
 
   -- | Type definition constructor
   | TypeDefinition
-    (TypeDef' ty blk a) -- ^ the type definition (struct, union, etc.)
+    (TypeDef' ty expr blk a) -- ^ the type definition (struct, union, etc.)
     a
   deriving (Show, Functor)
 
-instance Annotated (AnnASTElement' ty blk expr) where
-  getAnnotation :: AnnASTElement' ty blk expr a -> a
+instance Annotated (AnnASTElement' ty expr blk) where
+  getAnnotation :: AnnASTElement' ty expr blk a -> a
   getAnnotation (Function _ _ _ _ _ a) = a
   getAnnotation (GlobalDeclaration glb) =  getAnnotation glb
   getAnnotation (TypeDefinition _ a) =  a
 
-  updateAnnotation :: AnnASTElement' ty blk expr a -> a -> AnnASTElement' ty blk expr a
+  updateAnnotation :: AnnASTElement' ty expr blk a -> a -> AnnASTElement' ty expr blk a
   updateAnnotation (Function n p r b m _) = Function n p r b m
   updateAnnotation (GlobalDeclaration glb) = GlobalDeclaration . updateAnnotation glb
   updateAnnotation (TypeDefinition t _) = TypeDefinition t
@@ -109,7 +119,7 @@ data ModuleImport' pf a = ModuleImport
 -- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
-data Modifier' ty a = Modifier Identifier (Maybe (Const' ty a))
+data Modifier' expr a = Modifier Identifier (Maybe (expr a))
   deriving (Show, Functor)
 
 -- | Identifiers as `String`
@@ -125,7 +135,7 @@ data TypeParameter' expr a =
 data TypeSpecifier' expr a
   = TSUInt8 | TSUInt16 | TSUInt32 | TSUInt64
   | TSInt8 | TSInt16 | TSInt32 | TSInt64 | TSUSize
-  | TSBool | TSChar
+  | TSBool | TSChar | TSFloat32 | TSFloat64
   | TSConstSubtype (TypeSpecifier' expr a)
   | TSDefinedType Identifier [TypeParameter' expr a]
   | TSArray (TypeSpecifier' expr a) (expr a)
@@ -147,7 +157,7 @@ data TerminaType' expr a
   -- Primitive types
   = TUInt8 | TUInt16 | TUInt32 | TUInt64
   | TInt8 | TInt16 | TInt32 | TInt64 | TUSize
-  | TBool | TChar
+  | TBool | TChar | TFloat32 | TFloat64
   | TStruct Identifier
   | TEnum Identifier
   | TInterface InterfaceKind Identifier
@@ -192,6 +202,8 @@ instance Eq (TerminaType' expr a) where
   TUSize == TUSize = True
   TBool == TBool = True
   TChar == TChar = True
+  TFloat32 == TFloat32 = True
+  TFloat64 == TFloat64 = True
   TStruct ident == TStruct ident' = ident == ident'
   TEnum ident == TEnum ident' = ident == ident'
   TUnit == TUnit = True
@@ -219,7 +231,9 @@ instance Ord (TerminaType' expr a) where
       typeTag (TStruct _) = 11
       typeTag (TEnum _) = 12
       typeTag TUnit = 13
-      typeTag _ = 14
+      typeTag TFloat32 = 14
+      typeTag TFloat64 = 15
+      typeTag _ = 16
 
       compareSame :: TerminaType' expr a -> TerminaType' expr a -> Ordering
       compareSame TUInt8 TUInt8 = EQ
@@ -233,6 +247,8 @@ instance Ord (TerminaType' expr a) where
       compareSame TUSize TUSize = EQ
       compareSame TBool TBool = EQ
       compareSame TChar TChar = EQ
+      compareSame TFloat32 TFloat32 = EQ
+      compareSame TFloat64 TFloat64 = EQ
       compareSame (TStruct id1) (TStruct id2) = compare id1 id2
       compareSame (TEnum id1) (TEnum id2) = compare id1 id2
       compareSame TUnit TUnit = EQ
@@ -251,6 +267,8 @@ instance (ShowText (expr a)) => ShowText (TerminaType' expr a) where
     showText TUSize = "usize"
     showText TBool = "bool"
     showText TChar = "char"
+    showText TFloat32 = "f32"
+    showText TFloat64 = "f64"
     showText (TConstSubtype ts) = "const " <> showText ts
     showText (TStruct ident) = T.pack ident
     showText (TEnum ident) = T.pack ident
@@ -306,7 +324,7 @@ data Op
   | BitwiseXor
   | LogicalAnd
   | LogicalOr
-  deriving Show
+  deriving (Show, Eq)
 
 instance ShowText Op where
     showText Addition = "+"
@@ -365,28 +383,28 @@ data Global' ty expr a
       Identifier -- ^ name of the task
       (ty a) -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
     -- | Shared resource global variable constructor
     | Resource
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Channel
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     | Emitter
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Handler global variable constructor
@@ -394,7 +412,7 @@ data Global' ty expr a
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
       (Maybe (expr a)) -- ^ initialization expression (optional)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
     -- | Constant constructor
@@ -402,14 +420,14 @@ data Global' ty expr a
       Identifier -- ^ name of the constant
       (ty a) -- ^ type of the constant
       (expr a) -- ^ initialization expression
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
     -- | Constant expression constructor
     | ConstExpr
       Identifier -- ^ name of the constant
       (ty a) -- ^ type of the constant
       (expr a) -- ^ initialization expression
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
   deriving (Show, Functor)
@@ -432,14 +450,14 @@ instance Annotated (Global' ty expr) where
   updateAnnotation (ConstExpr n t i m _) = ConstExpr n t i m
 
 -- Extremelly internal type definition
-data TypeDef' ty blk a
-  = Struct Identifier [FieldDefinition' ty a]  [Modifier' ty a]
-  | Enum Identifier [EnumVariant' ty a] [Modifier' ty a]
-  | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' ty a]
-  | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty a] [Modifier' ty a]
+data TypeDef' ty expr blk a
+  = Struct Identifier [FieldDefinition' ty a]  [Modifier' expr a]
+  | Enum Identifier [EnumVariant' ty a] [Modifier' expr a]
+  | Class ClassKind Identifier [ClassMember' ty blk a] [Identifier] [Modifier' expr a]
+  | Interface InterfaceKind Identifier [Identifier] [InterfaceMember' ty expr a] [Modifier' expr a]
   deriving (Show, Functor)
 
-instance ShowText (TypeDef' ty blk a) where
+instance ShowText (TypeDef' ty expr blk a) where
     showText (Struct ident _ _) = T.pack $ "struct " <> ident
     showText (Enum ident _ _) = T.pack $ "enum " <> ident
     showText (Class TaskClass ident _ _ _) = T.pack $ "task class " <> ident
@@ -458,14 +476,14 @@ data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | Chann
 
 -------------------------------------------------
 -- Interface Member
-data InterfaceMember' ty a
+data InterfaceMember' ty expr a
   =
     -- | Procedure
     InterfaceProcedure
       AccessKind -- ^ access kind (immutable, mutable)
       Identifier -- ^ name of the procedure
       [Parameter' ty a] -- ^ list of parameters (possibly empty)
-      [Modifier' ty a] -- ^ list of possible modifiers
+      [Modifier' expr a] -- ^ list of possible modifiers
       a
   deriving (Show, Functor)
 
@@ -558,13 +576,15 @@ data EnumVariant' ty a = EnumVariant {
 -- - Booleans
 -- - Integers
 -- - Characters
-data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | C Char | Null
+data Const' ty a = B Bool | I TInteger (Maybe (ty a)) | F TFloat (Maybe (ty a)) | C Char | Null
   deriving (Show, Functor)
 
 
 instance (ShowText (ty a)) => ShowText (Const' ty a) where
     showText (I i Nothing) = showText i
     showText (I i (Just ts)) = showText i <> " : " <> showText ts
+    showText (F f Nothing) = showText f
+    showText (F f (Just ts)) = showText f <> " : " <> showText ts
     showText (B True) = "true"
     showText (B False) = "false"
     showText (C c) = T.pack [c]
@@ -573,9 +593,9 @@ instance (ShowText (ty a)) => ShowText (Const' ty a) where
 ----------------------------------------
 -- Termina Programs definitions
 
-data TerminaModule' ty blk expr pf a = Termina
+data TerminaModule' ty expr blk pf a = Termina
   { modules :: [ModuleImport' pf a]
-  , frags :: [AnnASTElement' ty blk expr a] }
+  , frags :: [AnnASTElement' ty expr blk a] }
   deriving Show
 
-type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty blk expr a]
+type AnnotatedProgram' ty blk expr a = [AnnASTElement' ty expr blk a]
