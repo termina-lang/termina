@@ -207,8 +207,12 @@ transFoldExpression (Casting expr _ _) = transFoldExpression expr
 transFoldExpression (FunctionCall ident args _) = do
   mapM_ transFoldExpression args
   progArchitecture <- ST.gets progArch
-  let func = functions progArchitecture M.! ident
-  transFoldFlowTransfer args func
+  -- Prelude/builtin functions (e.g. f32_from_bits) are not in the program's
+  -- function map: there is no user-defined body, so there is no const-parameter
+  -- flow to transfer. Skip them.
+  case M.lookup ident (functions progArchitecture) of
+    Just func -> transFoldFlowTransfer args func
+    Nothing -> return ()
 transFoldExpression (MemberFunctionCall obj ident args _) = do
   mapM_ transFoldExpression args
   progArchitecture <- ST.gets progArch
