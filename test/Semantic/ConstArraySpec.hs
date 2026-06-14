@@ -25,21 +25,21 @@ spec :: Spec
 spec = do
   describe "Global const arrays: read vs write" $ do
 
-    it "reads an element of a const f32 array" $
+    it "Reads an element of a const f32 array" $
       compileErrorCode (constFloatArray ++
         "function read_float() -> f32 {\n" ++
         "    return farr[1];\n" ++
         "}")
         `shouldBe` Nothing
 
-    it "reads an element of a const u32 array" $
+    it "Reads an element of a const u32 array" $
       compileErrorCode (constIntArray ++
         "function read_int() -> u32 {\n" ++
         "    return iarr[1];\n" ++
         "}")
         `shouldBe` Nothing
 
-    it "rejects writing to a const f32 array element" $
+    it "Rejects writing to a const f32 array element" $
       compileErrorCode (constFloatArray ++
         "function write_float() {\n" ++
         "    farr[0] = 9.0 : f32;\n" ++
@@ -47,7 +47,7 @@ spec = do
         "}")
         `shouldBe` writeToImmutable
 
-    it "rejects writing to a const u32 array element" $
+    it "Rejects writing to a const u32 array element" $
       compileErrorCode (constIntArray ++
         "function write_int() {\n" ++
         "    iarr[0] = 99 : u32;\n" ++

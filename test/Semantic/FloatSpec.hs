@@ -87,13 +87,13 @@ spec = do
     it "SE-107: rejects a floating-point literal annotated with an integer type" $
       runNegativeTestTypeCheck testFloatLiteralIntType
         `shouldSatisfy` isEInvalidNumericConstantType TUInt32
-    it "rejects casting char to a floating-point type" $
+    it "Rejects casting char to a floating-point type" $
       runNegativeTestTypeCheck testCharAsFloat
         `shouldSatisfy` isENotCasteable TChar TFloat32
-    it "rejects initialising a float with an integer literal" $
+    it "Rejects initialising a float with an integer literal" $
       runNegativeTestTypeCheck testIntLitToFloat
         `shouldSatisfy` isEUnexpectedNumericConstant TFloat32
-    it "rejects initialising an integer with a float literal" $
+    it "Rejects initialising an integer with a float literal" $
       runNegativeTestTypeCheck testFloatLitToInt
         `shouldSatisfy` isEUnexpectedNumericConstant TInt32
 

@@ -93,20 +93,20 @@ statusInitAssign =
 spec :: Spec
 spec = do
   describe "Initialization in declarations (single C initializer)" $ do
-    it "arrays: list, fill, string and nested array" $
+    it "Arrays: list, fill, string and nested array" $
       renderSource declArrays `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid ta() {\n    \n    uint8_t a[3U] = { 1U, 2U, 3U };\n\n    uint8_t f[3U] = { 0U, 0U, 0U };\n\n    char s[6U] = { 'h', 'e', 'l', 'l', 'o' };\n\n    uint8_t m[2U][2U] = { { 1U, 2U }, { 3U, 4U } };\n\n    return;\n\n}\n"
-    it "structs: struct, struct with array field, and array of structs" $
+    it "Structs: struct, struct with array field, and array of structs" $
       renderSource declStructs `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid tb() {\n    \n    Point p = { .x = 1U, .y = 2U };\n\n    Box b = { .v = { 1U, 2U } };\n\n    Point arr[2U] = { { .x = 1U, .y = 2U }, { .x = 3U, .y = 4U } };\n\n    return;\n\n}\n"
     it "Option (Some/None) and enum variants (with/without parameters)" $
       renderSource declVariants `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid tc() {\n    \n    __option_uint32_t o = { .__variant = Some, .Some = { .__0 = 5U } };\n\n    __option_uint32_t n = { .__variant = None };\n\n    Color c = { .__variant = Color__Pair, .Pair = { .__0 = 1U, .__1 = 2U } };\n\n    Color r = { .__variant = Color__Red };\n\n    return;\n\n}\n"
   describe "Assignment to an already-declared variable (element-wise)" $ do
-    it "arrays: list, fill and string assignment" $
+    it "Arrays: list, fill and string assignment" $
       renderSource assignArrays `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid td() {\n    \n    uint8_t a[3U] = { 0U, 0U, 0U };\n\n    a[0U] = 1U;\n    a[1U] = 2U;\n    a[2U] = 3U;\n\n    for (size_t __i0 = 0U; __i0 < 3U; __i0 = __i0 + 1U) {\n        a[__i0] = 9U;\n    }\n\n    char s[6U] = { 'a', 'a', 'a', 'a', 'a' };\n\n    s[0U] = 'h';\n    s[1U] = 'e';\n    s[2U] = 'l';\n    s[3U] = 'l';\n    s[4U] = 'o';\n    s[5U] = '\\0';\n\n    return;\n\n}\n"
-    it "struct field-wise assignment, struct copy and Option assignment" $
+    it "Struct field-wise assignment, struct copy and Option assignment" $
       renderSource assignAggregates `shouldBe`
         pack "\n#include \"test.h\"\n\nvoid te() {\n    \n    Point p = { .x = 0U, .y = 0U };\n\n    p.x = 1U;\n    p.y = 2U;\n\n    Point p2 = { .x = 0U, .y = 0U };\n\n    p2 = p;\n\n    __option_uint32_t o = { .__variant = None };\n\n    o.__variant = Some;\n    o.Some.__0 = 7U;\n\n    return;\n\n}\n"
   describe "Status declaration and assignment" $
