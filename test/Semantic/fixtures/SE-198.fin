@@ -1,0 +1,14 @@
+task class TaskClass0 {
+
+    in_port : in u32 triggers handle;
+
+    action handle(&priv self, _msg : u32) -> u32 {
+        return 0 : u32;
+    }
+
+};
+
+channel chan : MsgQueue<u32; 10>;
+
+#[priority(10)]
+task task0 : TaskClass0 = { in_port <- chan };
