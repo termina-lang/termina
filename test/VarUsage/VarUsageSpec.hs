@@ -237,6 +237,33 @@ testVE012 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veAlloc ++ veMatchMove
 testVE013 :: String
 testVE013 = veWrap (veFreeData ++ veDeclOpt ++ veMatchMove)
 
+-- VE-008: @opt@ is allocated only in the @if@ branch (with an explicit @else@
+-- that leaves it alone) and then used after the merge, so it is used in a
+-- previous branch but missing in another.
+testVE008 :: String
+testVE008 = veWrap (
+  veDeclOpt ++
+  "        if (data == 0) {\n" ++ veAlloc ++ "        } else {\n        }\n" ++
+  veMatchMove ++ veFreeData)
+
+-- VE-014: matching an option-box with a default @case _@ instead of an explicit
+-- @Some@ case. The type checker accepts the match as exhaustive, but the usage
+-- analysis flags the missing @Some@ case.
+testVE014 :: String
+testVE014 =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, data : Option<box u32>);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    procedure proc0(&mut self, data : Option<box u32>) {\n" ++
+  "        match (data) {\n" ++
+  "            case None => { }\n" ++
+  "            case _ => { }\n" ++
+  "        }\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
@@ -296,6 +323,14 @@ spec = do
       runNegativeTestVarUsage testVE013
         `shouldSatisfy`
           isEMovedWithoutAlloc "opt"
+    it "VE-008: option-box used in a previous branch but missing in another" $ do
+      runNegativeTestVarUsage testVE008
+        `shouldSatisfy`
+          isEMissingOptionBox "opt"
+    it "VE-014: option-box match missing the Some case" $ do
+      runNegativeTestVarUsage testVE014
+        `shouldSatisfy`
+          isEOptionBoxMatchMissingSomeCase
 
   where
 
@@ -334,3 +369,9 @@ spec = do
 
     isEMovedWithoutAlloc :: Identifier -> Maybe Error -> Bool
     isEMovedWithoutAlloc inIdent = \case Just (EMovedWithoutAlloc ident _) -> (inIdent == ident); _ -> False
+
+    isEMissingOptionBox :: Identifier -> Maybe Error -> Bool
+    isEMissingOptionBox inIdent = \case Just (EMissingOptionBox ident _) -> (inIdent == ident); _ -> False
+
+    isEOptionBoxMatchMissingSomeCase :: Maybe Error -> Bool
+    isEOptionBoxMatchMissingSomeCase = \case Just EOptionBoxMatchMissingSomeCase -> True; _ -> False
