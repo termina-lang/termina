@@ -1,0 +1,9 @@
+constexpr k : u32 = 5 : u32;
+
+function test0() {
+
+    k = 10 : u32;
+
+    return;
+
+}

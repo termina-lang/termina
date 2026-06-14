@@ -1,0 +1,5 @@
+function test0(r : Result<&u32; u32>) {
+
+    return;
+
+}

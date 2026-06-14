@@ -1,0 +1,6 @@
+struct Point {
+    x : u32;
+    y : u32;
+};
+
+const c : Point = { x = 1 : u32, y = 2 : u32 } : Point;

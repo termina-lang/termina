@@ -1,0 +1,5 @@
+function test0(s : Status<&u32>) {
+
+    return;
+
+}
