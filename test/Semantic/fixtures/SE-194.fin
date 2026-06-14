@@ -1,0 +1,11 @@
+task class TaskClass0 {
+
+    snk0 : sink u32 triggers action0;
+
+    action action0(&priv self, _input : u32) -> u32 {
+        return 0 : u32;
+    }
+
+};
+
+task task0 : TaskClass0 = { snk0 <- test_irq };

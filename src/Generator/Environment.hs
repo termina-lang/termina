@@ -103,7 +103,10 @@ getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
     [("crs_irq",          LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | FreeRTOS10STM32L432XX.Config.enableCrsIrq            platformConfig] ++
     -- | SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
-getPlatformInitialGlobalEnv _ TestPlatform = []
+getPlatformInitialGlobalEnv _ TestPlatform =
+    -- A single interrupt emitter so the test harness can exercise interrupt
+    -- connection errors (e.g. SE-158, SE-194).
+    [("test_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal)]
 
 getPlatformInitialProgram :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn
 getPlatformInitialProgram config POSIXGCC = 
