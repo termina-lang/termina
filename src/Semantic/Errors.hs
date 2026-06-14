@@ -551,6 +551,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EAtomicArrayInvalidType _ty) _pos) = "invalid atomic array type"
     errorTitle (AnnotatedError (EAtomicConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic connection type mismatch"
     errorTitle (AnnotatedError (EAtomicArrayConnectionTypeMismatch _expectedTy _actualTy) _pos) = "atomic array connection type mismatch"
+    errorTitle (AnnotatedError EInvalidDefaultCase _pos) = "unnecessary default case"
     errorTitle (AnnotatedError (EConstantWithoutKnownType _c) _pos) = "constant without known type"
     errorTitle (AnnotatedError EStructInitializerInvalidUse _pos) = "invalid use of struct initializer"
     errorTitle (AnnotatedError (EStructInitializerTypeMismatch _expectedTy _actualTy) _pos) = "struct initializer type mismatch"
