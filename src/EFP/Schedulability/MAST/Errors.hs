@@ -23,7 +23,6 @@ data Error
     | EUnknownStep Identifier -- ^ Unknown step referenced in transactional step (internal)
     | EInvalidInitialStep Identifier -- ^ Invalid initial step identifier for MAST generation (internal)
     | EInvalidStepType Identifier -- ^ Invalid step type for transactional step (internal)
-    | EUnsupportedConstExpression -- ^ Unsupported constant expression in operation postfix (internal)
     | EUnsupportedSystemCall Identifier -- ^ Unsupported system call in transactional step (internal)
     | EInvalidTimerPeriodExpression -- ^ Invalid timer period expression in periodic timer emitter (internal)
     | EInvalidEmitterType -- ^ Invalid emitter type for MAST code generation (internal)

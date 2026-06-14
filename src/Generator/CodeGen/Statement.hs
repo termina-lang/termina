@@ -905,32 +905,13 @@ genStatement (AssignmentStmt obj expr ann) = do
 genStatement (Declaration identifier _ ts expr ann) = do
   let loc = getLocation ann
   cType <- genType noqual ts
-  let cObj = CVar identifier cType
-      -- | A single declaration carrying a (possibly nested) C initializer:
-      -- "T x = <init>;". Used for every structured initializer (lists,
-      -- strings, structs, Option/Status/Result, enums) and for scalars.
-      declWithInit = do
-        cInit <- genInitializerExpr expr
-        return [pre_cr (var identifier cType @:= cInit) |>> loc]
-      -- | Element-wise initialization into a bare declaration "T x; ...". Used
-      -- for array fills [e; N] (kept as a loop, not an N-element list, for
-      -- compactness) and array copies (an array is not `=`-initialisable).
-      declElementWise = do
-        arrayInitialization <- genArrayAssign loc False 0 cObj expr
-        return $ pre_cr (var identifier cType) |>> loc : arrayInitialization
-  case expr of
-    ArrayInitializer {} -> declElementWise
-    ArrayExprListInitializer {} -> declWithInit
-    StringInitializer {} -> declWithInit
-    StructInitializer {} -> declWithInit
-    MonadicVariantInitializer {} -> declWithInit
-    EnumVariantInitializer {} -> declWithInit
-    _ -> case ts of
-        -- | Array copy from another array: element-wise (typechecker-rejected
-        -- in real code, since arrays are not copyTy, but exercised by tests).
-        TArray _ _ -> declElementWise
-        -- | Scalars and struct/variant copies (all copyTy): plain C init.
-        _ -> declWithInit
+  -- | After constant folding every array size is a literal, so a declaration is
+  -- always a single C initializer "T x = <init>;". genInitializerExpr expands
+  -- array fills and char-array strings into element lists. (Arrays are not
+  -- copyTy, so an array-from-array copy is rejected upstream as SE-095 and
+  -- never reaches codegen.)
+  cInit <- genInitializerExpr expr
+  return [pre_cr (var identifier cType @:= cInit) |>> loc]
 genStatement (SingleExpStmt expr ann) = do
     let loc = getLocation ann
     cExpr <- genExpression expr

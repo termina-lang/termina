@@ -403,12 +403,21 @@ genInitializerExpr e@(ArrayInitializer iexpr _size ann) = do
             return $ CExprArrayInitializer (replicate (fromIntegral n) cElem) cType (buildGenericAnn ann)
         _ -> throwError $ InternalError $ "array fill initializer with non-literal size: " ++ show cType
 genInitializerExpr e@(StringInitializer value ann) = do
-    -- | In initializer position C accepts a string literal for a char array
-    -- (char s[N] = "..."), which fills the excess bytes with zeros (and adds
-    -- no null terminator on an exact fit). This is only valid here, not in the
-    -- element-wise assignment path (see genStringAssign).
+    -- | A char-array string initializer is emitted as an explicit list of
+    -- character constants { 'h', 'e', ..., '\0', ... }, padded with nulls up to
+    -- the array size. We avoid the C string-literal form (char s[N] = "..."):
+    -- it makes the no-trailing-null exact-fit case explicit instead of relying
+    -- on string-literal truncation (which MISRA flags), and keeps declarations
+    -- uniformly initializer lists. Requires a literal array size; const-sized
+    -- (VLA) char arrays are initialized element-wise instead (see genStatement).
     cType <- getExprType e >>= genType noqual
-    return $ CExprConstant (CStrConst (CString value)) cType (buildGenericAnn ann)
+    case cType of
+        CTArray _ (CExprConstant (CIntConst (CInteger n _)) _ _) -> do
+            let cAnn = buildGenericAnn ann
+                cChars = map (@: char) value
+                cPadding = replicate (max 0 (fromIntegral n - length value)) ('\0' @: char)
+            return $ CExprArrayInitializer (cChars ++ cPadding) cType cAnn
+        _ -> throwError $ InternalError $ "string initializer with non-literal size: " ++ show cType
 genInitializerExpr e@(StructInitializer fas ann) = do
     cType <- getExprType e >>= genType noqual
     cFields <- mapM genFieldInit fas

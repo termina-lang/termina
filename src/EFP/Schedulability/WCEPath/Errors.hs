@@ -27,9 +27,6 @@ data Error
     | EUnknownAccessPort Identifier (Identifier, Location) -- ^ Unknown access port
     | EUnknownVariable Identifier -- ^ Unknown variable
     | EUnknownOutputPort Identifier (Identifier, Location) -- ^ Unknown output port
-    | EConstParamsNumMismatch Identifier Identifier Integer Integer Location -- ^ Constant parameters number mismatch
-    | EConstVarAlreadyDefined (Identifier, Location) -- ^ Constant variable already defined
-    | EConstParamAlreadyDefined Identifier -- ^ Constant parameter already defined
     | EUnknownProcedure Identifier Identifier Identifier -- ^ Unknown procedure
     | EInvalidAccessToAllocator Identifier Identifier -- ^ Invalid access to allocator 
     | EClassPathMismatch Identifier (Location, Location) -- ^ Class path mismatch
@@ -47,13 +44,10 @@ instance ErrorMessage WCEPathErrors where
     errorIdent (AnnotatedError (EUnknownAccessPort _id (_clsId, _clsIdPos)) _pos) = "WCEPE-004"
     errorIdent (AnnotatedError (EUnknownVariable _id) _pos) = "WCEPE-005"
     errorIdent (AnnotatedError (EUnknownOutputPort _id (_clsId, _clsIdPos)) _pos) = "WCEPE-006"
-    errorIdent (AnnotatedError (EConstParamsNumMismatch _clsId _functionId _expected _got _functionPos) _pos') = "WCEPE-007"
-    errorIdent (AnnotatedError (EConstVarAlreadyDefined _identLoc) _pos) = "WCEPE-008"
-    errorIdent (AnnotatedError (EConstParamAlreadyDefined _ident) _pos) = "WCEPE-009"
-    errorIdent (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "WCEPE-010"
-    errorIdent (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "WCEPE-011"
-    errorIdent (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "WCEPE-012"
-    errorIdent (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "WCEPE-013"
+    errorIdent (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "WCEPE-007"
+    errorIdent (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "WCEPE-008"
+    errorIdent (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "WCEPE-009"
+    errorIdent (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "WCEPE-010"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EUnknownClass _id) _pos) = "unknown class"
@@ -62,13 +56,9 @@ instance ErrorMessage WCEPathErrors where
     errorTitle (AnnotatedError (EUnknownAccessPort _id (_clsId, _clsIdPos)) _pos) = "unknown access port"
     errorTitle (AnnotatedError (EUnknownVariable _id) _pos) = "unknown variable"
     errorTitle (AnnotatedError (EUnknownOutputPort _id (_clsId, _clsIdPos)) _pos) = "unknown output port"
-    errorTitle (AnnotatedError (EConstParamsNumMismatch _clsId _functionId _expected _got _functionPos) _pos') = "constant parameters number mismatch"
-    errorTitle (AnnotatedError (EConstVarAlreadyDefined _identLoc) _pos) = "constant variable already defined"
-    errorTitle (AnnotatedError (EConstParamAlreadyDefined _ident) _pos) = "constant parameter already defined"
     errorTitle (AnnotatedError (EUnknownProcedure _procName _portName _iface) _pos) = "unknown procedure"
     errorTitle (AnnotatedError (EInvalidAccessToAllocator _procName _portName) _pos) = "invalid access to allocator"
     errorTitle (AnnotatedError (EClassPathMismatch _classId _locs) _pos) = "class path mismatch"
-    errorTitle (AnnotatedError (EConstExpressionTypeMismatch _expected _got) _pos) = "constant expression type mismatch"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -134,38 +124,6 @@ instance ErrorMessage WCEPathErrors where
                         pprintSimpleError
                             clsSourceLines "The class is defined here:" clsFileName
                             clsIdPos Nothing
-                EConstParamsNumMismatch classId functionId expected got functionPos@(Position _ funcStart _) ->
-                    let funcFileName = sourceName funcStart
-                        funcSourceLines = files M.! funcFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("Member function \x1b[31m" <> T.pack functionId <>
-                                "\x1b[0m of class \x1b[31m" <> T.pack classId <>
-                                "\x1b[0m defines \x1b[31m" <> T.pack (show expected) <>
-                                "\x1b[0m constant parameters but \x1b[31m" <> T.pack (show got) <>
-                                "\x1b[0m were provided."))
-                        <>
-                        pprintSimpleError
-                            funcSourceLines "The member function is defined here:" funcFileName
-                            functionPos Nothing 
-                EConstVarAlreadyDefined (ident, identLoc@(Position _ identStart _)) ->
-                    let identFileName = sourceName identStart
-                        identSourceLines = files M.! identFileName
-                    in
-                        pprintSimpleError
-                            sourceLines title fileName pos
-                            (Just ("There exists a constant variable with the same name \x1b[31m" <> 
-                                T.pack ident <> "\x1b[0m."))
-                        <>
-                        pprintSimpleError
-                            identSourceLines "The previous definition is here:" identFileName
-                            identLoc Nothing
-                EConstParamAlreadyDefined ident ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("There already exists a constant parameter with the name \x1b[31m" <> 
-                            T.pack ident <> "\x1b[0m in the local scope."))
                 EUnknownProcedure procName portName iface ->
                     pprintSimpleError
                         sourceLines title fileName pos

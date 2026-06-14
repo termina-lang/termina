@@ -43,14 +43,12 @@ data WCEPathBlock a
         a
     | WCEPathMemberFunctionCall 
         Identifier -- ^ Function name
-        [ConstExpression a] -- ^ Constant argument expressions
         BlockPosition
         a
     -- | Invoke a resource procedure
     | WCEPProcedureInvoke 
         Identifier -- ^ Port name
         Identifier -- ^ Procedure name 
-        [ConstExpression a] -- ^ Constant argument expression
         BlockPosition
         a
     | WCEPAllocBox 
@@ -73,7 +71,6 @@ data WCEPathBlock a
     -- | System call
     | WCEPSystemCall 
         Identifier
-        [ConstExpression a] -- ^ Constant argument expression
         BlockPosition
         a
     deriving Show
@@ -83,12 +80,11 @@ data WCEPath a
         Identifier -- ^ task/handler/resource name
         Identifier -- ^ action/procedure/method name
         Identifier -- ^ path name
-        [Identifier] -- ^ constant parameters
         [WCEPathBlock a]
         a
     deriving Show
 
 instance Annotated WCEPath where
-    getAnnotation (WCEPath _ _ _ _ _ a) = a
-    updateAnnotation (WCEPath tName aName pName constParams blocks _) =
-        WCEPath tName aName pName constParams blocks
+    getAnnotation (WCEPath _ _ _ _ a) = a
+    updateAnnotation (WCEPath tName aName pName blocks _) =
+        WCEPath tName aName pName blocks

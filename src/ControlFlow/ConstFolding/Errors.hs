@@ -21,11 +21,9 @@ data Error =
   | EInvalidExprTypeAnnotation -- ^ Error when the semantic annotation of an expression does not contain the expected type information (Internal)
   | EUnknownTask Identifier -- ^ Unknown task (Internal)
   | EUnknownTaskClass Identifier -- ^ Unknown task class (Internal)
-  | EUnknownInputPort Identifier Identifier -- ^ Unknown input port (Internal)
   | EUnknownAccessPort Identifier Identifier -- ^ Unknown access port (Internal)
   | EUnknownHandler Identifier -- ^ Unknown handler (Internal)
   | EUnknownHandlerClass Identifier -- ^ Unknown handler class (Internal)
-  | EUnknownChannel Identifier -- ^ Unknown channel (Internal)
   | EUnknownMemberFunction Identifier -- ^ Unknown member function (Internal)
   | EUnknownResource Identifier -- ^ Unknown resource (Internal)
   | EUnknownResourceClass Identifier -- ^ Unknown resource class(Internal)
@@ -35,13 +33,10 @@ data Error =
   | EInvalidExpression String -- ^ Invalid expression (Internal)
   | EInvalidConstantEvaluation -- ^ Invalid constant evaluation (Internal)
   | ENotConstant -- ^ Not constant (Internal)
-  | EInvalidParameterList -- ^ Invalid parameter list (Internal)
-  | EInvalidFieldValueAssignmentAnnotation -- ^ Invalid field value assignment annotation (Internal)
-  | EInvalidReferenceType -- ^ Invalid reference type (Internal)
-  | EInvalidSystemCallAnnotation -- ^ Invalid system call annotation (Internal)
+  | EInvalidReferenceType -- ^ Invalid reference type (Internal)
+  | EInvalidSystemCallAnnotation -- ^ Invalid system call annotation (Internal)
   | EAtomicArrayConnectionSizeMismatch Integer Integer -- ^ Atomic array connection size mismatch
   | EArrayInitializerSizeMismatch Integer Integer -- ^ Array initializer size mismatch
-  | EArrayExprListInitializerSizeMismatch Integer Integer -- ^ Array expression list array initializer size mismatch
   | EStringInitializerInvalidSize Integer Integer -- ^ String initializer size mismatch
   | EConstIntegerOverflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
   | EConstIntegerUnderflow Integer (TerminaType SemanticAnn) -- ^ Constant integer overflow
@@ -63,7 +58,6 @@ instance ErrorMessage ConstFoldError where
 
     errorIdent (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "CPE-001"
     errorIdent (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CPE-002"
-    errorIdent (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CPE-003"
     errorIdent (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "CPE-004"
     errorIdent (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "CPE-005"
     errorIdent (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "CPE-006"
@@ -81,7 +75,6 @@ instance ErrorMessage ConstFoldError where
 
     errorTitle (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "atomic array connection size mismatch"
     errorTitle (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array initializer size mismatch"
-    errorTitle (AnnotatedError (EArrayExprListInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array expression list initializer size mismatch"
     errorTitle (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "invalid string initializer size"
     errorTitle (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "constant integer overflow"
     errorTitle (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "constant integer underflow"
@@ -112,11 +105,6 @@ instance ErrorMessage ConstFoldError where
                     pprintSimpleError
                         sourceLines title fileName pos
                         (Just ("The size of the array initializer is \x1b[31m" <> T.pack (show initializerSize) <>
-                            "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
-                EArrayExprListInitializerSizeMismatch expectedSize initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the array expression list initializer is \x1b[31m" <> T.pack (show initializerSize) <>
                             "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
                 EStringInitializerInvalidSize expectedSize initializerSize ->
                     pprintSimpleError

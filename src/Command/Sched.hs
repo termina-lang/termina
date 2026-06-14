@@ -728,18 +728,16 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    when chatty (putStrLn . debugMessage $ "Performing constant simplification")
-    simplBBProject <- constSimpl rawBBProject
+    when chatty (putStrLn . debugMessage $ "Performing constant folding")
+    bbProject <- constFolding rawBBProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
-    programArchitecture <- genArchitecture simplBBProject (getPlatformInitialProgram config plt) orderedDependencies
-    checkEmitterConnections simplBBProject programArchitecture
-    checkChannelConnections simplBBProject programArchitecture
-    checkResourceUsage simplBBProject programArchitecture
-    checkPoolUsage simplBBProject programArchitecture
-    checkProjectBoxSources simplBBProject programArchitecture
-    when chatty (putStrLn . debugMessage $ "Performing depth constant folding")
-    bbProject <- constFolding simplBBProject programArchitecture
+    programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
+    checkEmitterConnections bbProject programArchitecture
+    checkChannelConnections bbProject programArchitecture
+    checkResourceUsage bbProject programArchitecture
+    checkPoolUsage bbProject programArchitecture
+    checkProjectBoxSources bbProject programArchitecture
     -- | Load the transactional worst-case execution paths
     when chatty (putStrLn . debugMessage $ "Loading transactional worst-case execution paths")
     pathProject <- loadWCEPathModules bbProject (efpFolder config)

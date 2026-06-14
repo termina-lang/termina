@@ -56,13 +56,8 @@ instance WCEPathPrinter (WCEPathBlock a) where
         pretty "continue" <> parens (pretty actionName) <> pprint loc
     pprint (WCEPReboot loc _) =
         pretty "reboot" <> pprint loc
-    pprint (WCEPSystemCall sysCallName argExprs loc _) =
-        let ppArgExprs = fmap pprint argExprs
-        in
-            case ppArgExprs of
-                [] -> pretty "syscall" <> parens (pretty sysCallName) <> pprint loc
-                _  ->
-                    pretty "syscall" <> parens (pretty sysCallName) <> parens (hsep (punctuate comma ppArgExprs)) <> pprint loc
+    pprint (WCEPSystemCall sysCallName loc _) =
+        pretty "syscall" <> parens (pretty sysCallName) <> pprint loc
     pprint (WCEPathCondIf blocks loc _) =
         let ppBlocks = fmap pprint blocks
         in
@@ -88,31 +83,19 @@ instance WCEPathPrinter (WCEPathBlock a) where
             pretty "case" <> pprint loc <> brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks))) 
     pprint (WCEPSendMessage portName loc _) =
         pretty "send" <> parens (pretty portName) <> pprint loc
-    pprint (WCEPathMemberFunctionCall funcName argExprs loc _) =
-        let ppArgExprs = fmap pprint argExprs
-        in
-            case ppArgExprs of
-                [] -> pretty "call" <> parens (pretty funcName) <> pprint loc
-                _  ->
-                    pretty "call" <> parens (pretty funcName) <> parens (hsep (punctuate comma ppArgExprs)) <> pprint loc
-    pprint (WCEPProcedureInvoke portName procName argExprs loc _) =
-        let ppArgExprs = fmap pprint argExprs
-        in
-            case ppArgExprs of
-                [] -> pretty "invoke" <> parens (pretty portName <> pretty "." <> pretty procName) <> pprint loc
-                _  ->
-                    pretty "invoke" <> parens (pretty portName <> pretty "." <> pretty procName) <> parens (hsep (punctuate comma ppArgExprs)) <> pprint loc
+    pprint (WCEPathMemberFunctionCall funcName loc _) =
+        pretty "call" <> parens (pretty funcName) <> pprint loc
+    pprint (WCEPProcedureInvoke portName procName loc _) =
+        pretty "invoke" <> parens (pretty portName <> pretty "." <> pretty procName) <> pprint loc
     pprint (WCEPAllocBox portName loc _) =
         pretty "alloc" <> parens (pretty portName) <> pprint loc
     pprint (WCEPFreeBox portName loc _) =
         pretty "free" <> parens (pretty portName) <> pprint loc
 
 instance WCEPathPrinter (WCEPath a) where
-    pprint (WCEPath taskName actionName pathName constParams blocks _) =
-        let ppBlocks = map pprint blocks
-            pParams = map pretty constParams
-        in
-        pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <> parens (align (fillSep (punctuate comma pParams))) <+> pretty "=" <+> 
+    pprint (WCEPath taskName actionName pathName blocks _) =
+        let ppBlocks = map pprint blocks in
+        pretty "twcep" <+> pretty taskName <::> pretty actionName <::> pretty pathName <+> pretty "=" <+> 
             brackets' ((indentTab . align) (vsep (punctuate comma ppBlocks))) <> line
 
 runWCEPathPrinter :: [WCEPath a] -> Text

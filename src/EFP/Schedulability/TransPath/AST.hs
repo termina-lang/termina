@@ -39,13 +39,11 @@ data TransPathBlock a
         BlockPosition
         a
     | TPBlockMemberFunctionCall 
-        [ConstExpression a] -- ^ Constant argument expressions
         (TRPOperation a) -- ^ Operation being called
         BlockPosition
         a
     -- | Invoke a resource procedure
     | TPBlockProcedureInvoke 
-        [ConstExpression a] -- ^ Constant argument expression
         (TRPOperation a) -- ^ Operation being called
         BlockPosition
         a
@@ -62,7 +60,6 @@ data TransPathBlock a
     | TPBlockReboot BlockPosition a
     | TPBlockSystemCall 
         Identifier
-        [ConstExpression a] -- ^ Constant argument expression
         BlockPosition
         a
     deriving Show

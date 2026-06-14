@@ -98,23 +98,13 @@ evalConstExpression (ConstBinOp op left right _ann) = do
     -- | Now perform the operation
     evalBinOp op left' right'
 
-passArguments ::
-    [Identifier]
-    -> [ConstExpression TRPSemAnn] -> TRPGenMonad ()
-passArguments [] [] = return ()
-passArguments (argName:argNames) (argValue:argValues) = do
-    modify $ \st ->
-        st { localConstEnv = M.insert argName argValue (localConstEnv st) }
-    passArguments argNames argValues
-passArguments _ _ = throwError . annotateError Internal $ EInvalidArgumentPassing
-
 getResourceLockSet ::
     S.Set (Identifier, Identifier, Identifier)
     -> TransPathBlock TRPSemAnn
     -> TRPGenMonad (S.Set (Identifier, Identifier, Identifier))
-getResourceLockSet currentLockSet (TPBlockProcedureInvoke _ (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
+getResourceLockSet currentLockSet (TPBlockProcedureInvoke (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
     return $ S.union currentLockSet lockSet
-getResourceLockSet currentLockSet (TPBlockMemberFunctionCall _ (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
+getResourceLockSet currentLockSet (TPBlockMemberFunctionCall (TRPResourceOperation _ _ _ _  _ (TRPOperationTy lockSet)) _ _) =
     return $ S.union currentLockSet lockSet
 getResourceLockSet currentLockSet (TPBlockForLoop _ blks _ _) =
     foldlM getResourceLockSet currentLockSet blks

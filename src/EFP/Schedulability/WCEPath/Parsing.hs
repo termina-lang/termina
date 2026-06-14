@@ -88,9 +88,8 @@ memberFunctionCallParser = do
     startPos <- getPosition
     _ <- reserved "call"
     funcName <- parens identifierParser
-    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
-    WCEPathMemberFunctionCall funcName argExprs loc . Position current startPos <$> getPosition
+    WCEPathMemberFunctionCall funcName loc . Position current startPos <$> getPosition
 
 procedureInvokeParser :: SchedParser (WCEPathBlock ParserAnn)
 procedureInvokeParser = do
@@ -102,9 +101,8 @@ procedureInvokeParser = do
         _ <- reservedOp "."
         prName <- identifierParser
         return (pName, prName)
-    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
-    WCEPProcedureInvoke portName procName argExprs loc . Position current startPos <$> getPosition
+    WCEPProcedureInvoke portName procName loc . Position current startPos <$> getPosition
 
 allocBoxParser :: SchedParser (WCEPathBlock ParserAnn)
 allocBoxParser = do
@@ -163,9 +161,8 @@ systemCallParser = do
     startPos <- getPosition
     _ <- reserved "syscall"
     sysCallName <- parens identifierParser
-    argExprs <- option [] (parens (sepBy constExpressionParser comma))
     loc <- blockPositionParser
-    WCEPSystemCall sysCallName argExprs loc . Position current startPos <$> getPosition
+    WCEPSystemCall sysCallName loc . Position current startPos <$> getPosition
 
 wcepPathBlockParser :: SchedParser (WCEPathBlock ParserAnn)
 wcepPathBlockParser =
@@ -195,10 +192,9 @@ transactionalWCEPParser = do
     elementName <- identifierParser
     _ <- reservedOp "::"
     memberFunction <- identifierParser
-    constParams <- parens (sepBy identifierParser comma)
     _ <- reservedOp "="
     blocks <- brackets (sepBy wcepPathBlockParser comma)
-    WCEPath clsName elementName memberFunction constParams blocks . Position current startPos <$> getPosition
+    WCEPath clsName elementName memberFunction blocks . Position current startPos <$> getPosition
 
 -- | Top Level parser
 topLevel :: SchedParser [WCEPath ParserAnn]

@@ -39,20 +39,10 @@ genConstExpression (BinOp op left right _) =
 genConstExpression _ = error "Unsupported constant expression in ConstExpression generation"
 
 genExpressionPath :: Expression STYPES.SemanticAnn -> [WCEPathBlock GeneratorAnn] -> [WCEPathBlock GeneratorAnn]
-genExpressionPath (MemberFunctionCall _obj ident args ann) acc =
-    let pts = case ann of
-            STYPES.SemanticAnn (STYPES.ETy (STYPES.AppType pts' _)) _ -> pts'
-            _ -> error "Unexpected annotation in ProcedureInvoke block when generating WCE paths"
-        constArgs = genConstExpression . fst <$> filter (\case (_, Parameter _ (TConstSubtype _)) -> True; _ -> False) (zip args pts)
-    in
-        WCEPathMemberFunctionCall ident constArgs (loc2BlockPos . getLocation $ ann) Generated : acc
-genExpressionPath (DerefMemberFunctionCall _obj ident args ann) acc =
-    let pts = case ann of
-            STYPES.SemanticAnn (STYPES.ETy (STYPES.AppType pts' _)) _ -> pts'
-            _ -> error "Unexpected annotation in ProcedureInvoke block when generating WCE paths"
-        constArgs = genConstExpression .fst <$> filter (\case (_, Parameter _ (TConstSubtype _)) -> True; _ -> False) (zip args pts)
-    in
-        WCEPathMemberFunctionCall ident constArgs (loc2BlockPos . getLocation $ ann) Generated : acc
+genExpressionPath (MemberFunctionCall _obj ident _args ann) acc =
+    WCEPathMemberFunctionCall ident (loc2BlockPos . getLocation $ ann) Generated : acc
+genExpressionPath (DerefMemberFunctionCall _obj ident _args ann) acc =
+    WCEPathMemberFunctionCall ident (loc2BlockPos . getLocation $ ann) Generated : acc
 genExpressionPath (BinOp _op left right _) acc =
     let leftPath = genExpressionPath left acc
         rightPath = genExpressionPath right leftPath
@@ -180,17 +170,13 @@ genPaths (SendMessage obj _ ann) =
             _ -> error "Unexpected object in SendMessage block when generating WCE paths"
     in
         [WCEPSendMessage outPt (loc2BlockPos . getLocation $ ann) Generated]
-genPaths (ProcedureInvoke obj procId args ann) =
+genPaths (ProcedureInvoke obj procId _args ann) =
     let outPt = case obj of
             (MemberAccess _ portId _) -> portId
             (DereferenceMemberAccess _ portId _) -> portId
             _ -> error "Unexpected object in ProcedureInvoke block when generating WCE paths"
-        pts = case ann of
-            STYPES.SemanticAnn (STYPES.ETy (STYPES.AppType pts' _)) _ -> pts'
-            _ -> error "Unexpected annotation in ProcedureInvoke block when generating WCE paths"
-        constArgs = genConstExpression . fst <$> filter (\case (_, Parameter _ (TConstSubtype _)) -> True; _ -> False) (zip args pts)
     in
-        [WCEPProcedureInvoke outPt procId constArgs (loc2BlockPos . getLocation $ ann) Generated]
+        [WCEPProcedureInvoke outPt procId (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicLoad _obj _expr ann) =
     [WCEPRegularBlock (loc2BlockPos . getLocation $ ann) Generated]
 genPaths (AtomicStore _obj _expr ann) =
@@ -224,12 +210,8 @@ genPaths (ContinueBlock expr ann) =
         _ -> error "Unexpected expression in Continue block when generating WCE paths"
 genPaths (RebootBlock ann) =
     [WCEPReboot (loc2BlockPos . getLocation $ ann) Generated]
-genPaths (SystemCall _obj syscallId args ann) = do
-    let pts = case ann of
-            STYPES.SemanticAnn (STYPES.ETy (STYPES.AppType pts' _)) _ -> pts'
-            _ -> error "Unexpected annotation in ProcedureInvoke block when generating WCE paths"
-        constArgs = genConstExpression . fst <$> filter (\case (_, Parameter _ (TConstSubtype _)) -> True; _ -> False) (zip args pts)
-    [WCEPSystemCall syscallId constArgs (loc2BlockPos . getLocation $ ann) Generated]
+genPaths (SystemCall _obj syscallId _args ann) = do
+    [WCEPSystemCall syscallId (loc2BlockPos . getLocation $ ann) Generated]
 
 
 genWCEPaths :: [[WCEPathBlock GeneratorAnn]] -> [BasicBlock STYPES.SemanticAnn] -> [[WCEPathBlock GeneratorAnn]]
@@ -242,28 +224,25 @@ genWCEPaths paths (blk : xs) =
     genWCEPaths appendedPaths xs
 
 genClassMemberWCEPs :: Identifier -> ClassMember STYPES.SemanticAnn -> [WCEPath GeneratorAnn]
-genClassMemberWCEPs className (ClassMethod _ak ident params _mrty blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk)
-        constParams = [name | Parameter name (TConstSubtype _) <- params] in
+genClassMemberWCEPs className (ClassMethod _ak ident _params _mrty blk _) =
+    let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
-        WCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
-genClassMemberWCEPs className (ClassProcedure _ak ident params blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk)
-        constParams = [name | Parameter name (TConstSubtype _) <- params] in
+genClassMemberWCEPs className (ClassProcedure _ak ident _params blk _) =
+    let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
-        WCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs className (ClassAction _ak ident _param _mrty blk _) =
     let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
-        WCEPath className ident pathName [] path Generated) 
+        WCEPath className ident pathName path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs className (ClassViewer ident _params _mrty blk _) =
-    let wcePaths = genWCEPaths [] (blockBody blk)
-        constParams = [name | Parameter name (TConstSubtype _) <- _params] in
+    let wcePaths = genWCEPaths [] (blockBody blk) in
     zipWith (\pathName path -> 
-        WCEPath className ident pathName constParams path Generated) 
+        WCEPath className ident pathName path Generated) 
         ["path" ++ show idx | idx <- [(0 :: Integer) ..]] (reverse <$> wcePaths)
 genClassMemberWCEPs _ _ = []
 

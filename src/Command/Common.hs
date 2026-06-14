@@ -25,7 +25,8 @@ import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
-import ControlFlow.ConstFolding (runTransFolding, runConstSimpl)
+import ControlFlow.ConstFolding (runConstFolding, constFoldModule)
+import ControlFlow.ConstFolding.Monad (ConstFoldEnv(..))
 import qualified Data.Set as S
 import qualified Data.ByteString as BS
 import qualified Data.Text.Encoding as TE
@@ -205,25 +206,28 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constSimpl :: BasicBlocksProject -> IO BasicBlocksProject
-constSimpl bbProject = do
-  case runConstSimpl bbProject of
-    Left err ->
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    Right bbProject' -> return bbProject'
+constFolding :: BasicBlocksProject -> IO BasicBlocksProject
+constFolding bbProject =
+  -- | Fold the modules in dependency order, threading the constant environment
+  -- from one module to the next so that a module can resolve the constants
+  -- defined by the modules it imports.
+  case sortProjectDepsOrLoop (M.map importedModules bbProject) of
+    -- | The build pipeline orders the modules (and reports dependency cycles)
+    -- before reaching this point, so a cycle here would be an internal error.
+    Left _ -> die . errorMessage $ "Dependency cycle detected during constant folding"
+    Right orderedDependencies ->
+      foldModules (ConstFoldEnv M.empty) M.empty orderedDependencies
 
-constFolding :: BasicBlocksProject -> TerminaProgArch SemanticAnn -> IO BasicBlocksProject
-constFolding bbProject progArchitecture =
-  case runTransFolding bbProject progArchitecture of
-    Left err ->
-      -- | Create the source files map. This map will be used to obtainn the source files that
-      -- will be feed to the error pretty printer. The source files map must use as key the
-      -- path of the source file and as element the text of the source file.
-      let sourceFilesMap =
-            M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-                M.empty bbProject in
-      TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    Right bbProject' -> return bbProject'
+  where
+
+    foldModules :: ConstFoldEnv -> BasicBlocksProject -> [QualifiedName] -> IO BasicBlocksProject
+    foldModules _ foldedProject [] = return foldedProject
+    foldModules env foldedProject (m:ms) =
+      case runConstFolding env (constFoldModule (bbProject M.! m)) of
+        Left err ->
+          let sourceFilesMap =
+                M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+                    M.empty bbProject in
+          TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+        Right (foldedModule, env') ->
+          foldModules env' (M.insert m foldedModule foldedProject) ms

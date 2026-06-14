@@ -130,8 +130,8 @@ stdlibGlobalEnv =
       InterfaceProcedure Mutable "println_f64" [Parameter "value" TFloat64] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
     ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
-      InterfaceProcedure Mutable "read" [Parameter "size" (TConstSubtype TUSize), 
-          Parameter "str" (TReference Mutable (TArray TChar (AccessObject (Variable "size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize)))))),
+      InterfaceProcedure Mutable "read" [ 
+          Parameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger 1024 DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))),
           Parameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn Internal TUnit)
     ] [])) Internal)
   ]

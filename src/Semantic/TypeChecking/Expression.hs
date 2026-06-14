@@ -386,14 +386,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
                   when (psLen > asLen) (throwError $ annotateError ann (EMemberFunctionCallMissingArgs (ident, ps, getLocation anns) (fromIntegral asLen)))
                   typed_args <- localScope $ zipWithM (\(p, idx) e ->
                     catchMismatch ann (EMemberFunctionCallArgTypeMismatch (ident, p, getLocation anns) idx)
-                      (
-                        case paramType p of 
-                          (TConstSubtype pty) -> do
-                            -- | See FunctionCall comment
-                            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
-                            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
-                            return typedArgument
-                          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   fty <- maybe (throwError $ annotateError Internal EInvalidMemberFunctionTypeAnnotation) return (getTypeSemAnn anns)
                   return ((ps, typed_args), fty)
                 Nothing -> throwError $ annotateError ann (EMemberAccessNotFunction ident)
@@ -416,14 +409,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
                   when (psLen > asLen) (throwError $ annotateError ann (EProcedureCallMissingArgs (ident, ps, loc) (fromIntegral asLen)))
                   typed_args <- localScope $ zipWithM (\(p, idx) e ->
                     catchMismatch ann (EProcedureCallArgTypeMismatch (ident, p, loc) idx)
-                      (
-                            case paramType p of 
-                              (TConstSubtype pty) -> do
-                                -- | See FunctionCall comment
-                                typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
-                                ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
-                                return typedArgument
-                              ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+                      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
                   return ((ps, typed_args), TUnit)
             );
             _ -> throwError $ annotateError Internal EExpectedInterfaceType
@@ -1270,19 +1256,7 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   when (psLen < asLen) (throwError $ annotateError ann (EFunctionCallExtraArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
-      (
-        case paramType p of 
-          (TConstSubtype pty) -> do
-            -- | We need to type the expression and ADD it to the global context as a const expression
-            -- We have to do this because the const parameter may have been used to define an array size
-            -- of another parameter. We may have to expand the size of the array if we are passing a
-            -- slice of an array as parameter whose bounds are not known at compile time. We are using
-            -- the global const substitution mechanism instread of implementing a new one for this
-            -- case so that we can reuse the code.
-            typedArgument <- typeExpression (Just (TConstSubtype pty)) typeRHSObject e
-            ST.modify $ \s -> s { global = M.insert (paramIdentifier p) (LocatedElement (GConstExpr pty typedArgument) (getAnnotation e)) (global s) }
-            return typedArgument
-          ty -> typeExpression (Just ty) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
+      (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
   maybe (return ()) (flip (sameTyOrError ann) retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 

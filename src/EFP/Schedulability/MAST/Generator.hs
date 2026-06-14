@@ -49,11 +49,11 @@ getEnclosingOperations transactionId stepId acc (TPBlockCondElseIf blks _ _) = f
 getEnclosingOperations transactionId stepId acc (TPBlockCondElse blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
 getEnclosingOperations transactionId stepId acc (TPBlockForLoop _ blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
 getEnclosingOperations transactionId stepId acc (TPBlockMatchCase blks _ _) = foldM (getEnclosingOperations transactionId stepId) acc blks
-getEnclosingOperations transactionId stepId acc (TPBlockMemberFunctionCall args operation _ _) =
-    genMASTOperation transactionId stepId False args operation >>= \opId ->
+getEnclosingOperations transactionId stepId acc (TPBlockMemberFunctionCall operation _ _) =
+    genMASTOperation transactionId stepId False operation >>= \opId ->
         return $ S.insert opId acc
-getEnclosingOperations transactionId stepId acc (TPBlockProcedureInvoke args operation _ _) =
-    genMASTOperation transactionId stepId True args operation >>= \opId ->
+getEnclosingOperations transactionId stepId acc (TPBlockProcedureInvoke operation _ _) =
+    genMASTOperation transactionId stepId True operation >>= \opId ->
         return $ S.insert opId acc
 getEnclosingOperations _transactionId _stepId acc (TPBlockAllocBox poolId _ _) = do
     let opId = getAllocBoxMASTOperationId poolId
@@ -92,7 +92,7 @@ getEnclosingOperations _transactionId _stepId acc (TPBlockFreeBox poolId _ _) = 
                     genMutexLockSharedPool poolId ceil
                     >> return (S.insert opId acc)
                 Nothing -> throwError . annotateError Internal $ EUnknownResource poolId
-getEnclosingOperations _transactionId _stepId acc (TPBlockSystemCall systemCallName _ _ _) = do
+getEnclosingOperations _transactionId _stepId acc (TPBlockSystemCall systemCallName _ _) = do
     let opId = getSystemCallMASTOperationId systemCallName
     ops <- gets operations
     case M.lookup opId ops of
@@ -113,8 +113,8 @@ genBodyOperation bodyOpId enclosingOps wcet = do
             enclosingOps
     insertOperation operation
 
-genMASTOperation :: Identifier -> Identifier -> Bool -> [ConstExpression a] -> TRPOperation a -> MASTGenMonad Identifier
-genMASTOperation transactionId stepId _isInvoke _args (TRPTaskOperation _stepName taskId actionId pathId blks _ wcet _) = do
+genMASTOperation :: Identifier -> Identifier -> Bool -> TRPOperation a -> MASTGenMonad Identifier
+genMASTOperation transactionId stepId _isInvoke (TRPTaskOperation _stepName taskId actionId pathId blks _ wcet _) = do
     -- | The operation identifier is the name of the step defined in the transaction
     let opId = getTaskMASTOperationId transactionId stepId taskId actionId pathId
     ops <- gets operations
@@ -124,7 +124,7 @@ genMASTOperation transactionId stepId _isInvoke _args (TRPTaskOperation _stepNam
             enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
             genBodyOperation opId (S.toList enclosingOps) wcet
             >> return opId
-genMASTOperation transactionId stepId _isInvoke _args (TRPHandlerOperation _stepName handlerId actionId pathId blks _ wcet _) = do
+genMASTOperation transactionId stepId _isInvoke (TRPHandlerOperation _stepName handlerId actionId pathId blks _ wcet _) = do
     let opId = getHandlerMASTOperationId transactionId stepId handlerId actionId pathId
     ops <- gets operations
     case M.lookup opId ops of
@@ -133,9 +133,9 @@ genMASTOperation transactionId stepId _isInvoke _args (TRPHandlerOperation _step
             enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
             genBodyOperation opId (S.toList enclosingOps) wcet
             >> return opId
-genMASTOperation transactionId stepId isInvoke args (TRPResourceOperation resName functionName pathName blks wcet _) = do
+genMASTOperation transactionId stepId isInvoke (TRPResourceOperation resName functionName pathName blks wcet _) = do
     -- | First, we need to check if the resource operation has already been generated
-    opId <- getResourceMASTOperationId transactionId stepId resName functionName pathName args
+    opId <- getResourceMASTOperationId transactionId stepId resName functionName pathName
     ops <- gets operations
     case M.lookup opId ops of
         Just _ -> return opId
@@ -193,7 +193,7 @@ genMASTTransactionStep (MASTRegularTransaction transactionId [extEvent] intEvent
             tsk <- case M.lookup taskId (tasks arch) of
                 Just t -> return t
                 Nothing -> throwError . annotateError Internal $ EUnknownTask taskId
-            opId <- genMASTOperation transactionId stepName False [] op
+            opId <- genMASTOperation transactionId stepName False op
             -- | Now, we need to create the event handler for the operation
             schServers <- gets schedulingServers
             unless (M.member taskId schServers) $ genTaskSchedulingServer tsk >>= insertSchedulingServer
@@ -277,7 +277,7 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transactionId initialS
                     [externalEventHandler]
             genMASTTransactionStep initialTransaction initialStepId
         op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
-            opId <- genMASTOperation transactionId initialStepId False [] op
+            opId <- genMASTOperation transactionId initialStepId False op
             case continuations of
                 [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
                 [c] -> do
@@ -362,7 +362,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transactionId initia
                     [externalEventHandler]
             genMASTTransactionStep initialTransaction initialStepId
         op@(TRPHandlerOperation _ _ _ _ _ continuations _ _) -> do
-            opId <- genMASTOperation transactionId initialStepId False [] op
+            opId <- genMASTOperation transactionId initialStepId False op
             case continuations of
                 [] -> throwError . annotateError Internal $ EInvalidStepType initialStepId
                 [c] -> do

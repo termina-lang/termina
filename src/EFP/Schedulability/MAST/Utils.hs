@@ -50,16 +50,9 @@ irqHandlerSchedulerServerId emitterId = "irq_handler_" <> emitterId <::> "server
 
 getResourceMASTOperationId :: Identifier 
     -> Identifier
-    -> Identifier -> Identifier -> Identifier -> [ConstExpression a] -> MASTGenMonad Identifier
-getResourceMASTOperationId transactionId stepId targetComponent targetAction targetPath postfix = do
-    postfixStr <- concat <$> mapM (showConstExpression >=> return . ("__" ++)) postfix
-    return $ "op" <::> transactionId <::> stepId <::> targetComponent <::> targetAction <::> targetPath <> postfixStr
-
-    where
-
-        showConstExpression :: ConstExpression a -> MASTGenMonad Identifier
-        showConstExpression (ConstInt (TInteger val _) _) = return $ show val
-        showConstExpression _ = throwError . annotateError Internal $ EUnsupportedConstExpression
+    -> Identifier -> Identifier -> Identifier -> MASTGenMonad Identifier
+getResourceMASTOperationId transactionId stepId targetComponent targetAction targetPath = do
+    return $ "op" <::> transactionId <::> stepId <::> targetComponent <::> targetAction <::> targetPath
 
 getTargetAction :: Identifier -> Identifier -> MASTGenMonad Identifier
 getTargetAction componentName sinkPort = do

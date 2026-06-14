@@ -47,11 +47,11 @@ genBlock currentCmp acc (TPBlockMatchCase blocks pos _) = do
     let endGroup = PlantUMLGroupEnd
     innerStmts <- foldM (genBlock currentCmp) [] blocks
     return $ acc ++ [startGroup] ++ innerStmts ++ [endGroup]
-genBlock currentCmp acc (TPBlockMemberFunctionCall args called _pos _) = do
-    stepStmts <- genOperation currentCmp called args
+genBlock currentCmp acc (TPBlockMemberFunctionCall called _pos _) = do
+    stepStmts <- genOperation currentCmp called
     return $ acc ++ stepStmts
-genBlock currentCmp acc (TPBlockProcedureInvoke args called _pos _) = do
-    stepStmts <- genOperation currentCmp called args
+genBlock currentCmp acc (TPBlockProcedureInvoke called _pos _) = do
+    stepStmts <- genOperation currentCmp called
     return $ acc ++ stepStmts
 genBlock currentCmp acc (TPBlockAllocBox poolName _pos _) = do
     let startMsg = PlantUMLSeqMessage currentCmp poolName (Just (T.pack "alloc"))
@@ -74,35 +74,35 @@ genBlock _currentCmp acc (TPBlockReboot {}) = do
 genBlock _currentCmp acc (TPBlockSystemCall {}) = do
     return acc
 
-genOperation :: Identifier -> TRPOperation a -> [ConstExpression a] -> PlantUMLGenMonad [PlantUMLSeqDiagStatement]
-genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blocks nextSteps _ _) _ = do
+genOperation :: Identifier -> TRPOperation a -> PlantUMLGenMonad [PlantUMLSeqDiagStatement]
+genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blocks nextSteps _ _) = do
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
             Nothing -> -- | It is an end step and it does not have further operations
                 return []
-            Just act -> genOperation taskName act []
+            Just act -> genOperation taskName act
         ) nextSteps
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName
     let startMsg = PlantUMLSeqMessage prevCmp taskName (Just activityName)
     stepStmts <- foldM (genBlock taskName) [] blocks
     ST.modify $ \s -> s { participants = M.insert taskName (PlantUMLSeqDiagParticipant taskName 20) (participants s) }
     return $ startMsg : stepStmts ++ concat nextActivities
-genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathName blocks nextSteps _ _) _ = do
+genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathName blocks nextSteps _ _) = do
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
             Nothing -> -- | It is an end step and it does not have further operations
                 return []
-            Just act -> genOperation handlerName act []
+            Just act -> genOperation handlerName act
         ) nextSteps
     let activityName = T.pack "<b>" <> T.pack stepName <> "</b> " <> T.pack actionName <> "::" <> T.pack pathName
     let startMsg = PlantUMLSeqMessage prevCmp handlerName (Just activityName)
     stepStmts <- foldM (genBlock handlerName) [] blocks
     ST.modify $ \s -> s { participants = M.insert handlerName (PlantUMLSeqDiagParticipant handlerName 10) (participants s) }
     return $ startMsg : stepStmts ++ concat nextActivities
-genOperation prevCmp (TRPResourceOperation currentCmp procName pathName blocks _ _) args = do
-    let activityName = T.pack procName <> "::" <> T.pack pathName <> "(" <> T.intercalate ", " (map showText args) <> ")"
+genOperation prevCmp (TRPResourceOperation currentCmp procName pathName blocks _ _) = do
+    let activityName = T.pack procName <> "::" <> T.pack pathName <> "()"
         startMsg = PlantUMLSeqMessage prevCmp currentCmp (Just activityName)
         activate = PlantUMLSeqActivationStart currentCmp
         endMsg = PlantUMLSeqMessage currentCmp prevCmp Nothing
@@ -117,7 +117,7 @@ runPlantUMLGenerator emitterId initialStep stMap =
         Nothing -> Left $ T.pack $ "Initial step not found in activity map: " ++ initialStep
         Just initialAct -> 
             let initialState = PlantUMLGenState stMap M.empty
-                (result, finalState) = ST.runState (runExceptT (genOperation emitterId initialAct [])) initialState
+                (result, finalState) = ST.runState (runExceptT (genOperation emitterId initialAct)) initialState
             in case result of
                 Left err -> Left err
                 Right stmts -> 

@@ -20,7 +20,7 @@ import EFP.Schedulability.RT.Utils
 
 
 getPathContinuations :: Identifier -> M.Map Identifier (Identifier, a) -> WCEPath b -> RTMonad [Continuation]
-getPathContinuations componentName outputConns (WCEPath _ _ _ _ blocks _) =
+getPathContinuations componentName outputConns (WCEPath _ _ _ blocks _) =
     foldM extractContinuations [] blocks
 
     where
