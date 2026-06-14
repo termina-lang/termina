@@ -1,4 +1,4 @@
-module Semantic.SemanticSpec (spec) where
+module Semantic.ErrorDetailSpec (spec) where
 
 import Test.Hspec
 import Semantic.AST

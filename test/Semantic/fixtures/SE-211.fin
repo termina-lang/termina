@@ -1,0 +1,17 @@
+interface IFoo {
+    procedure get(&mut self, r : &mut u32);
+};
+
+resource class FooRes provides IFoo {
+
+    value : u32;
+
+    procedure get(&mut self, r : &mut u32) {
+        *r = self->value;
+        return;
+    }
+
+};
+
+#[unprotected]
+resource foo : FooRes = { value = 0 };
