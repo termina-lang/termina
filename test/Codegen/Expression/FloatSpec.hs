@@ -79,7 +79,7 @@ test_bits = "function test_bits(x : f32) -> u32 {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing floating-point expressions" $ do
-    it "Prints declaration of function test0" $ do
+    it "Declares a function with floating-point arithmetic" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -89,7 +89,7 @@ spec = do
               "void test0();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function test0" $ do
+    it "Generates floating-point arithmetic" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

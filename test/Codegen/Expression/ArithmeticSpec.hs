@@ -45,7 +45,7 @@ test1 = "interface test_iface {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing arithmetic expressions" $ do
-    it "Prints declaration of function test0" $ do
+    it "Declares a function with scalar arithmetic" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -55,7 +55,7 @@ spec = do
               "void test0();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function test0" $ do
+    it "Generates scalar arithmetic operations" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -87,7 +87,7 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}\n")    
-    it "Prints declaration of function test1" $ do
+    it "Declares a procedure with box arithmetic" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -102,7 +102,7 @@ spec = do
               "                __termina_box_t foo);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function test1" $ do
+    it "Generates arithmetic on an unboxed parameter" $ do
      renderSource test1 `shouldBe`
        pack ("\n" ++
              "#include \"test.h\"\n" ++

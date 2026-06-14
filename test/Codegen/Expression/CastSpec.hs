@@ -24,7 +24,7 @@ test0 = "function casting_test0() {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing casting expressions" $ do
-    it "Prints declaration of function casting_test0" $ do
+    it "Declares a function with cast expressions" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -34,7 +34,7 @@ spec = do
               "void casting_test0();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function bitwise_test0" $ do
+    it "Generates cast expressions" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

@@ -25,7 +25,7 @@ test0 = "function bitwise_test0(foo : u16) {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing bitwise shifting expressions" $ do
-    it "Prints declaration of function bitwise_test0" $ do
+    it "Declares a function with bitwise shift expressions" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -35,7 +35,7 @@ spec = do
               "void bitwise_test0(uint16_t foo);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function bitwise_test0" $ do
+    it "Generates bitwise shift expressions" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

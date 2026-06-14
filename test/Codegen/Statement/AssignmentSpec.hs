@@ -43,8 +43,8 @@ test2 = "interface test_iface {\n" ++
 
 spec :: Spec
 spec = do
-  describe "Pretty printing arithmetic expressions" $ do
-    it "Prints declaration of function assignment_test0" $ do
+  describe "Code generation for assignment statements" $ do
+    it "Declares a function with a scalar assignment" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -54,7 +54,7 @@ spec = do
               "void assignment_test0();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function assignment_test0" $ do
+    it "Generates a scalar assignment" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -70,7 +70,7 @@ spec = do
               "    return;\n" ++
               "\n" ++ 
               "}\n")    
-    it "Prints declaration of function assignment_test1" $ do
+    it "Declares a procedure assigning Some to an option-box" $ do
      renderHeader test1 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -85,7 +85,7 @@ spec = do
               "                           void * const __this, __termina_box_t box_var0);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function assignment_test1" $ do
+    it "Generates an option-box assignment inside a locked resource" $ do
      renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -108,7 +108,7 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of function assignment_test2" $ do
+    it "Declares a procedure with two box parameters" $ do
      renderHeader test2 `shouldBe`
        pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -124,7 +124,7 @@ spec = do
               "                           __termina_box_t box_var1);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function assignment_test2" $ do
+    it "Generates assignments through unboxed box parameters" $ do
      renderSource test2 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

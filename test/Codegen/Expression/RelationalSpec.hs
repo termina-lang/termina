@@ -27,7 +27,7 @@ test0 = "function relational_test0(foo : u16) {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing relational expressions" $ do
-    it "Prints declaration of function relational_test0" $ do
+    it "Declares a function with relational expressions" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -37,7 +37,7 @@ spec = do
               "void relational_test0(uint16_t foo);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function bitwise_test0" $ do
+    it "Generates relational expressions" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

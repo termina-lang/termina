@@ -18,7 +18,7 @@ test0 = "function func_test0_0(a : u16) -> u16 {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing function call expressions" $ do
-    it "Prints declaration of functions of test0" $ do
+    it "Declares the called functions" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -29,7 +29,7 @@ spec = do
               "uint16_t func_test0_1(uint16_t a);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of functions of test0" $ do
+    it "Generates a function call expression" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

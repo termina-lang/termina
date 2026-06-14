@@ -39,8 +39,8 @@ test1 = "enum Message {\n" ++
 
 spec :: Spec
 spec = do
-  describe "Pretty printing match statements" $ do
-    it "Prints declaration of function match_test0" $ do
+  describe "Code generation for is-variant expressions" $ do
+    it "Declares a procedure with an option-box is-variant test" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -55,7 +55,7 @@ spec = do
               "                      __option_box_t option0);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of procedure match_test0" $ do
+    it "Generates an option-box is-variant test" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -81,7 +81,7 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of procedure match_test1" $ do
+    it "Declares a function with an enum is-variant test" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -115,7 +115,7 @@ spec = do
               "uint32_t match_test1();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of procedure match_test1" $ do
+    it "Generates an enum is-variant test" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

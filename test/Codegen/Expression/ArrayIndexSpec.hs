@@ -27,7 +27,7 @@ test1 = "function array_test1(p_array0 : &mut [u32; 10]) {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing array index expressions" $ do
-    it "Prints declaration of function array_test0" $ do
+    it "Declares a function indexing local arrays" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -37,7 +37,7 @@ spec = do
               "void array_test0();\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function array_test0" $ do
+    it "Generates array index expressions with the bounds helper" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -59,7 +59,7 @@ spec = do
               "    return;\n" ++
               "\n" ++
               "}\n")    
-    it "Prints declaration of function array_test1" $ do
+    it "Declares a function indexing through a reference" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -69,7 +69,7 @@ spec = do
               "void array_test1(uint32_t p_array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function array_test1" $ do
+    it "Generates array indexing through a dereferenced pointer" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

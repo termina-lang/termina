@@ -21,7 +21,7 @@ test0 = "function add_one(input : &mut [u32; 5]) {\n" ++
 spec :: Spec
 spec = do
   describe "Pretty printing array slicing expressions" $ do
-    it "Prints declaration of function slice_test0" $ do
+    it "Declares a function taking an array slice" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -33,7 +33,7 @@ spec = do
               "void slice_test0(uint32_t array0[5U][10U]);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function slice_test0" $ do
+    it "Generates an array-slice reference" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++

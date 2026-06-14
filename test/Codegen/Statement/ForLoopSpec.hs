@@ -27,8 +27,8 @@ test1 = "function for_loop_test1(array0 : & [u16; 10]) -> bool {\n" ++
 
 spec :: Spec
 spec = do
-  describe "Pretty printing arithmetic expressions" $ do
-    it "Prints declaration of function for_loop_test0" $ do
+  describe "Code generation for for-loop statements" $ do
+    it "Declares a function with a counting for loop" $ do
       renderHeader test0 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -38,7 +38,7 @@ spec = do
               "uint16_t for_loop_test0(const uint16_t array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function for_loop_test0_test0" $ do
+    it "Generates a counting for loop" $ do
       renderSource test0 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
@@ -56,7 +56,7 @@ spec = do
               "    return total;\n" ++
               "\n" ++
               "}\n")
-    it "Prints declaration of function for_loop_test0_test1" $ do
+    it "Declares a function with a guarded for loop" $ do
       renderHeader test1 `shouldBe`
         pack ("#ifndef __TEST_H__\n" ++
               "#define __TEST_H__\n" ++
@@ -66,7 +66,7 @@ spec = do
               "_Bool for_loop_test1(const uint16_t array0[10U]);\n" ++
               "\n" ++
               "#endif\n")
-    it "Prints definition of function assignment_test1" $ do
+    it "Generates a for loop with a while guard" $ do
       renderSource test1 `shouldBe`
         pack ("\n" ++
               "#include \"test.h\"\n" ++
