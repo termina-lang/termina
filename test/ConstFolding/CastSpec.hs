@@ -10,7 +10,7 @@ spec = do
 
     -- Regression: a *constant* integer cast to a float type must fold (or pass
     -- through) cleanly. It used to hit the integer-range check in
-    -- constSimplExpression and throw a spurious EConstIntegerOverflow (CPE-005),
+    -- constSimplExpression and throw a spurious EConstIntegerOverflow (CPE-004),
     -- because memberIntCons returns False for non-integer target types.
     it "folds a constant i32 -> f32 cast without a spurious overflow" $
       compileErrorCode "function f() -> f32 {\n    return 5 : i32 as f32;\n}"

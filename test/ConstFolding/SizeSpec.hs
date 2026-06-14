@@ -34,7 +34,7 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-002")
 
-    it "CPE-004: string initializer larger than the array" $ do
+    it "CPE-003: string initializer larger than the array" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "function use_chars(_c : &[char; n]) {\n" ++
                 "    return;\n" ++
@@ -44,9 +44,9 @@ spec = do
                 "    use_chars(&s);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-004")
+      compileErrorCode src `shouldBe` Just (pack "CPE-003")
 
-    it "CPE-011: array slice out of bounds" $ do
+    it "CPE-010: array slice out of bounds" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -57,9 +57,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-011")
+      compileErrorCode src `shouldBe` Just (pack "CPE-010")
 
-    it "CPE-012: array slice with lower bound above upper bound" $ do
+    it "CPE-011: array slice with lower bound above upper bound" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -70,9 +70,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-012")
+      compileErrorCode src `shouldBe` Just (pack "CPE-011")
 
-    it "CPE-013: array slice length does not match the expected size" $ do
+    it "CPE-012: array slice length does not match the expected size" $ do
       let src = "function take2(_data : &[u8; 2]) {\n" ++
                 "    return;\n" ++
                 "}\n" ++
@@ -83,9 +83,9 @@ spec = do
                 "    take2(&a[lo .. hi]);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-013")
+      compileErrorCode src `shouldBe` Just (pack "CPE-012")
 
-    it "CPE-016: referenced array size mismatch" $ do
+    it "CPE-015: referenced array size mismatch" $ do
       let src = "constexpr n : usize = 4;\n" ++
                 "constexpr m : usize = 5;\n" ++
                 "function take(_data : &[u8; m]) {\n" ++
@@ -96,4 +96,4 @@ spec = do
                 "    take(&a);\n" ++
                 "    return;\n" ++
                 "}"
-      compileErrorCode src `shouldBe` Just (pack "CPE-016")
+      compileErrorCode src `shouldBe` Just (pack "CPE-015")
