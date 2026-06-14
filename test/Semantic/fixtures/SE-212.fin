@@ -1,0 +1,13 @@
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+
+    action action0(&mut self, _input : TimeVal) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
+    }
+
+};
+
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { snk0 <- timer0 };

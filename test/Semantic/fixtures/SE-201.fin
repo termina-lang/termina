@@ -1,0 +1,13 @@
+task class TaskClass0 {
+
+    snk0 : sink u32 triggers missing_action;
+
+    action action0(&priv self, _input : u32) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
+    }
+
+};
+
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { snk0 <- timer0 };

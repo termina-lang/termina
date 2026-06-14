@@ -1,0 +1,12 @@
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+
+    action action0(&priv self, _input : TimeVal) -> u32 {
+        return 0 : u32;
+    }
+
+};
+
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { snk0 <- timer0 };
