@@ -1,0 +1,7 @@
+function test0() {
+
+    var s : Status<i32> = None;
+
+    return;
+
+}

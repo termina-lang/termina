@@ -1,0 +1,11 @@
+function test0() {
+
+    var x : u32 = 0;
+
+    if (x is Success) {
+        return;
+    } else {
+        return;
+    }
+
+}
