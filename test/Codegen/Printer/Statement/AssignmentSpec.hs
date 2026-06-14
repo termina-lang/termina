@@ -123,34 +123,34 @@ str0Assign = AssignmentStmt str0 (StringInitializer "Hello world!" (arrayExprSem
 
 spec :: Spec
 spec = do
-  describe "Pretty printing integer variable declarations" $ do
-    it "Prints the statement foo1 = foo0; where foo1 : u32" $ do
+  describe "Pretty printing scalar assignments" $ do
+    it "Copies a u32 variable" $ do
       renderStatement foo1Assign `shouldBe`
         pack "\nfoo1 = foo0;"
-    it "Prints the statement foo2 = 0 : u32; where foo2 : u32" $ do
+    it "Assigns a u32 constant" $ do
       renderStatement foo2Assign `shouldBe`
         pack "\nfoo2 = 0U;"
-  describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement option0 = Some(box_var0); where option0 : TOption <'box u32>" $ do
+  describe "Pretty printing option-box assignments" $ do
+    it "Assigns Some to an option-box" $ do
       renderStatement option0Assign `shouldBe`
         pack (
           "\noption0.__variant = Some;\n" ++
           "option0.Some.__0 = box_var0;")
-    it "Prints the statement option1 = None; where option1 : TOption <'box u32>" $ do
+    it "Assigns None to an option-box" $ do
       renderStatement option1Assign `shouldBe`
         pack "\noption1.__variant = None;"
-  describe "Pretty printing enum variable declarations" $ do
-    it "Prints the statement enum0 = Message::Reset; where enum0 : Message" $ do
+  describe "Pretty printing enum assignments" $ do
+    it "Assigns a parameterless enum variant" $ do
       renderStatement enum0Assign `shouldBe`
         pack "\nenum0.__variant = Message__Reset;"
-    it "Prints the statement enum1 = Message::In(0 : u32, 0 : u32); where enum1 : Message" $ do
+    it "Assigns an enum variant with parameters" $ do
       renderStatement enum1Assign `shouldBe`
         pack (
           "\nenum1.__variant = Message__In;\n" ++
           "enum1.In.__0 = 0U;\n" ++
           "enum1.In.__1 = 0U;")
-  describe "Pretty printing struct variable declarations" $ do
-    it "Prints the statement struct0 = {field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000} : StructA} : TMDescriptor; where struct0 : TMDescriptor" $ do
+  describe "Pretty printing struct assignments" $ do
+    it "Assigns a nested struct initializer" $ do
       renderStatement struct0Assign `shouldBe`
         pack (
         "\nstruct0.field0 = 0U;\n" ++
@@ -159,17 +159,17 @@ spec = do
         "    struct0.field1.field_b[__i0] = 0U;\n" ++
         "}\n" ++
         "struct0.field1.field_c = 4294901760U;")
-    it "Prints the statement struct1 = struct0; where struct1 : TMDescriptor" $ do
+    it "Copies a struct variable" $ do
       renderStatement struct1Assign `shouldBe`
         pack "\nstruct1 = struct0;"
-  describe "Pretty printing array variable declarations" $ do
-    it "Prints the statement array1 = array0; where array1 : [u32; 10 : u32]" $ do
+  describe "Pretty printing array assignments" $ do
+    it "Copies a one-dimensional array element-wise" $ do
       renderStatement array1Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "    array1[__i0] = array0[__i0];\n" ++
           "}")
-    it "Prints the statement array2 = array0; where array2 : [[u32; 5 : u32]; 10 : u32]" $ do
+    it "Copies a two-dimensional array element-wise" $ do
       renderStatement array2Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
@@ -177,13 +177,13 @@ spec = do
           "        array2[__i0][__i1] = array1[__i0][__i1];\n" ++
           "    }\n" ++
           "}")
-    it "Prints the statement array3 = [0 : u32; 10 : u32]; where array3 : [u32; 10 : u32]" $ do
+    it "Fills a one-dimensional array with a constant" $ do
       renderStatement array3Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
           "    array3[__i0] = 0U;\n" ++
           "}")
-    it "Prints the statement array4 = [[0 : u32; 5 : u32]; 10 : u32]; where array4 : [[u32; 5 : u32]; 10 : u32]s" $ do
+    it "Fills a two-dimensional array with a constant" $ do
       renderStatement array4Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
@@ -191,7 +191,7 @@ spec = do
           "        array4[__i0][__i1] = 0U;\n" ++
           "    }\n" ++
           "}")
-    it "Prints the statement array4 = [array_row; 10 : u32]; where array4 : [[u32; 5 : u32]; 10 : u32]" $ do
+    it "Fills a two-dimensional array from a row variable" $ do
       renderStatement array5Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
@@ -199,8 +199,7 @@ spec = do
           "        array5[__i0][__i1] = array_row[__i1];\n" ++
           "    }\n" ++
           "}")
-    it ("Prints the statement array6 = " ++
-        "[{field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000} : StructA} : TMDescriptor; 20 : u32];") $ do
+    it "Fills an array with a struct initializer" $ do
       renderStatement array6Assign `shouldBe`
         pack (
           "\nfor (size_t __i0 = 0U; __i0 < 10U; __i0 = __i0 + 1U) {\n" ++
@@ -211,7 +210,7 @@ spec = do
           "    }\n" ++
           "    array6[__i0].field1.field_c = 4294901760U;\n" ++
           "}")
-    it "Prints the statement str = \"Hello world!\"" $ do
+    it "Assigns a string literal element-wise" $ do
       renderStatement str0Assign `shouldBe`
         pack (
           "\nstr0[0U] = 'H';\n" ++
@@ -227,9 +226,9 @@ spec = do
           "str0[10U] = 'd';\n" ++
           "str0[11U] = '!';")
   describe "Pretty printing unbox assignments" $ do
-    it "Prints the statement box_var0 = foo1" $ do
+    it "Assigns a variable through an unbox" $ do
       renderStatement unboxVar0AssignFoo1 `shouldBe`
         pack "\n*(uint32_t *)box_var0.data = foo1;"
-    it "Prints the statement box_var0 = 1024 : u32" $ do
+    it "Assigns a constant through an unbox" $ do
       renderStatement unboxVar0AssignConst `shouldBe`
         pack "\n*(uint32_t *)box_var0.data = 1024U;"

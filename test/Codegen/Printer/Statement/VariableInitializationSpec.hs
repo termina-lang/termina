@@ -91,41 +91,41 @@ option1 = Declaration "option1" Mutable optionBoxUInt32TS (MonadicVariantInitial
 
 spec :: Spec
 spec = do
-  describe "Pretty printing integer variable declarations" $ do
-    it "Prints the statement var foo1 : u32 = foo0;" $ do
+  describe "Pretty printing scalar variable declarations" $ do
+    it "Initializes a u32 variable from another variable" $ do
       renderStatement foo1 `shouldBe`
         pack "\nuint32_t foo1 = foo0;"
-    it "Prints the statement var foo2 : u32 = 0 : u32;" $ do
+    it "Initializes a u32 variable with a constant" $ do
       renderStatement foo2 `shouldBe`
         pack "\nuint32_t foo2 = 0U;"
   describe "Pretty printing option variable declarations" $ do
-    it "Prints the statement var option0 : TOption <'box u32> = Some(box_var0);" $ do
+    it "Initializes an option-box with Some" $ do
       renderStatement option0 `shouldBe`
         pack "\n__option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };"
-    it "Prints the statement var option1 : TOption <'box u32> = None;" $ do
+    it "Initializes an option-box with None" $ do
       renderStatement option1 `shouldBe`
         pack "\n__option_box_t option1 = { .__variant = None };"
   describe "Pretty printing enum variable declarations" $ do
-    it "Prints the statement var enum0 : Message = Message::Reset;" $ do
+    it "Initializes an enum variable with a parameterless variant" $ do
       renderStatement enum0 `shouldBe`
         pack "\nMessage enum0 = { .__variant = Message__Reset };"
-    it "Prints the statement var enum1 : Message = Message::In(0 : u32, 0 : u32);" $ do
+    it "Initializes an enum variable with a parameterized variant" $ do
       renderStatement enum1 `shouldBe`
         pack "\nMessage enum1 = { .__variant = Message__In, .In = { .__0 = 0U, .__1 = 0U } };"
   describe "Pretty printing struct variable declarations" $ do
-    it "Prints the statement var struct0 : TMDescriptor = {field0 = 0 : u32; field1 = {field_a = 0U; field_b = 0xFFFF0000U} : StructA} : TMDescriptor;" $ do
+    it "Initializes a struct variable with a nested initializer" $ do
       renderStatement struct0 `shouldBe`
         pack "\nTMDescriptor struct0 = { .field0 = 0U, .field1 = { .field_a = 0U,\n                                                   .field_b = { 0U, 0U, 0U, 0U,\n                                                                0U, 0U, 0U, 0U,\n                                                                0U, 0U },\n                                                   .field_c = 4294901760U } };"
-    it "Prints the statement var struct1 : TMDescriptor = struct0;" $ do
+    it "Initializes a struct variable from another struct" $ do
       renderStatement struct1 `shouldBe`
         pack "\nTMDescriptor struct1 = struct0;"
   describe "Pretty printing array variable declarations" $ do
     -- | A declaration's array fill is emitted as a C initializer list (after
     -- constant folding every array size is a literal). Sizes are kept small so
     -- the golden stays a single readable line.
-    it "Prints the statement var array3 : [u32; 10 : u32] = [0 : u32; 10 : u32];" $ do
+    it "Initializes a one-dimensional array with a fill" $ do
       renderStatement array3 `shouldBe`
         pack "\nuint32_t array3[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };"
-    it "Prints the statement var array4 : [[u32; 2 : u32]; 2 : u32] = [[0 : u32; 2 : u32]; 2 : u32];" $ do
+    it "Initializes a two-dimensional array with a fill" $ do
       renderStatement array4 `shouldBe`
         pack "\nint64_t array4[2U][2U] = { { 0U, 0U }, { 0U, 0U } };"

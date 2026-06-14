@@ -121,25 +121,25 @@ function3 = Function "function3" [Parameter "param0" TUInt32, Parameter "param1"
 spec :: Spec
 spec = do
   describe "Pretty printing function declarations" $ do
-    it "Prints fuction0 declaration" $ do
+    it "Declares a void function with no parameters" $ do
       renderFunctionDecl emptyMonadicTypes function0 `shouldBe`
         pack "\nvoid function0();"
-    it "Prints fuction1 declaration" $ do
+    it "Declares a function returning u32 with no parameters" $ do
       renderFunctionDecl emptyMonadicTypes function1 `shouldBe`
         pack "\nuint32_t function1();"
-    it "Prints fuction2 declaration" $ do
+    it "Declares a function with one scalar parameter" $ do
       renderFunctionDecl emptyMonadicTypes function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0);"
-    it "Prints fuction4 declaration" $ do
+    it "Declares a function with a scalar and an array parameter" $ do
       renderFunctionDecl emptyMonadicTypes function3 `shouldBe`
         pack "\nuint32_t function3(uint32_t param0, uint32_t param1[10U]);"
   describe "Pretty printing function definitions" $ do
-    it "Prints fuction0 definition" $ do
+    it "Defines a void function with a struct body" $ do
       renderFunction function0 `shouldBe`
         pack "\nvoid function0() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return;\n\n}"
-    it "Prints fuction1 definition" $ do
+    it "Defines a function returning a struct field" $ do
       renderFunction function1 `shouldBe`
         pack "\nuint32_t function1() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
-    it "Prints fuction2 definition" $ do
+    it "Defines a function using a parameter in a struct field" $ do
       renderFunction function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = { 0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U,\n                                                                         0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
