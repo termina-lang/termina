@@ -1,0 +1,17 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, data : box u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    data_pool : access Allocator<u32>;
+
+    procedure proc0(&mut self, data : box u16) {
+
+        return;
+
+    }
+
+};

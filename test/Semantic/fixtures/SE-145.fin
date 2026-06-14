@@ -1,0 +1,40 @@
+task class TaskClass0 {
+
+    snk0 : sink u32 triggers action0;
+
+    method method0(&priv self) {
+
+        self->method1();
+
+        return;
+
+    }
+
+    method method1(&priv self) {
+
+        self->method2();
+
+        return;
+
+    }
+
+    method method2(&priv self) {
+
+        self->method0();
+
+        return;
+
+    }
+
+    action action0(&priv self, _input : u32) -> Status<i32> {
+
+        let ret : Status<i32> = Success;
+
+        self->method0();
+
+        return ret;
+
+    }
+
+
+};

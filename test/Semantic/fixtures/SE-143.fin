@@ -1,0 +1,11 @@
+enum Enum0 {
+
+    variant0,
+    variant1,
+    variant2,
+    variant3,
+    variant1,
+    variant1,
+    variant2
+
+};

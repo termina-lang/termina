@@ -1,0 +1,9 @@
+
+function foo() -> bool {
+
+    let bar : bool = 0 : bool;
+
+    return bar;
+
+}
+

@@ -1,0 +1,9 @@
+const bar : u32 = 128;
+
+function foo() -> u32 {
+
+    bar = 10;
+
+    return bar;
+
+}

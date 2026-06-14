@@ -1,0 +1,38 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    field0 : u32;
+
+    procedure proc0(&mut self, input : u32) {
+
+       self->field0 = input; 
+       return;
+
+    }
+
+};
+
+task class TaskClass0 {
+
+    pool0 : access AtomicAccess<u32>;
+
+    snk0 : sink TimeVal triggers action0;
+    
+    action action0(&priv self, _input : TimeVal) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        return ret;
+
+    }
+
+};
+
+resource res0 : ResourceClass0 = { field0 = 0 };
+emitter timer0 : PeriodicTimer = { period = { tv_sec = 10, tv_usec = 0 } };
+task task0 : TaskClass0 = { pool0 <-> res0, snk0 <- timer0 };

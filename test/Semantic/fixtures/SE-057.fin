@@ -1,0 +1,25 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, data : u32);
+
+};
+
+resource glb_atomic : Atomic<u16> = { value = 0 };
+
+resource class ResourceClass0 provides Interface0 {
+
+    atomic_obj : access AtomicAccess<u32>;
+
+    procedure proc0(&mut self, data : u32) {
+
+        self->atomic_obj.store(data);
+
+        return;
+
+    }
+
+};
+
+resource res0 : ResourceClass0 = {
+    atomic_obj <-> glb_atomic
+};

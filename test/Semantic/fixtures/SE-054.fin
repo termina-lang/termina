@@ -1,0 +1,17 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, data : u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    data_pool : access AtomicArrayAccess<char; 10>;
+
+    procedure proc0(&mut self, _data : u16) {
+
+        return;
+
+    }
+
+};

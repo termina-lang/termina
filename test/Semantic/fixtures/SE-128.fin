@@ -1,0 +1,58 @@
+struct Struct0 {
+
+    field0 : u32;
+    field1 : u32;
+
+};
+
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    field0 : u32;
+
+    viewer viewer0(&self, value : u32) -> bool {
+
+        self->proc0(value);
+
+        return (value == self->field0);
+
+    }
+
+    procedure proc0(&mut self, input : u32) {
+
+       self->field0 = input; 
+       return;
+
+    }
+
+};
+
+task class TaskClass0 {
+
+    field0 : u32;
+    field1 : Struct0;
+
+    snk0 : sink TimeVal triggers action0;
+
+    action action0(&priv self, _input : TimeVal) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        self->field1.field2 = self->field0;
+
+        return ret;
+
+    }
+
+};
+
+resource res0 : ResourceClass0 = { field0 = 0 };
+emitter timer0 : PeriodicTimer = {
+    period = {tv_sec = 1 : u32, tv_usec = 0 : u32}
+};
+task task0 : TaskClass0 = { field0 = 0, snk0 <- timer0 };

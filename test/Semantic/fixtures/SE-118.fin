@@ -1,0 +1,9 @@
+
+
+function fun0() -> u32 {
+
+    var array0 : [u32; 2] = [32 : u16; 5];
+
+    return array0[0];
+
+}

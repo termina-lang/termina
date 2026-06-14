@@ -1,0 +1,12 @@
+struct Struct0 {
+
+    field0 : u32;
+
+};
+
+function f() -> Struct0 {
+
+
+    return { field0 = 10 } : Struct0;
+
+}

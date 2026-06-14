@@ -1,0 +1,20 @@
+enum Enum0 {
+
+    variant0,
+    variant1,
+    variant2,
+    variant3
+
+};
+
+function foo(input : u32) -> u32 {
+
+    var ret : u32 = 0;
+
+    if input is None {
+        ret = 1;
+    }
+
+    return ret;
+
+}

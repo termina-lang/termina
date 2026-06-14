@@ -1,0 +1,9 @@
+function f() {
+
+    let foo : bool = true;
+
+    var casting : u32 = foo as u32;
+
+    return;
+
+}

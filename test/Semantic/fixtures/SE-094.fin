@@ -1,0 +1,8 @@
+function test0() -> bool {
+
+    let bar : u16 = 10;
+
+    let foo : bool = 20 == 'a';
+
+    return foo;
+}

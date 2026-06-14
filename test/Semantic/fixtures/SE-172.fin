@@ -1,0 +1,19 @@
+
+interface Iface0 {
+
+    procedure proc0(&mut self, param0 : u32, param1 : u16, param2 : box u32);
+
+};
+
+interface Iface1 {
+
+    procedure proc0(&mut self, param0 : u8);
+
+};
+
+interface Iface2 extends Iface0, Iface1 {
+
+    procedure proc2(&mut self, param0 : u32, param1 : u16);
+
+};
+

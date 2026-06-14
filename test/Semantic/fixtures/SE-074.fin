@@ -1,0 +1,7 @@
+function foo() {
+
+    let ret : u32 = 0;
+
+    return ret;
+
+}

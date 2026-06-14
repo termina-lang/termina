@@ -1,0 +1,9 @@
+
+
+function fun1() -> u32 {
+
+    var foo : u32 = [0; 10];
+
+    return foo;
+
+}

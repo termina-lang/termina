@@ -1,0 +1,38 @@
+enum Enum0 {
+
+    variant0,
+    variant1,
+    variant2,
+    variant3
+
+};
+
+function foo(input : Enum0) -> u32 {
+
+    var ret : u32 = 0;
+
+    match input {
+
+        case variant3 => {
+
+            ret = 3;
+
+        }
+
+        case variant0 => {
+            
+            ret = 1;
+
+        }
+
+        case variant1 => {
+
+            ret = 2;
+
+        }
+
+    }
+
+    return ret;
+
+}

@@ -1,0 +1,13 @@
+function foo(param0 : u8) -> u8 {
+
+    return param0;
+
+}
+
+function bar() {
+
+    foo(0);
+
+    return;
+
+}

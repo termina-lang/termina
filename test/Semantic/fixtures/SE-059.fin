@@ -1,0 +1,42 @@
+enum Enum0 {
+
+    variant0,
+    variant1,
+    variant2
+
+};
+
+function foo(input : Enum0) -> bool {
+
+    var ret : bool = false;
+
+    match input {
+
+        case variant0 => {
+
+            ret = true;
+
+        }
+
+        case variant1 => {
+
+
+            ret = true;
+
+        }
+
+        case variant2 => {
+
+        }
+
+        case _ => {
+
+            ret = true;
+
+        }
+
+    }
+
+    return ret;
+
+}

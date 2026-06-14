@@ -1,0 +1,7 @@
+handler class HandlerClass0 {
+
+    data_pool : access Allocator<u32>;
+
+
+
+};

@@ -1,0 +1,9 @@
+function test0() {
+
+    var foo : u32 = 0;
+
+    foo[0] = 1024;
+
+    return;
+
+}

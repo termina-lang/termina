@@ -1,0 +1,19 @@
+task class TaskClass0 {
+
+    pl0 : access Allocator<u32>;
+
+    in0 : in u16 triggers action0;
+    
+    action action0(&priv self, input : u16) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        return ret;
+
+    }
+
+};
+
+channel msg_queue0 : MsgQueue<u16;10>;
+resource pool0 : Pool<u16; 10>;
+task task0 : TaskClass0 = { in0 <- msg_queue0, pl0 <-> pool0 };

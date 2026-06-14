@@ -1,0 +1,16 @@
+
+function fun0(foo : &mut [u32; 2]) {
+
+    foo[0] = 10;
+
+    return;
+
+}
+
+function fun1() {
+
+    fun0({ 0, 1 });
+
+    return;
+
+}

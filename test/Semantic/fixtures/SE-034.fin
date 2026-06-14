@@ -1,0 +1,12 @@
+function keep_inside(n: usize, array : &mut[u8;64], range: &[u8;2]) {
+    let lower_limit : u8 = range[1 : usize];
+    let upper_limit : u8 = range[2 : usize];
+    let x : u8 = (*array)[n];
+
+    if (1 : u32) {
+        //do nothing
+    }
+    
+    return;
+    
+}

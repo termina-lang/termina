@@ -1,0 +1,20 @@
+task class TaskClass0 {
+
+    in0 : in u16 triggers action0;
+    out0 : out u16;
+    
+    action action0(&priv self, input : u16) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        self->out0.send(input);
+
+        return ret;
+
+    }
+
+};
+
+channel msg_queue0 : MsgQueue<u16;10>;
+channel msg_queue1 : MsgQueue<u32;10>;
+task task0 : TaskClass0 = { in0 <- msg_queue0, out0 -> msg_queue1 };

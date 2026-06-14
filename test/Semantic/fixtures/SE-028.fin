@@ -1,0 +1,23 @@
+handler class HandlerClass0 {
+
+    data_pool : access Allocator<u32>;
+
+    event_sink : sink u32 triggers action0;
+
+    procedure proc0(&mut self, data : box u32) {
+
+        self->data_pool.free(data);
+
+        return;
+
+    }
+
+    action action0(&priv self, _data : u32) -> Result {
+
+        var ret : Result = Result::Ok;
+
+        return ret;
+
+    }
+
+};

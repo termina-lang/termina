@@ -1,0 +1,25 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, data : u32);
+
+};
+
+resource glb_atomic_array : AtomicArray<u16; 10> = { values = [0; 10] };
+
+resource class ResourceClass0 provides Interface0 {
+
+    atomic_array : access AtomicArrayAccess<u32; 10>;
+
+    procedure proc0(&mut self, data : u32) {
+
+        self->atomic_array.store_index(0, data);
+
+        return;
+
+    }
+
+};
+
+resource res0 : ResourceClass0 = {
+    atomic_array <-> glb_atomic_array
+};

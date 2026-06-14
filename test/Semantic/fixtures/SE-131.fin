@@ -1,0 +1,13 @@
+struct Struct0 {
+
+    field0 : u32;
+    field1 : u32;
+
+};
+
+interface Struct0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+

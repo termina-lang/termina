@@ -1,0 +1,12 @@
+function foo() -> bool {
+
+    var array0 : [u32; 10] = [0; 10];
+
+    for i : bool in 0 .. 10 {
+
+        array0[i] = 1;
+
+    }
+
+    return (array0[i] == 0);
+}

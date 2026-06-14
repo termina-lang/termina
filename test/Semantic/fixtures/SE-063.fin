@@ -1,0 +1,19 @@
+enum Enum0 {
+
+    Variant0
+
+};
+
+enum Enum1 {
+
+    Variant1
+
+};
+
+function f() -> Enum0 {
+
+    var enum0 : Enum0 = Enum1::Variant1;
+
+    return enum0;
+
+}

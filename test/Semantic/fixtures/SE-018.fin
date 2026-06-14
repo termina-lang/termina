@@ -1,0 +1,17 @@
+struct TMChannelInterface {
+
+    field0 : u32;
+
+};
+
+
+resource class TMChannel provides TMChannelInterface {
+    
+  tm_sent_packets : u32;
+
+  procedure get_tm_sent_packets(&mut self, packets : &mut u32) {
+    *packets = self->tm_sent_packets;
+    return;
+  }
+
+};

@@ -1,0 +1,11 @@
+const bar : u32 = 0;
+
+function foo() -> Status<i32> {
+
+    var ret : Status<i32> = Success;
+
+    bar(&mut ret);
+
+    return ret;
+
+}

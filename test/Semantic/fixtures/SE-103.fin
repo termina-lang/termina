@@ -1,0 +1,14 @@
+
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+enum Enum0 {
+
+    Variant0(Interface0, u32),
+    Variant1
+
+};
+

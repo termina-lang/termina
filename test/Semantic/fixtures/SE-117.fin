@@ -1,0 +1,17 @@
+task class TaskClass0 {
+
+    snk0 : sink u32 triggers action0;
+
+    out0 : out u16;
+
+    action action0(&priv self, input : u32) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        self->out0.send(input);
+
+        return ret;
+
+    }
+
+};

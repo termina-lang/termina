@@ -1,0 +1,8 @@
+function test0() {
+
+    var foo : bool = false;
+
+    foo = 3 : u32 && 3 : u32 == 2 : u32;
+
+    return;
+}

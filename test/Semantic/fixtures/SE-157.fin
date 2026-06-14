@@ -1,0 +1,28 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+interface Interface1 {
+
+    procedure proc1(&mut self, input : u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    field0 : u32;
+    ap0 : access Interface1;
+
+    procedure proc0(&mut self, input : u32) {
+
+       self->field0 = input; 
+       self->ap0.proc1(input);
+       return;
+
+    }
+
+};
+
+resource res0 : ResourceClass0 = { field0 = 0, ap0 <-> res1 };

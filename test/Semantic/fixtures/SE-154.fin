@@ -1,0 +1,18 @@
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+    
+    out0 : out u32;
+
+    action action0(&priv self, _input : TimeVal) -> Status<i32> {
+
+        var ret : Status<i32> = Success;
+
+        self->out0.receive(0);
+
+        return ret;
+
+    }
+
+};
+

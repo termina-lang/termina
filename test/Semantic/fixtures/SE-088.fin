@@ -1,0 +1,15 @@
+enum Enum0 {
+
+    Variant0,
+    Variant1(u32),
+    Variant2(u32, u16)
+
+};
+
+function f() -> Enum0 {
+
+    var enum0 : Enum0 = Enum0::Variant3;
+
+    return enum0;
+
+}

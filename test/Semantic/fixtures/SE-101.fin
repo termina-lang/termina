@@ -1,0 +1,22 @@
+
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+task class TaskClass0 {
+
+    ap0 : Interface0;
+
+    snk0 : sink u32 triggers action0;
+
+    action action0(&priv self, input : u32) -> Result {
+
+        var ret : Result = Result::Ok;
+
+        return ret;
+
+    }
+
+};

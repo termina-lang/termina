@@ -1,0 +1,7 @@
+function foo(input : u32) -> u32 {
+
+    var bar : box [u32; 10] = input;
+
+    return bar;
+
+}

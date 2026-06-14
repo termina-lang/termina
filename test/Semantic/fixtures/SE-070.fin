@@ -1,0 +1,11 @@
+const min_count : u8 = 0;
+
+
+function sum_up_10_max_count_times (x : u8) -> u8 {
+
+    for i : usize in min_count..250 {
+        x = x + 10;
+    }
+
+    return sum;
+}

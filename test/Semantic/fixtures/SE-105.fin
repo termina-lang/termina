@@ -1,0 +1,15 @@
+
+interface Interface0 {
+
+    procedure proc0(&mut self, input : u32);
+
+};
+
+function foo() {
+
+    let bar : Interface0 = 0;
+
+    return;
+
+}
+

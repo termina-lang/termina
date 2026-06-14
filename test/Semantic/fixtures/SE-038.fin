@@ -1,0 +1,17 @@
+handler class HandlerClass0 {
+
+    data_pool : access Allocator<u32>;
+
+    event_sink0 : sink u32 triggers action0;
+
+    action action0(&priv self, _data : u32) -> Result {
+
+        var ret : Result = Result::Ok;
+
+        self->member0();
+
+        return ret;
+
+    }
+
+};

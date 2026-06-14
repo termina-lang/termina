@@ -1,0 +1,21 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, data : u32);
+
+};
+
+resource bad_atomic_array : AtomicArray<char; 10>;
+
+resource class ResourceClass0 provides Interface0 {
+
+    atomic_array : access AtomicArrayAccess<u32; 10>;
+
+    procedure proc0(&mut self, data : u32) {
+
+        self->atomic_array.store_index(0, data);
+
+        return;
+
+    }
+
+};

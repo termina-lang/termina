@@ -1,0 +1,20 @@
+struct Struct0 {
+
+    field0 : u32;
+
+};
+
+struct Struct1 {
+
+    field1 : u32;
+
+};
+
+function f() -> Struct0 {
+
+    var struct0 : Struct0 = { field0 = 10 };
+    var struct1 : Struct1 = { field0 = 20 } : Struct0;
+
+    return struct0;
+
+}

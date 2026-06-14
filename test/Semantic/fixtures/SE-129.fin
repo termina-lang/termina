@@ -1,0 +1,1 @@
+const period : u8 = 1024;

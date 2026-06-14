@@ -1,0 +1,9 @@
+interface Interface0 {
+
+    procedure proc0(&mut self);
+    procedure proc1(&mut self, input : u32);
+    procedure proc0(&mut self);
+    procedure proc1(&mut self, input : u32);
+    procedure proc2(&mut self);
+
+};

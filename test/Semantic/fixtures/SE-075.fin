@@ -1,0 +1,26 @@
+interface Interface0 {
+
+    procedure proc0(&mut self, input : &mut u32);
+
+};
+
+resource class ResourceClass0 provides Interface0 {
+
+    procedure proc0(&mut self, input : &mut u32) {
+
+        *input = 0;
+
+        return;
+
+    }
+
+};
+
+
+function foo() -> u32 {
+
+    let ret : [ResourceClass0; 10] = [0; 10];
+
+    return ret[0];
+
+}

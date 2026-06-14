@@ -1,0 +1,9 @@
+function test0() -> bool {
+
+    var bar : [u16; 10] = [0; 10];
+    var foo : [u16; 10] = [0; 10];
+
+    let res : bool = 20 == foo;
+
+    return res;
+}

@@ -1,0 +1,8 @@
+function foo() -> u32 {
+
+    let bar : u32 = 0;
+
+    bar.field0 = 0;
+
+    return bar;
+}

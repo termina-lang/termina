@@ -1,0 +1,8 @@
+
+function foo() -> Struct0 {
+
+    var bar : Struct0 = { field0 = 0 };
+
+    return bar;
+
+}

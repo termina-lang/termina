@@ -1,0 +1,16 @@
+
+function fun0(foo : &mut [char; 12]) {
+
+    foo[0] = 'h';
+
+    return;
+
+}
+
+function fun1() {
+
+    fun0("Hello world!");
+
+    return;
+
+}
