@@ -1,0 +1,10 @@
+task class TaskClass0 {
+
+    in_port : in u32 triggers handle;
+
+    action handle(&priv self, _msg : u16) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
+    }
+
+};
