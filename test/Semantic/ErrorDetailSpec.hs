@@ -355,7 +355,7 @@ spec = do
      runNegativeTestTypeCheck testSE015
        `shouldSatisfy`
         isEResourceClassInPort "input_msg"
-    it "SE-015: resource class defines an out port" $ do
+    it "SE-016: resource class defines an out port" $ do
      runNegativeTestTypeCheck testSE016
        `shouldSatisfy`
         isEResourceClassOutPort "output_msg"
