@@ -206,7 +206,7 @@ testVE005 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veMatchMove ++ veMatch
 testVE006 :: String
 testVE006 = veWrap (
   veDeclOpt ++ veAlloc ++
-  "        if (true) {\n" ++ veMatchMove ++
+  "        if (data == 0) {\n" ++ veMatchMove ++
   "        } else {\n" ++ veAlloc ++ veMatchMove ++ "        }\n" ++
   veFreeData)
 
@@ -219,7 +219,7 @@ testVE007 = veWrap (
 -- VE-009: the box @data@ is moved in the @if@ branch but not in the @else@.
 testVE009 :: String
 testVE009 = veWrap (
-  "        if (true) {\n" ++ veFreeData ++ "        } else {\n        }\n")
+  "        if (data == 0) {\n" ++ veFreeData ++ "        } else {\n        }\n")
 
 -- VE-010: the box @data@ is moved inside a for loop (a branch that may not run).
 testVE010 :: String
