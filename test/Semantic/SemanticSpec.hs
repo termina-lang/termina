@@ -290,7 +290,7 @@ testSE016 = "interface TMChannelInterface {\n" ++
 
 spec :: Spec
 spec = do
-  describe "Semantic Errors" $ do
+  describe "Semantic: detailed SE error assertions (constructor + arguments)" $ do
     it "SE-001: invalid array indexing" $ do
      runNegativeTestTypeCheck testSE001
        `shouldSatisfy`

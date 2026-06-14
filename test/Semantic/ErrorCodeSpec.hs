@@ -258,7 +258,7 @@ spec = do
   files <- runIO $ do
     entries <- listDirectory fixturesDir
     return $ sort [ f | f <- entries, "SE-" `isPrefixOf` f, ".fin" `isSuffixOf` f ]
-  describe "Semantic: exhaustive SE error-code coverage" $
+  describe "Semantic: SE error-code coverage (one fixture per code)" $
     forM_ files $ \f -> do
       let code = dropExtension f
           name = maybe code (\t -> code ++ ": " ++ t) (lookup code titles)
