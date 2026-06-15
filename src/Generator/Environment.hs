@@ -104,9 +104,15 @@ getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =
     -- | SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime"] [] [])) Internal)]
 getPlatformInitialGlobalEnv _ TestPlatform =
-    -- A single interrupt emitter so the test harness can exercise interrupt
-    -- connection errors (e.g. SE-158, SE-194).
-    [("test_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal)]
+    -- System emitters so the test harness can exercise their connection errors
+    -- (e.g. SE-158/194 for interrupts, SE-160/196 for system init, SE-193/197
+    -- for system exceptions). They are name-resolution entries only; unlike the
+    -- enable-* config flags they are not added to the program architecture, so
+    -- an unconnected one does not trip the disconnected-emitter check.
+    [ ("test_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal)
+    , ("system_init", LocatedElement (GGlob (TGlobal EmitterClass "SystemInit")) Internal)
+    , ("system_except", LocatedElement (GGlob (TGlobal EmitterClass "SystemExcept")) Internal)
+    ]
 
 getPlatformInitialProgram :: TerminaConfig -> Platform -> TerminaProgArch SemanticAnn
 getPlatformInitialProgram config POSIXGCC = 

@@ -1,0 +1,11 @@
+task class TaskClass0 {
+
+    snk0 : sink Exception triggers action0;
+
+    action action0(&priv self, _input : Exception) -> u32 {
+        return 0 : u32;
+    }
+
+};
+
+task task0 : TaskClass0 = { snk0 <- system_except };

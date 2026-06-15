@@ -28,7 +28,6 @@ shadowed =
   , ("SE-132", "SE-014")
   , ("SE-133", "SE-014")
   , ("SE-145", "SE-208")
-  , ("SE-160", "SE-157")
   ]
 
 -- | Human-readable title per error code (mirrors @errorTitle@ in
