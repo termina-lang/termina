@@ -1,0 +1,10 @@
+
+function foo() -> u32 {
+
+    return 0;
+
+    var bar : u32 = 0;
+
+    return bar;
+
+}

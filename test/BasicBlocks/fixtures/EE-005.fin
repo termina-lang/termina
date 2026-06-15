@@ -1,0 +1,15 @@
+
+task class foo {
+
+    in_prt : in u32 triggers action1;
+
+    out_prt : out u32;
+
+    action action1(&priv self, data : u32) -> Status<i32> {
+
+        self->out_prt.send(data);
+
+    }
+
+};
+
