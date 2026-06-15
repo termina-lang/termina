@@ -456,7 +456,7 @@ checkClassKind anns clsId ResourceClass (fs, prcs, acts, _methods, viewers) prov
   case viewers of
     [] -> return ()
     (ClassViewer viewerId _ _ _ ann):_  ->
-        throwError $ annotateError ann (EResourceClassAction (clsId, anns) viewerId)
+        throwError $ annotateError ann (EResourceClassViewer (clsId, anns) viewerId)
     _ -> throwError (annotateError Internal EMalformedClassTyping)
   -- Check that the resource class does not define any in and out ports
   mapM_ (
