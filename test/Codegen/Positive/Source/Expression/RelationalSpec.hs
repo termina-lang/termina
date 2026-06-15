@@ -1,0 +1,77 @@
+module Codegen.Positive.Source.Expression.RelationalSpec (spec) where
+
+import Codegen.Positive.Source.Common
+
+import Test.Hspec
+import Data.Text
+
+test0 :: String
+test0 = "function relational_test0(foo : u16) {\n" ++
+        "    var res : bool = false;\n" ++
+        "    res = foo == 1024 : u16;\n" ++
+        "    res = 1024 : u16 == foo;\n" ++
+        "    res = foo != 1024 : u16;\n" ++
+        "    res = 1024 : u16 != foo;\n" ++
+        "    res = foo > 1024 : u16;\n" ++
+        "    res = 1024 : u16 > foo;\n" ++
+        "    res = foo >= 1024 : u16;\n" ++
+        "    res = 1024 : u16 >= foo;\n" ++
+        "    res = foo < 1024 : u16;\n" ++
+        "    res = 1024 : u16 < foo;\n" ++
+        "    res = foo <= 1024 : u16;\n" ++
+        "    res = true && false;\n" ++
+        "    res = true || false;\n" ++
+        "    return;\n" ++
+        "}"
+
+spec :: Spec
+spec = do
+  describe "Pretty printing relational expressions" $ do
+    it "Declares a function with relational expressions" $ do
+      renderHeader test0 `shouldBe`
+        pack ("#ifndef __TEST_H__\n" ++
+              "#define __TEST_H__\n" ++
+              "\n" ++
+              "#include <termina.h>\n" ++
+              "\n" ++
+              "void relational_test0(uint16_t foo);\n" ++
+              "\n" ++
+              "#endif\n")
+    it "Generates relational expressions" $ do
+      renderSource test0 `shouldBe`
+        pack ("\n" ++
+              "#include \"test.h\"\n" ++
+              "\n" ++ 
+              "void relational_test0(uint16_t foo) {\n" ++
+              "    \n" ++
+              "    _Bool res = 0;\n" ++
+              "\n" ++
+              "    res = foo == 1024U;\n" ++
+              "\n" ++
+              "    res = 1024U == foo;\n" ++
+              "\n" ++
+              "    res = foo != 1024U;\n" ++
+              "\n" ++
+              "    res = 1024U != foo;\n" ++ 
+              "\n" ++
+              "    res = foo > 1024U;\n" ++
+              "\n" ++
+              "    res = 1024U > foo;\n" ++
+              "\n" ++
+              "    res = foo >= 1024U;\n" ++
+              "\n" ++
+              "    res = 1024U >= foo;\n" ++
+              "\n" ++
+              "    res = foo < 1024U;\n" ++
+              "\n" ++
+              "    res = 1024U < foo;\n" ++
+              "\n" ++
+              "    res = foo <= 1024U;\n" ++
+              "\n" ++
+              "    res = 1 && 0;\n" ++
+              "\n" ++
+              "    res = 1 || 0;\n" ++ 
+              "\n" ++
+              "    return;\n" ++
+              "\n" ++
+              "}\n")

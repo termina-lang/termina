@@ -1,0 +1,33 @@
+
+// EE-010: if is not the last statement (a return follows) yet all its branches exit.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action1(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        if (data == 0) {
+
+            continue self->action1(data);
+
+        } else {
+
+            continue self->action1(data);
+
+        }
+
+        return st;
+
+    }
+
+};

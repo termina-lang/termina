@@ -1,0 +1,19 @@
+
+// EE-007: send separated from the exit point by a non-send statement.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    out_prt : out u32;
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        self->out_prt.send(data);
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+};

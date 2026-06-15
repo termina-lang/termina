@@ -2,10 +2,12 @@ module VarUsage.Common where
 
 import Text.Parsec
 import Parser.Parsing
+import Data.Text (Text)
 
 import Semantic.TypeChecking
 import Semantic.Environment
 import Utils.Annotations
+import Utils.Errors (ErrorMessage(errorIdent))
 import Configuration.Platform
 import Configuration.Configuration
 import ControlFlow.BasicBlocks
@@ -28,3 +30,9 @@ runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
         Right bbProgram -> case runUDAnnotatedProgram bbProgram of
           Just err -> Just $ getError err
           Nothing -> Nothing
+
+-- | The VE-NNN code of the variable-usage error a program raises (or 'Nothing'
+-- if usage is well-formed). The code spec asserts this; the detail spec asserts
+-- the error constructor itself.
+varUsageErrorCode :: String -> Maybe Text
+varUsageErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestVarUsage

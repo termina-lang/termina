@@ -1,0 +1,25 @@
+
+// EE-006: continue that is not the last statement of an action.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action1(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        continue self->action1(data);
+
+        return st;
+
+    }
+
+};

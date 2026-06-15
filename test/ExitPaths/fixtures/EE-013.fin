@@ -1,0 +1,17 @@
+
+// EE-014: reboot that is not the last statement of an action.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        reboot;
+
+        return st;
+
+    }
+
+};

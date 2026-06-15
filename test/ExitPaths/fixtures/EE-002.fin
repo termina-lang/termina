@@ -1,0 +1,24 @@
+
+// EE-002: continue inside a viewer (non-action member). Reaches the
+// exit-path check in EPExitNotAllowed -> EEInvalidContinue.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    viewer viewer0(&self, value : u32) -> bool {
+
+        continue self->action0(value);
+
+        return value == 0;
+
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+};

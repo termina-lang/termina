@@ -1,0 +1,9 @@
+
+// EE-013: reboot that is not the last statement of a function (non-action).
+function foo() -> u32 {
+
+    reboot;
+
+    return 0;
+
+}

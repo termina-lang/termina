@@ -33,7 +33,8 @@ import Command.Utils
      getVisibleModules, sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
-import Utils.Annotations (QualifiedName)
+import Parser.Errors (Error(..), ParsingErrors)
+import Utils.Annotations (QualifiedName, annotateError, Location(Internal))
 
 import ControlFlow.Architecture (runGenArchitecture)
 import ControlFlow.Architecture.Types (TerminaProgArch)
@@ -120,7 +121,7 @@ buildAndRenderModule target sources =
 parseModule :: (QualifiedName, String) -> Either Text (QualifiedName, ParsedModule)
 parseModule (qname, src) =
   case runParser terminaModuleParser qname "" src of
-    Left err -> Left . pack $ "Parser error in " ++ qname ++ ": " ++ show err
+    Left err -> Left (errCode (annotateError Internal (EParseError err) :: ParsingErrors))
     Right (Termina imports prog) -> do
       deps <- mapM toDep imports
       pure (qname, TerminaModuleData qname qname dummyTime deps [] (pack src) (ParsingData prog))
@@ -135,7 +136,7 @@ parseModule (qname, src) =
 orderModules :: ParsedProject -> Either Text [QualifiedName]
 orderModules parsedProject =
   case sortProjectDepsOrLoop (M.map importedModules parsedProject) of
-    Left loop -> Left . pack $ "Dependency cycle: " ++ show loop
+    Left loop -> Left (errCode (annotateError Internal (EImportedFilesLoop loop) :: ParsingErrors))
     Right ordered -> Right ordered
 
 typeProject :: ParsedProject -> [QualifiedName] -> Either Text TypedProject

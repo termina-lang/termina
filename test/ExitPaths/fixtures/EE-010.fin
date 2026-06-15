@@ -1,0 +1,41 @@
+
+// EE-011: match is not the last statement (a return follows) yet all its cases exit.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action1(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        var opt : Option<u32> = None;
+
+        match opt {
+
+            case Some(value) => {
+
+                continue self->action1(value);
+
+            }
+
+            case None => {
+
+                continue self->action1(data);
+
+            }
+
+        }
+
+        return st;
+
+    }
+
+};

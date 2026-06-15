@@ -1,0 +1,115 @@
+module Codegen.Positive.Printer.Expression.BitwiseSpec (spec) where
+
+import Codegen.Positive.Printer.Common
+
+import Test.Hspec
+import Semantic.AST
+import Data.Text
+import Semantic.Types
+
+var0 :: Expression SemanticAnn
+-- | var0 : u16
+var0 = AccessObject (Variable "var0" (objSemAnn Mutable TUInt16))
+
+unboxVar1 :: Expression SemanticAnn
+unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable TUInt16))
+
+constUInt8, constUInt16 :: Expression SemanticAnn
+constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just TUInt8)) uint8ExprSemAnn
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
+
+var0LeftShiftConstant :: Expression SemanticAnn
+var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16ExprSemAnn
+
+constantLeftShiftVar0 :: Expression SemanticAnn
+constantLeftShiftVar0 = BinOp BitwiseLeftShift constUInt8 var0 uint16ExprSemAnn
+
+var1LeftShiftConstant :: Expression SemanticAnn
+var1LeftShiftConstant = BinOp BitwiseLeftShift unboxVar1 constUInt8 uint16ExprSemAnn
+
+constantLeftShiftVar1 :: Expression SemanticAnn
+constantLeftShiftVar1 = BinOp BitwiseLeftShift constUInt8 unboxVar1 uint16ExprSemAnn
+
+var0LeftShiftVar1 :: Expression SemanticAnn
+var0LeftShiftVar1 = BinOp BitwiseLeftShift var0 unboxVar1 uint16ExprSemAnn
+
+var0LeftShiftVar1LeftShiftConstant :: Expression SemanticAnn
+var0LeftShiftVar1LeftShiftConstant = BinOp BitwiseLeftShift var0LeftShiftVar1 constUInt8 uint16ExprSemAnn
+
+var0RightShiftConstant :: Expression SemanticAnn
+var0RightShiftConstant = BinOp BitwiseRightShift var0 constUInt8 uint16ExprSemAnn
+
+constantRightShiftVar0 :: Expression SemanticAnn
+constantRightShiftVar0 = BinOp BitwiseRightShift constUInt8 var0 uint16ExprSemAnn
+
+var0BitwiseAndConstant :: Expression SemanticAnn
+var0BitwiseAndConstant = BinOp BitwiseAnd var0 constUInt16 uint16ExprSemAnn
+
+constantBitwiseAndVar0 :: Expression SemanticAnn
+constantBitwiseAndVar0 = BinOp BitwiseAnd constUInt16 var0 uint16ExprSemAnn
+
+var0BitwiseAndVar1 :: Expression SemanticAnn
+var0BitwiseAndVar1 = BinOp BitwiseAnd var0 unboxVar1 uint16ExprSemAnn
+
+var1BitwiseOrconstant :: Expression SemanticAnn
+var1BitwiseOrconstant = BinOp BitwiseOr unboxVar1 constUInt16 uint16ExprSemAnn
+
+var0BitwiseOrVar1 :: Expression SemanticAnn
+var0BitwiseOrVar1 = BinOp BitwiseOr var0 unboxVar1 uint16ExprSemAnn
+
+var1BitwiseXorconstant :: Expression SemanticAnn
+var1BitwiseXorconstant = BinOp BitwiseXor unboxVar1 constUInt16 uint16ExprSemAnn
+
+var0BitwiseXorVar1 :: Expression SemanticAnn
+var0BitwiseXorVar1 = BinOp BitwiseXor var0 unboxVar1 uint16ExprSemAnn
+
+spec :: Spec
+spec = do
+  describe "Pretty printing variable expression" $ do
+    it "Prints the expression: var0 << 0x8U : u8" $ do
+      renderExpression var0LeftShiftConstant `shouldBe`
+        pack "var0 << 0x8U"
+    it "Prints the expression: var1 << 0x8U : u8" $ do
+      renderExpression var1LeftShiftConstant `shouldBe`
+        pack "*(uint16_t *)var1.data << 0x8U"
+    it "Prints the expression: 8 : u8 << var0" $ do
+      renderExpression constantLeftShiftVar0 `shouldBe`
+        pack "0x8U << var0"
+    it "Prints the expression: 8 : u8 << var1" $ do
+      renderExpression constantLeftShiftVar1 `shouldBe`
+        pack "0x8U << *(uint16_t *)var1.data"
+    it "Prints the expression: var0 << var1 : u16" $ do
+      renderExpression var0LeftShiftVar1 `shouldBe`
+        pack "var0 << *(uint16_t *)var1.data"
+    it "Prints the expression: var0 << var1 << 0x8U : u8" $ do
+      renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
+        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 0x8U"
+    it "Prints the expression: var0 >> 0x8U : u8" $ do
+      renderExpression var0RightShiftConstant `shouldBe`
+        pack "var0 >> 0x8U"
+    it "Prints the expression: 0x8U >> var0" $ do
+      renderExpression constantRightShiftVar0 `shouldBe`
+        pack "0x8U >> var0"
+    it "Prints the expression: var0 & 1024 : u16" $ do
+      renderExpression var0BitwiseAndConstant `shouldBe`
+        pack "var0 & 1024U"
+    it "Prints the expression: 1024 : u16 & var0" $ do
+      renderExpression constantBitwiseAndVar0 `shouldBe`
+        pack "1024U & var0"
+    it "Prints the expression: var0 & var1 : u16" $ do
+      renderExpression var0BitwiseAndVar1 `shouldBe`
+        pack "var0 & *(uint16_t *)var1.data"
+    it "Prints the expression: var1 | 1024 : u16" $ do
+      renderExpression var1BitwiseOrconstant `shouldBe`
+        pack "*(uint16_t *)var1.data | 1024U"
+    it "Prints the expression: var0 | var1 : u16" $ do
+      renderExpression var0BitwiseOrVar1 `shouldBe`
+        pack "var0 | *(uint16_t *)var1.data"
+    it "Prints the expression: var1 ^ 1024 : u16" $ do
+      renderExpression var1BitwiseXorconstant `shouldBe`
+        pack "*(uint16_t *)var1.data ^ 1024U"
+    it "Prints the expression: var0 ^ var1 : u16" $ do
+      renderExpression var0BitwiseXorVar1 `shouldBe`
+        pack "var0 ^ *(uint16_t *)var1.data"
+        
+    

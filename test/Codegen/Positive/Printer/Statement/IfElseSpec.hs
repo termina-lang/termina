@@ -1,0 +1,109 @@
+module Codegen.Positive.Printer.Statement.IfElseSpec (spec) where
+
+import Codegen.Positive.Printer.Common
+
+import Test.Hspec
+import Semantic.AST
+import Data.Text
+import Semantic.Types
+
+optionBoxUInt32TS :: TerminaType SemanticAnn
+optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
+
+arrayTS :: TerminaType SemanticAnn
+arrayTS = TArray TUInt32 (buildConstExprTUSize 10)
+
+optionBoxUInt32ExprSemAnn :: SemanticAnn
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
+
+array1 :: Statement SemanticAnn
+array1 = Declaration "array1" Mutable arrayTS
+    (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) (arrayExprSemAnn TUInt32 (buildConstExprTUSize 10))) stmtSemAnn
+
+foo0 :: Expression SemanticAnn
+foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
+
+uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+
+constToFoo0 :: Statement SemanticAnn
+constToFoo0 = AssignmentStmt (Variable "foo0" (objSemAnn Mutable TUInt32)) uint32Const0 stmtSemAnn
+
+boxVar0 :: Expression SemanticAnn
+boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
+
+option0, option1 :: Statement SemanticAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
+
+twoDeclarations :: Block SemanticAnn
+twoDeclarations = Block [array1, option0] stmtSemAnn
+
+oneAssignment :: Block SemanticAnn
+oneAssignment = Block [constToFoo0] stmtSemAnn
+
+oneDeclaration :: Block SemanticAnn
+oneDeclaration = Block [option1] stmtSemAnn
+
+cond0, cond1 :: Expression SemanticAnn
+cond0 = BinOp RelationalEqual foo0 uint32Const0 boolExprSemAnn
+cond1 = BinOp RelationalNotEqual foo0 uint32Const0xFFFF0000 boolExprSemAnn
+
+singleIf :: Statement SemanticAnn
+singleIf = IfElseStmt (CondIf cond0 twoDeclarations stmtSemAnn) [] Nothing stmtSemAnn
+
+ifElse :: Statement SemanticAnn
+ifElse = IfElseStmt (CondIf cond1 twoDeclarations stmtSemAnn) [] (Just (CondElse oneDeclaration stmtSemAnn)) stmtSemAnn
+
+elseIf :: CondElseIf SemanticAnn
+elseIf = CondElseIf cond0 oneAssignment stmtSemAnn
+
+ifElseIf :: Statement SemanticAnn
+ifElseIf = IfElseStmt (CondIf cond1 twoDeclarations stmtSemAnn) [elseIf] (Just (CondElse oneDeclaration stmtSemAnn)) stmtSemAnn
+
+spec :: Spec
+spec = do
+  describe "Pretty printing if statements" $ do
+    it "Prints a single if statement" $ do
+      renderStatement singleIf `shouldBe`
+        pack (
+          "\nif (foo0 == 0U) {\n" ++
+          "    \n" ++
+          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+          "\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
+          "\n" ++
+          "}")
+    it "Prints an if-else statement" $ do
+      renderStatement ifElse `shouldBe`
+        pack (
+          "\nif (foo0 != 4294901760U) {\n" ++
+          "    \n" ++
+          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+          "\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
+          "\n" ++
+          "} else {\n" ++
+          "    \n" ++
+          "    __option_box_t option1 = { .__variant = None };\n" ++
+          "\n" ++
+          "}")
+    it "Prints an if-else-if-else statement" $ do
+      renderStatement ifElseIf `shouldBe`
+        pack (
+          "\nif (foo0 != 4294901760U) {\n" ++
+          "    \n" ++
+          "    uint32_t array1[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };\n" ++
+          "\n" ++
+          "    __option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };\n" ++
+          "\n" ++
+          "} else if (foo0 == 0U) {\n" ++
+          "    \n" ++
+          "    foo0 = 0U;\n" ++
+          "\n" ++
+          "} else {\n" ++
+          "    \n" ++
+          "    __option_box_t option1 = { .__variant = None };\n" ++
+          "\n" ++
+          "}")

@@ -1,0 +1,25 @@
+
+// EE-012: if is the last statement of the action, its branch exits, but there is no else.
+task class foo {
+
+    snk : sink u32 triggers action0;
+
+    action action1(&priv self, data : u32) -> Status<i32> {
+
+        var st : Status<i32> = Success;
+
+        return st;
+
+    }
+
+    action action0(&priv self, data : u32) -> Status<i32> {
+
+        if (data == 0) {
+
+            continue self->action1(data);
+
+        }
+
+    }
+
+};

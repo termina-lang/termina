@@ -1,0 +1,131 @@
+module Codegen.Positive.Printer.Statement.VariableInitializationSpec (spec) where
+
+import Codegen.Positive.Printer.Common
+
+import Test.Hspec
+import Semantic.AST
+import Data.Text
+import Semantic.Types
+
+tmDescriptorTS, messageTS :: TerminaType SemanticAnn
+tmDescriptorTS = TStruct "TMDescriptor"
+messageTS = TStruct "Message"
+
+optionBoxUInt32TS :: TerminaType SemanticAnn
+optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
+
+arrayTS, arrayTMDescriptorTS, twoDimArrayTS :: TerminaType SemanticAnn
+arrayTS = TArray TUInt32 (buildConstExprTUSize 10)
+arrayTMDescriptorTS = TArray tmDescriptorTS (buildConstExprTUSize 2)
+twoDimArrayTS = TArray (TArray TInt64 (buildConstExprTUSize 2)) (buildConstExprTUSize 2)
+
+optionBoxUInt32ExprSemAnn :: SemanticAnn
+optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
+
+arrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
+arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
+twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
+
+arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
+arrayExprAnn = arrayExprSemAnn TUInt32 (buildConstExprTUSize 10)
+arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (buildConstExprTUSize 2)
+twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (buildConstExprTUSize 2)
+twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (buildConstExprTUSize 2) (buildConstExprTUSize 2)
+
+array0 :: Expression SemanticAnn
+array0 = AccessObject (Variable "array0" arrayObjAnn)
+
+array3, array4, array5 :: Statement SemanticAnn
+array3 = Declaration "array3" Mutable arrayTS (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn
+array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (buildConstExprTUSize 2) twoDymArrayRowExprAnn) (buildConstExprTUSize 2) twoDymArrayExprAnn) stmtSemAnn
+array5 = Declaration "array5" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (buildConstExprTUSize 2) arrayTMDescriptorExprAnn) stmtSemAnn
+
+foo0 :: Expression SemanticAnn
+foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
+
+foo1, foo2 :: Statement SemanticAnn
+foo1 = Declaration "foo1" Mutable TUInt32 foo0 stmtSemAnn
+foo2 = Declaration "foo2" Mutable TUInt32 uint32Const0 stmtSemAnn
+
+tmDescriptorObjSemAnn :: SemanticAnn
+tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"
+
+structAExprSemAnn, tmDescriptorExprSemAnn, messageExprSemAnn :: SemanticAnn
+structAExprSemAnn = structExprSemAnn "StructA"
+tmDescriptorExprSemAnn = structExprSemAnn "TMDescriptor"
+messageExprSemAnn = structExprSemAnn "Message"
+
+uint32Const0, uint32Const0xFFFF0000 :: Expression SemanticAnn
+uint32Const0 = Constant (I (TInteger 0 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+uint32Const0xFFFF0000 = Constant (I (TInteger 4294901760 DecRepr) (Just TUInt32)) uint32ExprSemAnn
+
+-- | Initialization expression:
+-- { field_a = 0 : u32, field_b = 0xFFFF0000 : u32 } : StructA
+structAFieldsInit0 :: Expression SemanticAnn
+structAFieldsInit0 =
+    StructInitializer 
+        [FieldValueAssignment "field_a" uint32Const0 undefined,
+         FieldValueAssignment "field_b" (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn,
+         FieldValueAssignment "field_c" uint32Const0xFFFF0000 stmtSemAnn] structAExprSemAnn
+
+tmDescriptorFieldsInit0 :: Expression SemanticAnn
+tmDescriptorFieldsInit0 =
+    StructInitializer
+        [FieldValueAssignment "field0" uint32Const0 undefined,
+         FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorExprSemAnn
+
+struct0, struct1 :: Statement SemanticAnn
+struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
+struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorObjSemAnn)) stmtSemAnn
+
+enum0, enum1 :: Statement SemanticAnn
+enum0 = Declaration "enum0" Mutable messageTS (EnumVariantInitializer "Message" "Reset" [] messageExprSemAnn) stmtSemAnn
+enum1 = Declaration "enum1" Mutable messageTS (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageExprSemAnn) stmtSemAnn
+
+boxVar0 :: Expression SemanticAnn
+boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
+
+option0, option1 :: Statement SemanticAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
+
+spec :: Spec
+spec = do
+  describe "Pretty printing scalar variable declarations" $ do
+    it "Initializes a u32 variable from another variable" $ do
+      renderStatement foo1 `shouldBe`
+        pack "\nuint32_t foo1 = foo0;"
+    it "Initializes a u32 variable with a constant" $ do
+      renderStatement foo2 `shouldBe`
+        pack "\nuint32_t foo2 = 0U;"
+  describe "Pretty printing option variable declarations" $ do
+    it "Initializes an option-box with Some" $ do
+      renderStatement option0 `shouldBe`
+        pack "\n__option_box_t option0 = { .__variant = Some, .Some = { .__0 = box_var0 } };"
+    it "Initializes an option-box with None" $ do
+      renderStatement option1 `shouldBe`
+        pack "\n__option_box_t option1 = { .__variant = None };"
+  describe "Pretty printing enum variable declarations" $ do
+    it "Initializes an enum variable with a parameterless variant" $ do
+      renderStatement enum0 `shouldBe`
+        pack "\nMessage enum0 = { .__variant = Message__Reset };"
+    it "Initializes an enum variable with a parameterized variant" $ do
+      renderStatement enum1 `shouldBe`
+        pack "\nMessage enum1 = { .__variant = Message__In, .In = { .__0 = 0U, .__1 = 0U } };"
+  describe "Pretty printing struct variable declarations" $ do
+    it "Initializes a struct variable with a nested initializer" $ do
+      renderStatement struct0 `shouldBe`
+        pack "\nTMDescriptor struct0 = { .field0 = 0U, .field1 = { .field_a = 0U,\n                                                   .field_b = { 0U, 0U, 0U, 0U,\n                                                                0U, 0U, 0U, 0U,\n                                                                0U, 0U },\n                                                   .field_c = 4294901760U } };"
+    it "Initializes a struct variable from another struct" $ do
+      renderStatement struct1 `shouldBe`
+        pack "\nTMDescriptor struct1 = struct0;"
+  describe "Pretty printing array variable declarations" $ do
+    -- | A declaration's array fill is emitted as a C initializer list (after
+    -- constant folding every array size is a literal). Sizes are kept small so
+    -- the golden stays a single readable line.
+    it "Initializes a one-dimensional array with a fill" $ do
+      renderStatement array3 `shouldBe`
+        pack "\nuint32_t array3[10U] = { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U };"
+    it "Initializes a two-dimensional array with a fill" $ do
+      renderStatement array4 `shouldBe`
+        pack "\nint64_t array4[2U][2U] = { { 0U, 0U }, { 0U, 0U } };"
