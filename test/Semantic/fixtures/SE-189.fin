@@ -1,0 +1,5 @@
+function f() -> Option<u32> {
+    var b : bool = false;
+    var o : Option<u32> = Some(b);
+    return o;
+}

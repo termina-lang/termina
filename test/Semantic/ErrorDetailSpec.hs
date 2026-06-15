@@ -288,6 +288,18 @@ testSE016 = "interface TMChannelInterface {\n" ++
        "\n" ++
        "};\n"
 
+-- One per monadic-variant payload site (Option Some, Result Ok, Result Error,
+-- Status Failure): a bool argument where a numeric payload is expected.
+seMonadicOption, seMonadicResultOk, seMonadicResultError, seMonadicStatus :: String
+seMonadicOption =
+  "function f() -> Option<u32> {\n    var b : bool = false;\n    var o : Option<u32> = Some(b);\n    return o;\n}\n"
+seMonadicResultOk =
+  "function f() -> Result<u32; u32> {\n    var b : bool = false;\n    var r : Result<u32; u32> = Ok(b);\n    return r;\n}\n"
+seMonadicResultError =
+  "function f() -> Result<u32; u32> {\n    var b : bool = false;\n    var r : Result<u32; u32> = Error(b);\n    return r;\n}\n"
+seMonadicStatus =
+  "function f() -> Status<i32> {\n    var b : bool = false;\n    var s : Status<i32> = Failure(b);\n    return s;\n}\n"
+
 spec :: Spec
 spec = do
   describe "Semantic: detailed SE error assertions (constructor + arguments)" $ do
@@ -360,6 +372,20 @@ spec = do
        `shouldSatisfy`
         isEResourceClassOutPort "output_msg"
 
+  describe "SE-189: monadic variant parameter type mismatch (every variant)" $ do
+    it "Option Some with a wrong payload type" $
+      runNegativeTestTypeCheck seMonadicOption
+        `shouldSatisfy` isEMonadicVariantParameterTypeMismatch TUInt32 TBool
+    it "Result Ok with a wrong payload type" $
+      runNegativeTestTypeCheck seMonadicResultOk
+        `shouldSatisfy` isEMonadicVariantParameterTypeMismatch TUInt32 TBool
+    it "Result Error with a wrong payload type" $
+      runNegativeTestTypeCheck seMonadicResultError
+        `shouldSatisfy` isEMonadicVariantParameterTypeMismatch TUInt32 TBool
+    it "Status Failure with a wrong payload type" $
+      runNegativeTestTypeCheck seMonadicStatus
+        `shouldSatisfy` isEMonadicVariantParameterTypeMismatch TInt32 TBool
+
   where
 
     isEInvalidArrayIndexing :: TerminaType SemanticAnn -> Maybe Error -> Bool
@@ -412,3 +438,8 @@ spec = do
 
     isEResourceClassOutPort :: Identifier -> Maybe Error -> Bool
     isEResourceClassOutPort inIdent = \case Just (EResourceClassOutPort _ ident) -> (inIdent == ident); _ -> False
+
+    isEMonadicVariantParameterTypeMismatch :: TerminaType SemanticAnn -> TerminaType SemanticAnn -> Maybe Error -> Bool
+    isEMonadicVariantParameterTypeMismatch expectedTy actualTy = \case
+      Just (EMonadicVariantParameterTypeMismatch e a) -> e == expectedTy && a == actualTy
+      _ -> False

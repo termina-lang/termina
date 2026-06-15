@@ -1,0 +1,4 @@
+function test0() {
+    var s : SomeType = { x = 0 : u32 } : SomeType;
+    return;
+}

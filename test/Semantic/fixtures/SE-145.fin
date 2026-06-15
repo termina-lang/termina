@@ -1,40 +1,24 @@
-task class TaskClass0 {
+interface IFoo {
+    procedure get(&mut self, r : &mut u32);
+};
 
-    snk0 : sink u32 triggers action0;
+resource class FooRes provides IFoo {
 
-    method method0(&priv self) {
+    value : u32;
 
-        self->method1();
-
+    method m0(&mut self) {
+        self->m1();
         return;
-
     }
 
-    method method1(&priv self) {
-
-        self->method2();
-
+    method m1(&mut self) {
+        self->m0();
         return;
-
     }
 
-    method method2(&priv self) {
-
-        self->method0();
-
+    procedure get(&mut self, r : &mut u32) {
+        *r = self->value;
         return;
-
     }
-
-    action action0(&priv self, _input : u32) -> Status<i32> {
-
-        let ret : Status<i32> = Success;
-
-        self->method0();
-
-        return ret;
-
-    }
-
 
 };

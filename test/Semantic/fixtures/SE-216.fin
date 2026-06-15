@@ -1,0 +1,5 @@
+function test0() {
+    var foo : f32 = 0.0 : f32;
+    var b : bool = (0 & foo) == (0 & foo);
+    return;
+}

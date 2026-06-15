@@ -1,11 +1,11 @@
 module Semantic.ErrorCodeSpec (spec) where
 
-import Pipeline.Common (compileErrorCode)
+import Pipeline.Common (compileErrorCode, compileProjectErrorCode)
 
 import Test.Hspec
 import Data.Text (pack)
 import Data.List (sort, isPrefixOf, isSuffixOf)
-import Control.Monad (forM_)
+import Control.Monad (forM_, forM)
 import System.Directory (listDirectory)
 import System.FilePath ((</>), dropExtension)
 
@@ -16,19 +16,20 @@ import System.FilePath ((</>), dropExtension)
 fixturesDir :: FilePath
 fixturesDir = "test" </> "Semantic" </> "fixtures"
 
+-- | Directory holding the multi-module negative fixtures. Each subdirectory is
+-- named after the error code it must trigger and contains one @.fin@ per module
+-- (the file name is the module name). They exercise errors that only arise
+-- across modules, e.g. referencing a type or function from a module that is not
+-- imported (SE-199, SE-200).
+multiDir :: FilePath
+multiDir = "test" </> "Semantic" </> "fixtures-multi"
+
 -- | Fixtures whose intended error is currently shadowed by an earlier-firing
 -- check, so the program stops with a different code than its file name. They
 -- are reported as pending (not failures) until the fixture is restructured to
 -- isolate the intended error. The second component is the code produced today.
 shadowed :: [(String, String)]
-shadowed =
-  [ ("SE-087", "SE-069")
-  , ("SE-091", "SE-118")
-  , ("SE-128", "SE-014")
-  , ("SE-132", "SE-014")
-  , ("SE-133", "SE-014")
-  , ("SE-145", "SE-208")
-  ]
+shadowed = []
 
 -- | Human-readable title per error code (mirrors @errorTitle@ in
 -- @Semantic.Errors@) so the test names read like the other negative specs:
@@ -268,3 +269,16 @@ spec = do
           it name $ do
             src <- readFile (fixturesDir </> f)
             compileErrorCode src `shouldBe` Just (pack code)
+
+  multiCases <- runIO $ do
+    subdirs <- sort . filter ("SE-" `isPrefixOf`) <$> listDirectory multiDir
+    forM subdirs $ \d -> do
+      fs <- sort . filter (".fin" `isSuffixOf`) <$> listDirectory (multiDir </> d)
+      mods <- forM fs $ \f -> do
+        src <- readFile (multiDir </> d </> f)
+        return (dropExtension f, src)
+      return (d, mods)
+  describe "Semantic: multi-module SE error-code coverage" $
+    forM_ multiCases $ \(code, mods) -> do
+      let name = maybe code (\t -> code ++ ": " ++ t) (lookup code titles)
+      it name $ compileProjectErrorCode mods `shouldBe` Just (pack code)

@@ -1,6 +1,8 @@
+enum Enum0 {
+    Variant0,
+    Variant1(u32)
+};
 
-function foo() -> Status<i32> {
-
-    return Success;
-
+function f() -> Enum0 {
+    return Enum0::Variant0;
 }
