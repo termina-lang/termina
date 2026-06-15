@@ -12,18 +12,17 @@ data ExitCheckError =
     EEInvalidCheckState -- ^ Invalid check state (Internal)
     | EEInvalidReturn -- ^ Invalid return statement (EE-001)
     | EEInvalidContinue -- ^ Invalid continue statement (EE-002)
-    | EEInvalidSend -- ^ Invalid send statement (EE-003)
-    | EEBlockShallExit -- ^ Missing return statement (EE-004)
-    | EEActionShallExit -- ^ Missing exit point on an action (EE-005)
-    | EEActionInvalidContinue -- ^ Invalid continue statement on an action (EE-006)
-    | EEActionInvalidSend -- ^ Invalid send statement on an action (EE-007)
-    | EEActionIfBlockShallExit -- ^ Missing continue statement on an action if block (EE-008)
-    | EEActionMatchBlockShallExit -- ^ Missing continue statement on an action match block (EE-009)
-    | EEActionIfBlockShallNotExit -- ^ If block shall not exit (EE-010)
-    | EEActionMatchBlockShallNotExit -- ^ Match block shall not exit (EE-011)
-    | EEActionIfBlockMissingElseExit -- ^ Missing else exit on an action if block (EE-012)
-    | EEInvalidReboot -- ^ Invalid reboot statement (EE-013)
-    | EEActionInvalidReboot -- ^ Invalid reboot statement on an action (EE-014)
+    | EEBlockShallExit -- ^ Missing return statement (EE-003)
+    | EEActionShallExit -- ^ Missing exit point on an action (EE-004)
+    | EEActionInvalidContinue -- ^ Invalid continue statement on an action (EE-005)
+    | EEActionInvalidSend -- ^ Invalid send statement on an action (EE-006)
+    | EEActionIfBlockShallExit -- ^ Missing continue statement on an action if block (EE-007)
+    | EEActionMatchBlockShallExit -- ^ Missing continue statement on an action match block (EE-008)
+    | EEActionIfBlockShallNotExit -- ^ If block shall not exit (EE-009)
+    | EEActionMatchBlockShallNotExit -- ^ Match block shall not exit (EE-010)
+    | EEActionIfBlockMissingElseExit -- ^ Missing else exit on an action if block (EE-011)
+    | EEInvalidReboot -- ^ Invalid reboot statement (EE-012)
+    | EEActionInvalidReboot -- ^ Invalid reboot statement on an action (EE-013)
     deriving (Show)
 
 type PathsCheckError = AnnotatedError ExitCheckError Location
@@ -32,23 +31,21 @@ instance ErrorMessage PathsCheckError where
 
     errorIdent (AnnotatedError EEInvalidReturn _pos) = "EE-001"
     errorIdent (AnnotatedError EEInvalidContinue _pos) = "EE-002"
-    errorIdent (AnnotatedError EEInvalidSend _pos) = "EE-003"
-    errorIdent (AnnotatedError EEBlockShallExit _pos) = "EE-004"
-    errorIdent (AnnotatedError EEActionShallExit _pos) = "EE-005"
-    errorIdent (AnnotatedError EEActionInvalidContinue _pos) = "EE-006"
-    errorIdent (AnnotatedError EEActionInvalidSend _pos) = "EE-007"
-    errorIdent (AnnotatedError EEActionIfBlockShallExit _pos) = "EE-008"
-    errorIdent (AnnotatedError EEActionMatchBlockShallExit _pos) = "EE-009"
-    errorIdent (AnnotatedError EEActionIfBlockShallNotExit _pos) = "EE-010"
-    errorIdent (AnnotatedError EEActionMatchBlockShallNotExit _pos) = "EE-011"
-    errorIdent (AnnotatedError EEActionIfBlockMissingElseExit _pos) = "EE-012"
-    errorIdent (AnnotatedError EEInvalidReboot _pos) = "EE-013"
-    errorIdent (AnnotatedError EEActionInvalidReboot _pos) = "EE-014"
+    errorIdent (AnnotatedError EEBlockShallExit _pos) = "EE-003"
+    errorIdent (AnnotatedError EEActionShallExit _pos) = "EE-004"
+    errorIdent (AnnotatedError EEActionInvalidContinue _pos) = "EE-005"
+    errorIdent (AnnotatedError EEActionInvalidSend _pos) = "EE-006"
+    errorIdent (AnnotatedError EEActionIfBlockShallExit _pos) = "EE-007"
+    errorIdent (AnnotatedError EEActionMatchBlockShallExit _pos) = "EE-008"
+    errorIdent (AnnotatedError EEActionIfBlockShallNotExit _pos) = "EE-009"
+    errorIdent (AnnotatedError EEActionMatchBlockShallNotExit _pos) = "EE-010"
+    errorIdent (AnnotatedError EEActionIfBlockMissingElseExit _pos) = "EE-011"
+    errorIdent (AnnotatedError EEInvalidReboot _pos) = "EE-012"
+    errorIdent (AnnotatedError EEActionInvalidReboot _pos) = "EE-013"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError EEInvalidReturn _pos) = "invalid return statement"
     errorTitle (AnnotatedError EEInvalidContinue _pos) = "invalid continue statement"
-    errorTitle (AnnotatedError EEInvalidSend _pos) = "invalid send statement"
     errorTitle (AnnotatedError EEBlockShallExit _pos) = "missing return statement"
     errorTitle (AnnotatedError EEActionShallExit _pos) = "missing exit point on an action"
     errorTitle (AnnotatedError EEActionInvalidContinue _pos) = "invalid continue statement on an action"
@@ -78,11 +75,6 @@ instance ErrorMessage PathsCheckError where
                         sourceLines title fileName pos
                         (Just ("Invalid continue statement.\n" <>
                             "Continue statements are only allowed inside actions."))
-                EEInvalidSend ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("Invalid send statement.\n" <>
-                            "Send statements are only allowed inside actions."))
                 EEBlockShallExit ->
                     pprintSimpleError
                         sourceLines title fileName pos

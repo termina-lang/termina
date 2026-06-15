@@ -1353,10 +1353,6 @@ contents p = wspcs *> p <* eof
 terminaModuleParser :: TerminaParser (TerminaModule ParserAnn)
 terminaModuleParser = wspcs *> (Termina <$> many moduleImportParser <*> contents topLevel)
 
--- | Simple function to test parsers
-strParse :: String -> Either ParseError (AnnotatedProgram ParserAnn)
-strParse = runP topLevel "" ""
-
 getStartPosition :: ParserAnn -> SourcePos
 getStartPosition (Position _ startPos _) = startPos
 getStartPosition _ = error "Internal error: expected Position annotation (this should not happen)"

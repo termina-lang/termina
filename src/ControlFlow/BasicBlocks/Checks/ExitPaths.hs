@@ -65,7 +65,6 @@ checkBlockPaths loc stmts = do
             case stmts of
                 [] -> return step
                 (ReturnBlock _ ann: _) -> throwError $ annotateError (getLocation ann) EEInvalidReturn
-                (SendMessage _ _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidSend
                 (ContinueBlock _ ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidContinue
                 (RebootBlock ann : _) -> throwError $ annotateError (getLocation ann) EEInvalidReboot
                 (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just elseBlocks) _ : xb) -> 
