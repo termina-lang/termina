@@ -1,0 +1,21 @@
+interface IFoo {
+    procedure inc(&mut self);
+};
+
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+
+    ap : access IFoo;
+
+    viewer peek(&self) -> u32 {
+        self->ap.inc();
+        return 0 : u32;
+    }
+
+    action action0(&priv self, _input : TimeVal) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
+    }
+
+};

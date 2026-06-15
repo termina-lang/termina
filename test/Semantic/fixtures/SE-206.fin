@@ -1,0 +1,17 @@
+task class TaskClass0 {
+
+    snk0 : sink TimeVal triggers action0;
+
+    out_port : out u32;
+
+    viewer peek(&self) -> u32 {
+        self->out_port.send(0 : u32);
+        return 0 : u32;
+    }
+
+    action action0(&priv self, _input : TimeVal) -> Status<i32> {
+        var ret : Status<i32> = Success;
+        return ret;
+    }
+
+};
