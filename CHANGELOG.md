@@ -13,6 +13,30 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-18
+
+### Added
+
+- `f32` and `f64` floating-point types: decimal and scientific-notation
+  literals, arithmetic (`+ - * /`) and ordering (`< <= > >=`) operators mixing
+  integers and floats, `int`/`float` and `f32`/`f64` casts, and the Prelude bit
+  reinterpretation functions `f32_to_bits`/`f32_from_bits` (and the `f64`
+  variants). The integer-only operators (`%`, bitwise, shifts) and equality
+  (`==`, `!=`) are rejected on floating-point operands. Floats are printed with
+  `print_f32`/`println_f32`/`print_f64`/`println_f64` (requires
+  `termina-osal v0.4.x`).
+- Aggregate initializers for arrays, structs, `Option`/`Status`/`Result` and
+  enum variants are lowered to C initializer lists, and `const` globals may now
+  hold arrays of constants (emitted as `static const T x[N] = { ... }`).
+
+### Removed
+
+- **BREAKING**: variable-length arrays and `const` parameters (the
+  `TConstSubtype` feature). Array sizes must now be compile-time constants
+  (MISRA C Rule 18.8); constant sizes are folded per module, in dependency
+  order, before the architecture stage.
+
+
 ## [0.3.4] - 2026-05-27
 
 ### Fixed
