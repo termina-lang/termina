@@ -1,0 +1,39 @@
+name: Tests
+
+# Runs the transpiler test suite on every push to main and on every pull
+# request. The suite is pure Haskell (no z3/SMT or other system dependencies),
+# so a Stack build is all that is needed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Stack and GHC
+        uses: haskell-actions/setup@v2
+        with:
+          enable-stack: true
+          stack-no-global: true
+
+      - name: Cache Stack artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.stack
+            .stack-work
+          key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml', 'stack.yaml.lock', 'package.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stack-
+
+      - name: Build and run the test suite
+        run: stack test --no-terminal
