@@ -1,5 +1,11 @@
 # The Termina Programming Language
 
+[![Tests](https://github.com/termina-lang/termina/actions/workflows/test.yml/badge.svg)](https://github.com/termina-lang/termina/actions/workflows/test.yml)
+[![Latest release](https://img.shields.io/github/v/release/termina-lang/termina)](https://github.com/termina-lang/termina/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker image](https://img.shields.io/badge/ghcr.io-docker--termina-2496ED?logo=docker&logoColor=white)](https://github.com/termina-lang/docker-termina/pkgs/container/docker-termina)
+[![Documentation](https://img.shields.io/badge/docs-termina--book-blue)](https://termina-lang.github.io/termina-book/)
+
 Termina is a domain-specific language for real-time embedded systems aimed at simplifying their implementation and reducing validation and verification costs.
 
 This repository contains the implementation of a transpiler from Termina to C. The generated code is supported on an [operating system abstraction layer](https://github.com/termina-lang/termina-osal). This layer is responsible for adapting the generated code for different real-time operating systems.
