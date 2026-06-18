@@ -40,6 +40,9 @@ dependencies:
 - errata
 - optparse-applicative
 - yaml
+# JSON serialization of the program architecture
+- aeson
+- aeson-pretty
 - lens
 - lsp
 - co-log-core

@@ -42,9 +42,11 @@ import EFP.Schedulability.WCEPath.Printer
 import Command.Common
 import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.PlantUML
+import ControlFlow.Architecture.JSON
 import Extras.PlantUML.Printer
 import Text.Read
 import Data.Char
+import qualified Data.ByteString.Lazy as BL
 
 
 data CmpDiagramParam =
@@ -59,6 +61,7 @@ data BuildCmdArgs =
         Bool -- ^ Verbose mode
         Bool -- ^ Generate transactional worst-case execution paths
         (Maybe CmpDiagramParam)
+        Bool -- ^ Serialize the program architecture to JSON
     deriving Show
 
 -- | Parser for the "new" command arguments
@@ -70,6 +73,8 @@ buildCmdArgsParser = BuildCmdArgs
     <*> O.switch (O.long "gen-transactional-wceps"
         <> O.help "Generate transactional worst-case execution paths")
     <*> O.optional paramParser
+    <*> O.switch (O.long "gen-arch-json"
+        <> O.help "Serialize the program architecture (wiring) to <name>.json")
 
   where
 
@@ -178,6 +183,16 @@ genComponentDiagramFile params progArch param = do
         Right diagram -> do
             createDirectoryIfMissing True (takeDirectory cmpFile)
             TIO.writeFile cmpFile $ runPlantUMLPrinter diagram
+
+genArchJSONFile ::
+  TerminaConfig
+  -> TerminaProgArch a
+  -> IO ()
+genArchJSONFile params progArch = do
+    let destinationPath = outputFolder params
+        jsonFile = destinationPath </> T.unpack (name params) <.> "json"
+    createDirectoryIfMissing True (takeDirectory jsonFile)
+    BL.writeFile jsonFile $ runArchJSONPrinter progArch
 
 genModules ::
   TerminaConfig
@@ -374,7 +389,7 @@ genResultHeaderFile params plt monadicTypes bbProject appModName = do
 
 -- | Command handler for the "build" command
 buildCommand :: BuildCmdArgs -> IO ()
-buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
+buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag genArchJSONFlag) = do
     when chatty (putStrLn . debugMessage $ "Reading project configuration from \"termina.yaml\"")
     -- | Read the termina.yaml file
     config <- loadConfig >>= either (
@@ -482,4 +497,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
       Just param ->
         when chatty (putStrLn . debugMessage $ "Generating component diagram") >>
         genComponentDiagramFile config programArchitecture param
+    when genArchJSONFlag $
+      when chatty (putStrLn . debugMessage $ "Serializing the program architecture to JSON") >>
+      genArchJSONFile config programArchitecture
     when chatty (putStrLn . debugMessage $ "Build completed successfully")
