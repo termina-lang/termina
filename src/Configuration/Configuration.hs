@@ -4,7 +4,9 @@ module Configuration.Configuration (
     TerminaConfig(..),
     ProjectProfile(..),
     ProjectBuilder(..),
-    defaultConfig
+    defaultConfig,
+    defaultSysPrintOutputBufferSize,
+    defaultSysReadInputBufferSize
 ) where
 
 import qualified Data.Text as T
@@ -13,6 +15,10 @@ import Data.Yaml
 import Configuration.Platform
 
 data ProjectProfile = Debug | Release deriving (Eq, Show)
+
+defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
+defaultSysPrintOutputBufferSize = 256
+defaultSysReadInputBufferSize = 256
 
 instance FromJSON ProjectProfile where
     parseJSON (String "debug") = return Debug
@@ -47,6 +53,8 @@ data TerminaConfig =
     profile :: !ProjectProfile,
     enableSystemInit :: !Bool,
     enableSystemPort :: !Bool,
+    sysPrintOutputBufferSize :: !Integer,
+    sysReadInputBufferSize :: !Integer,
     enableSystemExcept :: !Bool,
     builder :: !ProjectBuilder,
     platformFlags :: !PlatformFlags
@@ -66,6 +74,8 @@ instance FromJSON TerminaConfig where
     o .:?  "profile" .!= Release <*>         
     o .:?  "enable-system-init" .!= False <*>
     o .:?  "enable-system-port" .!= False <*>
+    o .:?  "sys-print-output-buffer-size" .!= defaultSysPrintOutputBufferSize <*>
+    o .:?  "sys-read-input-buffer-size"  .!= defaultSysReadInputBufferSize <*>
     o .:?  "enable-system-except" .!= False <*>
     o .:   "builder" <*>
     o .:?  "platform-flags" .!= defaultPlatformFlags
@@ -84,6 +94,8 @@ instance ToJSON TerminaConfig where
             prjProfile
             prjEnableSystemInit
             prjEnableSystemPort
+            prjSysPrintOutputBufferSize
+            prjSysReadInputBufferSize
             prjEnableSystemExcept
             prjBuilder
             prjPlatformFlags
@@ -102,6 +114,8 @@ instance ToJSON TerminaConfig where
             -- We only serialize the enable-system-init flag if it is different from the default value
             <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
             <> if prjEnableSystemPort then ["enable-system-port" .= prjEnableSystemPort] else []
+            <> if prjSysPrintOutputBufferSize /= defaultSysPrintOutputBufferSize then ["sys-print-output-buffer-size" .= prjSysPrintOutputBufferSize] else []
+            <> if prjSysReadInputBufferSize  /= defaultSysReadInputBufferSize then ["sys-read-input-buffer-size"  .= prjSysReadInputBufferSize]  else []
             <> if prjEnableSystemExcept then ["enable-system-except" .= prjEnableSystemExcept] else []
             <> if prjBuilder /= None then ["builder" .= prjBuilder] else []
             -- We only serialize the platform flags corresponding to the selected platform
@@ -122,6 +136,8 @@ defaultConfig projectName plt = TerminaConfig {
     profile = Release,
     enableSystemInit = False,
     enableSystemPort = False,
+    sysPrintOutputBufferSize = defaultSysPrintOutputBufferSize,
+    sysReadInputBufferSize = defaultSysReadInputBufferSize,
     enableSystemExcept = False,
     builder = Make,
     platformFlags = defaultPlatformFlags

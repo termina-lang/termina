@@ -24,17 +24,18 @@ import Utils.Printer
 
 genConfigFile ::
     QualifiedName
+    -> TerminaConfig
     -> TerminaProgArch SemanticAnn
     -> CGenerator CFile
-genConfigFile mName progArchitecture = do
+genConfigFile mName config progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
         taskClss = taskClasses progArchitecture
         periodicTimers = M.filter (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) (emitters progArchitecture)
         progPools = M.elems $ pools progArchitecture
 
     let resLockMap = genResourceLockings progArchitecture
-    let mutexes = 
-            M.filter (\case{ResourceLockMutex {} -> True; _ -> False}) resLockMap 
+    let mutexes =
+            M.filter (\case{ResourceLockMutex {} -> True; _ -> False}) resLockMap
 
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
@@ -55,13 +56,13 @@ genConfigFile mName progArchitecture = do
     return $ CHeaderFile mName $ [
             _ifndef "__CONFIG_H__",
             _define "__CONFIG_H__" Nothing
-        ] ++ cVariantsForTaskPorts 
+        ] ++ cVariantsForTaskPorts
         ++ cEmitterDefines
-        ++ cMutexDefines 
-        ++ cTaskDefines 
-        ++ cHandlerDefines 
-        ++ cMsgQueueDefines 
-        ++ cPoolDefines 
+        ++ cMutexDefines
+        ++ cTaskDefines
+        ++ cHandlerDefines
+        ++ cMsgQueueDefines
+        ++ cPoolDefines
         ++ cTimerDefines
         ++ [
             pre_cr $ _define "__TERMINA_APP_CONFIG_POOLS" (Just [show (length progPools)]),
@@ -73,6 +74,8 @@ genConfigFile mName progArchitecture = do
         [
             pre_cr $ _define "__TERMINA_MICROSECONDS_PER_TICK" (Just [show (10000 :: Integer)])
         ] ++
+        ([pre_cr $ _define "__TERMINA_SYS_PRINT_OUTPUT_BUFFER_SIZE" (Just [show $ sysPrintOutputBufferSize config]) | sysPrintOutputBufferSize config /= defaultSysPrintOutputBufferSize]) ++
+        ([pre_cr $ _define "__TERMINA_SYS_READ_INPUT_BUFFER_SIZE" (Just [show $ sysReadInputBufferSize config]) | sysReadInputBufferSize config /= defaultSysReadInputBufferSize]) ++
         [
             pre_cr _endif
         ]
@@ -146,7 +149,7 @@ runGenConfigFile ::
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
 runGenConfigFile config irqMap configFilePath progArchitecture =
-    case runState (runExceptT (genConfigFile configFilePath progArchitecture))
+    case runState (runExceptT (genConfigFile configFilePath config progArchitecture))
         (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

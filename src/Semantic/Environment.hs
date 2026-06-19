@@ -33,8 +33,8 @@ data Environment
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
 getEntry = element
 
-stdlibGlobalEnv :: [(Identifier, LocatedElement (GEntry SemanticAnn))]
-stdlibGlobalEnv =
+stdlibGlobalEnv :: Integer -> Integer -> [(Identifier, LocatedElement (GEntry SemanticAnn))]
+stdlibGlobalEnv outBufSize inBufSize =
   [
     -- | Floating-point bit reinterpretation. These are Prelude functions whose
     -- body is provided by the OSAL (memcpy-based static inline). They lower to a
@@ -102,8 +102,8 @@ stdlibGlobalEnv =
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
       -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
-      InterfaceProcedure Mutable "print" [Parameter "size" (TConstSubtype TUSize), Parameter "str" (TReference Immutable (TArray TChar (AccessObject (Variable "size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))))] [] (buildExpAnn Internal TUnit),
-      InterfaceProcedure Mutable "println" [Parameter "size" (TConstSubtype TUSize), Parameter "str" (TReference Immutable (TArray TChar (AccessObject (Variable "size" (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))))] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "print" [Parameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
+      InterfaceProcedure Mutable "println" [Parameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "print_char" [Parameter "value" TChar] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "println_char" [Parameter "value" TChar] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "print_u8" [Parameter "value" TUInt8, Parameter "base" (TEnum "SysPrintBase")] [] (buildExpAnn Internal TUnit),
@@ -131,7 +131,7 @@ stdlibGlobalEnv =
     ] [])) Internal),
     ("SysGetChar", LocatedElement (GType (Interface SystemInterface "SysGetChar" [] [
       InterfaceProcedure Mutable "read" [ 
-          Parameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger 1024 DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnnObj Internal Immutable (TConstSubtype TUSize))))),
+          Parameter "str" (TReference Mutable (TArray TChar (Constant (I (TInteger inBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize))))),
           Parameter "read_bytes" (TReference Mutable TUSize)] [] (buildExpAnn Internal TUnit)
     ] [])) Internal)
   ]
@@ -156,7 +156,7 @@ makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEn
 makeInitialGlobalEnv (Just config) pltEnvironment = 
   let 
     globalEnv = mconcat [
-      stdlibGlobalEnv,
+      stdlibGlobalEnv (sysPrintOutputBufferSize config) (sysReadInputBufferSize config),
       -- | The platform specific environment. It should declare its own SystemAPI interface.
       pltEnvironment,
       [
@@ -171,6 +171,6 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
   in
   ExprST (M.fromList globalEnv) M.empty M.empty S.empty
 makeInitialGlobalEnv Nothing pltEnvironment = 
-  let globalEnv = mconcat [stdlibGlobalEnv, pltEnvironment]
+  let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment]
   in
   ExprST (M.fromList globalEnv) M.empty M.empty S.empty
