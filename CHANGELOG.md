@@ -13,6 +13,26 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-19
+
+### Added
+
+- `sys-print-output-buffer-size` and `sys-read-input-buffer-size` options in
+  `termina.yaml` that set the fixed size of the system port's output (`print`,
+  `println`) and input (`read`) buffers. Both default to 256. The values are
+  emitted as `#define`s in the generated `config.h`, so the OSAL uses the same
+  sizes.
+
+### Changed
+
+- **BREAKING**: the system port's `print`, `println` and `read` procedures no
+  longer take an explicit size argument. `print`/`println` now take a reference
+  to a `[char; sys-print-output-buffer-size]` array, and `read` fills a
+  `[char; sys-read-input-buffer-size]` array. A call such as
+  `print(15, &msg)` must be rewritten as `print(&msg)`, with the buffer declared
+  at the configured size. Requires `termina-osal v0.5.x`.
+
+
 ## [0.4.0] - 2026-06-18
 
 ### Added
