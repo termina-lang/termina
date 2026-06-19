@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/termina-lang/termina)](https://github.com/termina-lang/termina/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docker image](https://img.shields.io/badge/ghcr.io-docker--termina-2496ED?logo=docker&logoColor=white)](https://github.com/termina-lang/docker-termina/pkgs/container/docker-termina)
-[![Documentation](https://img.shields.io/badge/docs-termina--book-blue)](https://termina-lang.github.io/termina-book/)
+[![Documentation](https://img.shields.io/badge/docs-book-blue)](https://termina-lang.org/book/)
 
 Termina is a domain-specific language for real-time embedded systems aimed at simplifying their implementation and reducing validation and verification costs.
 
@@ -44,12 +44,12 @@ cd output && make     # compile the generated C
 ```
 
 For installation options and a guided first program, see the [Termina
-book](https://termina-lang.github.io/termina-book/).
+book](https://termina-lang.org/book/).
 
 ## Documentation
 
 The main source of documentation of this project is the [Termina
-book](https://termina-lang.github.io/termina-book/). It contains installation
+book](https://termina-lang.org/book/). It contains installation
 instructions and documentation on the syntax and use of the language.
 
 ## Status
