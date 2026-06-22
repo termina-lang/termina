@@ -7,8 +7,7 @@
 -- their classes and modifiers, and the port-level connections between them. It
 -- deliberately omits member-function bodies and the semantic annotations
 -- carried by the architecture (the @a@ type parameter is ignored). Types,
--- sizes and modifier expressions are rendered to text through the same
--- pretty-printer used by the PlantUML generator, so no AST is dumped.
+-- sizes and modifier expressions are rendered to text, so no AST is dumped.
 module ControlFlow.Architecture.JSON (genArchJSON, runArchJSONPrinter) where
 
 import ControlFlow.Architecture.Types
