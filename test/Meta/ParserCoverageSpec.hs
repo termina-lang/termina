@@ -10,7 +10,7 @@
 module Meta.ParserCoverageSpec (spec) where
 
 import Data.Char (isSpace, isUpper, isAlphaNum)
-import Data.List (isPrefixOf, isInfixOf, nub, sort, (\\), foldl')
+import Data.List (isPrefixOf, isInfixOf, nub, sort)
 import qualified Data.Set as S
 import Control.Monad (forM_)
 import System.Directory (listDirectory)
