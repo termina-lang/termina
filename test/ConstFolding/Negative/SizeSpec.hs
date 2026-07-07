@@ -97,3 +97,32 @@ spec = do
                 "    return;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-015")
+
+    it "CPE-015: referenced multidimensional array inner size mismatch" $ do
+      let src = "constexpr n : usize = 4;\n" ++
+                "constexpr i : usize = 3;\n" ++
+                "constexpr j : usize = 2;\n" ++
+                "function take(_data : &[[u8; i]; n]) {\n" ++
+                "    return;\n" ++
+                "}\n" ++
+                "function f() {\n" ++
+                "    var a : [[u8; j]; n] = [[0 : u8; j]; n];\n" ++
+                "    take(&a);\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CPE-015")
+
+    it "CPE-015: referenced three-dimensional array innermost size mismatch" $ do
+      let src = "constexpr a : usize = 4;\n" ++
+                "constexpr b : usize = 3;\n" ++
+                "constexpr i : usize = 2;\n" ++
+                "constexpr j : usize = 5;\n" ++
+                "function take(_data : &[[[u8; i]; b]; a]) {\n" ++
+                "    return;\n" ++
+                "}\n" ++
+                "function f() {\n" ++
+                "    var arr : [[[u8; j]; b]; a] = [[[0 : u8; j]; b]; a];\n" ++
+                "    take(&arr);\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CPE-015")

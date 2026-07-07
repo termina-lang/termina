@@ -219,6 +219,13 @@ constFoldCheckType loc ty expr = do
         checkSameTy loc' lhsTy rhsTy
       else
         throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
+    checkSameTy loc' lhsArray@(TArray lhsTy _) rhsArray@(TArray rhsTy _) = do
+      lhsArraySizeValue <- getArraySizeValue lhsArray
+      rhsArraySizeValue <- getArraySizeValue rhsArray
+      if lhsArraySizeValue == rhsArraySizeValue then
+        checkSameTy loc' lhsTy rhsTy
+      else
+        throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
     checkSameTy _ _ _ = return ()
 
 constFoldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
