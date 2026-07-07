@@ -217,7 +217,6 @@ genResultStructName tyOk tyError = do
 getCInteger :: TInteger -> CInteger
 getCInteger (TInteger i DecRepr) = CInteger i CDecRepr
 getCInteger (TInteger i HexRepr) = CInteger i CHexRepr
-getCInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
 genIndexOf :: (MonadError CGeneratorError m) => CObject -> CExpression -> m CObject
 genIndexOf obj index = 
@@ -290,7 +289,6 @@ genAtomicMethodCall mName cObj cArgs cAnn =
 genInteger :: TInteger -> CInteger
 genInteger (TInteger i DecRepr) = CInteger i CDecRepr
 genInteger (TInteger i HexRepr) = CInteger i CHexRepr
-genInteger (TInteger i OctalRepr) = CInteger i COctalRepr
 
 genFloat :: TFloat -> CFloat
 genFloat (TFloat d FPDecimal)    = CFloat d CFloatDec

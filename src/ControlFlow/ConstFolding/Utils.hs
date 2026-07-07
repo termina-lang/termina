@@ -114,12 +114,8 @@ getFunctionMembers progArchitecture ident =
  
 intReprBinOp :: IntRepr -> IntRepr -> IntRepr
 intReprBinOp DecRepr DecRepr = DecRepr
-intReprBinOp HexRepr HexRepr = HexRepr
-intReprBinOp OctalRepr OctalRepr = OctalRepr
 intReprBinOp _ HexRepr = HexRepr
 intReprBinOp HexRepr _ = HexRepr
-intReprBinOp OctalRepr  _ = OctalRepr
-intReprBinOp _ OctalRepr  = OctalRepr
 
 evalBinOp :: (MonadError ConstFoldError m) => Location
   -> Op -> Const SemanticAnn

@@ -188,7 +188,7 @@ instance Pretty CString where
 newtype CString = CString String
     deriving Show
 
-data CIntRepr = CDecRepr | CHexRepr | COctalRepr
+data CIntRepr = CDecRepr | CHexRepr 
     deriving Show
 
 data CInteger = 
@@ -198,7 +198,6 @@ data CInteger =
 instance Pretty CInteger where
   pretty (CInteger i CDecRepr) = pretty i
   pretty (CInteger i CHexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
-  pretty (CInteger i COctalRepr) = pretty "0" <> pretty (showOct i "")
 
 data CFloatRepr = CFloatDec | CFloatSci
     deriving Show
