@@ -10,7 +10,7 @@ module Generator.LanguageC.Embedded (
     (@==), (|>>), (@->),
     (@>), (@<), (@>=), (@<=),
     (@+), (@-), (@*), (@/), (@%),
-    cast, addrOf, deref, ptr, str,
+    cast, addrOf, deref, ptr, 
     void, void_ptr, size_t, typeDef, char,
     uint8_t, uint16_t, uint32_t, uint64_t,
     int8_t, int16_t, int32_t, int64_t,
@@ -237,9 +237,6 @@ newtype Decimal = Decimal Integer
 
 dec :: Integer -> CConstant
 dec value = CIntConst (CInteger value CDecRepr)
-
-str :: String -> CConstant
-str = CStrConst . CString
 
 instance TypeElement CConstant CExpression where
     (@:) constant cType =

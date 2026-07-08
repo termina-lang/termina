@@ -178,15 +178,31 @@ instance Pretty CStorageSpecifier where
 newtype CChar = CChar Char
     deriving Show
 
+-- | Zero-padded (>= 2 digit) uppercase hexadecimal escape, e.g. '\xC8'.
+cHexEscape :: Char -> String
+cHexEscape c =
+  let h = map toUpper (showHex (ord c) "")
+  in "\\x" ++ if length h < 2 then replicate (2 - length h) '0' ++ h else h
+
+-- | Escape one character for the body of a C literal (C11 6.4.4.4 / 6.4.5):
+-- the backslash and the standard simple escapes, everything else printable
+-- verbatim, and any non-printable or non-ASCII character as a hex escape. The
+-- delimiter (' or ") is handled by the caller.
+escapeCCommon :: Char -> String
+escapeCCommon '\\' = "\\\\"
+escapeCCommon '\a' = "\\a"
+escapeCCommon '\b' = "\\b"
+escapeCCommon '\f' = "\\f"
+escapeCCommon '\n' = "\\n"
+escapeCCommon '\r' = "\\r"
+escapeCCommon '\t' = "\\t"
+escapeCCommon '\v' = "\\v"
+escapeCCommon c = if isAscii c && isPrint c then [c] else cHexEscape c
+
 instance Pretty CChar where
-  pretty (CChar '\0') = pretty "'\\0'"
-  pretty (CChar c) = pretty $ show c
-
-instance Pretty CString where
-  pretty (CString s) = pretty $ show s
-
-newtype CString = CString String
-    deriving Show
+  pretty (CChar '\0')  = pretty "'\\0'"
+  pretty (CChar '\'')  = pretty "'\\''"
+  pretty (CChar c)     = pretty ("'" ++ escapeCCommon c ++ "'")
 
 data CIntRepr = CDecRepr | CHexRepr 
     deriving Show
@@ -214,7 +230,6 @@ data CConstant =
   CIntConst   CInteger
   | CFloatConst CFloat
   | CCharConst  CChar
-  | CStrConst   CString
     deriving Show
 
 data CObject' a = 
@@ -352,7 +367,6 @@ instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
   pretty (CFloatConst f) = pretty f
   pretty (CCharConst c) = pretty c
-  pretty (CStrConst s) = pretty s
 
 instance Pretty CBinaryOp where
   pretty op = pretty $ case op of

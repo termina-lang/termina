@@ -267,6 +267,7 @@ data Error
   | EUnprotectedResourceWithRegularFields (Identifier, Location) -- ^ Unprotected resource with regular fields
   | EMemberFunctionWithMutableSelfInTaskClass Identifier -- ^ Member function with mutable self reference in task class
   | EMemberFunctionWithMutableSelfInHandlerClass Identifier -- ^ Member function with mutable self reference in handler class
+  | ECharLiteralOutOfRange Char -- ^ Character literal whose code point is outside the 7-bit ASCII range (SE-217)
   deriving Show
 
 type SemanticErrors = AnnotatedError Error Location
@@ -325,6 +326,7 @@ instance ErrorMessage SemanticErrors where
     errorIdent (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "SE-214"
     errorIdent (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "SE-215"
     errorIdent (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "SE-216"
+    errorIdent (AnnotatedError (ECharLiteralOutOfRange _cp) _pos) = "SE-217"
     errorIdent (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "SE-050"
     errorIdent (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "SE-051"
     errorIdent (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "SE-052"
@@ -542,6 +544,7 @@ instance ErrorMessage SemanticErrors where
     errorTitle (AnnotatedError (EBinOpExpectedTypeNotInt _op _ty) _pos) = "binary operation expected result type not integer"
     errorTitle (AnnotatedError (EBinOpLeftTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the left"
     errorTitle (AnnotatedError (EBinOpRightTypeNotInt _op _ty) _pos) = "binary operation expected integer type on the right"
+    errorTitle (AnnotatedError (ECharLiteralOutOfRange _cp) _pos) = "character literal out of range"
     errorTitle (AnnotatedError (EBinOpRightTypeNotPos _op _ty) _pos) = "binary operation expected positive numeric type on the right"
     errorTitle (AnnotatedError (EBinOpLeftTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the left"
     errorTitle (AnnotatedError (EBinOpRightTypeNotEq _op _ty) _pos) = "binary operation expected equatable type on the right"
@@ -2405,6 +2408,10 @@ instance ErrorMessage SemanticErrors where
                         (Just ("Member function \x1b[31m" <> T.pack ident <> "\x1b[0m defines a mutable self reference. " <>
                             "Member functions in handler classes cannot define mutable self references\n" <>
                             "Only immutable or private self references are allowed."))
+                ECharLiteralOutOfRange cp ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The character literal has code point \x1b[31m" <> T.pack (show (fromEnum cp)) <> "\x1b[0m, which is outside the 7-bit ASCII range (0 to 127)."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 

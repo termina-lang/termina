@@ -529,7 +529,10 @@ typeConstant loc typeObj (F tFloat (Just ts)) = do
   ty <- typeTypeSpecifier loc typeObj ts
   return $ SAST.F tFloat (Just ty)
 typeConstant _loc _typeObj (B tBool) = return $ SAST.B tBool
-typeConstant _loc _typeObj (C tChar) = return $ SAST.C tChar
+typeConstant loc _typeObj (C tChar) =
+  if fromEnum tChar > 0x7F
+    then throwError $ annotateError loc (ECharLiteralOutOfRange tChar)
+    else return $ SAST.C tChar
 typeConstant _loc _typeObj Null = return SAST.Null
 
 -- | Function that translates a |TypeSpecifier| into a |TerminaType|.
