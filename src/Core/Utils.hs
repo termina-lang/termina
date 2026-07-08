@@ -412,6 +412,24 @@ memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
 memberIntCons i (TConstSubtype ty) = memberIntCons i ty
 memberIntCons _ _      = False
 
+-- | The bit width of an integer type, used to bound shift amounts (Rule 12.2):
+-- a shift amount must lie in [0, width - 1]. usize is assumed 32-bit, matching
+-- 'memberIntCons' above and its TODO (platform parameterization is tracked
+-- separately). The type checker guarantees the operand is a numeric integer
+-- type, so the catch-all is unreachable.
+shiftWidth :: TerminaType' expr a -> Integer
+shiftWidth TUInt8  = 8
+shiftWidth TUInt16 = 16
+shiftWidth TUInt32 = 32
+shiftWidth TUInt64 = 64
+shiftWidth TInt8   = 8
+shiftWidth TInt16  = 16
+shiftWidth TInt32  = 32
+shiftWidth TInt64  = 64
+shiftWidth TUSize  = 32
+shiftWidth (TConstSubtype ty) = shiftWidth ty
+shiftWidth _ = error "shiftWidth: not an integer type"
+
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident
 getTypeIdentifier (Enum ident _ _)          = ident

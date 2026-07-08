@@ -61,3 +61,11 @@ spec = do
                 "    return;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-013")
+
+    it "CPE-016: shift amount greater than or equal to the type width" $ do
+      let src = "function f() {\n" ++
+                "    var x : u8 = 0 : u8;\n" ++
+                "    x = x << 8 : usize;\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CPE-016")

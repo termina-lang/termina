@@ -152,17 +152,23 @@ evalBinOp loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
   let result = lhs `mod` rhs in
   return $ I (TInteger result repr) (Just ty)
 evalBinOp loc BitwiseLeftShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
-  let result = lhs `shiftL` fromIntegral rhs in
-  if memberIntCons result ty then
-    return $ I (TInteger result repr) (Just ty)
+  if rhs >= shiftWidth ty then
+    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth ty) rhs)
   else
-    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+    let result = lhs `shiftL` fromIntegral rhs in
+    if memberIntCons result ty then
+      return $ I (TInteger result repr) (Just ty)
+    else
+      throwError $ annotateError loc (EConstIntegerOverflow result ty)
 evalBinOp loc BitwiseRightShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
-  let result = lhs `shiftR` fromIntegral rhs in
-  if memberIntCons result ty then
-    return $ I (TInteger result repr) (Just ty)
+  if rhs >= shiftWidth ty then
+    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth ty) rhs)
   else
-    throwError $ annotateError loc (EConstIntegerOverflow result ty)
+    let result = lhs `shiftR` fromIntegral rhs in
+    if memberIntCons result ty then
+      return $ I (TInteger result repr) (Just ty)
+    else
+      throwError $ annotateError loc (EConstIntegerOverflow result ty)
 evalBinOp _ RelationalLT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs < rhs then
     return $ B True

@@ -48,11 +48,11 @@ spec = do
               "\n" ++
               "    bar16 = foo << 8U;\n" ++
               "\n" ++
-              "    bar8 = 8U << foo;\n" ++ 
+              "    bar8 = 8U << __termina_shift__amount(8U, foo);\n" ++ 
               "\n" ++
               "    bar16 = foo >> 8U;\n" ++ 
               "\n" ++
-              "    bar8 = 8U << foo;\n" ++
+              "    bar8 = 8U << __termina_shift__amount(8U, foo);\n" ++
               "\n" ++
               "    bar16 = foo & 1024U;\n" ++
               "\n" ++

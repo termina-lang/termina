@@ -50,6 +50,7 @@ data Error =
   | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   | EReferencedArraySizeMismatch Integer Integer -- ^ Referenced array size mismatch
+  | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
   deriving Show
 
 type ConstFoldError = AnnotatedError Error Location
@@ -71,6 +72,7 @@ instance ErrorMessage ConstFoldError where
     errorIdent (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "CPE-013"
     errorIdent (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "CPE-014"
     errorIdent (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "CPE-015"
+    errorIdent (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "CPE-016"
     errorIdent _ = "Internal"
 
     errorTitle (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "atomic array connection size mismatch"
@@ -88,6 +90,7 @@ instance ErrorMessage ConstFoldError where
     errorTitle (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "array index out of bounds"
     errorTitle (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "atomic array index out of bounds"
     errorTitle (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "referenced array size mismatch"
+    errorTitle (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "shift amount out of bounds"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -169,6 +172,12 @@ instance ErrorMessage ConstFoldError where
                         sourceLines title fileName pos
                         (Just ("The referenced array size is \x1b[31m" <> T.pack (show actualSize) <>
                             "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
+                EShiftAmountOutOfBounds width amount ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The shift amount \x1b[31m" <> T.pack (show amount) <>
+                            "\x1b[0m is greater than or equal to the width \x1b[31m" <> T.pack (show width) <>
+                            "\x1b[0m of the shifted type."))
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
 
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e

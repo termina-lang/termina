@@ -305,7 +305,18 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
       ty <- getExprType e
       fConst <- evalBinOp (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann
-    _ -> return $ BinOp op lhs' rhs' ann'
+    _ -> do
+      case (op, rhs') of
+        (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
+        (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
+        _ -> return ()
+      return $ BinOp op lhs' rhs' ann'
+  where
+    checkShiftAmount :: Integer -> ConstFoldMonad ()
+    checkShiftAmount k = do
+      ty <- getExprType lhs
+      when (k >= shiftWidth ty) $
+        throwError $ annotateError (getLocation ann) (EShiftAmountOutOfBounds (shiftWidth ty) k)
 constFoldExpression (Casting expr ty ann) = do
   ann' <- constFoldAnnotation ann
   expr' <- constFoldExpression expr

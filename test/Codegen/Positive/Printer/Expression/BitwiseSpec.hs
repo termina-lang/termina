@@ -15,8 +15,8 @@ unboxVar1 :: Expression SemanticAnn
 unboxVar1 = AccessObject (Unbox (Variable "var1" boxUInt16SemAnn) (objSemAnn Mutable TUInt16))
 
 constUInt8, constUInt16 :: Expression SemanticAnn
-constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just TUInt8)) uint8ExprSemAnn
-constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) uint16ExprSemAnn
+constUInt8 = Constant (I (TInteger 0x08 HexRepr) (Just TUInt8)) (simpleTySemAnn (TConstSubtype TUInt8))
+constUInt16 = Constant (I (TInteger 1024 DecRepr) (Just TUInt16)) (simpleTySemAnn (TConstSubtype TUInt16))
 
 var0LeftShiftConstant :: Expression SemanticAnn
 var0LeftShiftConstant = BinOp BitwiseLeftShift var0 constUInt8 uint16ExprSemAnn
@@ -74,22 +74,22 @@ spec = do
         pack "*(uint16_t *)var1.data << 0x8U"
     it "Prints the expression: 8 : u8 << var0" $ do
       renderExpression constantLeftShiftVar0 `shouldBe`
-        pack "0x8U << var0"
+        pack "0x8U << __termina_shift__amount(8U, var0)"
     it "Prints the expression: 8 : u8 << var1" $ do
       renderExpression constantLeftShiftVar1 `shouldBe`
-        pack "0x8U << *(uint16_t *)var1.data"
+        pack "0x8U << __termina_shift__amount(8U, *(uint16_t *)var1.data)"
     it "Prints the expression: var0 << var1 : u16" $ do
       renderExpression var0LeftShiftVar1 `shouldBe`
-        pack "var0 << *(uint16_t *)var1.data"
+        pack "var0 << __termina_shift__amount(16U, *(uint16_t *)var1.data)"
     it "Prints the expression: var0 << var1 << 0x8U : u8" $ do
       renderExpression var0LeftShiftVar1LeftShiftConstant `shouldBe`
-        pack "(uint16_t)(var0 << *(uint16_t *)var1.data) << 0x8U"
+        pack "(uint16_t)(var0 << __termina_shift__amount(16U, *(uint16_t *)var1.data)) << 0x8U"
     it "Prints the expression: var0 >> 0x8U : u8" $ do
       renderExpression var0RightShiftConstant `shouldBe`
         pack "var0 >> 0x8U"
     it "Prints the expression: 0x8U >> var0" $ do
       renderExpression constantRightShiftVar0 `shouldBe`
-        pack "0x8U >> var0"
+        pack "0x8U >> __termina_shift__amount(8U, var0)"
     it "Prints the expression: var0 & 1024 : u16" $ do
       renderExpression var0BitwiseAndConstant `shouldBe`
         pack "var0 & 1024U"
