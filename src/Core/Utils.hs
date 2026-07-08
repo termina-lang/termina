@@ -3,6 +3,7 @@
 module Core.Utils where
 
 import Parser.AST
+import Configuration.Platform (Platform, usizeWidth)
 import qualified Data.List as L
 
 copyTy :: TerminaType' expr a -> Bool
@@ -396,39 +397,38 @@ eqTy TChar   = True
 eqTy (TConstSubtype ty) = eqTy ty
 eqTy _      = False
 
-memberIntCons :: Integer -> TerminaType' expr a -> Bool
-memberIntCons i TUInt8  = ( 0 <= i ) && ( i <= 255)
-memberIntCons i TUInt16 = ( 0 <= i ) && ( i <= 65536)
-memberIntCons i TUInt32 = ( 0 <= i ) && ( i <= 4294967295)
-memberIntCons i TUInt64 = ( 0 <= i ) && ( i <= 18446744073709551615)
-memberIntCons i TInt8   = ( -128 <= i ) && ( i <= 127 )
-memberIntCons i TInt16  = ( -32768 <= i ) && ( i <= 32767 )
-memberIntCons i TInt32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
-memberIntCons i TInt64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
--- | TODO: This value depends on the target architecture and shall be selected
--- accordingly. Since we are currently targeting 32-bit systems, we assume that
--- usize is a 32-bit unsigned integer.
-memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
-memberIntCons i (TConstSubtype ty) = memberIntCons i ty
-memberIntCons _ _      = False
+-- | Whether a value fits an integer type. The first argument is the target
+-- platform, used for the 'TUSize' case (its width is @usizeWidth@); the
+-- fixed-width types ignore it.
+memberIntCons :: Platform -> Integer -> TerminaType' expr a -> Bool
+memberIntCons _ i TUInt8  = ( 0 <= i ) && ( i <= 255)
+memberIntCons _ i TUInt16 = ( 0 <= i ) && ( i <= 65536)
+memberIntCons _ i TUInt32 = ( 0 <= i ) && ( i <= 4294967295)
+memberIntCons _ i TUInt64 = ( 0 <= i ) && ( i <= 18446744073709551615)
+memberIntCons _ i TInt8   = ( -128 <= i ) && ( i <= 127 )
+memberIntCons _ i TInt16  = ( -32768 <= i ) && ( i <= 32767 )
+memberIntCons _ i TInt32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
+memberIntCons _ i TInt64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
+memberIntCons plt i TUSize  = ( 0 <= i ) && ( i <= (2 ^ usizeWidth plt - 1) )
+memberIntCons plt i (TConstSubtype ty) = memberIntCons plt i ty
+memberIntCons _ _ _      = False
 
 -- | The bit width of an integer type, used to bound shift amounts (Rule 12.2):
--- a shift amount must lie in [0, width - 1]. usize is assumed 32-bit, matching
--- 'memberIntCons' above and its TODO (platform parameterization is tracked
--- separately). The type checker guarantees the operand is a numeric integer
--- type, so the catch-all is unreachable.
-shiftWidth :: TerminaType' expr a -> Integer
-shiftWidth TUInt8  = 8
-shiftWidth TUInt16 = 16
-shiftWidth TUInt32 = 32
-shiftWidth TUInt64 = 64
-shiftWidth TInt8   = 8
-shiftWidth TInt16  = 16
-shiftWidth TInt32  = 32
-shiftWidth TInt64  = 64
-shiftWidth TUSize  = 32
-shiftWidth (TConstSubtype ty) = shiftWidth ty
-shiftWidth _ = error "shiftWidth: not an integer type"
+-- a shift amount must lie in [0, width - 1]. The first argument is the target
+-- platform, used for the 'TUSize' case. The type checker guarantees the operand
+-- is a numeric integer type, so the catch-all is unreachable.
+shiftWidth :: Platform -> TerminaType' expr a -> Integer
+shiftWidth _ TUInt8  = 8
+shiftWidth _ TUInt16 = 16
+shiftWidth _ TUInt32 = 32
+shiftWidth _ TUInt64 = 64
+shiftWidth _ TInt8   = 8
+shiftWidth _ TInt16  = 16
+shiftWidth _ TInt32  = 32
+shiftWidth _ TInt64  = 64
+shiftWidth plt TUSize = usizeWidth plt
+shiftWidth plt (TConstSubtype ty) = shiftWidth plt ty
+shiftWidth _ _ = error "shiftWidth: not an integer type"
 
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident

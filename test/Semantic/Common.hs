@@ -18,6 +18,6 @@ runNegativeTestTypeCheck input = case runP (contents topLevel) "test" "" input o
   Left err -> error $ "Parser Error: " ++ show err
   Right ast ->
     let config = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule (S.singleton "test") ast) of
+    case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> Just $ getError err
       Right _ -> Nothing

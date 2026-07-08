@@ -6,6 +6,7 @@ import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform)
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
@@ -93,24 +94,24 @@ genSourceFile mName program = do
 
 runGenSourceFile :: 
     TerminaConfig 
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName 
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
-runGenSourceFile config irqMap mName program = 
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config irqMap) of
+runGenSourceFile config plt mName program = 
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file
 
 runGenHeaderFile :: 
     TerminaConfig 
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName 
     -> [QualifiedName] 
     -> AnnotatedProgram SemanticAnn 
     -> MonadicTypes 
     -> Either CGeneratorError (CFile, MonadicTypes)
-runGenHeaderFile config irqMap mName imports program monadicTys = 
+runGenHeaderFile config plt mName imports program monadicTys = 
     let includeOptionH = not (S.null (S.filter (\case {
             TStruct _ -> False;
             TEnum _ -> False;
@@ -128,6 +129,6 @@ runGenHeaderFile config irqMap mName imports program monadicTys =
             }) $ resultTypes monadicTys))
     in
     case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config irqMap) of
+        (CGeneratorEnv mName S.empty monadicTys config plt) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

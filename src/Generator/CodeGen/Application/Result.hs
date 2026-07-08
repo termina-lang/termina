@@ -4,6 +4,7 @@ module Generator.CodeGen.Application.Result where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform)
 import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
@@ -39,12 +40,12 @@ genResultHeaderFile = do
 
 runGenResultHeaderFile ::
     TerminaConfig
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName
     -> MonadicTypes
     -> Either CGeneratorError CFile
-runGenResultHeaderFile config irqMap resultFileName monadicTys =
+runGenResultHeaderFile config plt resultFileName monadicTys =
     case runState (runExceptT genResultHeaderFile)
-        (CGeneratorEnv resultFileName S.empty monadicTys config irqMap) of
+        (CGeneratorEnv resultFileName S.empty monadicTys config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

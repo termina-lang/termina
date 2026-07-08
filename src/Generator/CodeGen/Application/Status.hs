@@ -4,10 +4,10 @@ module Generator.CodeGen.Application.Status where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform)
 import System.FilePath
 import Generator.CodeGen.TypeDefinition
 import qualified Data.Set as S
-import qualified Data.Map.Strict as M
 import ControlFlow.BasicBlocks.AST
 import Utils.Annotations
 import Control.Monad.Except
@@ -39,12 +39,12 @@ genStatusHeaderFile = do
 
 runGenStatusHeaderFile ::
     TerminaConfig
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName
     -> MonadicTypes
     -> Either CGeneratorError CFile
-runGenStatusHeaderFile config irqMap optionFileName opts =
+runGenStatusHeaderFile config plt optionFileName opts =
     case runState (runExceptT genStatusHeaderFile)
-        (CGeneratorEnv optionFileName S.empty opts config irqMap) of
+        (CGeneratorEnv optionFileName S.empty opts config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

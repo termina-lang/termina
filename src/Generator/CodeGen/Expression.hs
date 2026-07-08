@@ -6,6 +6,7 @@ import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
 import Control.Monad (zipWithM)
+import Control.Monad.State (gets)
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
@@ -304,8 +305,9 @@ genExpression (BinOp op left right ann) =
                         TConstSubtype _ -> return cRight
                         _ -> do
                             leftTy <- getExprType left
+                            plt <- gets targetPlatform
                             let cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
-                                cWidth = CExprConstant (CIntConst (CInteger (shiftWidth leftTy) CDecRepr)) (CTSizeT noqual) cAnn
+                                cWidth = CExprConstant (CIntConst (CInteger (shiftWidth plt leftTy) CDecRepr)) (CTSizeT noqual) cAnn
                             return $ CExprCall (CExprValOf (CVar "__termina_shift__amount" cFuncType) cFuncType cAnn) [cWidth, cRight] (CTSizeT noqual) cAnn
             cRight' <- case op of
                 BitwiseLeftShift  -> boundShift

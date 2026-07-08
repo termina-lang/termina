@@ -7,12 +7,23 @@ import Configuration.Platform.RTEMS5LEON3NEXYSA7
 import Configuration.Platform.POSIXGCC
 import Configuration.Platform.FreeRTOS10STM32L432XX
 
-data Platform = 
+data Platform =
     POSIXGCC
     | RTEMS5LEON3NEXYSA7
     | FreeRTOS10STM32L432XX
     | TestPlatform
     deriving Eq
+
+-- | The bit width of @usize@ on a platform, i.e. the width of C @size_t@ on the
+-- target. Used only for the transpiler's static range and shift-amount checks;
+-- the generated C uses @size_t@, which the C compiler sizes for the target.
+-- POSIX-gcc is fixed at 64 (matching a 64-bit host, the normal case); a 32-bit
+-- host would warrant a separate platform (e.g. @POSIXGCC32b@).
+usizeWidth :: Platform -> Integer
+usizeWidth POSIXGCC              = 64
+usizeWidth RTEMS5LEON3NEXYSA7    = 32
+usizeWidth FreeRTOS10STM32L432XX = 32
+usizeWidth TestPlatform          = 32
 
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,

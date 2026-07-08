@@ -23,7 +23,7 @@ import Semantic.Types (SemanticAnn)
 import Configuration.Configuration (defaultConfig, TerminaConfig)
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
-    (getPlatformInterruptMap, getPlatformInitialGlobalEnv, getPlatformInitialProgram)
+    (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
 import Generator.LanguageC.Printer (runCPrinter)
 
@@ -79,7 +79,7 @@ runFullProjectBuild sources = do
 -- environment so a module resolves the constants defined by the modules it
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
 foldProject :: BasicBlocksProject -> [QualifiedName] -> Either Text BasicBlocksProject
-foldProject bbProject = go (ConstFoldEnv M.empty) M.empty
+foldProject bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty
   where
     go _ folded [] = Right folded
     go env folded (m:ms) =
@@ -180,7 +180,7 @@ runChecks progArch =
 
 renderModule :: BasicBlocksModule -> Either Text Text
 renderModule bbModule =
-  case runGenSourceFile configParams irqMap (qualifiedName bbModule)
+  case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
          (basicBlocksAST . metadata $ bbModule) of
     Left err -> Left . T.pack $ show err
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
@@ -190,11 +190,8 @@ renderModule bbModule =
 configParams :: TerminaConfig
 configParams = defaultConfig "test" TestPlatform
 
-irqMap :: M.Map QualifiedName Integer
-irqMap = getPlatformInterruptMap TestPlatform
-
 initialEnv :: Environment
-initialEnv = makeInitialGlobalEnv (Just configParams)
+initialEnv = makeInitialGlobalEnv (Just configParams) TestPlatform
                (getPlatformInitialGlobalEnv configParams TestPlatform)
 
 initialProg :: TerminaProgArch SemanticAnn

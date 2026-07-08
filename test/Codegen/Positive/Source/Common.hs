@@ -20,15 +20,14 @@ renderHeader :: String -> Text
 renderHeader input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    let configParams = defaultConfig "test" TestPlatform
-        irqMap = getPlatformInterruptMap TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule (S.singleton "test") ast) of
+    let configParams = defaultConfig "test" TestPlatform in
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenHeaderFile configParams irqMap "test" [] bbAST emptyMonadicTypes of
+            case runGenHeaderFile configParams TestPlatform "test" [] bbAST emptyMonadicTypes of
               Left err -> pack $ show err
               Right (cHeaderFile, _) -> runCPrinter False cHeaderFile
 
@@ -36,22 +35,20 @@ renderSource :: String -> Text
 renderSource input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
   Right ast -> 
-    let configParams = defaultConfig "test" TestPlatform
-        irqMap = getPlatformInterruptMap TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just configParams) []) (typeTerminaModule (S.singleton "test") ast) of
+    let configParams = defaultConfig "test" TestPlatform in
+    case runTypeChecking (makeInitialGlobalEnv (Just configParams) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
       Left err -> pack $ "Type error: " ++ show err
       Right (tast, _) -> 
         case runGenBBModule tast of
           Left err -> pack $ "Basic blocks error: " ++ show err
           Right bbAST -> 
-            case runGenSourceFile configParams irqMap "test" bbAST of
+            case runGenSourceFile configParams TestPlatform "test" bbAST of
               Left err -> pack $ show err
               Right cSourceFile -> runCPrinter False cSourceFile
 
 renderOption :: MonadicTypes -> Text
 renderOption monadicTypes =
-  let configParams = defaultConfig "test" TestPlatform 
-      irqMap = getPlatformInterruptMap TestPlatform in
-  case runGenOptionHeaderFile configParams irqMap "test" monadicTypes of
+  let configParams = defaultConfig "test" TestPlatform  in
+  case runGenOptionHeaderFile configParams TestPlatform "test" monadicTypes of
     Left err -> pack $ show err
     Right cOptionsFile -> runCPrinter False cOptionsFile

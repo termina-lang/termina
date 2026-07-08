@@ -5,6 +5,7 @@ import Semantic.AST
 import Utils.Annotations
 import Semantic.Types
 import Configuration.Configuration
+import Configuration.Platform (Platform)
 import qualified Data.Set as S
 
 ----------------------------------------
@@ -28,6 +29,9 @@ data Environment
  -- | Set of all the modules that are imported in the current module together with the
  -- | current module.
  , visible :: S.Set QualifiedName
+ -- | Target platform, for the static range checks (its @usize@ width; see
+ -- 'Configuration.Platform').
+ , targetPlatform :: Platform
  }
 
 getEntry :: LocatedElement (GEntry SemanticAnn) -> GEntry SemanticAnn
@@ -152,8 +156,8 @@ systemEntryGlobalEnv =
     ("system_entry", LocatedElement (GGlob (TGlobal ResourceClass "SystemEntry")) Internal)
   ]
 
-makeInitialGlobalEnv :: Maybe TerminaConfig -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
-makeInitialGlobalEnv (Just config) pltEnvironment = 
+makeInitialGlobalEnv :: Maybe TerminaConfig -> Platform -> [(Identifier, LocatedElement (GEntry SemanticAnn))] -> Environment
+makeInitialGlobalEnv (Just config) plt pltEnvironment =
   let 
     globalEnv = mconcat [
       stdlibGlobalEnv (sysPrintOutputBufferSize config) (sysReadInputBufferSize config),
@@ -169,8 +173,8 @@ makeInitialGlobalEnv (Just config) pltEnvironment =
         env | enableSystemExcept config, env <- sysExceptGlobalEnv
       ]]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty S.empty
-makeInitialGlobalEnv Nothing pltEnvironment = 
+  ExprST (M.fromList globalEnv) M.empty M.empty S.empty plt
+makeInitialGlobalEnv Nothing plt pltEnvironment =
   let globalEnv = mconcat [stdlibGlobalEnv defaultSysPrintOutputBufferSize defaultSysReadInputBufferSize, pltEnvironment]
   in
-  ExprST (M.fromList globalEnv) M.empty M.empty S.empty
+  ExprST (M.fromList globalEnv) M.empty M.empty S.empty plt

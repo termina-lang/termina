@@ -25,13 +25,14 @@ import Generator.Environment (getPlatformInitialGlobalEnv)
 import Data.Functor (void)
 import Semantic.Environment
 import Command.Types (typedAST)
+import Data.Maybe (fromMaybe)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do
     infoM "Loading termina.yaml..."
     ecfg <- loadConfig
     case ecfg of
-      Left err -> 
+      Left err ->
         errorM $ "Error when parsing termina.yaml: " <> T.pack (show err)
       Right cfg -> do
         -- We have loaded the configuration file. Then we must check that the platform is OK
@@ -41,7 +42,7 @@ initializeHandler _req = do
           Nothing ->
             errorM $ "Unsupported platform: \"" <> T.pack (show (platform cfg)) <> "\""
           Just plt -> do
-            put $ ServerState (Just cfg) mempty 
+            put $ ServerState (Just cfg) mempty
             -- The platform is OK
             -- Then we have to check the folder's structure
             existSourceFolder <- liftIO $ doesDirectoryExist (sourceModulesFolder cfg)
@@ -69,10 +70,10 @@ initializeHandler _req = do
                     (\_loop ->
                       -- TODO: Generate diagnostics
                       return ())
-                    (\orderedDependencies -> 
-                      let initialGlobalEnv = makeInitialGlobalEnv (Just cfg) (getPlatformInitialGlobalEnv cfg plt) in
+                    (\orderedDependencies ->
+                      let initialGlobalEnv = makeInitialGlobalEnv (Just cfg) plt (getPlatformInitialGlobalEnv cfg plt) in
                       void $ typeModules (sourceModulesFolder cfg) M.empty initialGlobalEnv orderedDependencies)
-                    $ sortProjectDepsOrLoop projectDependencies 
+                    $ sortProjectDepsOrLoop projectDependencies
               return ()
 
 typeProject :: HandlerM ()
@@ -85,24 +86,26 @@ typeProject = do
       -- TODO: Generate diagnostics
       return ())
     (\orderedDependencies -> do
-      let pltInitialGlbEnv = case cfg of
+      let lspPlt = fromMaybe
+            TestPlatform (cfg >>= checkPlatform . T.unpack . platform)
+          pltInitialGlbEnv = case cfg of
             Nothing -> []
-            Just cfg' -> case checkPlatform (T.unpack (platform cfg')) of 
+            Just cfg' -> case checkPlatform (T.unpack (platform cfg')) of
               Nothing -> []
               Just plt -> getPlatformInitialGlobalEnv cfg' plt
-      let initialGlobalEnv = makeInitialGlobalEnv cfg pltInitialGlbEnv
+      let initialGlobalEnv = makeInitialGlobalEnv cfg lspPlt pltInitialGlbEnv
       case cfg of
         Nothing -> void $ typeModules "" M.empty initialGlobalEnv orderedDependencies
         Just cfg' -> void $ typeModules (sourceModulesFolder cfg') M.empty initialGlobalEnv orderedDependencies)
     $ sortProjectDepsOrLoop projectDependencies
   diags <- gets project_modules
-  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 
+  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags))
 
 documentChange :: Handlers HandlerM
 documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
   let fileURI = msg ^. J.params . J.textDocument . J.uri
-  case uriToFilePath fileURI of 
-    Nothing -> 
+  case uriToFilePath fileURI of
+    Nothing ->
       sendNotification SMethod_WindowShowMessage
         (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
     Just filePath -> do
@@ -113,8 +116,8 @@ documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
 requestSymbols :: Handlers HandlerM
 requestSymbols = requestHandler SMethod_TextDocumentDocumentSymbol $ \req responder -> do
   let fileURI = req ^. J.params . J.textDocument . J.uri
-  case uriToFilePath fileURI of 
-    Nothing -> 
+  case uriToFilePath fileURI of
+    Nothing ->
       sendNotification SMethod_WindowShowMessage
         (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
     Just filePath -> do
@@ -138,8 +141,8 @@ initialized = notificationHandler SMethod_Initialized $ \_msg -> do
 didOpen :: Handlers HandlerM
 didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \msg -> do
     let fileURI = msg ^. J.params . J.textDocument . J.uri
-    case uriToFilePath fileURI of 
-      Nothing -> 
+    case uriToFilePath fileURI of
+      Nothing ->
         sendNotification SMethod_WindowShowMessage
           (ShowMessageParams MessageType_Error $ T.pack ("Internal error: unknown file: " ++ show (uriToFilePath fileURI)))
       Just filePath -> do
@@ -154,7 +157,7 @@ didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \msg -> do
 handlers :: Handlers HandlerM
 handlers =
   mconcat
-    [ 
+    [
       notificationHandler SMethod_WorkspaceDidChangeConfiguration $ \_not ->
         return ()
       , initialized

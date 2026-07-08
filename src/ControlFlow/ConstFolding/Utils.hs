@@ -9,6 +9,7 @@ import Utils.Annotations
 import ControlFlow.Architecture.Types
 import qualified Data.Map.Strict as M
 import Core.Utils
+import Configuration.Platform (Platform)
 import Data.Bits
 import ControlFlow.Architecture.Utils (classMemberFunctions)
 
@@ -117,106 +118,106 @@ intReprBinOp DecRepr DecRepr = DecRepr
 intReprBinOp _ HexRepr = HexRepr
 intReprBinOp HexRepr _ = HexRepr
 
-evalBinOp :: (MonadError ConstFoldError m) => Location
+evalBinOp :: (MonadError ConstFoldError m) => Platform -> Location
   -> Op -> Const SemanticAnn
   -> Const SemanticAnn
   -> TerminaType SemanticAnn -> m (Const SemanticAnn)
-evalBinOp loc Multiplication (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp plt loc Multiplication (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs * rhs in
-  if memberIntCons result ty then
+  if memberIntCons plt result ty then
     return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
   else
     throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp loc Division (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp _ loc Division (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   if rhs == 0 then
     throwError $ annotateError loc EConstDivisionByZero
   else
   let result = lhs `div` rhs in
   return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
-evalBinOp loc Addition (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp plt loc Addition (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs + rhs in
-  if memberIntCons result ty then
+  if memberIntCons plt result ty then
     return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
   else
     throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp loc Subtraction (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp _ loc Subtraction (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs - rhs in
   if posTy ty && result < 0 then
     throwError $ annotateError loc (EConstIntegerUnderflow result ty)
   else
     return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
-evalBinOp loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+evalBinOp _ loc Modulo (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
   if rhs == 0 then
     throwError $ annotateError loc EConstDivisionByZero
   else
   let result = lhs `mod` rhs in
   return $ I (TInteger result repr) (Just ty)
-evalBinOp loc BitwiseLeftShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
-  if rhs >= shiftWidth ty then
-    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth ty) rhs)
+evalBinOp plt loc BitwiseLeftShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+  if rhs >= shiftWidth plt ty then
+    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth plt ty) rhs)
   else
     let result = lhs `shiftL` fromIntegral rhs in
-    if memberIntCons result ty then
+    if memberIntCons plt result ty then
       return $ I (TInteger result repr) (Just ty)
     else
       throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp loc BitwiseRightShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
-  if rhs >= shiftWidth ty then
-    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth ty) rhs)
+evalBinOp plt loc BitwiseRightShift (I (TInteger lhs repr) _) (I (TInteger rhs _) _) ty =
+  if rhs >= shiftWidth plt ty then
+    throwError $ annotateError loc (EShiftAmountOutOfBounds (shiftWidth plt ty) rhs)
   else
     let result = lhs `shiftR` fromIntegral rhs in
-    if memberIntCons result ty then
+    if memberIntCons plt result ty then
       return $ I (TInteger result repr) (Just ty)
     else
       throwError $ annotateError loc (EConstIntegerOverflow result ty)
-evalBinOp _ RelationalLT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalLT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs < rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ RelationalLTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalLTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs <= rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ RelationalGT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalGT (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs > rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ RelationalGTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalGTE (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs >= rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ RelationalEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs == rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ RelationalNotEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
+evalBinOp _ _ RelationalNotEqual (I (TInteger lhs _) _) (I (TInteger rhs _) _) _ =
   if lhs /= rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ BitwiseAnd (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty = do
+evalBinOp _ _ BitwiseAnd (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty = do
   let result = lhs .&. rhs
   return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
-evalBinOp _ BitwiseOr (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp _ _ BitwiseOr (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs .|. rhs in
   return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
-evalBinOp _ BitwiseXor (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
+evalBinOp _ _ BitwiseXor (I (TInteger lhs lhsRepr) _) (I (TInteger rhs rhsRepr) _) ty =
   let result = lhs `xor` rhs in
   return $ I (TInteger result (intReprBinOp lhsRepr rhsRepr)) (Just ty)
-evalBinOp _ LogicalAnd (B lhs) (B rhs) _ =
+evalBinOp _ _ LogicalAnd (B lhs) (B rhs) _ =
   if lhs && rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ LogicalOr (B lhs) (B rhs) _ =
+evalBinOp _ _ LogicalOr (B lhs) (B rhs) _ =
   if lhs || rhs then
     return $ B True
   else
     return $ B False
-evalBinOp _ _ _ _ _ =
+evalBinOp _ _ _ _ _ _ =
   throwError $ annotateError Internal (EInvalidExpression "invalid bin op")

@@ -4,6 +4,7 @@ import Generator.LanguageC.AST
 import qualified Data.Map.Strict as M
 import Generator.LanguageC.Embedded
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform)
 import Control.Monad.Except (MonadError(throwError), runExceptT)
 import Control.Monad.Reader (runReader)
 import Data.Text (unpack)
@@ -144,12 +145,12 @@ genConfigFile mName config progArchitecture = do
 
 runGenConfigFile ::
     TerminaConfig
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
-runGenConfigFile config irqMap configFilePath progArchitecture =
+runGenConfigFile config plt configFilePath progArchitecture =
     case runState (runExceptT (genConfigFile configFilePath config progArchitecture))
-        (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config irqMap) of
+        (CGeneratorEnv configFilePath S.empty emptyMonadicTypes config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

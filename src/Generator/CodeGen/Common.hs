@@ -5,10 +5,10 @@ module Generator.CodeGen.Common where
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Control.Monad.Except
-import Data.Map
 import Generator.LanguageC.AST
 import Utils.Annotations
 import Configuration.Configuration
+import Configuration.Platform (Platform)
 import Generator.Monadic
 import qualified Control.Monad.State as ST
 import qualified Data.Set as S
@@ -21,7 +21,7 @@ data CGeneratorEnv = CGeneratorEnv {
     extraImports :: S.Set QualifiedName,
     monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
-    interruptsMap :: Map Identifier Integer
+    targetPlatform :: Platform
   }
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)

@@ -20,7 +20,7 @@ exitPathsError input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser error: " ++ show err
   Right ast ->
     let config = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just config) [])
+    case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform [])
            (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing error: " ++ show err
       Right (typed, _) -> case runGenBBModule typed of

@@ -73,10 +73,11 @@ checkConstant loc expected_type Null =
   sameTyOrError loc expected_type TUnit
 
 checkIntConstant :: Location -> SAST.TerminaType SemanticAnn -> TInteger -> SemanticMonad ()
-checkIntConstant loc tyI ti@(TInteger i _) =
-  if memberIntCons i tyI
-  then return ()
-  else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
+checkIntConstant loc tyI ti@(TInteger i _) = do
+  plt <- ST.gets targetPlatform
+  if memberIntCons plt i tyI
+    then return ()
+    else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
 
 -- | Function checking that a TerminaType is well-defined.
 -- We are assuming that this function is always called AFTER the type was

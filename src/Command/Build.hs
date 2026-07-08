@@ -234,7 +234,7 @@ genModules params plt initialMonadicTypes bbProject =
       let destinationPath = outputFolder params
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           tAST = basicBlocksAST . metadata $ bbModule
-      case runGenSourceFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) tAST of
+      case runGenSourceFile params plt (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> do
           createDirectoryIfMissing True (takeDirectory sourceFile)
@@ -245,7 +245,7 @@ genModules params plt initialMonadicTypes bbProject =
       let destinationPath = outputFolder params
           tAST = basicBlocksAST . metadata $ bbModule
           moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-      case runGenHeaderFile params (getPlatformInterruptMap plt) (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
+      case runGenHeaderFile params plt (qualifiedName bbModule) moduleDeps tAST currentMonadicTypes of
         Left err -> die . errorMessage $ show err
         Right (cHeaderFile, newMonadicTypes) -> do
           let headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
@@ -279,7 +279,7 @@ genInitFile params plt bbProject appModName = do
     runGenInitFile' :: IO ()
     runGenInitFile' = do
       let projectModules = M.toList $ basicBlocksAST . metadata <$> bbProject
-      case runGenInitFile params (getPlatformInterruptMap plt) initFile projectModules of
+      case runGenInitFile params plt initFile projectModules of
         Left err -> die . errorMessage $ show err
         Right cInitFile -> do
           createDirectoryIfMissing True (takeDirectory initFile)
@@ -311,7 +311,7 @@ genOptionHeaderFile params plt monadicTypes bbProject appModName = do
 
     runGenOptionHeaderFile' :: IO ()
     runGenOptionHeaderFile' = do
-      case runGenOptionHeaderFile params (getPlatformInterruptMap plt) optionFile monadicTypes of
+      case runGenOptionHeaderFile params plt optionFile monadicTypes of
         Left err -> die . errorMessage $ show err
         Right cOptionsFile -> TIO.writeFile optionFile $ runCPrinter (profile params == Debug) cOptionsFile
 
@@ -339,7 +339,7 @@ genStatusHeaderFile params plt monadicTypes bbProject appModName = do
     statusFile = destinationPath </> "include" </> "status" <.> "h"
 
     runGenStatusHeaderFile' :: IO ()
-    runGenStatusHeaderFile' = case runGenStatusHeaderFile params (getPlatformInterruptMap plt) statusFile monadicTypes of
+    runGenStatusHeaderFile' = case runGenStatusHeaderFile params plt statusFile monadicTypes of
       Left err -> die . errorMessage $ show err
       Right cOptionsFile -> TIO.writeFile statusFile $ runCPrinter (profile params == Debug) cOptionsFile
 
@@ -368,7 +368,7 @@ genResultHeaderFile params plt monadicTypes bbProject appModName = do
 
     runGenResultHeaderFile' :: IO ()
     runGenResultHeaderFile' =
-      case runGenResultHeaderFile params (getPlatformInterruptMap plt) resultFile monadicTypes of
+      case runGenResultHeaderFile params plt resultFile monadicTypes of
         Left err -> die . errorMessage $ show err
         Right cOptionsFile -> TIO.writeFile resultFile $ runCPrinter (profile params == Debug) cOptionsFile
 
@@ -414,7 +414,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         $ sortProjectDepsOrLoop projectDependencies
     when chatty (putStrLn. debugMessage $ "Type checking project modules")
     -- | Create the initial global environment
-    let initialGlobalEnv = makeInitialGlobalEnv (Just config) (getPlatformInitialGlobalEnv config plt)
+    let initialGlobalEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
     -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
@@ -445,7 +445,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
-    bbProject <- constFolding rawBBProject
+    bbProject <- constFolding plt rawBBProject
     -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
