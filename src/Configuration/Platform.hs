@@ -25,6 +25,19 @@ usizeWidth RTEMS5LEON3NEXYSA7    = 32
 usizeWidth FreeRTOS10STM32L432XX = 32
 usizeWidth TestPlatform          = 32
 
+-- | Whether the target requires naturally-aligned memory accesses, i.e. a
+-- misaligned load/store traps or is penalized instead of being handled
+-- transparently. On such targets, taking a reference to a member of a @packed@
+-- struct is rejected: the reference would carry an under-aligned address whose
+-- packed provenance is lost at the call boundary, so the callee emits an
+-- aligned access (undefined behavior, MISRA-C:2023 Rule 1.3). Hosts that handle
+-- misaligned accesses (x86) do not need the restriction.
+strictAlignment :: Platform -> Bool
+strictAlignment POSIXGCC              = False   -- x86 host: misaligned access is fine
+strictAlignment RTEMS5LEON3NEXYSA7    = True    -- SPARC/LEON3: traps
+strictAlignment FreeRTOS10STM32L432XX = True    -- Cortex-M: conservative
+strictAlignment TestPlatform          = True
+
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,
     posix_gcc                :: POSIXGCCFlags,
