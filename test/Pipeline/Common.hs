@@ -1,6 +1,9 @@
 module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
+  , runFullProjectApp
+  , renderMainFile
+  , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
   , compileProjectErrorCode
@@ -25,7 +28,10 @@ import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
+import Generator.CodeGen.Application.Glue (runGenMainFile)
+import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
+import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 
 import Command.Types
 import Command.Utils
@@ -62,6 +68,31 @@ import Utils.Errors (ErrorMessage(errorIdent))
 -- comparable 'Text' (@Left@) the spec can assert on, never a process exit.
 runFullProjectBuild :: [(QualifiedName, String)] -> Either Text (M.Map QualifiedName Text)
 runFullProjectBuild sources = do
+  (foldedProject, _, _) <- runProjectPipeline sources
+  mapM renderModule foldedProject
+
+-- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
+-- per-module source rendering, returning the whole-program architecture and
+-- the per-module basic-block programs in dependency order. The application
+-- glue (the @main@ and @init@ files) is generated from these two artifacts
+-- rather than from a single source module, so a spec that wants to exercise
+-- the glue renders it via 'renderMainFile' / 'renderInitFile'.
+runFullProjectApp ::
+  [(QualifiedName, String)]
+  -> Either Text (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
+runFullProjectApp sources = do
+  (foldedProject, ordered, progArch) <- runProjectPipeline sources
+  let prjprogs = [ (m, basicBlocksAST . metadata $ foldedProject M.! m) | m <- ordered ]
+  pure (progArch, prjprogs)
+
+-- | The full pipeline up to (and including) the architecture checks, shared by
+-- 'runFullProjectBuild' (which renders each source module) and
+-- 'runFullProjectApp' (which renders the application glue). Returns the
+-- constant-folded project, the dependency order, and the program architecture.
+runProjectPipeline ::
+  [(QualifiedName, String)]
+  -> Either Text (BasicBlocksProject, [QualifiedName], TerminaProgArch SemanticAnn)
+runProjectPipeline sources = do
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
   typedProject <- typeProject parsedProject ordered
@@ -73,7 +104,25 @@ runFullProjectBuild sources = do
   foldedProject <- foldProject bbProject ordered
   progArch <- genProjectArchitecture foldedProject ordered
   runChecks progArch
-  mapM renderModule foldedProject
+  pure (foldedProject, ordered, progArch)
+
+-- | Render the generated @main@ file (task/emitter installation, the app init
+-- entry point) from a program architecture, collapsing a codegen failure into
+-- the returned 'Text'.
+renderMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFile progArch =
+  case runGenMainFile configParams TestPlatform "main" progArch of
+    Left err -> Left . T.pack $ show err
+    Right cFile -> Right $ runCPrinter False cFile
+
+-- | Render the generated @init@ file (global object initialization and port
+-- wiring) from the per-module basic-block programs, collapsing a codegen
+-- failure into the returned 'Text'.
+renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
+renderInitFile prjprogs =
+  case runGenInitFile configParams TestPlatform "init" prjprogs of
+    Left err -> Left . T.pack $ show err
+    Right cFile -> Right $ runCPrinter False cFile
 
 -- | Constant-fold every module in dependency order, threading the constant
 -- environment so a module resolves the constants defined by the modules it

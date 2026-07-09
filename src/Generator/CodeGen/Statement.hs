@@ -398,7 +398,7 @@ genStructAssign loc before level cObj expr = do
                 let portFieldObj = cObj @. fid @: cPortFieldType
                 clsFunctionName <- genClassFunctionName resource procid
                 clsFunctionType <- genProcedureType ptys
-                let clsFunctionExpr = clsFunctionName @: clsFunctionType
+                let clsFunctionExpr = addrOf (clsFunctionName @: clsFunctionType)
                 if before then
                     return $ pre_cr (portFieldObj @. procid @: clsFunctionType @= clsFunctionExpr) |>> getLocation ann
                 else

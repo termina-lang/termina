@@ -74,7 +74,7 @@ genInitTasks progArchitecture = do
                             taskId @: __termina_id_t,
                             taskPrio @: __termina_task_prio_t,
                             taskStackSize @: size_t,
-                            cTaskFunctionName @: __termina_task_entry_t,
+                            addrOf (cTaskFunctionName @: __termina_task_entry_t),
                             addrOf (tskName @: typeDef classId),
                             "status" @: (_const . ptr $ int32_t)
                         ]
