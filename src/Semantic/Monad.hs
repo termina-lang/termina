@@ -108,7 +108,7 @@ insertLocalImmutObj loc ident ty = do
 
 moveObject :: Location -> Object a -> SemanticMonad ()
 moveObject loc obj = 
-  let objectHash = getMovedHash obj Nothing
+  let objectHash = getMovedHash obj
   in
     modify (\s -> s{
       moved = M.insert objectHash loc (moved s)

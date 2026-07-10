@@ -35,7 +35,7 @@ import Semantic.Utils
 
 checkObjectNotMoved :: Location -> SAST.Object a -> SemanticMonad (SAST.Object a)
 checkObjectNotMoved loc obj = do
-  let objectHash = getMovedHash obj Nothing
+  let objectHash = getMovedHash obj
   movedObjects <- ST.gets moved
   case M.lookup objectHash movedObjects of
     Nothing -> return obj
