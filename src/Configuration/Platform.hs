@@ -38,6 +38,24 @@ strictAlignment RTEMS5LEON3NEXYSA7    = True    -- SPARC/LEON3: traps
 strictAlignment FreeRTOS10STM32L432XX = True    -- Cortex-M: conservative
 strictAlignment TestPlatform          = True
 
+-- | The maximum number of significant initial characters a generated
+-- identifier may have on a platform's toolchain, or @Nothing@ when the toolchain
+-- treats all characters as significant. C11 guarantees only 31 significant
+-- characters in an external identifier and 63 in an internal identifier or macro
+-- name; a concrete toolchain may raise those limits or keep them. Every
+-- currently supported platform uses a GCC-family compiler, which imposes no
+-- limit, so the transpiler's identifier-length check never fires. Declaring the
+-- limit here (rather than assuming it) turns the toolchain property into an
+-- enforced check: a future platform whose toolchain caps significant length
+-- states the cap here, and the generator then rejects any longer identifier at
+-- generation time. A per-identifier cap at or below the limit is sufficient to
+-- rule out significant-character collisions, so no pairwise analysis is needed.
+maxIdentifierLength :: Platform -> Maybe Integer
+maxIdentifierLength POSIXGCC              = Nothing
+maxIdentifierLength RTEMS5LEON3NEXYSA7    = Nothing
+maxIdentifierLength FreeRTOS10STM32L432XX = Nothing
+maxIdentifierLength TestPlatform          = Nothing
+
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,
     posix_gcc                :: POSIXGCCFlags,

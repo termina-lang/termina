@@ -12,6 +12,7 @@ import Configuration.Platform (Platform)
 import Generator.Monadic
 import qualified Control.Monad.State as ST
 import qualified Data.Set as S
+import Data.Maybe (maybeToList)
 
 newtype CGeneratorError = InternalError String
     deriving (Show)
@@ -36,6 +37,75 @@ namefy = ("__" <>)
 
 (<:>) :: Identifier -> Identifier -> Identifier
 (<:>) id0 id1 = id0 <> "_" <> id1
+
+-- | Every identifier a generated translation unit introduces: the file-scope
+-- declarations (functions, objects, typedef and tag names, enumeration
+-- constants, macro names) plus the function-scope identifiers inside each
+-- definition (parameters and block-scope locals, including a @for@ init
+-- declaration). File-scope external names are bound by the C limit on
+-- significant characters in an external identifier; block-scope locals and
+-- macros by the looser internal-identifier limit. All are collected and checked
+-- against a single per-platform bound, which is conservative; a linkage-aware
+-- split (external vs internal) is left as a future refinement. Struct/union
+-- member names are not collected (a separate namespace, rarely long).
+generatedIdentifiers :: CFile -> [Ident]
+generatedIdentifiers file = concatMap itemIdents (fileItems file)
+  where
+    fileItems (CSourceFile _ its) = its
+    fileItems (CHeaderFile _ its) = its
+
+    itemIdents :: CFileItem -> [Ident]
+    itemIdents (CFunctionDef _ (CFunction _ ident params body) _) =
+        ident : paramIdents params ++ stmtIdents body
+    itemIdents (CExtDecl ed _) = extDeclIdents ed
+    itemIdents (CPPDirective d _) = ppIdents d
+
+    extDeclIdents :: CExternalDeclaration -> [Ident]
+    extDeclIdents (CEDVariable _ (CDecl _ mid _)) = maybeToList mid
+    extDeclIdents (CEDFunction _ ident params) = ident : paramIdents params
+    extDeclIdents (CEDEnum mid (CEnum _ constants _)) = maybeToList mid ++ map fst constants
+    extDeclIdents (CEDStructUnion mid _) = maybeToList mid
+    extDeclIdents (CEDTypeDef ident _) = [ident]
+
+    ppIdents :: CPreprocessorDirective -> [Ident]
+    ppIdents (CPPDefine ident _) = [ident]
+    ppIdents _ = []
+
+    paramIdents :: [CDeclaration] -> [Ident]
+    paramIdents = concatMap (\(CDecl _ mid _) -> maybeToList mid)
+
+    stmtIdents :: CStatement -> [Ident]
+    stmtIdents (CSCompound items _)         = concatMap blockItemIdents items
+    stmtIdents (CSIfThenElse _ s1 ms2 _)    = stmtIdents s1 ++ maybe [] stmtIdents ms2
+    stmtIdents (CSFor initPart _ _ body _)  = forInitIdents initPart ++ stmtIdents body
+    stmtIdents (CSCase _ s _)               = stmtIdents s
+    stmtIdents (CSDefault s _)              = stmtIdents s
+    stmtIdents (CSSwitch _ s _)             = stmtIdents s
+    stmtIdents _                            = []
+
+    blockItemIdents :: CCompoundBlockItem -> [Ident]
+    blockItemIdents (CBlockStmt s)              = stmtIdents s
+    blockItemIdents (CBlockDecl (CDecl _ mid _) _) = maybeToList mid
+
+    forInitIdents :: Either (Maybe CExpression) CDeclaration -> [Ident]
+    forInitIdents (Right (CDecl _ mid _)) = maybeToList mid
+    forInitIdents (Left _)                = []
+
+-- | Reject any generated identifier longer than the platform's
+-- significant-character limit. @Nothing@ (the toolchain treats all characters as
+-- significant, as GCC does) is a no-op, which is the case for every currently
+-- supported platform. A per-identifier cap at or below the limit is sufficient
+-- to rule out significant-character collisions, so no pairwise analysis is
+-- needed. See 'Configuration.Platform.maxIdentifierLength'.
+checkIdentifierLengths :: (MonadError CGeneratorError m) => Maybe Integer -> CFile -> m ()
+checkIdentifierLengths Nothing _ = return ()
+checkIdentifierLengths (Just limit) file =
+    case filter ((> limit) . toInteger . length) (generatedIdentifiers file) of
+        [] -> return ()
+        (ident : _) -> throwError . InternalError $
+            "generated identifier '" <> ident <> "' has " <> show (length ident) <>
+            " significant characters, exceeding the " <> show limit <>
+            "-character limit declared for the target platform"
 
 -- | Termina's pretty builtin types
 optionBox, boxStruct, sinkPort, inPort, outPort :: Identifier
