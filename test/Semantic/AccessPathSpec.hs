@@ -5,7 +5,7 @@
 -- Objects are built with @()@ annotations, which `objectPath` ignores.
 module Semantic.AccessPathSpec (spec) where
 
-import Semantic.Utils (objectPath, getMovedHash, AccessPath(..), AccessStep(..))
+import Semantic.Utils (objectPath, getMovedHash, mayAlias, AccessPath(..), AccessStep(..))
 import Semantic.AST (Object(..), Expression(..))
 
 import Test.Hspec
@@ -54,6 +54,42 @@ spec = do
     it "p->f is sugar for (*p).f: both give the same path (deref then field)" $
       objectPath (DereferenceMemberAccess (var "p") "f" ())
         `shouldBe` objectPath (MemberAccess (Dereference (var "p") ()) "f" ())
+
+  describe "mayAlias: overlap of two access paths" $ do
+    it "a path aliases itself" $
+      mayAlias (AccessPath "s" [FieldStep "a"]) (AccessPath "s" [FieldStep "a"])
+        `shouldBe` True
+    it "distinct roots never alias" $
+      mayAlias (AccessPath "x" []) (AccessPath "y" []) `shouldBe` False
+    it "distinct struct fields are disjoint" $
+      mayAlias (AccessPath "s" [FieldStep "a"]) (AccessPath "s" [FieldStep "b"])
+        `shouldBe` False
+    it "a field and the whole object overlap (prefix)" $
+      mayAlias (AccessPath "s" []) (AccessPath "s" [FieldStep "a"])
+        `shouldBe` True
+    it "two array elements may alias (index is opaque)" $
+      mayAlias (AccessPath "arr" [IndexStep]) (AccessPath "arr" [IndexStep])
+        `shouldBe` True
+    it "distinct nested fields are disjoint" $
+      mayAlias (AccessPath "s" [FieldStep "a", FieldStep "x"])
+               (AccessPath "s" [FieldStep "a", FieldStep "y"])
+        `shouldBe` False
+    it "an array field and a sibling field are disjoint" $
+      mayAlias (AccessPath "s" [FieldStep "arr", IndexStep])
+               (AccessPath "s" [FieldStep "other"])
+        `shouldBe` False
+    it "an array element and its whole array field overlap (prefix)" $
+      mayAlias (AccessPath "s" [FieldStep "arr", IndexStep])
+               (AccessPath "s" [FieldStep "arr"])
+        `shouldBe` True
+    it "distinct fields through a dereference are disjoint (p->a vs p->b)" $
+      mayAlias (AccessPath "p" [DerefStep, FieldStep "a"])
+               (AccessPath "p" [DerefStep, FieldStep "b"])
+        `shouldBe` False
+    it "the same field through a dereference aliases (p->a vs p->a)" $
+      mayAlias (AccessPath "p" [DerefStep, FieldStep "a"])
+               (AccessPath "p" [DerefStep, FieldStep "a"])
+        `shouldBe` True
 
   describe "getMovedHash: the move key is the root of any access" $ do
     it "collapses a nested field access to the root" $

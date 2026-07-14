@@ -444,6 +444,15 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    -- | Side-effect and mutable-reference aliasing checking
+    when chatty (putStrLn . debugMessage $ "Side-effect checking project modules")
+    case sideEffectCheckModules plt rawBBProject of
+      Nothing -> return ()
+      Just err ->
+        let sourceFilesMap =
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+              M.empty rawBBProject in
+        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     bbProject <- constFolding plt rawBBProject
     -- | Obtain the architectural description of the program

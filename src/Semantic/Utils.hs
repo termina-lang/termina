@@ -232,3 +232,21 @@ objectPath (SAST.Unbox obj _ann) =
 -- key is the object's root variable.
 getMovedHash :: SAST.Object a -> Identifier
 getMovedHash = accessRoot . objectPath
+
+-- | Whether two access paths may refer to overlapping storage. They must share
+-- a root; from there they are disjoint only if they diverge at a distinct
+-- struct field before any shared array index. Array indices are opaque, so two
+-- elements of the same array may alias; and a prefix relationship (one path
+-- reaches through the other) is an overlap.
+mayAlias :: AccessPath -> AccessPath -> Bool
+mayAlias (AccessPath root1 steps1) (AccessPath root2 steps2) =
+    root1 == root2 && overlap steps1 steps2
+  where
+    overlap xs ys = case (xs, ys) of
+      -- distinct struct fields are disjoint; equal fields keep comparing
+      (FieldStep a : as, FieldStep b : bs) -> a == b && overlap as bs
+      -- dereference and unbox are transparent single-valued indirections
+      (DerefStep : as, DerefStep : bs)     -> overlap as bs
+      (UnboxStep : as, UnboxStep : bs)     -> overlap as bs
+      -- a prefix, or a shared array index: may alias
+      _                                    -> True
