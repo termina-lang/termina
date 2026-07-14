@@ -72,29 +72,6 @@ packedClass = TypeDefinition
     ] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
   ] ["Interface0"] [Modifier "packed" Nothing]) (buildTypeAnn Internal)
 
-alignedClass :: AnnASTElement SemanticAnn
-alignedClass = TypeDefinition
-  (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field1" TUInt16 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
-      (buildFieldAnn Internal)),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))]) (buildTypeAnn Internal)
-
-packedAndAlignedClass :: AnnASTElement SemanticAnn
-packedAndAlignedClass = TypeDefinition
-  (Class ResourceClass "Class0" [
-    ClassField (FieldDefinition "field0" TUInt64 (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field1" (TStruct "TCDescriptor") (buildFieldAnn Internal)),
-    ClassField (FieldDefinition "field2" (TArray (TStruct "TMDescriptor") (buildConstExprTUSize 32))
-      (buildFieldAnn Internal)),
-    ClassProcedure Mutable "procedure0" [] (Block [ReturnStmt Nothing undefined] stmtSemAnn) undefined
-  ] ["Interface0"] [
-      Modifier "packed" Nothing,
-      Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))
-    ]) (buildTypeAnn Internal)
-
 classWithFixedLocationField :: AnnASTElement SemanticAnn
 classWithFixedLocationField = TypeDefinition
   (Class ResourceClass "Class0" [
@@ -185,30 +162,6 @@ spec = do
             "\n" ++
             "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
             "                        void * const __this, char param0, uint8_t param1[16U]);")
-    it "Prints an aligned class" $ do
-      renderTypeDefinitionDecl emptyMonadicTypes alignedClass `shouldBe`
-        pack (
-            "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
-            "    uint64_t field0;\n" ++
-            "    uint16_t field1;\n" ++
-            "    TMDescriptor field2[32U];\n" ++
-            "} __attribute__((aligned(16U))) Class0;\n" ++
-            "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
-    it "Prints a packed & aligned class" $ do
-      renderTypeDefinitionDecl emptyMonadicTypes packedAndAlignedClass `shouldBe`
-        pack (
-            "\ntypedef struct {\n" ++
-            "    __termina_resource_lock_type_t __lock_type;\n" ++
-            "    uint64_t field0;\n" ++
-            "    TCDescriptor field1;\n" ++
-            "    TMDescriptor field2[32U];\n" ++
-            "} __attribute__((packed, aligned(16U))) Class0;\n" ++
-            "\n" ++
-            "void Class0__procedure0(const __termina_event_t * const __ev,\n" ++
-            "                        void * const __this);")
     it "Prints a class with a fixed location field" $ do
       renderTypeDefinitionDecl emptyMonadicTypes classWithFixedLocationField `shouldBe`
         pack (

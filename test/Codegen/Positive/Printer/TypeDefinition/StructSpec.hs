@@ -55,36 +55,6 @@ packedStruct = TypeDefinition
       (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
   ] [Modifier "packed" Nothing]) (buildTypeAnn Internal)
 
-{- | Aligned Struct type.
-In Termina's concrete sytax:
-#[aligned(16)]
-struct id0 {
-    field0 : u8;
-    field1 : u16;
-    field2 : [u16; 10 : u32];
-};
--}
-alignedStruct :: AnnASTElement SemanticAnn
-alignedStruct = TypeDefinition
-  (Struct "id0" [
-    FieldDefinition "field0" TUInt8 (buildExpAnn Internal TUInt8),
-    FieldDefinition "field1" TUInt16 (buildExpAnn Internal TUInt16),
-    FieldDefinition "field2" (TArray TUInt32 (buildConstExprTUSize 10))
-      (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
-  ] [Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))]) (buildTypeAnn Internal)
-
-packedAndAlignedStruct :: AnnASTElement SemanticAnn
-packedAndAlignedStruct = TypeDefinition
-  (Struct "id0" [
-    FieldDefinition "field0" TUInt8 (buildExpAnn Internal TUInt8),
-    FieldDefinition "field1" TUInt16 (buildExpAnn Internal TUInt16),
-    FieldDefinition "field2" (TArray TUInt32 (buildConstExprTUSize 10))
-      (buildExpAnn Internal (TArray TUInt32 (buildConstExprTUSize 10)))
-  ] [
-      Modifier "packed" Nothing,
-      Modifier "aligned" (Just (Constant (I (TInteger 16 DecRepr) (Just TUInt32)) (buildExpAnn Internal TUInt32)))
-    ]) (buildTypeAnn Internal)
-
 spec :: Spec
 spec = do
   describe "Pretty printing Structs" $ do
@@ -136,19 +106,3 @@ spec = do
             "    uint16_t field1;\n" ++
             "    uint32_t field2[10U];\n" ++
             "} __attribute__((packed)) id0;")
-    it "Prints an aligned struct" $ do
-      renderTypeDefinitionDecl emptyMonadicTypes alignedStruct `shouldBe`
-        pack (
-            "\ntypedef struct {\n" ++
-            "    uint8_t field0;\n" ++
-            "    uint16_t field1;\n" ++
-            "    uint32_t field2[10U];\n" ++
-            "} __attribute__((aligned(16U))) id0;")
-    it "Prints a packet & aligned struct" $ do
-      renderTypeDefinitionDecl emptyMonadicTypes packedAndAlignedStruct `shouldBe`
-        pack (
-            "\ntypedef struct {\n" ++
-            "    uint8_t field0;\n" ++
-            "    uint16_t field1;\n" ++
-            "    uint32_t field2[10U];\n" ++
-            "} __attribute__((packed, aligned(16U))) id0;")

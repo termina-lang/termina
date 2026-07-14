@@ -23,7 +23,6 @@ import Core.Utils
 filterStructModifiers :: [Modifier SemanticAnn] -> [Modifier SemanticAnn]
 filterStructModifiers = filter (\case
       Modifier "packed" Nothing -> True
-      Modifier "aligned" _ -> True
       _ -> False)
 
 genFieldDeclaration :: FieldDefinition SemanticAnn -> CGenerator [CDeclaration]
