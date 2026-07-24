@@ -91,6 +91,7 @@ genTWCEPFiles params bbProject = do
         TIO.writeFile twcepFile $ runWCEPathPrinter wceps)
 
 genArchJSONFile ::
+  Located a =>
   TerminaConfig
   -> TerminaProgArch a
   -> IO ()

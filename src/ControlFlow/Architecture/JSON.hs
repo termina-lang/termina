@@ -1,24 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Serialization of the program architecture ('TerminaProgArch') to JSON.
 --
 -- This module emits the /wiring/ view of the architecture: instances (tasks,
 -- handlers, resources, pools, atomics, atomic arrays, channels and emitters),
 -- their classes and modifiers, and the port-level connections between them. It
--- deliberately omits member-function bodies and the semantic annotations
--- carried by the architecture (the @a@ type parameter is ignored). Types,
--- sizes and modifier expressions are rendered to text, so no AST is dumped.
+-- deliberately omits member-function bodies. From the semantic annotation of
+-- each instance it keeps only the source location (start and end line/column),
+-- so consumers can navigate from the diagram to the code; no AST is dumped, and
+-- types, sizes and modifier expressions are rendered to text.
 module ControlFlow.Architecture.JSON (genArchJSON, runArchJSONPrinter) where
 
 import ControlFlow.Architecture.Types
 import ControlFlow.BasicBlocks.AST
+import Utils.Annotations (Location (..), Located (..), Annotated (..))
 import Utils.Printer (showText)
 
 import Data.Aeson (Value, object, toJSON, (.=))
+import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
+import Text.Parsec.Pos (sourceColumn, sourceLine)
+
+-- | Render a source 'Location' as @{"start": {...}, "end": {...}}@, or 'Null'
+-- for elements without a source position (builtins, internals).
+locToJSON :: Location -> Value
+locToJSON (Position _ start end) =
+    object ["start" .= posToJSON start, "end" .= posToJSON end]
+  where
+    posToJSON p = object ["line" .= sourceLine p, "column" .= sourceColumn p]
+locToJSON _ = A.Null
+
+-- | Source location of any annotated architecture element.
+locOf :: (Annotated d, Located a) => d a -> Value
+locOf = locToJSON . getLocation . getAnnotation
 
 -- | Render a single modifier as text, e.g. @priority(5)@ or @unprotected@.
 renderModifier :: Modifier a -> T.Text
@@ -36,21 +54,22 @@ portConnMap = toJSON . M.map fst
 endpoint :: (Identifier, Identifier, a) -> Value
 endpoint (entity, port, _) = object ["entity" .= entity, "port" .= port]
 
-emitterToJSON :: TPEmitter a -> Value
-emitterToJSON (TPInterruptEmitter _ _) =
-    object ["kind" .= ("interrupt" :: T.Text)]
-emitterToJSON (TPPeriodicTimerEmitter _ period modul _) =
+emitterToJSON :: Located a => TPEmitter a -> Value
+emitterToJSON e@(TPInterruptEmitter _ _) =
+    object ["kind" .= ("interrupt" :: T.Text), "loc" .= locOf e]
+emitterToJSON e@(TPPeriodicTimerEmitter _ period modul _) =
     object
         [ "kind" .= ("periodic_timer" :: T.Text)
         , "period" .= showText period
         , "module" .= modul
+        , "loc" .= locOf e
         ]
-emitterToJSON (TPSystemInitEmitter _ _) =
-    object ["kind" .= ("system_init" :: T.Text)]
-emitterToJSON (TPSystemExceptEmitter _ _) =
-    object ["kind" .= ("system_except" :: T.Text)]
+emitterToJSON e@(TPSystemInitEmitter _ _) =
+    object ["kind" .= ("system_init" :: T.Text), "loc" .= locOf e]
+emitterToJSON e@(TPSystemExceptEmitter _ _) =
+    object ["kind" .= ("system_except" :: T.Text), "loc" .= locOf e]
 
-taskToJSON :: TPTask a -> Value
+taskToJSON :: Located a => TPTask a -> Value
 taskToJSON tsk =
     object
         [ "class" .= taskClass tsk
@@ -60,9 +79,10 @@ taskToJSON tsk =
         , "sinkPorts" .= portConnMap (taskSinkPortConns tsk)
         , "outputPorts" .= portConnMap (taskOutputPortConns tsk)
         , "accessPorts" .= portConnMap (taskAPConnections tsk)
+        , "loc" .= locOf tsk
         ]
 
-handlerToJSON :: TPHandler a -> Value
+handlerToJSON :: Located a => TPHandler a -> Value
 handlerToJSON hdl =
     object
         [ "class" .= handlerClass hdl
@@ -71,42 +91,55 @@ handlerToJSON hdl =
         , "sinkPort" .= sinkObj (handlerSinkPortConn hdl)
         , "outputPorts" .= portConnMap (handlerOutputPortConns hdl)
         , "accessPorts" .= portConnMap (handlerAPConnections hdl)
+        , "loc" .= locOf hdl
         ]
   where
     sinkObj (port, source, _) = object ["port" .= port, "source" .= source]
 
-resourceToJSON :: TPResource a -> Value
+resourceToJSON :: Located a => TPResource a -> Value
 resourceToJSON res =
     object
         [ "class" .= resourceClass res
         , "module" .= resourceModule res
         , "modifiers" .= renderModifiers (resModifiers res)
         , "accessPorts" .= portConnMap (resAPConnections res)
+        , "loc" .= locOf res
         ]
 
-poolToJSON :: TPPool a -> Value
-poolToJSON (TPPool _ ty size modul _) =
-    object ["type" .= showText ty, "size" .= showText size, "module" .= modul]
+poolToJSON :: Located a => TPPool a -> Value
+poolToJSON p@(TPPool _ ty size modul _) =
+    object
+        [ "type" .= showText ty
+        , "size" .= showText size
+        , "module" .= modul
+        , "loc" .= locOf p
+        ]
 
-atomicToJSON :: TPAtomic a -> Value
-atomicToJSON (TPAtomic _ ty modul _) =
-    object ["type" .= showText ty, "module" .= modul]
+atomicToJSON :: Located a => TPAtomic a -> Value
+atomicToJSON a@(TPAtomic _ ty modul _) =
+    object ["type" .= showText ty, "module" .= modul, "loc" .= locOf a]
 
-atomicArrayToJSON :: TPAtomicArray a -> Value
-atomicArrayToJSON (TPAtomicArray _ ty size modul _) =
-    object ["type" .= showText ty, "size" .= showText size, "module" .= modul]
+atomicArrayToJSON :: Located a => TPAtomicArray a -> Value
+atomicArrayToJSON a@(TPAtomicArray _ ty size modul _) =
+    object
+        [ "type" .= showText ty
+        , "size" .= showText size
+        , "module" .= modul
+        , "loc" .= locOf a
+        ]
 
-channelToJSON :: TPChannel a -> Value
-channelToJSON (TPMsgQueue _ ty size modul _) =
+channelToJSON :: Located a => TPChannel a -> Value
+channelToJSON ch@(TPMsgQueue _ ty size modul _) =
     object
         [ "kind" .= ("message_queue" :: T.Text)
         , "type" .= showText ty
         , "size" .= showText size
         , "module" .= modul
+        , "loc" .= locOf ch
         ]
 
 -- | Build the JSON 'Value' describing the wiring of the architecture.
-genArchJSON :: TerminaProgArch a -> Value
+genArchJSON :: Located a => TerminaProgArch a -> Value
 genArchJSON progArch =
     object
         [ "tasks" .= M.map taskToJSON (tasks progArch)
@@ -126,5 +159,5 @@ genArchJSON progArch =
         ]
 
 -- | Render the architecture as a pretty-printed JSON document.
-runArchJSONPrinter :: TerminaProgArch a -> BL.ByteString
+runArchJSONPrinter :: Located a => TerminaProgArch a -> BL.ByteString
 runArchJSONPrinter = encodePretty . genArchJSON
