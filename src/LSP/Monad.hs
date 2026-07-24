@@ -9,15 +9,18 @@ import Control.Monad.State
 import Control.Concurrent.MVar
 import Control.Monad.Reader
 import qualified Data.Map.Strict as M
-import LSP.Modules 
+import LSP.Modules
 
+import ControlFlow.Architecture.Types (TerminaProgArch)
+import Semantic.Types (SemanticAnn)
 import Utils.Annotations
 
-data ServerState = 
+data ServerState =
   ServerState {
     config :: Maybe TerminaConfig,
-    project_modules :: M.Map QualifiedName TerminaStoredModule
-  } 
+    project_modules :: M.Map QualifiedName TerminaStoredModule,
+    architecture :: Maybe (TerminaProgArch SemanticAnn)
+  }
 
 type HandlerM = LspT () (ReaderT (MVar ServerState) IO)
 

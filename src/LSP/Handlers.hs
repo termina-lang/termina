@@ -25,6 +25,9 @@ import Generator.Environment (getPlatformInitialGlobalEnv)
 import Data.Functor (void)
 import Semantic.Environment
 import Command.Types (typedAST)
+import Data.Proxy (Proxy (..))
+import ControlFlow.Architecture.JSON (genArchJSON)
+import LSP.Architecture (buildArchitectureFromStore)
 
 initializeHandler :: TMessage Method_Initialize -> HandlerM ()
 initializeHandler _req = do
@@ -41,7 +44,7 @@ initializeHandler _req = do
           Nothing ->
             errorM $ "Unsupported platform: \"" <> T.pack (show (platform cfg)) <> "\""
           Just plt -> do
-            put $ ServerState (Just cfg) mempty 
+            put $ ServerState (Just cfg) mempty Nothing 
             -- The platform is OK
             -- Then we have to check the folder's structure
             existSourceFolder <- liftIO $ doesDirectoryExist (sourceModulesFolder cfg)
@@ -75,8 +78,8 @@ initializeHandler _req = do
                     $ sortProjectDepsOrLoop projectDependencies 
               return ()
 
-typeProject :: HandlerM ()
-typeProject = do
+refreshProject :: HandlerM ()
+refreshProject = do
   parsedProject <- gets project_modules
   cfg <- gets config
   let projectDependencies = M.map importedModules parsedProject
@@ -96,7 +99,19 @@ typeProject = do
         Just cfg' -> void $ typeModules (sourceModulesFolder cfg') M.empty initialGlobalEnv orderedDependencies)
     $ sortProjectDepsOrLoop projectDependencies
   diags <- gets project_modules
-  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags)) 
+  mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags))
+  updateArchitecture
+
+-- | Recompute the program architecture from the type-checked project. 
+updateArchitecture :: HandlerM ()
+updateArchitecture = do
+  cfg <- gets config
+  stored <- gets project_modules
+  let march = do
+        cfg' <- cfg
+        plt <- checkPlatform (T.unpack (platform cfg'))
+        either (const Nothing) Just (buildArchitectureFromStore plt cfg' stored)
+  modify (\s -> s { architecture = march })
 
 documentChange :: Handlers HandlerM
 documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
@@ -108,7 +123,7 @@ documentChange  = notificationHandler SMethod_TextDocumentDidChange $ \msg -> do
     Just filePath -> do
       cfg <- gets config
       _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
-      typeProject
+      refreshProject
 
 requestSymbols :: Handlers HandlerM
 requestSymbols = requestHandler SMethod_TextDocumentDocumentSymbol $ \req responder -> do
@@ -134,6 +149,7 @@ initialized :: Handlers HandlerM
 initialized = notificationHandler SMethod_Initialized $ \_msg -> do
   diags <- gets project_modules
   mapM_ (uncurry emitDiagnostics) (M.toList (diagnostics <$> diags))
+  updateArchitecture
 
 didOpen :: Handlers HandlerM
 didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \msg -> do
@@ -149,17 +165,30 @@ didOpen = notificationHandler SMethod_TextDocumentDidOpen $ \msg -> do
         -- referenced (either directly or indirectly, by the main app module). 
         cfg <- gets config
         _ <- loadTerminaModule filePath (sourceModulesFolder <$> cfg)
-        typeProject
+        refreshProject
+
+-- | Custom request that returns the program architecture as JSON, or an error
+-- when no valid model is available (the project does not type check yet).
+architectureRequest :: Handlers HandlerM
+architectureRequest =
+  requestHandler (SMethod_CustomMethod (Proxy :: Proxy "termina/architecture")) $ \_req responder -> do
+    march <- gets architecture
+    case march of
+      Just arch -> responder (Right (genArchJSON arch))
+      Nothing ->
+        responder (Left (ResponseError (InR ErrorCodes_InternalError)
+                          "Architecture model not available" Nothing))
 
 handlers :: Handlers HandlerM
 handlers =
   mconcat
-    [ 
+    [
       notificationHandler SMethod_WorkspaceDidChangeConfiguration $ \_not ->
         return ()
       , initialized
       , documentChange
       , requestSymbols
+      , architectureRequest
     ]
 
 
