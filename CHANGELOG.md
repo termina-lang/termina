@@ -13,6 +13,20 @@ Patch versions on either side are interchangeable.
 
 ## [Unreleased]
 
+### Added
+
+- `tracing` generation profile (`profile: tracing` in `termina.yaml`). It marks
+  the entry and every exit of each generated function with an assembly label,
+  emitted through the GCC `__asm__ __volatile__` extension, so the addresses of
+  the entry and the exits of an action, a procedure, a method, a viewer or a
+  function can be read from the ELF and used to time the code on the target.
+  Labels are named after the generated C function
+  (`termina__CTMChannel__send_tm__entry`,
+  `termina__CTMChannel__send_tm__exit__0`), and exits are always numbered from
+  zero. A `continue` counts as an exit; a `reboot` does not. Being a GCC
+  extension, the labels are not MISRA compliant and never appear under the
+  `release` or `debug` profiles.
+
 ## [0.5.0] - 2026-06-19
 
 ### Added

@@ -570,6 +570,6 @@ runGenMainFile ::
     -> Either CGeneratorError CFile
 runGenMainFile config plt mainFilePath progArchitecture =
     case runState (runExceptT (genMainFile mainFilePath progArchitecture))
-        (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config plt False) of
+        (mkCGeneratorEnv mainFilePath S.empty emptyMonadicTypes config plt) of
     (Left err, _) -> Left err
     (Right cFile, _) -> Right cFile

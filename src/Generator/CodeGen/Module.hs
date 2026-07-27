@@ -105,7 +105,7 @@ runGenSourceFile ::
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
 runGenSourceFile config plt mName program =
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False) of
+    case runState (runExceptT (genSourceFile mName program)) (mkCGeneratorEnv mName S.empty emptyMonadicTypes config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file
 
@@ -135,6 +135,6 @@ runGenHeaderFile config plt mName imports program monadicTys =
             }) $ resultTypes monadicTys))
     in
     case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config plt False) of
+        (mkCGeneratorEnv mName S.empty monadicTys config plt) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

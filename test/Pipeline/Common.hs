@@ -1,5 +1,6 @@
 module Pipeline.Common
   ( runFullBuild
+  , runFullBuildWithProfile
   , runFullProjectBuild
   , runChecksReport
   , runFullProjectApp
@@ -36,7 +37,8 @@ import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Environment (makeInitialGlobalEnv, Environment, addDeclaredNames)
 import Semantic.Types (SemanticAnn)
 
-import Configuration.Configuration (defaultConfig, TerminaConfig (..))
+import Configuration.Configuration
+    (defaultConfig, TerminaConfig(..), ProjectProfile)
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
     (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
@@ -263,6 +265,14 @@ compileProjectErrorMessage =
 -- any pipeline failure into the returned 'Text' so a spec can assert on it.
 runFullBuild :: String -> Text
 runFullBuild input = buildAndRenderModule "test" [("test", input)]
+
+-- | 'runFullBuild' under a given generation profile.
+runFullBuildWithProfile :: ProjectProfile -> String -> Text
+runFullBuildWithProfile prof input =
+  case runFullProjectBuildWith (configParams { profile = prof }) [("test", input)] of
+    Left err -> failMessage err
+    Right rendered ->
+      M.findWithDefault (pack "Module not found in project: test") "test" rendered
 
 -- | Build a project and return the rendered C of @target@, collapsing a
 -- pipeline failure (or a missing target) into the returned 'Text'.

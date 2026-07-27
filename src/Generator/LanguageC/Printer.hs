@@ -586,6 +586,15 @@ instance CPrint CStatement where
                     prependLine before . indentStmt expand . addDebugLine debugLines (location ann) 
                     $ pretty "break" <> semi
             _ -> error $ "Invalid annotation: " ++ show s
+    pprint s@(CSAsmLabel label ann) =
+        case itemAnnotation ann of
+            CStatementAnn before expand -> do
+                debugLines <- asks debug
+                return $
+                    prependLine before . indentStmt expand . addDebugLine debugLines (location ann)
+                    $ pretty "__asm__ __volatile__"
+                        <> parens (dquotes (pretty label <> pretty ":\\n")) <> semi
+            _ -> error $ "Invalid annotation: " ++ show s
 
 instance CPrint CCompoundBlockItem where
     pprint (CBlockStmt stat) = pprint stat

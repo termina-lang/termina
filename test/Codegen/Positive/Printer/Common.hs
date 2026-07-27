@@ -191,7 +191,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression (elaborateExpression provers expr))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+  case runState (runExceptT (genExpression (elaborateExpression provers expr))) (mkCGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -201,7 +201,7 @@ renderStatement stmt =
     Left err -> pack $ show err
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (E.blockBody (elaborateBody provers (L.Block bBlocks stmtSemAnn))))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks (E.blockBody (elaborateBody provers (L.Block bBlocks stmtSemAnn))))) (mkCGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -211,7 +211,7 @@ renderTypeDefinitionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genTypeDefinitionDecl (elaborateElement bbDecl))) (mkCGeneratorEnv "test" S.empty monTypes config TestPlatform) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -221,7 +221,7 @@ renderFunctionDecl monTypes decl =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
+      case runState (runExceptT (genFunctionDecl (elaborateElement bbAST))) (mkCGeneratorEnv "test" S.empty monTypes config TestPlatform) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -231,7 +231,7 @@ renderFunction func =
     Left err -> pack $ show err
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform in
-      case runState (runExceptT (genFunction (elaborateElement bbAST))) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
+      case runState (runExceptT (genFunction (elaborateElement bbAST))) (mkCGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 -- | Elaborates a single lowered element with the provers of a build.

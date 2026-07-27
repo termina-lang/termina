@@ -100,6 +100,6 @@ runGenInitFile ::
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
 runGenInitFile config plt initFilePath prjprogs = 
     case runState (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False) of
+        (mkCGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

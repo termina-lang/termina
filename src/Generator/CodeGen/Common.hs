@@ -17,14 +17,32 @@ import Data.Maybe (maybeToList)
 newtype CGeneratorError = InternalError String
     deriving (Show)
 
-data CGeneratorEnv = CGeneratorEnv { 
+data CGeneratorEnv = CGeneratorEnv {
     currentModule :: QualifiedName,
     extraImports :: S.Set QualifiedName,
     monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
     targetPlatform :: Platform,
-    eventParamUsed :: Bool
+    eventParamUsed :: Bool,
+    -- | Function whose body is being generated while the tracing profile is
+    -- selected: the name of the generated C function, which is the prefix its
+    -- tracing labels share, and the index of its next exit label. It is
+    -- 'Nothing' under any other profile and outside a function body. See
+    -- "Generator.CodeGen.Tracing".
+    tracedFunction :: Maybe (Ident, Integer)
   }
+
+-- | Builds the initial generator environment. The tracing state always starts
+-- empty: it is set per function while its body is generated.
+mkCGeneratorEnv ::
+    QualifiedName
+    -> S.Set QualifiedName
+    -> MonadicTypes
+    -> TerminaConfig
+    -> Platform
+    -> CGeneratorEnv
+mkCGeneratorEnv mName imports monTys config plt =
+    CGeneratorEnv mName imports monTys config plt False Nothing
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
 

@@ -346,6 +346,8 @@ data CStatement' a =
    | CSReturn (Maybe (CExpression' a)) a -- ^ return statement
    | CSSwitch (CExpression' a) (CStatement' a) a -- ^ switch statement
    | CSBreak a -- ^ break statement
+   -- | Assembly label emitted through the GCC @__asm__ __volatile__@ extension.
+   | CSAsmLabel Ident a
     deriving Show
 
 instance Annotated CStatement' where 
@@ -359,6 +361,7 @@ instance Annotated CStatement' where
   getAnnotation (CSReturn _ a) = a
   getAnnotation (CSSwitch _ _ a) = a
   getAnnotation (CSBreak a) = a
+  getAnnotation (CSAsmLabel _ a) = a
 
   updateAnnotation CSSkip = const CSSkip
   updateAnnotation (CSCase e s _) = CSCase e s
@@ -370,6 +373,7 @@ instance Annotated CStatement' where
   updateAnnotation (CSReturn e _) = CSReturn e
   updateAnnotation (CSSwitch e s _) = CSSwitch e s
   updateAnnotation (CSBreak _) = CSBreak
+  updateAnnotation (CSAsmLabel l _) = CSAsmLabel l
 
 instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
