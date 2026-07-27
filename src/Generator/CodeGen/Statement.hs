@@ -8,6 +8,7 @@ import Control.Monad ( zipWithM )
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Expression
+import Generator.CodeGen.Tracing
 import Utils.Annotations
 import Generator.CodeGen.Types
 
@@ -842,16 +843,20 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             return $ pre_cr (var p (head cParamTypes) @:= (cObj @. this_variant @: cParamsStructType) @. namefy (show (0 :: Integer)) @: head cParamTypes) |>> loc' : rest
 
 
-genBlocks (ReturnBlock mExpr ann) =
+genBlocks (ReturnBlock mExpr ann) = do
+    cExitLabel <- genTracingExitLabel (getLocation ann)
     case mExpr of
         Nothing ->
-            return [pre_cr (_return Nothing) |>> getLocation ann]
+            return $ cExitLabel ++ [pre_cr (_return Nothing) |>> getLocation ann]
         Just expr -> do
             cExpr <- genExpression expr
-            return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
+            return $ cExitLabel ++ [pre_cr (_return (Just cExpr)) |>> getLocation ann]
+-- | A continue chains to another action of the same task, and lowers to a
+-- return, so it is an exit of the current action and gets its own label.
 genBlocks (ContinueBlock expr ann) = do
+    cExitLabel <- genTracingExitLabel (getLocation ann)
     cExpr <- genExpression expr
-    return [pre_cr (_return (Just cExpr)) |>> getLocation ann]
+    return $ cExitLabel ++ [pre_cr (_return (Just cExpr)) |>> getLocation ann]
 genBlocks (RebootBlock ann) = do
     return [pre_cr $ __termina_exec__reboot @@ [] |>> getLocation ann]
 genBlocks (SystemCall obj ident args ann) = do

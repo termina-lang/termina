@@ -45,6 +45,6 @@ runGenStatusHeaderFile ::
     -> Either CGeneratorError CFile
 runGenStatusHeaderFile config irqMap optionFileName opts =
     case runState (runExceptT genStatusHeaderFile)
-        (CGeneratorEnv optionFileName S.empty opts config irqMap) of
+        (mkCGeneratorEnv optionFileName S.empty opts config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

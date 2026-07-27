@@ -98,7 +98,7 @@ runGenSourceFile ::
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
 runGenSourceFile config irqMap mName program = 
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config irqMap) of
+    case runState (runExceptT (genSourceFile mName program)) (mkCGeneratorEnv mName S.empty emptyMonadicTypes config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file
 
@@ -128,6 +128,6 @@ runGenHeaderFile config irqMap mName imports program monadicTys =
             }) $ resultTypes monadicTys))
     in
     case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config irqMap) of
+        (mkCGeneratorEnv mName S.empty monadicTys config irqMap) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

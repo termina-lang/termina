@@ -18,7 +18,7 @@ module Generator.LanguageC.Embedded (
     block, var, field, struct, _const,
     function, static_function,
     global, static_global, extern,
-    _if, _if_else, _break, _switch, _case, 
+    _if, _if_else, _break, _switch, _case, _asm_label,
     _for, _for_let, _default, _return,
     _sizeOfType, _sizeOfExpr,
     _define, _include, _ifdef, _ifndef, _endif
@@ -303,6 +303,8 @@ instance Indentation CCompoundBlockItem where
         CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
     indent (CBlockStmt (CSBreak (LocatedElement (CStatementAnn pre _) loc))) =
         CBlockStmt $ CSBreak (LocatedElement (CStatementAnn pre True) loc)
+    indent (CBlockStmt (CSAsmLabel label (LocatedElement (CStatementAnn pre _) loc))) =
+        CBlockStmt $ CSAsmLabel label (LocatedElement (CStatementAnn pre True) loc)
     indent stmt = stmt
 
 instance Indentation CStatement where
@@ -322,6 +324,8 @@ instance Indentation CStatement where
         CSSwitch expr stmt (LocatedElement (CStatementAnn pre True) loc)
     indent (CSBreak (LocatedElement (CStatementAnn pre _) loc)) =
         CSBreak (LocatedElement (CStatementAnn pre True) loc)
+    indent (CSAsmLabel label (LocatedElement (CStatementAnn pre _) loc)) =
+        CSAsmLabel label (LocatedElement (CStatementAnn pre True) loc)
     indent stmt = stmt
 
 class Trailing a where
@@ -361,6 +365,8 @@ instance Alignment CStatement CCompoundBlockItem where
         CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn True ind) loc)
     pre_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
         CBlockStmt $ CSBreak (LocatedElement (CStatementAnn True ind) loc)
+    pre_cr (CSAsmLabel label (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSAsmLabel label (LocatedElement (CStatementAnn True ind) loc)
     pre_cr stmt = error $ "pre_cr: invalid annotation: " ++ show stmt
 
     no_cr CSSkip = CBlockStmt CSSkip
@@ -382,6 +388,8 @@ instance Alignment CStatement CCompoundBlockItem where
         CBlockStmt $ CSSwitch expr stmt (LocatedElement (CStatementAnn False ind) loc)
     no_cr (CSBreak (LocatedElement (CStatementAnn _ ind) loc)) =
         CBlockStmt $ CSBreak (LocatedElement (CStatementAnn False ind) loc)
+    no_cr (CSAsmLabel label (LocatedElement (CStatementAnn _ ind) loc)) =
+        CBlockStmt $ CSAsmLabel label (LocatedElement (CStatementAnn False ind) loc)
     no_cr stmt = error $ "no_cr: invalid annotation: " ++ show stmt
 
 instance Alignment CExpression CCompoundBlockItem where
@@ -420,6 +428,10 @@ block items =
 
 _break :: CStatement
 _break = CSBreak (internalAnn (CStatementAnn False False))
+
+-- | Assembly label statement, e.g. @__asm__ __volatile__("some_label:\n");@.
+_asm_label :: Ident -> CStatement
+_asm_label label = CSAsmLabel label (internalAnn (CStatementAnn False False))
 
 _switch :: CExpression -> CStatement -> CStatement
 _switch expr stmt =

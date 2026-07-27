@@ -1,5 +1,6 @@
 module Pipeline.Common
   ( runFullBuild
+  , runFullBuildWithProfile
   , runFullProjectBuild
   , buildAndRenderModule
   , compileErrorCode
@@ -20,7 +21,8 @@ import Semantic.TypeChecking (runTypeChecking, typeTerminaModule)
 import Semantic.Environment (makeInitialGlobalEnv, Environment)
 import Semantic.Types (SemanticAnn)
 
-import Configuration.Configuration (defaultConfig, TerminaConfig)
+import Configuration.Configuration
+    (defaultConfig, TerminaConfig(..), ProjectProfile)
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
     (getPlatformInterruptMap, getPlatformInitialGlobalEnv, getPlatformInitialProgram)
@@ -61,7 +63,13 @@ import Utils.Errors (ErrorMessage(errorIdent))
 -- errors and @exitFailure@. We call the pure runners directly so a failure is a
 -- comparable 'Text' (@Left@) the spec can assert on, never a process exit.
 runFullProjectBuild :: [(QualifiedName, String)] -> Either Text (M.Map QualifiedName Text)
-runFullProjectBuild sources = do
+runFullProjectBuild = runFullProjectBuildWith configParams
+
+-- | 'runFullProjectBuild' under a given configuration. Only the code-generation
+-- stage reads it, so the earlier stages keep using the default one.
+runFullProjectBuildWith ::
+  TerminaConfig -> [(QualifiedName, String)] -> Either Text (M.Map QualifiedName Text)
+runFullProjectBuildWith config sources = do
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
   typedProject <- typeProject parsedProject ordered
@@ -73,7 +81,7 @@ runFullProjectBuild sources = do
   foldedProject <- foldProject bbProject ordered
   progArch <- genProjectArchitecture foldedProject ordered
   runChecks progArch
-  mapM renderModule foldedProject
+  mapM (renderModule config) foldedProject
 
 -- | Constant-fold every module in dependency order, threading the constant
 -- environment so a module resolves the constants defined by the modules it
@@ -104,6 +112,14 @@ compileProjectErrorCode = either Just (const Nothing) . runFullProjectBuild
 -- any pipeline failure into the returned 'Text' so a spec can assert on it.
 runFullBuild :: String -> Text
 runFullBuild input = buildAndRenderModule "test" [("test", input)]
+
+-- | 'runFullBuild' under a given generation profile.
+runFullBuildWithProfile :: ProjectProfile -> String -> Text
+runFullBuildWithProfile prof input =
+  case runFullProjectBuildWith (configParams { profile = prof }) [("test", input)] of
+    Left err -> err
+    Right rendered ->
+      M.findWithDefault (pack "Module not found in project: test") "test" rendered
 
 -- | Build a project and return the rendered C of @target@, collapsing a
 -- pipeline failure (or a missing target) into the returned 'Text'.
@@ -178,9 +194,9 @@ runChecks progArch =
               , runCheckPoolUsage progArch
               , runCheckBoxSources progArch ]
 
-renderModule :: BasicBlocksModule -> Either Text Text
-renderModule bbModule =
-  case runGenSourceFile configParams irqMap (qualifiedName bbModule)
+renderModule :: TerminaConfig -> BasicBlocksModule -> Either Text Text
+renderModule config bbModule =
+  case runGenSourceFile config irqMap (qualifiedName bbModule)
          (basicBlocksAST . metadata $ bbModule) of
     Left err -> Left . T.pack $ show err
     Right cSourceFile -> Right $ runCPrinter False cSourceFile

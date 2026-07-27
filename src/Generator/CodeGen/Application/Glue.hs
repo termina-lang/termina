@@ -649,6 +649,6 @@ runGenMainFile ::
     -> Either CGeneratorError CFile
 runGenMainFile config irqMap mainFilePath progArchitecture =
     case runState (runExceptT (genMainFile mainFilePath progArchitecture))
-        (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config irqMap) of
+        (mkCGeneratorEnv mainFilePath S.empty emptyMonadicTypes config irqMap) of
     (Left err, _) -> Left err
     (Right cFile, _) -> Right cFile

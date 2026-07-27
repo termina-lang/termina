@@ -14,7 +14,12 @@ import Data.Yaml
 
 import Configuration.Platform
 
-data ProjectProfile = Debug | Release deriving (Eq, Show)
+-- | Generation profile. It selects what the transpiler adds to the generated C
+-- besides the code itself: nothing in 'Release', @#line@ directives pointing
+-- back at the Termina source in 'Debug', and inline-assembly labels at the
+-- entry and the exits of every generated function in 'Tracing'. It does not
+-- affect the compiler flags used to build the generated code.
+data ProjectProfile = Debug | Release | Tracing deriving (Eq, Show)
 
 defaultSysPrintOutputBufferSize, defaultSysReadInputBufferSize :: Integer
 defaultSysPrintOutputBufferSize = 256
@@ -23,11 +28,13 @@ defaultSysReadInputBufferSize = 256
 instance FromJSON ProjectProfile where
     parseJSON (String "debug") = return Debug
     parseJSON (String "release") = return Release
+    parseJSON (String "tracing") = return Tracing
     parseJSON _ = fail "Expected profile type"
-  
+
 instance ToJSON ProjectProfile where
     toJSON Debug = String "debug"
     toJSON Release = String "release"
+    toJSON Tracing = String "tracing"
 
 data ProjectBuilder = None | Make deriving (Eq, Show)
 
@@ -109,8 +116,8 @@ instance ToJSON TerminaConfig where
             "efp-folder" .= prjEFPFolder
         ]   -- We only serialize the profile if it is different from the default value
             <> case prjProfile of
-                Debug -> ["profile" .= prjProfile]
-                _ -> []
+                Release -> []
+                _ -> ["profile" .= prjProfile]
             -- We only serialize the enable-system-init flag if it is different from the default value
             <> if prjEnableSystemInit then ["enable-system-init" .= prjEnableSystemInit] else []
             <> if prjEnableSystemPort then ["enable-system-port" .= prjEnableSystemPort] else []

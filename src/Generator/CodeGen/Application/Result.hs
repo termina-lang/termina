@@ -45,6 +45,6 @@ runGenResultHeaderFile ::
     -> Either CGeneratorError CFile
 runGenResultHeaderFile config irqMap resultFileName monadicTys =
     case runState (runExceptT genResultHeaderFile)
-        (CGeneratorEnv resultFileName S.empty monadicTys config irqMap) of
+        (mkCGeneratorEnv resultFileName S.empty monadicTys config irqMap) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

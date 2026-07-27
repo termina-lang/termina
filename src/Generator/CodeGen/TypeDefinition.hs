@@ -8,6 +8,7 @@ import Semantic.Types
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
+import Generator.CodeGen.Tracing
 import qualified Data.Map.Strict as M
 import Utils.Annotations
 import Generator.LanguageC.Embedded
@@ -654,9 +655,11 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cParamDecls <- mapM genParameterDeclaration parameters
             cEventParam <- getEventParam
             cSelfParam <- genConstSelfParam clsdef
-            cBody <- foldM (\acc x -> do
-                cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] stmts
+            cBody <- withTracingLabels clsFuncName $ do
+                cEntryLabel <- genTracingEntryLabel (getLocation ann)
+                foldM (\acc x -> do
+                    cStmt <- genBlocks x
+                    return $ acc ++ cStmt) cEntryLabel stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
@@ -671,15 +674,20 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstSelfCastStmt ann identifier
                 _ -> genSelfCastStmt ann identifier
             resourceLockStmt <- genResourceLockStmt ann identifier
-            cBody <- foldM (\acc x -> do
-                case x of
-                    ReturnBlock _ ann' -> do
-                        cStmt <- genBlocks x
-                        resourceUnlockStmt <- genResourceUnlockStmt ann' identifier
-                        return $ acc ++ (resourceUnlockStmt : cStmt)
-                    _ -> do
-                        cStmt <- genBlocks x
-                        return $ acc ++ cStmt) [selfCastStmt, resourceLockStmt] stmts
+            -- | The entry label goes before the lock and the exit label after
+            -- the unlock, so that the interval they delimit includes the
+            -- locking of the resource.
+            cBody <- withTracingLabels clsFuncName $ do
+                cEntryLabel <- genTracingEntryLabel (getLocation ann)
+                foldM (\acc x -> do
+                    case x of
+                        ReturnBlock _ ann' -> do
+                            resourceUnlockStmt <- genResourceUnlockStmt ann' identifier
+                            cStmt <- genBlocks x
+                            return $ acc ++ (resourceUnlockStmt : cStmt)
+                        _ -> do
+                            cStmt <- genBlocks x
+                            return $ acc ++ cStmt) (cEntryLabel ++ [selfCastStmt, resourceLockStmt]) stmts
             return $ CFunctionDef Nothing (CFunction (CTVoid noqual) clsFuncName (cEventParam : cThisParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
@@ -692,9 +700,11 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
             cParamDecls <- mapM genParameterDeclaration parameters
-            cBody <- foldM (\acc x -> do
-                cStmt <- genBlocks x
-                return $ acc ++ cStmt) [] stmts
+            cBody <- withTracingLabels clsFuncName $ do
+                cEntryLabel <- genTracingEntryLabel (getLocation ann)
+                foldM (\acc x -> do
+                    cStmt <- genBlocks x
+                    return $ acc ++ cStmt) cEntryLabel stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
@@ -708,9 +718,11 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             selfCastStmt <- case ak of
                 Immutable -> genConstSelfCastStmt ann identifier
                 _ -> genSelfCastStmt ann identifier
-            cBody <- foldM (\acc x -> do
-                cStmt <- genBlocks x
-                return $ acc ++ cStmt) [selfCastStmt] stmts
+            cBody <- withTracingLabels clsFuncName $ do
+                cEntryLabel <- genTracingEntryLabel (getLocation ann)
+                foldM (\acc x -> do
+                    cStmt <- genBlocks x
+                    return $ acc ++ cStmt) (cEntryLabel ++ [selfCastStmt]) stmts
             case param of
                 Just p -> do
                     cParam <- genParameterDeclaration p

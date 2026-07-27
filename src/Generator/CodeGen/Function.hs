@@ -9,6 +9,7 @@ import Control.Monad
 import Control.Monad.Except
 import Generator.CodeGen.Common
 import Generator.CodeGen.Statement
+import Generator.CodeGen.Tracing
 import Generator.LanguageC.Embedded
 import Utils.Annotations
 import Generator.CodeGen.Expression
@@ -27,9 +28,11 @@ genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cParamDecls <- mapM (\(Parameter pid pty) -> do
         cPty <- genType noqual pty
         return $ pid @: cPty) parameters
-    cBody <- foldM (\acc x -> do
-        cStmt <- genBlocks x
-        return $ acc ++ cStmt) [] stmts
+    cBody <- withTracingLabels identifier $ do
+        cEntryLabel <- genTracingEntryLabel (getLocation ann)
+        foldM (\acc x -> do
+            cStmt <- genBlocks x
+            return $ acc ++ cStmt) cEntryLabel stmts
     return [ pre_cr $ function identifier cParamDecls @-> cRetType $
                     ((trail_cr . block $ cBody) |>> getLocation ann) |>> getLocation ann]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item
