@@ -246,6 +246,27 @@ genMemberFunctionAccess obj ident args ann = do
         _ -> throwError $ InternalError $ "unsupported member function access to object: " ++ show obj
         
 
+-- | Casts the C expression generated for a binary operation to the type of the
+-- operation, so that its value is truncated to that type: integer operands are
+-- promoted to int in C, and the result could otherwise keep bits that the
+-- Termina type does not have. Any other expression is returned unchanged.
+castBinOpToOwnType :: Location -> Expression SemanticAnn -> CExpression -> CGenerator CExpression
+castBinOpToOwnType loc (BinOp {}) cExpr = castToOwnType loc cExpr
+castBinOpToOwnType _ _ cExpr = return cExpr
+
+-- | Casts an integer C expression to its own type, without qualifiers.
+castToOwnType :: Location -> CExpression -> CGenerator CExpression
+castToOwnType loc cExpr =
+    case getCExprType cExpr of
+        CTBool _ -> return cExpr
+        CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) cExpr |>> loc
+        CTSizeT _ -> return $ cast (CTSizeT noqual) cExpr |>> loc
+        -- | Float operands need no cast: same-type float arithmetic
+        -- does not promote (float + float stays float), unlike integer
+        -- promotion to int. 
+        CTFloat _ _ -> return cExpr
+        cType -> throwError $ InternalError $ "Unsupported expression type: " ++ show cType
+
 genExpression :: Expression SemanticAnn -> CGenerator CExpression
 genExpression (AccessObject obj) = do
     cObj <- genObject obj
@@ -270,33 +291,19 @@ genExpression (BinOp op left right ann) =
             -- | We need to check if the left and right expressions are binary operations
             -- If they are, we need to cast them to ensure that the resulting value
             -- is truncated to the correct type
-            cLeft <- (do
-                leftExpr <- genExpression left
-                case left of
-                    (BinOp {}) -> do
-                        let leftExprType = getCExprType leftExpr
-                        case leftExprType of
-                            CTBool _ -> return leftExpr
-                            CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) leftExpr |>> getLocation ann
-                            CTSizeT _ -> return $ cast (CTSizeT noqual) leftExpr |>> getLocation ann
-                            -- | Float operands need no cast: same-type float arithmetic
-                            -- does not promote (float + float stays float), unlike integer
-                            -- promotion to int. See FLT_EVAL_METHOD note.
-                            CTFloat _ _ -> return leftExpr
-                            _ -> throwError $ InternalError $ "Unsupported left expression type: " ++ show leftExprType
-                    _ -> return leftExpr)
-            cRight <- (do
-                rightExpr <- genExpression right
-                case right of
-                    (BinOp {}) -> do
-                        let rightExprType = getCExprType rightExpr
-                        case rightExprType of
-                            CTBool _ -> return rightExpr
-                            CTInt intSize intSign _  -> return $ cast (CTInt intSize intSign noqual) rightExpr |>> getLocation ann
-                            CTSizeT _ -> return $ cast (CTSizeT noqual) rightExpr |>> getLocation ann
-                            CTFloat _ _ -> return rightExpr
-                            _ -> throwError $ InternalError $ "Unsupported right expression type: " ++ show rightExpr
-                    _ -> genExpression right)
+            cLeft <- genExpression left >>= castBinOpToOwnType (getLocation ann) left
+            cRight <- genExpression right >>= castBinOpToOwnType (getLocation ann) right
+            -- | The type of a shift is the one of its left operand. A constant
+            -- left operand is cast to its type, so that the type written in the
+            -- source is the one of the shift, regardless of the value.
+            let castShiftConstant =
+                    case left of
+                        Constant {} -> castToOwnType (getLocation ann) cLeft
+                        _ -> return cLeft
+            cLeft' <- case op of
+                BitwiseLeftShift  -> castShiftConstant
+                BitwiseRightShift -> castShiftConstant
+                _ -> return cLeft
             let boundShift = do
                     rightTy <- getExprType right
                     case rightTy of
@@ -311,7 +318,7 @@ genExpression (BinOp op left right ann) =
                 BitwiseLeftShift  -> boundShift
                 BitwiseRightShift -> boundShift
                 _ -> return cRight
-            return $ CExprBinaryOp (cBinOp op) cLeft cRight' (getCExprType cLeft) cAnn
+            return $ CExprBinaryOp (cBinOp op) cLeft' cRight' (getCExprType cLeft) cAnn
 
 genExpression e@(Constant c ann) = do
     cType <- getExprType e >>= genType noqual
@@ -327,7 +334,9 @@ genExpression e@(Constant c ann) = do
         Null -> throwError $ InternalError "Null constant should not be translated to C"
 genExpression (Casting expr ts ann) = do
     cType <- genType noqual ts
-    cExpr <- genExpression expr
+    -- | A binary operation is first cast to its own type, so that the value
+    -- converted to the target type is the one of the operation.
+    cExpr <- genExpression expr >>= castBinOpToOwnType (getLocation ann) expr
     return $ cast cType cExpr |>> getLocation ann
 genExpression (ReferenceExpression _ obj ann) = do
     typeObj <- getObjType obj

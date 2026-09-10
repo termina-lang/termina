@@ -19,6 +19,7 @@ test0 = "function bitwise_test0(foo : u16) {\n" ++
         "    bar16 = 1024 : u16 | foo;\n" ++
         "    bar16 = foo ^ 1024: u16;\n" ++
         "    bar16 = 1024 : u16 ^ foo;\n" ++
+        "    bar16 = 1 : u16 << foo;\n" ++
         "    return;\n" ++
         "}"
 
@@ -48,11 +49,11 @@ spec = do
               "\n" ++
               "    bar16 = foo << 8U;\n" ++
               "\n" ++
-              "    bar8 = 8U << __termina_shift__amount(8U, foo);\n" ++ 
+              "    bar8 = (uint8_t)8U << __termina_shift__amount(8U, foo);\n" ++ 
               "\n" ++
               "    bar16 = foo >> 8U;\n" ++ 
               "\n" ++
-              "    bar8 = 8U << __termina_shift__amount(8U, foo);\n" ++
+              "    bar8 = (uint8_t)8U << __termina_shift__amount(8U, foo);\n" ++
               "\n" ++
               "    bar16 = foo & 1024U;\n" ++
               "\n" ++
@@ -65,6 +66,8 @@ spec = do
               "    bar16 = foo ^ 1024U;\n" ++
               "\n" ++
               "    bar16 = 1024U ^ foo;\n" ++
+              "\n" ++
+              "    bar16 = (uint16_t)1U << __termina_shift__amount(16U, foo);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

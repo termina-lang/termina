@@ -18,6 +18,7 @@ test0 = "function casting_test0() {\n" ++
         "    bar_u32 = (bar_u8 as u32) + (bar_i8 as u32);\n" ++
         "    bar_i16 = bar_i16 * (bar_u8 as i16);\n" ++
         "    bar_i32 = bar_i8 as i32 * (bar_i16 as i32) * bar_u8 as i32 * (bar_u16 as i32);\n" ++
+        "    bar_u32 = (bar_u16 + bar_u16) as u32;\n" ++
         "    return;\n" ++
         "}"
 
@@ -62,6 +63,8 @@ spec = do
               "    bar_i16 = bar_i16 * (int16_t)bar_u8;\n" ++
               "\n" ++
               "    bar_i32 = (int32_t)((int32_t)((int32_t)bar_i8 * (int32_t)bar_i16) * (int32_t)bar_u8) * (int32_t)bar_u16;\n" ++
+              "\n" ++
+              "    bar_u32 = (uint32_t)(uint16_t)(bar_u16 + bar_u16);\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++
