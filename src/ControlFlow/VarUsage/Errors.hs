@@ -46,8 +46,9 @@ data Error
   | EAllocTwice Identifier Location -- ^ Option-box allocated twice (VE-012)
   | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (VE-013)
   | EOptionBoxMatchMissingSomeCase
-  | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-015)
-  | EMemberFunctionNotUsed Identifier -- ^ Method or viewer is never called (VE-016)
+  | EActionSelfNotUsed Identifier -- ^ Action does not use self (VE-015)
+  | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-016)
+  | EMemberFunctionNotUsed Identifier -- ^ Method or viewer is never called (VE-017)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -68,8 +69,9 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "VE-012"
     errorIdent (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "VE-013"
     errorIdent (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "VE-014"
-    errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-015"
-    errorIdent (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "VE-016"
+    errorIdent (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "VE-015"
+    errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-016"
+    errorIdent (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "VE-017"
     errorIdent (AnnotatedError e _pos) = T.pack $ show e
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
@@ -86,6 +88,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "option-box allocated twice"
     errorTitle (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "option-box moved but not allocated"
     errorTitle (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "option-box match missing some"
+    errorTitle (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "action does not use self"
     errorTitle (AnnotatedError (ESelfNotUsed _ident) _pos) = "self not used"
     errorTitle (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "member function not used"
     errorTitle _ = "internal error"
@@ -225,6 +228,11 @@ instance ErrorMessage VarUsageError where
                     sourceLines title fileName pos
                     (Just ("Member function \x1b[31m" <> T.pack ident <>
                         "\x1b[0m does not use \x1b[31mself\x1b[0m. It must be reimplemented as a function."))
+            EActionSelfNotUsed ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Action \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m does not use \x1b[31mself\x1b[0m, so it cannot have any effect other than its result."))
             EMemberFunctionNotUsed ident ->
                 pprintSimpleError
                     sourceLines title fileName pos

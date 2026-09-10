@@ -369,7 +369,7 @@ useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
 useDefCMemb (ClassField fdef)
   = defVariable (fieldIdentifier fdef) (getLocation (fieldAnnotation fdef))
 useDefCMemb (ClassMethod _ak ident ps _tyret bret ann)
-  = useDefSelfBody ident (getLocation ann) (useDefBlockRet bret)
+  = useDefSelfBody (ESelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
   >> mapM_ (useArraySize . paramType) ps
   >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
 useDefCMemb (ClassProcedure _ak _ident ps blk ann)
@@ -378,13 +378,13 @@ useDefCMemb (ClassProcedure _ak _ident ps blk ann)
   >> mapM_ (`defArgumentsProc` getLocation ann) ps
   -- >> mapM_ (annotateError (location ann) . defVariable . paramIdentifier) ps
 useDefCMemb (ClassViewer ident ps _tyret bret ann)
-  = useDefSelfBody ident (getLocation ann) (useDefBlockRet bret)
+  = useDefSelfBody (ESelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
   >> mapM_ (useArraySize . paramType) ps
   >> mapM_ ((`defVariable` getLocation ann) . paramIdentifier) ps
-useDefCMemb (ClassAction _ak _ident Nothing _tyret bret _ann)
-  = useDefBlockRet bret
-useDefCMemb (ClassAction _ak _ident (Just p) _tyret bret ann)
-  = useDefBlockRet bret
+useDefCMemb (ClassAction _ak ident Nothing _tyret bret ann)
+  = useDefSelfBody (EActionSelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
+useDefCMemb (ClassAction _ak ident (Just p) _tyret bret ann)
+  = useDefSelfBody (EActionSelfNotUsed ident) (getLocation ann) (useDefBlockRet bret)
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 
 -- | Checks that the methods and viewers are called by some member of the class.

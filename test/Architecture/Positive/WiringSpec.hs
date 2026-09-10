@@ -14,7 +14,7 @@ timerWired :: String
 timerWired =
   timerTaskClass ++ periodicEmitter "timer" 1
   ++ "#[priority(10)]\n"
-  ++ "task t : TimerTask = { timer_port <- timer };\n"
+  ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
 
 -- A channel with both a source (producer out port) and a target (consumer in
 -- port): the dual of AE-005/AE-006.

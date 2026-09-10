@@ -6,8 +6,8 @@ module VarUsage.Negative.DetailSpec
   ( spec
   , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
-  , testVE011, testVE012, testVE013, testVE014, testVE015, testVE015_1
-  , testVE016, testVE016_1
+  , testVE011, testVE012, testVE013, testVE014, testVE016, testVE016_1
+  , testVE015, testVE017, testVE017_1
   ) where
 
 import Test.Hspec
@@ -274,8 +274,8 @@ testVE014 =
   "    }\n" ++
   "};\n"
 
-testVE015 :: String
-testVE015 = "interface Interface0 {\n" ++
+testVE016 :: String
+testVE016 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -297,8 +297,8 @@ testVE015 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE015_1 :: String
-testVE015_1 = "task class TaskClass0 {\n" ++
+testVE016_1 :: String
+testVE016_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -316,8 +316,20 @@ testVE015_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE016 :: String
-testVE016 = "interface Interface0 {\n" ++
+testVE015 :: String
+testVE015 = "task class TaskClass0 {\n" ++
+       "\n" ++
+       "    snk0 : sink u32 triggers action0;\n" ++
+       "\n" ++
+       "    action action0(&priv self, _input : u32) -> Status<i32> {\n" ++
+       "        var ret : Status<i32> = Success;\n" ++
+       "        return ret;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
+testVE017 :: String
+testVE017 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -339,8 +351,8 @@ testVE016 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE016_1 :: String
-testVE016_1 = "task class TaskClass0 {\n" ++
+testVE017_1 :: String
+testVE017_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -425,20 +437,24 @@ spec = do
       runNegativeTestVarUsage testVE014
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
-    it "VE-015: method does not use self" $ do
-      runNegativeTestVarUsage testVE015
-        `shouldSatisfy`
-          isESelfNotUsed "method0"
-    it "VE-015: viewer does not use self" $ do
-      runNegativeTestVarUsage testVE015_1
-        `shouldSatisfy`
-          isESelfNotUsed "viewer0"
-    it "VE-016: method never called" $ do
+    it "VE-016: method does not use self" $ do
       runNegativeTestVarUsage testVE016
         `shouldSatisfy`
-          isEMemberFunctionNotUsed "method0"
-    it "VE-016: viewer never called" $ do
+          isESelfNotUsed "method0"
+    it "VE-016: viewer does not use self" $ do
       runNegativeTestVarUsage testVE016_1
+        `shouldSatisfy`
+          isESelfNotUsed "viewer0"
+    it "VE-015: action does not use self" $ do
+      runNegativeTestVarUsage testVE015
+        `shouldSatisfy`
+          isEActionSelfNotUsed "action0"
+    it "VE-017: method never called" $ do
+      runNegativeTestVarUsage testVE017
+        `shouldSatisfy`
+          isEMemberFunctionNotUsed "method0"
+    it "VE-017: viewer never called" $ do
+      runNegativeTestVarUsage testVE017_1
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
 
@@ -488,6 +504,9 @@ spec = do
 
     isESelfNotUsed :: Identifier -> Maybe Error -> Bool
     isESelfNotUsed inIdent = \case Just (ESelfNotUsed ident) -> (inIdent == ident); _ -> False
+
+    isEActionSelfNotUsed :: Identifier -> Maybe Error -> Bool
+    isEActionSelfNotUsed inIdent = \case Just (EActionSelfNotUsed ident) -> (inIdent == ident); _ -> False
 
     isEMemberFunctionNotUsed :: Identifier -> Maybe Error -> Bool
     isEMemberFunctionNotUsed inIdent = \case Just (EMemberFunctionNotUsed ident) -> (inIdent == ident); _ -> False

@@ -24,8 +24,10 @@ returnSuccess =
 timerTaskClass :: String
 timerTaskClass =
     "task class TimerTask {\n" ++
+    "    ticks : u32;\n" ++
     "    timer_port : sink TimeVal triggers timeout;\n" ++
     "    action timeout(&priv self, _t : TimeVal) -> Status<i32> {\n" ++
+    "        self->ticks = 1 : u32;\n" ++
     returnSuccess ++
     "    }\n" ++
     "};\n"
@@ -45,7 +47,7 @@ spec = do
              ++ periodicEmitter "timer" 1
              ++ periodicEmitter "spare" 2
              ++ "#[priority(10)]\n"
-             ++ "task t : TimerTask = { timer_port <- timer };\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-004")
 
     it "AE-007: resource instance used by nobody" $ do
@@ -63,7 +65,7 @@ spec = do
             timerTaskClass
             ++ periodicEmitter "timer" 1
             ++ "#[priority(10)]\n"
-            ++ "task t : TimerTask = { timer_port <- timer };\n"
+            ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
             ++ "resource foo : FooRes = { value = 0 };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-007")
 
@@ -71,7 +73,7 @@ spec = do
       let src = timerTaskClass
              ++ periodicEmitter "timer" 1
              ++ "#[priority(10)]\n"
-             ++ "task t : TimerTask = { timer_port <- timer };\n"
+             ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
              ++ "resource mypool : Pool<u32; 4>;\n"
       compileErrorCode src `shouldBe` Just (pack "AE-008")
 
@@ -97,38 +99,42 @@ spec = do
       -- The task consumes a channel through an in port, but nothing feeds it.
       let src =
             "task class ConsumerTask {\n" ++
+            "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
-            "    action handle(&priv self, _msg : u32) -> Status<i32> {\n" ++
+            "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
+            "        self->last = msg;\n" ++
             returnSuccess ++
             "    }\n" ++
             "};\n" ++
             "channel chan : MsgQueue<u32; 10>;\n"
             ++ "#[priority(10)]\n"
-            ++ "task t : ConsumerTask = { in_port <- chan };\n"
+            ++ "task t : ConsumerTask = { last = 0, in_port <- chan };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-005")
 
     it "AE-001: same emitter connected to two sinks" $ do
       let src = timerTaskClass
              ++ periodicEmitter "timer" 1
              ++ "#[priority(10)]\n"
-             ++ "task t1 : TimerTask = { timer_port <- timer };\n"
+             ++ "task t1 : TimerTask = { ticks = 0, timer_port <- timer };\n"
              ++ "#[priority(11)]\n"
-             ++ "task t2 : TimerTask = { timer_port <- timer };\n"
+             ++ "task t2 : TimerTask = { ticks = 0, timer_port <- timer };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-001")
 
     it "AE-002: same channel connected to two in ports" $ do
       let src =
             "task class ConsumerTask {\n" ++
+            "    last : u32;\n" ++
             "    in_port : in u32 triggers handle;\n" ++
-            "    action handle(&priv self, _msg : u32) -> Status<i32> {\n" ++
+            "    action handle(&priv self, msg : u32) -> Status<i32> {\n" ++
+            "        self->last = msg;\n" ++
             returnSuccess ++
             "    }\n" ++
             "};\n" ++
             "channel chan : MsgQueue<u32; 10>;\n"
             ++ "#[priority(10)]\n"
-            ++ "task t1 : ConsumerTask = { in_port <- chan };\n"
+            ++ "task t1 : ConsumerTask = { last = 0, in_port <- chan };\n"
             ++ "#[priority(11)]\n"
-            ++ "task t2 : ConsumerTask = { in_port <- chan };\n"
+            ++ "task t2 : ConsumerTask = { last = 0, in_port <- chan };\n"
       compileErrorCode src `shouldBe` Just (pack "AE-002")
 
     it "AE-003: mismatched box source" $ do

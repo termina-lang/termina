@@ -231,15 +231,15 @@ defArgumentsProc ps loc
         _ -> flip defVariable loc)
     (paramIdentifier ps)
 
--- | Methods and viewers must use self. Otherwise, they must be implemented as
--- functions. Since the set of used variables is shared among all the members
--- of the class, self is removed from it before computing the body.
-useDefSelfBody :: Identifier -> Location -> UDM VarUsageError () -> UDM VarUsageError ()
-useDefSelfBody ident loc body = do
+-- | Methods, viewers and actions must use self. Otherwise, the error given is
+-- raised. Since the set of used variables is shared among all the members of
+-- the class, self is removed from it before computing the body.
+useDefSelfBody :: Error -> Location -> UDM VarUsageError () -> UDM VarUsageError ()
+useDefSelfBody err loc body = do
   ST.modify (removeUsed "self")
   body
   used <- ST.gets (S.member "self" . usedVarSet)
-  unless used (throwError $ annotateError loc (ESelfNotUsed ident))
+  unless used (throwError $ annotateError loc err)
 
 -- | Key under which a call to a member function through self is recorded in
 -- the set of used variables. It is not a valid identifier, so it cannot clash

@@ -15,14 +15,14 @@ disconnectedSpareEmitter :: String
 disconnectedSpareEmitter =
   timerTaskClass ++ periodicEmitter "timer" 1 ++ periodicEmitter "spare" 2
   ++ "#[priority(10)]\n"
-  ++ "task t : TimerTask = { timer_port <- timer };\n"
+  ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
 
 -- AE-008: a pool nobody accesses.
 unusedPool :: String
 unusedPool =
   timerTaskClass ++ periodicEmitter "timer" 1
   ++ "#[priority(10)]\n"
-  ++ "task t : TimerTask = { timer_port <- timer };\n"
+  ++ "task t : TimerTask = { ticks = 0, timer_port <- timer };\n"
   ++ "resource mypool : Pool<u32; 4>;\n"
 
 spec :: Spec
