@@ -497,7 +497,7 @@ genBlocks (ProcedureInvoke obj ident args ann) = do
             cObj' <- genObject obj'
             return $ cObj' @. identifier @: CTTypeDef iface noqual
         _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
-    let cEventArg = eventParam @: ptr __termina_event_t
+    cEventArg <- genEventParamArg (internalAnn CGenericAnn)
     -- Generate the C code for the parameters
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
@@ -872,7 +872,7 @@ genBlocks (SystemCall obj ident args ann) = do
             return $ cObj' @. identifier @: CTTypeDef iface noqual
         _ -> throwError $ InternalError $ "Invalid object in procedure call: " ++ show obj
     -- Generate the C code for the parameters
-    let cEventArg = eventParam @: ptr __termina_event_t
+    cEventArg <- genEventParamArg (internalAnn CGenericAnn)
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
     return

@@ -286,8 +286,9 @@ genConstSelfCastStmt ann identifier = do
 genResourceLockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceLockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
+    cEventObj <- genEventParamObj
     let lock = var lockVar __termina_lock_t @:= __termina_resource__lock @@ [
-            addrOf (eventParam @: ptr __termina_event_t @. "owner" @: __termina_id_t),
+            addrOf (cEventObj @. "owner" @: __termina_id_t),
             addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: __termina_resource_lock_type_t)
             ]
     return $ pre_cr lock |>> getLocation ann
@@ -295,8 +296,9 @@ genResourceLockStmt ann identifier = do
 genResourceUnlockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceUnlockStmt ann identifier = do
     selfCType <- genType noqual (TStruct identifier)
+    cEventObj <- genEventParamObj
     let unlock = __termina_resource__unlock @@ [
-            addrOf (eventParam @: ptr __termina_event_t @. "owner" @: __termina_id_t),
+            addrOf (cEventObj @. "owner" @: __termina_id_t),
             addrOf ("self" @: ptr selfCType @. resourceLockTypeField @: __termina_resource_lock_type_t),
             lockVar @: __termina_lock_t
             ]
@@ -654,7 +656,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cParamDecls <- mapM genParameterDeclaration parameters
             cEventParam <- getEventParam
             cSelfParam <- genConstSelfParam clsdef
-            cBody <- foldM (\acc x -> do
+            cBody <- genMemberBody parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
@@ -667,19 +669,20 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstThisParam
                 _ -> genThisParam
             cParamDecls <- mapM genParameterDeclaration parameters
-            selfCastStmt <- case ak of
-                Immutable -> genConstSelfCastStmt ann identifier
-                _ -> genSelfCastStmt ann identifier
-            resourceLockStmt <- genResourceLockStmt ann identifier
-            cBody <- foldM (\acc x -> do
-                case x of
-                    ReturnBlock _ ann' -> do
-                        cStmt <- genBlocks x
-                        resourceUnlockStmt <- genResourceUnlockStmt ann' identifier
-                        return $ acc ++ (resourceUnlockStmt : cStmt)
-                    _ -> do
-                        cStmt <- genBlocks x
-                        return $ acc ++ cStmt) [selfCastStmt, resourceLockStmt] stmts
+            cBody <- genMemberBody parameters $ do
+                selfCastStmt <- case ak of
+                    Immutable -> genConstSelfCastStmt ann identifier
+                    _ -> genSelfCastStmt ann identifier
+                resourceLockStmt <- genResourceLockStmt ann identifier
+                foldM (\acc x -> do
+                    case x of
+                        ReturnBlock _ ann' -> do
+                            cStmt <- genBlocks x
+                            resourceUnlockStmt <- genResourceUnlockStmt ann' identifier
+                            return $ acc ++ (resourceUnlockStmt : cStmt)
+                        _ -> do
+                            cStmt <- genBlocks x
+                            return $ acc ++ cStmt) [selfCastStmt, resourceLockStmt] stmts
             return $ CFunctionDef Nothing (CFunction (CTVoid noqual) clsFuncName (cEventParam : cThisParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
@@ -692,7 +695,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
             cParamDecls <- mapM genParameterDeclaration parameters
-            cBody <- foldM (\acc x -> do
+            cBody <- genMemberBody parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
             return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
@@ -705,12 +708,13 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cThisParam <-  case ak of
                 Immutable -> genConstThisParam
                 _ -> genThisParam
-            selfCastStmt <- case ak of
-                Immutable -> genConstSelfCastStmt ann identifier
-                _ -> genSelfCastStmt ann identifier
-            cBody <- foldM (\acc x -> do
-                cStmt <- genBlocks x
-                return $ acc ++ cStmt) [selfCastStmt] stmts
+            cBody <- genMemberBody [p | Just p <- [param]] $ do
+                selfCastStmt <- case ak of
+                    Immutable -> genConstSelfCastStmt ann identifier
+                    _ -> genSelfCastStmt ann identifier
+                foldM (\acc x -> do
+                    cStmt <- genBlocks x
+                    return $ acc ++ cStmt) [selfCastStmt] stmts
             case param of
                 Just p -> do
                     cParam <- genParameterDeclaration p
@@ -722,4 +726,18 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
                         (CSCompound cBody (buildCompoundAnn ann False True)))
                         (buildDeclarationAnn ann True)
         genClassFunctionDefinition member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
+
+        -- | Generates the body of a class member, which receives the event
+        -- parameter. The body starts discarding the event parameter, when the
+        -- member does not use it, and every ignored parameter.
+        genMemberBody :: [Parameter SemanticAnn] -> CGenerator [CCompoundBlockItem] -> CGenerator [CCompoundBlockItem]
+        genMemberBody memberParams genItems = do
+            modify (\env -> env { eventParamUsed = False })
+            cItems <- genItems
+            used <- gets eventParamUsed
+            ignored <- mapM (\(Parameter pid pty) -> do
+                cPty <- genType noqual pty
+                return (pid, cPty)) [p | p@(Parameter pid _) <- memberParams, isIgnoredParameter pid]
+            let cEventParamType = _const . ptr $ _const __termina_event_t
+            return $ genDiscardedParameters ([(eventParam, cEventParamType) | not used] ++ ignored) ++ cItems
 genClassDefinition e = throwError $ InternalError $ "AST element is not a class: " ++ show e

@@ -223,17 +223,16 @@ genMemberFunctionAccess obj ident args ann = do
     cArgs <- mapM genExpression args
     -- | Obtain the type of the object
     typeObj <- getObjType obj
+    cEventArg <- genEventParamArg (internalAnn CGenericAnn)
     case typeObj of
         (TReference _ ts) ->
             case ts of
                 -- | If the left hand size is a class:
                 (TGlobal _ classId) ->
-                    let cEventArg = eventParam @: ptr __termina_event_t in
                     return $ ((classId <::> ident) @: cFuncType) @@ (cEventArg : cObjExpr : cArgs) |>> getLocation ann
                 -- | Anything else should not happen
                 _ -> throwError $ InternalError $ "unsupported member function access to object reference: " ++ show obj
         (TGlobal _ classId) ->
-            let cEventArg = eventParam @: ptr __termina_event_t in
             case obj of
                 (Dereference _ _) ->
                     let selfCType = ptr (typeDef classId) in

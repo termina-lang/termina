@@ -183,7 +183,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression expr)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config M.empty) of
+  case runState (runExceptT (genExpression expr)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config M.empty False) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -194,7 +194,7 @@ renderStatement stmt =
     Right bBlocks ->
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap) of
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap False) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -205,7 +205,7 @@ renderTypeDefinitionDecl monTypes decl =
     Right bbDecl ->
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv "test" S.empty monTypes config irqMap) of
+      case runState (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv "test" S.empty monTypes config irqMap False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -216,7 +216,7 @@ renderFunctionDecl monTypes decl =
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv "test" S.empty monTypes config irqMap) of
+      case runState (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv "test" S.empty monTypes config irqMap False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -227,6 +227,6 @@ renderFunction func =
     Right bbAST -> 
       let config = defaultConfig "test" TestPlatform
           irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genFunction bbAST)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap) of
+      case runState (runExceptT (genFunction bbAST)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)

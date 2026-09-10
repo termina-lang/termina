@@ -21,7 +21,8 @@ data CGeneratorEnv = CGeneratorEnv {
     extraImports :: S.Set QualifiedName,
     monadicTypes :: MonadicTypes,
     configParams :: TerminaConfig,
-    interruptsMap :: Map Identifier Integer
+    interruptsMap :: Map Identifier Integer,
+    eventParamUsed :: Bool
   }
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
@@ -234,11 +235,10 @@ genAddrOf obj qual cAnn =
         CTArray {} -> return $ CExprValOf obj cObjType cAnn
         ty -> return $ CExprAddrOf obj (CTPointer ty qual) cAnn
 
-genPoolMethodCallExpr :: (MonadError CGeneratorError m) => Identifier -> CObject -> CExpression -> CAnns ->  m CExpression
-genPoolMethodCallExpr mName cObj cArg cAnn =
-    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
-        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
-    in
+genPoolMethodCallExpr :: (MonadError CGeneratorError m, ST.MonadState CGeneratorEnv m) => Identifier -> CObject -> CExpression -> CAnns ->  m CExpression
+genPoolMethodCallExpr mName cObj cArg cAnn = do
+    cEventArg <- genEventParamArg cAnn
+    let cEventArgType = getCExprType cEventArg
     case mName of
         "alloc" -> do
             let cObjExpr = CExprValOf (CField cObj thatField (CTPointer (getCObjType cObj) noqual)) (CTPointer (getCObjType cObj) noqual) cAnn
@@ -252,20 +252,20 @@ genPoolMethodCallExpr mName cObj cArg cAnn =
             return $ CExprCall (CExprValOf cFunctionCall cFuncType cAnn) [cEventArg, cObjExpr, cArg] (CTVoid noqual) cAnn
         _ -> throwError $ InternalError $ "invalid pool method name: " ++ mName
 
-genMsgQueueSendNULLExpr :: (MonadError CGeneratorError m) => CObject -> CAnns -> m CExpression
+genMsgQueueSendNULLExpr :: (MonadError CGeneratorError m, ST.MonadState CGeneratorEnv m) => CObject -> CAnns -> m CExpression
 genMsgQueueSendNULLExpr cObj cAnn = do
-    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
-        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
+    cEventArg <- genEventParamArg cAnn
+    let cEventArgType = getCExprType cEventArg
         cFuncType = CTFunction (CTVoid noqual) [cEventArgType, getCObjType cObj, CTPointer (CTVoid noqual) noqual]
         cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
         cDataArg = CExprValOf (CVar "NULL" (CTPointer (CTVoid noqual) noqual)) (CTPointer (CTVoid noqual) noqual) cAnn
     return $
         CExprCall (CExprValOf (CVar msgQueueSendMethodName cFuncType) cFuncType cAnn) [cEventArg, cObjExpr, cDataArg] (CTVoid noqual) cAnn
 
-genMsgQueueSendCall :: (MonadError CGeneratorError m) => CObject -> CExpression -> CAnns -> m CExpression
+genMsgQueueSendCall :: (MonadError CGeneratorError m, ST.MonadState CGeneratorEnv m) => CObject -> CExpression -> CAnns -> m CExpression
 genMsgQueueSendCall cObj cArg cAnn = do
-    let cEventArgType = CTPointer (CTTypeDef "__termina_event_t" noqual) noqual
-        cEventArg = CExprValOf (CVar eventParam cEventArgType) cEventArgType cAnn 
+    cEventArg <- genEventParamArg cAnn
+    let cEventArgType = getCExprType cEventArg
         cArgType = getCExprType cArg
         cFuncType = CTFunction (CTVoid noqual) [cEventArgType, cArgType, CTPointer (CTVoid noqual) noqual]
         cObjExpr = CExprValOf cObj (getCObjType cObj) cAnn
@@ -325,3 +325,38 @@ enumFieldType = CTInt IntSize32 Unsigned noqual
 
 taskFunctionName :: (MonadError CGeneratorError m) => Identifier -> m Identifier
 taskFunctionName classId = return $ namefy classId <::> "termina" <:> "task"
+
+-- | Object that refers to the event parameter of the class member being
+-- generated. It records that the member uses the parameter, so that its
+-- definition does not discard it.
+genEventParamObj :: (ST.MonadState CGeneratorEnv m) => m CObject
+genEventParamObj = do
+    ST.modify (\env -> env { eventParamUsed = True })
+    return $ CVar eventParam (CTPointer (CTTypeDef "__termina_event_t" noqual) noqual)
+
+-- | Expression that passes the event parameter of the class member being
+-- generated as an argument.
+genEventParamArg :: (ST.MonadState CGeneratorEnv m) => CAnns -> m CExpression
+genEventParamArg cAnn = do
+    cEventObj <- genEventParamObj
+    return $ CExprValOf cEventObj (getCObjType cEventObj) cAnn
+
+-- | Parameters whose name starts with a single underscore are ignored: the
+-- body of the function cannot use them.
+isIgnoredParameter :: Identifier -> Bool
+isIgnoredParameter ('_' : c : _) = c /= '_'
+isIgnoredParameter _ = False
+
+-- | Statements that discard the given parameters with a cast to void, to be
+-- placed at the beginning of a function body.
+genDiscardedParameters :: [(Identifier, CType)] -> [CCompoundBlockItem]
+genDiscardedParameters params =
+    zipWith discard (True : repeat False) params
+
+    where
+
+        discard before (identifier, cType) =
+            let cAnn = internalAnn CGenericAnn in
+            CBlockStmt $ CSDo
+                (CExprCast (CExprValOf (CVar identifier cType) cType cAnn) (CTVoid noqual) cAnn)
+                (internalAnn (CStatementAnn before False))

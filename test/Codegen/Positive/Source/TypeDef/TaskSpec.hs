@@ -95,6 +95,8 @@ spec = do
               "                                    const CHousekeeping * const self,\n" ++
               "                                    uint32_t limit) {\n" ++
               "    \n" ++
+              "    (void)__ev;\n" ++
+              "\n" ++
               "    _Bool ret = 1;\n" ++
               "\n" ++
               "    if (self->interval > limit) {\n" ++

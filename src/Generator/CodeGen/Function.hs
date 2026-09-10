@@ -30,6 +30,9 @@ genFunction (Function identifier parameters rts (Block stmts _) _ ann) = do
     cBody <- foldM (\acc x -> do
         cStmt <- genBlocks x
         return $ acc ++ cStmt) [] stmts
+    ignored <- mapM (\(Parameter pid pty) -> do
+        cPty <- genType noqual pty
+        return (pid, cPty)) [p | p@(Parameter pid _) <- parameters, isIgnoredParameter pid]
     return [ pre_cr $ function identifier cParamDecls @-> cRetType $
-                    ((trail_cr . block $ cBody) |>> getLocation ann) |>> getLocation ann]
+                    ((trail_cr . block $ genDiscardedParameters ignored ++ cBody) |>> getLocation ann) |>> getLocation ann]
 genFunction item = throwError $ InternalError $ "Not a function: " ++ show item

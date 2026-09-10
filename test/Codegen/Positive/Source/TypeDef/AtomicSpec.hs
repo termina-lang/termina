@@ -72,6 +72,8 @@ spec = do
               "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
               "                                        void * const __this, TimeVal current) {\n" ++
               "    \n" ++
+              "    (void)__ev;\n" ++
+              "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
               "    __status_int32_t ret = { .__variant = Success };\n" ++
@@ -176,6 +178,8 @@ spec = do
               "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
               "                                        void * const __this, TimeVal current) {\n" ++
               "    \n" ++
+              "    (void)__ev;\n" ++
+              "\n" ++
               "    CHousekeeping * self = (CHousekeeping *)__this;\n" ++
               "\n" ++
               "    __status_int32_t ret = { .__variant = Success };\n" ++
