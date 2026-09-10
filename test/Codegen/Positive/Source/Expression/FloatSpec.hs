@@ -86,7 +86,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void test0();\n" ++
+              "void test0(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates floating-point arithmetic" $ do
@@ -94,7 +94,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test0() {\n" ++
+              "void test0(void) {\n" ++
               "    \n" ++
               "    float32_t foo = 0.0f;\n" ++
               "\n" ++
@@ -112,7 +112,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test1() {\n" ++
+              "void test1(void) {\n" ++
               "    \n" ++
               "    float32_t a = 1.0f;\n" ++
               "\n" ++
@@ -130,7 +130,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test_array() {\n" ++
+              "void test_array(void) {\n" ++
               "    \n" ++
               "    float32_t arr[3U] = { 1.0f, 2.0f, 3.0f };\n" ++
               "\n" ++
@@ -144,7 +144,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test_option() {\n" ++
+              "void test_option(void) {\n" ++
               "    \n" ++
               "    __option_float32_t o = { .__variant = None };\n" ++
               "\n" ++
@@ -159,7 +159,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test_cast() {\n" ++
+              "void test_cast(void) {\n" ++
               "    \n" ++
               "    int32_t i = 5L;\n" ++
               "\n" ++
@@ -183,7 +183,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "void test_relational() {\n" ++
+              "void test_relational(void) {\n" ++
               "    \n" ++
               "    float32_t f = 1.0f;\n" ++
               "\n" ++

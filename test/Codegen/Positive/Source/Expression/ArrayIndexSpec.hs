@@ -34,7 +34,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void array_test0();\n" ++
+              "void array_test0(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates array index expressions with the bounds helper" $ do
@@ -42,7 +42,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void array_test0() {\n" ++
+              "void array_test0(void) {\n" ++
               "    \n" ++
               "    size_t foo = 0U;\n" ++
               "\n" ++

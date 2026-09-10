@@ -199,7 +199,7 @@ spec = do
               "    };\n" ++
               "} Message;\n" ++
               "\n" ++
-              "uint32_t match_test1();\n" ++
+              "uint32_t match_test1(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates an enum match with four variants" $ do
@@ -207,7 +207,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "uint32_t match_test1() {\n" ++
+              "uint32_t match_test1(void) {\n" ++
               "    \n" ++
               "    uint32_t ret = 0U;\n" ++
               "\n" ++

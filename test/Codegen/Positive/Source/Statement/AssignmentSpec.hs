@@ -51,7 +51,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void assignment_test0();\n" ++
+              "void assignment_test0(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates a scalar assignment" $ do
@@ -59,7 +59,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void assignment_test0() {\n" ++
+              "void assignment_test0(void) {\n" ++
               "    \n" ++
               "    uint32_t foo0 = 0U;\n" ++
               "\n" ++

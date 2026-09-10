@@ -31,7 +31,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void casting_test0();\n" ++
+              "void casting_test0(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates cast expressions" $ do
@@ -39,7 +39,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void casting_test0() {\n" ++
+              "void casting_test0(void) {\n" ++
               "    \n" ++
               "    uint8_t bar_u8 = 0U;\n" ++
               "\n" ++

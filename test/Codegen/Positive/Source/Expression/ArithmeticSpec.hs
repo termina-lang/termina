@@ -52,7 +52,7 @@ spec = do
               "\n" ++
               "#include <termina.h>\n" ++
               "\n" ++
-              "void test0();\n" ++
+              "void test0(void);\n" ++
               "\n" ++
               "#endif\n")
     it "Generates scalar arithmetic operations" $ do
@@ -60,7 +60,7 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++ 
-              "void test0() {\n" ++
+              "void test0(void) {\n" ++
               "    \n" ++
               "    uint16_t foo = 0U;\n" ++ 
               "\n" ++

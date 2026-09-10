@@ -123,10 +123,10 @@ spec = do
   describe "Pretty printing function declarations" $ do
     it "Declares a void function with no parameters" $ do
       renderFunctionDecl emptyMonadicTypes function0 `shouldBe`
-        pack "\nvoid function0();"
+        pack "\nvoid function0(void);"
     it "Declares a function returning u32 with no parameters" $ do
       renderFunctionDecl emptyMonadicTypes function1 `shouldBe`
-        pack "\nuint32_t function1();"
+        pack "\nuint32_t function1(void);"
     it "Declares a function with one scalar parameter" $ do
       renderFunctionDecl emptyMonadicTypes function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0);"
@@ -136,10 +136,10 @@ spec = do
   describe "Pretty printing function definitions" $ do
     it "Defines a void function with a struct body" $ do
       renderFunction function0 `shouldBe`
-        pack "\nvoid function0() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return;\n\n}"
+        pack "\nvoid function0(void) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return;\n\n}"
     it "Defines a function returning a struct field" $ do
       renderFunction function1 `shouldBe`
-        pack "\nuint32_t function1() {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
+        pack "\nuint32_t function1(void) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = 0U, .field_b = { 0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U, 0U, 0U,\n                                                                     0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"
     it "Defines a function using a parameter in a struct field" $ do
       renderFunction function2 `shouldBe`
         pack "\nuint32_t function2(uint32_t param0) {\n    \n    TMDescriptor struct0 = { .field0 = 0U,\n                             .field1 = { .field_a = param0, .field_b = { 0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U, 0U,\n                                                                         0U,\n                                                                         0U },\n                                         .field_c = 4294901760U } };\n\n    TMDescriptor struct1 = struct0;\n\n    struct0.field0 = struct0.field0 + 1024U;\n\n    return struct0.field0;\n\n}"

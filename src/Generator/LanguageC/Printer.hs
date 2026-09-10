@@ -68,6 +68,12 @@ instance CPrint CQualifier where
 parenPrec :: Integer -> Integer -> DocStyle -> DocStyle
 parenPrec prec prec2 t = if prec <= prec2 then t else parens t
 
+-- | Parameter list of a function declarator. An empty list is printed as
+-- @(void)@, so that the declarator is always a prototype.
+pprintParamList :: [DocStyle] -> DocStyle
+pprintParamList [] = parens (pretty "void")
+pprintParamList pparams = parens (align (fillSep (punctuate comma pparams)))
+
 pprintCTInt :: CIntSize -> CSignedness -> CPrinter
 pprintCTInt size signedness = do
     let ssize = case size of
@@ -128,12 +134,12 @@ instance CPrint CType where
     pprint (CTPointer (CTFunction rTy params) (CQualifier False False False)) = do
         prTy <- pprint rTy
         pparams <- mapM pprint params
-        return $ prTy <+> parens (pretty "*") <> parens (align (fillSep (punctuate comma pparams)))
+        return $ prTy <+> parens (pretty "*") <> pprintParamList pparams
     pprint (CTPointer (CTFunction rTy params) qual) = do
         prTy <- pprint rTy
         pqual <- pprint qual
         pparams <- mapM pprint params
-        return $ prTy <+> parens (pretty "*" <+> pqual) <> parens (align (fillSep (punctuate comma pparams)))
+        return $ prTy <+> parens (pretty "*" <+> pqual) <> pprintParamList pparams
     pprint (CTPointer ty (CQualifier False False False)) = do
         ptype <- pprint ty
         return $ ptype <+> pretty "*"
@@ -346,12 +352,12 @@ pprintCTypeDecl ident ty =
         CTPointer (CTFunction rTy params) (CQualifier False False False) -> do
             prTy <- pprint rTy
             pparams <- mapM pprint params
-            return $ prTy <+> parens (pretty "*" <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
+            return $ prTy <+> parens (pretty "*" <+> pretty ident) <> pprintParamList pparams
         CTPointer (CTFunction rTy params) qual -> do
             prTy <- pprint rTy
             pqual <- pprint qual
             pparams <- mapM pprint params
-            return $ prTy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> parens (align (fillSep (punctuate comma pparams)))
+            return $ prTy <+> parens (pretty "*" <+> pqual <+> pretty ident) <> pprintParamList pparams
         _ -> do
             pty <- pprint ty
             return $ pty <+> pretty ident
@@ -601,7 +607,7 @@ instance CPrint CFunction where
         pty <- pprint ty
         pparams <- mapM pprint params
         pbody <- pprint body
-        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <+> pbody
+        return $ pty <+> pretty ident <> pprintParamList pparams <+> pbody
 
 instance CPrint CExternalDeclaration where
     pprint (CEDVariable Nothing decl) = do
@@ -613,7 +619,7 @@ instance CPrint CExternalDeclaration where
     pprint (CEDFunction ty ident params) = do
         pty <- pprint ty
         pparams <- mapM pprint params
-        return $ pty <+> pretty ident <> parens (align (fillSep (punctuate comma pparams))) <> semi
+        return $ pty <+> pretty ident <> pprintParamList pparams <> semi
     pprint (CEDEnum Nothing enum) = do
         penum <- pprint enum
         return $ penum <> semi
