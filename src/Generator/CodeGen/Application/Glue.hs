@@ -480,24 +480,34 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                         addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- __status_int32_t status;
-                    pre_cr $ var "status" __status_int32_t,
-                    -- status.__variant = Success;
-                    no_cr $ ("status" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
-                    -- status = classFunctionName(self, current);
-                    pre_cr $ "status" @: __status_int32_t @=
+                    -- __status_int32_t result;
+                    pre_cr $ var "result" __status_int32_t,
+                    -- result.__variant = Success;
+                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    -- result = classFunctionName(&event, self, current);
+                    pre_cr $ "result" @: __status_int32_t @=
                         timer_handler classId targetAction @@
                             [
                                 addrOf ("event" @: __termina_event_t),
                                 "self" @: ptr classIdType,
                                 "current" @: _TimeVal
                             ],
-                    -- if (status.__variant != Success)
+                    -- if (result.__variant != Success)
                     pre_cr $ _if (
-                            (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
-                        $ block [
-                            -- __termina_exec__reboot();
-                            no_cr $ __termina_exec__reboot @@ []
+                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                        $ trail_cr $ block [
+                            -- ExceptSource source;
+                            pre_cr $ var "source" (typeDef "ExceptSource"),
+                            -- source.__variant = ExceptSource__Handler;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
+                            -- source.Handler.__0 = handler_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Handler" @: enumFieldType @. namefy "0" @: __termina_id_t @= handlerId @: __termina_id_t,
+                            -- __termina_except__action_failure(source, 0, result.Failure.__0);
+                            pre_cr $ __termina_except__action_failure @@ [
+                                "source" @: typeDef "ExceptSource",
+                                dec 0 @: size_t,
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                            ]
                         ],
                     pre_cr $ _return Nothing
                 ]
@@ -522,23 +532,33 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                         addrOf ("current" @: _TimeVal)],
                     -- classId * self = &identifier;
                     pre_cr $ var "self" (ptr classIdType) @:= addrOf (identifier @: classIdType),
-                    -- __status_int32_t status;
-                    pre_cr $ var "status" __status_int32_t,
-                    -- status.__variant = Success;
-                    no_cr $ ("status" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
-                    -- status = classFunctionName(self, current);
-                    pre_cr $ "status" @: __status_int32_t @=
+                    -- __status_int32_t result;
+                    pre_cr $ var "result" __status_int32_t,
+                    -- result.__variant = Success;
+                    no_cr $ ("result" @: __status_int32_t) @. variant @: enumFieldType @= "Success" @: enumFieldType,
+                    -- result = classFunctionName(self, current);
+                    pre_cr $ "result" @: __status_int32_t @=
                         timer_handler classId targetAction @@
                             [
                                 "self" @: ptr classIdType,
                                 deref ("current" @: (_const . ptr $ _TimeVal))
                             ],
-                    -- if (status.__variant != Success)
+                    -- if (result.__variant != Success)
                     pre_cr $ _if (
-                            (("status" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
-                        $ block [
-                            -- __termina_exec__reboot();
-                            no_cr $ __termina_exec__reboot @@ []
+                            (("result" @: __status_int32_t) @. variant) @: enumFieldType @!= "Success" @: enumFieldType)
+                        $ trail_cr $ block [
+                            -- ExceptSource source;
+                            pre_cr $ var "source" (typeDef "ExceptSource"),
+                            -- source.__variant = ExceptSource__Task;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
+                            -- source.Task.__0 = task_id;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= taskId @: __termina_id_t,
+                            -- __termina_except__action_failure(source, port_id, result.Failure.__0);
+                            pre_cr $ __termina_except__action_failure @@ [
+                                "source" @: typeDef "ExceptSource",
+                                portId @: size_t,
+                                ("result" @: __status_int32_t) @. statusFailureVariant @: enumFieldType @. namefy "0" @: int32_t
+                            ]
                         ],
                     pre_cr $ _return Nothing
                 ]
@@ -570,7 +590,7 @@ genAppInit progArchitecture = do
                         ]
             ] ++ ([pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                         $ trail_cr . block $ [
-                            pre_cr $ __termina_app__initial_event @@ ["status" @: (_const . ptr $ int32_t)]
+                            pre_cr $ __termina_app__initial_event @@ []
                         ] | any (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture)]) ++
             [
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))

@@ -313,11 +313,7 @@ __termina_app__init_msg_queues = "__termina_app__init_msg_queues" @:
 
 __termina_app__initial_event :: CExpression
 __termina_app__initial_event = "__termina_app__initial_event" @:
-    CTFunction void
-        [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
-        ]
+    CTFunction void []
 
 __termina_app__init_emitters :: CExpression
 __termina_app__init_emitters = "__termina_app__init_emitters" @:
