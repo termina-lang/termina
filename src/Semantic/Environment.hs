@@ -48,6 +48,7 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("PeriodicTimer", LocatedElement (GType (Class EmitterClass "PeriodicTimer" [ClassField (FieldDefinition "period" (TStruct "TimeVal") (buildExpAnn Internal (TStruct "TimeVal")))] [] [])) Internal),
     ("SysPrintBase", LocatedElement (GType (Enum "SysPrintBase" [EnumVariant "Decimal" [], EnumVariant "Hexadecimal" []] [])) Internal),
     ("ExceptSource", LocatedElement (GType (Enum "ExceptSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
+    ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [EnumVariant "Ceiling" [TUInt8]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
       -- | Action failure
       EnumVariant "EActionFailure" [

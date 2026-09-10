@@ -250,10 +250,16 @@ genInitMutexes mutexes = do
             return $
                 pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
                     $ trail_cr . block $ [
+                        -- MutexProtocol protocol;
+                        pre_cr $ var "protocol" _MutexProtocol,
+                        -- protocol.__variant = MutexProtocol__Ceiling;
+                        no_cr $ "protocol" @: _MutexProtocol @. variant @: enumFieldType @= "MutexProtocol__Ceiling" @: enumFieldType,
+                        -- protocol.Ceiling.__0 = ceiling_priority;
+                        no_cr $ "protocol" @: _MutexProtocol @. "Ceiling" @: enumFieldType @. namefy "0" @: __termina_task_prio_t @= getCInteger ceilingPriority @: __termina_task_prio_t,
+                        -- __termina_mutex__init(mutex_id, protocol, status);
                         pre_cr $ __termina_mutex__init @@ [
                             mutexId @: __termina_id_t,
-                            "__termina_mutex_policy__ceiling" @: enumFieldType,
-                            getCInteger ceilingPriority @: __termina_task_prio_t,
+                            "protocol" @: _MutexProtocol,
                             "status" @: (_const . ptr $ int32_t)
                         ]
                 ]

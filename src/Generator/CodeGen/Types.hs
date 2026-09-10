@@ -160,8 +160,8 @@ __termina_interrupt__init = "__termina_interrupt__init" @:
             _const . ptr $ int32_t
         ]
 
-__termina_mutex_policy_t, __termina_task_prio_t :: CType
-__termina_mutex_policy_t = typeDef "__termina_mutex_policy_t"
+_MutexProtocol, __termina_task_prio_t :: CType
+_MutexProtocol = typeDef "MutexProtocol"
 __termina_task_prio_t = typeDef "__termina_task_prio_t"
 
 __termina_task_entry_t :: CType
@@ -191,10 +191,8 @@ __termina_mutex__init = "__termina_mutex__init" @:
         [
             -- | const __termina_id_t mutex_id
             _const __termina_id_t,
-            -- | const __termina_mutex_policy_t policy,
-            _const __termina_mutex_policy_t,
-            -- | const __termina_task_prio_t prio_ceiling,
-            _const __termina_task_prio_t,
+            -- | const MutexProtocol protocol,
+            _const _MutexProtocol,
             -- | int32_t * const status
             _const . ptr $ int32_t
         ]
