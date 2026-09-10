@@ -230,6 +230,7 @@ data CConstant =
   CIntConst   CInteger
   | CFloatConst CFloat
   | CCharConst  CChar
+  | CBoolConst  Bool
     deriving Show
 
 data CObject' a = 
@@ -367,6 +368,7 @@ instance Pretty CConstant where
   pretty (CIntConst i) = pretty i
   pretty (CFloatConst f) = pretty f
   pretty (CCharConst c) = pretty c
+  pretty (CBoolConst b) = pretty (if b then "true" else "false" :: String)
 
 instance Pretty CBinaryOp where
   pretty op = pretty $ case op of

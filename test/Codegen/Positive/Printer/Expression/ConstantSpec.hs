@@ -85,7 +85,7 @@ spec = do
         pack "'\\0'"
     it "Prints the constant true of type bool" $ do
       renderExpression trueBool `shouldBe`
-        pack "1"
+        pack "true"
     it "Prints the constant false of type bool" $ do
       renderExpression falseBool `shouldBe`
-        pack "0"  
+        pack "false"  

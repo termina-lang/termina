@@ -73,13 +73,13 @@ spec = do
               "\n" ++ 
               "_Bool for_loop_test1(const uint16_t array0[10U]) {\n" ++
               "    \n" ++
-              "    _Bool found = 0;\n" ++
+              "    _Bool found = false;\n" ++
               "\n" ++
-              "    for (size_t i = 0U; i < 10U && found == 0; i = i + 1U) {\n" ++
+              "    for (size_t i = 0U; i < 10U && found == false; i = i + 1U) {\n" ++
               "        \n" ++
               "        if (array0[__termina_array__index(10U, i)] == 1024U) {\n" ++
               "            \n" ++
-              "            found = 1;\n" ++
+              "            found = true;\n" ++
               "\n" ++
               "        }\n" ++  
               "\n" ++

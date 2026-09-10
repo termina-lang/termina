@@ -109,6 +109,11 @@ instance TypeElement Char CExpression where
         let cAnn = internalAnn CGenericAnn in
         CExprConstant (CCharConst (CChar chr)) cType cAnn
 
+instance TypeElement Bool CExpression where
+    (@:) b cType =
+        let cAnn = internalAnn CGenericAnn in
+        CExprConstant (CBoolConst b) cType cAnn
+
 addrOf :: CObject -> CExpression
 addrOf obj =
     let cAnn = internalAnn CGenericAnn

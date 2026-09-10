@@ -97,11 +97,11 @@ spec = do
               "    \n" ++
               "    (void)__ev;\n" ++
               "\n" ++
-              "    _Bool ret = 1;\n" ++
+              "    _Bool ret = true;\n" ++
               "\n" ++
               "    if (self->interval > limit) {\n" ++
               "        \n" ++
-              "        ret = 0;\n" ++
+              "        ret = false;\n" ++
               "\n" ++
               "    }\n" ++
               "\n" ++
@@ -135,7 +135,7 @@ spec = do
               "\n" ++
               "    _Bool check = CHousekeeping__check_interval(__ev, self, 10U);\n" ++
               "\n" ++
-              "    if (check == 0) {\n" ++
+              "    if (check == false) {\n" ++
               "        \n" ++
               "        ret.__variant = Failure;\n" ++
               "        ret.Failure.__0 = -(1L);\n" ++

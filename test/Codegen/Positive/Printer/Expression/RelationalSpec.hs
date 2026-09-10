@@ -194,14 +194,14 @@ spec = do
   describe "Pretty printing logical and expressions" $ do
     it "Prints the expression: true && false" $ do
       renderExpression logicalAndConst `shouldBe`
-        pack "1 && 0"
+        pack "true && false"
     it "Prints the expression: var0 == var1 && var4 != var5" $ do
       renderExpression logicalAndExpr `shouldBe`
         pack "var0 == *(uint16_t *)var1.data && var0 <= 1024U"
   describe "Pretty printing logical or expressions" $ do
     it "Prints the expression: false || true" $ do
       renderExpression logicalOrConst `shouldBe`
-        pack "0 || 1"
+        pack "false || true"
     it "Prints the expression: var1 < 1024U || var2 == var3" $ do
       renderExpression logicalOrExpr `shouldBe`
         pack "*(uint16_t *)var1.data < 1024U || var0 <= 1024U"

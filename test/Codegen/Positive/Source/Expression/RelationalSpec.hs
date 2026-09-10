@@ -44,7 +44,7 @@ spec = do
               "\n" ++ 
               "void relational_test0(uint16_t foo) {\n" ++
               "    \n" ++
-              "    _Bool res = 0;\n" ++
+              "    _Bool res = false;\n" ++
               "\n" ++
               "    res = foo == 1024U;\n" ++
               "\n" ++
@@ -68,9 +68,9 @@ spec = do
               "\n" ++
               "    res = foo <= 1024U;\n" ++
               "\n" ++
-              "    res = 1 && 0;\n" ++
+              "    res = true && false;\n" ++
               "\n" ++
-              "    res = 1 || 0;\n" ++ 
+              "    res = true || false;\n" ++
               "\n" ++
               "    return;\n" ++
               "\n" ++

@@ -91,6 +91,9 @@ instance CPrint CConstant where
     pprint (CIntConst i) = return $ pretty i
     pprint (CFloatConst f) = return $ pretty f
     pprint (CCharConst c) = return $ pretty c
+    -- | Boolean constants use the macros of stdbool.h, which are essentially
+    -- Boolean in the MISRA-C essential type model (0 and 1 are not).
+    pprint (CBoolConst b) = return $ pretty (if b then "true" else "false" :: String)
 
 rootCType :: CType -> CType
 rootCType ty =
