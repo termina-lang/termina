@@ -78,10 +78,6 @@ spec = do
               "\n" ++   
               "void __CHousekeeping__termina_task(void * const arg);\n" ++
               "\n" ++
-              "_Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
-              "                                    const CHousekeeping * const self,\n" ++
-              "                                    uint32_t limit);\n" ++
-              "\n" ++
               "__status_int32_t CHousekeeping__timeout(const __termina_event_t * const __ev,\n" ++
               "                                        void * const __this, TimeVal current);\n" ++
               "\n" ++
@@ -91,9 +87,13 @@ spec = do
         pack ("\n" ++
               "#include \"test.h\"\n" ++
               "\n" ++
-              "_Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
-              "                                    const CHousekeeping * const self,\n" ++
-              "                                    uint32_t limit) {\n" ++
+              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "                                           const CHousekeeping * const self,\n" ++
+              "                                           uint32_t limit);\n" ++
+              "\n" ++
+              "static _Bool CHousekeeping__check_interval(const __termina_event_t * const __ev,\n" ++
+              "                                           const CHousekeeping * const self,\n" ++
+              "                                           uint32_t limit) {\n" ++
               "    \n" ++
               "    (void)__ev;\n" ++
               "\n" ++

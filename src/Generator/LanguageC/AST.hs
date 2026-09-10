@@ -65,7 +65,7 @@ data CDeclaration' a =
 
 data CExternalDeclaration' a
     = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
-    | CEDFunction CType Ident [CDeclaration' a]
+    | CEDFunction (Maybe CStorageSpecifier) CType Ident [CDeclaration' a]
     | CEDEnum (Maybe Ident) (CEnum' a)
     | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
     | CEDTypeDef Ident CType

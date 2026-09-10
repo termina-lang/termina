@@ -618,10 +618,11 @@ instance CPrint CExternalDeclaration where
     pprint (CEDVariable stspec decl) = do
         pdecl <- pprint decl
         return $ pretty stspec <+> pdecl <> semi
-    pprint (CEDFunction ty ident params) = do
+    pprint (CEDFunction stspec ty ident params) = do
         pty <- pprint ty
         pparams <- mapM pprint params
-        return $ pty <+> pretty ident <> pprintParamList pparams <> semi
+        let pdecl = pty <+> pretty ident <> pprintParamList pparams <> semi
+        return $ maybe pdecl (\spec -> pretty spec <+> pdecl) stspec
     pprint (CEDEnum Nothing enum) = do
         penum <- pprint enum
         return $ penum <> semi

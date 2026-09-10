@@ -384,7 +384,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             ClassField (FieldDefinition _ (TInPort {}) _) -> False;
             _ -> True}) fields
     cFields <- concat <$> traverse genClassField fields'
-    cFunctions <- traverse genClassFunctionDeclaration functions
+    cFunctions <- traverse (genClassFunctionDeclaration clsdef) (filter (not . isPrivateClassMember) functions)
     let structFields = case clsKind of
             TaskClass ->
                 let cMsgQueueIDField = field taskMsgQueueIDField (typeDef terminaID) 
@@ -410,7 +410,7 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
 
         genTaskFunctionDeclaration :: CGenerator CFileItem
         genTaskFunctionDeclaration = do
-            return $ CExtDecl (CEDFunction void (namefy identifier <::> "termina_task") [
+            return $ CExtDecl (CEDFunction Nothing void (namefy identifier <::> "termina_task") [
                     CDecl (CTypeSpec (_const . ptr $ void)) (Just "arg") Nothing
                 ]) (buildDeclarationAnn ann True)
 
@@ -418,23 +418,37 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
         genClassField (ClassField fld) = genFieldDeclaration fld
         genClassField member = throwError $ InternalError $ "invalid class member. Not a field: " ++ show member
 
-        genClassFunctionDeclaration :: ClassMember SemanticAnn -> CGenerator CFileItem
-        genClassFunctionDeclaration (ClassViewer viewer params rts _ _) = do
+genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
+
+-- | Methods and viewers can only be called from the members of their own
+-- class, which are all defined in the same source file. They have internal
+-- linkage and they are not declared in the header file.
+isPrivateClassMember :: ClassMember a -> Bool
+isPrivateClassMember (ClassMethod {}) = True
+isPrivateClassMember (ClassViewer {}) = True
+isPrivateClassMember _ = False
+
+-- | Declaration of a class member function. The declarations of the private
+-- member functions carry the static storage class specifier.
+genClassFunctionDeclaration :: AnnASTElement SemanticAnn -> ClassMember SemanticAnn -> CGenerator CFileItem
+genClassFunctionDeclaration clsdef@(TypeDefinition (Class _ identifier _ _ _) ann) member =
+    case member of
+        ClassViewer viewer params rts _ _ -> do
             retType <- maybe (return void) (genType noqual) rts
             cParamDecls <- mapM genParameterDeclaration params
             cEventParam <- getEventParam
             cSelfParam <- genConstSelfParam clsdef
             clsFuncName <- genClassFunctionName identifier viewer
-            return $ CExtDecl (CEDFunction retType clsFuncName (cEventParam : cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassProcedure ak procedure params _ _) = do
+            return $ CExtDecl (CEDFunction storage retType clsFuncName (cEventParam : cSelfParam : cParamDecls)) (buildDeclarationAnn ann True)
+        ClassProcedure ak procedure params _ _ -> do
             cParamDecls <- mapM genParameterDeclaration params
             cEventParam <- getEventParam
             cThisParam <- case ak of
                 Immutable -> genConstThisParam
                 _ -> genThisParam
             clsFuncName <- genClassFunctionName identifier procedure
-            return $ CExtDecl (CEDFunction void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassMethod ak method params rts _ _) = do
+            return $ CExtDecl (CEDFunction storage void clsFuncName (cEventParam : cThisParam : cParamDecls)) (buildDeclarationAnn ann True)
+        ClassMethod ak method params rts _ _ -> do
             cParamDecls <- mapM genParameterDeclaration params
             retType <- maybe (return (CTVoid noqual)) (genType noqual) rts
             clsFuncName <- genClassFunctionName identifier method
@@ -442,8 +456,8 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             cSelfParam <- case ak of
                 Immutable -> genConstSelfParam clsdef
                 _ -> genSelfParam clsdef
-            return $ CExtDecl (CEDFunction retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration (ClassAction ak action param rts _ _) = do
+            return $ CExtDecl (CEDFunction storage retType clsFuncName ([cEventParam, cSelfParam] ++ cParamDecls)) (buildDeclarationAnn ann True)
+        ClassAction ak action param rts _ _ -> do
             retType <- genType noqual rts
             cEventParam <- getEventParam
             cThisParam <- case ak of
@@ -453,11 +467,17 @@ genTypeDefinitionDecl clsdef@(TypeDefinition cls@(Class clsKind identifier _memb
             case param of
                 Just p -> do
                     cParamDecl <- genParameterDeclaration p
-                    return $ CExtDecl (CEDFunction retType clsFuncName [cEventParam, cThisParam, cParamDecl]) (buildDeclarationAnn ann True)
+                    return $ CExtDecl (CEDFunction storage retType clsFuncName [cEventParam, cThisParam, cParamDecl]) (buildDeclarationAnn ann True)
                 Nothing ->
-                    return $ CExtDecl (CEDFunction retType clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
-        genClassFunctionDeclaration member = throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
-genTypeDefinitionDecl ts = throwError $ InternalError $ "Unsupported type definition: " ++ show ts
+                    return $ CExtDecl (CEDFunction storage retType clsFuncName [cEventParam, cThisParam]) (buildDeclarationAnn ann True)
+        _ -> throwError $ InternalError $ "invalid class member. Not a function: " ++ show member
+
+    where
+
+        storage :: Maybe CStorageSpecifier
+        storage = if isPrivateClassMember member then Just CStatic else Nothing
+
+genClassFunctionDeclaration _ member = throwError $ InternalError $ "invalid class definition for member: " ++ show member
 
 genTaskClassCode :: AnnASTElement SemanticAnn -> CGenerator CFileItem
 genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _) = do
@@ -639,12 +659,15 @@ genTaskClassCode _ = throwError $ InternalError "Not a task class definition"
 genClassDefinition :: AnnASTElement SemanticAnn -> CGenerator [CFileItem]
 genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members _provides _) _) = do
     (_fields, functions) <- classifyClassMembers cls
+    -- | The private member functions are not declared in the header file, so
+    -- they are declared before the definitions of the members.
+    cPrivateDecls <- traverse (genClassFunctionDeclaration clsdef) (filter isPrivateClassMember functions)
     cFunctionDefs <- traverse genClassFunctionDefinition functions
     case clsKind of
         TaskClass -> do
             cTaskClassCode <- genTaskClassCode clsdef
-            return $ cFunctionDefs ++ [cTaskClassCode]
-        _ -> return cFunctionDefs
+            return $ cPrivateDecls ++ cFunctionDefs ++ [cTaskClassCode]
+        _ -> return $ cPrivateDecls ++ cFunctionDefs
 
     where
 
@@ -658,7 +681,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cBody <- genMemberBody parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
-            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
+            return $ CFunctionDef (Just CStatic) (CFunction cRetType clsFuncName (cEventParam : cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassProcedure ak procedure parameters (Block stmts _) ann) = do
@@ -697,7 +720,7 @@ genClassDefinition clsdef@(TypeDefinition cls@(Class clsKind identifier _members
             cBody <- genMemberBody parameters $ foldM (\acc x -> do
                 cStmt <- genBlocks x
                 return $ acc ++ cStmt) [] stmts
-            return $ CFunctionDef Nothing (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
+            return $ CFunctionDef (Just CStatic) (CFunction cRetType clsFuncName (cEventParam :  cSelfParam : cParamDecls)
                 (CSCompound cBody (buildCompoundAnn ann False True)))
                 (buildDeclarationAnn ann True)
         genClassFunctionDefinition (ClassAction ak action param rts (Block stmts _) ann) = do
