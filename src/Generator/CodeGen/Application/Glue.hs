@@ -624,7 +624,6 @@ genMainFile :: QualifiedName
     -> CGenerator CFile
 genMainFile mName progArchitecture = do
     let includeTermina = CPPDirective (CPPInclude True "termina.h") (internalAnn (CPPDirectiveAnn True))
-        externInitGlobals = CExtDecl (CEDFunction void (namefy $ "termina_app" <::> "init_globals") []) (internalAnn (CDeclarationAnn True))
     sinkPortMessageQueues <- getSinkPortMessageQueues progArchitecture
     channelMessageQueues <- getChannelsMessageQueues progArchitecture
     taskMessageQueues <- getTasksMessageQueues progArchitecture (sinkPortMessageQueues ++ channelMessageQueues)
@@ -655,9 +654,6 @@ genMainFile mName progArchitecture = do
             -- #include <termina.h>
             includeTermina
         ] ++ includes
-        ++ [
-            externInitGlobals
-        ]
         ++ cPoolMemoryAreas
         ++ [initTasks, initHandlers, initEmitters, initMutexes, initPools, initMessageQueues,
             enableProtection, channelConnections] ++ initialEventFunction

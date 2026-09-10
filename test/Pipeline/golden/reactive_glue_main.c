@@ -3,8 +3,6 @@
 
 #include "test.h"
 
-void __termina_app__init_globals(void);
-
 static void __termina_app__init_tasks(int32_t * const status) {
     
     *status = 0L;
