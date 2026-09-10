@@ -45,7 +45,8 @@ data Error
   | EAllocNotMoved Identifier -- ^ Option-box allocated but not moved (VE-011)
   | EAllocTwice Identifier Location -- ^ Option-box allocated twice (VE-012)
   | EMovedWithoutAlloc Identifier Location -- ^ Option-box moved but not allocated (VE-013)
-  | EOptionBoxMatchMissingSomeCase 
+  | EOptionBoxMatchMissingSomeCase
+  | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-015)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -66,6 +67,7 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "VE-012"
     errorIdent (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "VE-013"
     errorIdent (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "VE-014"
+    errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-015"
     errorIdent (AnnotatedError e _pos) = T.pack $ show e
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
@@ -82,6 +84,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (EAllocTwice _ident _prevAlloc) _pos) = "option-box allocated twice"
     errorTitle (AnnotatedError (EMovedWithoutAlloc _ident _prevMove) _pos) = "option-box moved but not allocated"
     errorTitle (AnnotatedError EOptionBoxMatchMissingSomeCase _pos) = "option-box match missing some"
+    errorTitle (AnnotatedError (ESelfNotUsed _ident) _pos) = "self not used"
     errorTitle _ = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -214,6 +217,11 @@ instance ErrorMessage VarUsageError where
                 pprintSimpleError 
                     sourceLines title fileName pos
                     (Just "Option-box match is missing Some case.")
+            ESelfNotUsed ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Member function \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m does not use \x1b[31mself\x1b[0m. It must be reimplemented as a function."))
 
             _ -> T.pack $ show pos ++ ": " ++ show e
 -- | Print the error as is

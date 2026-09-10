@@ -6,7 +6,7 @@ module VarUsage.Negative.DetailSpec
   ( spec
   , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
-  , testVE011, testVE012, testVE013, testVE014
+  , testVE011, testVE012, testVE013, testVE014, testVE015, testVE015_1
   ) where
 
 import Test.Hspec
@@ -273,6 +273,48 @@ testVE014 =
   "    }\n" ++
   "};\n"
 
+testVE015 :: String
+testVE015 = "interface Interface0 {\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self);\n" ++
+       "\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    field0 : u32;\n" ++
+       "\n" ++
+       "    method method0(&mut self) {\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self) {\n" ++
+       "        self->field0 = 0 : u32;\n" ++
+       "        self->method0();\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
+testVE015_1 :: String
+testVE015_1 = "task class TaskClass0 {\n" ++
+       "\n" ++
+       "    field0 : u32;\n" ++
+       "\n" ++
+       "    snk0 : sink u32 triggers action0;\n" ++
+       "\n" ++
+       "    viewer viewer0(&self, value : u32) -> u32 {\n" ++
+       "        return value;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    action action0(&priv self, input : u32) -> Status<i32> {\n" ++
+       "        var ret : Status<i32> = Success;\n" ++
+       "        self->field0 = self->viewer0(input);\n" ++
+       "        return ret;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
@@ -340,6 +382,14 @@ spec = do
       runNegativeTestVarUsage testVE014
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
+    it "VE-015: method does not use self" $ do
+      runNegativeTestVarUsage testVE015
+        `shouldSatisfy`
+          isESelfNotUsed "method0"
+    it "VE-015: viewer does not use self" $ do
+      runNegativeTestVarUsage testVE015_1
+        `shouldSatisfy`
+          isESelfNotUsed "viewer0"
 
   where
 
@@ -384,3 +434,6 @@ spec = do
 
     isEOptionBoxMatchMissingSomeCase :: Maybe Error -> Bool
     isEOptionBoxMatchMissingSomeCase = \case Just EOptionBoxMatchMissingSomeCase -> True; _ -> False
+
+    isESelfNotUsed :: Identifier -> Maybe Error -> Bool
+    isESelfNotUsed inIdent = \case Just (ESelfNotUsed ident) -> (inIdent == ident); _ -> False

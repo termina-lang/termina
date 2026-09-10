@@ -5,7 +5,7 @@ module ControlFlow.VarUsage.Computation (
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
   unifyStates, defVariableOptionBox, defBox, defVariable, safeUseVariable,
   initializeOptionBox, moveOptionBox, safeMoveBox, allocOptionBox,
-  defArgumentsProc, runComputation, emptyUDSt
+  defArgumentsProc, runComputation, emptyUDSt, useDefSelfBody
 ) where
 
 import ControlFlow.BasicBlocks.AST 
@@ -229,6 +229,16 @@ defArgumentsProc ps loc
         TBoxSubtype _ -> flip defBox loc
         _ -> flip defVariable loc)
     (paramIdentifier ps)
+
+-- | Methods and viewers must use self. Otherwise, they must be implemented as
+-- functions. Since the set of used variables is shared among all the members
+-- of the class, self is removed from it before computing the body.
+useDefSelfBody :: Identifier -> Location -> UDM VarUsageError () -> UDM VarUsageError ()
+useDefSelfBody ident loc body = do
+  ST.modify (removeUsed "self")
+  body
+  used <- ST.gets (S.member "self" . usedVarSet)
+  unless used (throwError $ annotateError loc (ESelfNotUsed ident))
 
 ----------------------------------------
 -- Run computation and get its result.
