@@ -9,7 +9,6 @@ import Control.Monad (zipWithM)
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
-import Generator.CodeGen.Types
 
 
 cBinOp :: Op -> CBinaryOp
