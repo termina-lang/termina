@@ -46,6 +46,17 @@ positiveLoop =
   "    return;\n" ++
   "}"
 
+-- Comparisons against constants strictly inside the range of the type.
+comparisonsInRange :: String
+comparisonsInRange =
+  "function f(x : u8) -> u32 {\n" ++
+  "    var y : u32 = 0 : u32;\n" ++
+  "    if ((x > 0 : u8) && (255 : u8 > x)) {\n" ++
+  "        y = 1 : u32;\n" ++
+  "    }\n" ++
+  "    return y;\n" ++
+  "}"
+
 spec :: Spec
 spec = describe "ConstFolding: well-formed constants compile cleanly" $
   mapM_ (\(name, src) -> it name $ compileErrorCode src `shouldBe` Nothing)
@@ -53,4 +64,5 @@ spec = describe "ConstFolding: well-formed constants compile cleanly" $
     , ("accepts a constant arithmetic expression that folds in range", foldsArithmetic)
     , ("accepts a slice whose length matches the expected size", matchingSlice)
     , ("accepts a for loop with a positive iteration count", positiveLoop)
+    , ("accepts comparisons against constants inside the type range", comparisonsInRange)
     ]

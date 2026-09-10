@@ -61,3 +61,13 @@ spec = do
                 "    return;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-013")
+
+    it "CPE-017: comparison against a constant at the limit of the type range" $ do
+      let src = "function f(x : u32) -> u32 {\n" ++
+                "    var y : u32 = 0 : u32;\n" ++
+                "    if (x < 0 : u32) {\n" ++
+                "        y = 1 : u32;\n" ++
+                "    }\n" ++
+                "    return y;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CPE-017")

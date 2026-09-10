@@ -26,8 +26,38 @@ sliceOutOfBounds =
   "    return;\n" ++
   "}"
 
+-- CPE-017: an unsigned expression is never less than zero.
+unsignedBelowZero :: String
+unsignedBelowZero =
+  "function f(x : u32) -> u32 {\n" ++
+  "    var y : u32 = 0 : u32;\n" ++
+  "    if (x < 0 : u32) {\n" ++
+  "        y = 1 : u32;\n" ++
+  "    }\n" ++
+  "    return y;\n" ++
+  "}"
+
+-- CPE-017: with the constant on the left, 255 >= x holds for every u8.
+constantAtUpperLimit :: String
+constantAtUpperLimit =
+  "function f(x : u8) -> u32 {\n" ++
+  "    var y : u32 = 0 : u32;\n" ++
+  "    if (255 : u8 >= x) {\n" ++
+  "        y = 1 : u32;\n" ++
+  "    }\n" ++
+  "    return y;\n" ++
+  "}"
+
 spec :: Spec
 spec = describe "ConstFolding: error detail (carried value)" $ do
+  it "CPE-017 carries the constant and the fixed result (lower limit)" $
+    constFoldError unsignedBelowZero `shouldSatisfy` \case
+      Just (AnnotatedError (EInvariantComparison 0 _ False) _) -> True
+      _ -> False
+  it "CPE-017 carries the constant and the fixed result (upper limit, swapped operands)" $
+    constFoldError constantAtUpperLimit `shouldSatisfy` \case
+      Just (AnnotatedError (EInvariantComparison 255 _ True) _) -> True
+      _ -> False
   it "CPE-004 carries the overflowing constant" $
     constFoldError overflow `shouldSatisfy` \case
       Just (AnnotatedError (EConstIntegerOverflow 256 _) _) -> True

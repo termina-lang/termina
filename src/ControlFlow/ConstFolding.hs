@@ -298,7 +298,9 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
       ty <- getExprType e
       fConst <- evalBinOp (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann
-    _ -> return $ BinOp op lhs' rhs' ann'
+    _ -> do
+      constFoldCheckComparison (getLocation ann) op lhs' rhs'
+      return $ BinOp op lhs' rhs' ann'
 constFoldExpression (Casting expr ty ann) = do
   ann' <- constFoldAnnotation ann
   expr' <- constFoldExpression expr
@@ -420,6 +422,64 @@ constFoldCheckCondition cond = do
       value <- evalConstExpression cond
       throwError $ annotateError (getLocation . getAnnotation $ cond) (EConstCondition value)
     _ -> return ()
+
+-- | Checks that the result of a relational comparison between an integer
+-- expression and a constant depends on the value of the expression. It does
+-- not when the constant is at or beyond the limits of the range of the type of
+-- the expression, e.g., when an unsigned expression is checked to be less than
+-- zero.
+constFoldCheckComparison :: Location -> Op -> Expression SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
+constFoldCheckComparison loc op lhs rhs
+  | op `elem` [RelationalLT, RelationalLTE, RelationalGT, RelationalGTE] = do
+    lhsType <- getExprType lhs
+    rhsType <- getExprType rhs
+    case (lhsType, rhsType) of
+      (TConstSubtype _, TConstSubtype _) -> return ()
+      (_, TConstSubtype _) -> checkBounds op lhsType rhs
+      (TConstSubtype _, _) -> checkBounds (swapOperands op) rhsType lhs
+      _ -> return ()
+  | otherwise = return ()
+
+  where
+
+    -- | Operator that yields the same result when the operands are swapped.
+    swapOperands :: Op -> Op
+    swapOperands RelationalLT = RelationalGT
+    swapOperands RelationalLTE = RelationalGTE
+    swapOperands RelationalGT = RelationalLT
+    swapOperands RelationalGTE = RelationalLTE
+    swapOperands o = o
+
+    -- | Checks the comparison (e op' constExpr), where e is of type ty.
+    checkBounds :: Op -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
+    checkBounds op' ty constExpr =
+      case intRange ty of
+        Nothing -> return ()
+        Just (lo, hi) -> do
+          value <- evalConstExpression constExpr
+          case value of
+            I (TInteger c _) _ ->
+              maybe (return ())
+                (throwError . annotateError loc . EInvariantComparison c ty)
+                (fixedResult op' lo hi c)
+            _ -> return ()
+
+    -- | Result of (e op' c) for every value of e in [lo, hi], if it is the same
+    -- for all of them.
+    fixedResult :: Op -> Integer -> Integer -> Integer -> Maybe Bool
+    fixedResult RelationalLT lo hi c
+      | c <= lo = Just False
+      | c > hi = Just True
+    fixedResult RelationalLTE lo hi c
+      | c < lo = Just False
+      | c >= hi = Just True
+    fixedResult RelationalGT lo hi c
+      | c >= hi = Just False
+      | c < lo = Just True
+    fixedResult RelationalGTE lo hi c
+      | c > hi = Just False
+      | c <= lo = Just True
+    fixedResult _ _ _ _ = Nothing
 
 constFoldBasicBlock :: BasicBlock SemanticAnn -> ConstFoldMonad (BasicBlock SemanticAnn)
 constFoldBasicBlock (RegularBlock stmts) =
