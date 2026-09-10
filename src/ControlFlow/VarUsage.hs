@@ -76,6 +76,12 @@ useFieldAssignment _ = return ()
 getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
+-- | Records the calls to member functions of the class made through self.
+useSelfMemberFunction :: Object SemanticAnn -> Identifier -> UDM VarUsageError ()
+useSelfMemberFunction (Variable "self" _) ident = safeUseMemberFunction ident
+useSelfMemberFunction (Dereference (Variable "self" _) _) ident = safeUseMemberFunction ident
+useSelfMemberFunction _ _ = return ()
+
 useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
 useExpression (AccessObject obj)
   = useObject obj
@@ -95,10 +101,10 @@ useExpression (IsMonadicVariantExpression obj _ _)
   = useObject obj
 useExpression (ArraySliceExpression _aK obj eB eT _ann)
   = useObject obj >> useExpression eB >> useExpression eT
-useExpression (MemberFunctionCall obj _ident args _ann) = do
-    useObject obj >> mapM_ useArguments args
-useExpression (DerefMemberFunctionCall obj _ident args _ann)
-  = useObject obj >> mapM_ useArguments args
+useExpression (MemberFunctionCall obj ident args _ann) = do
+    useSelfMemberFunction obj ident >> useObject obj >> mapM_ useArguments args
+useExpression (DerefMemberFunctionCall obj ident args _ann)
+  = useSelfMemberFunction obj ident >> useObject obj >> mapM_ useArguments args
 useExpression (ArrayInitializer e _size _ann)
   = useExpression e
 useExpression (ArrayExprListInitializer exprs _ann) = mapM_ useExpression exprs
@@ -381,10 +387,18 @@ useDefCMemb (ClassAction _ak _ident (Just p) _tyret bret ann)
   = useDefBlockRet bret
   >> mapM_ (`defArgumentsProc` getLocation ann) [p]
 
+-- | Checks that the methods and viewers are called by some member of the class.
+useDefMemberFunction :: ClassMember SemanticAnn -> UDM VarUsageError ()
+useDefMemberFunction (ClassMethod _ak ident _ps _tyret _bret ann) = defMemberFunction ident (getLocation ann)
+useDefMemberFunction (ClassViewer ident _ps _tyret _bret ann) = defMemberFunction ident (getLocation ann)
+useDefMemberFunction _ = return ()
+
 useDefTypeDef :: TypeDef SemanticAnn -> UDM VarUsageError ()
 useDefTypeDef (Class _k _id members _provides _mods)
   -- First we go through uses
   = mapM_ useDefCMemb muses
+  -- Then the calls to the methods and viewers
+  >> mapM_ useDefMemberFunction muses
   -- Then all definitions (ClassFields)
   >> mapM_ useDefCMemb mdefs
   where

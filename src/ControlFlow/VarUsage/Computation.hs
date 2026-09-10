@@ -5,7 +5,8 @@ module ControlFlow.VarUsage.Computation (
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
   unifyStates, defVariableOptionBox, defBox, defVariable, safeUseVariable,
   initializeOptionBox, moveOptionBox, safeMoveBox, allocOptionBox,
-  defArgumentsProc, runComputation, emptyUDSt, useDefSelfBody
+  defArgumentsProc, runComputation, emptyUDSt, useDefSelfBody,
+  safeUseMemberFunction, defMemberFunction
 ) where
 
 import ControlFlow.BasicBlocks.AST 
@@ -239,6 +240,23 @@ useDefSelfBody ident loc body = do
   body
   used <- ST.gets (S.member "self" . usedVarSet)
   unless used (throwError $ annotateError loc (ESelfNotUsed ident))
+
+-- | Key under which a call to a member function through self is recorded in
+-- the set of used variables. It is not a valid identifier, so it cannot clash
+-- with the name of a variable.
+memberFunctionKey :: Identifier -> Identifier
+memberFunctionKey ident = "self->" ++ ident
+
+-- | Records a call to a member function of the class made through self.
+safeUseMemberFunction :: Identifier -> UDM VarUsageError ()
+safeUseMemberFunction = safeUseVariable . memberFunctionKey
+
+-- | Methods and viewers can only be called through self by the members of
+-- their own class, so a method or a viewer that no member calls is never used.
+defMemberFunction :: Identifier -> Location -> UDM VarUsageError ()
+defMemberFunction ident loc = do
+  used <- ST.gets (S.member (memberFunctionKey ident) . usedVarSet)
+  unless used (throwError $ annotateError loc (EMemberFunctionNotUsed ident))
 
 ----------------------------------------
 -- Run computation and get its result.

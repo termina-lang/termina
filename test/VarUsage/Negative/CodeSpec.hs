@@ -7,7 +7,7 @@ import VarUsage.Common (varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVE001, testVE002, testVE003, testVE004, testVE005, testVE006, testVE007
   , testVE008, testVE009, testVE010, testVE011, testVE012, testVE013, testVE014
-  , testVE015 )
+  , testVE015, testVE016 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
@@ -31,6 +31,7 @@ cases =
   , ("VE-013", "option-box moved without being allocated", testVE013)
   , ("VE-014", "option-box match missing the Some case", testVE014)
   , ("VE-015", "method or viewer does not use self", testVE015)
+  , ("VE-016", "method or viewer never called", testVE016)
   ]
 
 spec :: Spec

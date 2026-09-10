@@ -7,6 +7,7 @@ module VarUsage.Negative.DetailSpec
   , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
   , testVE011, testVE012, testVE013, testVE014, testVE015, testVE015_1
+  , testVE016, testVE016_1
   ) where
 
 import Test.Hspec
@@ -315,6 +316,48 @@ testVE015_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
+testVE016 :: String
+testVE016 = "interface Interface0 {\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self);\n" ++
+       "\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    field0 : u32;\n" ++
+       "\n" ++
+       "    method method0(&mut self) {\n" ++
+       "        self->field0 = 1 : u32;\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self) {\n" ++
+       "        self->field0 = 0 : u32;\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
+testVE016_1 :: String
+testVE016_1 = "task class TaskClass0 {\n" ++
+       "\n" ++
+       "    field0 : u32;\n" ++
+       "\n" ++
+       "    snk0 : sink u32 triggers action0;\n" ++
+       "\n" ++
+       "    viewer viewer0(&self) -> u32 {\n" ++
+       "        return self->field0;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    action action0(&priv self, input : u32) -> Status<i32> {\n" ++
+       "        var ret : Status<i32> = Success;\n" ++
+       "        self->field0 = input;\n" ++
+       "        return ret;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
@@ -390,6 +433,14 @@ spec = do
       runNegativeTestVarUsage testVE015_1
         `shouldSatisfy`
           isESelfNotUsed "viewer0"
+    it "VE-016: method never called" $ do
+      runNegativeTestVarUsage testVE016
+        `shouldSatisfy`
+          isEMemberFunctionNotUsed "method0"
+    it "VE-016: viewer never called" $ do
+      runNegativeTestVarUsage testVE016_1
+        `shouldSatisfy`
+          isEMemberFunctionNotUsed "viewer0"
 
   where
 
@@ -437,3 +488,6 @@ spec = do
 
     isESelfNotUsed :: Identifier -> Maybe Error -> Bool
     isESelfNotUsed inIdent = \case Just (ESelfNotUsed ident) -> (inIdent == ident); _ -> False
+
+    isEMemberFunctionNotUsed :: Identifier -> Maybe Error -> Bool
+    isEMemberFunctionNotUsed inIdent = \case Just (EMemberFunctionNotUsed ident) -> (inIdent == ident); _ -> False
