@@ -82,6 +82,9 @@ genMakefile params bbProject =
                 MakeCommand False [MFragment "@$(RM) -rf $(TARGET_DIR_NAME)"]
             ],
             MInclude False "$(DEPS)"
+        ],
+        MakeBlock [
+            MInclude True $ "$(TERMINA_OSAL_DIR)" </> "shared" </> "shared" <.> "mk"
         ]
 
     ]
