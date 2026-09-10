@@ -515,9 +515,9 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source.__variant = ExceptSource__Handler;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
-                            -- source.Task.__0 = port_connection->handler.handler_id;
+                            -- source.__variant = ExceptSource__Task;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
+                            -- source.Task.__0 = self->__task_id;
                             no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
 
                             -- __termina_except__action_failure(source, , status.Failure.__0);
@@ -568,9 +568,9 @@ genTaskClassCode (TypeDefinition (Class TaskClass classId members _provides _) _
                         $ trail_cr $ block [
                             -- ExceptSource source;
                             pre_cr $ var "source" (typeDef "ExceptSource"),
-                            -- source.__variant = ExceptSource__Handler;
-                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Handler" @: enumFieldType,
-                            -- source.Task.__0 = port_connection->handler.handler_id;
+                            -- source.__variant = ExceptSource__Task;
+                            no_cr $ "source" @: typeDef "ExceptSource" @. variant @: enumFieldType @= "ExceptSource__Task" @: enumFieldType,
+                            -- source.Task.__0 = self->__task_id;
                             no_cr $ "source" @: typeDef "ExceptSource" @. "Task" @: enumFieldType @. namefy "0" @: __termina_id_t @= ("self" @: ptr classStructType) @. taskIDField @: __termina_id_t,
 
                             -- __termina_except__action_failure(source, , status.Failure.__0);

@@ -124,7 +124,7 @@ spec = do
               "                if (result.__variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
-              "                    source.__variant = ExceptSource__Handler;\n" ++
+              "                    source.__variant = ExceptSource__Task;\n" ++
               "                    source.Task.__0 = self->__task_id;\n" ++
               "\n" ++
               "                    __termina_except__action_failure(source,\n" ++
@@ -228,7 +228,7 @@ spec = do
               "                if (result.__variant != Success) {\n" ++
               "                    \n" ++ 
               "                    ExceptSource source;\n" ++
-              "                    source.__variant = ExceptSource__Handler;\n" ++
+              "                    source.__variant = ExceptSource__Task;\n" ++
               "                    source.Task.__0 = self->__task_id;\n" ++
               "\n" ++
               "                    __termina_except__action_failure(source,\n" ++
