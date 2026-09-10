@@ -396,21 +396,25 @@ eqTy TChar   = True
 eqTy (TConstSubtype ty) = eqTy ty
 eqTy _      = False
 
-memberIntCons :: Integer -> TerminaType' expr a -> Bool
-memberIntCons i TUInt8  = ( 0 <= i ) && ( i <= 255)
-memberIntCons i TUInt16 = ( 0 <= i ) && ( i <= 65536)
-memberIntCons i TUInt32 = ( 0 <= i ) && ( i <= 4294967295)
-memberIntCons i TUInt64 = ( 0 <= i ) && ( i <= 18446744073709551615)
-memberIntCons i TInt8   = ( -128 <= i ) && ( i <= 127 )
-memberIntCons i TInt16  = ( -32768 <= i ) && ( i <= 32767 )
-memberIntCons i TInt32  = ( -2147483648 <= i ) && ( i <= 2147483647 )
-memberIntCons i TInt64  = ( -9223372036854775808 <= i ) && ( i <= 9223372036854775807 )
+-- | Minimum and maximum values of an integer type.
+intRange :: TerminaType' expr a -> Maybe (Integer, Integer)
+intRange TUInt8  = Just (0, 255)
+intRange TUInt16 = Just (0, 65535)
+intRange TUInt32 = Just (0, 4294967295)
+intRange TUInt64 = Just (0, 18446744073709551615)
+intRange TInt8   = Just (-128, 127)
+intRange TInt16  = Just (-32768, 32767)
+intRange TInt32  = Just (-2147483648, 2147483647)
+intRange TInt64  = Just (-9223372036854775808, 9223372036854775807)
 -- | TODO: This value depends on the target architecture and shall be selected
 -- accordingly. Since we are currently targeting 32-bit systems, we assume that
 -- usize is a 32-bit unsigned integer.
-memberIntCons i TUSize  = ( 0 <= i ) && ( i <= 4294967295)
-memberIntCons i (TConstSubtype ty) = memberIntCons i ty
-memberIntCons _ _      = False
+intRange TUSize  = Just (0, 4294967295)
+intRange (TConstSubtype ty) = intRange ty
+intRange _      = Nothing
+
+memberIntCons :: Integer -> TerminaType' expr a -> Bool
+memberIntCons i = maybe False (\(lo, hi) -> ( lo <= i ) && ( i <= hi )) . intRange
 
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident
