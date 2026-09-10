@@ -62,6 +62,14 @@ spec = do
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-013")
 
+    it "CPE-016: shift amount greater than or equal to the type width" $ do
+      let src = "function f() {\n" ++
+                "    var x : u8 = 0 : u8;\n" ++
+                "    x = x << 8 : usize;\n" ++
+                "    return;\n" ++
+                "}"
+      compileErrorCode src `shouldBe` Just (pack "CPE-016")
+
     it "CPE-017: comparison against a constant at the limit of the type range" $ do
       let src = "function f(x : u32) -> u32 {\n" ++
                 "    var y : u32 = 0 : u32;\n" ++

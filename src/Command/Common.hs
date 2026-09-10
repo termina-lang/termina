@@ -21,6 +21,7 @@ import ControlFlow.Architecture.Types
 import ControlFlow.Architecture.Checks
 import Core.AST
     ( TerminaModule'(frags) )
+import Configuration.Platform (Platform)
 import Utils.Errors
 import Utils.Annotations
 import Text.Parsec.Error
@@ -206,8 +207,8 @@ checkProjectBoxSources bbProject progArchitecture =
       TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     Right _ -> return ()
 
-constFolding :: BasicBlocksProject -> IO BasicBlocksProject
-constFolding bbProject =
+constFolding :: Platform -> BasicBlocksProject -> IO BasicBlocksProject
+constFolding plt bbProject =
   -- | Fold the modules in dependency order, threading the constant environment
   -- from one module to the next so that a module can resolve the constants
   -- defined by the modules it imports.
@@ -216,7 +217,7 @@ constFolding bbProject =
     -- before reaching this point, so a cycle here would be an internal error.
     Left _ -> die . errorMessage $ "Dependency cycle detected during constant folding"
     Right orderedDependencies ->
-      foldModules (ConstFoldEnv M.empty) M.empty orderedDependencies
+      foldModules (ConstFoldEnv M.empty plt) M.empty orderedDependencies
 
   where
 

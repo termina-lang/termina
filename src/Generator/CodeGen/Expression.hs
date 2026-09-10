@@ -6,9 +6,11 @@ import Generator.LanguageC.AST
 import Semantic.Types
 import Control.Monad.Except
 import Control.Monad (zipWithM)
+import Control.Monad.State (gets)
 import Generator.CodeGen.Common
 import Utils.Annotations
 import Generator.LanguageC.Embedded
+import Core.Utils (shiftWidth)
 
 
 cBinOp :: Op -> CBinaryOp
@@ -295,7 +297,21 @@ genExpression (BinOp op left right ann) =
                             CTFloat _ _ -> return rightExpr
                             _ -> throwError $ InternalError $ "Unsupported right expression type: " ++ show rightExpr
                     _ -> genExpression right)
-            return $ CExprBinaryOp (cBinOp op) cLeft cRight (getCExprType cLeft) cAnn
+            let boundShift = do
+                    rightTy <- getExprType right
+                    case rightTy of
+                        TConstSubtype _ -> return cRight
+                        _ -> do
+                            leftTy <- getExprType left
+                            plt <- gets targetPlatform
+                            let cFuncType = CTFunction (CTSizeT noqual) [_const size_t, _const size_t]
+                                cWidth = CExprConstant (CIntConst (CInteger (shiftWidth plt leftTy) CDecRepr)) (CTSizeT noqual) cAnn
+                            return $ CExprCall (CExprValOf (CVar "__termina_shift__amount" cFuncType) cFuncType cAnn) [cWidth, cRight] (CTSizeT noqual) cAnn
+            cRight' <- case op of
+                BitwiseLeftShift  -> boundShift
+                BitwiseRightShift -> boundShift
+                _ -> return cRight
+            return $ CExprBinaryOp (cBinOp op) cLeft cRight' (getCExprType cLeft) cAnn
 
 genExpression e@(Constant c ann) = do
     cType <- getExprType e >>= genType noqual

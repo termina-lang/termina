@@ -15,7 +15,6 @@ import Generator.LanguageC.Printer
 import Command.Types
 import Configuration.Platform
 import Generator.CodeGen.Application.Glue
-import Generator.Environment (getPlatformInterruptMap)
 import Generator.CodeGen.Application.Makefile
 import Generator.Makefile.Printer
 import Generator.CodeGen.Application.Config
@@ -46,7 +45,7 @@ genPlatformCode params plt bbProject appModName progArchitecture = do
   else
     runGenMainFile'
 
-  case runGenConfigFile params (getPlatformInterruptMap plt) configFile progArchitecture of
+  case runGenConfigFile params plt configFile progArchitecture of
     Left err -> die . errorMessage $ show err
     Right cConfigFile -> do
       -- If the config file already exists, we need to load it first to check if
@@ -97,6 +96,6 @@ genPlatformCode params plt bbProject appModName progArchitecture = do
 
     runGenMainFile' :: IO ()
     runGenMainFile' =
-      case runGenMainFile params (getPlatformInterruptMap plt) mainFile progArchitecture of
+      case runGenMainFile params plt mainFile progArchitecture of
         Left err -> die . errorMessage $ show err
         Right cMainFile -> TIO.writeFile mainFile $ runCPrinter (profile params == Debug) cMainFile

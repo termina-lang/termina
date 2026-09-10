@@ -1,0 +1,7 @@
+function test0() {
+
+    var c : char = '\x20AC';
+
+    return;
+
+}

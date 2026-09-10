@@ -7,7 +7,6 @@ import Parser.Common (parseWith)
 import Parser.Parsing (constantParser)
 import Parser.AST
 import Parser.Types (ParserAnn)
-import Core.AST
 
 import Test.Hspec
 

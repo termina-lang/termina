@@ -29,12 +29,13 @@ import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Control.Monad.State as ST
 import Semantic.Environment
-import Utils.Monad 
+import Configuration.Platform (strictAlignment)
+import Utils.Monad
 import Semantic.Utils
 
 checkObjectNotMoved :: Location -> SAST.Object a -> SemanticMonad (SAST.Object a)
 checkObjectNotMoved loc obj = do
-  let objectHash = getMovedHash obj Nothing
+  let objectHash = getMovedHash obj
   movedObjects <- ST.gets moved
   case M.lookup objectHash movedObjects of
     Nothing -> return obj
@@ -73,10 +74,70 @@ checkConstant loc expected_type Null =
   sameTyOrError loc expected_type TUnit
 
 checkIntConstant :: Location -> SAST.TerminaType SemanticAnn -> TInteger -> SemanticMonad ()
-checkIntConstant loc tyI ti@(TInteger i _) =
-  if memberIntCons i tyI
-  then return ()
-  else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
+checkIntConstant loc tyI ti@(TInteger i _) = do
+  plt <- ST.gets targetPlatform
+  if memberIntCons plt i tyI
+    then return ()
+    else throwError $ annotateError loc (EConstantOutRange (I ti (Just tyI)))
+
+-- | On strict-alignment targets, reject taking a reference to a location that
+-- is reached through a member of a @packed@ struct: the resulting pointer is
+-- under-aligned and its packed provenance is lost at the call boundary, so the
+-- callee performs a misaligned access (undefined behavior, MISRA-C:2023 Rule
+-- 1.3). On targets that handle misaligned accesses the reference is allowed.
+checkPackedMemberReference :: Location -> SAST.Object SemanticAnn -> SemanticMonad ()
+checkPackedMemberReference loc obj = do
+  plt <- ST.gets targetPlatform
+  when (strictAlignment plt) $
+    packedMemberReference loc obj >>=
+      maybe (return ()) (throwError . annotateError loc . EReferenceToPackedMember)
+
+-- | Walks a referenced object's access chain and, if it crosses a member of a
+-- packed struct, returns that struct's name. Array indexing, slicing, box
+-- unwrapping and dereferences are transparent (walked through to the base
+-- object): a reference to an element of an array *of* packed structs is
+-- well-defined (the pointee type is itself packed and carries its alignment),
+-- whereas a reference into a field or array *inside* a packed struct crosses a
+-- packed member and is not.
+packedMemberReference :: Location -> SAST.Object SemanticAnn -> SemanticMonad (Maybe Identifier)
+packedMemberReference loc = \case
+  SAST.MemberAccess parent _ _            -> packedContainer parent
+  SAST.DereferenceMemberAccess parent _ _ -> packedContainer parent
+  SAST.ArrayIndexExpression base _ _      -> packedMemberReference loc base
+  SAST.Dereference base _                 -> packedMemberReference loc base
+  SAST.Unbox base _                       -> packedMemberReference loc base
+  SAST.Variable {}                        -> return Nothing
+
+  where
+
+    -- | If the container of a field access is a packed struct, this is a
+    -- packed-member reference; otherwise keep walking outward from it.
+    packedContainer :: SAST.Object SemanticAnn -> SemanticMonad (Maybe Identifier)
+    packedContainer parent = do
+      (_, parent_ty) <- getObjType parent
+      case structIdentifier parent_ty of
+        Just dident -> do
+          packed <- isPackedStruct loc dident
+          if packed then return (Just dident) else packedMemberReference loc parent
+        Nothing -> packedMemberReference loc parent
+
+    -- | The struct name behind a type, peeling the forms a field access can go
+    -- through (a reference, a box, a fixed location).
+    structIdentifier :: SAST.TerminaType SemanticAnn -> Maybe Identifier
+    structIdentifier (TStruct dident)    = Just dident
+    structIdentifier (TReference _ ty)   = structIdentifier ty
+    structIdentifier (TBoxSubtype ty)    = structIdentifier ty
+    structIdentifier (TFixedLocation ty) = structIdentifier ty
+    structIdentifier _                   = Nothing
+
+-- | Whether a named type is a struct carrying the @packed@ modifier.
+isPackedStruct :: Location -> Identifier -> SemanticMonad Bool
+isPackedStruct loc dident = getGlobalTypeDef loc dident >>= \case
+  LocatedElement (Struct _ _ mods) _ -> return (any isPacked mods)
+  _ -> return False
+  where
+    isPacked (Modifier "packed" Nothing) = True
+    isPacked _ = False
 
 -- | Function checking that a TerminaType is well-defined.
 -- We are assuming that this function is always called AFTER the type was
@@ -529,7 +590,10 @@ typeConstant loc typeObj (F tFloat (Just ts)) = do
   ty <- typeTypeSpecifier loc typeObj ts
   return $ SAST.F tFloat (Just ty)
 typeConstant _loc _typeObj (B tBool) = return $ SAST.B tBool
-typeConstant _loc _typeObj (C tChar) = return $ SAST.C tChar
+typeConstant loc _typeObj (C tChar) =
+  if fromEnum tChar > 0x7F
+    then throwError $ annotateError loc (ECharLiteralOutOfRange tChar)
+    else return $ SAST.C tChar
 typeConstant _loc _typeObj Null = return SAST.Null
 
 -- | Function that translates a |TypeSpecifier| into a |TerminaType|.
@@ -1210,6 +1274,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
   case rhs_e of
     PAST.ArraySlice obj lower upper _anns -> do
       typed_obj <- typeObj obj
+      checkPackedMemberReference pann typed_obj
       (obj_ak, obj_ty) <- getObjType typed_obj
       typed_lower <- catchMismatch (getAnnotation lower) EArraySliceLowerBoundNotUSize (typeExpression (Just TUSize) typeRHSObject lower)
       typed_upper <- catchMismatch (getAnnotation upper) EArraySliceUpperBoundNotUSize (typeExpression (Just TUSize) typeRHSObject upper)
@@ -1227,6 +1292,7 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
     _ -> do
       -- | Type object
       typed_obj <- typeObj rhs_e
+      checkPackedMemberReference pann typed_obj
       -- | Get the type of the object
       (obj_ak, obj_type) <- getObjType typed_obj
       case obj_type of

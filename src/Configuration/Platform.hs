@@ -7,12 +7,54 @@ import Configuration.Platform.RTEMS5LEON3NEXYSA7
 import Configuration.Platform.POSIXGCC
 import Configuration.Platform.FreeRTOS10STM32L432XX
 
-data Platform = 
+data Platform =
     POSIXGCC
     | RTEMS5LEON3NEXYSA7
     | FreeRTOS10STM32L432XX
     | TestPlatform
     deriving Eq
+
+-- | The bit width of @usize@ on a platform, i.e. the width of C @size_t@ on the
+-- target. Used only for the transpiler's static range and shift-amount checks;
+-- the generated C uses @size_t@, which the C compiler sizes for the target.
+-- POSIX-gcc is fixed at 64 (matching a 64-bit host, the normal case); a 32-bit
+-- host would warrant a separate platform (e.g. @POSIXGCC32b@).
+usizeWidth :: Platform -> Integer
+usizeWidth POSIXGCC              = 64
+usizeWidth RTEMS5LEON3NEXYSA7    = 32
+usizeWidth FreeRTOS10STM32L432XX = 32
+usizeWidth TestPlatform          = 32
+
+-- | Whether the target requires naturally-aligned memory accesses, i.e. a
+-- misaligned load/store traps or is penalized instead of being handled
+-- transparently. On such targets, taking a reference to a member of a @packed@
+-- struct is rejected: the reference would carry an under-aligned address whose
+-- packed provenance is lost at the call boundary, so the callee emits an
+-- aligned access (undefined behavior, MISRA-C:2023 Rule 1.3). Hosts that handle
+-- misaligned accesses (x86) do not need the restriction.
+strictAlignment :: Platform -> Bool
+strictAlignment POSIXGCC              = False   -- x86 host: misaligned access is fine
+strictAlignment RTEMS5LEON3NEXYSA7    = True    -- SPARC/LEON3: traps
+strictAlignment FreeRTOS10STM32L432XX = True    -- Cortex-M: conservative
+strictAlignment TestPlatform          = True
+
+-- | The maximum number of significant initial characters a generated
+-- identifier may have on a platform's toolchain, or @Nothing@ when the toolchain
+-- treats all characters as significant. C11 guarantees only 31 significant
+-- characters in an external identifier and 63 in an internal identifier or macro
+-- name; a concrete toolchain may raise those limits or keep them. Every
+-- currently supported platform uses a GCC-family compiler, which imposes no
+-- limit, so the transpiler's identifier-length check never fires. Declaring the
+-- limit here (rather than assuming it) turns the toolchain property into an
+-- enforced check: a future platform whose toolchain caps significant length
+-- states the cap here, and the generator then rejects any longer identifier at
+-- generation time. A per-identifier cap at or below the limit is sufficient to
+-- rule out significant-character collisions, so no pairwise analysis is needed.
+maxIdentifierLength :: Platform -> Maybe Integer
+maxIdentifierLength POSIXGCC              = Nothing
+maxIdentifierLength RTEMS5LEON3NEXYSA7    = Nothing
+maxIdentifierLength FreeRTOS10STM32L432XX = Nothing
+maxIdentifierLength TestPlatform          = Nothing
 
 data PlatformFlags = PlatformFlags {
     rtems5_leon3_nexysa7        :: RTEMS5LEON3NEXYSA7Flags,

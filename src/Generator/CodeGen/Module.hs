@@ -6,6 +6,7 @@ import ControlFlow.BasicBlocks.AST
 import Generator.LanguageC.AST
 import Semantic.Types
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform, maxIdentifierLength)
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Global
 import Generator.CodeGen.Function
@@ -59,20 +60,23 @@ genHeaderFile includeOptionH includeStatusH includeResultH mName imports program
     items <- concat <$> traverse genHeaderASTElement program
     extra <- gets extraImports
     let includeList = genIncludeList (S.toList (S.union (S.fromList imports) extra))
-    return $ CHeaderFile mName $
-        [
-            CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
-            CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
-        ] ++ includeList 
-        ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
-        ++ ([CPPDirective (CPPInclude False "status.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
-        ++ ([CPPDirective (CPPInclude False "result.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
-        ++ items 
-        ++ [
-            CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
-        ]
-    
+    let file = CHeaderFile mName $
+            [
+                CPPDirective (CPPIfNDef defineLabel) (LocatedElement (CPPDirectiveAnn False) Internal),
+                CPPDirective (CPPDefine defineLabel Nothing) (LocatedElement (CPPDirectiveAnn False) Internal),
+                CPPDirective (CPPInclude True "termina.h") (LocatedElement (CPPDirectiveAnn True) Internal)
+            ] ++ includeList
+            ++ ([CPPDirective (CPPInclude False "option.h") (LocatedElement (CPPDirectiveAnn True) Internal) | includeOptionH])
+            ++ ([CPPDirective (CPPInclude False "status.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeStatusH])
+            ++ ([CPPDirective (CPPInclude False "result.h") (LocatedElement (CPPDirectiveAnn False) Internal) | includeResultH])
+            ++ items
+            ++ [
+                CPPDirective CPPEndif (LocatedElement (CPPDirectiveAnn True) Internal)
+            ]
+    plt <- gets targetPlatform
+    checkIdentifierLengths (maxIdentifierLength plt) file
+    return file
+
     where
 
         genIncludeList :: [QualifiedName] -> [CFileItem]
@@ -87,30 +91,33 @@ genSourceFile ::
     -> CGenerator CFile
 genSourceFile mName program = do
     items <- concat <$> traverse genSourceASTElement program
-    return $ CSourceFile mName $
-        CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
-        : items
+    let file = CSourceFile mName $
+            CPPDirective (CPPInclude False (mName <.> "h")) (LocatedElement (CPPDirectiveAnn True) Internal)
+            : items
+    plt <- gets targetPlatform
+    checkIdentifierLengths (maxIdentifierLength plt) file
+    return file
 
 runGenSourceFile :: 
     TerminaConfig 
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName 
     -> AnnotatedProgram SemanticAnn 
     -> Either CGeneratorError CFile
-runGenSourceFile config irqMap mName program = 
-    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config irqMap False) of
+runGenSourceFile config plt mName program =
+    case runState (runExceptT (genSourceFile mName program)) (CGeneratorEnv mName S.empty emptyMonadicTypes config plt False) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file
 
 runGenHeaderFile :: 
     TerminaConfig 
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName 
     -> [QualifiedName] 
     -> AnnotatedProgram SemanticAnn 
     -> MonadicTypes 
     -> Either CGeneratorError (CFile, MonadicTypes)
-runGenHeaderFile config irqMap mName imports program monadicTys = 
+runGenHeaderFile config plt mName imports program monadicTys = 
     let includeOptionH = not (S.null (S.filter (\case {
             TStruct _ -> False;
             TEnum _ -> False;
@@ -128,6 +135,6 @@ runGenHeaderFile config irqMap mName imports program monadicTys =
             }) $ resultTypes monadicTys))
     in
     case runState (runExceptT (genHeaderFile includeOptionH includeStatusH includeResultH mName imports program)) 
-        (CGeneratorEnv mName S.empty monadicTys config irqMap False) of
+        (CGeneratorEnv mName S.empty monadicTys config plt False) of
     (Left err, _) -> Left err
     (Right file, env) -> Right (file, monadicTypes env)

@@ -24,7 +24,7 @@ architectureError input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser error: " ++ show err
   Right ast ->
     let config = defaultConfig "test" TestPlatform
-        env = makeInitialGlobalEnv (Just config) (getPlatformInitialGlobalEnv config TestPlatform)
+        env = makeInitialGlobalEnv (Just config) TestPlatform (getPlatformInitialGlobalEnv config TestPlatform)
         initialProg = getPlatformInitialProgram config TestPlatform
     in case runTypeChecking env (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing error: " ++ show err

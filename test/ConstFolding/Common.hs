@@ -28,14 +28,14 @@ constFoldError input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser error: " ++ show err
   Right ast ->
     let config = defaultConfig "test" TestPlatform
-        env = makeInitialGlobalEnv (Just config) (getPlatformInitialGlobalEnv config TestPlatform)
+        env = makeInitialGlobalEnv (Just config) TestPlatform (getPlatformInitialGlobalEnv config TestPlatform)
     in case runTypeChecking env (typeTerminaModule (S.singleton "test") ast) of
       Left err -> error $ "Typing error: " ++ show err
       Right (typed, _) -> case runGenBBModule typed of
         Left err -> error $ "Basic Blocks error: " ++ show err
         Right bb ->
           let bbModule = TerminaModuleData "test" "test" dummyTime [] [] (pack input) (BasicBlockData bb)
-          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty) (constFoldModule bbModule))
+          in either Just (const Nothing) (runConstFolding (ConstFoldEnv M.empty TestPlatform) (constFoldModule bbModule))
 
 dummyTime :: UTCTime
 dummyTime = UTCTime (fromGregorian 1997 8 29) (secondsToDiffTime 0)

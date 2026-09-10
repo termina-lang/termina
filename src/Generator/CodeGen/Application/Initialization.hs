@@ -4,11 +4,11 @@ module Generator.CodeGen.Application.Initialization where
 
 import Generator.LanguageC.AST
 import Generator.CodeGen.Common
+import Configuration.Platform (Platform)
 import System.FilePath
 import ControlFlow.BasicBlocks.AST
 import Semantic.Types
 import Generator.CodeGen.Statement
-import qualified Data.Map.Strict as M
 import Control.Monad.Except (runExceptT)
 import Configuration.Configuration
 import Generator.LanguageC.Embedded
@@ -95,11 +95,11 @@ genInitFile mName prjprogs = do
 
 runGenInitFile :: 
     TerminaConfig 
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName 
     -> [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either CGeneratorError CFile 
-runGenInitFile config irqMap initFilePath prjprogs = 
+runGenInitFile config plt initFilePath prjprogs = 
     case runState (runExceptT (genInitFile initFilePath prjprogs)) 
-        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config irqMap False) of
+        (CGeneratorEnv initFilePath S.empty emptyMonadicTypes config plt False) of
     (Left err, _) -> Left err
     (Right file, _) -> Right file

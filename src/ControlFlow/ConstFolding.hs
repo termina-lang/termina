@@ -30,8 +30,9 @@ evalConstExpression expr@(BinOp op lhs rhs ann) = do
   lhs' <- evalConstExpression lhs
   rhs' <- evalConstExpression rhs
   ty <- getExprType expr
+  plt <- ST.gets targetPlatform
   case (lhs', rhs') of
-    (c1, c2) -> evalBinOp (getLocation ann) op c1 c2 ty
+    (c1, c2) -> evalBinOp plt (getLocation ann) op c1 c2 ty
 evalConstExpression (Casting expr' ty _) = do
   constExpr <- evalConstExpression expr'
   case constExpr of
@@ -219,6 +220,13 @@ constFoldCheckType loc ty expr = do
         checkSameTy loc' lhsTy rhsTy
       else
         throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
+    checkSameTy loc' lhsArray@(TArray lhsTy _) rhsArray@(TArray rhsTy _) = do
+      lhsArraySizeValue <- getArraySizeValue lhsArray
+      rhsArraySizeValue <- getArraySizeValue rhsArray
+      if lhsArraySizeValue == rhsArraySizeValue then
+        checkSameTy loc' lhsTy rhsTy
+      else
+        throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
     checkSameTy _ _ _ = return ()
 
 constFoldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
@@ -287,7 +295,8 @@ constFoldExpression (MonadicVariantInitializer variant ann) = do
 constFoldExpression e@(BinOp op (Constant lConst@(I {}) _) (Constant rConst@(I {}) _) ann) = do
   ann' <- constFoldAnnotation ann
   ty <- getExprType e
-  fConst <- evalBinOp (getLocation ann) op lConst rConst ty
+  plt <- ST.gets targetPlatform
+  fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
   return $ Constant fConst ann'
 constFoldExpression e@(BinOp op lhs rhs ann) = do
   ann' <- constFoldAnnotation ann
@@ -296,14 +305,27 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
   case (lhs', rhs') of
     (Constant lConst@(I {}) _, Constant rConst@(I {}) _) -> do
       ty <- getExprType e
-      fConst <- evalBinOp (getLocation ann) op lConst rConst ty
+      plt <- ST.gets targetPlatform
+      fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
       return $ Constant fConst ann
     _ -> do
       constFoldCheckComparison (getLocation ann) op lhs' rhs'
+      case (op, rhs') of
+        (BitwiseLeftShift, Constant (I (TInteger k _) _) _)  -> checkShiftAmount k
+        (BitwiseRightShift, Constant (I (TInteger k _) _) _) -> checkShiftAmount k
+        _ -> return ()
       return $ BinOp op lhs' rhs' ann'
+  where
+    checkShiftAmount :: Integer -> ConstFoldMonad ()
+    checkShiftAmount k = do
+      ty <- getExprType lhs
+      plt <- ST.gets targetPlatform
+      when (k >= shiftWidth plt ty) $
+        throwError $ annotateError (getLocation ann) (EShiftAmountOutOfBounds (shiftWidth plt ty) k)
 constFoldExpression (Casting expr ty ann) = do
   ann' <- constFoldAnnotation ann
   expr' <- constFoldExpression expr
+  plt <- ST.gets targetPlatform
   case expr' of
     -- | We only fold integer-to-integer casts, where the result is exact and
     -- thus trivially uniform with C. Any cast involving a floating-point type
@@ -311,7 +333,7 @@ constFoldExpression (Casting expr ty ann) = do
     -- compute a float value statically that could diverge from the target's
     -- IEEE-754 behaviour.
     Constant (I (TInteger i repr) _) _ | intTy ty ->
-      if memberIntCons i ty then
+      if memberIntCons plt i ty then
         return $ Constant (I (TInteger i repr) (Just ty)) ann
       else
         throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
@@ -452,8 +474,9 @@ constFoldCheckComparison loc op lhs rhs
 
     -- | Checks the comparison (e op' constExpr), where e is of type ty.
     checkBounds :: Op -> TerminaType SemanticAnn -> Expression SemanticAnn -> ConstFoldMonad ()
-    checkBounds op' ty constExpr =
-      case intRange ty of
+    checkBounds op' ty constExpr = do
+      plt <- ST.gets targetPlatform
+      case intRange plt ty of
         Nothing -> return ()
         Just (lo, hi) -> do
           value <- evalConstExpression constExpr

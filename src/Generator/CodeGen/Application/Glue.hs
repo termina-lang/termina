@@ -10,6 +10,8 @@ import Generator.CodeGen.Common
 import Semantic.Types
 import ControlFlow.Architecture.Types
 import Configuration.Configuration
+import Configuration.Platform (Platform)
+import Generator.Environment (getPlatformInterruptMap)
 import Generator.LanguageC.Embedded
 import ControlFlow.Architecture.Utils
 import System.FilePath
@@ -72,7 +74,7 @@ genInitTasks progArchitecture = do
                             taskId @: __termina_id_t,
                             taskPrio @: __termina_task_prio_t,
                             taskStackSize @: size_t,
-                            cTaskFunctionName @: __termina_task_entry_t,
+                            addrOf (cTaskFunctionName @: __termina_task_entry_t),
                             addrOf (tskName @: typeDef classId),
                             "status" @: (_const . ptr $ int32_t)
                         ]
@@ -153,7 +155,7 @@ genInitEmitters progArchitecture = do
                     Nothing -> throwError $ InternalError $ "Invalid connection for timer: " ++ show targetEntity
         genEmitterConnection (TPInterruptEmitter irq _) = do
             emitterId <- genDefineEmitterIdLabel irq
-            irqMap <- gets interruptsMap
+            irqMap <- gets (getPlatformInterruptMap . targetPlatform)
             irqVector <- case M.lookup irq irqMap of
                 Just v -> return v
                 Nothing -> throwError $ InternalError $ "Invalid interrupt emitter: " ++ show irq
@@ -669,12 +671,12 @@ genMainFile mName progArchitecture = do
 
 runGenMainFile ::
     TerminaConfig
-    -> M.Map Identifier Integer
+    -> Platform
     -> QualifiedName
     -> TerminaProgArch SemanticAnn
     -> Either CGeneratorError CFile
-runGenMainFile config irqMap mainFilePath progArchitecture =
+runGenMainFile config plt mainFilePath progArchitecture =
     case runState (runExceptT (genMainFile mainFilePath progArchitecture))
-        (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config irqMap False) of
+        (CGeneratorEnv mainFilePath S.empty emptyMonadicTypes config plt False) of
     (Left err, _) -> Left err
     (Right cFile, _) -> Right cFile

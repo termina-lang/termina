@@ -188,19 +188,65 @@ fieldDepClass (ClassViewer _vId _params _type bRet _ann) =
 fieldDepClass (ClassAction _ak _aId _param _type bRet _ann) =
   M.unionWith S.union (fieldDepBlock bRet M.empty)
 
-(<::>) :: Identifier -> Identifier -> Identifier
-(<::>) i1 i2 = i1 ++ "__" ++ i2
+-- | A single projection in an access path.
+data AccessStep
+  = FieldStep Identifier  -- ^ @.field@ or @->field@
+  | IndexStep             -- ^ @[_]@; the subscript is opaque (not recorded)
+  | DerefStep             -- ^ @*@
+  | UnboxStep             -- ^ @unbox@
+  deriving (Eq, Ord, Show)
 
-getMovedHash :: SAST.Object a -> Maybe Identifier -> Identifier
-getMovedHash (SAST.Variable ident _ann) prev =
-  maybe ident (ident <::>) prev
-getMovedHash (SAST.Dereference obj _ann) prev = 
-  getMovedHash obj prev
-getMovedHash (SAST.DereferenceMemberAccess obj mident _ann) prev =
-  getMovedHash obj $ (mident <::>) <$> prev
-getMovedHash (SAST.MemberAccess obj mident _ann) prev =
-  getMovedHash obj $ (mident <::>) <$> prev
-getMovedHash (SAST.ArrayIndexExpression obj _expr _ann) _prev =
-  getMovedHash obj Nothing
-getMovedHash (SAST.Unbox obj _ann) _prev =
-  getMovedHash obj Nothing
+-- | The canonical access path of an lvalue: its root variable plus the chain of
+-- projections from root to leaf. Array indexing and unboxing are opaque steps
+-- that carry no subscript, so two accesses differing only in an array index
+-- share the same path. This is the shared primitive for the analyses that
+-- reason about object identity: the move checker projects it to its root (a
+-- moved box invalidates every access reached through it), while an aliasing
+-- check compares whole paths (distinct struct fields are disjoint storage).
+data AccessPath = AccessPath
+  { accessRoot  :: Identifier    -- ^ the root variable
+  , accessSteps :: [AccessStep]  -- ^ projections, from root to leaf
+  } deriving (Eq, Ord, Show)
+
+-- | Append a projection to an access path.
+stepBy :: AccessPath -> AccessStep -> AccessPath
+stepBy (AccessPath root steps) step = AccessPath root (steps ++ [step])
+
+-- | The canonical access path of an object.
+objectPath :: SAST.Object a -> AccessPath
+objectPath (SAST.Variable ident _ann) = AccessPath ident []
+objectPath (SAST.MemberAccess obj mident _ann) =
+  objectPath obj `stepBy` FieldStep mident
+objectPath (SAST.DereferenceMemberAccess obj mident _ann) =
+  objectPath obj `stepBy` DerefStep `stepBy` FieldStep mident
+objectPath (SAST.Dereference obj _ann) =
+  objectPath obj `stepBy` DerefStep
+objectPath (SAST.ArrayIndexExpression obj _expr _ann) =
+  objectPath obj `stepBy` IndexStep
+objectPath (SAST.Unbox obj _ann) =
+  objectPath obj `stepBy` UnboxStep
+
+-- | The key under which the move checker records a moved object. A move always
+-- concerns a whole box (boxes cannot be struct fields or array elements), and a
+-- moved box must invalidate every subsequent access reached through it, so the
+-- key is the object's root variable.
+getMovedHash :: SAST.Object a -> Identifier
+getMovedHash = accessRoot . objectPath
+
+-- | Whether two access paths may refer to overlapping storage. They must share
+-- a root; from there they are disjoint only if they diverge at a distinct
+-- struct field before any shared array index. Array indices are opaque, so two
+-- elements of the same array may alias; and a prefix relationship (one path
+-- reaches through the other) is an overlap.
+mayAlias :: AccessPath -> AccessPath -> Bool
+mayAlias (AccessPath root1 steps1) (AccessPath root2 steps2) =
+    root1 == root2 && overlap steps1 steps2
+  where
+    overlap xs ys = case (xs, ys) of
+      -- distinct struct fields are disjoint; equal fields keep comparing
+      (FieldStep a : as, FieldStep b : bs) -> a == b && overlap as bs
+      -- dereference and unbox are transparent single-valued indirections
+      (DerefStep : as, DerefStep : bs)     -> overlap as bs
+      (UnboxStep : as, UnboxStep : bs)     -> overlap as bs
+      -- a prefix, or a shared array index: may alias
+      _                                    -> True

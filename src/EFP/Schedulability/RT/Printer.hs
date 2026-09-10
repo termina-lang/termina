@@ -27,7 +27,6 @@ instance RTPrinter TInteger where
 
     pprint (TInteger i DecRepr) = pretty i
     pprint (TInteger i HexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
-    pprint (TInteger i OctalRepr) = pretty "0" <> pretty (showOct i "")
 
 instance RTPrinter (ConstExpression a) where
     pprint (ConstInt intVal _) =

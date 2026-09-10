@@ -26,7 +26,6 @@ instance WCEPathPrinter TInteger where
 
     pprint (TInteger i DecRepr) = pretty i
     pprint (TInteger i HexRepr) = pretty "0x" <> pretty (toUpper <$> showHex i "")
-    pprint (TInteger i OctalRepr) = pretty "0" <> pretty (showOct i "")
 
 instance WCEPathPrinter (ConstExpression a) where
     pprint (ConstInt intVal _) =

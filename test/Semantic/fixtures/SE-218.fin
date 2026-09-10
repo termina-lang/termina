@@ -1,0 +1,16 @@
+#[packed]
+struct Packet {
+    header : u32;
+    flags : u8;
+};
+
+function write_u32(value : &mut u32) {
+    *value = 1 : u32;
+    return;
+}
+
+function trigger() {
+    var pkt : Packet = {header = 0 : u32, flags = 0 : u8};
+    write_u32(&mut pkt.header);
+    return;
+}

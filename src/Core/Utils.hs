@@ -3,6 +3,7 @@
 module Core.Utils where
 
 import Parser.AST
+import Configuration.Platform (Platform, usizeWidth)
 import qualified Data.List as L
 
 copyTy :: TerminaType' expr a -> Bool
@@ -396,25 +397,42 @@ eqTy TChar   = True
 eqTy (TConstSubtype ty) = eqTy ty
 eqTy _      = False
 
--- | Minimum and maximum values of an integer type.
-intRange :: TerminaType' expr a -> Maybe (Integer, Integer)
-intRange TUInt8  = Just (0, 255)
-intRange TUInt16 = Just (0, 65535)
-intRange TUInt32 = Just (0, 4294967295)
-intRange TUInt64 = Just (0, 18446744073709551615)
-intRange TInt8   = Just (-128, 127)
-intRange TInt16  = Just (-32768, 32767)
-intRange TInt32  = Just (-2147483648, 2147483647)
-intRange TInt64  = Just (-9223372036854775808, 9223372036854775807)
--- | TODO: This value depends on the target architecture and shall be selected
--- accordingly. Since we are currently targeting 32-bit systems, we assume that
--- usize is a 32-bit unsigned integer.
-intRange TUSize  = Just (0, 4294967295)
-intRange (TConstSubtype ty) = intRange ty
-intRange _      = Nothing
+-- | Minimum and maximum values of an integer type. The first argument is the
+-- target platform, used for the 'TUSize' case (its width is @usizeWidth@); the
+-- fixed-width types ignore it.
+intRange :: Platform -> TerminaType' expr a -> Maybe (Integer, Integer)
+intRange _ TUInt8  = Just (0, 255)
+intRange _ TUInt16 = Just (0, 65535)
+intRange _ TUInt32 = Just (0, 4294967295)
+intRange _ TUInt64 = Just (0, 18446744073709551615)
+intRange _ TInt8   = Just (-128, 127)
+intRange _ TInt16  = Just (-32768, 32767)
+intRange _ TInt32  = Just (-2147483648, 2147483647)
+intRange _ TInt64  = Just (-9223372036854775808, 9223372036854775807)
+intRange plt TUSize  = Just (0, 2 ^ usizeWidth plt - 1)
+intRange plt (TConstSubtype ty) = intRange plt ty
+intRange _ _      = Nothing
 
-memberIntCons :: Integer -> TerminaType' expr a -> Bool
-memberIntCons i = maybe False (\(lo, hi) -> ( lo <= i ) && ( i <= hi )) . intRange
+-- | Whether a value fits an integer type on the target platform.
+memberIntCons :: Platform -> Integer -> TerminaType' expr a -> Bool
+memberIntCons plt i = maybe False (\(lo, hi) -> ( lo <= i ) && ( i <= hi )) . intRange plt
+
+-- | The bit width of an integer type, used to bound shift amounts (Rule 12.2):
+-- a shift amount must lie in [0, width - 1]. The first argument is the target
+-- platform, used for the 'TUSize' case. The type checker guarantees the operand
+-- is a numeric integer type, so the catch-all is unreachable.
+shiftWidth :: Platform -> TerminaType' expr a -> Integer
+shiftWidth _ TUInt8  = 8
+shiftWidth _ TUInt16 = 16
+shiftWidth _ TUInt32 = 32
+shiftWidth _ TUInt64 = 64
+shiftWidth _ TInt8   = 8
+shiftWidth _ TInt16  = 16
+shiftWidth _ TInt32  = 32
+shiftWidth _ TInt64  = 64
+shiftWidth plt TUSize = usizeWidth plt
+shiftWidth plt (TConstSubtype ty) = shiftWidth plt ty
+shiftWidth _ _ = error "shiftWidth: not an integer type"
 
 getTypeIdentifier :: TypeDef' ty expr blk a -> Identifier
 getTypeIdentifier (Struct ident _ _)        = ident

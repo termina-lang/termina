@@ -18,7 +18,7 @@ import Data.Bits
 -- A value of this type is used to indicate the representation in which the
 -- value was introduced. It will be later used by the code generator to generate
 -- the correspoding literal using the same representation.
-data IntRepr = DecRepr | HexRepr | OctalRepr
+data IntRepr = DecRepr | HexRepr 
   deriving (Show, Eq, Ord)
 
 -- | Termina integers
@@ -66,7 +66,6 @@ instance Bits TInteger where
 instance ShowText TInteger where
     showText (TInteger value DecRepr) = T.pack $ show value
     showText (TInteger value HexRepr) = T.toUpper . T.pack $ "0x" <> showHex value ""
-    showText (TInteger value OctalRepr) = T.pack ("0" <> showOct value "")
 
 data FloatRepr = FPDecimal | FPScientific
   deriving (Show, Eq, Ord)

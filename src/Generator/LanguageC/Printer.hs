@@ -91,7 +91,6 @@ instance CPrint CConstant where
     pprint (CIntConst i) = return $ pretty i
     pprint (CFloatConst f) = return $ pretty f
     pprint (CCharConst c) = return $ pretty c
-    pprint (CStrConst s) = return $ pretty s
 
 rootCType :: CType -> CType
 rootCType ty =

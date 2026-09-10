@@ -25,7 +25,6 @@ import Parser.Errors
 import Utils.Annotations
 import Text.Parsec.Error
 import Semantic.Environment
-import Generator.Environment (getPlatformInterruptMap)
 import Generator.Monadic (emptyMonadicTypes)
 import qualified Data.Set as S
 import System.Directory
@@ -72,7 +71,7 @@ loadSingleModule filePath = do
 typeSingleModule :: ParsedModule -> IO TypedModule
 typeSingleModule parsedModule = do
     let config = (\c -> c{ enableSystemInit = True, enableSystemPort = True }) $ defaultConfig "test" TestPlatform
-        result = runTypeChecking (makeInitialGlobalEnv (Just config) []) (typeTerminaModule (S.singleton (qualifiedName parsedModule)) . parsedAST . metadata $ parsedModule)
+        result = runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton (qualifiedName parsedModule)) . parsedAST . metadata $ parsedModule)
     case result of
         (Left err) ->
             let sourceFilesMap = M.fromList [(fullPath parsedModule, sourcecode parsedModule)] in
@@ -90,7 +89,7 @@ printSourceModule :: Bool -> BasicBlocksModule -> IO ()
 printSourceModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         config = defaultConfig "test" TestPlatform
-    case runGenSourceFile config (getPlatformInterruptMap TestPlatform) (qualifiedName bbModule) tAST of
+    case runGenSourceFile config TestPlatform (qualifiedName bbModule) tAST of
         Left err -> die. errorMessage $ show err
         Right cSourceFile -> TIO.putStrLn $ runCPrinter debugBuild cSourceFile
 
@@ -99,7 +98,7 @@ printHeaderModule debugBuild bbModule = do
     let tAST = basicBlocksAST . metadata $ bbModule
         configParams = defaultConfig "test" TestPlatform
         moduleDeps = (\(ModuleDependency qname _) -> qname) <$> importedModules bbModule
-    case runGenHeaderFile configParams (getPlatformInterruptMap TestPlatform) (qualifiedName bbModule) moduleDeps tAST emptyMonadicTypes of
+    case runGenHeaderFile configParams TestPlatform (qualifiedName bbModule) moduleDeps tAST emptyMonadicTypes of
         Left err -> die . errorMessage $ show err
         Right (cHeaderFile, _) -> TIO.putStrLn $ runCPrinter debugBuild cHeaderFile
 

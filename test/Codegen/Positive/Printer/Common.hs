@@ -10,7 +10,6 @@ import Configuration.Configuration
 import Configuration.Platform
 import Generator.CodeGen.Common
 import Generator.LanguageC.Printer
-import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Semantic.AST
 import Data.Text
@@ -18,7 +17,6 @@ import ControlFlow.BasicBlocks
 import Generator.CodeGen.Statement
 import Generator.CodeGen.TypeDefinition
 import Generator.CodeGen.Function
-import Generator.Environment
 import Generator.Monadic
 
 import Prettyprinter
@@ -183,7 +181,7 @@ funSemAnn params ts = SemanticAnn (ETy (AppType params ts)) Internal
 renderExpression :: Expression SemanticAnn -> Text
 renderExpression expr = 
   let config = defaultConfig "test" TestPlatform in
-  case runState (runExceptT (genExpression expr)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config M.empty False) of
+  case runState (runExceptT (genExpression expr)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
     (Left err, _) -> pack $ show err
     (Right cExpr, _) -> render $ runReader (pprint cExpr) (CPrinterConfig False False)
 
@@ -192,9 +190,8 @@ renderStatement stmt =
   case runExcept (genBBlocks [] [stmt]) of
     Left err -> pack $ show err
     Right bBlocks ->
-      let config = defaultConfig "test" TestPlatform
-          irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap False) of
+      let config = defaultConfig "test" TestPlatform in
+      case runState (runExceptT (Prelude.concat <$> traverse genBlocks bBlocks)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cStmts, _) -> render $ vsep $ runReader (mapM pprint cStmts) (CPrinterConfig False False)
 
@@ -203,9 +200,8 @@ renderTypeDefinitionDecl monTypes decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbDecl ->
-      let config = defaultConfig "test" TestPlatform
-          irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv "test" S.empty monTypes config irqMap False) of
+      let config = defaultConfig "test" TestPlatform in
+      case runState (runExceptT (genTypeDefinitionDecl bbDecl)) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)
 
@@ -214,9 +210,8 @@ renderFunctionDecl monTypes decl =
   case runExcept . genBBAnnASTElement $ decl of
     Left err -> pack $ show err
     Right bbAST -> 
-      let config = defaultConfig "test" TestPlatform
-          irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv "test" S.empty monTypes config irqMap False) of
+      let config = defaultConfig "test" TestPlatform in
+      case runState (runExceptT (genFunctionDecl bbAST)) (CGeneratorEnv "test" S.empty monTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False) 
 
@@ -225,8 +220,7 @@ renderFunction func =
   case runExcept . genBBAnnASTElement $ func of
     Left err -> pack $ show err
     Right bbAST -> 
-      let config = defaultConfig "test" TestPlatform
-          irqMap = getPlatformInterruptMap TestPlatform in
-      case runState (runExceptT (genFunction bbAST)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config irqMap False) of
+      let config = defaultConfig "test" TestPlatform in
+      case runState (runExceptT (genFunction bbAST)) (CGeneratorEnv "test" S.empty emptyMonadicTypes config TestPlatform False) of
         (Left err, _) -> pack $ show err
         (Right cDecls, _) -> render $ vsep $ runReader (mapM pprint cDecls) (CPrinterConfig False False)

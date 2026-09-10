@@ -1,6 +1,9 @@
 module Pipeline.Common
   ( runFullBuild
   , runFullProjectBuild
+  , runFullProjectApp
+  , renderMainFile
+  , renderInitFile
   , buildAndRenderModule
   , compileErrorCode
   , compileProjectErrorCode
@@ -23,14 +26,17 @@ import Semantic.Types (SemanticAnn)
 import Configuration.Configuration (defaultConfig, TerminaConfig)
 import Configuration.Platform (Platform(TestPlatform))
 import Generator.Environment
-    (getPlatformInterruptMap, getPlatformInitialGlobalEnv, getPlatformInitialProgram)
+    (getPlatformInitialGlobalEnv, getPlatformInitialProgram)
 import Generator.CodeGen.Module (runGenSourceFile)
+import Generator.CodeGen.Application.Glue (runGenMainFile)
+import Generator.CodeGen.Application.Initialization (runGenInitFile)
 import Generator.LanguageC.Printer (runCPrinter)
+import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 
 import Command.Types
 import Command.Utils
     (genBasicBlocks, basicBlockPathsCheckModules, useDefCheckModules,
-     getVisibleModules, sortProjectDepsOrLoop)
+     sideEffectCheckModules, getVisibleModules, sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
@@ -62,24 +68,68 @@ import Utils.Errors (ErrorMessage(errorIdent))
 -- comparable 'Text' (@Left@) the spec can assert on, never a process exit.
 runFullProjectBuild :: [(QualifiedName, String)] -> Either Text (M.Map QualifiedName Text)
 runFullProjectBuild sources = do
+  (foldedProject, _, _) <- runProjectPipeline sources
+  mapM renderModule foldedProject
+
+-- | Drives the same full pipeline as 'runFullProjectBuild' but stops before
+-- per-module source rendering, returning the whole-program architecture and
+-- the per-module basic-block programs in dependency order. The application
+-- glue (the @main@ and @init@ files) is generated from these two artifacts
+-- rather than from a single source module, so a spec that wants to exercise
+-- the glue renders it via 'renderMainFile' / 'renderInitFile'.
+runFullProjectApp ::
+  [(QualifiedName, String)]
+  -> Either Text (TerminaProgArch SemanticAnn, [(QualifiedName, AnnotatedProgram SemanticAnn)])
+runFullProjectApp sources = do
+  (foldedProject, ordered, progArch) <- runProjectPipeline sources
+  let prjprogs = [ (m, basicBlocksAST . metadata $ foldedProject M.! m) | m <- ordered ]
+  pure (progArch, prjprogs)
+
+-- | The full pipeline up to (and including) the architecture checks, shared by
+-- 'runFullProjectBuild' (which renders each source module) and
+-- 'runFullProjectApp' (which renders the application glue). Returns the
+-- constant-folded project, the dependency order, and the program architecture.
+runProjectPipeline ::
+  [(QualifiedName, String)]
+  -> Either Text (BasicBlocksProject, [QualifiedName], TerminaProgArch SemanticAnn)
+runProjectPipeline sources = do
   parsedProject <- M.fromList <$> mapM parseModule sources
   ordered <- orderModules parsedProject
   typedProject <- typeProject parsedProject ordered
   bbProject <- stage $ genBasicBlocks typedProject
   noError $ basicBlockPathsCheckModules bbProject
   noError $ useDefCheckModules bbProject
+  noError $ sideEffectCheckModules TestPlatform bbProject
   -- | Constant folding runs before architecture so the architecture pass and
   -- the code generator see every type (array sizes) already folded to literals.
   foldedProject <- foldProject bbProject ordered
   progArch <- genProjectArchitecture foldedProject ordered
   runChecks progArch
-  mapM renderModule foldedProject
+  pure (foldedProject, ordered, progArch)
+
+-- | Render the generated @main@ file (task/emitter installation, the app init
+-- entry point) from a program architecture, collapsing a codegen failure into
+-- the returned 'Text'.
+renderMainFile :: TerminaProgArch SemanticAnn -> Either Text Text
+renderMainFile progArch =
+  case runGenMainFile configParams TestPlatform "main" progArch of
+    Left err -> Left . T.pack $ show err
+    Right cFile -> Right $ runCPrinter False cFile
+
+-- | Render the generated @init@ file (global object initialization and port
+-- wiring) from the per-module basic-block programs, collapsing a codegen
+-- failure into the returned 'Text'.
+renderInitFile :: [(QualifiedName, AnnotatedProgram SemanticAnn)] -> Either Text Text
+renderInitFile prjprogs =
+  case runGenInitFile configParams TestPlatform "init" prjprogs of
+    Left err -> Left . T.pack $ show err
+    Right cFile -> Right $ runCPrinter False cFile
 
 -- | Constant-fold every module in dependency order, threading the constant
 -- environment so a module resolves the constants defined by the modules it
 -- imports. Mirrors @Command.Common.constFolding@ but stays in 'Either'.
 foldProject :: BasicBlocksProject -> [QualifiedName] -> Either Text BasicBlocksProject
-foldProject bbProject = go (ConstFoldEnv M.empty) M.empty
+foldProject bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty
   where
     go _ folded [] = Right folded
     go env folded (m:ms) =
@@ -180,7 +230,7 @@ runChecks progArch =
 
 renderModule :: BasicBlocksModule -> Either Text Text
 renderModule bbModule =
-  case runGenSourceFile configParams irqMap (qualifiedName bbModule)
+  case runGenSourceFile configParams TestPlatform (qualifiedName bbModule)
          (basicBlocksAST . metadata $ bbModule) of
     Left err -> Left . T.pack $ show err
     Right cSourceFile -> Right $ runCPrinter False cSourceFile
@@ -190,11 +240,8 @@ renderModule bbModule =
 configParams :: TerminaConfig
 configParams = defaultConfig "test" TestPlatform
 
-irqMap :: M.Map QualifiedName Integer
-irqMap = getPlatformInterruptMap TestPlatform
-
 initialEnv :: Environment
-initialEnv = makeInitialGlobalEnv (Just configParams)
+initialEnv = makeInitialGlobalEnv (Just configParams) TestPlatform
                (getPlatformInitialGlobalEnv configParams TestPlatform)
 
 initialProg :: TerminaProgArch SemanticAnn

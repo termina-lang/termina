@@ -50,6 +50,7 @@ data Error =
   | EArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   | EAtomicArrayIndexOutOfBounds Integer Integer -- ^ Array index out of bounds
   | EReferencedArraySizeMismatch Integer Integer -- ^ Referenced array size mismatch
+  | EShiftAmountOutOfBounds Integer Integer -- ^ Shift amount out of bounds (width, amount)
   | EInvariantComparison Integer (TerminaType SemanticAnn) Bool -- ^ Comparison against a constant with a fixed result
   deriving Show
 
@@ -72,6 +73,7 @@ instance ErrorMessage ConstFoldError where
     errorIdent (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "CPE-013"
     errorIdent (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "CPE-014"
     errorIdent (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "CPE-015"
+    errorIdent (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "CPE-016"
     errorIdent (AnnotatedError (EInvariantComparison _value _ty _result) _pos) = "CPE-017"
     errorIdent _ = "Internal"
 
@@ -90,6 +92,7 @@ instance ErrorMessage ConstFoldError where
     errorTitle (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "array index out of bounds"
     errorTitle (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "atomic array index out of bounds"
     errorTitle (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "referenced array size mismatch"
+    errorTitle (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "shift amount out of bounds"
     errorTitle (AnnotatedError (EInvariantComparison _value _ty _result) _pos) = "invariant comparison"
     errorTitle (AnnotatedError _err _pos) = "internal error"
 
@@ -172,6 +175,12 @@ instance ErrorMessage ConstFoldError where
                         sourceLines title fileName pos
                         (Just ("The referenced array size is \x1b[31m" <> T.pack (show actualSize) <>
                             "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
+                EShiftAmountOutOfBounds width amount ->
+                    pprintSimpleError
+                        sourceLines title fileName pos
+                        (Just ("The shift amount \x1b[31m" <> T.pack (show amount) <>
+                            "\x1b[0m is greater than or equal to the width \x1b[31m" <> T.pack (show width) <>
+                            "\x1b[0m of the shifted type."))
                 EInvariantComparison value ty result ->
                     pprintSimpleError
                         sourceLines title fileName pos

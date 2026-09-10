@@ -14,31 +14,21 @@ messageTS = TStruct "Message"
 optionBoxUInt32TS :: TerminaType SemanticAnn
 optionBoxUInt32TS = TOption (TBoxSubtype TUInt32)
 
-arrayTS, arrayTMDescriptorTS, twoDimArrayTS :: TerminaType SemanticAnn
+arrayTS, twoDimArrayTS :: TerminaType SemanticAnn
 arrayTS = TArray TUInt32 (buildConstExprTUSize 10)
-arrayTMDescriptorTS = TArray tmDescriptorTS (buildConstExprTUSize 2)
 twoDimArrayTS = TArray (TArray TInt64 (buildConstExprTUSize 2)) (buildConstExprTUSize 2)
 
 optionBoxUInt32ExprSemAnn :: SemanticAnn
 optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
-arrayObjAnn, twoDymArrayObjAnn :: SemanticAnn
-arrayObjAnn = arrayObjSemAnn Mutable TUInt32 (buildConstExprTUSize 10)
-twoDymArrayObjAnn = twoDymArrayObjSemAnn Mutable TInt64 (buildConstExprTUSize 5) (buildConstExprTUSize 10)
-
-arrayExprAnn, arrayTMDescriptorExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
+arrayExprAnn, twoDymArrayExprAnn, twoDymArrayRowExprAnn :: SemanticAnn
 arrayExprAnn = arrayExprSemAnn TUInt32 (buildConstExprTUSize 10)
-arrayTMDescriptorExprAnn = arrayExprSemAnn tmDescriptorTS (buildConstExprTUSize 2)
 twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (buildConstExprTUSize 2)
 twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (buildConstExprTUSize 2) (buildConstExprTUSize 2)
 
-array0 :: Expression SemanticAnn
-array0 = AccessObject (Variable "array0" arrayObjAnn)
-
-array3, array4, array5 :: Statement SemanticAnn
+array3, array4 :: Statement SemanticAnn
 array3 = Declaration "array3" Mutable arrayTS (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn
 array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (buildConstExprTUSize 2) twoDymArrayRowExprAnn) (buildConstExprTUSize 2) twoDymArrayExprAnn) stmtSemAnn
-array5 = Declaration "array5" Mutable arrayTMDescriptorTS (ArrayInitializer tmDescriptorFieldsInit0 (buildConstExprTUSize 2) arrayTMDescriptorExprAnn) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
