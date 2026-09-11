@@ -277,11 +277,7 @@ __termina_app__init_tasks = "__termina_app__init_tasks" @:
 
 __termina_app__init_handlers :: CExpression
 __termina_app__init_handlers = "__termina_app__init_handlers" @:
-    CTFunction void
-        [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
-        ]
+    CTFunction void []
 
 __termina_app__install_emitters :: CExpression
 __termina_app__install_emitters = "__termina_app__install_emitters" @:
@@ -297,11 +293,7 @@ __termina_app__enable_protection = "__termina_app__enable_protection" @:
 
 __termina_app__init_channel_connections :: CExpression
 __termina_app__init_channel_connections = "__termina_app__init_channel_connections" @:
-    CTFunction void
-        [
-            -- | int32_t * const status
-            _const . ptr $ int32_t
-        ]
+    CTFunction void []
 
 __termina_app__init_msg_queues :: CExpression
 __termina_app__init_msg_queues = "__termina_app__init_msg_queues" @:

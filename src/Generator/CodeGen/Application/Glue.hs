@@ -27,14 +27,31 @@ import Control.Monad.State
 import qualified Data.Set as S
 import Utils.Annotations
 
-genInitHandlers :: TerminaProgArch a -> CGenerator CFileItem
+-- | Body of an initialization function that can fail, given the declarations of
+-- the local variables that its steps share and the steps. The status is an
+-- output: the function sets it to zero, performs the first step and performs
+-- each of the rest only while the status is still zero.
+genStatusSteps :: [CCompoundBlockItem] -> [[CCompoundBlockItem]] -> [CCompoundBlockItem]
+genStatusSteps declarations steps =
+    declarations ++
+    pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t) :
+        case steps of
+            [] -> []
+            (firstStep : restSteps) -> firstStep ++ map statusCheck restSteps
+
+    where
+
+        statusCheck :: [CCompoundBlockItem] -> CCompoundBlockItem
+        statusCheck items =
+            pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+                $ trail_cr . block $ items
+
+genInitHandlers :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitHandlers progArchitecture = do
     let progHandlers = M.elems $ handlers progArchitecture
     initHandlers <- mapM genOSALHandlerInit progHandlers
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_handlers") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initHandlers
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_handlers") [] @-> void $
+            trail_cr . block $ initHandlers | not (null initHandlers)]
 
     where
 
@@ -44,17 +61,15 @@ genInitHandlers progArchitecture = do
             return $ pre_cr $
                 handlerName hndlr @: typeDef (handlerClass hndlr) @. handlerIDField @: __termina_id_t @= handlerId @: __termina_id_t
 
-genInitTasks :: TerminaProgArch a -> CGenerator CFileItem
+genInitTasks :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitTasks progArchitecture = do
     let progTasks = M.elems $ tasks progArchitecture
     initTasks <- mapM genOSALTaskInit progTasks
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_tasks") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initTasks
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_tasks") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $ genStatusSteps [] initTasks | not (null initTasks)]
 
     where
-        genOSALTaskInit :: TPTask a -> CGenerator CCompoundBlockItem
+        genOSALTaskInit :: TPTask a -> CGenerator [CCompoundBlockItem]
         genOSALTaskInit tsk = do
             taskId <- genDefineTaskIdLabel (taskName tsk)
             taskMsgQueueId <- genDefineTaskMsgQueueIdLabel (taskName tsk)
@@ -63,34 +78,38 @@ genInitTasks progArchitecture = do
                 taskPrio = getCInteger . getPriority $ tsk
                 taskStackSize = getCInteger . getStackSize $ tsk
             cTaskFunctionName <- taskFunctionName classId
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        pre_cr $ tskName @: typeDef classId @. taskIDField @: __termina_id_t
-                            @= taskId @: __termina_id_t,
-                        pre_cr $ tskName @: typeDef classId @. namefy "task_msg_queue_id" @: __termina_id_t
-                            @= taskMsgQueueId @: __termina_id_t,
-                        pre_cr $ __termina_task__init @@ [
-                            taskId @: __termina_id_t,
-                            taskPrio @: __termina_task_prio_t,
-                            taskStackSize @: size_t,
-                            addrOf (cTaskFunctionName @: __termina_task_entry_t),
-                            addrOf (tskName @: typeDef classId),
-                            "status" @: (_const . ptr $ int32_t)
-                        ]
+            return [
+                    pre_cr $ tskName @: typeDef classId @. taskIDField @: __termina_id_t
+                        @= taskId @: __termina_id_t,
+                    pre_cr $ tskName @: typeDef classId @. namefy "task_msg_queue_id" @: __termina_id_t
+                        @= taskMsgQueueId @: __termina_id_t,
+                    pre_cr $ __termina_task__init @@ [
+                        taskId @: __termina_id_t,
+                        taskPrio @: __termina_task_prio_t,
+                        taskStackSize @: size_t,
+                        addrOf (cTaskFunctionName @: __termina_task_entry_t),
+                        addrOf (tskName @: typeDef classId),
+                        "status" @: (_const . ptr $ int32_t)
+                    ]
                 ]
 
 -- | Function __termina_app__install_emitters. This function is called from the
 -- Init task.  The function installs the ISRs and the periodic timers. The
 -- function is called AFTER the initialization of the tasks and handlers.
-genInitEmitters :: TerminaProgArch a -> CGenerator CFileItem
+genInitEmitters :: TerminaProgArch a -> CGenerator [CFileItem]
 genInitEmitters progArchitecture = do
     let progEmitters = M.elems $ emitters progArchitecture
-    initEmitter <- mapM genOSALEmitterInit $ filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_emitters") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initEmitter
+    let installedEmitters = filter (\case { TPSystemInitEmitter {} -> False; _ -> True }) progEmitters
+        -- | The OSAL copies the connection, so all the timers share one
+        -- connection variable and all the interrupts share another one
+        declarations =
+            [pre_cr $ var "timer_connection" __termina_periodic_timer_connection_t
+                | any (\case { TPPeriodicTimerEmitter {} -> True; _ -> False }) installedEmitters]
+            ++ [pre_cr $ var "interrupt_connection" __termina_interrupt_connection_t
+                | any (\case { TPInterruptEmitter {} -> True; _ -> False }) installedEmitters]
+    initEmitter <- mapM genEmitterConnection installedEmitters
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_emitters") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $ genStatusSteps declarations initEmitter | not (null initEmitter)]
 
     where
 
@@ -110,19 +129,18 @@ genInitEmitters progArchitecture = do
                         (_, targetAction) = sinkPorts cls M.! targetPort
                     handlerId <- genDefineHandlerIdLabel identifier
                     return [
-                            pre_cr $ var "connection" __termina_periodic_timer_connection_t,
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
+                            pre_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                 @= "__termina_emitter_connection_type__handler" @: enumFieldType,
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
+                            no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_object" @: ptr void @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
+                            no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_id" @: __termina_periodic_timer_action_t @= handlerId @: size_t,
-                            no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
+                            no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "handler" @: __termina_periodic_timer_handler_connection_t
                                 @. "handler_action" @: __termina_periodic_timer_action_t @= classId <::> targetAction @: __termina_periodic_timer_action_t,
                             pre_cr $ __termina_periodic_timer__init @@ [
                                 timerId @: __termina_id_t,
                                 emitterId @: __termina_id_t,
-                                addrOf ("connection" @: __termina_periodic_timer_connection_t),
+                                addrOf ("timer_connection" @: __termina_periodic_timer_connection_t),
                                 addrOf (timer @: __termina_periodic_timer_t @. "period" @: _TimeVal),
                                 "status" @: (_const . ptr $ int32_t)
                             ]
@@ -133,21 +151,20 @@ genInitEmitters progArchitecture = do
                         taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
                         sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
                         return [
-                                pre_cr $ var "connection" __termina_periodic_timer_connection_t,
-                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
+                                pre_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "type" @: enumFieldType
                                     @= "__termina_emitter_connection_type__task" @: enumFieldType,
-                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "task_msg_queue_id" @: __termina_id_t @= taskMsgQueueId @: __termina_id_t,
-                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_msgq_id" @: __termina_id_t @= sinkMsgQueueId @:  __termina_id_t,
-                                no_cr $ "connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "timer_connection" @: __termina_periodic_timer_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_port_id" @: __termina_id_t @= variantForPort @:  __termina_id_t,
                                 pre_cr $ targetEntity @: typeDef tskCls @. targetPort @: __termina_id_t
                                     @= sinkMsgQueueId @: __termina_id_t,
                                 pre_cr $ __termina_periodic_timer__init @@ [
                                     timerId @: __termina_id_t,
                                     emitterId @: __termina_id_t,
-                                    addrOf ("connection" @: __termina_periodic_timer_connection_t),
+                                    addrOf ("timer_connection" @: __termina_periodic_timer_connection_t),
                                     addrOf (timer @: __termina_periodic_timer_t @. "period" @: _TimeVal),
                                     "status" @: (_const . ptr $ int32_t)
                                 ]
@@ -172,19 +189,18 @@ genInitEmitters progArchitecture = do
                         (_, targetAction) = sinkPorts cls M.! targetPort
                     handlerId <- genDefineHandlerIdLabel identifier
                     return [
-                            pre_cr $ var "connection" __termina_interrupt_connection_t,
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
+                            pre_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                 @= "__termina_emitter_connection_type__handler" @: enumFieldType,
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
+                            no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
                                 @. "handler_object" @: ptr void @= cast (ptr void) (addrOf (identifier @: typeDef classId)),
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
+                            no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
                                 @. "handler_id" @: __termina_interrupt_action_t @= handlerId @: size_t,
-                            no_cr $ "connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
+                            no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "handler" @: __termina_interrupt_handler_connection_t
                                 @. "handler_action" @: __termina_interrupt_action_t @= classId <::> targetAction @: __termina_interrupt_action_t,
                             pre_cr $ __termina_interrupt__init @@ [
                                 dec irqVector @: __termina_id_t,
                                 emitterId @: __termina_id_t,
-                                addrOf ("connection" @: __termina_interrupt_connection_t),
+                                addrOf ("interrupt_connection" @: __termina_interrupt_connection_t),
                                 "status" @: (_const . ptr $ int32_t)
                             ]
                         ]
@@ -194,87 +210,61 @@ genInitEmitters progArchitecture = do
                         taskMsgQueueId <- genDefineTaskMsgQueueIdLabel targetEntity
                         sinkMsgQueueId <- genDefineSinkMsgQueueIdLabel targetEntity targetPort
                         return [
-                                pre_cr $ var "connection" __termina_interrupt_connection_t,
-                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
+                                pre_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "type" @: enumFieldType
                                     @= "__termina_emitter_connection_type__task" @: enumFieldType,
-                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "task_msg_queue_id" @: __termina_id_t @= taskMsgQueueId @: __termina_id_t,
-                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_msgq_id" @: __termina_id_t @= sinkMsgQueueId @:  __termina_id_t,
-                                no_cr $ "connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
+                                no_cr $ "interrupt_connection" @: __termina_interrupt_connection_t @. "task" @: __termina_emitter_task_connection_t
                                     @. "sink_port_id" @: __termina_id_t @= variantForPort @:  __termina_id_t,
                                 pre_cr $ targetEntity @: typeDef tskCls @. targetPort @: __termina_id_t
                                     @= sinkMsgQueueId @: __termina_id_t,
                                 pre_cr $ __termina_interrupt__init @@ [
                                     dec irqVector @: __termina_id_t,
                                     emitterId @: __termina_id_t,
-                                    addrOf ("connection" @: __termina_interrupt_connection_t),
+                                    addrOf ("interrupt_connection" @: __termina_interrupt_connection_t),
                                     "status" @: (_const . ptr $ int32_t)
                                 ]
                             ]
                     Nothing -> throwError $ InternalError $ "Invalid connection for interrupt: " ++ show targetEntity
         genEmitterConnection _ = throwError $ InternalError "Invalid event emitter"
 
-        genOSALEmitterInit :: TPEmitter a -> CGenerator CCompoundBlockItem
-        genOSALEmitterInit timer@(TPPeriodicTimerEmitter {}) = do
-            periodicTimerConnection <- genEmitterConnection timer
-            -- | Obtain the identifier of the target entity and the port to which the
-            -- interrupt emitter is connected
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ periodicTimerConnection
-        genOSALEmitterInit irq@(TPInterruptEmitter {}) = do
-            interruptConnection <- genEmitterConnection irq
-            -- | Obtain the identifier of the target entity and the port to which the
-            -- interrupt emitter is connected
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ interruptConnection
-        genOSALEmitterInit _ = throwError $ InternalError "Invalid event emitter"
-
 -- | Function __termina_app__init_mutexes. This function is called from the
 -- Init task.  The function initializes the mutexes. The function is called AFTER
 -- the execution of the init handler (if any) and before the initialization of the
 -- resource locking mechanism.
-genInitMutexes :: ResourceLockingMap -> CGenerator CFileItem
+genInitMutexes :: ResourceLockingMap -> CGenerator [CFileItem]
 genInitMutexes mutexes = do
     let mutexesList = M.toList mutexes
     initMutexes <- mapM genOSALMutexInit mutexesList
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initMutexes
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_mutexes") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $ genStatusSteps [pre_cr $ var "protocol" _MutexProtocol] initMutexes | not (null initMutexes)]
 
     where
-        genOSALMutexInit :: (Identifier, ResourceLock) -> CGenerator CCompoundBlockItem
+        genOSALMutexInit :: (Identifier, ResourceLock) -> CGenerator [CCompoundBlockItem]
         genOSALMutexInit (identifier, ResourceLockMutex ceilingPriority) = do
             mutexId <- genDefineMutexIdLabel identifier
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        -- MutexProtocol protocol;
-                        pre_cr $ var "protocol" _MutexProtocol,
-                        -- protocol.__variant = MutexProtocol__Ceiling;
-                        no_cr $ "protocol" @: _MutexProtocol @. variant @: enumFieldType @= "MutexProtocol__Ceiling" @: enumFieldType,
-                        -- protocol.Ceiling.__0 = ceiling_priority;
-                        no_cr $ "protocol" @: _MutexProtocol @. "Ceiling" @: enumFieldType @. namefy "0" @: __termina_task_prio_t @= getCInteger ceilingPriority @: __termina_task_prio_t,
-                        -- __termina_mutex__init(mutex_id, protocol, status);
-                        pre_cr $ __termina_mutex__init @@ [
-                            mutexId @: __termina_id_t,
-                            "protocol" @: _MutexProtocol,
-                            "status" @: (_const . ptr $ int32_t)
-                        ]
+            return [
+                    -- protocol.__variant = MutexProtocol__Ceiling;
+                    pre_cr $ "protocol" @: _MutexProtocol @. variant @: enumFieldType @= "MutexProtocol__Ceiling" @: enumFieldType,
+                    -- protocol.Ceiling.__0 = ceiling_priority;
+                    no_cr $ "protocol" @: _MutexProtocol @. "Ceiling" @: enumFieldType @. namefy "0" @: __termina_task_prio_t @= getCInteger ceilingPriority @: __termina_task_prio_t,
+                    -- __termina_mutex__init(mutex_id, protocol, status);
+                    pre_cr $ __termina_mutex__init @@ [
+                        mutexId @: __termina_id_t,
+                        "protocol" @: _MutexProtocol,
+                        "status" @: (_const . ptr $ int32_t)
+                    ]
                 ]
         genOSALMutexInit _ = throwError $ InternalError "Invalid resource lock"
 
-genChannelConnections :: TerminaProgArch a -> CGenerator CFileItem
+genChannelConnections :: TerminaProgArch a -> CGenerator [CFileItem]
 genChannelConnections progArchitecture = do
     let targets = M.toList $ channelTargets progArchitecture
     channelConnections <- concat <$> traverse genChannelConnection targets
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : channelConnections
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_channel_connections") [] @-> void $
+            trail_cr . block $ channelConnections | not (null channelConnections)]
 
     where
 
@@ -305,99 +295,86 @@ genChannelConnections progArchitecture = do
                         @= channelMsgQueueId @: __termina_id_t
                 ]
 
-genInitPools :: [TPPool SemanticAnn] -> CGenerator CFileItem
+genInitPools :: [TPPool SemanticAnn] -> CGenerator [CFileItem]
 genInitPools pls = do
     initPools <- mapM genPoolInit pls
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initPools
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_pools") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $ genStatusSteps [] initPools | not (null initPools)]
 
     where
 
-        genPoolInit :: TPPool SemanticAnn -> CGenerator CCompoundBlockItem
+        genPoolInit :: TPPool SemanticAnn -> CGenerator [CCompoundBlockItem]
         genPoolInit (TPPool identifier ts _ _ _) = do
             cTs <- genType noqual ts
             poolId <- genDefinePoolIdLabel identifier
-            return $
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        pre_cr $ identifier @: __termina_pool_t @. namefy "pool_id" @: __termina_id_t
-                            @= poolId @: __termina_id_t,
-                        pre_cr $ __termina_pool__init @@
-                                [
-                                    addrOf (identifier @: ptr __termina_pool_t),
-                                    cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
-                                    _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
-                                    _sizeOfType cTs,
-                                    "status" @: (_const . ptr $ int32_t)
-                                ]
+            return [
+                    pre_cr $ identifier @: __termina_pool_t @. namefy "pool_id" @: __termina_id_t
+                        @= poolId @: __termina_id_t,
+                    pre_cr $ __termina_pool__init @@
+                            [
+                                addrOf (identifier @: ptr __termina_pool_t),
+                                cast (ptr void) (poolMemoryArea identifier @: ptr uint8_t),
+                                _sizeOfExpr (poolMemoryArea identifier @: ptr uint8_t),
+                                _sizeOfType cTs,
+                                "status" @: (_const . ptr $ int32_t)
+                            ]
                 ]
 
-genInitMessageQueues :: [OSALMsgQueue] -> CGenerator CFileItem
+genInitMessageQueues :: [OSALMsgQueue] -> CGenerator [CFileItem]
 genInitMessageQueues queues = do
     initMsgQueues <- concat <$> traverse genOSALMsgQueueInit queues
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ int32_t)] @-> void $
-            trail_cr . block $
-                pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t)
-                : initMsgQueues
+    return [pre_cr $ static_function (namefy "termina_app" <::> "init_msg_queues") ["status" @: (_const . ptr $ int32_t)] @-> void $
+            trail_cr . block $ genStatusSteps [] initMsgQueues | not (null initMsgQueues)]
 
     where
-        genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [CCompoundBlockItem]
+        -- | Steps that initialize a message queue: one step, or none if the
+        -- queue does not need a definition
+        genOSALMsgQueueInit :: OSALMsgQueue -> CGenerator [[CCompoundBlockItem]]
         genOSALMsgQueueInit mq@(OSALTaskMsgQueue _ _ size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
-            return [
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                    $ trail_cr . block $ [
-                        pre_cr $ __termina_msg_queue__init @@ [
-                            msgQueueId @: __termina_id_t,
-                            _sizeOfType __termina_event_t,
-                            cSize,
-                            "status" @: (_const . ptr $ int32_t)
-                        ]
+            return [[
+                    pre_cr $ __termina_msg_queue__init @@ [
+                        msgQueueId @: __termina_id_t,
+                        _sizeOfType __termina_event_t,
+                        cSize,
+                        "status" @: (_const . ptr $ int32_t)
                     ]
-                ]
+                ]]
         -- | Message queues with unit type do not need a definition
         genOSALMsgQueueInit (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
             cTs <- genType noqual ty
-            return [
-                    pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
+            return [[
                             pre_cr $ __termina_msg_queue__init @@ [
                                 msgQueueId @: __termina_id_t,
                                 _sizeOfType cTs,
                                 cSize,
                                 "status" @: (_const . ptr $ int32_t)
                             ]
-                    ]
-                ]
+                ]]
         genOSALMsgQueueInit mq@(OSALSinkPortMsgQueue _ _ _ ty size) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
             cSize <- genExpression size
             cTs <- genType noqual ty
-            return [
-                    pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
+            return [[
                             pre_cr $ __termina_msg_queue__init @@ [
                                 msgQueueId @: __termina_id_t,
                                 _sizeOfType cTs,
                                 cSize,
                                 "status" @: (_const . ptr $ int32_t)
                             ]
-                    ]
-                ]
+                ]]
 
-genEnableProtection :: TerminaProgArch SemanticAnn -> CGenerator CFileItem
+genEnableProtection :: TerminaProgArch SemanticAnn -> CGenerator [CFileItem]
 genEnableProtection progArchitecture = do
     resourceProtections <- concat <$> forM (M.elems $ resources progArchitecture) genEnableProtectionResource
     poolProtections <- concat <$> forM (M.elems $ pools progArchitecture) genEnableProtectionPool
-    return $ pre_cr $ static_function (namefy "termina_app" <::> "enable_protection") [] @-> void $
-            trail_cr . block $
-                resourceProtections ++ poolProtections
+    let protections = resourceProtections ++ poolProtections
+    return [pre_cr $ static_function (namefy "termina_app" <::> "enable_protection") [] @-> void $
+            trail_cr . block $ protections | not (null protections)]
 
     where
 
@@ -566,8 +543,14 @@ genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
                 ]
 genInitalEventFunction _ _ = throwError $ InternalError "Invalid event emitter"
 
-genAppInit :: TerminaProgArch a -> CGenerator CFileItem
-genAppInit progArchitecture = do
+-- | Step of the application initialization: the call to the function that
+-- performs it, whether that function can fail (and then receives the status)
+-- and the definition of the function. A step whose definition is empty has
+-- nothing to initialize and is neither defined nor called.
+data InitStep = InitStep CExpression Bool [CFileItem]
+
+genAppInit :: [InitStep] -> CGenerator CFileItem
+genAppInit initSteps = do
     return $ pre_cr $ function (namefy "termina_app" <::> "init") [
             "status" @: (_const . ptr $ int32_t)
         ] @-> void $
@@ -576,48 +559,39 @@ genAppInit progArchitecture = do
                 pre_cr (deref ("status" @: (_const . ptr $ int32_t)) @= dec 0 @: int32_t),
                 -- | External call to __termina_app__init_globals().
                 -- This function cannot fail, so we do not check the status.
-                pre_cr $ __termina_app__init_globals @@ [],
-                pre_cr $ __termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ int32_t)]
-            ] ++
-            [
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_channel_connections @@ ["status" @: (_const . ptr $ int32_t)]
-                        ]
-            ] ++
-            [
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_pools @@ ["status" @: (_const . ptr $ int32_t)]
-                        ]
-            ] ++ ([pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__initial_event @@ []
-                        ] | any (\case { TPSystemInitEmitter {} -> True; _ -> False }) (emitters progArchitecture)]) ++
-            [
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_mutexes @@ ["status" @: (_const . ptr $ int32_t)]
-                        ]
-            ] ++
-            [
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__enable_protection @@ []
-                        ],
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_emitters @@ ["status" @: (_const . ptr $ int32_t)]
-                        ],
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_handlers @@ ["status" @: (_const . ptr $ int32_t)]
-                        ],
-                pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
-                        $ trail_cr . block $ [
-                            pre_cr $ __termina_app__init_tasks @@ ["status" @: (_const . ptr $ int32_t)]
-                        ]
-            ]
+                pre_cr $ __termina_app__init_globals @@ []
+            ] ++ unguardedCalls (filter (\(InitStep _ _ definition) -> not (null definition)) initSteps)
+
+    where
+
+        stepCall :: InitStep -> CCompoundBlockItem
+        stepCall (InitStep call _ _) = pre_cr call
+
+        canFail :: InitStep -> Bool
+        canFail (InitStep _ fails _) = fails
+
+        -- | The steps up to the first one that can fail are called without
+        -- checking the status, which is still zero.
+        unguardedCalls :: [InitStep] -> [CCompoundBlockItem]
+        unguardedCalls steps =
+            case break canFail steps of
+                (before, []) -> map stepCall before
+                (before, step : after) -> map stepCall (before ++ [step]) ++ guardedCalls after
+
+        -- | Each of the remaining steps is called only while the status is zero.
+        -- The steps that cannot fail do not change the status, so they share
+        -- the check with the next step that can fail.
+        guardedCalls :: [InitStep] -> [CCompoundBlockItem]
+        guardedCalls [] = []
+        guardedCalls steps =
+            case break canFail steps of
+                (before, []) -> [statusCheck before]
+                (before, step : after) -> statusCheck (before ++ [step]) : guardedCalls after
+
+        statusCheck :: [InitStep] -> CCompoundBlockItem
+        statusCheck steps =
+            pre_cr $ _if (dec 0 @: int32_t @== deref ("status" @: (_const . ptr $ int32_t)))
+                $ trail_cr . block $ map stepCall steps
 
 genMainFile :: QualifiedName
     -> TerminaProgArch SemanticAnn
@@ -648,15 +622,26 @@ genMainFile mName progArchitecture = do
             genInitalEventFunction progArchitecture systemInitEmitter
         _ -> return [])
 
-    appInit <- genAppInit progArchitecture
+    -- | The steps are listed in the order in which they are called
+    appInit <- genAppInit [
+            InitStep (__termina_app__init_msg_queues @@ ["status" @: (_const . ptr $ int32_t)]) True initMessageQueues,
+            InitStep (__termina_app__init_channel_connections @@ []) False channelConnections,
+            InitStep (__termina_app__init_pools @@ ["status" @: (_const . ptr $ int32_t)]) True initPools,
+            InitStep (__termina_app__initial_event @@ []) False initialEventFunction,
+            InitStep (__termina_app__init_mutexes @@ ["status" @: (_const . ptr $ int32_t)]) True initMutexes,
+            InitStep (__termina_app__enable_protection @@ []) False enableProtection,
+            InitStep (__termina_app__init_emitters @@ ["status" @: (_const . ptr $ int32_t)]) True initEmitters,
+            InitStep (__termina_app__init_handlers @@ []) False initHandlers,
+            InitStep (__termina_app__init_tasks @@ ["status" @: (_const . ptr $ int32_t)]) True initTasks
+        ]
 
     return $ CSourceFile mName $ [
             -- #include <termina.h>
             includeTermina
         ] ++ includes
         ++ cPoolMemoryAreas
-        ++ [initTasks, initHandlers, initEmitters, initMutexes, initPools, initMessageQueues,
-            enableProtection, channelConnections] ++ initialEventFunction
+        ++ initTasks ++ initHandlers ++ initEmitters ++ initMutexes ++ initPools ++ initMessageQueues
+        ++ enableProtection ++ channelConnections ++ initialEventFunction
         ++ [appInit]
 
     where
