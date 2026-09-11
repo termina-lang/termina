@@ -7,7 +7,7 @@ module VarUsage.Negative.DetailSpec
   , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
   , testVE011, testVE012, testVE013, testVE014, testVE016, testVE016_1
-  , testVE015, testVE017, testVE017_1
+  , testVE015, testVE017, testVE017_1, testVE018, testVE018_1, testVE018_2
   ) where
 
 import Test.Hspec
@@ -370,6 +370,33 @@ testVE017_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
+testVE018 :: String
+testVE018 = "function fun0() -> u32 {\n" ++
+       "    var x : u32 = 0 : u32;\n" ++
+       "    x = 1 : u32;\n" ++
+       "    x = 2 : u32;\n" ++
+       "    return x;\n" ++
+       "}\n"
+
+testVE018_1 :: String
+testVE018_1 = "function fun0(c : bool) -> u32 {\n" ++
+       "    var x : u32 = 0 : u32;\n" ++
+       "    if (c) {\n" ++
+       "        x = 1 : u32;\n" ++
+       "    }\n" ++
+       "    x = 2 : u32;\n" ++
+       "    return x;\n" ++
+       "}\n"
+
+testVE018_2 :: String
+testVE018_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
+       "    var last : u32 = 0 : u32;\n" ++
+       "    for i : usize in 0 : usize .. 10 : usize {\n" ++
+       "        last = (*array0)[i];\n" ++
+       "    }\n" ++
+       "    return 0 : u32;\n" ++
+       "}\n"
+
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
@@ -457,6 +484,18 @@ spec = do
       runNegativeTestVarUsage testVE017_1
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
+    it "VE-018: value assigned and overwritten before being read" $ do
+      runNegativeTestVarUsage testVE018
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "x"
+    it "VE-018: value assigned in a branch and overwritten after it" $ do
+      runNegativeTestVarUsage testVE018_1
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "x"
+    it "VE-018: value assigned in a loop and never read" $ do
+      runNegativeTestVarUsage testVE018_2
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "last"
 
   where
 
@@ -507,6 +546,9 @@ spec = do
 
     isEActionSelfNotUsed :: Identifier -> Maybe Error -> Bool
     isEActionSelfNotUsed inIdent = \case Just (EActionSelfNotUsed ident) -> (inIdent == ident); _ -> False
+
+    isEAssignedValueNotUsed :: Identifier -> Maybe Error -> Bool
+    isEAssignedValueNotUsed inIdent = \case Just (EAssignedValueNotUsed ident) -> (inIdent == ident); _ -> False
 
     isEMemberFunctionNotUsed :: Identifier -> Maybe Error -> Bool
     isEMemberFunctionNotUsed inIdent = \case Just (EMemberFunctionNotUsed ident) -> (inIdent == ident); _ -> False

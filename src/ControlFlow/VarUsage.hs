@@ -166,7 +166,9 @@ useDefStmt (AssignmentStmt obj e ann) = do
             Variable ident _ -> allocOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
         _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-    _ -> useObject obj >> useExpression e
+    _ -> case obj of
+      Variable ident _ -> defAssignedVariable ident (getLocation ann) >> useExpression e
+      _ -> useObject obj >> useExpression e
 useDefStmt (SingleExpStmt e _ann)
   = useExpression e
 
@@ -190,21 +192,43 @@ useDefBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
    -- set of used boxes must be equal.
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
+  -- The values read afterwards are the ones read in any branch, and also the
+  -- ones read after the if when there is no else branch.
+  let branchesLive = S.unions (map (liveVarSet . fst) sets)
+  putLiveVarSet (maybe (S.union branchesLive (liveVarSet prevSt)) (const branchesLive) bFalse)
    -- Use the else-ifs conditional expressions
   mapM_ (useExpression . condElseIfCond) elseIfs
   -- Finally, use the if conditional expression
   useExpression (condIfCond condIf)
 useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     prevSt <- ST.get
+    -- The guard is evaluated before each iteration, so the variables it reads
+    -- are read at the head of the loop, together with the ones read after it.
+    guardLive <- runEncapsWithEmptyVars
+      (putLiveVarSet S.empty >> maybe (return ()) useExpression mBrk >> ST.gets liveVarSet)
+    headLive <- loopHeadLive (S.union guardLive (liveVarSet prevSt))
     -- What happens inside the body of a for, may not happen at all.
-    loopSt <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody block) >> ST.get)
+    loopSt <- runEncapsWithEmptyVars (putLiveVarSet headLive >> useDefBasicBlocks (blockBody block) >> ST.get)
     finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
+    putLiveVarSet headLive
     maybe (return ()) useExpression mBrk
     -- Use the expressions of the for loop bounds, just in case they contain
     -- references to const input parameters.
     useExpression eB
     useExpression eE
+
+  where
+
+    -- | Variables read at the head of the loop. A value assigned in an
+    -- iteration may be read in the next one, so the body is analyzed, without
+    -- checking the assigned values, until the set does not change.
+    loopHeadLive :: VarSet -> UDM VarUsageError VarSet
+    loopHeadLive live = do
+      bodyLive <- runEncapsWithEmptyVars (withUncheckedAssignments
+        (putLiveVarSet live >> useDefBasicBlocks (blockBody block) >> ST.gets liveVarSet))
+      let live' = S.union live bodyLive
+      if live' == live then return live else loopHeadLive live'
 useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
   prevSt <- ST.get
   caseSets <- maybe (throwError $ annotateError (getLocation ann) EInvalidExprTypeAnnotation)
@@ -237,6 +261,9 @@ useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
     Nothing -> return caseSets
   finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
   unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
+  -- The values read afterwards are the ones read in any case. The ones read
+  -- after the match are kept too, since a case may be missing.
+  putLiveVarSet (S.unions (liveVarSet prevSt : map (liveVarSet . fst) sets))
   useExpression e
 useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
   case arg of

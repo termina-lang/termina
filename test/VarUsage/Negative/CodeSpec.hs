@@ -7,7 +7,7 @@ import VarUsage.Common (varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVE001, testVE002, testVE003, testVE004, testVE005, testVE006, testVE007
   , testVE008, testVE009, testVE010, testVE011, testVE012, testVE013, testVE014
-  , testVE015, testVE016, testVE017 )
+  , testVE015, testVE016, testVE017, testVE018 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
@@ -33,6 +33,7 @@ cases =
   , ("VE-015", "action does not use self", testVE015)
   , ("VE-016", "method or viewer does not use self", testVE016)
   , ("VE-017", "method or viewer never called", testVE017)
+  , ("VE-018", "assigned value never read", testVE018)
   ]
 
 spec :: Spec

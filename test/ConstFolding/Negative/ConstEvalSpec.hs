@@ -28,12 +28,12 @@ spec = do
       compileErrorCode src `shouldBe` Just (pack "CPE-006")
 
     it "CPE-007: condition folds to a constant" $ do
-      let src = "function f() {\n" ++
+      let src = "function f() -> u32 {\n" ++
                 "    var x : u32 = 0 : u32;\n" ++
                 "    if (1 : u32 == 1 : u32) {\n" ++
                 "        x = 1 : u32;\n" ++
                 "    }\n" ++
-                "    return;\n" ++
+                "    return x;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-007")
 
@@ -63,10 +63,10 @@ spec = do
       compileErrorCode src `shouldBe` Just (pack "CPE-013")
 
     it "CPE-016: shift amount greater than or equal to the type width" $ do
-      let src = "function f() {\n" ++
+      let src = "function f() -> u8 {\n" ++
                 "    var x : u8 = 0 : u8;\n" ++
                 "    x = x << 8 : usize;\n" ++
-                "    return;\n" ++
+                "    return x;\n" ++
                 "}"
       compileErrorCode src `shouldBe` Just (pack "CPE-016")
 

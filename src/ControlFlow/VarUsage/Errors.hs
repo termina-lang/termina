@@ -49,6 +49,7 @@ data Error
   | EActionSelfNotUsed Identifier -- ^ Action does not use self (VE-015)
   | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-016)
   | EMemberFunctionNotUsed Identifier -- ^ Method or viewer is never called (VE-017)
+  | EAssignedValueNotUsed Identifier -- ^ Value assigned to a variable is never read (VE-018)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -72,6 +73,7 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "VE-015"
     errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-016"
     errorIdent (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "VE-017"
+    errorIdent (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "VE-018"
     errorIdent (AnnotatedError e _pos) = T.pack $ show e
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
@@ -91,6 +93,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "action does not use self"
     errorTitle (AnnotatedError (ESelfNotUsed _ident) _pos) = "self not used"
     errorTitle (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "member function not used"
+    errorTitle (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "assigned value never read"
     errorTitle _ = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -238,6 +241,11 @@ instance ErrorMessage VarUsageError where
                     sourceLines title fileName pos
                     (Just ("Member function \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is not called by any member of the class."))
+            EAssignedValueNotUsed ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("The value assigned to variable \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m is never read."))
 
             _ -> T.pack $ show pos ++ ": " ++ show e
 -- | Print the error as is
