@@ -119,7 +119,11 @@ addrOf obj =
     let cAnn = internalAnn CGenericAnn
         cPtrType = CTPointer (getCObjType obj) noqual
     in
-    CExprAddrOf obj cPtrType cAnn
+    case obj of
+        -- | The address of a dereferenced pointer is the pointer itself, so
+        -- &*p is emitted as p.
+        CDeref ptrObj _ -> CExprValOf ptrObj cPtrType cAnn
+        _ -> CExprAddrOf obj cPtrType cAnn
 
 class Dereference a where
     deref :: CObject -> a
