@@ -307,7 +307,7 @@ constFoldExpression e@(BinOp op lhs rhs ann) = do
       ty <- getExprType e
       plt <- ST.gets targetPlatform
       fConst <- evalBinOp plt (getLocation ann) op lConst rConst ty
-      return $ Constant fConst ann
+      return $ Constant fConst ann'
     _ -> do
       constFoldCheckComparison (getLocation ann) op lhs' rhs'
       case (op, rhs') of
@@ -334,7 +334,7 @@ constFoldExpression (Casting expr ty ann) = do
     -- IEEE-754 behaviour.
     Constant (I (TInteger i repr) _) _ | intTy ty ->
       if memberIntCons plt i ty then
-        return $ Constant (I (TInteger i repr) (Just ty)) ann
+        return $ Constant (I (TInteger i repr) (Just ty)) ann'
       else
         throwError $ annotateError (getLocation ann) (EConstIntegerOverflow i ty)
     _ -> return $ Casting expr' ty ann'
@@ -349,22 +349,24 @@ constFoldExpression (FunctionCall ident args ann) = do
   return $ FunctionCall ident args' ann'
 constFoldExpression (MemberFunctionCall obj ident args ann) = do
   ann' <- constFoldAnnotation ann
+  obj' <- constFoldObject obj
   args' <- mapM constFoldExpression args
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
         Parameter _ paramTy -> constFoldCheckType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-  return $ MemberFunctionCall obj ident args' ann'
+  return $ MemberFunctionCall obj' ident args' ann'
 constFoldExpression (DerefMemberFunctionCall obj ident args ann) = do
   ann' <- constFoldAnnotation ann
+  obj' <- constFoldObject obj
   args' <- mapM constFoldExpression args
   case ann' of
     (SemanticAnn (ETy (AppType params _ty)) exprLoc) ->
       zipWithM_ (\param arg -> case param of
         Parameter _ paramTy -> constFoldCheckType exprLoc paramTy arg) params args'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
-  return $ DerefMemberFunctionCall obj ident args' ann'
+  return $ DerefMemberFunctionCall obj' ident args' ann'
 constFoldExpression (ArraySliceExpression ak obj lower upper ann) = do
   ann' <- constFoldAnnotation ann
   obj' <- constFoldObject obj
@@ -392,7 +394,7 @@ constFoldExpression (ArraySliceExpression ak obj lower upper ann) = do
           else when (expectedSliceSizeValue /= (upperIndex - lowerIndex)) $ throwError $ annotateError (getLocation ann) (EArraySliceInvalidRange arraySizeValue lowerIndex upperIndex)
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
-  return $ ArraySliceExpression ak obj lower' upper' ann'
+  return $ ArraySliceExpression ak obj' lower' upper' ann'
 constFoldExpression (EnumVariantInitializer enumId variantId exprs ann) = do
   ann' <- constFoldAnnotation ann
   exprs' <- mapM constFoldExpression exprs
@@ -401,10 +403,11 @@ constFoldExpression (StructInitializer fvas ann) = do
   ann' <- constFoldAnnotation ann
   fvas' <- mapM constFoldFieldValueAssignment fvas
   return $ StructInitializer fvas' ann'
-constFoldExpression (ArrayInitializer expr ty ann) = do
+constFoldExpression (ArrayInitializer expr size ann) = do
   ann' <- constFoldAnnotation ann
   expr' <- constFoldExpression expr
-  return $ ArrayInitializer expr' ty ann'
+  size' <- constFoldExpression size
+  return $ ArrayInitializer expr' size' ann'
 constFoldExpression (ArrayExprListInitializer exprs ann) = do
   ann' <- constFoldAnnotation ann
   exprs' <- mapM constFoldExpression exprs
