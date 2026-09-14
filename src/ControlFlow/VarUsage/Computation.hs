@@ -5,8 +5,7 @@ module ControlFlow.VarUsage.Computation (
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
   unifyStates, defVariableOptionBox, defBox, safeUseVariable,
   initializeOptionBox, moveOptionBox, safeMoveBox, allocOptionBox,
-  defArgumentsProc, runComputation, emptyUDSt, defAssignedVariable,
-  withUncheckedAssignments, putLiveVarSet
+  defArgumentsProc, runComputation, emptyUDSt
 ) where
 
 import ControlFlow.BasicBlocks.AST 
@@ -41,17 +40,12 @@ data UDSt = UDSt {
     usedVarSet :: VarSet,
     -- | Map of moved boxes. It maps each box variable to the location where it
     -- was moved.
-    movedBoxes :: VarMap,
-    -- | Set of variables whose current value is read afterwards.
-    liveVarSet :: VarSet,
-    -- | Number of nested analyses in which assigned values are not checked.
-    -- They are run while the variables read at the head of a loop are computed.
-    uncheckedDepth :: Int
+    movedBoxes :: VarMap
   }
 
 emptyUDSt :: UDSt
 emptyUDSt
-  = UDSt M.empty S.empty M.empty S.empty 0
+  = UDSt M.empty S.empty M.empty
 
 -- | Monad to compute the use/defs of variables.
 type UDM e = ExceptT e (ST.State UDSt)
@@ -64,9 +58,6 @@ putUsedVarSet = ST.modify . (\s st -> st {usedVarSet = s})
 
 putMovedBoxMap :: VarMap -> UDM e ()
 putMovedBoxMap =ST.modify . (\s st -> st {movedBoxes = s})
-
-putLiveVarSet :: VarSet -> UDM e ()
-putLiveVarSet = ST.modify . (\s st -> st {liveVarSet = s})
 
 withState :: (UDSt -> UDSt) -> UDM e a -> UDM e a
 withState f = (ST.modify f >>)
@@ -106,9 +97,7 @@ unifyStates prev curr
   UDSt {
     optionBoxesMap = M.union (optionBoxesMap curr) (optionBoxesMap prev),
     movedBoxes = M.union (movedBoxes curr) (movedBoxes prev),
-    usedVarSet = S.union (usedVarSet curr) (usedVarSet prev),
-    liveVarSet = S.union (liveVarSet curr) (liveVarSet prev),
-    uncheckedDepth = uncheckedDepth prev
+    usedVarSet = S.union (usedVarSet curr) (usedVarSet prev)
   }
 
 unsafeAddMap :: Identifier -> Location -> VarMap -> VarMap
@@ -123,9 +112,6 @@ unionUsed optionBoxes regular =
     optionBoxesMap = M.union optionBoxes (optionBoxesMap st),
     usedVarSet = S.union regular (usedVarSet st)})
 
-removeLive :: Identifier -> UDSt -> UDSt
-removeLive s st = st {liveVarSet = S.delete s (liveVarSet st)}
-
 ----------------------------------------
 -- This function checks we have not reached the limit of the data structure.
 safeUseVariable :: Identifier -> UDM VarUsageError ()
@@ -135,7 +121,6 @@ safeUseVariable ident
     usedVarSet' <- ST.gets usedVarSet
     unless (S.size usedVarSet' < maxBound) (throwError $ annotateError Internal ESetMaxBound)
     putUsedVarSet $ unsafeAddSet ident usedVarSet'
-    ST.modify (\st -> st {liveVarSet = S.insert ident (liveVarSet st)})
 
 safeMoveBox :: Identifier -> Location -> UDM VarUsageError ()
 safeMoveBox ident loc
@@ -220,24 +205,6 @@ defVariableOptionBox ident loc =
         -- Defined;Defined not allowed,
         Defined _ -> throwError $ annotateError Internal EDefinedTwice 
         }) . M.lookup ident =<< ST.gets optionBoxesMap
-
--- | Assignment to a whole variable. The value assigned must be read afterwards.
--- The assignment still counts as a use of the variable.
-defAssignedVariable :: Identifier -> Location -> UDM VarUsageError ()
-defAssignedVariable ident loc = do
-  st <- ST.get
-  unless (uncheckedDepth st > 0 || S.member ident (liveVarSet st))
-    (throwError $ annotateError loc (EAssignedValueNotUsed ident))
-  safeUseVariable ident
-  ST.modify (removeLive ident)
-
--- | Runs an analysis in which assigned values are not checked.
-withUncheckedAssignments :: UDM e a -> UDM e a
-withUncheckedAssignments m = do
-  ST.modify (\st -> st {uncheckedDepth = uncheckedDepth st + 1})
-  res <- m
-  ST.modify (\st -> st {uncheckedDepth = uncheckedDepth st - 1})
-  return res
 
 -- Procedures can receive /box/ variables as arguments.
 -- Box variables have a special use, through free or stuff.

@@ -1,22 +1,26 @@
 -- | Definite assignment and variable usage check.
 --
--- This pass walks the basic blocks /forwards/ and answers two kinds of
--- question. The first one is sensitive to the path taken: an object declared
--- without an initializer may not be read, nor may one of its fields or
--- elements be written, before the whole object is assigned (VE-019, VE-020).
--- The second one is not: whether an identifier is read at all somewhere, which
--- is what the unused variable, unused field and uncalled member function
--- checks need (VE-001, VE-002, VE-015, VE-016, VE-017).
+-- This pass walks the basic blocks, checking that: 
+-- - An object declared without an initializer may not be read, nor may one of
+-- its fields or elements be written, before the whole object is assigned
+-- (VE-019, VE-020).  
+-- - Whether an identifier is read at all somewhere, which is what the unused
+-- variable, unused field and uncalled member function checks need (VE-001,
+-- VE-002, VE-015, VE-016, VE-017).  
+-- - A value that nobody reads before it is overwritten is a dead store
+-- (VE-018).
 --
--- Accordingly the state keeps two accumulators: one per body, for the objects
--- that are declared and not assigned yet, and one per top-level element, for
--- every identifier that is read. The latter spans the whole class because a
--- field is used when /any/ of its members reads it.
+-- Accordingly, the state keeps one accumulator per body for the objects that
+-- are declared and not assigned yet, one per top-level element for every
+-- identifier that is read, and one per body for the assignments whose value is
+-- still unread. The second one spans the whole class because a field is used
+-- when /any/ of its members reads it.
 module ControlFlow.Initialization (runInitCheck) where
 
 import Control.Monad (when, unless)
 import Control.Monad.Except
 import qualified Control.Monad.State as ST
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe)
 
@@ -37,18 +41,59 @@ data InitSt = InitSt
     readIdents :: S.Set Identifier,
     -- | Objects declared in the body being checked, with the location to blame
     -- if nobody reads them.
-    declared :: [(Identifier, Location)]
+    declared :: [(Identifier, Location)],
+    -- | Assignments of a whole object that reach this point along the current
+    -- path without having been read, kept under the name assigned and located
+    -- by the assignment itself. Joining two paths is the union of their maps,
+    -- since a value is worth reporting as soon as one path leaves it unread.
+    unread :: M.Map Identifier (S.Set Location),
+    -- | Assignments read at some point along some path. An assignment read
+    -- anywhere is not dead, so this set is what rescues the candidates below.
+    readDefs :: S.Set Location,
+    -- | Assignments overwritten before being read, in the order they were
+    -- found. They are only candidates: the walk of a loop body reports the
+    -- same one on every turn, and a later turn may still read it.
+    deadStores :: [(Identifier, Location)]
   }
+
+-- | What a branch leaves behind: the objects it does not assign and the
+-- assignments it does not read.
+type BranchOut = (S.Set Identifier, M.Map Identifier (S.Set Location))
 
 type InitMonad = ExceptT VarUsageError (ST.State InitSt)
 
 emptySt :: InitSt
-emptySt = InitSt S.empty S.empty []
+emptySt = InitSt S.empty S.empty [] M.empty S.empty []
 
 -- | Key under which a call to a member function through self is recorded. It
 -- is not a valid identifier, so it cannot clash with the name of a variable.
 memberFunctionKey :: Identifier -> Identifier
-memberFunctionKey ident = "self->" ++ ident
+memberFunctionKey ident = "self->" ++ ident ++ "()"
+
+-- | Key under which the read of a field is recorded. Fields and variables
+-- share the set of identifiers read, so the key spells out the access the
+-- field is reached through: that keeps a field from rescuing a variable of the
+-- same name, and the field of one object from answering for the field of
+-- another.
+fieldKey :: Object SemanticAnn -> Identifier -> Identifier
+fieldKey obj ident = objectKey obj ++ "->" ++ ident
+
+-- | The key of a field of the class being checked, which its own members reach
+-- through self.
+selfFieldKey :: Identifier -> Identifier
+selfFieldKey ident = "self->" ++ ident
+
+-- | Spelling of an access, which is what makes the keys above unique. It is
+-- canonical: dereferencing and unboxing do not show, and both field accessors
+-- render alike, so that @(*obj).field@ and @obj->field@ share one key. Indices
+-- are not part of it either, so every element of an array shares one.
+objectKey :: Object SemanticAnn -> Identifier
+objectKey (Variable ident _) = ident
+objectKey (ArrayIndexExpression obj _ _) = objectKey obj ++ "[]"
+objectKey (MemberAccess obj ident _) = objectKey obj ++ "->" ++ ident
+objectKey (Dereference obj _) = objectKey obj
+objectKey (DereferenceMemberAccess obj ident _) = objectKey obj ++ "->" ++ ident
+objectKey (Unbox obj _) = objectKey obj
 
 markDeclared :: Identifier -> Location -> InitMonad ()
 markDeclared ident loc = ST.modify (\st -> st {
@@ -67,8 +112,29 @@ markInitialized ident loc = ST.modify (\st -> st {
 markAssigned :: Identifier -> InitMonad ()
 markAssigned ident = ST.modify (\st -> st { pending = S.delete ident (pending st) })
 
+-- | Reading an identifier reads whatever assignments of it reach this point,
+-- which takes them out of the candidates for good.
 markRead :: Identifier -> InitMonad ()
-markRead ident = ST.modify (\st -> st { readIdents = S.insert ident (readIdents st) })
+markRead ident = ST.modify (\st -> st {
+    readIdents = S.insert ident (readIdents st),
+    readDefs = S.union (M.findWithDefault S.empty ident (unread st)) (readDefs st),
+    unread = M.delete ident (unread st)
+  })
+
+-- | An assignment is killed when the whole object is assigned again and when
+-- the body ends. One killed unread is a candidate to be reported.
+killAssignments :: Identifier -> InitMonad ()
+killAssignments ident = ST.modify (\st -> st {
+    unread = M.delete ident (unread st),
+    deadStores = deadStores st ++
+      [(ident, loc) | loc <- S.toList (M.findWithDefault S.empty ident (unread st))]
+  })
+
+-- | Assignment of a whole object: it kills whatever reached this point.
+markAssignment :: Identifier -> Location -> InitMonad ()
+markAssignment ident loc = do
+  killAssignments ident
+  ST.modify (\st -> st { unread = M.insert ident (S.singleton loc) (unread st) })
 
 -- | The object the access starts from.
 rootIdent :: Object SemanticAnn -> Maybe Identifier
@@ -100,10 +166,10 @@ checkPartialWrite obj loc =
 readObject :: Object SemanticAnn -> InitMonad ()
 readObject (Variable ident ann) = checkRead ident (getLocation ann)
 readObject (ArrayIndexExpression obj e _) = readObject obj >> readExpression e
-readObject (MemberAccess obj _ _) = readObject obj
+readObject (MemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
 readObject (Dereference obj _) = readObject obj
 -- | A field reached through self counts as a read of the field itself
-readObject (DereferenceMemberAccess obj ident _) = markRead ident >> readObject obj
+readObject (DereferenceMemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
 readObject (Unbox obj _) = readObject obj
 
 -- | Writing into an object does not use it: an object that is written and
@@ -165,9 +231,9 @@ markWrittenObject obj = do
     markChain :: Object SemanticAnn -> InitMonad ()
     markChain (Variable ident _) = markRead ident
     markChain (ArrayIndexExpression inner _ _) = markChain inner
-    markChain (MemberAccess inner _ _) = markChain inner
+    markChain (MemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
     markChain (Dereference inner _) = markChain inner
-    markChain (DereferenceMemberAccess inner ident _) = markRead ident >> markChain inner
+    markChain (DereferenceMemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
     markChain (Unbox inner _) = markChain inner
 
 -- | The index expressions of an object that is being written into. The object
@@ -223,13 +289,17 @@ readExpression (StringInitializer _ _) = return ()
 
 checkStatement :: Statement SemanticAnn -> InitMonad ()
 checkStatement (Declaration ident _ _ Nothing ann) = markDeclared ident (getLocation ann)
+-- | The value an initializer gives the object is an assignment like any
+-- other, so one that nobody reads before it is overwritten is a dead store.
+-- The object is then meant to be declared without an initializer.
 checkStatement (Declaration ident _ _ (Just initExpr) ann) =
   readExpression initExpr >> markInitialized ident (getLocation ann)
+    >> markAssignment ident (getLocation ann)
 checkStatement (AssignmentStmt obj e ann) = do
   readExpression e
   case obj of
     -- | The whole object is assigned
-    Variable ident _ -> markAssigned ident
+    Variable ident _ -> markAssigned ident >> markAssignment ident (getLocation ann)
     -- | Only a part of it is
     _ -> checkPartialWrite obj (getLocation ann) >> markWrittenObject obj >> readIndices obj
 checkStatement (SingleExpStmt e _) = readExpression e
@@ -238,13 +308,26 @@ checkStatement (SingleExpStmt e _) = readExpression e
 -- unassigned, restoring the entry state so that the next branch starts where
 -- this one did. What the branch reads is kept, since reading does not depend
 -- on the path.
-checkBranch :: Block SemanticAnn -> InitMonad (S.Set Identifier)
+checkBranch :: Block SemanticAnn -> InitMonad BranchOut
 checkBranch blk = do
-  entry <- ST.gets pending
+  entry <- currentOut
   checkBlock blk
-  out <- ST.gets pending
-  ST.modify (\st -> st { pending = entry })
+  out <- currentOut
+  ST.modify (\st -> st { pending = fst entry, unread = snd entry })
   return out
+
+-- | What the path being walked has left behind so far.
+currentOut :: InitMonad BranchOut
+currentOut = ST.gets (\st -> (pending st, unread st))
+
+-- | Joins the paths that meet after a conditional: an object is initialized
+-- when every path assigns it, and a value is left unread when any path leaves
+-- it unread.
+joinBranches :: [BranchOut] -> InitMonad ()
+joinBranches outs = ST.modify (\st -> st {
+    pending = S.unions (map fst outs),
+    unread = M.unionsWith S.union (map snd outs)
+  })
 
 checkBasicBlock :: BasicBlock SemanticAnn -> InitMonad ()
 checkBasicBlock (RegularBlock stmts) = mapM_ checkStatement stmts
@@ -254,27 +337,43 @@ checkBasicBlock (IfElseBlock condIf elseIfs mElse _) = do
   elseIfOuts <- mapM
     (\elseIf -> readExpression (condElseIfCond elseIf) >> checkBranch (condElseIfBody elseIf))
     elseIfs
-  entry <- ST.gets pending
+  entry <- currentOut
   -- | Without an else branch there is a path that assigns nothing
   elseOut <- maybe (return entry) (checkBranch . condElseBody) mElse
-  ST.modify (\st -> st { pending = S.unions (ifOut : elseOut : elseIfOuts) })
+  joinBranches (ifOut : elseOut : elseIfOuts)
 checkBasicBlock (MatchBlock e cases mDefaultCase _) = do
   readExpression e
   caseOuts <- mapM checkMatchCase cases
-  entry <- ST.gets pending
+  entry <- currentOut
   case mDefaultCase of
     Just (DefaultCase blk _) -> do
       defaultOut <- checkBranch blk
-      ST.modify (\st -> st { pending = S.unions (defaultOut : caseOuts) })
+      joinBranches (defaultOut : caseOuts)
     -- | Without a default case the listed cases are exhaustive
-    Nothing -> ST.modify (\st -> st { pending = if null caseOuts then entry else S.unions caseOuts })
+    Nothing -> joinBranches (if null caseOuts then [entry] else caseOuts)
 checkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
   readExpression initE
   readExpression endE
   mapM_ readExpression mBreak
-  -- | The body may not run, so what it assigns does not count afterwards
-  _ <- checkBranch blk
-  return ()
+  entry <- ST.gets unread
+  bodyUnread <- loopUnread entry
+  -- | The body may not run, so what it assigns does not count afterwards,
+  -- while what it leaves unread may still be read after the loop
+  ST.modify (\st -> st { unread = M.unionWith S.union entry bodyUnread })
+
+  where
+
+    -- | The assignments the body leaves unread. A value assigned in one
+    -- iteration may be read in the next one, so the body is walked again with
+    -- what the previous walk left unread, until the set stops growing; the
+    -- reads of those extra walks are what rescue the candidates.
+    loopUnread :: M.Map Identifier (S.Set Location)
+      -> InitMonad (M.Map Identifier (S.Set Location))
+    loopUnread known = do
+      ST.modify (\st -> st { unread = known })
+      (_, out) <- checkBranch blk
+      let known' = M.unionWith S.union known out
+      if known' == known then return out else loopUnread known'
 checkBasicBlock (SendMessage obj e _) = readObject obj >> readExpression e
 checkBasicBlock (ProcedureInvoke obj _ args _) = readObject obj >> mapM_ readExpression args
 checkBasicBlock (AtomicLoad obj e _) = readObject obj >> readExpression e
@@ -291,7 +390,7 @@ checkBasicBlock (ContinueBlock e _) = readExpression e
 checkBasicBlock (RebootBlock _) = return ()
 
 -- | The variables a case binds are declared by the case itself.
-checkMatchCase :: MatchCase SemanticAnn -> InitMonad (S.Set Identifier)
+checkMatchCase :: MatchCase SemanticAnn -> InitMonad BranchOut
 checkMatchCase (MatchCase _ bvars body ann) = do
   mapM_ (`markInitialized` getLocation ann) bvars
   checkBranch body
@@ -316,14 +415,35 @@ checkDeclaredAreRead = do
         _ -> unless (S.member ident reads')
           (throwError $ annotateError loc (ENotUsed ident))
 
--- | Runs the body of a member or of a function: the objects pending assignment
--- and the declarations are its own, the identifiers read are not.
+-- | When the body ends, every assignment still unread is killed, and the
+-- candidates that nobody read along any path are the dead stores. The check is
+-- left for the end because a candidate found early may be read later, either
+-- in another turn of a loop or along another branch.
+checkDeadStores :: InitMonad ()
+checkDeadStores = do
+  idents <- ST.gets (M.keys . unread)
+  mapM_ killAssignments idents
+  st <- ST.get
+  mapM_ report (filter (not . (`S.member` readDefs st) . snd) (deadStores st))
+
+  where
+
+    report :: (Identifier, Location) -> InitMonad ()
+    report (ident, loc) = throwError $ annotateError loc (EAssignedValueNotUsed ident)
+
+-- | Runs the body of a member or of a function: the objects pending
+-- assignment, the declarations and the assignments are its own, the
+-- identifiers read are not.
 checkBody :: [Parameter SemanticAnn] -> Location -> Block SemanticAnn -> InitMonad ()
 checkBody ps loc body = do
-  ST.modify (\st -> st { pending = S.empty, declared = [] })
+  ST.modify (\st -> st {
+      pending = S.empty, declared = [],
+      unread = M.empty, readDefs = S.empty, deadStores = []
+    })
   mapM_ (\p -> markInitialized (paramIdentifier p) loc) (filter (not . isBoxParam) ps)
   checkBlock body
   checkDeclaredAreRead
+  checkDeadStores
 
   where
 
@@ -361,7 +481,7 @@ checkFieldIsRead :: ClassMember SemanticAnn -> InitMonad ()
 checkFieldIsRead (ClassField (FieldDefinition _ (TSinkPort {}) _)) = return ()
 checkFieldIsRead (ClassField (FieldDefinition _ (TInPort {}) _)) = return ()
 checkFieldIsRead (ClassField fdef) = do
-  wasRead <- ST.gets (S.member (fieldIdentifier fdef) . readIdents)
+  wasRead <- ST.gets (S.member (selfFieldKey (fieldIdentifier fdef)) . readIdents)
   unless wasRead
     (throwError $ annotateError (getLocation (fieldAnnotation fdef))
       (ENotUsed (fieldIdentifier fdef)))

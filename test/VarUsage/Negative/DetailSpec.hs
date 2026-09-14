@@ -7,7 +7,8 @@ module VarUsage.Negative.DetailSpec
   , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
   , testVE011, testVE012, testVE013, testVE014, testVE016, testVE016_1
-  , testVE015, testVE017, testVE017_1, testVE018, testVE018_1, testVE018_2
+  , testVE015, testVE017, testVE017_1, testVE017_2, testVE018, testVE018_1
+  , testVE018_2, testVE018_3, testVE018_4, testVE018_5, testVE002_1, testVE002_2
   , testVE019, testVE020
   ) where
 
@@ -389,14 +390,127 @@ testVE018_1 = "function fun0(c : bool) -> u32 {\n" ++
        "    return x;\n" ++
        "}\n"
 
+-- | The variable is read after the loop, so it is not an unused one, but the
+-- value the loop assigns to it is overwritten before anybody reads it.
 testVE018_2 :: String
 testVE018_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
        "    var last : u32 = 0 : u32;\n" ++
        "    for i : usize in 0 : usize .. 10 : usize {\n" ++
        "        last = (*array0)[i];\n" ++
        "    }\n" ++
-       "    return 0 : u32;\n" ++
+       "    last = 5 : u32;\n" ++
+       "    return last;\n" ++
        "}\n"
+
+-- | The value the declaration gives the object is overwritten before anybody
+-- reads it, so either the real value belongs in the declaration or the object
+-- is to be declared without an initializer.
+testVE018_3 :: String
+testVE018_3 = "function fun0() -> u32 {\n" ++
+       "    var x : u32 = 0 : u32;\n" ++
+       "    x = 1 : u32;\n" ++
+       "    return x;\n" ++
+       "}\n"
+
+-- | A field and a variable of the same name: reading the field must not
+-- rescue the value the declaration gives the variable.
+testVE018_4 :: String
+testVE018_4 = "struct Struct0 {\n" ++
+       "    field0 : u8;\n" ++
+       "};\n" ++
+       "\n" ++
+       "function fun0(s : &Struct0) -> u8 {\n" ++
+       "    var field0 : u8 = 0 : u8;\n" ++
+       "    if (s->field0 == 1 : u8) {\n" ++
+       "        field0 = 2 : u8;\n" ++
+       "    } else {\n" ++
+       "        field0 = 3 : u8;\n" ++
+       "    }\n" ++
+       "    return field0;\n" ++
+       "}\n"
+
+-- | The same, with the field reached through the other spelling.
+testVE018_5 :: String
+testVE018_5 = "struct Struct0 {\n" ++
+       "    field0 : u8;\n" ++
+       "};\n" ++
+       "\n" ++
+       "function fun0(s : &Struct0) -> u8 {\n" ++
+       "    var field0 : u8 = 0 : u8;\n" ++
+       "    if ((*s).field0 == 1 : u8) {\n" ++
+       "        field0 = 2 : u8;\n" ++
+       "    } else {\n" ++
+       "        field0 = 3 : u8;\n" ++
+       "    }\n" ++
+       "    return field0;\n" ++
+       "}\n"
+
+-- | A field of the class that nobody reads, while a field of the same name is
+-- read from another object. The read of the latter must not answer for it.
+testVE002_1 :: String
+testVE002_1 = "struct Struct0 {\n" ++
+       "    field0 : u8;\n" ++
+       "};\n" ++
+       "\n" ++
+       "interface Interface0 {\n" ++
+       "    procedure proc0(&mut self, s : &Struct0);\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    field0 : u8;\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self, s : &Struct0) {\n" ++
+       "        self->field0 = s->field0;\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
+-- | The same, with the field of the other object reached through @(*s).@ and
+-- the field of the class written through @self->@.
+testVE002_2 :: String
+testVE002_2 = "struct Struct0 {\n" ++
+       "    field0 : u8;\n" ++
+       "};\n" ++
+       "\n" ++
+       "interface Interface0 {\n" ++
+       "    procedure proc0(&mut self, s : &Struct0);\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    field0 : u8;\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self, s : &Struct0) {\n" ++
+       "        self->field0 = (*s).field0;\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
+
+-- | A method that nobody calls, while a field of the class has its name. The
+-- read of the field must not pass for a call to the method.
+testVE017_2 :: String
+testVE017_2 = "interface Interface0 {\n" ++
+       "    procedure proc0(&mut self, data : &mut u8);\n" ++
+       "};\n" ++
+       "\n" ++
+       "resource class ResourceClass0 provides Interface0 {\n" ++
+       "\n" ++
+       "    method0 : u8;\n" ++
+       "    other0 : u8;\n" ++
+       "\n" ++
+       "    method method0(&self) -> u8 {\n" ++
+       "        return self->other0;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "    procedure proc0(&mut self, data : &mut u8) {\n" ++
+       "        *data = self->method0;\n" ++
+       "        return;\n" ++
+       "    }\n" ++
+       "\n" ++
+       "};\n"
 
 -- | The declaration has no initializer and the branch that assigns it may not
 -- be taken.
@@ -505,17 +619,41 @@ spec = do
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
     it "VE-018: value assigned and overwritten before being read" $ do
-      runNegativeTestVarUsage testVE018
+      runNegativeTestInit testVE018
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
     it "VE-018: value assigned in a branch and overwritten after it" $ do
-      runNegativeTestVarUsage testVE018_1
+      runNegativeTestInit testVE018_1
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
     it "VE-018: value assigned in a loop and never read" $ do
-      runNegativeTestVarUsage testVE018_2
+      runNegativeTestInit testVE018_2
         `shouldSatisfy`
           isEAssignedValueNotUsed "last"
+    it "VE-018: initializer overwritten before being read" $ do
+      runNegativeTestInit testVE018_3
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "x"
+    it "VE-018: initializer overwritten while a field of the same name is read" $ do
+      runNegativeTestInit testVE018_4
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "field0"
+    it "VE-018: the same, with the field reached through (*s).field" $ do
+      runNegativeTestInit testVE018_5
+        `shouldSatisfy`
+          isEAssignedValueNotUsed "field0"
+    it "VE-002: class field not read while another object's field of the same name is" $ do
+      runNegativeTestInit testVE002_1
+        `shouldSatisfy`
+          isENotUsed "field0"
+    it "VE-002: the same, with the other field reached through (*s).field" $ do
+      runNegativeTestInit testVE002_2
+        `shouldSatisfy`
+          isENotUsed "field0"
+    it "VE-017: method never called while a field of the class has its name" $ do
+      runNegativeTestInit testVE017_2
+        `shouldSatisfy`
+          isEMemberFunctionNotUsed "method0"
     it "VE-019: object read on a path where it is not assigned" $ do
       runNegativeTestInit testVE019
         `shouldSatisfy`

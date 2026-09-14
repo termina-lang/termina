@@ -2,7 +2,7 @@
 -- raises no error (the check returns 'Nothing').
 module VarUsage.Positive.UsageSpec (spec) where
 
-import VarUsage.Common (runNegativeTestVarUsage)
+import VarUsage.Common (runNegativeTestVarUsage, runNegativeTestInit)
 
 import Data.Maybe (isNothing)
 import Test.Hspec
@@ -44,16 +44,6 @@ freesBoxInBothBranches = wrap $
   "        } else {\n" ++
   "            self->data_pool.free(data);\n" ++
   "        }\n"
-
--- | An initial value overwritten before it is read: initializations are not
--- checked.
-overwritesInitializer :: String
-overwritesInitializer =
-  "function fun0() -> u32 {\n" ++
-  "    var x : u32 = 0 : u32;\n" ++
-  "    x = 1 : u32;\n" ++
-  "    return x;\n" ++
-  "}\n"
 
 -- | A variable assigned in every branch of an if and read after it.
 assignsInBothBranches :: String
@@ -118,13 +108,64 @@ readsPreviousIteration =
   "    return sum;\n" ++
   "}\n"
 
+-- | A field of the class read only through the dereference spelling. Both
+-- spellings name the same field, so the class field counts as used.
+readsFieldThroughDereference :: String
+readsFieldThroughDereference =
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, data : &mut u8);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    field0 : u8;\n" ++
+  "    procedure proc0(&mut self, data : &mut u8) {\n" ++
+  "        *data = (*self).field0;\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
+-- | Two objects with a field of the same name, both of them read. Neither the
+-- field of the class nor the one of the struct is reported.
+readsHomonymousFields :: String
+readsHomonymousFields =
+  "struct Struct0 {\n" ++
+  "    field0 : u8;\n" ++
+  "};\n" ++
+  "interface Interface0 {\n" ++
+  "    procedure proc0(&mut self, s : &Struct0, data : &mut u8);\n" ++
+  "};\n" ++
+  "resource class ResourceClass0 provides Interface0 {\n" ++
+  "    field0 : u8;\n" ++
+  "    procedure proc0(&mut self, s : &Struct0, data : &mut u8) {\n" ++
+  "        *data = self->field0 + s->field0;\n" ++
+  "        return;\n" ++
+  "    }\n" ++
+  "};\n"
+
+-- | A variable and a field of the same name, where the variable is read: the
+-- variable answers for itself and the field for itself.
+readsVariableAndHomonymousField :: String
+readsVariableAndHomonymousField =
+  "struct Struct0 {\n" ++
+  "    field0 : u8;\n" ++
+  "};\n" ++
+  "function fun0(s : &Struct0) -> u8 {\n" ++
+  "    var field0 : u8 = s->field0;\n" ++
+  "    return field0;\n" ++
+  "}\n"
+
 spec :: Spec
-spec = describe "VarUsage: well-formed usage raises no error" $
-  mapM_ (\(name, src) -> it name $ runNegativeTestVarUsage src `shouldSatisfy` isNothing)
+spec = do
+  describe "VarUsage: qualified field names" $
+    mapM_ (\(name, src) -> it name $ runNegativeTestInit src `shouldSatisfy` isNothing)
+      [ ("accepts a class field read through (*self).field", readsFieldThroughDereference)
+      , ("accepts homonymous fields of two objects, both read", readsHomonymousFields)
+      , ("accepts a variable and a field of the same name", readsVariableAndHomonymousField)
+      ]
+  describe "VarUsage: well-formed usage raises no error" $
+    mapM_ (\(name, src) -> it name $ runNegativeTestVarUsage src `shouldSatisfy` isNothing)
     [ ("accepts a box parameter that is freed once", freesBoxParam)
     , ("accepts an option-box allocated and consumed in all branches", allocAndConsumes)
     , ("accepts a box freed on every branch of an if", freesBoxInBothBranches)
-    , ("accepts an initial value overwritten before it is read", overwritesInitializer)
     , ("accepts a variable assigned in every branch and read after them", assignsInBothBranches)
     , ("accepts a variable assigned in one branch and read after it", assignsInOneBranch)
     , ("accepts a variable assigned in a loop and read in its guard", assignsInLoopGuard)

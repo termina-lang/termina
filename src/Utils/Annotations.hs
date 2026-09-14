@@ -15,7 +15,7 @@ data Location =
   | Builtin -- ^ Builtin position for elements that are not in the source code
   | Internal
   -- ^ Internal error position. Used for debugging, internals shoulnd't happen
-  deriving Show
+  deriving (Show, Eq, Ord)
 
 data LocatedElement a = LocatedElement {
     -- | LocatedElement element

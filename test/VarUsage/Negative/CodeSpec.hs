@@ -28,7 +28,6 @@ cases =
   , ("VE-012", "option-box allocated twice", testVE012)
   , ("VE-013", "option-box moved without being allocated", testVE013)
   , ("VE-014", "option-box match missing the Some case", testVE014)
-  , ("VE-018", "assigned value never read", testVE018)
   ]
 
 -- | (code, title, source) for the codes raised by the forward pass, which owns
@@ -40,6 +39,7 @@ initCases =
   , ("VE-015", "action does not use self", testVE015)
   , ("VE-016", "method or viewer does not use self", testVE016)
   , ("VE-017", "method or viewer never called", testVE017)
+  , ("VE-018", "assigned value never read", testVE018)
   , ("VE-019", "object read before it is assigned", testVE019)
   , ("VE-020", "partial write before the object is assigned", testVE020)
   ]
