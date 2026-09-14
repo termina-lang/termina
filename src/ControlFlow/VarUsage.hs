@@ -492,8 +492,8 @@ checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
 checkElement (GlobalDeclaration {}) = return ()
 
 -- | Run the check over a single top-level element.
-runInitElement :: AnnASTElement SemanticAnn -> Maybe VarUsageError
-runInitElement =
+runVarUsageElement :: AnnASTElement SemanticAnn -> Maybe VarUsageError
+runVarUsageElement =
   either Just (const Nothing) . run . checkElement
 
   where
@@ -503,4 +503,4 @@ runInitElement =
 
 -- | Run the check over a whole module, returning the first error.
 runVarUsageCheck :: AnnotatedProgram SemanticAnn -> Maybe VarUsageError
-runVarUsageCheck = listToMaybe . mapMaybe runInitElement
+runVarUsageCheck = listToMaybe . mapMaybe runVarUsageElement
