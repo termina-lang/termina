@@ -5,6 +5,7 @@ import ControlFlow.SideEffects.Monad
    setMutableSelfMethods, isMutableSelfMethod, getMutableSelfMethods)
 import ControlFlow.SideEffects.Errors (SideEffectsError, Error(..))
 import ControlFlow.BasicBlocks.AST
+import ControlFlow.BasicBlocks.Traversal (childExpressions, indexExpressions)
 import Semantic.Types
 import Semantic.Utils (objectPath, mayAlias, AccessPath)
 import Utils.Annotations (Location, getLocation, getAnnotation, annotateError)
@@ -44,51 +45,6 @@ callMutations e = case e of
     referencedObject (ReferenceExpression Mutable obj _)      = Just obj
     referencedObject (ArraySliceExpression Mutable obj _ _ _) = Just obj
     referencedObject _                                        = Nothing
-
--- | The index expressions embedded in an object's access path (the @i@ in
--- @arr[i]@), gathered along the whole path.
-indexExpressions :: Object SemanticAnn -> [Expression SemanticAnn]
-indexExpressions obj = case obj of
-  ArrayIndexExpression o idx _  -> idx : indexExpressions o
-  MemberAccess o _ _            -> indexExpressions o
-  DereferenceMemberAccess o _ _ -> indexExpressions o
-  Dereference o _               -> indexExpressions o
-  Unbox o _                     -> indexExpressions o
-  Variable {}                   -> []
-
--- | The immediate sub-expressions of an expression, including any index
--- expressions embedded in the objects it accesses or references.
-childExpressions :: Expression SemanticAnn -> [Expression SemanticAnn]
-childExpressions e = case e of
-  BinOp _ left right _               -> [left, right]
-  Casting inner _ _                  -> [inner]
-  FunctionCall _ args _              -> args
-  MemberFunctionCall _ _ args _      -> args
-  DerefMemberFunctionCall _ _ args _ -> args
-  AccessObject obj                   -> indexExpressions obj
-  ReferenceExpression _ obj _        -> indexExpressions obj
-  ArraySliceExpression _ obj lower upper _ -> lower : upper : indexExpressions obj
-  ArrayInitializer inner size _      -> [inner, size]
-  ArrayExprListInitializer es _      -> es
-  StructInitializer fields _         -> concatMap fieldExprs fields
-  EnumVariantInitializer _ _ args _  -> args
-  MonadicVariantInitializer mv _     -> variantExprs mv
-  _                                  -> []
-
-  where
-
-    fieldExprs :: FieldAssignment' Expression SemanticAnn -> [Expression SemanticAnn]
-    fieldExprs (FieldValueAssignment _ ex _)   = [ex]
-    fieldExprs (FieldAddressAssignment _ ex _) = [ex]
-    fieldExprs FieldPortConnection {}          = []
-
-    variantExprs :: MonadicVariant' Expression SemanticAnn -> [Expression SemanticAnn]
-    variantExprs (Some ex)    = [ex]
-    variantExprs (Ok ex)      = [ex]
-    variantExprs (Error ex)   = [ex]
-    variantExprs (Failure ex) = [ex]
-    variantExprs None         = []
-    variantExprs Success      = []
 
 -- | Whether an expression subtree contains a persistent side effect, i.e. a
 -- call that mutates through a @&mut@ argument anywhere inside it.

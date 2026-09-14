@@ -25,6 +25,7 @@ import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe)
 
 import ControlFlow.BasicBlocks.AST
+import ControlFlow.BasicBlocks.Traversal
 import ControlFlow.VarUsage.Errors
 import Semantic.Types (SemanticAnn, getObjectSAnns)
 import Utils.Annotations
@@ -140,15 +141,6 @@ markAssignment ident loc = do
   killAssignments ident
   ST.modify (\st -> st { unread = M.insert ident (S.singleton loc) (unread st) })
 
--- | The object the access starts from.
-rootIdent :: Object SemanticAnn -> Maybe Identifier
-rootIdent (Variable ident _) = Just ident
-rootIdent (ArrayIndexExpression obj _ _) = rootIdent obj
-rootIdent (MemberAccess obj _ _) = rootIdent obj
-rootIdent (Dereference obj _) = rootIdent obj
-rootIdent (DereferenceMemberAccess obj _ _) = rootIdent obj
-rootIdent (Unbox obj _) = rootIdent obj
-
 checkRead :: Identifier -> Location -> VarUsageMonad ()
 checkRead ident loc = do
   notAssigned <- ST.gets pending
@@ -159,22 +151,21 @@ checkRead ident loc = do
 -- | A write to a field or to an element only makes sense once the whole object
 -- has a value.
 checkPartialWrite :: Object SemanticAnn -> Location -> VarUsageMonad ()
-checkPartialWrite obj loc =
-  case rootIdent obj of
-    Nothing -> return ()
-    Just ident -> do
-      notAssigned <- ST.gets pending
-      when (S.member ident notAssigned)
-        (throwError $ annotateError loc (EPartialWriteBeforeAssignment ident))
+checkPartialWrite obj loc = do
+  let ident = rootIdent obj
+  notAssigned <- ST.gets pending
+  when (S.member ident notAssigned)
+    (throwError $ annotateError loc (EPartialWriteBeforeAssignment ident))
 
+-- | Reading an object reads its root variable, every field along the way, which
+-- is what the unused-field check needs, and the expressions that index it.
 readObject :: Object SemanticAnn -> VarUsageMonad ()
-readObject (Variable ident ann) = checkRead ident (getLocation ann)
-readObject (ArrayIndexExpression obj e _) = readObject obj >> readExpression e
-readObject (MemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
-readObject (Dereference obj _) = readObject obj
--- | A field reached through self counts as a read of the field itself
-readObject (DereferenceMemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
-readObject (Unbox obj _) = readObject obj
+readObject = walkObject ObjectVisitor
+  {
+    atRoot = \ident ann -> checkRead ident (getLocation ann)
+  , atField = \_ obj ident -> markRead (fieldKey obj ident)
+  , atIndex = readExpression
+  }
 
 -- | Writing into an object does not use it: an object that is written and
 -- never read is dead code, and the unused check is the one that says so.
@@ -190,10 +181,8 @@ readObject (Unbox obj _) = readObject obj
 markWrittenObject :: Object SemanticAnn -> VarUsageMonad ()
 markWrittenObject obj = do
   when (isFixedLocation obj) (markChain obj)
-  when (goesThroughReference obj) (mapM_ markRead (rootIdent obj))
-  case rootIdent obj of
-    Just "self" -> markRead "self"
-    _ -> return ()
+  when (goesThroughReference obj) (markRead (rootIdent obj))
+  when (rootIdent obj == "self") (markRead "self")
 
   where
 
@@ -233,26 +222,22 @@ markWrittenObject obj = do
     -- | Marks every name the access goes through, so that writing
     -- @self->registers.data@ uses both the field and the receiver.
     markChain :: Object SemanticAnn -> VarUsageMonad ()
-    markChain (Variable ident _) = markRead ident
-    markChain (ArrayIndexExpression inner _ _) = markChain inner
-    markChain (MemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
-    markChain (Dereference inner _) = markChain inner
-    markChain (DereferenceMemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
-    markChain (Unbox inner _) = markChain inner
+    markChain = walkObject ObjectVisitor
+      {
+        atRoot = \ident _ -> markRead ident
+      , atField = \_ inner ident -> markRead (fieldKey inner ident)
+      , atIndex = const (return ())
+      }
 
 -- | The index expressions of an object that is being written into. The object
 -- itself is not read, only the indices are.
 readIndices :: Object SemanticAnn -> VarUsageMonad ()
-readIndices (Variable _ _) = return ()
-readIndices (ArrayIndexExpression obj e _) = readIndices obj >> readExpression e
-readIndices (MemberAccess obj _ _) = readIndices obj
-readIndices (Dereference obj _) = readIndices obj
-readIndices (DereferenceMemberAccess obj _ _) = readIndices obj
-readIndices (Unbox obj _) = readIndices obj
-
-readFieldAssignment :: FieldAssignment SemanticAnn -> VarUsageMonad ()
-readFieldAssignment (FieldValueAssignment _ e _) = readExpression e
-readFieldAssignment _ = return ()
+readIndices = walkObject ObjectVisitor
+  {
+    atRoot = \_ _ -> return ()
+  , atField = \_ _ _ -> return ()
+  , atIndex = readExpression
+  }
 
 -- | Records a call to a member function of the class made through self.
 readSelfMemberFunction :: Object SemanticAnn -> Identifier -> VarUsageMonad ()
@@ -261,35 +246,22 @@ readSelfMemberFunction (Dereference (Variable "self" _) _) ident = markRead (mem
 readSelfMemberFunction _ _ = return ()
 
 -- | Taking a reference, either @&@ or @&mut@, counts as a read: the receiver
--- may read what it is given.
+-- may read what it is given. A constant expression that belongs to a type does
+-- not, since the program does not compute it.
 readExpression :: Expression SemanticAnn -> VarUsageMonad ()
-readExpression (AccessObject obj) = readObject obj
-readExpression (Constant _ _) = return ()
-readExpression (BinOp _ le re _) = readExpression le >> readExpression re
-readExpression (ReferenceExpression _ obj _) = readObject obj
-readExpression (Casting e _ _) = readExpression e
-readExpression (IsEnumVariantExpression obj _ _ _) = readObject obj
-readExpression (IsMonadicVariantExpression obj _ _) = readObject obj
-readExpression (ArraySliceExpression _ obj lower upper _) =
-  readObject obj >> readExpression lower >> readExpression upper
-readExpression (MemberFunctionCall obj ident args _) =
-  readSelfMemberFunction obj ident >> readObject obj >> mapM_ readExpression args
-readExpression (DerefMemberFunctionCall obj ident args _) =
-  readSelfMemberFunction obj ident >> readObject obj >> mapM_ readExpression args
-readExpression (ArrayInitializer e _ _) = readExpression e
-readExpression (ArrayExprListInitializer es _) = mapM_ readExpression es
-readExpression (StructInitializer fs _) = mapM_ readFieldAssignment fs
-readExpression (EnumVariantInitializer _ _ es _) = mapM_ readExpression es
-readExpression (MonadicVariantInitializer opt _) =
-  case opt of
-    None -> return ()
-    Some e -> readExpression e
-    Success -> return ()
-    Failure e -> readExpression e
-    Ok e -> readExpression e
-    Error e -> readExpression e
-readExpression (FunctionCall _ args _) = mapM_ readExpression args
-readExpression (StringInitializer _ _) = return ()
+readExpression expr = do
+  case expr of
+    MemberFunctionCall obj ident _ _ -> readSelfMemberFunction obj ident
+    DerefMemberFunctionCall obj ident _ _ -> readSelfMemberFunction obj ident
+    _ -> return ()
+  mapM_ readChild (expressionChildren expr)
+
+readChild :: Child SemanticAnn -> VarUsageMonad ()
+readChild (ChildObject obj) = readObject obj
+readChild (ChildReference _ obj) = readObject obj
+readChild (ChildExpr e) = readExpression e
+readChild (ChildArg e) = readExpression e
+readChild (ChildConstExpr _) = return ()
 
 checkStatement :: Statement SemanticAnn -> VarUsageMonad ()
 checkStatement (Declaration ident _ _ Nothing ann) = markDeclared ident (getLocation ann)
@@ -382,20 +354,11 @@ checkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
       (_, out) <- checkBranch blk
       let known' = M.unionWith S.union known out
       if known' == known then return out else loopUnread known'
-checkBasicBlock (SendMessage obj e _) = readObject obj >> readExpression e
-checkBasicBlock (ProcedureInvoke obj _ args _) = readObject obj >> mapM_ readExpression args
-checkBasicBlock (AtomicLoad obj e _) = readObject obj >> readExpression e
-checkBasicBlock (AtomicStore obj e _) = readObject obj >> readExpression e
-checkBasicBlock (AtomicArrayLoad obj idx e _) =
-  readObject obj >> readExpression idx >> readExpression e
-checkBasicBlock (AtomicArrayStore obj idx e _) =
-  readObject obj >> readExpression idx >> readExpression e
-checkBasicBlock (AllocBox obj e _) = readObject obj >> readExpression e
-checkBasicBlock (FreeBox obj e _) = readObject obj >> readExpression e
-checkBasicBlock (SystemCall obj _ args _) = readObject obj >> mapM_ readExpression args
-checkBasicBlock (ReturnBlock mRet _) = mapM_ readExpression mRet
-checkBasicBlock (ContinueBlock e _) = readExpression e
-checkBasicBlock (RebootBlock _) = return ()
+-- | Every other block only evaluates the expressions it holds, in order.
+-- 'simpleBlockChildren' is exhaustive, so a new kind of block breaks its
+-- definition rather than this one; a new block that branches has to be given a
+-- case above.
+checkBasicBlock block = mapM_ (mapM_ readChild) (simpleBlockChildren block)
 
 -- | The variables a case binds are declared by the case itself.
 checkMatchCase :: MatchCase SemanticAnn -> VarUsageMonad BranchOut

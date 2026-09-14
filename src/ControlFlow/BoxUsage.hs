@@ -26,6 +26,7 @@ import qualified Control.Monad.State as ST
 
 -- AST to work with.
 import ControlFlow.BasicBlocks.AST
+import ControlFlow.BasicBlocks.Traversal
 -- We need to know the type of objects.
 import Semantic.Types
 import ControlFlow.BoxUsage.Types
@@ -49,75 +50,41 @@ useArguments (ReferenceExpression _ (Variable ident _ann) _a) =
 useArguments e = useExpression e
 
 useObject :: Object SemanticAnn -> UDM BoxUsageError ()
-useObject (Variable ident ann) =
-  let loc = getLocation ann in
-  maybe
-    (throwError $ annotateError loc EExpectedOptionBoxType)
-    (\case {
-        TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
-        _ -> safeUseVariable ident
-    }) (getTypeSemAnn ann)
-useObject (ArrayIndexExpression obj e _ann)
-  = useObject obj >> useExpression e
-useObject (MemberAccess obj _i _ann)
-  = useObject obj
-useObject (Dereference obj _ann)
-  = useObject obj
-useObject (DereferenceMemberAccess obj i _ann)
-  = safeUseVariable i
-  >> useObject obj
-useObject (Unbox obj _ann)
-  = useObject obj
-
-useFieldAssignment :: FieldAssignment SemanticAnn -> UDM BoxUsageError ()
-useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
-useFieldAssignment _ = return ()
+useObject = walkObject ObjectVisitor
+  {
+    atRoot = \ident ann ->
+      let loc = getLocation ann in
+      maybe
+        (throwError $ annotateError loc EExpectedOptionBoxType)
+        (\case {
+            TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
+            _ -> safeUseVariable ident
+        }) (getTypeSemAnn ann)
+    -- A field reached through a reference is recorded, which is what tells
+    -- the two option-box errors apart; one reached directly is not.
+  , atField = \accessor _obj ident ->
+      case accessor of
+        ThroughReference -> safeUseVariable ident
+        Direct -> return ()
+  , atIndex = useExpression
+  }
 
 getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
 getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
 
 useExpression :: Expression SemanticAnn -> UDM BoxUsageError ()
-useExpression (AccessObject obj)
-  = useObject obj
-useExpression (Constant _c _a)
-  = return ()
-useExpression (BinOp _o el er _ann)
-  = useExpression el >> useExpression er
-useExpression (ReferenceExpression _refKind (Variable ident _ann) _a) 
-  = safeUseVariable ident
-useExpression (ReferenceExpression _ obj _a)
-  = useObject obj
-useExpression (Casting e _ty _a)
-  = useExpression e
-useExpression (IsEnumVariantExpression obj _ _ _)
-  = useObject obj
-useExpression (IsMonadicVariantExpression obj _ _)
-  = useObject obj
-useExpression (ArraySliceExpression _aK obj eB eT _ann)
-  = useObject obj >> useExpression eB >> useExpression eT
-useExpression (MemberFunctionCall obj _ident args _ann) =
-    useObject obj >> mapM_ useArguments args
-useExpression (DerefMemberFunctionCall obj _ident args _ann)
-  = useObject obj >> mapM_ useArguments args
-useExpression (ArrayInitializer e _size _ann)
-  = useExpression e
-useExpression (ArrayExprListInitializer exprs _ann) = mapM_ useExpression exprs
-useExpression (StructInitializer fs _ann)
-  = mapM_ useFieldAssignment fs
-useExpression (EnumVariantInitializer _ident _ident2 es _ann)
-  = mapM_ useExpression es
-useExpression (MonadicVariantInitializer opt _ann)
-  = case opt of
-        None   -> return ()
-        Some e -> useExpression e
-        Success -> return ()
-        Failure e -> useExpression e
-        Ok e -> useExpression e
-        Error e -> useExpression e
-useExpression (FunctionCall _ident args _ann)
-  = mapM_ useArguments args
-useExpression (StringInitializer _str _a)
-  = return ()
+useExpression = mapM_ useChild . expressionChildren
+
+-- | A reference to a bare variable only uses it, without going through the
+-- option-box protocol, and a constant expression that belongs to a type is not
+-- part of the computation.
+useChild :: Child SemanticAnn -> UDM BoxUsageError ()
+useChild (ChildObject obj) = useObject obj
+useChild (ChildReference _ (Variable ident _)) = safeUseVariable ident
+useChild (ChildReference _ obj) = useObject obj
+useChild (ChildExpr e) = useExpression e
+useChild (ChildArg e) = useArguments e
+useChild (ChildConstExpr _) = return ()
 
 useDefBlockRet :: Block SemanticAnn -> UDM BoxUsageError ()
 useDefBlockRet bret = useDefBasicBlocks (blockBody bret)
@@ -258,23 +225,10 @@ useDefBasicBlock (FreeBox obj arg ann)
       let loc = getLocation ann in
       safeMoveBox var loc
     _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
-useDefBasicBlock (ProcedureInvoke obj _ident args _ann)
-  = useObject obj >> mapM_ useArguments args
-useDefBasicBlock (AtomicLoad obj e _ann)
-  = useObject obj >> useExpression e
-useDefBasicBlock (AtomicStore obj e _ann)
-  = useObject obj >> useExpression e
-useDefBasicBlock (AtomicArrayLoad obj eI eO _ann)
-  = useObject obj >> useExpression eI >> useExpression eO
-useDefBasicBlock (AtomicArrayStore obj eI eO _ann)
-  = useObject obj >> useExpression eI >> useExpression eO
 useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
-useDefBasicBlock (ReturnBlock e _ann) =
-  mapM_ useExpression e
-useDefBasicBlock (ContinueBlock e _ann) = useExpression e
-useDefBasicBlock (RebootBlock _ann) = return ()
-useDefBasicBlock (SystemCall obj _ident args _ann) =
-  useObject obj >> mapM_ useArguments args
+-- | Every other block only evaluates the expressions it holds, and none of them
+-- hands over a box other than through a call argument.
+useDefBasicBlock block = mapM_ (mapM_ useChild) (simpleBlockChildren block)
 
 -- General case, not when it is TOption Box
 useMCase :: MatchCase SemanticAnn -> UDM BoxUsageError ()
