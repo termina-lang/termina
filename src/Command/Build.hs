@@ -437,7 +437,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Definite assignment checking
     when chatty (putStrLn . debugMessage $ "Definite assignment checking project modules")
-    case initCheckModules rawBBProject of
+    case varUsageCheckModules rawBBProject of
       Nothing -> return ()
       Just err ->
         let sourceFilesMap =
@@ -446,7 +446,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
-    case useDefCheckModules rawBBProject of
+    case boxUsageCheckModules rawBBProject of
       Nothing -> return ()
       Just err ->
         let sourceFilesMap =

@@ -1,414 +1,528 @@
--- | Simple POC of data flo analysis to compute flow of box variables.
+-- | Definite assignment and variable usage check.
+--
+-- This pass walks the basic blocks, checking that: 
+-- - An object declared without an initializer may not be read, nor may one of
+-- its fields or elements be written, before the whole object is assigned
+-- (VE-007, VE-008).  
+-- - Whether an identifier is read at all somewhere, which is what the unused
+-- variable, unused field and uncalled member function checks need (VE-001,
+-- VE-002, VE-003, VE-004, VE-005).  
+-- - A value that nobody reads before it is overwritten is a dead store
+-- (VE-006).
+--
+-- Accordingly, the state keeps one accumulator per body for the objects that
+-- are declared and not assigned yet, one per top-level element for every
+-- identifier that is read, and one per body for the assignments whose value is
+-- still unread. The second one spans the whole class because a field is used
+-- when /any/ of its members reads it.
+module ControlFlow.VarUsage (runVarUsageCheck) where
 
-module ControlFlow.VarUsage (
-  runUDAnnotatedProgram
-) where
+import Control.Monad (when, unless)
+import Control.Monad.Except
+import qualified Control.Monad.State as ST
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import Data.Maybe (listToMaybe, mapMaybe)
 
-{--
-At Termina level, each block is a basic block.
-
-In this module, we implement a backward analysis.
-That is, given a block, i.e. a sequence of statements, we go to the last
-statement and build our sets and maps backwards.
---}
-
-import ControlFlow.VarUsage.Computation
+import ControlFlow.BasicBlocks.AST
 import ControlFlow.VarUsage.Errors
-
+import Semantic.Types (SemanticAnn, getObjectSAnns)
 import Utils.Annotations
 
-import Control.Monad
-import Control.Monad.Except
+data InitSt = InitSt
+  {
+    -- | Objects declared without an initializer that are not assigned yet. An
+    -- object is initialized when it is not in this set, so joining two paths is
+    -- the union of their sets.
+    pending :: S.Set Identifier,
+    -- | Identifiers read so far. Besides variables, it holds the names of the
+    -- fields reached through @self->@ and, under the key of
+    -- 'memberFunctionKey', the member functions called through @self@.
+    readIdents :: S.Set Identifier,
+    -- | Objects declared in the body being checked, with the location to blame
+    -- if nobody reads them.
+    declared :: [(Identifier, Location)],
+    -- | Assignments of a whole object that reach this point along the current
+    -- path without having been read, kept under the name assigned and located
+    -- by the assignment itself. Joining two paths is the union of their maps,
+    -- since a value is worth reporting as soon as one path leaves it unread.
+    unread :: M.Map Identifier (S.Set Location),
+    -- | Assignments read at some point along some path. An assignment read
+    -- anywhere is not dead, so this set is what rescues the candidates below.
+    readDefs :: S.Set Location,
+    -- | Assignments overwritten before being read, in the order they were
+    -- found. They are only candidates: the walk of a loop body reports the
+    -- same one on every turn, and a later turn may still read it.
+    deadStores :: [(Identifier, Location)]
+  }
 
-import Data.Maybe
-import qualified Data.Map.Strict as M
-import qualified Control.Monad.State as ST
+-- | What a branch leaves behind: the objects it does not assign and the
+-- assignments it does not read.
+type BranchOut = (S.Set Identifier, M.Map Identifier (S.Set Location))
 
--- AST to work with.
-import ControlFlow.BasicBlocks.AST
--- We need to know the type of objects.
-import Semantic.Types
-import ControlFlow.VarUsage.Types
-import Data.Bifunctor
-import qualified Data.Set as S
+type InitMonad = ExceptT VarUsageError (ST.State InitSt)
 
--- There are two types of arguments :
--- + Moving out variables of type box T and TOption<box T>
--- + Copying expressions, everything.
-useArguments :: Expression SemanticAnn -> UDM VarUsageError ()
--- If we are giving a variable of type box T, we moving it out.
-useArguments e@(AccessObject (Variable ident ann))
-  = case getTypeSemAnn ann of
-    Just (TBoxSubtype _) ->
-      let loc = getLocation ann in
-      safeMoveBox ident loc
-    _ -> useExpression e
-useArguments (ReferenceExpression _ (Variable ident _ann) _a) =
-  safeUseVariable ident
--- Box variables inside expressions are read as values.
-useArguments e = useExpression e
+emptySt :: InitSt
+emptySt = InitSt S.empty S.empty [] M.empty S.empty []
 
-useObject :: Object SemanticAnn -> UDM VarUsageError ()
-useObject (Variable ident ann) =
-  let loc = getLocation ann in
-  maybe
-    (throwError $ annotateError loc EExpectedOptionBoxType)
-    (\case {
-        TOption (TBoxSubtype _) -> moveOptionBox ident loc >> safeUseVariable ident;
-        _ -> safeUseVariable ident
-    }) (getTypeSemAnn ann)
-useObject (ArrayIndexExpression obj e _ann)
-  = useObject obj >> useExpression e
-useObject (MemberAccess obj _i _ann)
-  = useObject obj
-useObject (Dereference obj _ann)
-  = useObject obj
-useObject (DereferenceMemberAccess obj i _ann)
-  = safeUseVariable i
-  >> useObject obj
-useObject (Unbox obj _ann)
-  = useObject obj
+-- | Key under which a call to a member function through self is recorded. It
+-- is not a valid identifier, so it cannot clash with the name of a variable.
+memberFunctionKey :: Identifier -> Identifier
+memberFunctionKey ident = "self->" ++ ident ++ "()"
 
-useFieldAssignment :: FieldAssignment SemanticAnn -> UDM VarUsageError ()
-useFieldAssignment (FieldValueAssignment _ident e _) = useExpression e
-useFieldAssignment _ = return ()
+-- | Key under which the read of a field is recorded. Fields and variables
+-- share the set of identifiers read, so the key spells out the access the
+-- field is reached through: that keeps a field from rescuing a variable of the
+-- same name, and the field of one object from answering for the field of
+-- another.
+fieldKey :: Object SemanticAnn -> Identifier -> Identifier
+fieldKey obj ident = objectKey obj ++ "->" ++ ident
 
-getObjType :: Object SemanticAnn -> UDM Error (AccessKind, TerminaType SemanticAnn)
-getObjType = maybe (throwError EInvalidObjectTypeAnnotation) return . getObjectSAnns . getAnnotation
+-- | The key of a field of the class being checked, which its own members reach
+-- through self.
+selfFieldKey :: Identifier -> Identifier
+selfFieldKey ident = "self->" ++ ident
 
-useExpression :: Expression SemanticAnn -> UDM VarUsageError ()
-useExpression (AccessObject obj)
-  = useObject obj
-useExpression (Constant _c _a)
-  = return ()
-useExpression (BinOp _o el er _ann)
-  = useExpression el >> useExpression er
-useExpression (ReferenceExpression _refKind (Variable ident _ann) _a) 
-  = safeUseVariable ident
-useExpression (ReferenceExpression _ obj _a)
-  = useObject obj
-useExpression (Casting e _ty _a)
-  = useExpression e
-useExpression (IsEnumVariantExpression obj _ _ _)
-  = useObject obj
-useExpression (IsMonadicVariantExpression obj _ _)
-  = useObject obj
-useExpression (ArraySliceExpression _aK obj eB eT _ann)
-  = useObject obj >> useExpression eB >> useExpression eT
-useExpression (MemberFunctionCall obj _ident args _ann) =
-    useObject obj >> mapM_ useArguments args
-useExpression (DerefMemberFunctionCall obj _ident args _ann)
-  = useObject obj >> mapM_ useArguments args
-useExpression (ArrayInitializer e _size _ann)
-  = useExpression e
-useExpression (ArrayExprListInitializer exprs _ann) = mapM_ useExpression exprs
-useExpression (StructInitializer fs _ann)
-  = mapM_ useFieldAssignment fs
-useExpression (EnumVariantInitializer _ident _ident2 es _ann)
-  = mapM_ useExpression es
-useExpression (MonadicVariantInitializer opt _ann)
-  = case opt of
-        None   -> return ()
-        Some e -> useExpression e
-        Success -> return ()
-        Failure e -> useExpression e
-        Ok e -> useExpression e
-        Error e -> useExpression e
-useExpression (FunctionCall _ident args _ann)
-  = mapM_ useArguments args
-useExpression (StringInitializer _str _a)
-  = return ()
+-- | Spelling of an access, which is what makes the keys above unique. It is
+-- canonical: dereferencing and unboxing do not show, and both field accessors
+-- render alike, so that @(*obj).field@ and @obj->field@ share one key. Indices
+-- are not part of it either, so every element of an array shares one.
+objectKey :: Object SemanticAnn -> Identifier
+objectKey (Variable ident _) = ident
+objectKey (ArrayIndexExpression obj _ _) = objectKey obj ++ "[]"
+objectKey (MemberAccess obj ident _) = objectKey obj ++ "->" ++ ident
+objectKey (Dereference obj _) = objectKey obj
+objectKey (DereferenceMemberAccess obj ident _) = objectKey obj ++ "->" ++ ident
+objectKey (Unbox obj _) = objectKey obj
 
-useDefBlockRet :: Block SemanticAnn -> UDM VarUsageError ()
-useDefBlockRet bret = useDefBasicBlocks (blockBody bret)
+markDeclared :: Identifier -> Location -> InitMonad ()
+markDeclared ident loc = ST.modify (\st -> st {
+    pending = S.insert ident (pending st),
+    declared = (ident, loc) : declared st
+  })
 
-useDefStmt :: Statement SemanticAnn -> UDM VarUsageError ()
-useDefStmt (Declaration ident _accK tyS initE ann)
-  -- variable def is defined
-  = let loc = getLocation ann in
-  case tyS of
-    -- Box are only declared on match statements
-    TOption (TBoxSubtype _) -> defVariableOptionBox ident loc
-    -- Box are not possible, they come from somewhere else.
-    TBoxSubtype _ -> throwError $ annotateError loc EDefiningBox
-    -- | Everything else is a plain variable, which the forward pass owns
-    _        -> return ()
-  -- Use everithing in the |initE| if included
-  >> mapM_ useExpression initE
--- All branches should have the same used Only ones.
-useDefStmt (AssignmentStmt obj e ann) = do
-  -- | We need to check if the object is an option-box
-  obj_ty <- withLocation (getLocation ann) (getObjType obj)
-  case obj_ty of
-    (_, TOption (TBoxSubtype _)) -> 
-      -- | We are assigning to an option-box. This can only be done through a
-      -- MonadicVariantInitializer.
-      case e of 
-        MonadicVariantInitializer None _ -> 
-          case obj of
-            Variable ident _ -> initializeOptionBox ident (getLocation ann)
-            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-        MonadicVariantInitializer (Some boxObjExpr) _ -> do
-          -- | We need to move the box object 
-          case boxObjExpr of
-            AccessObject (Variable ident _) -> 
-              let loc = getLocation ann in
-              safeMoveBox ident loc
-            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-          -- | And update the option-box as allocated
-          case obj of
-            Variable ident _ -> allocOptionBox ident (getLocation ann)
-            _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-        _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-    _ -> case obj of
-      Variable ident _ -> safeUseVariable ident >> useExpression e
-      _ -> useObject obj >> useExpression e
-useDefStmt (SingleExpStmt e _ann)
-  = useExpression e
+-- | A declaration with an initializer: the object has a value from the start,
+-- but it still has to be read by somebody.
+markInitialized :: Identifier -> Location -> InitMonad ()
+markInitialized ident loc = ST.modify (\st -> st {
+    pending = S.delete ident (pending st),
+    declared = (ident, loc) : declared st
+  })
 
-useDefBasicBlocks :: [BasicBlock SemanticAnn] -> UDM VarUsageError ()
-useDefBasicBlocks = mapM_ useDefBasicBlock . reverse
+markAssigned :: Identifier -> InitMonad ()
+markAssigned ident = ST.modify (\st -> st { pending = S.delete ident (pending st) })
 
-useDefStatements :: [Statement SemanticAnn] -> UDM VarUsageError ()
-useDefStatements = mapM_ useDefStmt . reverse
+-- | Reading an identifier reads whatever assignments of it reach this point,
+-- which takes them out of the candidates for good.
+markRead :: Identifier -> InitMonad ()
+markRead ident = ST.modify (\st -> st {
+    readIdents = S.insert ident (readIdents st),
+    readDefs = S.union (M.findWithDefault S.empty ident (unread st)) (readDefs st),
+    unread = M.delete ident (unread st)
+  })
 
-useDefBasicBlock :: BasicBlock SemanticAnn -> UDM VarUsageError ()
-useDefBasicBlock (IfElseBlock condIf elseIfs bFalse _ann)
-  = do
-  let blocks = condIfBody condIf : map condElseIfBody elseIfs ++ (condElseBody <$> maybeToList bFalse)
-      bodiesWithLocs = map (\b -> (blockBody b, getLocation (blockAnnotation b))) blocks
-  prevSt <- ST.get
-  -- All sets generated for all different branches.
-  sets <- mapM (\(body, loc) -> do
-    blockSt <- runEncapsWithEmptyVars (useDefBasicBlocks body >> ST.get)
-    return (blockSt, loc)) bodiesWithLocs
-   -- Rule here is, when entering, the state of all the boxes must be the same and the
-   -- set of used boxes must be equal.
-  finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
-  unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
-   -- Use the else-ifs conditional expressions
-  mapM_ (useExpression . condElseIfCond) elseIfs
-  -- Finally, use the if conditional expression
-  useExpression (condIfCond condIf)
-useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
-    prevSt <- ST.get
-    -- What happens inside the body of a for, may not happen at all.
-    loopSt <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody block) >> ST.get)
-    finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
-    unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
-    mapM_ useExpression mBrk
-    -- Use the expressions of the for loop bounds, just in case they contain
-    -- references to const input parameters.
-    useExpression eB
-    useExpression eE
-useDefBasicBlock (MatchBlock e mcase mDefaultCase ann) = do
-  prevSt <- ST.get
-  caseSets <- maybe (throwError $ annotateError (getLocation ann) EInvalidExprTypeAnnotation)
-    (\case
-        TOption (TBoxSubtype _) ->
-            case mcase of
-              [ml,mr] -> do
-                let (mSome, mNone) = if matchIdentifier ml == "Some" then (ml,mr) else (mr,ml)
-                someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
-                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
-                noneBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mNone) >> ST.get)
-                return [(someBlk, getLocation . matchAnnotation $ mSome), (noneBlk, getLocation . matchAnnotation $ mNone)]
-              [mSome@(MatchCase "Some" _ _ _)] -> do
-                someBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody . matchBody $ mSome)
-                  >> defBox (head (matchBVars mSome)) (getLocation (matchAnnotation mSome)) >> ST.get)
-                return [(someBlk, getLocation . matchAnnotation $ mSome)]
-              [MatchCase "None" _ _ _] -> 
-                throwError $ annotateError (getLocation ann) EOptionBoxMatchMissingSomeCase
-              _ -> throwError $ annotateError Internal EMalformedOptionBoxMatch;
-        -- Otherwise, it is a simple use variable.
-        _ -> runMultipleEncapsWithEmptyVars (
-          map (\c -> do
-            blockSt <- useMCase c >> ST.get
-            return (blockSt, getLocation . matchAnnotation $ c)) mcase);
-    ) (getResultingType $ getSemanticAnn $ getAnnotation e)
-  sets <- case mDefaultCase of
-    Just (DefaultCase blk ann') -> do
-      defaultBlk <- runEncapsWithEmptyVars (useDefBasicBlocks (blockBody blk) >> ST.get)
-      return $ (defaultBlk, getLocation ann') : caseSets
-    Nothing -> return caseSets
-  finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) sets
-  unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
-  useExpression e
-useDefBasicBlock (SendMessage obj arg ann) = useObject obj >>
-  case arg of
-    AccessObject input_obj@(Variable var _) -> do
-      input_obj_type <- withLocation (getLocation ann) (getObjType input_obj)
-      case input_obj_type of
-        (_, TBoxSubtype _) -> let loc = getLocation ann in
-          safeMoveBox var loc
-        _ -> useObject input_obj
-    _ -> useExpression arg
-useDefBasicBlock (AllocBox obj arg ann) = useObject obj >>
-  case arg of
-    -- I don't think we can have expression computing variables here.
-    ReferenceExpression Mutable (Variable avar _anni) _ann ->
-      allocOptionBox avar (getLocation ann)
-    AccessObject (Variable avar _anni) ->
-      allocOptionBox avar (getLocation ann)
-    _ -> throwError $ annotateError (getLocation ann) EBadAllocArg
-useDefBasicBlock (FreeBox obj arg ann)
-  = useObject obj >>
-  case arg of
-    AccessObject (Variable var _anni) ->
-      let loc = getLocation ann in
-      safeMoveBox var loc
-    _ -> withLocation (getLocation ann) (throwError EBadFreeArg)
-useDefBasicBlock (ProcedureInvoke obj _ident args _ann)
-  = useObject obj >> mapM_ useArguments args
-useDefBasicBlock (AtomicLoad obj e _ann)
-  = useObject obj >> useExpression e
-useDefBasicBlock (AtomicStore obj e _ann)
-  = useObject obj >> useExpression e
-useDefBasicBlock (AtomicArrayLoad obj eI eO _ann)
-  = useObject obj >> useExpression eI >> useExpression eO
-useDefBasicBlock (AtomicArrayStore obj eI eO _ann)
-  = useObject obj >> useExpression eI >> useExpression eO
-useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
-useDefBasicBlock (ReturnBlock e _ann) =
-  mapM_ useExpression e
-useDefBasicBlock (ContinueBlock e _ann) = useExpression e
-useDefBasicBlock (RebootBlock _ann) = return ()
-useDefBasicBlock (SystemCall obj _ident args _ann) =
-  useObject obj >> mapM_ useArguments args
+-- | An assignment is killed when the whole object is assigned again and when
+-- the body ends. One killed unread is a candidate to be reported.
+killAssignments :: Identifier -> InitMonad ()
+killAssignments ident = ST.modify (\st -> st {
+    unread = M.delete ident (unread st),
+    deadStores = deadStores st ++
+      [(ident, loc) | loc <- S.toList (M.findWithDefault S.empty ident (unread st))]
+  })
 
--- General case, not when it is TOption Box
-useMCase :: MatchCase SemanticAnn -> UDM VarUsageError ()
-useMCase (MatchCase _mIdent _bvars blk _ann)
-  = useDefBasicBlocks (blockBody blk)
+-- | Assignment of a whole object: it kills whatever reached this point.
+markAssignment :: Identifier -> Location -> InitMonad ()
+markAssignment ident loc = do
+  killAssignments ident
+  ST.modify (\st -> st { unread = M.insert ident (S.singleton loc) (unread st) })
 
-useArraySize :: TerminaType SemanticAnn -> UDM VarUsageError ()
-useArraySize (TReference _ (TArray ty size)) = do
-  useArraySize ty
-  useExpression size
-useArraySize (TArray ty size) = do
-  useArraySize ty
-  useExpression size
-useArraySize _ty = return ()
+-- | The object the access starts from.
+rootIdent :: Object SemanticAnn -> Maybe Identifier
+rootIdent (Variable ident _) = Just ident
+rootIdent (ArrayIndexExpression obj _ _) = rootIdent obj
+rootIdent (MemberAccess obj _ _) = rootIdent obj
+rootIdent (Dereference obj _) = rootIdent obj
+rootIdent (DereferenceMemberAccess obj _ _) = rootIdent obj
+rootIdent (Unbox obj _) = rootIdent obj
 
-checkUseVariableStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
-checkUseVariableStates prevSt sets = do
-  finalSt <- checkOptionBoxStates prevSt sets 
-  checkSameMovedBoxes (map (first (flip M.difference (movedBoxes prevSt) . movedBoxes)) sets)
-  return finalSt
+checkRead :: Identifier -> Location -> InitMonad ()
+checkRead ident loc = do
+  notAssigned <- ST.gets pending
+  when (S.member ident notAssigned)
+    (throwError $ annotateError loc (EReadBeforeAssignment ident))
+  markRead ident
 
-checkSameMovedBoxes :: [(VarMap, Location)] -> UDM VarUsageError ()
-checkSameMovedBoxes [] = return ()
-checkSameMovedBoxes [(boxes, _)] = 
-  case M.toList boxes of
-    [] -> return ()
-    ((ident, loc):_) -> throwError $ annotateError loc (EBoxMoveConditionalBranch ident)
-checkSameMovedBoxes (x:xs) = mapM_ (sameMovedBoxes x) xs
+-- | A write to a field or to an element only makes sense once the whole object
+-- has a value.
+checkPartialWrite :: Object SemanticAnn -> Location -> InitMonad ()
+checkPartialWrite obj loc =
+  case rootIdent obj of
+    Nothing -> return ()
+    Just ident -> do
+      notAssigned <- ST.gets pending
+      when (S.member ident notAssigned)
+        (throwError $ annotateError loc (EPartialWriteBeforeAssignment ident))
+
+readObject :: Object SemanticAnn -> InitMonad ()
+readObject (Variable ident ann) = checkRead ident (getLocation ann)
+readObject (ArrayIndexExpression obj e _) = readObject obj >> readExpression e
+readObject (MemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
+readObject (Dereference obj _) = readObject obj
+-- | A field reached through self counts as a read of the field itself
+readObject (DereferenceMemberAccess obj ident _) = markRead (fieldKey obj ident) >> readObject obj
+readObject (Unbox obj _) = readObject obj
+
+-- | Writing into an object does not use it: an object that is written and
+-- never read is dead code, and the unused check is the one that says so.
+--
+-- There are two exceptions, and both are about an effect that is observable
+-- from outside the body. The first one is a write that goes through a
+-- dereference, which means the object belongs to somebody else: writing an
+-- out parameter, @*status = Failure(e)@, uses it, and so does writing a field
+-- through @self@. Only the root is used that way, so a field that is written
+-- and never read is still dead. The second one is a memory-mapped location,
+-- where the write is the effect: a hardware register is written and never read
+-- back, and there the whole access counts.
+markWrittenObject :: Object SemanticAnn -> InitMonad ()
+markWrittenObject obj = do
+  when (isFixedLocation obj) (markChain obj)
+  when (goesThroughReference obj) (mapM_ markRead (rootIdent obj))
+  case rootIdent obj of
+    Just "self" -> markRead "self"
+    _ -> return ()
 
   where
 
-    sameMovedBoxes :: (VarMap, Location) -> (VarMap, Location) -> UDM VarUsageError ()
-    sameMovedBoxes (lmap, lloc) (rmap, rloc) = do
-      mapM_ (\k ->
-        case (M.lookup k lmap, M.lookup k rmap) of
-          (Nothing, Nothing) -> throwError $ annotateError Internal EUnboxingVariableMap
-          (Nothing, Just vloc)  -> throwError $ annotateError lloc (EMissingBoxMove k vloc)
-          (Just vloc, Nothing)  -> throwError $ annotateError rloc (EMissingBoxMove k vloc)
-          _ -> return ()) (M.keys $ M.union lmap rmap)
+    -- | Whether the object written belongs to somebody else. It does when the
+    -- access dereferences, and also when it goes through an object of
+    -- reference type: a reference to an array is indexed without dereferencing
+    -- it first, as in @paction_num[i] = ...@ over a @&mut [usize; 4]@.
+    goesThroughReference :: Object SemanticAnn -> Bool
+    goesThroughReference (Dereference _ _) = True
+    goesThroughReference (DereferenceMemberAccess {}) = True
+    goesThroughReference o@(ArrayIndexExpression inner _ _) =
+      isReference o || isReference inner || goesThroughReference inner
+    goesThroughReference o@(MemberAccess inner _ _) =
+      isReference o || isReference inner || goesThroughReference inner
+    goesThroughReference o@(Unbox inner _) =
+      isReference o || goesThroughReference inner
+    goesThroughReference o@(Variable _ _) = isReference o
 
-checkOptionBoxStates :: UDSt -> [(UDSt, Location)] -> UDM VarUsageError UDSt
-checkOptionBoxStates prevSt [] = return prevSt
-checkOptionBoxStates prevSt [(state, loc)] = do
-  let lmap = optionBoxesMap prevSt
-      rmap = optionBoxesMap state
-  mapM_ (\k ->
-    case (M.lookup k lmap, M.lookup k rmap) of
-      (Nothing, Nothing) -> throwError $ annotateError Internal EUnboxingOptionMap
-      (Nothing, Just rval) -> 
-        unless (isAllocated rval) $ throwError $ annotateError (getLocation rval) (EDifferentNewOptionBoxUse k rval)
-      (Just lval, Nothing) -> 
-        unless (isAllocated lval) $ throwError $ annotateError (getLocation lval) (EDifferentNewOptionBoxUse k lval)
-      (Just lval, Just rval) -> 
-        unless (sameState lval rval) (
-          case (S.member k (usedVarSet prevSt), S.member k (usedVarSet state)) of
-            (False, True) -> throwError $ annotateError (getLocation rval) (EDifferentNewOptionBoxUse k rval)
-            (True, False) -> throwError $ annotateError loc (EMissingOptionBox k lval)
-            _ -> throwError $ annotateError (getLocation lval) (EDifferentOptionBoxUse k lval (rval, loc))))
-        (M.keys $ M.union lmap rmap)
-  unifyStates prevSt state
-checkOptionBoxStates lSt ((rSt, rloc):xs) = do
-  let lmap = optionBoxesMap lSt
-      rmap = optionBoxesMap rSt
-  mapM_ (\k ->
-    case (M.lookup k lmap, M.lookup k rmap) of
-      (Nothing, Nothing) -> throwError $ annotateError Internal EUnboxingOptionMap
-      (Nothing, Just _) -> 
-        -- | If the option-box is not in the previous state, it means that
-        -- it was not used after the branches and it was firstly "mentioned"
-        -- in the current one.  However, since there are going to be more
-        -- branches, then we will check later on if it is used correctly or
-        -- not.
-        return ()
-      (Just lval, Nothing) -> 
-        unless (isAllocated lval) $ throwError $ annotateError (getLocation lval) (EDifferentNewOptionBoxUse k lval)
-      (Just lval, Just rval) -> 
-        unless (sameState lval rval) (
-          case (S.member k (usedVarSet lSt), S.member k (usedVarSet rSt)) of
-            (False, True) -> return ()
-            (True, False) -> throwError $ annotateError rloc (EMissingOptionBox k lval)
-            _ -> throwError $ annotateError (getLocation lval) (EDifferentOptionBoxUse k lval (rval, rloc))))
-        (M.keys $ M.union lmap rmap)
-  nextSt <- unifyStates lSt rSt
-  checkOptionBoxStates nextSt xs
+    isReference :: Object SemanticAnn -> Bool
+    isReference o =
+      case getObjectSAnns (getAnnotation o) of
+        Just (_, TReference {}) -> True
+        _ -> False
 
-useDefCMemb :: ClassMember SemanticAnn -> UDM VarUsageError ()
-useDefCMemb (ClassField {}) = return ()
-useDefCMemb (ClassMethod _ak _ident ps _tyret bret _ann)
-  = useDefBlockRet bret
-  >> mapM_ (useArraySize . paramType) ps
-useDefCMemb (ClassProcedure _ak _ident ps blk ann)
-  = useDefBlockRet blk
-  >> mapM_ (useArraySize . paramType) ps
-  >> mapM_ (`defArgumentsProc` getLocation ann) ps
-useDefCMemb (ClassViewer _ident ps _tyret bret _ann)
-  = useDefBlockRet bret
-  >> mapM_ (useArraySize . paramType) ps
-useDefCMemb (ClassAction _ak _ident Nothing _tyret bret _ann)
-  = useDefBlockRet bret
-useDefCMemb (ClassAction _ak _ident (Just p) _tyret bret ann)
-  = useDefBlockRet bret
-  >> mapM_ (`defArgumentsProc` getLocation ann) [p]
+    isFixedLocation :: Object SemanticAnn -> Bool
+    isFixedLocation o =
+      case getObjectSAnns (getAnnotation o) of
+        Just (_, TFixedLocation _) -> True
+        _ -> case o of
+          ArrayIndexExpression inner _ _ -> isFixedLocation inner
+          MemberAccess inner _ _ -> isFixedLocation inner
+          Dereference inner _ -> isFixedLocation inner
+          DereferenceMemberAccess inner _ _ -> isFixedLocation inner
+          Unbox inner _ -> isFixedLocation inner
+          Variable _ _ -> False
 
-useDefTypeDef :: TypeDef SemanticAnn -> UDM VarUsageError ()
-useDefTypeDef (Class _k _id members _provides _mods)
-  = mapM_ useDefCMemb members
-useDefTypeDef (Struct {}) = return ()
-useDefTypeDef (Interface {}) = return ()
-useDefTypeDef (Enum {}) = return ()
+    -- | Marks every name the access goes through, so that writing
+    -- @self->registers.data@ uses both the field and the receiver.
+    markChain :: Object SemanticAnn -> InitMonad ()
+    markChain (Variable ident _) = markRead ident
+    markChain (ArrayIndexExpression inner _ _) = markChain inner
+    markChain (MemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
+    markChain (Dereference inner _) = markChain inner
+    markChain (DereferenceMemberAccess inner ident _) = markRead (fieldKey inner ident) >> markChain inner
+    markChain (Unbox inner _) = markChain inner
 
--- Globals
-useDefFrag :: AnnASTElement SemanticAnn -> UDM VarUsageError ()
-useDefFrag (Function _ident ps _ty blk _mods anns)
- = useDefBlockRet blk
- >> mapM_ (useArraySize . paramType) ps
- >> mapM_ (`defArgumentsProc` getLocation anns) ps
- -- >> mapM_ ((annotateError (location anns)) . defVariable . paramIdentifier) ps
-useDefFrag (GlobalDeclaration {})
-  = return ()
-useDefFrag (TypeDefinition tyDef _ann)
-  = useDefTypeDef tyDef
+-- | The index expressions of an object that is being written into. The object
+-- itself is not read, only the indices are.
+readIndices :: Object SemanticAnn -> InitMonad ()
+readIndices (Variable _ _) = return ()
+readIndices (ArrayIndexExpression obj e _) = readIndices obj >> readExpression e
+readIndices (MemberAccess obj _ _) = readIndices obj
+readIndices (Dereference obj _) = readIndices obj
+readIndices (DereferenceMemberAccess obj _ _) = readIndices obj
+readIndices (Unbox obj _) = readIndices obj
 
-runUDFrag :: AnnASTElement SemanticAnn -> Maybe VarUsageError
-runUDFrag =
-  either Just (const Nothing)
-  . fst
-  . runComputation
-  . useDefFrag
+readFieldAssignment :: FieldAssignment SemanticAnn -> InitMonad ()
+readFieldAssignment (FieldValueAssignment _ e _) = readExpression e
+readFieldAssignment _ = return ()
 
-runUDAnnotatedProgram :: AnnotatedProgram  SemanticAnn -> Maybe VarUsageError
-runUDAnnotatedProgram
-  = safeHead
-  . filter isJust
-  . map runUDFrag
+-- | Records a call to a member function of the class made through self.
+readSelfMemberFunction :: Object SemanticAnn -> Identifier -> InitMonad ()
+readSelfMemberFunction (Variable "self" _) ident = markRead (memberFunctionKey ident)
+readSelfMemberFunction (Dereference (Variable "self" _) _) ident = markRead (memberFunctionKey ident)
+readSelfMemberFunction _ _ = return ()
+
+-- | Taking a reference, either @&@ or @&mut@, counts as a read: the receiver
+-- may read what it is given.
+readExpression :: Expression SemanticAnn -> InitMonad ()
+readExpression (AccessObject obj) = readObject obj
+readExpression (Constant _ _) = return ()
+readExpression (BinOp _ le re _) = readExpression le >> readExpression re
+readExpression (ReferenceExpression _ obj _) = readObject obj
+readExpression (Casting e _ _) = readExpression e
+readExpression (IsEnumVariantExpression obj _ _ _) = readObject obj
+readExpression (IsMonadicVariantExpression obj _ _) = readObject obj
+readExpression (ArraySliceExpression _ obj lower upper _) =
+  readObject obj >> readExpression lower >> readExpression upper
+readExpression (MemberFunctionCall obj ident args _) =
+  readSelfMemberFunction obj ident >> readObject obj >> mapM_ readExpression args
+readExpression (DerefMemberFunctionCall obj ident args _) =
+  readSelfMemberFunction obj ident >> readObject obj >> mapM_ readExpression args
+readExpression (ArrayInitializer e _ _) = readExpression e
+readExpression (ArrayExprListInitializer es _) = mapM_ readExpression es
+readExpression (StructInitializer fs _) = mapM_ readFieldAssignment fs
+readExpression (EnumVariantInitializer _ _ es _) = mapM_ readExpression es
+readExpression (MonadicVariantInitializer opt _) =
+  case opt of
+    None -> return ()
+    Some e -> readExpression e
+    Success -> return ()
+    Failure e -> readExpression e
+    Ok e -> readExpression e
+    Error e -> readExpression e
+readExpression (FunctionCall _ args _) = mapM_ readExpression args
+readExpression (StringInitializer _ _) = return ()
+
+checkStatement :: Statement SemanticAnn -> InitMonad ()
+checkStatement (Declaration ident _ _ Nothing ann) = markDeclared ident (getLocation ann)
+-- | The value an initializer gives the object is an assignment like any
+-- other, so one that nobody reads before it is overwritten is a dead store.
+-- The object is then meant to be declared without an initializer.
+checkStatement (Declaration ident _ _ (Just initExpr) ann) =
+  readExpression initExpr >> markInitialized ident (getLocation ann)
+    >> markAssignment ident (getLocation ann)
+checkStatement (AssignmentStmt obj e ann) = do
+  readExpression e
+  case obj of
+    -- | The whole object is assigned
+    Variable ident _ -> markAssigned ident >> markAssignment ident (getLocation ann)
+    -- | Only a part of it is
+    _ -> checkPartialWrite obj (getLocation ann) >> markWrittenObject obj >> readIndices obj
+checkStatement (SingleExpStmt e _) = readExpression e
+
+-- | Checks one branch from the current state and returns the objects it leaves
+-- unassigned, restoring the entry state so that the next branch starts where
+-- this one did. What the branch reads is kept, since reading does not depend
+-- on the path.
+checkBranch :: Block SemanticAnn -> InitMonad BranchOut
+checkBranch blk = do
+  entry <- currentOut
+  checkBlock blk
+  out <- currentOut
+  ST.modify (\st -> st { pending = fst entry, unread = snd entry })
+  return out
+
+-- | What the path being walked has left behind so far.
+currentOut :: InitMonad BranchOut
+currentOut = ST.gets (\st -> (pending st, unread st))
+
+-- | Joins the paths that meet after a conditional: an object is initialized
+-- when every path assigns it, and a value is left unread when any path leaves
+-- it unread.
+joinBranches :: [BranchOut] -> InitMonad ()
+joinBranches outs = ST.modify (\st -> st {
+    pending = S.unions (map fst outs),
+    unread = M.unionsWith S.union (map snd outs)
+  })
+
+checkBasicBlock :: BasicBlock SemanticAnn -> InitMonad ()
+checkBasicBlock (RegularBlock stmts) = mapM_ checkStatement stmts
+checkBasicBlock (IfElseBlock condIf elseIfs mElse _) = do
+  readExpression (condIfCond condIf)
+  ifOut <- checkBranch (condIfBody condIf)
+  elseIfOuts <- mapM
+    (\elseIf -> readExpression (condElseIfCond elseIf) >> checkBranch (condElseIfBody elseIf))
+    elseIfs
+  entry <- currentOut
+  -- | Without an else branch there is a path that assigns nothing
+  elseOut <- maybe (return entry) (checkBranch . condElseBody) mElse
+  joinBranches (ifOut : elseOut : elseIfOuts)
+checkBasicBlock (MatchBlock e cases mDefaultCase _) = do
+  readExpression e
+  caseOuts <- mapM checkMatchCase cases
+  entry <- currentOut
+  case mDefaultCase of
+    Just (DefaultCase blk _) -> do
+      defaultOut <- checkBranch blk
+      joinBranches (defaultOut : caseOuts)
+    -- | Without a default case the listed cases are exhaustive
+    Nothing -> joinBranches (if null caseOuts then [entry] else caseOuts)
+checkBasicBlock (ForLoopBlock _ _ initE endE mBreak blk _) = do
+  readExpression initE
+  readExpression endE
+  mapM_ readExpression mBreak
+  entry <- ST.gets unread
+  bodyUnread <- loopUnread entry
+  -- | The body may not run, so what it assigns does not count afterwards,
+  -- while what it leaves unread may still be read after the loop
+  ST.modify (\st -> st { unread = M.unionWith S.union entry bodyUnread })
+
   where
-    safeHead []     = Nothing
-    safeHead (x:_) = x
+
+    -- | The assignments the body leaves unread. A value assigned in one
+    -- iteration may be read in the next one, so the body is walked again with
+    -- what the previous walk left unread, until the set stops growing; the
+    -- reads of those extra walks are what rescue the candidates.
+    loopUnread :: M.Map Identifier (S.Set Location)
+      -> InitMonad (M.Map Identifier (S.Set Location))
+    loopUnread known = do
+      ST.modify (\st -> st { unread = known })
+      (_, out) <- checkBranch blk
+      let known' = M.unionWith S.union known out
+      if known' == known then return out else loopUnread known'
+checkBasicBlock (SendMessage obj e _) = readObject obj >> readExpression e
+checkBasicBlock (ProcedureInvoke obj _ args _) = readObject obj >> mapM_ readExpression args
+checkBasicBlock (AtomicLoad obj e _) = readObject obj >> readExpression e
+checkBasicBlock (AtomicStore obj e _) = readObject obj >> readExpression e
+checkBasicBlock (AtomicArrayLoad obj idx e _) =
+  readObject obj >> readExpression idx >> readExpression e
+checkBasicBlock (AtomicArrayStore obj idx e _) =
+  readObject obj >> readExpression idx >> readExpression e
+checkBasicBlock (AllocBox obj e _) = readObject obj >> readExpression e
+checkBasicBlock (FreeBox obj e _) = readObject obj >> readExpression e
+checkBasicBlock (SystemCall obj _ args _) = readObject obj >> mapM_ readExpression args
+checkBasicBlock (ReturnBlock mRet _) = mapM_ readExpression mRet
+checkBasicBlock (ContinueBlock e _) = readExpression e
+checkBasicBlock (RebootBlock _) = return ()
+
+-- | The variables a case binds are declared by the case itself.
+checkMatchCase :: MatchCase SemanticAnn -> InitMonad BranchOut
+checkMatchCase (MatchCase _ bvars body ann) = do
+  mapM_ (`markInitialized` getLocation ann) bvars
+  checkBranch body
+
+checkBlock :: Block SemanticAnn -> InitMonad ()
+checkBlock = mapM_ checkBasicBlock . blockBody
+
+-- | An identifier that is declared and never read is dead, unless its name
+-- starts with an underscore, in which case it is the other way round.
+checkDeclaredAreRead :: InitMonad ()
+checkDeclaredAreRead = do
+  st <- ST.get
+  mapM_ (check (readIdents st)) (declared st)
+
+  where
+
+    check :: S.Set Identifier -> (Identifier, Location) -> InitMonad ()
+    check reads' (ident, loc) =
+      case ident of
+        ('_' : _) -> when (S.member ident reads')
+          (throwError $ annotateError loc (EUsedIgnoredParameter ident))
+        _ -> unless (S.member ident reads')
+          (throwError $ annotateError loc (ENotUsed ident))
+
+-- | When the body ends, every assignment still unread is killed, and the
+-- candidates that nobody read along any path are the dead stores. The check is
+-- left for the end because a candidate found early may be read later, either
+-- in another turn of a loop or along another branch.
+checkDeadStores :: InitMonad ()
+checkDeadStores = do
+  idents <- ST.gets (M.keys . unread)
+  mapM_ killAssignments idents
+  st <- ST.get
+  mapM_ report (filter (not . (`S.member` readDefs st) . snd) (deadStores st))
+
+  where
+
+    report :: (Identifier, Location) -> InitMonad ()
+    report (ident, loc) = throwError $ annotateError loc (EAssignedValueNotUsed ident)
+
+-- | Runs the body of a member or of a function: the objects pending
+-- assignment, the declarations and the assignments are its own, the
+-- identifiers read are not.
+checkBody :: [Parameter SemanticAnn] -> Location -> Block SemanticAnn -> InitMonad ()
+checkBody ps loc body = do
+  ST.modify (\st -> st {
+      pending = S.empty, declared = [],
+      unread = M.empty, readDefs = S.empty, deadStores = []
+    })
+  mapM_ (\p -> markInitialized (paramIdentifier p) loc) (filter (not . isBoxParam) ps)
+  checkBlock body
+  checkDeclaredAreRead
+  checkDeadStores
+
+  where
+
+    -- | A box parameter is consumed, not read, so the linearity check owns it.
+    isBoxParam :: Parameter SemanticAnn -> Bool
+    isBoxParam p = case paramType p of
+      TBoxSubtype _ -> True
+      _ -> False
+
+checkClassMember :: ClassMember SemanticAnn -> InitMonad ()
+checkClassMember (ClassMethod _ak ident ps _tyret body ann) =
+  checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
+checkClassMember (ClassViewer ident ps _tyret body ann) =
+  checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
+checkClassMember (ClassAction _ak ident mp _tyret body ann) =
+  checkSelfBody (EActionSelfNotUsed ident) (getLocation ann)
+    (checkBody (maybe [] (: []) mp) (getLocation ann) body)
+checkClassMember (ClassProcedure _ak ident ps body ann) =
+  checkSelfBody (ESelfNotUsed ident) (getLocation ann) (checkBody ps (getLocation ann) body)
+checkClassMember (ClassField {}) = return ()
+
+-- | Methods, viewers and actions must use self. Since the identifiers read are
+-- shared by every member of the class, self is taken out of the set before the
+-- body and looked up again afterwards.
+checkSelfBody :: Error -> Location -> InitMonad () -> InitMonad ()
+checkSelfBody err loc body = do
+  ST.modify (\st -> st { readIdents = S.delete "self" (readIdents st) })
+  body
+  wasRead <- ST.gets (S.member "self" . readIdents)
+  unless wasRead (throwError $ annotateError loc err)
+
+-- | A field is used when any member of the class reads it. Sink and in ports
+-- are driven by the runtime, so they are not read by anybody.
+checkFieldIsRead :: ClassMember SemanticAnn -> InitMonad ()
+checkFieldIsRead (ClassField (FieldDefinition _ (TSinkPort {}) _)) = return ()
+checkFieldIsRead (ClassField (FieldDefinition _ (TInPort {}) _)) = return ()
+checkFieldIsRead (ClassField fdef) = do
+  wasRead <- ST.gets (S.member (selfFieldKey (fieldIdentifier fdef)) . readIdents)
+  unless wasRead
+    (throwError $ annotateError (getLocation (fieldAnnotation fdef))
+      (ENotUsed (fieldIdentifier fdef)))
+checkFieldIsRead _ = return ()
+
+-- | Methods and viewers can only be called through self by the members of
+-- their own class, so one that no member calls is never used.
+checkMemberFunctionIsCalled :: ClassMember SemanticAnn -> InitMonad ()
+checkMemberFunctionIsCalled (ClassMethod _ak ident _ps _tyret _body ann) =
+  checkCalled ident (getLocation ann)
+checkMemberFunctionIsCalled (ClassViewer ident _ps _tyret _body ann) =
+  checkCalled ident (getLocation ann)
+checkMemberFunctionIsCalled _ = return ()
+
+checkCalled :: Identifier -> Location -> InitMonad ()
+checkCalled ident loc = do
+  wasCalled <- ST.gets (S.member (memberFunctionKey ident) . readIdents)
+  unless wasCalled (throwError $ annotateError loc (EMemberFunctionNotUsed ident))
+
+checkTypeDef :: TypeDef SemanticAnn -> InitMonad ()
+checkTypeDef (Class _kind _ident members _provides _mods) = do
+  mapM_ checkClassMember members
+  mapM_ checkMemberFunctionIsCalled members
+  mapM_ checkFieldIsRead members
+checkTypeDef _ = return ()
+
+checkElement :: AnnASTElement SemanticAnn -> InitMonad ()
+checkElement (Function _ident ps _ty body _mods ann) = checkBody ps (getLocation ann) body
+checkElement (TypeDefinition tyDef _ann) = checkTypeDef tyDef
+checkElement (GlobalDeclaration {}) = return ()
+
+-- | Run the check over a single top-level element.
+runInitElement :: AnnASTElement SemanticAnn -> Maybe VarUsageError
+runInitElement =
+  either Just (const Nothing) . run . checkElement
+
+  where
+
+    run :: InitMonad a -> Either VarUsageError a
+    run c = fst $ ST.runState (runExceptT c) emptySt
+
+-- | Run the check over a whole module, returning the first error.
+runVarUsageCheck :: AnnotatedProgram SemanticAnn -> Maybe VarUsageError
+runVarUsageCheck = listToMaybe . mapMaybe runInitElement

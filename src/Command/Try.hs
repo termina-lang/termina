@@ -126,7 +126,7 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
                         (\err -> 
                             let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
                             TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
-                        $ useDefCheckModule bbModule
+                        $ boxUsageCheckModule bbModule
                 )
             if printHeader then
                 -- | Print the resulting header file into the standard output

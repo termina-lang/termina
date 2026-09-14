@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module ControlFlow.VarUsage.Types where
+module ControlFlow.BoxUsage.Types where
 import Utils.Annotations
 import Utils.Printer
 

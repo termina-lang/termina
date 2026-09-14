@@ -1,54 +1,56 @@
 {-# LANGUAGE OverloadedStrings #-}
--- | VarUsage (move/borrow) negative tests, *code* flavour: one assertion per
--- reachable VE-NNN code, over the source programs the detail spec defines.
+-- | Negative tests of the two usage checks, *code* flavour: one assertion per
+-- reachable code of each family, over the source programs the detail spec
+-- defines.
 module VarUsage.Negative.CodeSpec (spec) where
 
-import VarUsage.Common (varUsageErrorCode, initErrorCode)
+import VarUsage.Common (boxUsageErrorCode, varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
-  ( testVE001, testVE002, testVE003, testVE004, testVE005, testVE006, testVE007
-  , testVE008, testVE009, testVE010, testVE011, testVE012, testVE013, testVE014
-  , testVE015, testVE016, testVE017, testVE018, testVE019, testVE020 )
+  ( testVE001, testVE002, testBE001, testBE002, testBE003, testBE004, testBE005
+  , testBE006, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
+  , testVE003, testVE004, testVE005, testVE006, testVE007, testVE008 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
 import Test.Hspec
 
--- | (code, title, source) for every reachable VarUsage error.
-cases :: [(Text, String, String)]
-cases =
-  [ ("VE-003", "box variable not moved", testVE003)
-  , ("VE-004", "box variable moved twice", testVE004)
-  , ("VE-005", "option-box variable moved twice", testVE005)
-  , ("VE-006", "option-box final state mismatch across branches", testVE006)
-  , ("VE-007", "option-box used in a branch that may not run", testVE007)
-  , ("VE-008", "option-box used in a previous branch but missing in another", testVE008)
-  , ("VE-009", "box variable not moved in all branches", testVE009)
-  , ("VE-010", "box variable moved in a branch that may not run", testVE010)
-  , ("VE-011", "option-box allocated but not moved", testVE011)
-  , ("VE-012", "option-box allocated twice", testVE012)
-  , ("VE-013", "option-box moved without being allocated", testVE013)
-  , ("VE-014", "option-box match missing the Some case", testVE014)
+-- | (code, title, source) for every reachable error of the backward pass,
+-- which owns the linearity of boxes and option-boxes.
+boxCases :: [(Text, String, String)]
+boxCases =
+  [ ("BE-001", "box variable not moved", testBE001)
+  , ("BE-002", "box variable moved twice", testBE002)
+  , ("BE-003", "option-box variable moved twice", testBE003)
+  , ("BE-004", "option-box final state mismatch across branches", testBE004)
+  , ("BE-005", "option-box used in a branch that may not run", testBE005)
+  , ("BE-006", "option-box used in a previous branch but missing in another", testBE006)
+  , ("BE-007", "box variable not moved in all branches", testBE007)
+  , ("BE-008", "box variable moved in a branch that may not run", testBE008)
+  , ("BE-009", "option-box allocated but not moved", testBE009)
+  , ("BE-010", "option-box allocated twice", testBE010)
+  , ("BE-011", "option-box moved without being allocated", testBE011)
+  , ("BE-012", "option-box match missing the Some case", testBE012)
   ]
 
 -- | (code, title, source) for the codes raised by the forward pass, which owns
--- initialization and the usage of variables, fields and member functions.
-initCases :: [(Text, String, String)]
-initCases =
+-- definite assignment and the usage of variables, fields and member functions.
+varCases :: [(Text, String, String)]
+varCases =
   [ ("VE-001", "ignored parameter is used", testVE001)
   , ("VE-002", "variable not used", testVE002)
-  , ("VE-015", "action does not use self", testVE015)
-  , ("VE-016", "method or viewer does not use self", testVE016)
-  , ("VE-017", "method or viewer never called", testVE017)
-  , ("VE-018", "assigned value never read", testVE018)
-  , ("VE-019", "object read before it is assigned", testVE019)
-  , ("VE-020", "partial write before the object is assigned", testVE020)
+  , ("VE-003", "action does not use self", testVE003)
+  , ("VE-004", "method or viewer does not use self", testVE004)
+  , ("VE-005", "method or viewer never called", testVE005)
+  , ("VE-006", "assigned value never read", testVE006)
+  , ("VE-007", "object read before it is assigned", testVE007)
+  , ("VE-008", "partial write before the object is assigned", testVE008)
   ]
 
 spec :: Spec
-spec = describe "VarUsage: error-code coverage" $ do
-  forM_ cases $ \(code, title, src) ->
+spec = describe "Usage checks: error-code coverage" $ do
+  forM_ boxCases $ \(code, title, src) ->
+    it (unpack code ++ ": " ++ title) $
+      boxUsageErrorCode src `shouldBe` Just code
+  forM_ varCases $ \(code, title, src) ->
     it (unpack code ++ ": " ++ title) $
       varUsageErrorCode src `shouldBe` Just code
-  forM_ initCases $ \(code, title, src) ->
-    it (unpack code ++ ": " ++ title) $
-      initErrorCode src `shouldBe` Just code

@@ -2,7 +2,7 @@
 -- raises no error (the check returns 'Nothing').
 module VarUsage.Positive.UsageSpec (spec) where
 
-import VarUsage.Common (runNegativeTestVarUsage, runNegativeTestInit)
+import VarUsage.Common (runNegativeTestBoxUsage, runNegativeTestVarUsage)
 
 import Data.Maybe (isNothing)
 import Test.Hspec
@@ -156,13 +156,13 @@ readsVariableAndHomonymousField =
 spec :: Spec
 spec = do
   describe "VarUsage: qualified field names" $
-    mapM_ (\(name, src) -> it name $ runNegativeTestInit src `shouldSatisfy` isNothing)
+    mapM_ (\(name, src) -> it name $ runNegativeTestVarUsage src `shouldSatisfy` isNothing)
       [ ("accepts a class field read through (*self).field", readsFieldThroughDereference)
       , ("accepts homonymous fields of two objects, both read", readsHomonymousFields)
       , ("accepts a variable and a field of the same name", readsVariableAndHomonymousField)
       ]
   describe "VarUsage: well-formed usage raises no error" $
-    mapM_ (\(name, src) -> it name $ runNegativeTestVarUsage src `shouldSatisfy` isNothing)
+    mapM_ (\(name, src) -> it name $ runNegativeTestBoxUsage src `shouldSatisfy` isNothing)
     [ ("accepts a box parameter that is freed once", freesBoxParam)
     , ("accepts an option-box allocated and consumed in all branches", allocAndConsumes)
     , ("accepts a box freed on every branch of an if", freesBoxInBothBranches)

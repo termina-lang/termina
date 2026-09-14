@@ -13,8 +13,8 @@ import ControlFlow.BasicBlocks
 
 import Modules.Modules
 
-import ControlFlow.VarUsage (runUDAnnotatedProgram)
-import ControlFlow.Initialization (runInitCheck)
+import ControlFlow.BoxUsage (runBoxUsageCheck)
+import ControlFlow.VarUsage (runVarUsageCheck)
 import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
@@ -24,6 +24,7 @@ import Data.Yaml
 import System.Directory
 import Utils.Annotations
 import ControlFlow.BasicBlocks.Checks.ExitPaths.Errors (PathsCheckError)
+import ControlFlow.BoxUsage.Errors (BoxUsageError)
 import ControlFlow.VarUsage.Errors (VarUsageError)
 import ControlFlow.BasicBlocks.Errors (BBGeneratorError)
 import Parser.Errors
@@ -101,21 +102,21 @@ getModuleImports Nothing m =
                 Right qname -> do
                     return $ Left (annotateError ann (EImportedFileNotFound (qname <.> "fin")))
 
-useDefCheckModules :: BasicBlocksProject -> Maybe VarUsageError
-useDefCheckModules = check . M.elems
+boxUsageCheckModules :: BasicBlocksProject -> Maybe BoxUsageError
+boxUsageCheckModules = check . M.elems
 
     where
 
         check [] = Nothing
-        check [x] = useDefCheckModule x
+        check [x] = boxUsageCheckModule x
         check (x:xs) =
-            case useDefCheckModule x of
+            case boxUsageCheckModule x of
                 Nothing -> check xs
                 Just err -> Just err
 
-useDefCheckModule :: BasicBlocksModule -> Maybe VarUsageError
-useDefCheckModule =
-    runUDAnnotatedProgram . basicBlocksAST . metadata
+boxUsageCheckModule :: BasicBlocksModule -> Maybe BoxUsageError
+boxUsageCheckModule =
+    runBoxUsageCheck . basicBlocksAST . metadata
 
 sideEffectCheckModules :: Platform -> BasicBlocksProject -> Maybe SideEffectsError
 sideEffectCheckModules plt = check . M.elems
@@ -133,21 +134,21 @@ sideEffectCheckModule :: Platform -> BasicBlocksModule -> Maybe SideEffectsError
 sideEffectCheckModule plt =
     runSideEffectCheck plt . basicBlocksAST . metadata
 
-initCheckModules :: BasicBlocksProject -> Maybe VarUsageError
-initCheckModules = check . M.elems
+varUsageCheckModules :: BasicBlocksProject -> Maybe VarUsageError
+varUsageCheckModules = check . M.elems
 
     where
 
         check [] = Nothing
-        check [x] = initCheckModule x
+        check [x] = varUsageCheckModule x
         check (x:xs) =
-            case initCheckModule x of
+            case varUsageCheckModule x of
                 Nothing -> check xs
                 Just err -> Just err
 
-initCheckModule :: BasicBlocksModule -> Maybe VarUsageError
-initCheckModule =
-    runInitCheck . basicBlocksAST . metadata
+varUsageCheckModule :: BasicBlocksModule -> Maybe VarUsageError
+varUsageCheckModule =
+    runVarUsageCheck . basicBlocksAST . metadata
 
 genBasicBlocks :: TypedProject -> Either BBGeneratorError BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule

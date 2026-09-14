@@ -1,6 +1,6 @@
 -- | DSL to compute Use/Defs of Termina expressions
 
-module ControlFlow.VarUsage.Computation (
+module ControlFlow.BoxUsage.Computation (
   UDM, UDSt(..), VarMap, VarSet, OptionBoxMap,
   runEncapsWithEmptyVars, runMultipleEncapsWithEmptyVars, unionUsed, unifyState,
   unifyStates, defVariableOptionBox, defBox, safeUseVariable,
@@ -10,8 +10,8 @@ module ControlFlow.VarUsage.Computation (
 
 import ControlFlow.BasicBlocks.AST 
 
-import ControlFlow.VarUsage.Errors
-import ControlFlow.VarUsage.Types
+import ControlFlow.BoxUsage.Errors
+import ControlFlow.BoxUsage.Types
 
 import Control.Monad
 import qualified Control.Monad.State as ST
@@ -114,7 +114,7 @@ unionUsed optionBoxes regular =
 
 ----------------------------------------
 -- This function checks we have not reached the limit of the data structure.
-safeUseVariable :: Identifier -> UDM VarUsageError ()
+safeUseVariable :: Identifier -> UDM BoxUsageError ()
 -- Add Variable to use set
 safeUseVariable ident 
   = do
@@ -122,7 +122,7 @@ safeUseVariable ident
     unless (S.size usedVarSet' < maxBound) (throwError $ annotateError Internal ESetMaxBound)
     putUsedVarSet $ unsafeAddSet ident usedVarSet'
 
-safeMoveBox :: Identifier -> Location -> UDM VarUsageError ()
+safeMoveBox :: Identifier -> Location -> UDM BoxUsageError ()
 safeMoveBox ident loc
   = ST.gets movedBoxes
   >>= \boxSet ->
@@ -133,7 +133,7 @@ safeMoveBox ident loc
         putMovedBoxMap (unsafeAddMap ident loc boxSet)
         safeUseVariable ident
 
-safeUpdateOptionBox :: Identifier -> MVars -> UDM VarUsageError ()
+safeUpdateOptionBox :: Identifier -> MVars -> UDM BoxUsageError ()
 safeUpdateOptionBox ident mv
   = do
     ooMap <- ST.gets optionBoxesMap
@@ -147,7 +147,7 @@ safeUpdateOptionBox ident mv
         _ -> M.insert ident mv ooMap
 
 -- | Box variable manipulation
-defBox :: Identifier -> Location -> UDM VarUsageError ()
+defBox :: Identifier -> Location -> UDM BoxUsageError ()
 defBox ident loc
   = ST.gets movedBoxes
   >>= \boxSet ->
@@ -157,7 +157,7 @@ defBox ident loc
     else
       throwError $ annotateError loc (EBoxNotMoved ident)
 
-moveOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+moveOptionBox :: Identifier -> Location -> UDM BoxUsageError ()
 moveOptionBox ident loc
   = do
     optionBoxMap <- ST.gets optionBoxesMap
@@ -167,7 +167,7 @@ moveOptionBox ident loc
       Just (Defined _) -> throwError $ annotateError Internal EVarRedefinition;
       Nothing -> safeUpdateOptionBox ident (Moved loc) >> safeUseVariable ident
 
-initializeOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+initializeOptionBox :: Identifier -> Location -> UDM BoxUsageError ()
 initializeOptionBox ident loc
   = do
     optionBoxMap <- ST.gets optionBoxesMap
@@ -177,7 +177,7 @@ initializeOptionBox ident loc
       Just (Defined _) -> throwError $ annotateError Internal EVarRedefinition;
       _ -> return ()
       
-allocOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+allocOptionBox :: Identifier -> Location -> UDM BoxUsageError ()
 allocOptionBox ident loc
   =
   maybe
@@ -193,7 +193,7 @@ allocOptionBox ident loc
 
 -- | An option-box that nobody mentions is reported as an unused variable by
 -- the forward pass, so here it is simply not tracked.
-defVariableOptionBox :: Identifier -> Location -> UDM VarUsageError ()
+defVariableOptionBox :: Identifier -> Location -> UDM BoxUsageError ()
 defVariableOptionBox ident loc =
   maybe
     (return ())
@@ -210,7 +210,7 @@ defVariableOptionBox ident loc =
 -- Box variables have a special use, through free or stuff.
 -- So we need to analyze each argument to decide if it is normal variable or
 -- box.
-defArgumentsProc :: Parameter a -> Location -> UDM VarUsageError ()
+defArgumentsProc :: Parameter a -> Location -> UDM BoxUsageError ()
 defArgumentsProc ps loc
   = case paramType ps of
       TBoxSubtype _ -> defBox (paramIdentifier ps) loc

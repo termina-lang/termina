@@ -11,14 +11,37 @@ import Utils.Errors (ErrorMessage(errorIdent))
 import Configuration.Platform
 import Configuration.Configuration
 import ControlFlow.BasicBlocks
+import qualified ControlFlow.BoxUsage.Errors as BoxUsage
 import qualified ControlFlow.VarUsage.Errors as VarUsage
-import ControlFlow.VarUsage
-import ControlFlow.Initialization (runInitCheck)
+import ControlFlow.BoxUsage (runBoxUsageCheck)
+import ControlFlow.VarUsage (runVarUsageCheck)
 import qualified Data.Set as S
 
 -- | Parses, type-checks and lowers a single module named @test@ to basic
--- blocks, then runs the variable-usage (move/borrow) check, returning the
--- error it is expected to raise (or 'Nothing' if usage is well-formed).
+-- blocks, then runs the box usage (move/borrow) check, returning the error it
+-- is expected to raise (or 'Nothing' if usage is well-formed).
+runNegativeTestBoxUsage :: String -> Maybe BoxUsage.Error
+runNegativeTestBoxUsage input = case runP (contents topLevel) "test" "" input of
+  Left err -> error $ "Parser Error: " ++ show err
+  Right ast ->
+    let config = defaultConfig "test" TestPlatform in
+    case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
+      Left err -> error $ "Typing Error: " ++ show err
+      Right (typedProgram, _) -> case runGenBBModule typedProgram of
+        Left err -> error $ "Basic Blocks Generator Error: " ++ show err
+        Right bbProgram -> case runBoxUsageCheck bbProgram of
+          Just err -> Just $ getError err
+          Nothing -> Nothing
+
+-- | The BE-NNN code of the box usage error a program raises (or 'Nothing' if
+-- usage is well-formed). The code spec asserts this; the detail spec asserts
+-- the error constructor itself.
+boxUsageErrorCode :: String -> Maybe Text
+boxUsageErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestBoxUsage
+
+-- | Same pipeline as 'runNegativeTestBoxUsage', but running the variable usage
+-- check, which owns definite assignment, dead stores and the objects nobody
+-- reads.
 runNegativeTestVarUsage :: String -> Maybe VarUsage.Error
 runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
   Left err -> error $ "Parser Error: " ++ show err
@@ -28,32 +51,10 @@ runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
       Left err -> error $ "Typing Error: " ++ show err
       Right (typedProgram, _) -> case runGenBBModule typedProgram of
         Left err -> error $ "Basic Blocks Generator Error: " ++ show err
-        Right bbProgram -> case runUDAnnotatedProgram bbProgram of
+        Right bbProgram -> case runVarUsageCheck bbProgram of
           Just err -> Just $ getError err
           Nothing -> Nothing
 
--- | The VE-NNN code of the variable-usage error a program raises (or 'Nothing'
--- if usage is well-formed). The code spec asserts this; the detail spec asserts
--- the error constructor itself.
+-- | The VE-NNN code of the variable usage error a program raises.
 varUsageErrorCode :: String -> Maybe Text
 varUsageErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestVarUsage
-
--- | Same pipeline as 'runNegativeTestVarUsage', but running the definite
--- assignment check instead of the variable-usage one. Both raise errors of the
--- same family, so they share the error type and the code spec table.
-runNegativeTestInit :: String -> Maybe VarUsage.Error
-runNegativeTestInit input = case runP (contents topLevel) "test" "" input of
-  Left err -> error $ "Parser Error: " ++ show err
-  Right ast ->
-    let config = defaultConfig "test" TestPlatform in
-    case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
-      Left err -> error $ "Typing Error: " ++ show err
-      Right (typedProgram, _) -> case runGenBBModule typedProgram of
-        Left err -> error $ "Basic Blocks Generator Error: " ++ show err
-        Right bbProgram -> case runInitCheck bbProgram of
-          Just err -> Just $ getError err
-          Nothing -> Nothing
-
--- | The VE-NNN code of the definite assignment error a program raises.
-initErrorCode :: String -> Maybe Text
-initErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestInit

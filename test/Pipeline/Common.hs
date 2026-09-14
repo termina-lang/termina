@@ -35,8 +35,8 @@ import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 
 import Command.Types
 import Command.Utils
-    (genBasicBlocks, basicBlockPathsCheckModules, useDefCheckModules,
-     initCheckModules, sideEffectCheckModules, getVisibleModules,
+    (genBasicBlocks, basicBlockPathsCheckModules, boxUsageCheckModules,
+     varUsageCheckModules, sideEffectCheckModules, getVisibleModules,
      sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
@@ -99,8 +99,8 @@ runProjectPipeline sources = do
   typedProject <- typeProject parsedProject ordered
   bbProject <- stage $ genBasicBlocks typedProject
   noError $ basicBlockPathsCheckModules bbProject
-  noError $ initCheckModules bbProject
-  noError $ useDefCheckModules bbProject
+  noError $ varUsageCheckModules bbProject
+  noError $ boxUsageCheckModules bbProject
   noError $ sideEffectCheckModules TestPlatform bbProject
   -- | Constant folding runs before architecture so the architecture pass and
   -- the code generator see every type (array sizes) already folded to literals.
@@ -139,7 +139,7 @@ foldProject bbProject = go (ConstFoldEnv M.empty TestPlatform) M.empty
         Left err -> Left (errCode err)
         Right (foldedModule, env') -> go env' (M.insert m foldedModule folded) ms
 
--- | The error code (@errorIdent@: \"SE-042\", \"VE-003\", \"AE-007\",
+-- | The error code (@errorIdent@: \"SE-042\", \"BE-001\", \"AE-007\",
 -- \"CF-…\") raised by the first failing pipeline stage for a single-module
 -- program named @test@, or 'Nothing' if it compiles cleanly. This is the
 -- single assertion point for every negative test, whatever stage the error

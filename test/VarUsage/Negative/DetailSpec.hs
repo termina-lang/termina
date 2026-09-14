@@ -4,17 +4,20 @@
 -- over the same inputs without duplicating them.
 module VarUsage.Negative.DetailSpec
   ( spec
-  , testVE001, testVE002, testVE003, testVE003_1, testVE004, testVE004_1
-  , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
-  , testVE011, testVE012, testVE013, testVE014, testVE016, testVE016_1
-  , testVE015, testVE017, testVE017_1, testVE017_2, testVE018, testVE018_1
-  , testVE018_2, testVE018_3, testVE018_4, testVE018_5, testVE002_1, testVE002_2
-  , testVE019, testVE020
+  , testVE001, testVE002, testBE001, testBE001_1, testBE002, testBE002_1
+  , testBE003, testBE004, testBE005, testBE006, testBE007, testBE008
+  , testBE009, testBE010, testBE011, testBE012, testVE004, testVE004_1
+  , testVE003, testVE005, testVE005_1, testVE005_2, testVE006, testVE006_1
+  , testVE006_2, testVE006_3, testVE006_4, testVE006_5, testVE002_1, testVE002_2
+  , testVE007, testVE008
   ) where
 
 import Test.Hspec
 import Semantic.AST
-import ControlFlow.VarUsage.Errors
+import ControlFlow.BoxUsage.Errors hiding (Error)
+import ControlFlow.VarUsage.Errors hiding (Error)
+import qualified ControlFlow.BoxUsage.Errors as BE
+import qualified ControlFlow.VarUsage.Errors as VE
 import VarUsage.Common
 
 testVE001 :: String
@@ -49,8 +52,8 @@ testVE002 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE003 :: String
-testVE003 = "interface Interface0 {\n" ++
+testBE001 :: String
+testBE001 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self, _data : box u32);\n" ++
        "\n" ++
@@ -86,8 +89,8 @@ testVE003 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE003_1 :: String
-testVE003_1 = "interface Interface0 {\n" ++
+testBE001_1 :: String
+testBE001_1 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self, _data : box u32);\n" ++
        "\n" ++
@@ -105,8 +108,8 @@ testVE003_1 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE004 :: String
-testVE004 = "interface Interface0 {\n" ++
+testBE002 :: String
+testBE002 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self, _data : box u32);\n" ++
        "\n" ++
@@ -143,8 +146,8 @@ testVE004 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE004_1 :: String
-testVE004_1 = "interface Interface0 {\n" ++
+testBE002_1 :: String
+testBE002_1 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self, _data : box u32);\n" ++
        "\n" ++
@@ -209,60 +212,60 @@ veMatchMove  = "        match opt {\n" ++
                "            case None => { }\n" ++
                "        }\n"
 
--- VE-005: the option-box @opt@ is allocated once but moved (matched) twice.
-testVE005 :: String
-testVE005 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veMatchMove ++ veMatchMove)
+-- BE-003: the option-box @opt@ is allocated once but moved (matched) twice.
+testBE003 :: String
+testBE003 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veMatchMove ++ veMatchMove)
 
--- VE-006: @opt@ ends one branch moved and the other branch allocated, so the
+-- BE-004: @opt@ ends one branch moved and the other branch allocated, so the
 -- final option-box state differs across branches.
-testVE006 :: String
-testVE006 = veWrap (
+testBE004 :: String
+testBE004 = veWrap (
   veDeclOpt ++ veAlloc ++
   "        if (data == 0) {\n" ++ veMatchMove ++
   "        } else {\n" ++ veAlloc ++ veMatchMove ++ "        }\n" ++
   veFreeData)
 
--- VE-007: @opt@ is moved inside a for loop, i.e. in a branch that may not run.
-testVE007 :: String
-testVE007 = veWrap (
+-- BE-005: @opt@ is moved inside a for loop, i.e. in a branch that may not run.
+testBE005 :: String
+testBE005 = veWrap (
   veFreeData ++ veDeclOpt ++ veAlloc ++
   "        for i : usize in 0 .. 4 {\n" ++ veMatchMove ++ "        }\n")
 
--- VE-009: the box @data@ is moved in the @if@ branch but not in the @else@.
-testVE009 :: String
-testVE009 = veWrap (
+-- BE-007: the box @data@ is moved in the @if@ branch but not in the @else@.
+testBE007 :: String
+testBE007 = veWrap (
   "        if (data == 0) {\n" ++ veFreeData ++ "        } else {\n        }\n")
 
--- VE-010: the box @data@ is moved inside a for loop (a branch that may not run).
-testVE010 :: String
-testVE010 = veWrap ("        for i : usize in 0 .. 4 {\n" ++ veFreeData ++ "        }\n")
+-- BE-008: the box @data@ is moved inside a for loop (a branch that may not run).
+testBE008 :: String
+testBE008 = veWrap ("        for i : usize in 0 .. 4 {\n" ++ veFreeData ++ "        }\n")
 
--- VE-011: @opt@ is allocated but never moved afterwards.
-testVE011 :: String
-testVE011 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc)
+-- BE-009: @opt@ is allocated but never moved afterwards.
+testBE009 :: String
+testBE009 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc)
 
--- VE-012: @opt@ is allocated twice before being moved.
-testVE012 :: String
-testVE012 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veAlloc ++ veMatchMove)
+-- BE-010: @opt@ is allocated twice before being moved.
+testBE010 :: String
+testBE010 = veWrap (veFreeData ++ veDeclOpt ++ veAlloc ++ veAlloc ++ veMatchMove)
 
--- VE-013: @opt@ is moved (matched) without ever having been allocated.
-testVE013 :: String
-testVE013 = veWrap (veFreeData ++ veDeclOpt ++ veMatchMove)
+-- BE-011: @opt@ is moved (matched) without ever having been allocated.
+testBE011 :: String
+testBE011 = veWrap (veFreeData ++ veDeclOpt ++ veMatchMove)
 
--- VE-008: @opt@ is allocated only in the @if@ branch (with an explicit @else@
+-- BE-006: @opt@ is allocated only in the @if@ branch (with an explicit @else@
 -- that leaves it alone) and then used after the merge, so it is used in a
 -- previous branch but missing in another.
-testVE008 :: String
-testVE008 = veWrap (
+testBE006 :: String
+testBE006 = veWrap (
   veDeclOpt ++
   "        if (data == 0) {\n" ++ veAlloc ++ "        } else {\n        }\n" ++
   veMatchMove ++ veFreeData)
 
--- VE-014: matching an option-box with a default @case _@ instead of an explicit
+-- BE-012: matching an option-box with a default @case _@ instead of an explicit
 -- @Some@ case. The type checker accepts the match as exhaustive, but the usage
 -- analysis flags the missing @Some@ case.
-testVE014 :: String
-testVE014 =
+testBE012 :: String
+testBE012 =
   "interface Interface0 {\n" ++
   "    procedure proc0(&mut self, data : Option<box u32>);\n" ++
   "};\n" ++
@@ -276,8 +279,8 @@ testVE014 =
   "    }\n" ++
   "};\n"
 
-testVE016 :: String
-testVE016 = "interface Interface0 {\n" ++
+testVE004 :: String
+testVE004 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -299,8 +302,8 @@ testVE016 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE016_1 :: String
-testVE016_1 = "task class TaskClass0 {\n" ++
+testVE004_1 :: String
+testVE004_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -318,8 +321,8 @@ testVE016_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE015 :: String
-testVE015 = "task class TaskClass0 {\n" ++
+testVE003 :: String
+testVE003 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    snk0 : sink u32 triggers action0;\n" ++
        "\n" ++
@@ -330,8 +333,8 @@ testVE015 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE017 :: String
-testVE017 = "interface Interface0 {\n" ++
+testVE005 :: String
+testVE005 = "interface Interface0 {\n" ++
        "\n" ++
        "    procedure proc0(&mut self);\n" ++
        "\n" ++
@@ -353,8 +356,8 @@ testVE017 = "interface Interface0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE017_1 :: String
-testVE017_1 = "task class TaskClass0 {\n" ++
+testVE005_1 :: String
+testVE005_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "    field0 : u32;\n" ++
        "\n" ++
@@ -372,16 +375,16 @@ testVE017_1 = "task class TaskClass0 {\n" ++
        "\n" ++
        "};\n"
 
-testVE018 :: String
-testVE018 = "function fun0() -> u32 {\n" ++
+testVE006 :: String
+testVE006 = "function fun0() -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    x = 1 : u32;\n" ++
        "    x = 2 : u32;\n" ++
        "    return x;\n" ++
        "}\n"
 
-testVE018_1 :: String
-testVE018_1 = "function fun0(c : bool) -> u32 {\n" ++
+testVE006_1 :: String
+testVE006_1 = "function fun0(c : bool) -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    if (c) {\n" ++
        "        x = 1 : u32;\n" ++
@@ -392,8 +395,8 @@ testVE018_1 = "function fun0(c : bool) -> u32 {\n" ++
 
 -- | The variable is read after the loop, so it is not an unused one, but the
 -- value the loop assigns to it is overwritten before anybody reads it.
-testVE018_2 :: String
-testVE018_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
+testVE006_2 :: String
+testVE006_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
        "    var last : u32 = 0 : u32;\n" ++
        "    for i : usize in 0 : usize .. 10 : usize {\n" ++
        "        last = (*array0)[i];\n" ++
@@ -405,8 +408,8 @@ testVE018_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
 -- | The value the declaration gives the object is overwritten before anybody
 -- reads it, so either the real value belongs in the declaration or the object
 -- is to be declared without an initializer.
-testVE018_3 :: String
-testVE018_3 = "function fun0() -> u32 {\n" ++
+testVE006_3 :: String
+testVE006_3 = "function fun0() -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
        "    x = 1 : u32;\n" ++
        "    return x;\n" ++
@@ -414,8 +417,8 @@ testVE018_3 = "function fun0() -> u32 {\n" ++
 
 -- | A field and a variable of the same name: reading the field must not
 -- rescue the value the declaration gives the variable.
-testVE018_4 :: String
-testVE018_4 = "struct Struct0 {\n" ++
+testVE006_4 :: String
+testVE006_4 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -430,8 +433,8 @@ testVE018_4 = "struct Struct0 {\n" ++
        "}\n"
 
 -- | The same, with the field reached through the other spelling.
-testVE018_5 :: String
-testVE018_5 = "struct Struct0 {\n" ++
+testVE006_5 :: String
+testVE006_5 = "struct Struct0 {\n" ++
        "    field0 : u8;\n" ++
        "};\n" ++
        "\n" ++
@@ -491,8 +494,8 @@ testVE002_2 = "struct Struct0 {\n" ++
 
 -- | A method that nobody calls, while a field of the class has its name. The
 -- read of the field must not pass for a call to the method.
-testVE017_2 :: String
-testVE017_2 = "interface Interface0 {\n" ++
+testVE005_2 :: String
+testVE005_2 = "interface Interface0 {\n" ++
        "    procedure proc0(&mut self, data : &mut u8);\n" ++
        "};\n" ++
        "\n" ++
@@ -514,8 +517,8 @@ testVE017_2 = "interface Interface0 {\n" ++
 
 -- | The declaration has no initializer and the branch that assigns it may not
 -- be taken.
-testVE019 :: String
-testVE019 = "function fun0(c : bool) -> u32 {\n" ++
+testVE007 :: String
+testVE007 = "function fun0(c : bool) -> u32 {\n" ++
        "    var x : u32;\n" ++
        "    if (c) {\n" ++
        "        x = 1 : u32;\n" ++
@@ -524,8 +527,8 @@ testVE019 = "function fun0(c : bool) -> u32 {\n" ++
        "}\n"
 
 -- | An element is written before the array is assigned as a whole.
-testVE020 :: String
-testVE020 = "function fun0() -> u32 {\n" ++
+testVE008 :: String
+testVE008 = "function fun0() -> u32 {\n" ++
        "    var buf : [u8; 4];\n" ++
        "    buf[0] = 1 : u8;\n" ++
        "    return 0 : u32;\n" ++
@@ -535,192 +538,192 @@ spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
     it "VE-001: invalid array indexing" $ do
-     runNegativeTestInit testVE001
+     runNegativeTestVarUsage testVE001
        `shouldSatisfy`
         isEUsedIgnoredParameter "_data"
     it "VE-002: invalid array indexing" $ do
-     runNegativeTestInit testVE002
+     runNegativeTestVarUsage testVE002
        `shouldSatisfy`
         isENotUsed "opt"
-    it "VE-003: box variable not moved (matched Some payload)" $ do
-     runNegativeTestVarUsage testVE003
+    it "BE-001: box variable not moved (matched Some payload)" $ do
+     runNegativeTestBoxUsage testBE001
        `shouldSatisfy`
         isEBoxNotMoved "obj"
-    it "VE-003-1: box variable not moved (box parameter never consumed)" $ do
-     runNegativeTestVarUsage testVE003_1
+    it "BE-001-1: box variable not moved (box parameter never consumed)" $ do
+     runNegativeTestBoxUsage testBE001_1
        `shouldSatisfy`
         isEBoxNotMoved "data"
-    it "VE-004: box variable moved twice (moved into option, then freed)" $ do
-      runNegativeTestVarUsage testVE004
+    it "BE-002: box variable moved twice (moved into option, then freed)" $ do
+      runNegativeTestBoxUsage testBE002
         `shouldSatisfy`
           isEBoxMovedTwice "data"
-    it "VE-004-1: box variable moved twice (freed twice)" $ do
-      runNegativeTestVarUsage testVE004_1
+    it "BE-002-1: box variable moved twice (freed twice)" $ do
+      runNegativeTestBoxUsage testBE002_1
         `shouldSatisfy`
           isEBoxMovedTwice "data"
-    it "VE-005: option-box variable moved twice" $ do
-      runNegativeTestVarUsage testVE005
+    it "BE-003: option-box variable moved twice" $ do
+      runNegativeTestBoxUsage testBE003
         `shouldSatisfy`
           isEOptionBoxMovedTwice "opt"
-    it "VE-006: option-box final state mismatch across branches" $ do
-      runNegativeTestVarUsage testVE006
+    it "BE-004: option-box final state mismatch across branches" $ do
+      runNegativeTestBoxUsage testBE004
         `shouldSatisfy`
           isEDifferentOptionBoxUse "opt"
-    it "VE-007: option-box used in a branch that may not run" $ do
-      runNegativeTestVarUsage testVE007
+    it "BE-005: option-box used in a branch that may not run" $ do
+      runNegativeTestBoxUsage testBE005
         `shouldSatisfy`
           isEDifferentNewOptionBoxUse "opt"
-    it "VE-009: box variable not moved in all branches" $ do
-      runNegativeTestVarUsage testVE009
+    it "BE-007: box variable not moved in all branches" $ do
+      runNegativeTestBoxUsage testBE007
         `shouldSatisfy`
           isEMissingBoxMove "data"
-    it "VE-010: box variable moved in a branch that may not run" $ do
-      runNegativeTestVarUsage testVE010
+    it "BE-008: box variable moved in a branch that may not run" $ do
+      runNegativeTestBoxUsage testBE008
         `shouldSatisfy`
           isEBoxMoveConditionalBranch "data"
-    it "VE-011: option-box allocated but not moved" $ do
-      runNegativeTestVarUsage testVE011
+    it "BE-009: option-box allocated but not moved" $ do
+      runNegativeTestBoxUsage testBE009
         `shouldSatisfy`
           isEAllocNotMoved "opt"
-    it "VE-012: option-box allocated twice" $ do
-      runNegativeTestVarUsage testVE012
+    it "BE-010: option-box allocated twice" $ do
+      runNegativeTestBoxUsage testBE010
         `shouldSatisfy`
           isEAllocTwice "opt"
-    it "VE-013: option-box moved without being allocated" $ do
-      runNegativeTestVarUsage testVE013
+    it "BE-011: option-box moved without being allocated" $ do
+      runNegativeTestBoxUsage testBE011
         `shouldSatisfy`
           isEMovedWithoutAlloc "opt"
-    it "VE-008: option-box used in a previous branch but missing in another" $ do
-      runNegativeTestVarUsage testVE008
+    it "BE-006: option-box used in a previous branch but missing in another" $ do
+      runNegativeTestBoxUsage testBE006
         `shouldSatisfy`
           isEMissingOptionBox "opt"
-    it "VE-014: option-box match missing the Some case" $ do
-      runNegativeTestVarUsage testVE014
+    it "BE-012: option-box match missing the Some case" $ do
+      runNegativeTestBoxUsage testBE012
         `shouldSatisfy`
           isEOptionBoxMatchMissingSomeCase
-    it "VE-016: method does not use self" $ do
-      runNegativeTestInit testVE016
+    it "VE-004: method does not use self" $ do
+      runNegativeTestVarUsage testVE004
         `shouldSatisfy`
           isESelfNotUsed "method0"
-    it "VE-016: viewer does not use self" $ do
-      runNegativeTestInit testVE016_1
+    it "VE-004: viewer does not use self" $ do
+      runNegativeTestVarUsage testVE004_1
         `shouldSatisfy`
           isESelfNotUsed "viewer0"
-    it "VE-015: action does not use self" $ do
-      runNegativeTestInit testVE015
+    it "VE-003: action does not use self" $ do
+      runNegativeTestVarUsage testVE003
         `shouldSatisfy`
           isEActionSelfNotUsed "action0"
-    it "VE-017: method never called" $ do
-      runNegativeTestInit testVE017
+    it "VE-005: method never called" $ do
+      runNegativeTestVarUsage testVE005
         `shouldSatisfy`
           isEMemberFunctionNotUsed "method0"
-    it "VE-017: viewer never called" $ do
-      runNegativeTestInit testVE017_1
+    it "VE-005: viewer never called" $ do
+      runNegativeTestVarUsage testVE005_1
         `shouldSatisfy`
           isEMemberFunctionNotUsed "viewer0"
-    it "VE-018: value assigned and overwritten before being read" $ do
-      runNegativeTestInit testVE018
+    it "VE-006: value assigned and overwritten before being read" $ do
+      runNegativeTestVarUsage testVE006
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
-    it "VE-018: value assigned in a branch and overwritten after it" $ do
-      runNegativeTestInit testVE018_1
+    it "VE-006: value assigned in a branch and overwritten after it" $ do
+      runNegativeTestVarUsage testVE006_1
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
-    it "VE-018: value assigned in a loop and never read" $ do
-      runNegativeTestInit testVE018_2
+    it "VE-006: value assigned in a loop and never read" $ do
+      runNegativeTestVarUsage testVE006_2
         `shouldSatisfy`
           isEAssignedValueNotUsed "last"
-    it "VE-018: initializer overwritten before being read" $ do
-      runNegativeTestInit testVE018_3
+    it "VE-006: initializer overwritten before being read" $ do
+      runNegativeTestVarUsage testVE006_3
         `shouldSatisfy`
           isEAssignedValueNotUsed "x"
-    it "VE-018: initializer overwritten while a field of the same name is read" $ do
-      runNegativeTestInit testVE018_4
+    it "VE-006: initializer overwritten while a field of the same name is read" $ do
+      runNegativeTestVarUsage testVE006_4
         `shouldSatisfy`
           isEAssignedValueNotUsed "field0"
-    it "VE-018: the same, with the field reached through (*s).field" $ do
-      runNegativeTestInit testVE018_5
+    it "VE-006: the same, with the field reached through (*s).field" $ do
+      runNegativeTestVarUsage testVE006_5
         `shouldSatisfy`
           isEAssignedValueNotUsed "field0"
     it "VE-002: class field not read while another object's field of the same name is" $ do
-      runNegativeTestInit testVE002_1
+      runNegativeTestVarUsage testVE002_1
         `shouldSatisfy`
           isENotUsed "field0"
     it "VE-002: the same, with the other field reached through (*s).field" $ do
-      runNegativeTestInit testVE002_2
+      runNegativeTestVarUsage testVE002_2
         `shouldSatisfy`
           isENotUsed "field0"
-    it "VE-017: method never called while a field of the class has its name" $ do
-      runNegativeTestInit testVE017_2
+    it "VE-005: method never called while a field of the class has its name" $ do
+      runNegativeTestVarUsage testVE005_2
         `shouldSatisfy`
           isEMemberFunctionNotUsed "method0"
-    it "VE-019: object read on a path where it is not assigned" $ do
-      runNegativeTestInit testVE019
+    it "VE-007: object read on a path where it is not assigned" $ do
+      runNegativeTestVarUsage testVE007
         `shouldSatisfy`
           isEReadBeforeAssignment "x"
-    it "VE-020: element written before the array is assigned as a whole" $ do
-      runNegativeTestInit testVE020
+    it "VE-008: element written before the array is assigned as a whole" $ do
+      runNegativeTestVarUsage testVE008
         `shouldSatisfy`
           isEPartialWriteBeforeAssignment "buf"
 
   where
 
-    isEUsedIgnoredParameter :: Identifier -> Maybe Error -> Bool
+    isEUsedIgnoredParameter :: Identifier -> Maybe VE.Error -> Bool
     isEUsedIgnoredParameter inIdent = \case Just (EUsedIgnoredParameter ident) -> (inIdent == ident); _ -> False
 
-    isENotUsed :: Identifier -> Maybe Error -> Bool
+    isENotUsed :: Identifier -> Maybe VE.Error -> Bool
     isENotUsed inIdent = \case Just (ENotUsed ident) -> (inIdent == ident); _ -> False
 
-    isEBoxNotMoved :: Identifier -> Maybe Error -> Bool
+    isEBoxNotMoved :: Identifier -> Maybe BE.Error -> Bool
     isEBoxNotMoved inIdent = \case Just (EBoxNotMoved ident) -> (inIdent == ident); _ -> False
 
-    isEBoxMovedTwice :: Identifier -> Maybe Error -> Bool
+    isEBoxMovedTwice :: Identifier -> Maybe BE.Error -> Bool
     isEBoxMovedTwice inIdent = \case Just (EBoxMovedTwice ident _) -> (inIdent == ident); _ -> False
 
-    isEOptionBoxMovedTwice :: Identifier -> Maybe Error -> Bool
+    isEOptionBoxMovedTwice :: Identifier -> Maybe BE.Error -> Bool
     isEOptionBoxMovedTwice inIdent = \case Just (EOptionBoxMovedTwice ident _) -> (inIdent == ident); _ -> False
 
-    isEDifferentOptionBoxUse :: Identifier -> Maybe Error -> Bool
+    isEDifferentOptionBoxUse :: Identifier -> Maybe BE.Error -> Bool
     isEDifferentOptionBoxUse inIdent = \case Just (EDifferentOptionBoxUse ident _ _) -> (inIdent == ident); _ -> False
 
-    isEDifferentNewOptionBoxUse :: Identifier -> Maybe Error -> Bool
+    isEDifferentNewOptionBoxUse :: Identifier -> Maybe BE.Error -> Bool
     isEDifferentNewOptionBoxUse inIdent = \case Just (EDifferentNewOptionBoxUse ident _) -> (inIdent == ident); _ -> False
 
-    isEMissingBoxMove :: Identifier -> Maybe Error -> Bool
+    isEMissingBoxMove :: Identifier -> Maybe BE.Error -> Bool
     isEMissingBoxMove inIdent = \case Just (EMissingBoxMove ident _) -> (inIdent == ident); _ -> False
 
-    isEBoxMoveConditionalBranch :: Identifier -> Maybe Error -> Bool
+    isEBoxMoveConditionalBranch :: Identifier -> Maybe BE.Error -> Bool
     isEBoxMoveConditionalBranch inIdent = \case Just (EBoxMoveConditionalBranch ident) -> (inIdent == ident); _ -> False
 
-    isEAllocNotMoved :: Identifier -> Maybe Error -> Bool
+    isEAllocNotMoved :: Identifier -> Maybe BE.Error -> Bool
     isEAllocNotMoved inIdent = \case Just (EAllocNotMoved ident) -> (inIdent == ident); _ -> False
 
-    isEAllocTwice :: Identifier -> Maybe Error -> Bool
+    isEAllocTwice :: Identifier -> Maybe BE.Error -> Bool
     isEAllocTwice inIdent = \case Just (EAllocTwice ident _) -> (inIdent == ident); _ -> False
 
-    isEMovedWithoutAlloc :: Identifier -> Maybe Error -> Bool
+    isEMovedWithoutAlloc :: Identifier -> Maybe BE.Error -> Bool
     isEMovedWithoutAlloc inIdent = \case Just (EMovedWithoutAlloc ident _) -> (inIdent == ident); _ -> False
 
-    isEMissingOptionBox :: Identifier -> Maybe Error -> Bool
+    isEMissingOptionBox :: Identifier -> Maybe BE.Error -> Bool
     isEMissingOptionBox inIdent = \case Just (EMissingOptionBox ident _) -> (inIdent == ident); _ -> False
 
-    isEOptionBoxMatchMissingSomeCase :: Maybe Error -> Bool
+    isEOptionBoxMatchMissingSomeCase :: Maybe BE.Error -> Bool
     isEOptionBoxMatchMissingSomeCase = \case Just EOptionBoxMatchMissingSomeCase -> True; _ -> False
 
-    isESelfNotUsed :: Identifier -> Maybe Error -> Bool
+    isESelfNotUsed :: Identifier -> Maybe VE.Error -> Bool
     isESelfNotUsed inIdent = \case Just (ESelfNotUsed ident) -> (inIdent == ident); _ -> False
 
-    isEActionSelfNotUsed :: Identifier -> Maybe Error -> Bool
+    isEActionSelfNotUsed :: Identifier -> Maybe VE.Error -> Bool
     isEActionSelfNotUsed inIdent = \case Just (EActionSelfNotUsed ident) -> (inIdent == ident); _ -> False
 
-    isEAssignedValueNotUsed :: Identifier -> Maybe Error -> Bool
+    isEAssignedValueNotUsed :: Identifier -> Maybe VE.Error -> Bool
     isEAssignedValueNotUsed inIdent = \case Just (EAssignedValueNotUsed ident) -> (inIdent == ident); _ -> False
 
-    isEMemberFunctionNotUsed :: Identifier -> Maybe Error -> Bool
+    isEMemberFunctionNotUsed :: Identifier -> Maybe VE.Error -> Bool
     isEMemberFunctionNotUsed inIdent = \case Just (EMemberFunctionNotUsed ident) -> (inIdent == ident); _ -> False
 
-    isEReadBeforeAssignment :: Identifier -> Maybe Error -> Bool
+    isEReadBeforeAssignment :: Identifier -> Maybe VE.Error -> Bool
     isEReadBeforeAssignment inIdent = \case Just (EReadBeforeAssignment ident) -> (inIdent == ident); _ -> False
 
-    isEPartialWriteBeforeAssignment :: Identifier -> Maybe Error -> Bool
+    isEPartialWriteBeforeAssignment :: Identifier -> Maybe VE.Error -> Bool
     isEPartialWriteBeforeAssignment inIdent = \case Just (EPartialWriteBeforeAssignment ident) -> (inIdent == ident); _ -> False
