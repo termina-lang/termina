@@ -32,8 +32,13 @@ import Control.Monad.IO.Class
 import Data.Functor ((<&>))
 import qualified Data.Map.Strict as M
 import Utils.Graph (TopSortError(..), topSortFromDepList)
+import Utils.Errors (ErrorMessage(toText, errorIdent))
 import Modules.Utils
 import Data.Time (UTCTime)
+import Control.Monad (when)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+import System.Exit (exitFailure)
 
 -- | Error message formatter
 -- Prints error messages in the form "[error] <message>"
@@ -185,6 +190,68 @@ basicBlockPathsCheckModule bbModule = do
     case result of
         Left err -> Just err
         Right _ -> Nothing
+
+-- | What a check reports when it fails. Every check raises errors of its own
+-- type, and what is asked of all of them is the same, so a failure carries the
+-- answers instead of the error itself.
+data CheckFailure = CheckFailure
+  {
+    -- | The @XX-NNN@ code of the error.
+    failureCode :: T.Text
+    -- | The error as it is shown, which is all an internal error has, since it
+    -- carries no position in the source.
+  , failureShown :: String
+    -- | The message, given the source of every module of the project.
+  , failureMessage :: M.Map FilePath T.Text -> T.Text
+  }
+
+checkFailure :: (ErrorMessage e, Show e) => e -> CheckFailure
+checkFailure err = CheckFailure (errorIdent err) (show err) (toText err)
+
+-- | A check over the basic-block AST of a whole project, with the message that
+-- announces it while it runs.
+data Check = Check
+  {
+    checkMessage :: String
+  , runCheck :: Platform -> BasicBlocksProject -> Maybe CheckFailure
+  }
+
+-- | The checks the basic-block AST goes through, in the order they run. Reading
+-- an object that no path has assigned is a more basic mistake than assigning a
+-- value that nobody reads, so the usage check goes before the linearity one.
+basicBlockChecks :: [Check]
+basicBlockChecks =
+  [
+    Check "Checking basic block paths"
+      (const (fmap checkFailure . basicBlockPathsCheckModules))
+  , Check "Definite assignment checking project modules"
+      (const (fmap checkFailure . varUsageCheckModules))
+  , Check "Usage checking project modules"
+      (const (fmap checkFailure . boxUsageCheckModules))
+  , Check "Side-effect checking project modules"
+      (\plt -> fmap checkFailure . sideEffectCheckModules plt)
+  ]
+
+-- | The source of each module of a project, which is what the error printer
+-- quotes from.
+projectSourceFiles :: BasicBlocksProject -> M.Map FilePath T.Text
+projectSourceFiles =
+  M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap) M.empty
+
+-- | Runs every check over the basic-block AST, stopping at the first error.
+runBasicBlockChecks :: Bool -> Platform -> BasicBlocksProject -> IO ()
+runBasicBlockChecks chatty plt bbProject = mapM_ runOne basicBlockChecks
+
+  where
+
+    sourceFilesMap = projectSourceFiles bbProject
+
+    runOne :: Check -> IO ()
+    runOne check = do
+      when chatty (putStrLn . debugMessage $ checkMessage check)
+      case runCheck check plt bbProject of
+        Nothing -> return ()
+        Just failure -> TIO.putStrLn (failureMessage failure sourceFilesMap) >> exitFailure
 
 -- | Load "termina.yaml" configuration file
 loadConfig :: (MonadIO m) => m (Either ParseException TerminaConfig)

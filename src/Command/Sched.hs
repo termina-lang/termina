@@ -711,32 +711,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
           TIO.putStrLn (toText err M.empty) >> exitFailure)
         return
         $ genBasicBlocks typedProject
-    when chatty (putStrLn . debugMessage $ "Checking basic blocks paths")
-    case basicBlockPathsCheckModules rawBBProject of
-      Nothing -> return ()
-      Just err ->
-        let sourceFilesMap =
-              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-              M.empty rawBBProject in
-        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    -- | Definite assignment checking
-    when chatty (putStrLn . debugMessage $ "Definite assignment checking project modules")
-    case varUsageCheckModules rawBBProject of
-      Nothing -> return ()
-      Just err ->
-        let sourceFilesMap =
-              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-              M.empty rawBBProject in
-        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    -- | Usage checking
-    when chatty (putStrLn . debugMessage $ "Usage checking project modules")
-    case boxUsageCheckModules rawBBProject of
-      Nothing -> return ()
-      Just err ->
-        let sourceFilesMap =
-              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
-              M.empty rawBBProject in
-        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    runBasicBlockChecks chatty plt rawBBProject
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     bbProject <- constFolding plt rawBBProject
     -- | Obtain the architectural description of the program

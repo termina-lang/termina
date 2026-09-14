@@ -35,9 +35,8 @@ import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 
 import Command.Types
 import Command.Utils
-    (genBasicBlocks, basicBlockPathsCheckModules, boxUsageCheckModules,
-     varUsageCheckModules, sideEffectCheckModules, getVisibleModules,
-     sortProjectDepsOrLoop)
+    (genBasicBlocks, basicBlockChecks, runCheck, CheckFailure(..),
+     getVisibleModules, sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
@@ -98,10 +97,7 @@ runProjectPipeline sources = do
   ordered <- orderModules parsedProject
   typedProject <- typeProject parsedProject ordered
   bbProject <- stage $ genBasicBlocks typedProject
-  noError $ basicBlockPathsCheckModules bbProject
-  noError $ varUsageCheckModules bbProject
-  noError $ boxUsageCheckModules bbProject
-  noError $ sideEffectCheckModules TestPlatform bbProject
+  mapM_ (\check -> noCheckError $ runCheck check TestPlatform bbProject) basicBlockChecks
   -- | Constant folding runs before architecture so the architecture pass and
   -- the code generator see every type (array sizes) already folded to literals.
   foldedProject <- foldProject bbProject ordered
@@ -278,3 +274,16 @@ stage = either (Left . errCode) Right
 -- problem or does not) into the error's code on the @Left@.
 noError :: (ErrorMessage e, Show e) => Maybe e -> Either Text ()
 noError = maybe (Right ()) (Left . errCode)
+
+-- | The same, for a check of the basic-block AST, which reports the answers its
+-- callers need instead of the error itself.
+noCheckError :: Maybe CheckFailure -> Either Text ()
+noCheckError = maybe (Right ()) (Left . code)
+
+  where
+
+    code :: CheckFailure -> Text
+    code failure
+      | failureCode failure == pack "Internal" =
+          failureCode failure <> pack ": " <> pack (take 240 (failureShown failure))
+      | otherwise = failureCode failure
