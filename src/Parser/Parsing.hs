@@ -869,8 +869,8 @@ mutableObjDeclarationParser = do
   name <- identifierParser
   reservedOp ":"
   ty <- typeSpecifierParser
-  _ <- reservedOp "="
-  initializer <-  expressionParser
+  -- | A mutable object may be declared without an initializer. 
+  initializer <- optionMaybe (reservedOp "=" *> expressionParser)
   endPos <- getPosition
   _ <- semi
   return $ Declaration name Mutable ty initializer (Position current startPos endPos)
@@ -887,7 +887,7 @@ immutableObjDeclarationParser = do
   initializer <-  expressionParser
   endPos <- getPosition
   _ <- semi
-  return $ Declaration name Immutable ty initializer (Position current startPos endPos)
+  return $ Declaration name Immutable ty (Just initializer) (Position current startPos endPos)
 
 singleExprStmtParser :: TerminaParser (Statement ParserAnn)
 singleExprStmtParser = do

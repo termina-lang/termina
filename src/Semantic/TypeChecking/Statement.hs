@@ -39,8 +39,8 @@ typeStatement _retTy (Declaration lhs_id lhs_ak lhs_ts expr anns) = do
   checkTerminaType anns lhs_type
   -- Check if the type is a valid declaration type
   declTyOrFail anns lhs_type
-  -- Expression and type must match
-  ety <- typeAssignmentExpression lhs_type typeRHSObject expr
+  -- Expression and type must match. A deferred declaration has no initializer.
+  ety <- mapM (typeAssignmentExpression lhs_type typeRHSObject) expr
   -- Insert object in the corresponding environment
   -- If the object is mutable, then we insert it in the local mutable environment
   -- otherwise we insert it in the read-only environment

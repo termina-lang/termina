@@ -84,7 +84,7 @@ genExpressionPath expr acc =
 genRegularBlockPath :: [WCEPathBlock GeneratorAnn] -> [Statement STYPES.SemanticAnn] -> [WCEPathBlock GeneratorAnn]
 genRegularBlockPath acc [] = acc
 genRegularBlockPath acc (Declaration _ _ _ expr _ : xs) =
-    let exprPath = genExpressionPath expr acc
+    let exprPath = maybe acc (`genExpressionPath` acc) expr
     in genRegularBlockPath exprPath xs
 genRegularBlockPath acc (AssignmentStmt _ expr _ : xs) =
     let exprPath = genExpressionPath expr acc

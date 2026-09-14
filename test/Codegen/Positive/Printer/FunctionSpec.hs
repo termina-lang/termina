@@ -76,10 +76,10 @@ tmDescriptorFieldsInit3 =
          FieldValueAssignment "field1" structAFieldsInit3 stmtSemAnn] tmDescriptorExprSemAnn
 
 struct0Declaration0, struct0Declaration1, struct0Declaration2, struct1Declaration :: Statement SemanticAnn
-struct0Declaration0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
-struct0Declaration1 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit1 stmtSemAnn
-struct0Declaration2 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit3 stmtSemAnn
-struct1Declaration = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorObjSemAnn)) stmtSemAnn
+struct0Declaration0 = Declaration "struct0" Mutable tmDescriptorTS (Just tmDescriptorFieldsInit0) stmtSemAnn
+struct0Declaration1 = Declaration "struct0" Mutable tmDescriptorTS (Just tmDescriptorFieldsInit1) stmtSemAnn
+struct0Declaration2 = Declaration "struct0" Mutable tmDescriptorTS (Just tmDescriptorFieldsInit3) stmtSemAnn
+struct1Declaration = Declaration "struct1" Mutable tmDescriptorTS (Just (AccessObject (Variable "struct0" tmDescriptorObjSemAnn))) stmtSemAnn
 
 struct0 :: Object SemanticAnn
 struct0 = Variable "struct0" tmDescriptorObjSemAnn

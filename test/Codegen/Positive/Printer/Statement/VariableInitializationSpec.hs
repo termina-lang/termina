@@ -27,15 +27,15 @@ twoDymArrayRowExprAnn = arrayExprSemAnn TInt64 (buildConstExprTUSize 2)
 twoDymArrayExprAnn = twoDymArrayExprSemAnn TInt64 (buildConstExprTUSize 2) (buildConstExprTUSize 2)
 
 array3, array4 :: Statement SemanticAnn
-array3 = Declaration "array3" Mutable arrayTS (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn) stmtSemAnn
-array4 = Declaration "array4" Mutable twoDimArrayTS (ArrayInitializer (ArrayInitializer uint32Const0 (buildConstExprTUSize 2) twoDymArrayRowExprAnn) (buildConstExprTUSize 2) twoDymArrayExprAnn) stmtSemAnn
+array3 = Declaration "array3" Mutable arrayTS (Just (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) arrayExprAnn)) stmtSemAnn
+array4 = Declaration "array4" Mutable twoDimArrayTS (Just (ArrayInitializer (ArrayInitializer uint32Const0 (buildConstExprTUSize 2) twoDymArrayRowExprAnn) (buildConstExprTUSize 2) twoDymArrayExprAnn)) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
 
 foo1, foo2 :: Statement SemanticAnn
-foo1 = Declaration "foo1" Mutable TUInt32 foo0 stmtSemAnn
-foo2 = Declaration "foo2" Mutable TUInt32 uint32Const0 stmtSemAnn
+foo1 = Declaration "foo1" Mutable TUInt32 (Just foo0) stmtSemAnn
+foo2 = Declaration "foo2" Mutable TUInt32 (Just uint32Const0) stmtSemAnn
 
 tmDescriptorObjSemAnn :: SemanticAnn
 tmDescriptorObjSemAnn = structObjSemAnn Mutable "TMDescriptor"
@@ -65,19 +65,19 @@ tmDescriptorFieldsInit0 =
          FieldValueAssignment "field1" structAFieldsInit0 undefined] tmDescriptorExprSemAnn
 
 struct0, struct1 :: Statement SemanticAnn
-struct0 = Declaration "struct0" Mutable tmDescriptorTS tmDescriptorFieldsInit0 stmtSemAnn
-struct1 = Declaration "struct1" Mutable tmDescriptorTS (AccessObject (Variable "struct0" tmDescriptorObjSemAnn)) stmtSemAnn
+struct0 = Declaration "struct0" Mutable tmDescriptorTS (Just tmDescriptorFieldsInit0) stmtSemAnn
+struct1 = Declaration "struct1" Mutable tmDescriptorTS (Just (AccessObject (Variable "struct0" tmDescriptorObjSemAnn))) stmtSemAnn
 
 enum0, enum1 :: Statement SemanticAnn
-enum0 = Declaration "enum0" Mutable messageTS (EnumVariantInitializer "Message" "Reset" [] messageExprSemAnn) stmtSemAnn
-enum1 = Declaration "enum1" Mutable messageTS (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageExprSemAnn) stmtSemAnn
+enum0 = Declaration "enum0" Mutable messageTS (Just (EnumVariantInitializer "Message" "Reset" [] messageExprSemAnn)) stmtSemAnn
+enum1 = Declaration "enum1" Mutable messageTS (Just (EnumVariantInitializer "Message" "In" [uint32Const0, uint32Const0] messageExprSemAnn)) stmtSemAnn
 
 boxVar0 :: Expression SemanticAnn
 boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionBoxUInt32TS (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionBoxUInt32TS (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (Just (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn)) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (Just (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn)) stmtSemAnn
 
 spec :: Spec
 spec = do

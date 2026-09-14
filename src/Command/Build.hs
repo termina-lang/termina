@@ -435,6 +435,15 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
+    -- | Definite assignment checking
+    when chatty (putStrLn . debugMessage $ "Definite assignment checking project modules")
+    case initCheckModules rawBBProject of
+      Nothing -> return ()
+      Just err ->
+        let sourceFilesMap =
+              M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
+              M.empty rawBBProject in
+        TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     case useDefCheckModules rawBBProject of

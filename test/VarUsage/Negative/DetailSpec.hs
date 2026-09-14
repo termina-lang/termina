@@ -8,6 +8,7 @@ module VarUsage.Negative.DetailSpec
   , testVE005, testVE006, testVE007, testVE008, testVE009, testVE010
   , testVE011, testVE012, testVE013, testVE014, testVE016, testVE016_1
   , testVE015, testVE017, testVE017_1, testVE018, testVE018_1, testVE018_2
+  , testVE019, testVE020
   ) where
 
 import Test.Hspec
@@ -397,6 +398,25 @@ testVE018_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
        "    return 0 : u32;\n" ++
        "}\n"
 
+-- | The declaration has no initializer and the branch that assigns it may not
+-- be taken.
+testVE019 :: String
+testVE019 = "function fun0(c : bool) -> u32 {\n" ++
+       "    var x : u32;\n" ++
+       "    if (c) {\n" ++
+       "        x = 1 : u32;\n" ++
+       "    }\n" ++
+       "    return x;\n" ++
+       "}\n"
+
+-- | An element is written before the array is assigned as a whole.
+testVE020 :: String
+testVE020 = "function fun0() -> u32 {\n" ++
+       "    var buf : [u8; 4];\n" ++
+       "    buf[0] = 1 : u8;\n" ++
+       "    return 0 : u32;\n" ++
+       "}\n"
+
 spec :: Spec
 spec = do
   describe "Semantic Errors" $ do
@@ -496,6 +516,14 @@ spec = do
       runNegativeTestVarUsage testVE018_2
         `shouldSatisfy`
           isEAssignedValueNotUsed "last"
+    it "VE-019: object read on a path where it is not assigned" $ do
+      runNegativeTestInit testVE019
+        `shouldSatisfy`
+          isEReadBeforeAssignment "x"
+    it "VE-020: element written before the array is assigned as a whole" $ do
+      runNegativeTestInit testVE020
+        `shouldSatisfy`
+          isEPartialWriteBeforeAssignment "buf"
 
   where
 
@@ -552,3 +580,9 @@ spec = do
 
     isEMemberFunctionNotUsed :: Identifier -> Maybe Error -> Bool
     isEMemberFunctionNotUsed inIdent = \case Just (EMemberFunctionNotUsed ident) -> (inIdent == ident); _ -> False
+
+    isEReadBeforeAssignment :: Identifier -> Maybe Error -> Bool
+    isEReadBeforeAssignment inIdent = \case Just (EReadBeforeAssignment ident) -> (inIdent == ident); _ -> False
+
+    isEPartialWriteBeforeAssignment :: Identifier -> Maybe Error -> Bool
+    isEPartialWriteBeforeAssignment inIdent = \case Just (EPartialWriteBeforeAssignment ident) -> (inIdent == ident); _ -> False

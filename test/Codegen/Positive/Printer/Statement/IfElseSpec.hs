@@ -18,7 +18,7 @@ optionBoxUInt32ExprSemAnn = optionBoxExprSemAnn TUInt32
 
 array1 :: Statement SemanticAnn
 array1 = Declaration "array1" Mutable arrayTS
-    (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) (arrayExprSemAnn TUInt32 (buildConstExprTUSize 10))) stmtSemAnn
+    (Just (ArrayInitializer uint32Const0 (buildConstExprTUSize 10) (arrayExprSemAnn TUInt32 (buildConstExprTUSize 10)))) stmtSemAnn
 
 foo0 :: Expression SemanticAnn
 foo0 = AccessObject (Variable "foo0" (objSemAnn Mutable TUInt32))
@@ -34,8 +34,8 @@ boxVar0 :: Expression SemanticAnn
 boxVar0 = AccessObject (Variable "box_var0" boxUInt32SemAnn)
 
 option0, option1 :: Statement SemanticAnn
-option0 = Declaration "option0" Mutable optionBoxUInt32TS (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn) stmtSemAnn
-option1 = Declaration "option1" Mutable optionBoxUInt32TS (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn) stmtSemAnn
+option0 = Declaration "option0" Mutable optionBoxUInt32TS (Just (MonadicVariantInitializer (Some boxVar0) optionBoxUInt32ExprSemAnn)) stmtSemAnn
+option1 = Declaration "option1" Mutable optionBoxUInt32TS (Just (MonadicVariantInitializer None optionBoxUInt32ExprSemAnn)) stmtSemAnn
 
 twoDeclarations :: Block SemanticAnn
 twoDeclarations = Block [array1, option0] stmtSemAnn

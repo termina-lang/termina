@@ -420,8 +420,8 @@ constFoldStatement (Declaration ident ak ty initExpr ann) = do
   let stmtLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType (getLocation ann) ty
-  initExpr' <- constFoldExpression initExpr
-  constFoldCheckType stmtLoc ty' initExpr'
+  initExpr' <- mapM constFoldExpression initExpr
+  mapM_ (constFoldCheckType stmtLoc ty') initExpr'
   return $ Declaration ident ak ty' initExpr' ann'
 constFoldStatement (AssignmentStmt obj expr ann) = do
   let stmtLoc = getLocation ann

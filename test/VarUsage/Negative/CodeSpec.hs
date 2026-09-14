@@ -3,11 +3,11 @@
 -- reachable VE-NNN code, over the source programs the detail spec defines.
 module VarUsage.Negative.CodeSpec (spec) where
 
-import VarUsage.Common (varUsageErrorCode)
+import VarUsage.Common (varUsageErrorCode, initErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVE001, testVE002, testVE003, testVE004, testVE005, testVE006, testVE007
   , testVE008, testVE009, testVE010, testVE011, testVE012, testVE013, testVE014
-  , testVE015, testVE016, testVE017, testVE018 )
+  , testVE015, testVE016, testVE017, testVE018, testVE019, testVE020 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
@@ -36,8 +36,19 @@ cases =
   , ("VE-018", "assigned value never read", testVE018)
   ]
 
+-- | (code, title, source) for the codes raised by the definite assignment
+-- check, which is a pass of its own and therefore has its own runner.
+initCases :: [(Text, String, String)]
+initCases =
+  [ ("VE-019", "object read before it is assigned", testVE019)
+  , ("VE-020", "partial write before the object is assigned", testVE020)
+  ]
+
 spec :: Spec
-spec = describe "VarUsage: error-code coverage" $
+spec = describe "VarUsage: error-code coverage" $ do
   forM_ cases $ \(code, title, src) ->
     it (unpack code ++ ": " ++ title) $
       varUsageErrorCode src `shouldBe` Just code
+  forM_ initCases $ \(code, title, src) ->
+    it (unpack code ++ ": " ++ title) $
+      initErrorCode src `shouldBe` Just code

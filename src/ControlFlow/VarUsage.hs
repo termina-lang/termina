@@ -139,8 +139,8 @@ useDefStmt (Declaration ident _accK tyS initE ann)
     TBoxSubtype _ -> throwError $ annotateError loc EDefiningBox
     --Everything else
     _        -> defVariable ident loc
-  -- Use everithing in the |initE|
-  >> useExpression initE
+  -- Use everithing in the |initE| if included
+  >> mapM_ useExpression initE
 -- All branches should have the same used Only ones.
 useDefStmt (AssignmentStmt obj e ann) = do
   -- | We need to check if the object is an option-box

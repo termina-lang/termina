@@ -53,7 +53,7 @@ selfInv (Casting expr _ts _ann) prevMap = selfInv expr prevMap
 selfInv _ prevMap  = prevMap
 
 selfInvStmt :: Statement a -> SelfInvocation a -> SelfInvocation a
-selfInvStmt (Declaration _vident _accK _type e _ann) prevMap = selfInv e prevMap
+selfInvStmt (Declaration _vident _accK _type e _ann) prevMap = maybe prevMap (`selfInv` prevMap) e
 selfInvStmt (AssignmentStmt _obj e _ann) prevMap = selfInv e prevMap
 selfInvStmt (IfElseStmt ifCond elifs mElse _ann) prevMap =
   selfInvIf ifCond .
@@ -95,7 +95,7 @@ selfInvStmt (ContinueStmt ret _ann) prevMap =
 selfInvStmt (RebootStmt _ann) prevMap = prevMap
 
 fieldDepStmt :: Statement a -> M.Map Identifier (S.Set Identifier) -> M.Map Identifier (S.Set Identifier)
-fieldDepStmt (Declaration _vident _accK _type e _ann) prevMap = fieldDepExpr e prevMap
+fieldDepStmt (Declaration _vident _accK _type e _ann) prevMap = maybe prevMap (`fieldDepExpr` prevMap) e
 fieldDepStmt (AssignmentStmt _obj e _ann) prevMap = fieldDepExpr e prevMap
 fieldDepStmt (IfElseStmt ifCond elifs mElse _ann) prevMap =
   fieldDepIf ifCond .

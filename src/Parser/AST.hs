@@ -217,7 +217,7 @@ data Statement a =
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
     (TypeSpecifier a) -- ^ type of the variable
-    (Expression a) -- ^ initialization expression
+    (Maybe (Expression a)) -- ^ initialization expression, absent in a deferred declaration
     a
   | AssignmentStmt
     (Object a) -- ^ name of the variable

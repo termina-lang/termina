@@ -14,6 +14,7 @@ import ControlFlow.BasicBlocks
 import Modules.Modules
 
 import ControlFlow.VarUsage (runUDAnnotatedProgram)
+import ControlFlow.Initialization (runInitCheck)
 import ControlFlow.SideEffects (runSideEffectCheck)
 import ControlFlow.SideEffects.Errors (SideEffectsError)
 import Configuration.Platform (Platform)
@@ -131,6 +132,22 @@ sideEffectCheckModules plt = check . M.elems
 sideEffectCheckModule :: Platform -> BasicBlocksModule -> Maybe SideEffectsError
 sideEffectCheckModule plt =
     runSideEffectCheck plt . basicBlocksAST . metadata
+
+initCheckModules :: BasicBlocksProject -> Maybe VarUsageError
+initCheckModules = check . M.elems
+
+    where
+
+        check [] = Nothing
+        check [x] = initCheckModule x
+        check (x:xs) =
+            case initCheckModule x of
+                Nothing -> check xs
+                Just err -> Just err
+
+initCheckModule :: BasicBlocksModule -> Maybe VarUsageError
+initCheckModule =
+    runInitCheck . basicBlocksAST . metadata
 
 genBasicBlocks :: TypedProject -> Either BBGeneratorError BasicBlocksProject
 genBasicBlocks = mapM genBasicBlocksModule

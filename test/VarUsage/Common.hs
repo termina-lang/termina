@@ -13,6 +13,7 @@ import Configuration.Configuration
 import ControlFlow.BasicBlocks
 import qualified ControlFlow.VarUsage.Errors as VarUsage
 import ControlFlow.VarUsage
+import ControlFlow.Initialization (runInitCheck)
 import qualified Data.Set as S
 
 -- | Parses, type-checks and lowers a single module named @test@ to basic
@@ -36,3 +37,23 @@ runNegativeTestVarUsage input = case runP (contents topLevel) "test" "" input of
 -- the error constructor itself.
 varUsageErrorCode :: String -> Maybe Text
 varUsageErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestVarUsage
+
+-- | Same pipeline as 'runNegativeTestVarUsage', but running the definite
+-- assignment check instead of the variable-usage one. Both raise errors of the
+-- same family, so they share the error type and the code spec table.
+runNegativeTestInit :: String -> Maybe VarUsage.Error
+runNegativeTestInit input = case runP (contents topLevel) "test" "" input of
+  Left err -> error $ "Parser Error: " ++ show err
+  Right ast ->
+    let config = defaultConfig "test" TestPlatform in
+    case runTypeChecking (makeInitialGlobalEnv (Just config) TestPlatform []) (typeTerminaModule (S.singleton "test") ast) of
+      Left err -> error $ "Typing Error: " ++ show err
+      Right (typedProgram, _) -> case runGenBBModule typedProgram of
+        Left err -> error $ "Basic Blocks Generator Error: " ++ show err
+        Right bbProgram -> case runInitCheck bbProgram of
+          Just err -> Just $ getError err
+          Nothing -> Nothing
+
+-- | The VE-NNN code of the definite assignment error a program raises.
+initErrorCode :: String -> Maybe Text
+initErrorCode = fmap (errorIdent . annotateError Internal) . runNegativeTestInit

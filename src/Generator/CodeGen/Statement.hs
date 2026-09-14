@@ -910,8 +910,12 @@ genStatement (Declaration identifier _ ts expr ann) = do
   -- array fills and char-array strings into element lists. (Arrays are not
   -- copyTy, so an array-from-array copy is rejected upstream as SE-095 and
   -- never reaches codegen.)
-  cInit <- genInitializerExpr expr
-  return [pre_cr (var identifier cType @:= cInit) |>> loc]
+  -- A deferred declaration has no initializer and emits just "T x;".
+  case expr of
+    Nothing -> return [pre_cr (var identifier cType) |>> loc]
+    Just initExpr -> do
+      cInit <- genInitializerExpr initExpr
+      return [pre_cr (var identifier cType @:= cInit) |>> loc]
 genStatement (SingleExpStmt expr ann) = do
     let loc = getLocation ann
     cExpr <- genExpression expr

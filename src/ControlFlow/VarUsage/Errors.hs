@@ -50,6 +50,8 @@ data Error
   | ESelfNotUsed Identifier -- ^ Method or viewer does not use self (VE-016)
   | EMemberFunctionNotUsed Identifier -- ^ Method or viewer is never called (VE-017)
   | EAssignedValueNotUsed Identifier -- ^ Value assigned to a variable is never read (VE-018)
+  | EReadBeforeAssignment Identifier -- ^ Object read on a path where it has not been assigned (VE-019)
+  | EPartialWriteBeforeAssignment Identifier -- ^ Field or element written before the object is assigned as a whole (VE-020)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -74,6 +76,8 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-016"
     errorIdent (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "VE-017"
     errorIdent (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "VE-018"
+    errorIdent (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "VE-019"
+    errorIdent (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "VE-020"
     errorIdent (AnnotatedError e _pos) = T.pack $ show e
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
@@ -94,6 +98,8 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (ESelfNotUsed _ident) _pos) = "self not used"
     errorTitle (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "member function not used"
     errorTitle (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "assigned value never read"
+    errorTitle (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "object read before it is assigned"
+    errorTitle (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "partial write to an object that is not assigned yet"
     errorTitle _ = "internal error"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
@@ -112,6 +118,18 @@ instance ErrorMessage VarUsageError where
                     sourceLines title fileName pos
                     (Just ("Variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is declared but not used."))
+            EReadBeforeAssignment ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Variable \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m is declared without an initializer and there is a path that reaches this point without assigning it.\n" <>
+                        "Assign the whole object on every path before reading it."))
+            EPartialWriteBeforeAssignment ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("Variable \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m is declared without an initializer and this writes only a part of it.\n" <>
+                        "The whole object must be assigned before a field or an element of it is written."))
             EBoxNotMoved ident ->
                 pprintSimpleError
                     sourceLines title fileName pos

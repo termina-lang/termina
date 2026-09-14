@@ -36,7 +36,8 @@ import ControlFlow.BasicBlocks.AST (AnnotatedProgram)
 import Command.Types
 import Command.Utils
     (genBasicBlocks, basicBlockPathsCheckModules, useDefCheckModules,
-     sideEffectCheckModules, getVisibleModules, sortProjectDepsOrLoop)
+     initCheckModules, sideEffectCheckModules, getVisibleModules,
+     sortProjectDepsOrLoop)
 import Modules.Modules (TerminaModuleData(..), ModuleDependency(..))
 import Modules.Utils (buildModuleName)
 import Parser.Errors (Error(..), ParsingErrors)
@@ -98,6 +99,7 @@ runProjectPipeline sources = do
   typedProject <- typeProject parsedProject ordered
   bbProject <- stage $ genBasicBlocks typedProject
   noError $ basicBlockPathsCheckModules bbProject
+  noError $ initCheckModules bbProject
   noError $ useDefCheckModules bbProject
   noError $ sideEffectCheckModules TestPlatform bbProject
   -- | Constant folding runs before architecture so the architecture pass and

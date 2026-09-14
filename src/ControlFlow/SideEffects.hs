@@ -296,7 +296,7 @@ checkFullExpressions es = do
 
 checkSideEffStatement :: Statement SemanticAnn -> SideEffectsMonad ()
 checkSideEffStatement stmt = case stmt of
-  Declaration _ _ _ initExpr _ -> checkFullExpression initExpr
+  Declaration _ _ _ initExpr _ -> mapM_ checkFullExpression initExpr
   AssignmentStmt _ rhs _       -> checkFullExpression rhs
   SingleExpStmt e _            -> checkFullExpression e
 
