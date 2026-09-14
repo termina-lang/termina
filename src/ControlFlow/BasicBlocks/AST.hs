@@ -62,7 +62,7 @@ data CondElseIf a = CondElseIf
   } deriving (Show, Functor)
 
 data Statement a =
-  -- | Declaration statement
+  -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
@@ -94,7 +94,7 @@ data BasicBlock a =
         (Block a) a
     -- | Match basic block
     | MatchBlock (Expression a) [MatchCase a] (Maybe (DefaultCase a)) a
-    -- | Send message
+    -- | Send message
     | SendMessage (Object a) (Expression a) a
     -- | Invoke a resource procedure
     | ProcedureInvoke 
@@ -120,17 +120,17 @@ data BasicBlock a =
         (Expression a) -- ^ index expression
         (Expression a) -- ^ value to store
         a
-    -- | Call to the alloc procedure of a memory allocator
+    -- | Call to the alloc procedure of a memory allocator
     | AllocBox
         (Object a) -- port that implements the allocator interface
         (Expression a) -- ^ argument expression
         a
-    -- | Call to the free procedure of a memory allocator 
+    -- | Call to the free procedure of a memory allocator 
     | FreeBox
         (Object a) -- port that implements the allocator interface
         (Expression a) -- ^ argument expression
         a
-    -- | Regular block (list of statements)
+    -- | Regular block (list of statements)
     | RegularBlock [Statement a]
     | ReturnBlock 
         (Maybe (Expression a)) -- ^ return expression
@@ -139,7 +139,7 @@ data BasicBlock a =
         (Expression a)
         a
     | RebootBlock a
-    -- | System call
+    -- | System call
     | SystemCall
         (Object a) -- ^ access port
         Identifier -- ^ name of the system call

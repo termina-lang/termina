@@ -62,7 +62,7 @@ initializeHandler _req = do
                 Just appModule -> do
                   -- Load the modules of the project
                   loadModules (importedModules appModule) (sourceModulesFolder cfg)
-                  -- | Once all files have been loaded, we may proceed to type check them
+                  -- | Once all files have been loaded, we may proceed to type check them
                   -- We need to first obtain the order in which the modules must be type checked
                   parsedProject <- gets project_modules
                   let projectDependencies = fmap importedModules parsedProject

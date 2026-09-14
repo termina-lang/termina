@@ -15,7 +15,7 @@ getPlatformInitialGlobalEnv :: TerminaConfig -> Platform -> [(Identifier, Locate
 getPlatformInitialGlobalEnv config POSIXGCC =
     let platformConfig = posix_gcc . platformFlags $ config in
     [("kbd_irq", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | POSIXGCC.Config.enableKbdIrq platformConfig] ++
-    -- | SystemAPI interface. This interface extends all the system interfaces.
+    -- | SystemAPI interface. This interface extends all the system interfaces.
     -- Each target platform should declare its own SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint", "SysGetChar"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config RTEMS5LEON3NEXYSA7 = 
@@ -36,7 +36,7 @@ getPlatformInitialGlobalEnv config RTEMS5LEON3NEXYSA7 =
     [("irq_13", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3NEXYSA7.Config.enableIrq13 platformConfig] ++
     [("irq_14", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3NEXYSA7.Config.enableIrq14 platformConfig] ++
     [("irq_15", LocatedElement (GGlob (TGlobal EmitterClass "Interrupt")) Internal) | RTEMS5LEON3NEXYSA7.Config.enableIrq15 platformConfig] ++
-    -- | SystemAPI interface. This interface extends all the system interfaces.
+    -- | SystemAPI interface. This interface extends all the system interfaces.
     -- Each target platform should declare its own SystemAPI interface.
     [("SystemAPI", LocatedElement (GType (Interface SystemInterface "SystemAPI" ["SysTime", "SysPrint"] [] [])) Internal)]
 getPlatformInitialGlobalEnv config FreeRTOS10STM32L432XX =

@@ -18,10 +18,10 @@ import Utils.Printer
 data Error
   = ESetMaxBound -- ^ The set has reached its maximum bound (Internal)  
   | EMapMaxBound -- ^ The map has reached its maximum bound (Internal)
-  | EExpectedOptionBoxType -- ^ Expected option-box type (Internal)
+  | EExpectedOptionBoxType -- ^ Expected option-box type (Internal)
   | EInvalidObjectTypeAnnotation -- ^ Error when the semantic annotation of an object does not contain the expected type information (Internal)
   | EInvalidExprTypeAnnotation -- ^ Error when the semantic annotation of an expression does not contain the expected type information (Internal)
-  | EDefiningBox -- ^ Error when trying to declare variable of box type (Internal)
+  | EDefiningBox -- ^ Error when trying to declare variable of box type (Internal)
   | EBadAllocArg -- ^ Bad argument for alloc (Internal)
   | EBadFreeArg -- ^ Bad argument for free (Internal)
   | EBadSendArg -- ^ Bad argument for send (Internal)
@@ -37,7 +37,7 @@ data Error
   | EBoxNotMoved Identifier -- ^ Box variable is not moved (VE-003)
   | EBoxMovedTwice Identifier Location -- ^ Box variable is moved twice (VE-004)
   | EOptionBoxMovedTwice Identifier Location -- ^ Option-box variable is moved twice (VE-005)
-  | EDifferentOptionBoxUse Identifier MVars (MVars, Location) -- ^ Option-box final state mismatch (VE-006)
+  | EDifferentOptionBoxUse Identifier MVars (MVars, Location) -- ^ Option-box final state mismatch (VE-006)
   | EDifferentNewOptionBoxUse Identifier MVars -- ^ Option-box used in conditional branch (VE-007)
   | EMissingOptionBox Identifier MVars -- ^ Option-box unused in a branch but used previously (VE-008)
   | EMissingBoxMove Identifier Location -- ^ Box variable is not always moved (VE-009)
@@ -136,7 +136,7 @@ instance ErrorMessage VarUsageError where
                     (Just ("Box variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is declared but not moved."))
             EBoxMovedTwice ident prevMove@(Position _ moveStart _moveEnd) ->
-                -- | We can safely assume that the previous move is in the same file
+                -- | We can safely assume that the previous move is in the same file
                 let moveFileName = sourceName moveStart
                     moveSourceLines = files M.! moveFileName
                 in
@@ -148,7 +148,7 @@ instance ErrorMessage VarUsageError where
                         moveSourceLines "The previous move was done here:" moveFileName
                         prevMove Nothing
             EOptionBoxMovedTwice ident prevMove@(Position _ moveStart _moveEnd) ->
-                -- | We can safely assume that the previous move is in the same file
+                -- | We can safely assume that the previous move is in the same file
                 let moveFileName = sourceName moveStart
                     moveSourceLines = files M.! moveFileName
                 in
@@ -160,7 +160,7 @@ instance ErrorMessage VarUsageError where
                         moveSourceLines "The previous move was done here:" moveFileName
                         prevMove Nothing
             EDifferentOptionBoxUse ident rval (lval, otherPos@(Position _ otherStart _otherEnd)) ->
-                -- | We can safely assume that the other position is in the same file
+                -- | We can safely assume that the other position is in the same file
                 let otherFileName = sourceName otherStart
                     otherSourceLines = files M.! otherFileName
                 in
@@ -181,7 +181,7 @@ instance ErrorMessage VarUsageError where
                         "\x1b[0m in a branch that may not be executed or inside a loop.\n" <> 
                         "This shall cause the final state to be inconsistent."))
             EMissingOptionBox ident prevVal ->
-                -- | We can safely assume that the other position is in the same file
+                -- | We can safely assume that the other position is in the same file
                 let otherFileName = case getLocation prevVal of
                         Position _ otherStart _otherEnd -> sourceName otherStart
                         _ -> error "EMissingUsedOptionBox: TFixedLocation is not a position"

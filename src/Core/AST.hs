@@ -14,14 +14,14 @@ import qualified Data.Text as T
 import Numeric
 import Data.Bits
 
--- | Integer representation.  
+-- | Integer representation.  
 -- A value of this type is used to indicate the representation in which the
 -- value was introduced. It will be later used by the code generator to generate
 -- the correspoding literal using the same representation.
 data IntRepr = DecRepr | HexRepr 
   deriving (Show, Eq, Ord)
 
--- | Termina integers
+-- | Termina integers
 -- A Termina integer is defined by its value and its numeric representation.
 data TInteger = TInteger Integer IntRepr
   deriving (Show, Eq, Ord)
@@ -115,7 +115,7 @@ data ModuleImport' pf a = ModuleImport
   }
   deriving (Functor, Show)
 
--- | Modifier data type
+-- | Modifier data type
 -- Modifiers can be applied to different constructs. They must include
 -- an identifier and also may define an expression.
 data Modifier' expr a = Modifier Identifier (Maybe (expr a))
@@ -125,7 +125,7 @@ data Modifier' expr a = Modifier Identifier (Maybe (expr a))
 type Identifier = String
 
 data TypeParameter' expr a =
-  -- | Identifier that might be a defined type or a constant
+  -- | Identifier that might be a defined type or a constant
   TypeParamIdentifier Identifier
   | TypeParamTypeSpec (TypeSpecifier' expr a)
   | TypeParamSize (expr a)
@@ -141,9 +141,9 @@ data TypeSpecifier' expr a
   -- Non-primitive types
   | TSReference AccessKind (TypeSpecifier' expr a)
   | TSBoxSubtype (TypeSpecifier' expr a)
-  -- | Fixed-location types
+  -- | Fixed-location types
   | TSLocation (TypeSpecifier' expr a)
-  -- | Port types
+  -- | Port types
   | TSAccessPort (TypeSpecifier' expr a)
   | TSSinkPort (TypeSpecifier' expr a) Identifier
   | TSInPort (TypeSpecifier' expr a) Identifier
@@ -176,16 +176,16 @@ data TerminaType' expr a
   | TReference AccessKind (TerminaType' expr a)
   | TBoxSubtype (TerminaType' expr a)
   | TConstSubtype (TerminaType' expr a)
-  -- | Fixed-location types
+  -- | Fixed-location types
   | TFixedLocation (TerminaType' expr a)
-  -- | Port types
+  -- | Port types
   | TAccessPort (TerminaType' expr a)
   | TSinkPort (TerminaType' expr a) Identifier
   | TInPort (TerminaType' expr a) Identifier
   | TOutPort (TerminaType' expr a)
-  -- | Unit type
+  -- | Unit type
   | TUnit
-  -- | Global object types
+  -- | Global object types
   | TGlobal ClassKind Identifier
   deriving (Show, Functor)
 
@@ -208,7 +208,7 @@ instance Eq (TerminaType' expr a) where
   TUnit == TUnit = True
   _ == _ = False
 
--- | We define an ordering for Termina types to be able to use them as keys in maps and sets.
+-- | We define an ordering for Termina types to be able to use them as keys in maps and sets.
 -- The comparison is only supported for basic types, struct and enum types. 
 -- For other types, we return EQ.
 instance Ord (TerminaType' expr a) where
@@ -384,7 +384,7 @@ data Global' ty expr a
       (Maybe (expr a)) -- ^ initialization expression (optional)
       [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
-    -- | Shared resource global variable constructor
+    -- | Shared resource global variable constructor
     | Resource
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
@@ -406,7 +406,7 @@ data Global' ty expr a
       [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
-    -- | Handler global variable constructor
+    -- | Handler global variable constructor
     | Handler
       Identifier -- ^ name of the variable
       (ty a) -- ^ type of the variable
@@ -414,7 +414,7 @@ data Global' ty expr a
       [Modifier' expr a] -- ^ list of possible modifiers
       a -- ^ transpiler annotations
 
-    -- | Constant constructor
+    -- | Constant constructor
     | Const
       Identifier -- ^ name of the constant
       (ty a) -- ^ type of the constant
@@ -477,7 +477,7 @@ data ClassKind = TaskClass | ResourceClass | HandlerClass | EmitterClass | Chann
 -- Interface Member
 data InterfaceMember' ty expr a
   =
-    -- | Procedure
+    -- | Procedure
     InterfaceProcedure
       AccessKind -- ^ access kind (immutable, mutable)
       Identifier -- ^ name of the procedure
@@ -502,7 +502,7 @@ data ClassMember' ty blk a
       (Maybe (ty a)) -- ^ type of the return value (optional)
       (blk a) -- ^ statements block (with return) a
       a -- ^ transpiler annotation
-    -- | Procedures. They can only be used on shared resources, and constitute their
+    -- | Procedures. They can only be used on shared resources, and constitute their
     -- interface with the outside world. They define a list of parameters and a block
     -- of statements. They do not return any value.
     | ClassProcedure
@@ -529,7 +529,7 @@ data ClassMember' ty blk a
 
 ----------------------------------------
 
--- | Parameter data type
+-- | Parameter data type
 --
 -- This type constructor is used to build the parameters that are
 -- listed as part of the definition of a function.
@@ -544,8 +544,8 @@ data Parameter' ty a = Parameter {
 
 data FieldAssignment' expr a =
   FieldValueAssignment Identifier (expr a) a
-  | FieldAddressAssignment Identifier (expr a) a
-  | FieldPortConnection PortConnectionKind Identifier Identifier a
+  | FieldAddressAssignment Identifier (expr a) a
+  | FieldPortConnection PortConnectionKind Identifier Identifier a
   deriving (Show, Functor)
 
 instance (ShowText (expr a)) => ShowText (FieldAssignment' expr a) where
@@ -571,7 +571,7 @@ data EnumVariant' ty a = EnumVariant {
   , assocData       :: [ ty a ]
 } deriving (Show, Functor)
 
--- | Constant values:
+-- | Constant values:
 -- - Booleans
 -- - Integers
 -- - Characters

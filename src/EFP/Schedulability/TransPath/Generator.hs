@@ -235,7 +235,7 @@ genPaths componentName (WCEPathMatchCase innerBlocks pos _ann) = do
         [(0, [])] -> return []
         _ -> return $ map (\(wcet, blocks) -> (wcet, TPBlockMatchCase (reverse blocks) pos TRPBlockTy)) innerPaths
 genPaths _ (WCEPSendMessage _portName _pos _ann) =
-    -- | Continuations are directly defined by the user when defining the transaction
+    -- | Continuations are directly defined by the user when defining the transaction
     return []
 genPaths componentName (WCEPAllocBox portName pos _ann) = do
     targetComponent <- followInvoke componentName portName
@@ -247,7 +247,7 @@ genPaths componentName (WCEPFreeBox poolName pos _ann) = do
     targetComponent <- followInvoke componentName poolName
     return [(0, TPBlockFreeBox targetComponent pos TRPBlockTy)]
 genPaths _ (WCEPRegularBlock _pos _ann) =
-    -- | Regular blocks do not contribute to the transitional path
+    -- | Regular blocks do not contribute to the transitional path
     return []
 genPaths _ (WCEPSystemCall sysCallName pos _ann) = do
     -- | TODO: We set the wcet to 0 for the time being.
@@ -256,7 +256,7 @@ genPaths _ (WCEPSystemCall sysCallName pos _ann) = do
     return [(0, TPBlockSystemCall sysCallName pos TRPBlockTy)]
 genPaths _ (WCEPReturn pos _ann) = return [(0, TPBlockReturn pos TRPBlockTy)]
 genPaths _ (WCEPContinue _actionName _pos _ann) =
-    -- | Continuations are directly defined by the user when defining the transaction
+    -- | Continuations are directly defined by the user when defining the transaction
     return []
 genPaths _ (WCEPReboot pos _ann) = return [(0, TPBlockReboot pos TRPBlockTy)]
 

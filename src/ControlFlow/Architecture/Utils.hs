@@ -124,7 +124,7 @@ genResourceUsageGraph progArchitecture = S.toList <$> resDependenciesMap
 
   where
 
-    -- | This function returns a map of resource dependencies. The key is the
+    -- | This function returns a map of resource dependencies. The key is the
     -- resource identifier and the value is the set of resources that the
     -- resource depends on.
     resDependenciesMap :: M.Map Identifier (S.Set Identifier)
@@ -247,7 +247,7 @@ genResourceLockingsInternal programArchitecture =
             Just (ident', _, _) -> ident == ident'
             Nothing -> False
 
-    -- | Obtains the locking mechanism that must be used for a resource
+    -- | Obtains the locking mechanism that must be used for a resource
     getResLocking :: [Identifier] -> ResLockingMonad ResourceLock
     getResLocking [] = error "Internal error: empty resource list in getResLocking"
     getResLocking [_] = return ResourceLockNone
@@ -291,19 +291,19 @@ getGlobDeclModules progArchitecture =
     atomicModules = map atomicModule $ M.elems (atomics progArchitecture)
     atomicArrayModules = map atomicArrayModule $ M.elems (atomicArrays progArchitecture)
 
-    -- | This function returns the module name of a pool
+    -- | This function returns the module name of a pool
     poolModule :: TPPool a -> QualifiedName
     poolModule (TPPool _ _ _ modName _) = modName
 
-    -- | This function returns the module name of an atomic
+    -- | This function returns the module name of an atomic
     atomicModule :: TPAtomic a -> QualifiedName
     atomicModule (TPAtomic _ _ modName _) = modName
 
-    -- | This function returns the module name of an atomic array
+    -- | This function returns the module name of an atomic array
     atomicArrayModule :: TPAtomicArray a -> QualifiedName
     atomicArrayModule (TPAtomicArray _ _ _ modName _) = modName
 
--- | This function returns the type of an object. The type is extracted from the
+-- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
@@ -362,7 +362,7 @@ getExprType (IsEnumVariantExpression {}) = throwError $ annotateError Internal E
 getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsMonadicVariantExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 
--- | This function returns the name of a port. The function assumes that the object is
+-- | This function returns the name of a port. The function assumes that the object is
 -- a port and that the object is well-typed. If the object is not a port or if the object
 -- is not well-typed, the function will throw an error.    
 getPortName :: (MonadError ArchitectureError m) => Object SemanticAnn -> m Identifier
@@ -437,7 +437,7 @@ getPeriodicTimersToTasks progArchitecture = foldl (\acc emitter ->
         _ -> acc
     ) [] (getConnectedEmitters progArchitecture)
 
--- | Returns the value of the "priority" modifier, if present in the list of modifiers.
+-- | Returns the value of the "priority" modifier, if present in the list of modifiers.
 -- If not, it returns 255, which is the default value for the priority (the lowest).
 getPriority :: TPTask a -> TInteger
 getPriority = getPriority' . taskModifiers
@@ -451,7 +451,7 @@ getPriority = getPriority' . taskModifiers
     getPriority' (_ : modifiers) = getPriority' modifiers
 
 
--- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
+-- | Returns the value of the "stack_size" modifier, if present in the list of modifiers.
 -- If not, it returns 4096, which is the default value for the stack size (RTEMS_MINIUMUM_STACK_SIZE)
 getStackSize :: TPTask a -> TInteger
 getStackSize = getStackSize' . taskModifiers

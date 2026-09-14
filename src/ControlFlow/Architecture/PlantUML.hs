@@ -106,7 +106,7 @@ genTask (TPTask taskId taskCls _ _ outPorts apConns _ _ _) = do
     else do
         progArch <- ST.gets arch
         let cmp = PlantUMLCmpAction taskId (Just . T.pack $ taskCls) (Just $ PlantUMLColorName "PeachPuff")
-        -- | Insert the new participant
+        -- | Insert the new participant
         ST.modify $ \s -> s {
             participants = M.insert taskId cmp (participants s)
         }
@@ -128,7 +128,7 @@ genHandler (TPHandler handlerId handlerCls _ outPorts apConns _ _ _) = do
     else do
         progArch <- ST.gets arch
         let cmp = PlantUMLCmpAction handlerId (Just . T.pack $ handlerCls) (Just $ PlantUMLColorName "PaleGreen")
-        -- | Insert the new participant
+        -- | Insert the new participant
         ST.modify $ \s -> s {
             participants = M.insert handlerId cmp (participants s)
         }
@@ -182,7 +182,7 @@ genTargetResource currentDepth targetId = do
 genResource :: Int -> TPResource a -> PlantUMLCmpGenMonad a ()
 genResource currentDepth (TPResource resourceId resourceCls apConns _ _ _) = do
     let cmp = PlantUMLCmpComponent resourceId (Just . T.pack $ resourceCls) (Just $ PlantUMLColorName "LightYellow")
-    -- | Insert the new participant
+    -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert resourceId cmp (participants s)
     }
@@ -192,7 +192,7 @@ genPool :: TPPool a -> PlantUMLCmpGenMonad a ()
 genPool (TPPool poolId ty size _ _) = do
     let cmp = PlantUMLCmpComponent poolId
             (Just $ "Pool&#60;" <> showText ty <> "; " <> showText size <> "&#62;") (Just $ PlantUMLColorName "Plum")
-    -- | Insert the new participant
+    -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert poolId cmp (participants s)
     }
@@ -202,7 +202,7 @@ genAtomic (TPAtomic atomicId ty _ _) = do
     let cmp = PlantUMLCmpComponent atomicId 
             (Just $ "Atomic&#60;" <> showText ty <> "&#62;") 
             (Just $ PlantUMLColorName "Coral")
-    -- | Insert the new participant
+    -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert atomicId cmp (participants s)
     }
@@ -212,7 +212,7 @@ genAtomicArray (TPAtomicArray atomicArrayId ty size _ _) = do
     let cmp = PlantUMLCmpComponent atomicArrayId 
             (Just $ "AtomicArray&#60;" <> showText ty <> "," <> showText size <> "&#62;") 
             (Just $ PlantUMLColorName "Coral")
-    -- | Insert the new participant
+    -- | Insert the new participant
     ST.modify $ \s -> s {
         participants = M.insert atomicArrayId cmp (participants s)
     }

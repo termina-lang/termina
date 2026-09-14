@@ -6,8 +6,6 @@
 -- Reading one of them, or writing one of its fields or elements, is an error
 -- (VE-019 and VE-020).
 --
--- The pass is deliberately separate from "ControlFlow.VarUsage", which walks
--- the blocks backwards to compute liveness and to track the linearity of boxes.
 module ControlFlow.Initialization (runInitCheck) where
 
 import Control.Monad (when)

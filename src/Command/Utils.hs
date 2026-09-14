@@ -44,12 +44,12 @@ errorMessage msg = "\x1b[31m[error]\x1b[0m: " ++ msg
 debugMessage :: String -> String
 debugMessage msg = "\x1b[32m[debug]\x1b[0m " ++ msg
 
--- | Warning message formatter
+-- | Warning message formatter
 -- Prints warning messages in the form "[warning] <message>"
 warnMessage :: String -> String
 warnMessage msg = "\x1b[33m[warning]\x1b[0m " ++ msg
 
--- | Info message formatter
+-- | Info message formatter
 -- Prints info messages in the form "[info] <message>"
 infoMessage :: String -> String
 infoMessage msg = "\x1b[34m[info]\x1b[0m " ++ msg

@@ -17,7 +17,7 @@ type GlobalEnv = M.Map Identifier (LocatedElement (GEntry SemanticAnn))
 -- variables to their type
 type LocalEnv = M.Map Identifier (LocatedElement (AccessKind, TerminaType SemanticAnn))
 
--- | Map with the moved variables
+-- | Map with the moved variables
 type MovedEnv = M.Map Identifier Location
 
 -- | Environment required to type expression packed into just one type.
@@ -26,7 +26,7 @@ data Environment
  { global :: GlobalEnv
  , local  :: LocalEnv
  , moved  :: MovedEnv
- -- | Set of all the modules that are imported in the current module together with the
+ -- | Set of all the modules that are imported in the current module together with the
  -- | current module.
  , visible :: S.Set QualifiedName
  -- | Target platform, for the static range checks (its @usize@ width; see
@@ -54,7 +54,7 @@ stdlibGlobalEnv outBufSize inBufSize =
     ("ExceptSource", LocatedElement (GType (Enum "ExceptSource" [EnumVariant "Task" [TUSize], EnumVariant "Handler" [TUSize]] [])) Internal),
     ("MutexProtocol", LocatedElement (GType (Enum "MutexProtocol" [EnumVariant "Ceiling" [TUInt8]] [])) Internal),
     ("Exception", LocatedElement (GType (Enum "Exception" [
-      -- | Action failure
+      -- | Action failure
       EnumVariant "EActionFailure" [
         -- | Source of the exception
         TEnum "ExceptSource", 
@@ -62,51 +62,51 @@ stdlibGlobalEnv outBufSize inBufSize =
         TUSize, 
         -- | Error code returned by the action
         TInt32],
-      -- | Message queue full
+      -- | Message queue full
       EnumVariant "EMsgQueueFull" [
         -- | ID of the message queue
         TUSize],
       EnumVariant "EArrayIndexOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
-        -- | Size of the array
+        -- | Size of the array
         TUSize,
-        -- | Offending index
+        -- | Offending index
         TUSize],
       EnumVariant "EArraySliceOutOfBounds" [
         -- | Address of the offending expression
         TUSize,
-        -- | Size of the array
+        -- | Size of the array
         TUSize,
-        -- | Offending upper index
+        -- | Offending upper index
         TUSize],
       EnumVariant "EArraySliceNegativeRange" [
         -- | Address of the offending expression
         TUSize,
-        -- | Lower index
+        -- | Lower index
         TUSize,
-        -- | Upper index
+        -- | Upper index
         TUSize],
       EnumVariant "EArraySliceInvalidRange" [
         -- | Address of the offending expression
         TUSize,
-        -- | Expected size of the array
+        -- | Expected size of the array
         TUSize,
-        -- | Lower index
+        -- | Lower index
         TUSize,
-        -- | Upper index
+        -- | Upper index
         TUSize]
       ] [])) Internal),
     -- | SysTime interface
     ("SysTime", LocatedElement (GType (Interface SystemInterface "SysTime" [] [
-      -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
+      -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
       InterfaceProcedure Immutable "clock_get_uptime" [Parameter "current_time" (TReference Mutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit),
-      -- | procedure delay_in (&mut self, delay : &TimeVal)
+      -- | procedure delay_in (&mut self, delay : &TimeVal)
       InterfaceProcedure Mutable "delay_in" [Parameter "delay" (TReference Immutable (TStruct "TimeVal"))] [] (buildExpAnn Internal TUnit)
     ] [])) Internal),
     -- | SysPrint interface
     ("SysPrint", LocatedElement (GType (Interface SystemInterface "SysPrint" [] [
-      -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
+      -- | procedure clock_get_uptime (&mut self, current_time : &mut TimeVal)
       InterfaceProcedure Mutable "print" [Parameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "println" [Parameter "str" (TReference Immutable (TArray TChar (Constant (I (TInteger outBufSize DecRepr) (Just (TConstSubtype TUSize))) (buildExpAnn Internal (TConstSubtype TUSize)))))] [] (buildExpAnn Internal TUnit),
       InterfaceProcedure Mutable "print_char" [Parameter "value" TChar] [] (buildExpAnn Internal TUnit),

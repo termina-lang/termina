@@ -45,11 +45,11 @@ checkConstant :: Location -> SAST.TerminaType SemanticAnn -> SAST.Const Semantic
 checkConstant loc expected_type (I ti (Just type_c)) =
   -- |type_c| is correct
   checkTerminaType loc type_c >>
-  -- | Check that the constant is well-typed
+  -- | Check that the constant is well-typed
   catchExpectedNum loc EInvalidNumericConstantType (intTyOrFail loc type_c) >>
   -- | Check that the explicit type matches the expected type
   sameTyOrError loc expected_type type_c >>
-  -- | Check that the constant is in the range of the type
+  -- | Check that the constant is in the range of the type
   checkIntConstant loc type_c ti
 checkConstant loc expected_type (I ti Nothing) =
   -- | Check that the expected type is a valid type for an integer constant
@@ -90,7 +90,7 @@ checkPackedMemberReference loc obj = do
   plt <- ST.gets targetPlatform
   when (strictAlignment plt) $
     packedMemberReference loc obj >>=
-      maybe (return ()) (throwError . annotateError loc . EReferenceToPackedMember)
+      mapM_ (throwError . annotateError loc . EReferenceToPackedMember)
 
 -- | Walks a referenced object's access chain and, if it crosses a member of a
 -- packed struct, returns that struct's name. Array indexing, slicing, box
@@ -360,7 +360,7 @@ getMemberField loc obj_ty ident =
     ty -> throwError $ annotateError loc (EMemberAccessInvalidType ty)
 
 typeObject ::
-  -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
+  -- | Scope of variables. It returns its access kind (mutable or immutable) and its type
   (ParserAnn -> Identifier -> SemanticMonad (AccessKind, SAST.TerminaType SemanticAnn))
   -- The object to type
   -> Object ParserAnn
@@ -462,7 +462,7 @@ typeMemberFunctionCall ann ak obj_ty ident args =
               case findInterfaceProcedure ident (members ++ extendedProcedures) of
                 Nothing -> throwError $ annotateError ann (EUnknownProcedure ident)
                 Just (ak', ps, SemanticAnn _ loc) -> do
-                  -- | Check that the access kind is correct.
+                  -- | Check that the access kind is correct.
                   -- If the self reference is immutable, we cannot call a mutable procedure.
                   when (ak == Immutable && ak' /= Immutable) (throwError $ annotateError ann EInvalidAccessToProcedureFromImmutableSelfReference)
                   let (psLen , asLen) = (length ps, length args)
@@ -686,14 +686,14 @@ typeTypeSpecifier loc typeObj (TSArray ts s) = do
 typeTypeSpecifier loc _typeObj (TSDefinedType ident []) = do
   -- Check that the type was defined
   (LocatedElement glbTypeDef loc') <- getGlobalTypeDef loc ident
-  -- | Check that the location of the type is in the dependencies set
+  -- | Check that the location of the type is in the dependencies set
   -- of the current module. This is important because the type
   -- can be defined in another module and we need to check that
   -- the module is properly imported.
   case loc' of
     Position qualifiedName _ _ -> do
       -- | Check that the type is defined in the current module
-      -- | or in a module that is imported.
+      -- | or in a module that is imported.
       visibleMods <- ST.gets visible
       if S.member qualifiedName visibleMods then
         return ()
@@ -746,7 +746,7 @@ typeAssignmentExpression ::
   Expression ParserAnn ->
   SemanticMonad (SAST.Expression SemanticAnn)
 ----------------------------------------
--- | Struct Initializer
+-- | Struct Initializer
 typeAssignmentExpression expected_type@(TAtomic ty) typeObj (StructInitializer fs mts pann) = do
   -- | Check field type
   case mts of
@@ -836,7 +836,7 @@ typeAssignmentExpression expectedType typeObj (ArrayInitializer iexp size pann) 
 -- | TArray Initialization
   case expectedType of
     TArray ts _ -> do
-      -- | We do not need to catch any error, since it will be correctly handler
+      -- | We do not need to catch any error, since it will be correctly handler
       -- by the recursive call to |typeAssignmentExpression|
       typed_init <- typeAssignmentExpression ts typeObj iexp
       typed_init_size <- typeExpression (Just (TConstSubtype TUSize)) typeObj size
@@ -935,9 +935,9 @@ typeAssignmentExpression expectedType typeObj expr = do
 -- traversing, we are actually /creating/ a new tree with implicit
 -- constructions.
 typeExpression ::
-  -- | Expected type of the expression
+  -- | Expected type of the expression
   Maybe (SAST.TerminaType SemanticAnn) ->
-  -- | Function used to type objects (depends on the scope)
+  -- | Function used to type objects (depends on the scope)
   (Object ParserAnn -> SemanticMonad (SAST.Object SemanticAnn))
   -- | Expression to type
   -> Expression ParserAnn
@@ -947,7 +947,7 @@ typeExpression expectedType typeObj (AccessObject obj) = do
   case obj of 
     Variable ident loc -> do
       -- | This is the case of a single variable access.
-      -- | We need to check if the variable name refers to a constexpression or not
+      -- | We need to check if the variable name refers to a constexpression or not
       glb <- ST.gets global
       case M.lookup ident glb of
         Just (LocatedElement (GConstExpr _ty expr) _) -> do
@@ -977,9 +977,9 @@ typeExpression expectedType typeObj (AccessObject obj) = do
 
     typeObjExpression :: SemanticMonad (SAST.Expression SemanticAnn)
     typeObjExpression = do
-      -- | Type the object
+      -- | Type the object
       typed_obj <- typeObj obj
-      -- | Get the type of the object
+      -- | Get the type of the object
       (_, obj_type) <- getObjType typed_obj
       case (expectedType, obj_type) of
         (Just (TBoxSubtype ts), TBoxSubtype ts') -> do
@@ -1010,18 +1010,18 @@ typeExpression expectedType typeObj (AccessObject obj) = do
           return $ SAST.AccessObject (unBox typed_obj)
         (Nothing, _) ->
           return $ SAST.AccessObject typed_obj
--- | Constant literals with an expected type.
+-- | Constant literals with an expected type.
 typeExpression (Just (TConstSubtype expectedType)) typeObj (Constant c pann) = do
   typed_c <- typeConstant pann typeObj c
-  -- | Call the function that checks that the constant is of the expected type.
+  -- | Call the function that checks that the constant is of the expected type.
   checkConstant pann expectedType typed_c
   return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype expectedType))
 typeExpression (Just expectedType) typeObj (Constant c pann) = do
   typed_c <- typeConstant pann typeObj c
-  -- | Call the function that checks that the constant is of the expected type.
+  -- | Call the function that checks that the constant is of the expected type.
   checkConstant pann expectedType typed_c
   return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype expectedType))
--- | Integer literals without an expected type but with a known type.
+-- | Integer literals without an expected type but with a known type.
 typeExpression Nothing typeObj (Constant c@(I _ (Just ts)) pann) = do
   typed_c <- typeConstant pann typeObj c
   typedTS <- typeTypeSpecifier pann typeObj ts
@@ -1051,11 +1051,11 @@ typeExpression Nothing typeObj (Constant c@(F _ (Just ts)) pann) = do
 -- This is an error, since we cannot infer the type of the constant.
 typeExpression Nothing _ (Constant (F tFloat Nothing) pann) = do
   throwError $ annotateError pann $ EConstantWithoutKnownType (SAST.F tFloat Nothing)
--- | Boolean literals without an expected type.
+-- | Boolean literals without an expected type.
 typeExpression Nothing typeObj (Constant c@(B {}) pann) = do
   typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype TBool))
--- | Character literals without an expected type.
+-- | Character literals without an expected type.
 typeExpression Nothing typeObj (Constant c@(C {}) pann) = do
   typed_c <- typeConstant pann typeObj c
   return $ SAST.Constant typed_c (buildExpAnn pann (TConstSubtype TChar))
@@ -1064,7 +1064,7 @@ typeExpression Nothing typeObj (Constant c@Null pann) = do
   return $ SAST.Constant typed_c (buildExpAnn pann TUnit)
 typeExpression expectedType typeObj (Casting e nts pann) = do
   nty <- typeTypeSpecifier pann typeObj nts
-  maybe (return ()) (flip (sameTyOrError pann) nty) expectedType
+  mapM_ (flip (sameTyOrError pann) nty) expectedType
   -- | Casting Expressions.
   typed_exp <- typeExpression Nothing typeObj e
   type_exp <- getExprType typed_exp
@@ -1103,11 +1103,11 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
     -- the same. It also applies a function to check that the type is valid.
     sameTypeExpressions ::
       (SAST.TerminaType SemanticAnn -> Bool)
-      -- | Left hand side error constructor
+      -- | Left hand side error constructor
       -> (SAST.TerminaType SemanticAnn -> Error)
-      -- | Right hand side error constructor
+      -- | Right hand side error constructor
       -> (SAST.TerminaType SemanticAnn -> Error)
-      -- | Left hand side expression
+      -- | Left hand side expression
       -> Expression ParserAnn
       -- | Right hand side expression
       -> Expression ParserAnn
@@ -1117,7 +1117,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
       tyle <- catchError
         (typeExpression Nothing typeObj lnume)
         (\err -> case getError err of
-          -- | If the type of the left hand side is unknown, then we must
+          -- | If the type of the left hand side is unknown, then we must
           -- check the right hand side. This could be implemented in a more
           -- efficient way, but for now, we will check the right hand side and
           -- then check it again.
@@ -1214,7 +1214,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
           unless (intTy tyle_ty) (throwError $ annotateError pann (EBinOpLeftTypeNotInt op tyle_ty))
           return $ SAST.BinOp op tyle tyre (buildExpAnn pann tyle_ty)
 
-    -- | This function checks that the lhs and the rhs are both of the same type and that the
+    -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is equatable. This function is used to check the binary expressions == and !=.
     sameEquatableTyBool :: SemanticMonad (SAST.Expression SemanticAnn)
     sameEquatableTyBool =
@@ -1256,7 +1256,7 @@ typeExpression expectedType typeObj (BinOp op le re pann) = do
             TConstSubtype _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann (TConstSubtype TBool))
             _ -> return $ SAST.BinOp op tyle tyre (buildExpAnn pann TBool)
 
-    -- | This function checks that the lhs and the rhs are both of the same type and that the
+    -- | This function checks that the lhs and the rhs are both of the same type and that the
     -- type is boolean. This function is used to check the binary expressions && and ||.
     sameBoolType :: SemanticMonad (SAST.Expression SemanticAnn)
     sameBoolType =
@@ -1293,21 +1293,21 @@ typeExpression expectedType typeObj (ReferenceExpression refKind rhs_e pann) =
       -- | Type object
       typed_obj <- typeObj rhs_e
       checkPackedMemberReference pann typed_obj
-      -- | Get the type of the object
+      -- | Get the type of the object
       (obj_ak, obj_type) <- getObjType typed_obj
       case obj_type of
-        -- | If the object is of a box subtype, then the reference will be to an object of
+        -- | If the object is of a box subtype, then the reference will be to an object of
         -- the base type. Objects of a box subtype are always immutable, BUT a reference
         -- to an object of a box subtype can be mutable. Thus, we do not need to check
         -- the access kind of the object.
         TBoxSubtype ty -> do
-          -- | Check that the expected type is the same as the base type.  
-          maybe (return ()) (flip (sameTyOrError pann) (TReference refKind ty)) expectedType
+          -- | Check that the expected type is the same as the base type.  
+          mapM_ (flip (sameTyOrError pann) (TReference refKind ty)) expectedType
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind ty)))
         _ -> do
           -- | Check if the we are allowed to create that kind of reference from the object
           checkReferenceAccessKind obj_ak
-          maybe (return ()) (flip (sameTyOrError pann) (TReference refKind obj_type)) expectedType
+          mapM_ (flip (sameTyOrError pann) (TReference refKind obj_type)) expectedType
           return (SAST.ReferenceExpression refKind typed_obj (buildExpAnn pann (TReference refKind obj_type)))
 
   where 
@@ -1342,7 +1342,7 @@ typeExpression expectedType _ (FunctionCall ident args ann) = do
   when (psLen > asLen) (throwError $ annotateError ann (EFunctionCallMissingArgs (ident, ps, funcLocation) (fromIntegral asLen)))
   typed_args <- localScope $ zipWithM (\(p, idx) e -> catchMismatch ann (EFunctionCallArgTypeMismatch (ident, p, funcLocation) idx)
       (typeExpression (Just (paramType p)) typeRHSObject e)) (zip ps [0 :: Integer ..]) args
-  maybe (return ()) (flip (sameTyOrError ann) retty) expectedType
+  mapM_ (flip (sameTyOrError ann) retty) expectedType
   return $ SAST.FunctionCall ident typed_args expAnn
 
 ----------------------------------------
@@ -1350,7 +1350,7 @@ typeExpression expectedType typeObj (MemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
   (ak, obj_ty) <- getObjType obj_typed
   ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak obj_ty ident args
-  maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
+  mapM_ (flip (sameTyOrError ann) fty) expectedType
   return $ SAST.MemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
 typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann) = do
   obj_typed <- typeObj obj
@@ -1362,7 +1362,7 @@ typeExpression expectedType typeObj (DerefMemberFunctionCall obj ident args ann)
       -- a reference, the object (self) can only be of a user-defined class type. There
       -- cannot be references to ports. 
       ((ps, typed_args), fty) <- typeMemberFunctionCall ann ak rTy ident args
-      maybe (return ()) (flip (sameTyOrError ann) fty) expectedType
+      mapM_ (flip (sameTyOrError ann) fty) expectedType
       return $ SAST.DerefMemberFunctionCall obj_typed ident typed_args (buildExpAnnApp ann ps fty)
     ty -> throwError $ annotateError ann $ EDereferenceInvalidType ty
 typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_id pann) = do
@@ -1377,7 +1377,7 @@ typeExpression expectedType typeObj (IsEnumVariantExpression obj id_ty variant_i
     Enum lhs_enum ty_vs _mods ->
       case Data.List.find ((variant_id ==) . variantIdentifier) ty_vs of
         Just (EnumVariant {}) -> do
-          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          mapM_ (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsEnumVariantExpression obj_typed id_ty variant_id (buildExpAnn pann TBool)
         Nothing -> throwError $ annotateError pann (EEnumVariantNotFound lhs_enum variant_id)
     _ -> throwError $ annotateError Internal EExpectedEnumType
@@ -1398,7 +1398,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (_, obj_ty) <- getObjType obj_typed
       case obj_ty of
         (TOption {}) -> do
-          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          mapM_ (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
         _ -> throwError $ annotateError pann (EIsOptionVariantInvalidType obj_ty)
 
@@ -1408,7 +1408,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (_, obj_ty) <- getObjType obj_typed
       case obj_ty of
         (TStatus {}) -> do
-          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          mapM_ (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
         _ -> throwError $ annotateError pann (EIsStatusVariantInvalidType obj_ty)
 
@@ -1418,7 +1418,7 @@ typeExpression expectedType typeObj (IsMonadicVariantExpression obj variant_id p
       (_, obj_ty) <- getObjType obj_typed
       case obj_ty of
         (TResult {}) -> do
-          maybe (return ()) (flip (sameTyOrError pann) TBool) expectedType
+          mapM_ (flip (sameTyOrError pann) TBool) expectedType
           return $ SAST.IsMonadicVariantExpression obj_typed variant_id (buildExpAnn pann TBool)
         _ -> throwError $ annotateError pann (EIsResultVariantInvalidType obj_ty)
 

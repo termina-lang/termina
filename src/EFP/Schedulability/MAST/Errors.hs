@@ -26,7 +26,7 @@ data Error
     | EUnsupportedSystemCall Identifier -- ^ Unsupported system call in transactional step (internal)
     | EInvalidTimerPeriodExpression -- ^ Invalid timer period expression in periodic timer emitter (internal)
     | EInvalidEmitterType -- ^ Invalid emitter type for MAST code generation (internal)
-    | EInvalidTransactionStructure -- ^ Invalid structure of MAST transaction (internal)
+    | EInvalidTransactionStructure -- ^ Invalid structure of MAST transaction (internal)
     | EUnsupportedPlatform Identifier -- ^ Unsupported platform for MAST code generation
     | EUnsupportedSystemInitEmitter -- ^ System initialization emitter is not supported for MAST code generation
     | EUnsupportedSystemExceptEmitter -- ^ System exception emitter is not supported for MAST code generation

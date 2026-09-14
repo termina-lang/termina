@@ -112,10 +112,10 @@ schedCmdArgsParser = SchedCmdArgs
 
 loadRTModule :: FilePath -> IO ParsedRTModule
 loadRTModule rtModelFile = do
-  -- | Check RT model file extension
+  -- | Check RT model file extension
   when (takeExtension rtModelFile /= ".rt") $
       die . errorMessage $ "RT model file must have .rt extension"
-  -- | Check that RT model file exists
+  -- | Check that RT model file exists
   sourceFileExists <- doesFileExist rtModelFile
   unless sourceFileExists (die . errorMessage $ "RT model file \"" ++ rtModelFile ++ "\" does not exist")
   src_code <- TE.decodeUtf8 <$> BS.readFile rtModelFile
@@ -138,7 +138,7 @@ typeRTModule arch trPathMap bbProject pathProject rtModule = do
   let result = runRTTypeChecking arch trPathMap (parsedRTAST . metadata $ rtModule)
   case result of
     (Left err) ->
-      -- | Create the source files map. This map will be used to obtain the source files that
+      -- | Create the source files map. This map will be used to obtain the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
       -- path of the source file and as element the text of the source file.
       let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule)
@@ -165,7 +165,7 @@ flattenRTModule arch wcepMap rtModule = do
     let flattenResult = runFlattenModule arch wcepMap (typedRTAST . metadata $ rtModule)
     case flattenResult of
         Left err ->
-            -- | Create the source files map. This map will be used to obtain the source files that
+            -- | Create the source files map. This map will be used to obtain the source files that
             -- will be feed to the error pretty printer. The source files map must use as key the
             -- path of the source file and as element the text of the source file.
             let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule) in
@@ -183,7 +183,7 @@ genTransPath rtModule pathProject arch config wcepMap wcetMap transaction = do
     let transPathResult = runTransPathGenerator arch config wcepMap wcetMap transaction
     case transPathResult of
         Left err ->
-            -- | Create the source files map. This map will be used to obtain the source files that
+            -- | Create the source files map. This map will be used to obtain the source files that
             -- will be feed to the error pretty printer. The source files map must use as key the
             -- path of the source file and as element the text of the source file.
             let fileMap = M.singleton (fullPath rtModule) (sourcecode rtModule)
@@ -237,7 +237,7 @@ loadWCETModules bbProject efpPath = do
         TIO.putStrLn (toText pErr fileMap) >> exitFailure
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (WCETData term)
 
--- | Type check the transactional worst-case execution paths of the project modules
+-- | Type check the transactional worst-case execution paths of the project modules
 typeWCETModules :: TerminaProgArch SemanticAnn
   -> WCEPathMap WCEPSemAnn
   -> BasicBlocksProject
@@ -253,7 +253,7 @@ typeWCETModules arch wcepMap bbProject wcetProject =
       let result = runWCETTypeChecking arch wcepMap wcetTimesMap (wcetAST . metadata $ wcetModule)
       case result of
         (Left err) ->
-          -- | Create the source files map. This map will be used to obtain the source files that
+          -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
@@ -309,7 +309,7 @@ loadWCEPathModules bbProject efpPath = do
         TIO.putStrLn (toText pErr fileMap) >> exitFailure
       Right term -> return $ TerminaModuleData filePath fullP mod_time [] [] src_code (TransPathData term)
 
--- | Type check the transactional worst-case execution paths of the project modules
+-- | Type check the transactional worst-case execution paths of the project modules
 typeWCEPathModules :: TerminaProgArch SemanticAnn
   -> BasicBlocksProject
   -> WCEPProject
@@ -324,7 +324,7 @@ typeWCEPathModules arch bbProject pathProject =
       let result = runWCEPathTypeChecking arch wcePathMap (transPathAST . metadata $ transPathModule)
       case result of
         (Left err) ->
-          -- | Create the source files map. This map will be used to obtain the source files that
+          -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
@@ -670,12 +670,12 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     -- | Decode the selected platform field
     plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack $ platform config)
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    -- | Check that the files are in place
+    -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
     unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
     existAppFolder <- doesDirectoryExist (appFolder config)
     unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder config ++ "\" does not exist")
-    -- | Create output header and source folder if it does not exist
+    -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
     when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
@@ -689,7 +689,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
-    -- | Detect any possible loops in the project
+    -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
     let projectDependencies = M.map importedModules parsedProject
     orderedDependencies <-
@@ -728,7 +728,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    -- | Usage checking
+    -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     case useDefCheckModules rawBBProject of
       Nothing -> return ()
@@ -739,7 +739,7 @@ schedCommand (SchedCmdArgs rtModelFile chatty plantUML writeIntermediateRT write
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     bbProject <- constFolding plt rawBBProject
-    -- | Obtain the architectural description of the program
+    -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
     checkEmitterConnections bbProject programArchitecture

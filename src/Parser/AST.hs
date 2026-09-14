@@ -34,7 +34,7 @@ data Object a
   -- expression identifier.
   | Dereference (Object a) a
   -- ^ Dereference | *eI |, |eI| is an identifier expression.
-  | DereferenceMemberAccess (Object a) Identifier a
+  | DereferenceMemberAccess (Object a) Identifier a
   -- ^ Dereference member access | eI->name |, same as before |ei :: exprI a| is an
   | ArraySlice (Object a) (Expression a) (Expression a) a
   -- ^ TArray slicing | eI [ cEx .. cEy ]|,
@@ -86,12 +86,12 @@ data Expression
     a
   | MonadicVariantInitializer (MonadicVariant a) a
   | StringInitializer String a -- ^ String literal
-  | IsEnumVariantExpression
+  | IsEnumVariantExpression
     (Object a) -- ^ Enum object
     Identifier -- ^ Enum identifier
     Identifier -- ^ Variant identifier a
     a
-  | IsMonadicVariantExpression
+  | IsMonadicVariantExpression
     (Object a) -- ^ Option object
     MonadicVariantLabel -- ^ Variant label
     a
@@ -212,7 +212,7 @@ data CondElseIf a = CondElseIf
   } deriving (Show, Functor)
 
 data Statement a =
-  -- | Declaration statement
+  -- | Declaration statement
   Declaration
     Identifier -- ^ name of the variable
     AccessKind -- ^ kind of declaration (mutable "var" or immutable "let")
@@ -228,7 +228,7 @@ data Statement a =
     [CondElseIf a] -- ^ list of else if blocks
     (Maybe (CondElse a)) -- ^ statements in the else block
     a
-  -- | For loop
+  -- | For loop
   | ForLoopStmt
     Identifier -- ^ name of the iterator variable
     (TypeSpecifier a) -- ^ type of iterator variable

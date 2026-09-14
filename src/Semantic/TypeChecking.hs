@@ -44,8 +44,8 @@ typeElement :: AnnASTElement ParserAnn
 typeElement (Function ident ps_ts mts bret mds_ts anns) = do
   ----------------------------------------
   -- Check the return type 
-  mty <- maybe (return Nothing) (typeTypeSpecifier anns typeGlobalObject >=>
-      (\ty -> checkReturnType anns ty >> return (Just ty))) mts
+  mty <- mapM (typeTypeSpecifier anns typeGlobalObject >=>
+      (\ty -> checkReturnType anns ty >> return ty)) mts
   (ps_ty, typedBret) <- localScope $ do
       ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
           typedParam <- typeParameter anns param

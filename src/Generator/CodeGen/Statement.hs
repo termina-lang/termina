@@ -25,7 +25,7 @@ genAtomicStore loc before' cObj expr = do
 
 genAtomicArrayInitialization ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
@@ -69,7 +69,7 @@ genAtomicArrayInitialization loc before level cObj expr = do
 
 genAtomicInitialization ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
@@ -86,12 +86,12 @@ genAtomicInitialization loc before _level cObj expr = do
 
 genEnumAssign ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -> Integer ->
     -- | Enum
     CObject ->
-    -- |  The initialization expression
+    -- |  The initialization expression
     Expression SemanticAnn ->
     CGenerator [CCompoundBlockItem]
 genEnumAssign loc before level cObj expr = do
@@ -113,7 +113,7 @@ genEnumAssign loc before level cObj expr = do
 
 genStringAssign ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -> Integer
     -> CObject
@@ -162,7 +162,7 @@ genStringAssign loc before level cObj value = do
                     else
                         return []
                 CTArray (CTChar _) cArraySize -> do
-                    -- | If we have an array whose size is not a literal constant, i.e., it depends on a constant parameter,
+                    -- | If we have an array whose size is not a literal constant, i.e., it depends on a constant parameter,
                     -- we need to fill the rest of the array with null characters. We do this with a for loop.
                     let iterator = namefy $ "i" ++ show level'
                         cIteratorExpr = iterator @: size_t |>> loc
@@ -248,7 +248,7 @@ genMonadicVariantAssign loc before level cObj expr =
 
 genArrayAssign ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
@@ -332,7 +332,7 @@ genArrayAssign loc before level cObj expr = do
 
 genFieldAssign ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
@@ -377,7 +377,7 @@ genProcedureType tsParams = do
 
 genStructAssign ::
     Location
-    -- | Prepend a line to the initialization expression 
+    -- | Prepend a line to the initialization expression 
     -> Bool
     -- | Current array nesting level. This argument is used to
     -- generate the name of the iterator variable.
@@ -577,7 +577,7 @@ genBlocks (SendMessage obj arg ann) = do
             cArg <- genExpression arg
             mCall <- genMsgQueueSendCall cObj cArg cAnn
             return [pre_cr mCall |>> getLocation ann]
-        -- | If it is not an object, must store it in a temporary variable
+        -- | If it is not an object, must store it in a temporary variable
         _ -> do
             cArg <- genExpression arg
             let cArgType = getCExprType cArg
@@ -592,9 +592,9 @@ genBlocks (SendMessage obj arg ann) = do
 genBlocks (IfElseBlock (CondIf expr ifBlks _) elifsBlks elseBlk ann) = do
     cExpr <- genExpression expr
     cIfBlk <- concat <$> traverse genBlocks (blockBody ifBlks)
-    cElseBlk <- maybe (return Nothing) (\elseBlk' -> do
+    cElseBlk <- mapM (\elseBlk' -> do
                     blks <- concat <$> traverse genBlocks (blockBody . condElseBody $ elseBlk')
-                    return . Just $ (trail_cr . block $ blks) |>> getLocation ann) elseBlk
+                    return $ (trail_cr . block $ blks) |>> getLocation ann) elseBlk
     mAlts <- genAlternatives cElseBlk elifsBlks
     case mAlts of
         Nothing -> return [pre_cr $ _if cExpr (trail_cr . block $ cIfBlk) |>> getLocation ann]
@@ -685,7 +685,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             let cDefaultCase = (trail_cr . block) defCaseBlk
                             return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
                         Nothing -> genMatchCase cObj cTy m
-                -- | The first one must add a preceding blank line
+                -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
                     paramsStructName <- genParamsStructName identifier
@@ -716,7 +716,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
                             let cDefaultCase = (trail_cr . block) defCaseBlk
                             return [pre_cr (_if_else (cEnumVariantsFieldExpr @== cCasePrefixIdentExpr) theCase cDefaultCase) |>> loc']
                         Nothing -> genMatchCase cObj cTy m
-                -- | The first one must add a preceding blank line
+                -- | The first one must add a preceding blank line
                 m@(MatchCase identifier _ _ ann') : xs -> do
                     let loc' = getLocation ann'
                     paramsStructName <- genParamsStructName identifier
@@ -774,7 +774,7 @@ genBlocks match@(MatchBlock expr matchCases mDefaultCase ann) = do
             -- | The list of remaining match cases
             -> [MatchCase SemanticAnn]
             -> CGenerator CStatement
-        -- | This should never happen
+        -- | This should never happen
         genMatchCases _ _ _ [] = throwError $ InternalError "Match statement without cases"
         -- | The last one does not need to check the variant
         genMatchCases cObj casePrefix genParamsStructName [m@(MatchCase identifier _ _ ann')] = do

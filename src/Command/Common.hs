@@ -36,9 +36,9 @@ import qualified Data.Text.Encoding as TE
 -- | Load Termina file 
 loadTerminaModule ::
   FilePath
-  -- | Path of the file to load
+  -- | Path of the file to load
   -> FilePath
-  -- | Path of the source folder that stores the imported modules
+  -- | Path of the source folder that stores the imported modules
   -> FilePath
   -> IO ParsedModule
 loadTerminaModule root filePath srcPath = do
@@ -68,7 +68,7 @@ loadModules
   -> FilePath
   -> IO ParsedProject
 loadModules imported srcPath = do
-  -- | Load and parse the project.
+  -- | Load and parse the project.
   -- The main application module has been already loaded. We need to load the
   -- rest of the modules.
   loadModules' M.empty imported
@@ -108,7 +108,7 @@ typeModules parsedProject =
       let result = runTypeChecking prevState (typeTerminaModule (S.insert m vmods) . parsedAST . metadata $ parsedModule)
       case result of
         (Left err) ->
-          -- | Create the source files map. This map will be used to obtain the source files that
+          -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
@@ -140,7 +140,7 @@ genArchitecture bbProject initialTerminaProgram orderedDependencies = do
       let result = runGenArchitecture tp m typedModule
       case result of
         Left err ->
-          -- | Create the source files map. This map will be used to obtainn the source files that
+          -- | Create the source files map. This map will be used to obtainn the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap =
@@ -198,7 +198,7 @@ checkProjectBoxSources bbProject progArchitecture =
   let result = runCheckBoxSources progArchitecture in
   case result of
     Left err ->
-      -- | Create the source files map. This map will be used to obtainn the source files that
+      -- | Create the source files map. This map will be used to obtainn the source files that
       -- will be feed to the error pretty printer. The source files map must use as key the
       -- path of the source file and as element the text of the source file.
       let sourceFilesMap =

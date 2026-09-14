@@ -69,7 +69,7 @@ data ConnectionSeman a =
   | SPConnTy
     -- | Type specifier of the connected event emitter
     (TerminaType a)
-    -- | Name of the action that will be triggered when the event emitter emits an event 
+    -- | Name of the action that will be triggered when the event emitter emits an event 
     Identifier 
   -- | In port connection
   | InPConnTy
@@ -94,9 +94,9 @@ data SemanticElems a
   | STy (StmtSeman a)
   -- | Global objects
   | GTy (TerminaType a)
-  -- | Type definitions 
+  -- | Type definitions 
   | TTy 
-  -- | Function type
+  -- | Function type
   | FnTy (FunctionSeman a)
   deriving Show
 
@@ -206,7 +206,7 @@ buildExpAnnAccessPortObj loc ak ifaces pty = SemanticAnn (ETy (AccessPortObjType
 buildExpAnnApp :: Location -> [Parameter SemanticAnn] -> TerminaType SemanticAnn -> SemanticAnn
 buildExpAnnApp loc params rty = SemanticAnn (ETy (AppType params rty)) loc
 
--- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
+-- | Build annotations for global objects (tasks, handlers, resources, channels or emitters)
 buildGlobalAnn :: Location -> TerminaType SemanticAnn -> SemanticAnn
 buildGlobalAnn = flip $ SemanticAnn . GTy 
 

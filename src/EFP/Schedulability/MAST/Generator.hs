@@ -115,7 +115,7 @@ genBodyOperation bodyOpId enclosingOps wcet = do
 
 genMASTOperation :: Identifier -> Identifier -> Bool -> TRPOperation a -> MASTGenMonad Identifier
 genMASTOperation transactionId stepId _isInvoke (TRPTaskOperation _stepName taskId actionId pathId blks _ wcet _) = do
-    -- | The operation identifier is the name of the step defined in the transaction
+    -- | The operation identifier is the name of the step defined in the transaction
     let opId = getTaskMASTOperationId transactionId stepId taskId actionId pathId
     ops <- gets operations
     case M.lookup opId ops of
@@ -142,7 +142,7 @@ genMASTOperation transactionId stepId isInvoke (TRPResourceOperation resName fun
         Nothing -> do
             -- | Generate the MAST operation
             enclosingOps <- foldM (getEnclosingOperations transactionId stepId) S.empty blks
-            -- | If the operation is an invoke, we need to check the resource locking mechanism
+            -- | If the operation is an invoke, we need to check the resource locking mechanism
             if isInvoke then do
                 rlockingMap <- gets resourceLockingMap
                 case M.lookup resName rlockingMap of
@@ -227,7 +227,7 @@ genMASTTransactionStep (MASTRegularTransaction transactionId [extEvent] intEvent
         Just _ -> do
             throwError . annotateError Internal $ EInvalidStepType stepName
         Nothing ->
-            -- | If we are here, it means that the step is an end step
+            -- | If we are here, it means that the step is an end step
             return $ MASTRegularTransaction transactionId [extEvent] (internalEvent : intEvents) evHandlers
 genMASTTransactionStep _ _ = throwError . annotateError Internal $ EInvalidTransactionStructure
 
@@ -270,7 +270,7 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transactionId initialS
                     (getMASTInternalEventId initialStepId) -- ^ output event
                     (irqTopHalfMASTOperationId emitterId) -- ^ operation
                     (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
-            -- | Now, we need to create the internal event handler for the task activity
+            -- | Now, we need to create the internal event handler for the task activity
             let initialTransaction = MASTRegularTransaction
                     transactionId
                     [externalEvent] []
@@ -288,7 +288,7 @@ genMASTTransaction (SelectedEventBursty eventId emitterId transactionId initialS
                             (getMASTInternalEventId c) -- ^ output event
                             opId -- ^ operation
                             (irqHandlerSchedulerServerId emitterId) -- ^ scheduling server
-                    -- | Now, we need to create the internal event handler for the task activity
+                    -- | Now, we need to create the internal event handler for the task activity
                     let initialTransaction = MASTRegularTransaction
                             transactionId
                             [externalEvent] []
@@ -347,7 +347,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transactionId initia
             -- | 2. An internal event handler for the task's activity
             -- | First, we generate the top half operation in case it does not exist
             unless (M.member timerTopHalfMASTOperationId ops) $ genTimerTopHalfMASTOperation >>= insertOperation
-            -- | And the scheduling server
+            -- | And the scheduling server
             unless (M.member timerTopHalfSchedulingServerId schServers) $ genTimerTopHalfSchedulingServer >>= insertSchedulingServer
             -- | Now we have to create the external event handler
             let externalEventHandler = MASTTimedActivityEventHandler
@@ -355,7 +355,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transactionId initia
                     (getMASTInternalEventId initialStepId) -- ^ output event
                     timerTopHalfMASTOperationId -- ^ operation
                     timerTopHalfSchedulingServerId -- ^ scheduling server
-            -- | Now, we need to create the internal event handler for the task activity
+            -- | Now, we need to create the internal event handler for the task activity
             let initialTransaction = MASTRegularTransaction
                     transactionId
                     [externalEvent] []
@@ -373,7 +373,7 @@ genMASTTransaction (SelectedEventPeriodic eventId emitterId transactionId initia
                             (getMASTInternalEventId c) -- ^ output event
                             opId -- ^ operation
                             timerTopHalfSchedulingServerId -- ^ scheduling server
-                    -- | Now, we need to create the internal event handler for the task activity
+                    -- | Now, we need to create the internal event handler for the task activity
                     let initialTransaction = MASTRegularTransaction
                             transactionId
                             [externalEvent] []

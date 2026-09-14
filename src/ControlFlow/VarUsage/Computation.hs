@@ -31,14 +31,14 @@ import qualified Data.Set as S
 type VarMap = M.Map Identifier Location
 type VarSet = S.Set Identifier
 
--- | Map of option-box variables to their current state.
+-- | Map of option-box variables to their current state.
 type OptionBoxMap = M.Map Identifier MVars
 
 -- Internal state.
 data UDSt = UDSt { 
-    -- | Map with the current state of the option-box variables
+    -- | Map with the current state of the option-box variables
     optionBoxesMap :: OptionBoxMap,
-    -- | Set of used variables
+    -- | Set of used variables
     usedVarSet :: VarSet,
     -- | Map of moved boxes. It maps each box variable to the location where it
     -- was moved.

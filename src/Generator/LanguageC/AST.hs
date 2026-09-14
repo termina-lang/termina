@@ -10,18 +10,18 @@ type Ident = String
 
 data CFile' a
     = CSourceFile FilePath [CFileItem' a]
-    | CHeaderFile FilePath [CFileItem' a]
+    | CHeaderFile FilePath [CFileItem' a]
 
 data CPreprocessorDirective
     = CPPInclude Bool FilePath
     | CPPDefine Ident (Maybe [String])
-    | CPPIfDef Ident
+    | CPPIfDef Ident
     | CPPIfNDef Ident
     | CPPEndif
 
 data CFileItem' a
     = CExtDecl (CExternalDeclaration' a) a
-    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a) a
+    | CFunctionDef (Maybe CStorageSpecifier) (CFunction' a) a
     | CPPDirective CPreprocessorDirective a
 
 data CAttribute' a = CAttr Ident [CExpression' a]
@@ -51,7 +51,7 @@ data CEnum' a =
     deriving Show
 
 data CTerminaType' a = 
-    -- | Basic type specifiers
+    -- | Basic type specifiers
     CTypeSpec CType
     -- | Annonymous struct/union
     | CTSStructUnion (CStructureUnion' a)
@@ -67,7 +67,7 @@ data CExternalDeclaration' a
     = CEDVariable (Maybe CStorageSpecifier) (CDeclaration' a)
     | CEDFunction (Maybe CStorageSpecifier) CType Ident [CDeclaration' a]
     | CEDEnum (Maybe Ident) (CEnum' a)
-    | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
+    | CEDStructUnion (Maybe Ident) (CStructureUnion' a)
     | CEDTypeDef Ident CType
 
 data CFunction' a =
@@ -110,22 +110,22 @@ data CFloatSize =
     deriving Show
 
 data CType = 
-    -- | The void type
+    -- | The void type
     CTVoid CQualifier
     | CTChar CQualifier
-    -- | Integer types
+    -- | Integer types
     | CTInt CIntSize CSignedness CQualifier
     -- | Pointer types
     | CTPointer CType CQualifier
     -- | TArray types
     | CTArray CType CExpression
-    -- | Struct types
+    -- | Struct types
     | CTStruct CStructTag Ident CQualifier
     -- | Function type
     | CTFunction CType [CType]
-    -- | Enumeration types
+    -- | Enumeration types
     | CTEnum Ident CQualifier
-    -- | size_t type 
+    -- | size_t type 
     | CTSizeT CQualifier
     -- | _Bool type
     | CTBool CQualifier
@@ -138,7 +138,7 @@ data CType =
 data CBinaryOp = 
     COpAdd                   -- ^ addition (+)
     | COpSub                 -- ^ subtraction (-)
-    | COpMul                 -- ^ multiplication (*)
+    | COpMul                 -- ^ multiplication (*)
     | COpDiv                 -- ^ division (/)
     | COpMod                 -- ^ remainder of division (%)
     | COpAnd                 -- ^ bitwise and (&)
@@ -235,9 +235,9 @@ data CConstant =
 
 data CObject' a = 
     CVar Ident CType
-    | CField (CObject' a) Ident CType
-    | CDeref (CObject' a) CType -- ^ pointer dereference (unary *)
-    | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
+    | CField (CObject' a) Ident CType
+    | CDeref (CObject' a) CType -- ^ pointer dereference (unary *)
+    | CIndexOf (CObject' a) (CExpression' a) CType -- ^ array indexing
     | CObjCast (CObject' a) CType
     deriving Show
 
@@ -250,8 +250,8 @@ data CExpression' a =
     | CExprCast (CExpression' a) CType a
     | CExprSeqAnd (CExpression' a) (CExpression' a) CType a -- ^ sequential "and" r1 && r2
     | CExprSeqOr (CExpression' a) (CExpression' a) CType a -- ^ sequential "or" r1 || r2 
-    | CExprSizeOfType CType CType a
-    | CExprSizeOfExpr (CExpression' a) CType a
+    | CExprSizeOfType CType CType a
+    | CExprSizeOfExpr (CExpression' a) CType a
     | CExprAlignOfType CType CType a
     | CExprAssign (CObject' a) (CExpression' a) CType a
     | CExprComma (CExpression' a) (CExpression' a) CType a -- ^ sequence expression r1, r2
@@ -327,12 +327,12 @@ data CCompoundBlockItem' a
 
 data CStatement' a =
    CSSkip  -- ^ do nothing
-   | CSCase (CExpression' a) (CStatement' a) a -- ^ Case (labeled statement)
-   | CSDefault (CStatement' a) a -- ^ Default (labeled statement)
+   | CSCase (CExpression' a) (CStatement' a) a -- ^ Case (labeled statement)
+   | CSDefault (CStatement' a) a -- ^ Default (labeled statement)
    | CSDo (CExpression' a) a -- ^ evaluate expression for side effects
    | CSCompound [CCompoundBlockItem' a] a -- ^ compound statement 
    | CSIfThenElse (CExpression' a) (CStatement' a) (Maybe (CStatement' a)) a -- ^ conditional
-   | CSFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
+   | CSFor (Either (Maybe (CExpression' a)) (CDeclaration' a))
       (Maybe (CExpression' a))
       (Maybe (CExpression' a))
       (CStatement' a) a -- ^ for loop
@@ -396,16 +396,16 @@ instance Pretty CUnaryOp where
     CNegOp     -> "!"
 
 data CItemAnn = 
-    -- | Generic annotation
+    -- | Generic annotation
     CGenericAnn
-    -- | C Statement annotation
+    -- | C Statement annotation
     | CStatementAnn 
       Bool -- ^ Add new line before statement
       Bool -- ^ Indent statement
     | CCompoundAnn
       Bool -- ^ Add new line before the compound block
       Bool -- ^ Add trailing line inside the compound block
-    | CDeclarationAnn
+    | CDeclarationAnn
       Bool -- ^ Add new line before declaration 
     | CPPDirectiveAnn
       Bool -- ^ Add new line before directive

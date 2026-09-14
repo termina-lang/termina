@@ -87,7 +87,7 @@ loadModules
   -> FilePath
   -> HandlerM ()
 loadModules imported srcPath = do
-  -- | Load and parse the project.
+  -- | Load and parse the project.
   -- The main application module has been already loaded. We need to load the
   -- rest of the modules.
   loadModules' imported
@@ -116,9 +116,9 @@ loadModules imported srcPath = do
 
 -- | Load Termina file 
 loadTerminaModule ::
-  -- | Path of the file to load
+  -- | Path of the file to load
   FilePath
-  -- | Path of the source folder that stores the imported modules
+  -- | Path of the source folder that stores the imported modules
   -> Maybe FilePath
   -> HandlerM (Maybe TerminaStoredModule)
 loadTerminaModule fullP srcPath = do
@@ -161,9 +161,9 @@ loadTerminaModule fullP srcPath = do
               return $ Just newModule
 
 loadVSFile :: 
-  -- | Path of the file to load
+  -- | Path of the file to load
   FilePath
-  -- | Path of the source folder that stores the imported modules
+  -- | Path of the source folder that stores the imported modules
   -> HandlerM (Either IOError Text)
 loadVSFile filePath = do
   -- First, we check if the file is loaded into the VFS
@@ -189,7 +189,7 @@ typeModules srcPath prevModsMap prevState (m:ms) = do
       let result = runTypeChecking prevState (typeTerminaModule (S.insert m moduleDependencies) . parsedAST $ parsingData)
       case result of
         (Left err) -> do
-          -- | Create the source files map. This map will be used to obtain the source files that
+          -- | Create the source files map. This map will be used to obtain the source files that
           -- will be feed to the error pretty printer. The source files map must use as key the
           -- path of the source file and as element the text of the source file.
           let sourceFilesMap = 

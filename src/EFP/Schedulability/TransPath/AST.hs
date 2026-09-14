@@ -17,12 +17,12 @@ data TransPathBlock a
         [TransPathBlock a] -- ^ blocks in the if block
         BlockPosition
         a
-    -- | Else-if block
+    -- | Else-if block
     | TPBlockCondElseIf
         [TransPathBlock a] -- ^ blocks in the else-if block
         BlockPosition
         a
-    -- | Else block
+    -- | Else block
     | TPBlockCondElse
         [TransPathBlock a] -- ^ blocks in the else block
         BlockPosition
@@ -51,7 +51,7 @@ data TransPathBlock a
         Identifier -- ^ Pool resource name
         BlockPosition
         a
-    -- | Call to the free procedure of a memory allocator 
+    -- | Call to the free procedure of a memory allocator 
     | TPBlockFreeBox 
         Identifier -- ^ Pool resource name
         BlockPosition

@@ -66,7 +66,7 @@ getFunctionTy loc iden =
       case entryLoc of
         Position qualifiedName _ _ -> do
           -- | Check that the type is defined in the current module
-          -- | or in a module that is imported.
+          -- | or in a module that is imported.
           visibleMods <- ST.gets visible
           if S.member qualifiedName visibleMods then
             return ()
@@ -77,7 +77,7 @@ getFunctionTy loc iden =
       return (args, retty, entryLoc)
     LocatedElement _ entryLoc -> throwError $ annotateError loc (EGlobalNotFunction (iden, entryLoc))
 
--- | Get the type definition of an enum type from the global environment.
+-- | Get the type definition of an enum type from the global environment.
 -- This function is only called for a type that we know is an enum type. If
 -- there is an error it is an internal error.
 getEnumTy :: Location -> Identifier -> SemanticMonad (LocatedElement (SemanTypeDef SemanticAnn))
@@ -85,7 +85,7 @@ getEnumTy loc iden =
   catchError (getGlobalEntry loc iden) (\_ -> throwError $ annotateError Internal EExpectedEnumType) >>=
   (\case {
       LocatedElement (GType tydef@(Enum {})) entryLoc  -> return (LocatedElement tydef entryLoc);
-      -- | If we are here, it means that the type was not an enum type.
+      -- | If we are here, it means that the type was not an enum type.
       -- This should never happen.
       _ -> throwError $ annotateError Internal EExpectedEnumType
     })
@@ -260,9 +260,9 @@ getIntConst (I (TInteger i _) _) = return i
 getIntConst _ = throwError $ annotateError Internal EExpectedIntConstant
 
 catchMismatch :: 
-  -- | Location of the error
+  -- | Location of the error
   Parser.ParserAnn 
-  -- | Function to create the error
+  -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error) 
   -- | Action to execute
   -> SemanticMonad a 
@@ -286,9 +286,9 @@ enumParamTyOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 enumParamTyOrFail pann ty = unless (fieldTy ty) (throwError (annotateError pann (EInvalidEnumParameterType ty)))
 
 catchExpectedCopy ::
-  -- | Location of the error
+  -- | Location of the error
   Parser.ParserAnn
-  -- | Function to create the error
+  -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
   -> SemanticMonad a
@@ -299,9 +299,9 @@ catchExpectedCopy ann ferror action = catchError action (\err -> case getError e
   _ -> throwError err)
 
 catchExpectedNum ::
-  -- | Location of the error
+  -- | Location of the error
   Parser.ParserAnn
-  -- | Function to create the error
+  -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -- | Action to execute
   -> SemanticMonad a
@@ -313,7 +313,7 @@ catchExpectedNum ann ferror action = catchError action (\err -> case getError er
 
 catchExpectedConstSubtype ::
   Location
-  -- | Function to create the error
+  -- | Function to create the error
   -> (TerminaType SemanticAnn -> Error)
   -> SemanticMonad a
   -> SemanticMonad a
@@ -372,7 +372,7 @@ constSubtypeOrFail :: Location -> TerminaType SemanticAnn -> SemanticMonad ()
 constSubtypeOrFail _ (TConstSubtype _) = return ()
 constSubtypeOrFail loc _ = throwError (annotateError loc EExpressionNotConstant)
 
--- | This function gets the access kind and type of an already semantically
+-- | This function gets the access kind and type of an already semantically
 -- annotated object. If the object is not annotated properly, it throws an
 -- internal error.
 getObjType :: Object SemanticAnn -> SemanticMonad (AccessKind, TerminaType SemanticAnn)

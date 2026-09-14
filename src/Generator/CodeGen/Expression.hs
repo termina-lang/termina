@@ -37,31 +37,31 @@ cBinOp LogicalOr = error "Logical or is codified as a sequential expression"
 genType :: CQualifier 
     -> TerminaType SemanticAnn 
     -> CGenerator CType
--- |  Unsigned integer types
+-- |  Unsigned integer types
 genType qual TUInt8 = return (CTInt IntSize8 Unsigned qual)
 genType qual TUInt16 = return (CTInt IntSize16 Unsigned qual)
 genType qual TUInt32 = return (CTInt IntSize32 Unsigned qual)
 genType qual TUInt64 = return (CTInt IntSize64 Unsigned qual)
--- | Signed integer types
+-- | Signed integer types
 genType qual TInt8 = return (CTInt IntSize8 Signed qual)
 genType qual TInt16 = return (CTInt IntSize16 Signed qual)
 genType qual TInt32 = return (CTInt IntSize32 Signed qual)
 genType qual TInt64 = return (CTInt IntSize64 Signed qual)
--- | Other primitive typess
+-- | Other primitive typess
 genType qual TUSize = return (CTSizeT qual)
 genType qual TBool = return (CTBool qual)
 genType qual TChar = return (CTChar qual)
 -- | Floating-point types
 genType qual TFloat32 = return (CTFloat FloatSize32 qual)
 genType qual TFloat64 = return (CTFloat FloatSize64 qual)
--- | Primitive type
+-- | Primitive type
 genType qual (TGlobal _ clsIdentifier) = return (CTTypeDef clsIdentifier qual)
 -- | TArray type
 genType qual (TArray ts' s) = do
     ts <- genType qual ts'
     arraySize <- genExpression s
     return (CTArray ts arraySize)
--- | Option types
+-- | Option types
 genType _qual (TOption (TBoxSubtype _)) = return (CTTypeDef optionBox noqual)
 genType _qual (TOption ts) = do
     optName <- genOptionStructName ts
@@ -193,11 +193,11 @@ genObject o@(Unbox obj _ann) = do
             -- We must obtain the declaration specifier of the array
             ctype <- genType noqual ty
             return $ cast ctype ((cObj @. "data") @: dataFieldCType)
-            -- | Else, we print the derefence to the data
+            -- | Else, we print the derefence to the data
         (TBoxSubtype ty) -> do
             ctype <- genType noqual ty
             return $ deref (cast (ptr ctype) (cObj @. "data" @: dataFieldCType))
-        -- | An unbox can only be applied to a box subtype. We are not
+        -- | An unbox can only be applied to a box subtype. We are not
         -- supposed to reach here. If we are here, it means that the semantic
         -- analysis is wrong.
         _ -> throwError $ InternalError $ "Unsupported object: " ++ show o
@@ -288,7 +288,7 @@ genExpression (BinOp op left right ann) =
             cRight <- genExpression right
             return $ cLeft @|| cRight |>> location cAnn
         _ -> do
-            -- | We need to check if the left and right expressions are binary operations
+            -- | We need to check if the left and right expressions are binary operations
             -- If they are, we need to cast them to ensure that the resulting value
             -- is truncated to the correct type
             cLeft <- genExpression left >>= castBinOpToOwnType (getLocation ann) left
@@ -347,7 +347,7 @@ genExpression (ReferenceExpression _ obj ann) = do
             -- We must obtain the declaration specifier of the array
             cType <- genType noqual ty
             return $ cast cType (cObj @. "data" @: void_ptr) |>> getLocation ann
-            -- | Else, we print the address to the data
+            -- | Else, we print the address to the data
         (TBoxSubtype ty) -> do
             cType <- genType noqual ty
             return $ cast (ptr cType) (cObj @. "data" @: void_ptr) |>> getLocation ann

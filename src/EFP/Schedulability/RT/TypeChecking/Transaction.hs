@@ -107,15 +107,15 @@ typeTransStep [] (RTTransStepAction stepName componentName actionId pathName nex
             case M.lookup pathName paths of
                 Nothing -> throwError . annotateError (getLocation ann) $ EUnknownTransPath (classIdentifier tpCls) actionId pathName
                 Just p -> return p
-    -- | Get all possible continuations from the transactional path
+    -- | Get all possible continuations from the transactional path
     continuations <-
             getPathContinuations componentName outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
-        -- | No expected continuations and no next step: ok
+        -- | No expected continuations and no next step: ok
         ([], RTTransStepEnd stId ann') -> return $ SAST.RTTransStepEnd stId (RTStepTy (getLocation ann'))
-        -- | Expected continuations but no next step: error
+        -- | Expected continuations but no next step: error
         (cs, RTTransStepEnd {}) -> throwError . annotateError (getLocation ann) $ EActionMustContinue (classIdentifier tpCls) actionId pathName cs
-        -- | No expected continuations but next step provided: error
+        -- | No expected continuations but next step provided: error
         ([], _) -> throwError . annotateError (getLocation ann) $ EActionMustNotContinue (classIdentifier tpCls) actionId pathName (getLocation . getAnnotation $ trPath)
         (validContinuations, next) -> typeTransStep validContinuations next
     return $ SAST.RTTransStepAction stepName componentName actionId pathName typedNextStep (RTStepTy (getLocation ann))
@@ -133,7 +133,7 @@ typeTransStep [] (RTTransStepConditional (c:cs) ann) =
                         typedStep' <- typeTransStep [] step'
                         return (tyCondExpr', typedStep')
                     _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
-            -- | TODO: Check that the sum of all conditions is 100 and that they are all non-negative integer expressions
+            -- | TODO: Check that the sum of all conditions is 100 and that they are all non-negative integer expressions
             return $ SAST.RTTransStepConditional ((typedCondExpr, typedStep) : typedCondTransSteps) (RTStepTy (getLocation ann))
         _ -> throwError . annotateError (getLocation ann) $ EExpectedStepActionContinuation
 typeTransStep [] (RTTransStepMuticast _ ann) = throwError . annotateError (getLocation ann) $ EInvalidInitialStepMulticast
@@ -162,7 +162,7 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
         Just paths -> case M.lookup pathName paths of
                 Nothing -> throwError . annotateError (getLocation ann) $ EUnknownTransPath (classIdentifier tpCls) targetAction pathName
                 Just p -> return p
-    -- | Get all possible continuations from the transactional path
+    -- | Get all possible continuations from the transactional path
     continuations <- getPathContinuations targetTask outputConns trPath
     typedNextStep <- case (continuations, nextStep) of
         ([], RTTransStepEnd stName ann') -> return $ SAST.RTTransStepEnd stName (RTStepTy (getLocation ann'))
@@ -171,7 +171,7 @@ typeTransStep [(taskId, actionId)] (RTTransStepAction stepName targetTask target
         (validContinuations, next) -> typeTransStep validContinuations next
     return $ SAST.RTTransStepAction stepName targetTask targetAction pathName typedNextStep (RTStepTy (getLocation ann))
 typeTransStep [cont] (RTTransStepConditional condTransSteps ann) = do
-    -- | Check that there are at least two branches
+    -- | Check that there are at least two branches
     when (length condTransSteps < 2) $
         throwError . annotateError (getLocation ann) $ EConditionalStepsMustHaveMultipleBranches
     typedCondTransSteps <- forM condTransSteps $ \(condExpr, step) -> do
@@ -200,14 +200,14 @@ typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
                 RTTransStepAction _ targetTask targetAction _ _ stepAnn ->
                     -- | Check that the continuation has not been used before
                     case M.lookup (targetTask, targetAction) visitedSteps of
-                        -- | If it has been used before, throw an error
+                        -- | If it has been used before, throw an error
                         Just prevLoc -> throwError . annotateError (getLocation stepAnn) $ EDuplicatedMulticastContinuation (targetTask, targetAction) prevLoc
                         Nothing ->
-                            -- | Check that the continuation is valid
+                            -- | Check that the continuation is valid
                             if S.notMember (targetTask, targetAction) contSet then
                                 throwError . annotateError (getLocation stepAnn) $ EInvalidMulticastContinuation (targetTask, targetAction) validContinuations
                             else do
-                                -- | Type the step
+                                -- | Type the step
                                 typedTransStep <- typeTransStep [(targetTask, targetAction)] step
                                 return (S.delete (targetTask, targetAction) contSet,
                                         M.insert (targetTask, targetAction) (getLocation stepAnn) visitedSteps,
@@ -215,14 +215,14 @@ typeTransStep validContinuations (RTTransStepMuticast transSteps ann) = do
                 RTTransStepConditional ((_, RTTransStepAction _ targetTask targetAction _ _ _):_cs) stepAnn -> 
                     -- | Check that the continuation has not been used before
                     case M.lookup (targetTask, targetAction) visitedSteps of
-                        -- | If it has been used before, throw an error
+                        -- | If it has been used before, throw an error
                         Just prevLoc -> throwError . annotateError (getLocation stepAnn) $ EDuplicatedMulticastContinuation (targetTask, targetAction) prevLoc
                         Nothing ->
-                            -- | Check that the continuation is valid
+                            -- | Check that the continuation is valid
                             if S.notMember (targetTask, targetAction) contSet then
                                 throwError . annotateError (getLocation stepAnn) $ EInvalidMulticastContinuation (targetTask, targetAction) validContinuations
                             else do
-                                -- | Type the step
+                                -- | Type the step
                                 typedTransStep <- typeTransStep [(targetTask, targetAction)] step
                                 return (S.delete (targetTask, targetAction) contSet,
                                         M.insert (targetTask, targetAction) (getLocation stepAnn) visitedSteps,

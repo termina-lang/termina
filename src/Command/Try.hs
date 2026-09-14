@@ -49,7 +49,7 @@ tryCmdArgsParser = TryCmdArgs
 
 -- | Load Termina file 
 loadSingleModule ::
-  -- | Path of the file to load
+  -- | Path of the file to load
   FilePath
   -> IO ParsedModule
 loadSingleModule filePath = do
@@ -115,14 +115,14 @@ tryCommand (TryCmdArgs targetFile noUsageChecking printHeader debugBuild) = do
             let sourceFilesMap = M.fromList [(fullPath typedModule, sourcecode typedModule)] in
             TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
         Right bbModule -> do
-            maybe (return ()) 
+            mapM_ 
                 (\err -> 
                     let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
                     TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 
                 $ basicBlockPathsCheckModule bbModule
             -- | Check variable usage (if enabled)
             unless noUsageChecking (
-                    maybe (return ()) 
+                    mapM_ 
                         (\err -> 
                             let sourceFilesMap = M.fromList [(fullPath bbModule, sourcecode bbModule)] in
                             TIO.putStrLn (toText err sourceFilesMap) >> exitFailure) 

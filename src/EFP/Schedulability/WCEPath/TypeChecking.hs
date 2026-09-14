@@ -44,7 +44,7 @@ typeConstExpression (ConstObject ident ann) = do
         isLocalConst <- ST.gets (S.member ident . localConsts)
         unless isLocalConst $
             throwError . annotateError (getLocation ann) $ EUnknownVariable ident
-    -- | For now, all constants are of integer type: Termina does not support other constant types yet.
+    -- | For now, all constants are of integer type: Termina does not support other constant types yet.
     return $ ConstObject ident (WCEPExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
@@ -124,7 +124,7 @@ typePath (WCEPath classId functionId pathName blks ann) = do
             functionPaths <- case M.lookup (classId, functionId) trPaths of
                 Nothing -> return M.empty
                 Just fps -> return fps
-            -- | Check that there is no other path with the same name for the same function
+            -- | Check that there is no other path with the same name for the same function
             case M.lookup pathName functionPaths of
                 Nothing -> return ()
                 Just (WCEPath _ _ _ _ ann') ->

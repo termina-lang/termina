@@ -41,7 +41,7 @@ evalConstExpression (Casting expr' ty _) = do
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
 evalConstExpression _ = throwError $ annotateError Internal ENotConstant
 
--- | Evaluates a type. This basically only applies to arrays. The function
+-- | Evaluates a type. This basically only applies to arrays. The function
 -- returns the same expression but with the types (i.e., the array sizes)
 -- evaluated.
 constFoldType :: Location -> TerminaType SemanticAnn -> ConstFoldMonad (TerminaType SemanticAnn)
@@ -377,7 +377,7 @@ constFoldExpression (ArraySliceExpression ak obj lower upper ann) = do
   lowerType <- getExprType lower
   upperType <- getExprType upper
   case (exprTy, objTy, lowerType, upperType) of
-    -- | If both lower and upper are constant expressions, check if the slice is valid.
+    -- | If both lower and upper are constant expressions, check if the slice is valid.
     (TReference _ expectedSlice, array, TConstSubtype _, TConstSubtype _) -> do
       arraySizeValue <- getArraySizeValue array
       expectedSliceSizeValue <- getArraySizeValue expectedSlice
@@ -482,7 +482,7 @@ constFoldCheckComparison loc op lhs rhs
           value <- evalConstExpression constExpr
           case value of
             I (TInteger c _) _ ->
-              maybe (return ())
+              mapM_
                 (throwError . annotateError loc . EInvariantComparison c ty)
                 (fixedResult op' lo hi c)
             _ -> return ()
@@ -511,7 +511,7 @@ constFoldBasicBlock (IfElseBlock ifCond elifs mElse ann) = do
   ann' <- constFoldAnnotation ann
   ifCond' <- consSimplIfBlock ifCond
   elifs' <- mapM constFoldElseIfBlock elifs
-  mElse' <- maybe (return Nothing) (fmap Just . constFoldElseBlock) mElse
+  mElse' <- mapM constFoldElseBlock mElse
   return $ IfElseBlock ifCond' elifs' mElse' ann'
 
   where
@@ -546,7 +546,7 @@ constFoldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann
   from_expr' <- constFoldExpression from_expr
   to_expr' <- constFoldExpression to_expr
   body_stmt' <- constFoldBasicBlocks body_stmt
-  mWhile' <- maybe (return Nothing) (fmap Just . constFoldExpression) mWhile
+  mWhile' <- mapM constFoldExpression mWhile
   fromValue <- evalConstExpression from_expr
   toValue <- evalConstExpression to_expr
   case (fromValue, toValue) of
@@ -556,7 +556,7 @@ constFoldBasicBlock (ForLoopBlock iter ty from_expr to_expr mWhile body_stmt ann
       else if lhs > rhs then
         throwError $ annotateError stmtLoc (EForLoopStatementNegativeIterations lhs rhs)
       else do
-        maybe (return ()) constFoldCheckCondition mWhile'
+        mapM_ constFoldCheckCondition mWhile'
     _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
   return $ ForLoopBlock iter ty' from_expr' to_expr' mWhile' body_stmt' ann'
 constFoldBasicBlock (MatchBlock expr cases mDefaultCase ann) = do
@@ -703,7 +703,7 @@ constFoldTypeDef loc (Class ck classId members provides mods) = do
       ClassField <$> constFoldFieldDefinition fdef
     constFoldClassMember (ClassMethod ak ident params mrty body ann) = do
       params' <- mapM (constFoldParam loc) params
-      mrty' <- maybe (return Nothing) (fmap Just . constFoldType loc) mrty
+      mrty' <- mapM (constFoldType loc) mrty
       body' <- constFoldBasicBlocks body
       return $ ClassMethod ak ident params' mrty' body' ann
     constFoldClassMember (ClassProcedure ak ident params body ann) = do
@@ -712,7 +712,7 @@ constFoldTypeDef loc (Class ck classId members provides mods) = do
       return $ ClassProcedure ak ident params' body' ann
     constFoldClassMember (ClassViewer ident params mrty body ann) = do
       params' <- mapM (constFoldParam loc) params
-      mrty' <- maybe (return Nothing) (fmap Just . constFoldType loc) mrty
+      mrty' <- mapM (constFoldType loc) mrty
       body' <- constFoldBasicBlocks body
       return $ ClassViewer ident params' mrty' body' ann
     constFoldClassMember (ClassAction ak ident params rty body ann) = do
@@ -730,19 +730,19 @@ constFoldGlobal (Resource ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType glbLoc ty
-  mInitExpr' <- maybe (return Nothing) (fmap Just . constFoldExpression) mInitExpr
+  mInitExpr' <- mapM constFoldExpression mInitExpr
   return $ Resource ident ty' mInitExpr' mods ann'
 constFoldGlobal (Task ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType glbLoc ty
-  mInitExpr' <- maybe (return Nothing) (fmap Just . constFoldExpression) mInitExpr
+  mInitExpr' <- mapM constFoldExpression mInitExpr
   return $ Task ident ty' mInitExpr' mods ann'
 constFoldGlobal (Handler ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType glbLoc ty
-  mInitExpr' <- maybe (return Nothing) (fmap Just . constFoldExpression) mInitExpr
+  mInitExpr' <- mapM constFoldExpression mInitExpr
   return $ Handler ident ty' mInitExpr' mods ann'
 constFoldGlobal (Const identifier ty expr mods ann) = do
   let glbLoc = getLocation ann
@@ -763,13 +763,13 @@ constFoldGlobal (Channel ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType glbLoc ty
-  mInitExpr' <- maybe (return Nothing) (fmap Just . constFoldExpression) mInitExpr
+  mInitExpr' <- mapM constFoldExpression mInitExpr
   return $ Channel ident ty' mInitExpr' mods ann'
 constFoldGlobal (Emitter ident ty mInitExpr mods ann) = do
   let glbLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   ty' <- constFoldType glbLoc ty
-  mInitExpr' <- maybe (return Nothing) (fmap Just . constFoldExpression) mInitExpr
+  mInitExpr' <- mapM constFoldExpression mInitExpr
   return $ Emitter ident ty' mInitExpr' mods ann'
 constFoldGlobal g = return g -- This should not happen
 
@@ -785,7 +785,7 @@ constFoldElement (Function ident params mrty body mods ann) = do
   let funLoc = getLocation ann
   ann' <- constFoldAnnotation ann
   params' <- mapM (constFoldParam funLoc) params
-  mrty' <- maybe (return Nothing) (fmap Just . constFoldType funLoc) mrty
+  mrty' <- mapM (constFoldType funLoc) mrty
   body' <- constFoldBasicBlocks body
   return $ Function ident params' mrty' body' mods ann'
 

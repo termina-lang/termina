@@ -36,7 +36,7 @@ data TPClass a = TPClass {
 
     accessPorts :: M.Map Identifier (TerminaType a, a),
 
-    -- | Map of the input ports of the task
+    -- | Map of the input ports of the task
     -- It maps the name of the port to the type of the data that is received by
     -- the port and the name of the action that is executed when a message is
     -- received from the port.
@@ -69,7 +69,7 @@ data TPTask a = TPTask {
     -- | Class of the task
     taskClass :: Identifier,
 
-    -- | Map of the input ports of the task
+    -- | Map of the input ports of the task
     -- It maps the name of the port to the name of the channel
     -- that is connected to the port.
     taskInputPortConns :: Map Identifier (Identifier, a),
@@ -107,7 +107,7 @@ data TPEmitter a =
   TPInterruptEmitter 
     Identifier -- ^ emitter identifier
     a -- ^ annotations
-  | TPPeriodicTimerEmitter 
+  | TPPeriodicTimerEmitter 
     Identifier -- ^ emitter identifier
     (Expression a) -- ^ initializer expression for period field
     QualifiedName -- ^ Module that instantiates the timer
@@ -216,7 +216,7 @@ data TPHandler a = TPHandler {
     -- | Name of the module that instantiates the handler
     handlerModule :: QualifiedName,
 
-    -- | Annotations associated with the handler
+    -- | Annotations associated with the handler
     handlerAnns :: a
 
 } deriving Show
@@ -339,26 +339,26 @@ data TerminaProgArch a = TerminaProgArch {
 
 data InOptionBox a =
   InOptionBoxAlloc Identifier a
-  | InOptionBoxProcedureCall Identifier Integer a
+  | InOptionBoxProcedureCall Identifier Integer a
 
 data InBox a =
   InBoxInput Identifier
   | InBoxAlloc Identifier a
-  | InBoxProcedureCall Identifier Integer
+  | InBoxProcedureCall Identifier Integer
   deriving (Show, Eq, Ord)
 
 data BoxOutputInputMaps a = BoxOutputInputMaps {
 
-  -- | Map between the box parameters of a procedure call and the port from 
+  -- | Map between the box parameters of a procedure call and the port from 
   -- which the box was originated. The key is a tuple with the name of the
   -- port, the name of the procedure and the index of the box parameter.
   outBoxProcedureCall :: Map (Identifier, Identifier, Integer) [(a, InBox a)],
 
-  -- | Map between the output ports that send a box and the port from which the
+  -- | Map between the output ports that send a box and the port from which the
   -- box was originated.
   outBoxSend :: Map Identifier [(a, InBox a)],
 
-  -- | Map between the allocator ports that are used to free a box and the
+  -- | Map between the allocator ports that are used to free a box and the
   -- port from which the box was originated.
   outBoxFree :: Map Identifier [(a, InBox a)]
 
@@ -370,6 +370,6 @@ data BoxInOutState a = BoxInOutState {
     outputInputMaps :: BoxOutputInputMaps a
 }
 
--- | Map between the action identifiers and the set of out ports through which
+-- | Map between the action identifiers and the set of out ports through which
 -- the action sends messages.
 type ActionForwardingMap = Map Identifier (S.Set Identifier)

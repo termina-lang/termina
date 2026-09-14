@@ -127,7 +127,7 @@ genArchTypeDef ann tydef@(Class ResourceClass ident _ provides _) = do
     case runInOutClass tydef of 
       Left err -> throwError err
       Right boxMap -> return boxMap
-  -- | Resources do not have forwarding actions
+  -- | Resources do not have forwarding actions
   let resCls = TPClass {
     classIdentifier = ident,
     classKind = ResourceClass,
@@ -226,7 +226,7 @@ genArchGlobal modName (Task ident (TGlobal TaskClass tcls) (Just (StructInitiali
     tp {
       tasks = M.insert ident (TPTask ident tcls inpConns sinkConns outpConns apConns modifiers modName tann) (tasks tp)
     }
--- | Task declaration without struct initializer or a proper type specifier
+-- | Task declaration without struct initializer or a proper type specifier
 -- This should not happen, since a task must define at least one inbound port
 genArchGlobal _ (Task {}) = error "Internal error: invalid task declaration"
 genArchGlobal modName (Resource ident (TGlobal ResourceClass rcls) initializer modifiers rann) =
@@ -301,7 +301,7 @@ genArchGlobal modName (Handler ident (TGlobal HandlerClass hcls) (Just (StructIn
     tp {
       handlers = M.insert ident (TPHandler ident hcls (fromJust sinkConn) outpConns apConns modifiers modName hann) (handlers tp)
     }
--- | Handler declaration without struct initializer or a proper type specifier
+-- | Handler declaration without struct initializer or a proper type specifier
 -- This should not happen, since a handler must define one sink port
 genArchGlobal _ (Handler {}) = error "Internal error: invalid handler declaration"
 genArchGlobal modName (Channel ident (TMsgQueue mty size) _ _ cann) =

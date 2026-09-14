@@ -12,7 +12,7 @@ import Data.Foldable
 import qualified Control.Monad.State as ST
 import Utils.Monad
 
--- | Check if a block exits.
+-- | Check if a block exits.
 -- A block exits if it contains a return statement or a continue statement or,
 -- if it ends with a conditional block (if-else or match) and all the branches
 -- exit.
@@ -22,10 +22,10 @@ doesBlockExit (ContinueBlock {}) = True
 doesBlockExit (RebootBlock {}) = True
 doesBlockExit (IfElseBlock (CondIf _ ifBlocks _) elseIfBlocks (Just (CondElse elseBlocks _)) _) =
     let
-        -- | Check the exit of the if block
+        -- | Check the exit of the if block
         ifBlocksExit = not (null (blockBody ifBlocks)) && doesBlockExit (last (blockBody ifBlocks))
     in
-        -- | Check the exit of the else if blocks
+        -- | Check the exit of the else if blocks
         -- If the if block exits, then we must check the else if blocks
         -- and the else block (if present) 
         (ifBlocksExit &&
@@ -39,7 +39,7 @@ doesBlockExit (MatchBlock _ cases mDefaultCase _) =
     in
     case mDefaultCase of
         Just (DefaultCase (Block blocks _) _) ->
-            -- | Check the exit of the default case
+            -- | Check the exit of the default case
             doesCasesExit && not (null blocks) && doesBlockExit (last blocks)
         Nothing -> doesCasesExit
 doesBlockExit _ = False
@@ -48,19 +48,19 @@ checkBlockPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPath
 checkBlockPaths loc stmts = do
     step <- get
     case step of
-        -- | If we are here, it means that the block must exit on this step.
+        -- | If we are here, it means that the block must exit on this step.
         EPMustExit ->
             case stmts of
-                -- | If the block list is empty and it must exit, then a return
+                -- | If the block list is empty and it must exit, then a return
                 -- statement is missing.
                 [] -> throwError $ annotateError loc EEBlockShallExit
-                -- | If the last block is a return, then we must check that the
+                -- | If the last block is a return, then we must check that the
                 -- rest of the blocks
                 (ReturnBlock {} : xb) ->
                     -- | The rest of the blocks shall not exit
                     setExitNotAllowed >> checkBlockPaths loc xb
                 _ -> throwError $ annotateError loc EEBlockShallExit
-        -- | If we are here, it means that the block is not allowed to exit.
+        -- | If we are here, it means that the block is not allowed to exit.
         EPExitNotAllowed ->
             case stmts of
                 [] -> return step
@@ -95,10 +95,10 @@ checkActionPaths :: Location -> [BasicBlock SemanticAnn] -> BBPathsCheck ExitPat
 checkActionPaths loc stmts = do
     step <- get
     case step of
-        -- | If we are here, it means that the block must exit on this step.
+        -- | If we are here, it means that the block must exit on this step.
         EPMustExit ->
             case stmts of
-                -- | If the block list is empty and it must exit, then a return
+                -- | If the block list is empty and it must exit, then a return
                 -- statement is missing.
                 [] -> throwError $ annotateError loc EEActionShallExit
                 (x : xb) ->
@@ -144,7 +144,7 @@ checkActionPaths loc stmts = do
                                     Nothing -> put matchCaseState
                                 checkActionPaths loc xb
                         _ -> throwError $ annotateError loc EEActionShallExit
-        -- | If we are here, it means that we may exit the block or send messages BUT there
+        -- | If we are here, it means that we may exit the block or send messages BUT there
         -- must be a path that does not exit the block
         EPPartialExit ->
             case stmts of
@@ -268,7 +268,7 @@ checkActionPaths loc stmts = do
                             setExitNotAllowed >> checkActionPaths (getLocation ann) (reverse (blockBody loopBlocks)) >> checkActionPaths loc xb
                         _ ->
                             setExitNotAllowed >> checkActionPaths loc xb
-        -- | If we are here, it means that the block is not allowed to exit nor to send messages
+        -- | If we are here, it means that the block is not allowed to exit nor to send messages
         EPExitNotAllowed ->
             case stmts of
                 [] -> return step

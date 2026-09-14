@@ -82,7 +82,7 @@ data Error
     | EInvalidIntervalValue -- ^ Invalid interval value
     | EInvalidIntervalExpression -- ^ Invalid interval expression
     | EInvalidArrivalsValue Integer -- ^ Invalid arrivals value
-    | EInvalidDeadlineValue Double -- ^ Invalid deadline value
+    | EInvalidDeadlineValue Double -- ^ Invalid deadline value
     | EInvalidInitialEndStep -- ^ Initial step cannot be an end step
     deriving Show
 

@@ -27,7 +27,7 @@ data Error =
     | EInvalidResourceConnection -- ^ Invalid resource connection (Internal)
     | EInvalidPoolConnection -- ^ Invalid pool connection (Internal)
     | EUnsupportedEmitterClass -- ^ Unsupported emitter class (Internal)
-    | EMissingPeriodicTimerInitializer -- ^ Missing initializer expression for periodic timer emitter (Internal)
+    | EMissingPeriodicTimerInitializer -- ^ Missing initializer expression for periodic timer emitter (Internal)
     | EDuplicatedEmitterConnection Identifier Location -- ^ Duplicated emitter connection (AE-001)
     | EDuplicatedChannelConnection Identifier Location -- ^ Duplicated channel connection (AE-002)
     | EMismatchedBoxSource Identifier Identifier [Location] -- ^ Mismatched box source (AE-003)
@@ -134,7 +134,7 @@ instance ErrorMessage ArchitectureError where
 
             where
 
-                -- | Prints a trace of box allocations 
+                -- | Prints a trace of box allocations 
                 printBoxTrace :: Identifier -> [Location] -> T.Text
                 printBoxTrace _ [] = ""
                 printBoxTrace expectedSource [tracePos@(Position _ traceStartPos _)] =
@@ -174,7 +174,7 @@ instance ErrorMessage ArchitectureError where
     toText e@(AnnotatedError err Internal) _files =
         let title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."             
         in
-            -- | Check the errors are related to the internal resources/emitters
+            -- | Check the errors are related to the internal resources/emitters
             case err of
                 EDisconnectedEmitter emitter -> title <>
                     "\nEmitter \x1b[31m" <> T.pack emitter <>

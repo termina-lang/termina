@@ -41,7 +41,7 @@ showSupportedPlatforms =
 
 validateProjectName :: String -> IO ()
 validateProjectName project =
-    unless (all (\x -> isAlphaNum x || x == '_') project) (die . errorMessage $ "Project name must be alphanumeric")
+    unless (all (\x -> isAlphaNum x || x == '_') project) (die . errorMessage $ "Project name must be alphanumeric")
 
 emptyAppModuleContent :: String -> String
 emptyAppModuleContent projectName = unlines [
@@ -63,7 +63,7 @@ newCommand (NewCmdArgs project pltName chatty) = do
     -- Check if the directory already exists
     exists <- doesPathExist project
     when exists (die . errorMessage $ "Path already exists: " ++ project)
-    -- | Create the project directory
+    -- | Create the project directory
     when chatty (putStrLn . debugMessage $ "Creating project directory: " ++ project)
     createDirectory project
     -- | Create project default structure

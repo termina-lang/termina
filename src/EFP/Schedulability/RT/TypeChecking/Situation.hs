@@ -36,7 +36,7 @@ typeEventDefinition acc (RTEventPeriodic eventId evInit ann') = do
     typePeriodicEvent eventId evInit >>= \typedEv ->
         return $ M.insert eventId typedEv acc
 
--- | Type transaction object expression
+-- | Type transaction object expression
 -- It must refer to a valid transaction identifier
 typeTransactionObjectExpr :: ConstExpression ParserAnn -> RTMonad (SAST.RTElement RTSemAnn)
 typeTransactionObjectExpr (ConstObject ident ann') = do
@@ -57,7 +57,7 @@ typeEmitterObjectExpr (ConstObject ident ann') = do
 typeEmitterObjectExpr expr =
     throwError . annotateError (getLocation . getAnnotation $ expr) $ EInvalidEmitterFieldType
 
--- | This function recursively extracts all step names from a transaction step
+-- | This function recursively extracts all step names from a transaction step
 extractStepNames :: S.Set Identifier -> SAST.RTTransStep RTSemAnn -> S.Set Identifier
 extractStepNames acc (SAST.RTTransStepEnd stepName _) =
     S.insert stepName acc
@@ -82,7 +82,7 @@ typeDeadline expr = throwError . annotateError (getLocation . getAnnotation $ ex
 typeDeadlinesMap :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTDeadlineMap RTSemAnn)
 typeDeadlinesMap transactionId (ConstStructInitializer fields ann) = do
     trans <- ST.gets transactions
-    -- | Get all the step identifiers in the transaction
+    -- | Get all the step identifiers in the transaction
     transaction <- case M.lookup transactionId trans of
         Just t -> return t
         Nothing -> throwError . annotateError (getLocation ann) $ EUnknownTransaction transactionId
@@ -123,7 +123,7 @@ checkEmitterConnection loc emitterId targetCmp targetAction = do
             -- | If the component is not the target component, throw an error
             unless (cmp == targetCmp) $
                 throwError . annotateError loc $ EEmitterTargetMismatch emitterId targetCmp cmp
-            -- | Get the component class
+            -- | Get the component class
             tpCls <- case M.lookup cmp (tasks arch) of
                 Just tsk -> case M.lookup (taskClass tsk) (taskClasses arch) of
                     Just cls -> return cls
@@ -133,7 +133,7 @@ checkEmitterConnection loc emitterId targetCmp targetAction = do
                         Just cls -> return cls
                         Nothing -> throwError . annotateError loc $ EInvalidHandlerClass (handlerClass hdl)
                     Nothing -> throwError . annotateError loc $ EUnknownComponent cmp
-            -- | Obtain the target action from the sink port
+            -- | Obtain the target action from the sink port
             case M.lookup port (sinkPorts tpCls) of
                 Nothing -> throwError . annotateError Internal $ EInvalidSinkPort port
                 Just (_, act) ->
@@ -159,30 +159,30 @@ typeArrivalsField expr = throwError . annotateError (getLocation . getAnnotation
 typeBurstyEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTEvent RTSemAnn)
 typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
     let validNames = S.fromList ["interval", "arrivals", "deadlines", "transaction", "emitter"]
-    -- | Check that all fields are valid and there are no duplicates
+    -- | Check that all fields are valid and there are no duplicates
     fieldsMap <- checkFieldNames fields' validNames
-    -- | Type interval field
+    -- | Type interval field
     intervalExpr <- case M.lookup "interval" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) ->
             typeConstExpression expr >>= evalConstExpression >>= typeIntervalField
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "interval"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "interval"
-    -- | Type arrivals field
+    -- | Type arrivals field
     arrivalsExpr <- case M.lookup "arrivals" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) ->
             typeConstExpression expr >>= typeArrivalsField
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "arrivals"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "arrivals"
-    -- | Type emitter field
+    -- | Type emitter field
     emitterId <- case M.lookup "emitter" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             typeEmitterObjectExpr expr
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "emitter"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "emitter"
-    -- | Type transactions field
+    -- | Type transactions field
     transactionId <- case M.lookup "transaction" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             transaction <- typeTransactionObjectExpr expr
@@ -195,7 +195,7 @@ typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "transaction"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "transaction"
-    -- | Type deadlines field
+    -- | Type deadlines field
     deadlinesMap <- case M.lookup "deadlines" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructFieldValue structInit) _) ->
             typeDeadlinesMap transactionId structInit
@@ -208,16 +208,16 @@ typeBurstyEvent eventId (ConstStructInitializer fields' ann) = do
 typePeriodicEvent :: Identifier -> ConstStructInitializer ParserAnn -> RTMonad (SAST.RTEvent RTSemAnn)
 typePeriodicEvent eventId (ConstStructInitializer fields' ann) = do
     let validNames = S.fromList ["deadlines", "transaction", "emitter"]
-    -- | Check that all fields are valid and there are no duplicates
+    -- | Check that all fields are valid and there are no duplicates
     fieldsMap <- checkFieldNames fields' validNames
-    -- | Type emitter field
+    -- | Type emitter field
     emitterId <- case M.lookup "emitter" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             typeEmitterObjectExpr expr
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "emitter"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "emitter"
-    -- | Type transactions field
+    -- | Type transactions field
     transactionId <- case M.lookup "transaction" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructSimpleValue expr) _) -> do
             transaction <- typeTransactionObjectExpr expr
@@ -230,7 +230,7 @@ typePeriodicEvent eventId (ConstStructInitializer fields' ann) = do
         Just (ConstFieldAssignment _ (ConstStructFieldValue _) _) ->
             throwError . annotateError (getLocation ann) $ EInvalidEventFieldType "transaction"
         Nothing -> throwError . annotateError (getLocation ann) $ EMissingEventField "transaction"
-    -- | Type deadlines field
+    -- | Type deadlines field
     deadlinesMap <- case M.lookup "deadlines" fieldsMap of
         Just (ConstFieldAssignment _ (ConstStructFieldValue structInit) _) ->
             typeDeadlinesMap transactionId structInit

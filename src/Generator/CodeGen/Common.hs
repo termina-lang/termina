@@ -28,7 +28,7 @@ data CGeneratorEnv = CGeneratorEnv {
 
 type CGenerator = ExceptT CGeneratorError (ST.State CGeneratorEnv)
 
--- |  This function is used to create the names of temporal variables
+-- |  This function is used to create the names of temporal variables
 --  and symbols.
 namefy :: Identifier -> Identifier
 namefy = ("__" <>)
@@ -217,7 +217,7 @@ statusSuccessVariant, statusFailureVariant :: Identifier
 statusSuccessVariant = "Success"
 statusFailureVariant = "Failure"
 
--- | This function returns the type of an object. The type is extracted from the
+-- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.

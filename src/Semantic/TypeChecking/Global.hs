@@ -73,7 +73,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
               _ -> throwError $ annotateError Internal EExpectedClassType;
             } 
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    -- | Memory pools 
+    -- | Memory pools 
     TPool {} -> do
       exprty <-
         case mexpr of
@@ -81,7 +81,7 @@ typeGlobal (Resource ident ts mexpr mods anns) = do
           Nothing   -> return Nothing
       tyMods <- mapM (typeModifier anns typeGlobalObject) mods
       return (SAST.Resource ident ty exprty tyMods (buildGlobalAnn anns ty), LocatedElement (GGlob ty) anns)
-    -- | Atomic variables 
+    -- | Atomic variables 
     TAtomic {} -> do
       exprty <-
         case mexpr of

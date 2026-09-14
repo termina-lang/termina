@@ -53,7 +53,7 @@ __termina_resource__unlock = "__termina_resource__unlock" @:
             _const . ptr $ _const __termina_active_entity_t,
             -- | const __termina_resource_lock_type_t lock_type,
             _const . ptr $ _const __termina_resource_lock_type_t,
-            -- | __termina_lock_t lock
+            -- | __termina_lock_t lock
             __termina_lock_t
         ]
 
@@ -128,7 +128,7 @@ __termina_pool__size = "__termina_pool__size" @:
     CTFunction size_t [
         -- | size of type
         size_t,
-        -- | number of elements
+        -- | number of elements
         size_t
     ]
 
@@ -173,7 +173,7 @@ __termina_task__init = "__termina_task__init" @:
         [
             -- | const __termina_id_t task_id
             _const __termina_id_t,
-            -- | const __termina_task_prio_t entry,
+            -- | const __termina_task_prio_t entry,
             _const __termina_task_prio_t,
             -- | const size_t stack_size,
             _const size_t,
@@ -241,7 +241,7 @@ __termina_except__action_failure = "__termina_except__action_failure" @:
             _const (typeDef "Exception"),
             -- | const size_t sink_port_id,
             _const size_t,
-            -- | const int32_t error_code
+            -- | const int32_t error_code
             _const int32_t
         ]
 
@@ -254,7 +254,7 @@ __termina_pool__alloc = "__termina_pool__alloc" @:
     CTFunction void
         [
             _const __termina_id_t,
-            -- | __option_box_t * const opt
+            -- | __option_box_t * const opt
             _const . ptr $ __option_box_t
         ]
 
@@ -263,7 +263,7 @@ __termina_pool__free = "__termina_pool__free" @:
     CTFunction void
         [
             _const __termina_id_t,
-            -- | void * const element
+            -- | void * const element
             __termina_box_t
         ]
 

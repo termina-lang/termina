@@ -226,13 +226,13 @@ instance CPrint CExpression where
                 val <- pprint i
                 return $ val <> pretty "U"
             CTInt IntSize64 Signed _ ->
-                -- | Negative values cannot be expressed in hexadecimal format
+                -- | Negative values cannot be expressed in hexadecimal format
                 if value < 0 then return $ pretty "-" <> pretty "INT64_C" <> parens (pretty (abs value))
                 else do
                     val <- pprint i
                     return $ pretty "INT64_C" <> parens val
             CTInt IntSize128 Signed _ -> 
-                -- | Negative values cannot be expressed in hexadecimal format
+                -- | Negative values cannot be expressed in hexadecimal format
                 if value < 0 then return $ pretty "-" <> pretty "INT128_C" <> parens (pretty (abs value))
                 else do
                     val <- pprint i
@@ -240,7 +240,7 @@ instance CPrint CExpression where
             CTInt _ Signed _ -> 
                 if value < 0 then return $ pretty "-" <> parens (pretty (abs value) <> pretty "L")
                 else return $ pretty value <> pretty "L"
-            -- | Until C23, we do not have a specific suffix for size_t integer
+            -- | Until C23, we do not have a specific suffix for size_t integer
             -- literals.  We should parameterize the suffix to be used for
             -- size_t literals depending on the platform
             CTSizeT _ -> return $ pretty i <> pretty "U"

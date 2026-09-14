@@ -13,7 +13,7 @@ import Configuration.Platform (Platform)
 import Data.Bits
 import ControlFlow.Architecture.Utils (classMemberFunctions)
 
--- | This function returns the type of an object. The type is extracted from the
+-- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
@@ -72,7 +72,7 @@ getExprType (IsEnumVariantExpression {}) = throwError $ annotateError Internal E
 getExprType (IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType (IsMonadicVariantExpression {}) = throwError $ annotateError Internal EInvalidExprTypeAnnotation
 
--- | This function returns the name of a port. The function assumes that the object is
+-- | This function returns the name of a port. The function assumes that the object is
 -- a port and that the object is well-typed. If the object is not a port or if the object
 -- is not well-typed, the function will throw an error.    
 getPortName :: (MonadError ConstFoldError m) => Object SemanticAnn -> m Identifier

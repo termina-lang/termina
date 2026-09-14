@@ -113,7 +113,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"!=" -- RelationalNotEqual
                       ,"&" -- BitwiseAnd / reference creation
                       ,"|" -- BitwiseOr
-                      ,"^" -- BitwiseXor
+                      ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
                       ,"#" -- Attribute
@@ -350,7 +350,7 @@ structInitializerParser = do
         port <- identifierParser
         FieldPortConnection OutboundPortConnection identifier port . Position current startPos <$> getPosition
 
--- | Parser for an element modifier
+-- | Parser for an element modifier
 -- A modifier is of the form:
 -- #[identifier(expression)]
 -- where:
@@ -1250,7 +1250,7 @@ interfaceProcedureParser = do
       params <- option [] (comma >> sepBy parameterParser comma)
       return (ak, params)
   _ <- semi
-  -- | TODO: See if we allow modifiers in interface procedures to be set
+  -- | TODO: See if we allow modifiers in interface procedures to be set
   -- by the programmers
   InterfaceProcedure ak name params [] . Position current startPos <$> getPosition
 

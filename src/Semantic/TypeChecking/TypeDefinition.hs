@@ -140,7 +140,7 @@ typeTypeDefinition ann (Interface RegularInterface ident extends members mds_ts)
       mds_ty' <- mapM (typeModifier ann typeGlobalObject) mds_ts'
       return $ InterfaceProcedure ak procId ps_ty mds_ty' (buildExpAnn annIP TUnit)
     
-    -- | Checks that the procedures incorporated from the extended interfaces
+    -- | Checks that the procedures incorporated from the extended interfaces
     -- are not duplicated
     checkNoDuplicatedExtendedProcedures ::
       [Identifier] -- Accumulator
@@ -319,8 +319,8 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               let newPrc = SAST.ClassProcedure ak mIdent ps_ty typed_bret (buildExpAnn mann TUnit)
               return (newPrc : prevMembers)
             ClassMethod ak mIdent ps_ts mts mbody mann -> do
-              mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
-                  (\ty -> checkReturnType mann ty >> return (Just ty))) mts
+              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
+                  (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
@@ -332,8 +332,8 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               let newMth = SAST.ClassMethod ak mIdent ps_ty mty typed_bret (buildExpAnn mann (fromMaybe TUnit mty))
               return (newMth : prevMembers)
             ClassViewer mIdent ps_ts mts mbody mann -> do
-              mty <- maybe (return Nothing) (typeTypeSpecifier mann typeGlobalObject >=>
-                  (\ty -> checkReturnType mann ty >> return (Just ty))) mts
+              mty <- mapM (typeTypeSpecifier mann typeGlobalObject >=>
+                  (\ty -> checkReturnType mann ty >> return ty)) mts
               (ps_ty, typed_bret) <- localScope $ do
                   insertLocalImmutObj mann "self" (TReference Immutable (TGlobal kind ident))
                   ps_ty <- forM ps_ts (\param@(Parameter paramId _) -> do
@@ -346,11 +346,11 @@ typeTypeDefinition ann (Class kind ident members provides mds_ts) =
               return (newVw : prevMembers)
             ClassAction ak mIdent param ts mbody mann -> do
               ty <- typeTypeSpecifier mann typeGlobalObject ts
-              param_ty <- maybe (return Nothing) (typeActionParameter mann >=> return . Just) param
+              param_ty <- mapM (typeActionParameter mann) param
               checkReturnType mann ty
               typed_bret <- localScope $ do 
                   insertLocalImmutObj mann "self" (TReference ak (TGlobal kind ident))
-                  maybe (return ()) (\p_ty -> insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)) param_ty
+                  mapM_ (\p_ty -> insertLocalImmutObj mann (paramIdentifier p_ty) (paramType p_ty)) param_ty
                   typeBlock (Just ty) mbody
               let newAct = SAST.ClassAction ak mIdent param_ty ty typed_bret (buildExpAnn mann ty)
               return (newAct : prevMembers)

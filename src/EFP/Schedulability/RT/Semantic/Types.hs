@@ -29,6 +29,6 @@ instance Located RTSemAnn where
 type RTTransactionMap a = M.Map Identifier (RTElement a)
 type RTSituationMap a = M.Map Identifier (RTElement a)
 
--- | Valid continuation is a pair (Component identifier, Action identifier)
+-- | Valid continuation is a pair (Component identifier, Action identifier)
 type Continuation = (Identifier, Identifier)
 

@@ -16,7 +16,7 @@ import Utils.Printer
 
 data Error =
   EExpectedPort -- ^ Error when trying to access a port field (Internal)
-  | EInvalidPortAccessExpression -- ^ Error when trying to access a port access expression (Internal)
+  | EInvalidPortAccessExpression -- ^ Error when trying to access a port access expression (Internal)
   | EInvalidObjectTypeAnnotation -- ^ Error when the semantic annotation of an object does not contain the expected type information (Internal)
   | EInvalidExprTypeAnnotation -- ^ Error when the semantic annotation of an expression does not contain the expected type information (Internal)
   | EUnknownTask Identifier -- ^ Unknown task (Internal)
@@ -27,7 +27,7 @@ data Error =
   | EUnknownMemberFunction Identifier -- ^ Unknown member function (Internal)
   | EUnknownResource Identifier -- ^ Unknown resource (Internal)
   | EUnknownResourceClass Identifier -- ^ Unknown resource class(Internal)
-  | EUnknownResourceProcedure Identifier Identifier -- ^ Unknown resource procedure (Internal)
+  | EUnknownResourceProcedure Identifier Identifier -- ^ Unknown resource procedure (Internal)
   | EUnknownIdentifier Identifier -- ^ Unknown identifier (Internal)
   | EInvalidObject -- ^ Invalid object (Internal)
   | EInvalidExpression String -- ^ Invalid expression (Internal)

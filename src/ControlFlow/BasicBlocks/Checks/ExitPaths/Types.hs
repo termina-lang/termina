@@ -17,7 +17,7 @@ data ExitPathsCheckST =
     -- | Initial state. In this state, the block must exit. This can be done by
     -- a return statement or, if we are in an action, a continue statement.
     EPMustExit
-    -- | Partial exit. This state is used when in the following statements, the
+    -- | Partial exit. This state is used when in the following statements, the
     -- block may exit on a branch but not it all branches. This is used for
     -- if-else and match statements that precede the last statement of the
     -- block. This state may only be reached when we are analyzing an action.
@@ -27,16 +27,16 @@ data ExitPathsCheckST =
     -- executed, the block may no longer exit and the checker's state changes to
     -- EPAllowedSend.
     | EPPartialExit
-    -- | Allowed to continue. This is an internal state that is used when we
+    -- | Allowed to continue. This is an internal state that is used when we
     -- are analyzing a branch inside an action that is allowed to continue, i.e., 
     -- its last statement may be a continue statement.
     | EPAllowedContinue
-    -- | Allowed to send. This state can only be reached when analyzing an
+    -- | Allowed to send. This state can only be reached when analyzing an
     -- action.  In this state, the block may no longer exit and it may send
     -- messages (it may do so on one or more branches), or execute a non-sending
     -- statement. In that case, the state changes to EPExitNotAllowed.
-    | EPAllowedSend
-    -- | Exit not allowed. This state is reached when the block is not allowed
+    | EPAllowedSend
+    -- | Exit not allowed. This state is reached when the block is not allowed
     -- to exit nor, in the case of an action, to send messages. This state is
     -- the last state of the checker.
     | EPExitNotAllowed

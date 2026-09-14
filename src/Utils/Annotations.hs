@@ -1,5 +1,5 @@
 {-# Language KindSignatures #-}
-{-# Language FlexibleInstances #-}
+{-# Language FlexibleInstances #-}
 -- | Module describing a family of types equipped with annotations
 
 module Utils.Annotations where

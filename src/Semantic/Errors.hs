@@ -51,13 +51,13 @@ data Error
   | EEnumDefEmpty Identifier -- ^ Empty enum definition (Internal)
   | EInterfaceEmpty Identifier -- ^ Empty interface definition (Internal)
   | ESystemInterfaceDefinition Identifier -- ^ System interface definition (Internal)
-  | EInvalidConstExprType (TerminaType SemanticAnn) -- ^ Invalid constant expression type (Internal)
+  | EInvalidConstExprType (TerminaType SemanticAnn) -- ^ Invalid constant expression type (Internal)
   | EInvalidArrayIndexing (TerminaType SemanticAnn) -- ^ Invalid array indexing
   | ENotNamedObject Identifier -- ^ Object not found
   | EExpressionNotConstant -- ^ Expected constant expression
   | EAssignmentToImmutable -- ^ Assignment to immutable variable
   | EIfElseNoOtherwise -- ^ Missing else clause
-  | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error
+  | ENotCasteable (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Casting error
   | EInvalidParameterType (Parameter SemanticAnn) -- ^ Invalid parameter type
   | EInvalidReturnType (TerminaType SemanticAnn) -- ^ Invalid return type
   | EProcedureCallExtraArgs (Identifier, [Parameter SemanticAnn], Location) Integer -- ^ Extra parameters in procedure call
@@ -124,7 +124,7 @@ data Error
   | EArrayExprListInitializerInvalidUse -- ^ Invalid use of an expression list array initializer
   | EArrayExprListInitializerNotArray (TerminaType SemanticAnn) -- ^ Assignment of an expression list array initializer to a non-array type
   | EMonadicVariantInitializerInvalidUse -- ^ Invalid use of a builtin variant initializer
-  | EForLoopLowerBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop lower bound type mismatch
+  | EForLoopLowerBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop lower bound type mismatch
   | EForLoopUpperBoundTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ For loop upper bound type mismatch
   | EArrayExprListInitializerExprTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ List of initializing expressions type mismatch
   | EReturnValueExpected (TerminaType SemanticAnn) -- ^ Expected return value
@@ -243,7 +243,7 @@ data Error
   | EInvalidVariantForStatus Identifier -- ^ Invalid variant for status
   | EInvalidResultTypeSpecifier (PAST.TypeSpecifier ParserAnn) -- ^ Invalid type specifier for result
   | EMonadicVariantParameterTypeMismatch (TerminaType SemanticAnn) (TerminaType SemanticAnn) -- ^ Parameter type mismatch in monadic variant
-  | EObjectPreviouslyMoved Location -- ^ Object previously moved
+  | EObjectPreviouslyMoved Location -- ^ Object previously moved
   | EIsStatusVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-status-variant expression
   | EIsResultVariantInvalidType (TerminaType SemanticAnn) -- ^ Invalid type for is-result-variant expression
   | EInvalidSystemExceptEmitterType (TerminaType SemanticAnn) -- ^ Invalid system except emitter type
@@ -2425,7 +2425,7 @@ instance ErrorMessage SemanticErrors where
                 _ -> pprintSimpleError sourceLines title fileName pos Nothing
         where
 
-            -- | Prints a trace of member function calls
+            -- | Prints a trace of member function calls
             printCallTrace :: Identifier -> [(Identifier, Location)] -> T.Text
             printCallTrace _ [] = ""
             printCallTrace currentCall [(finalCall, tracePos@(Position _ traceStartPos _))] =

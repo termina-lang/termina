@@ -14,7 +14,7 @@ import ControlFlow.BasicBlocks.Errors
 
 -- This module contains utility functions that are used in the control flow analysis.
 
--- | This function returns the type of an object. The type is extracted from the
+-- | This function returns the type of an object. The type is extracted from the
 -- object's semantic annotation. The function assumes that the object is well-typed
 -- and that the semantic annotation is correct. If the object is not well-typed, the
 -- function will throw an error.
@@ -53,7 +53,7 @@ getExprType (SAST.IsEnumVariantExpression _ _ _  (SemanticAnn (ETy (SimpleType t
 getExprType (SAST.IsMonadicVariantExpression _ _ (SemanticAnn (ETy (SimpleType ts)) _)) = return ts
 getExprType ann = throwError $ InternalError $ "invalid expression annotation: " ++ show ann
 
--- | This function returns the name of a port. The function assumes that the object is
+-- | This function returns the name of a port. The function assumes that the object is
 -- a port and that the object is well-typed. If the object is not a port or if the object
 -- is not well-typed, the function will throw an error.    
 getPortName :: (MonadError BBGeneratorError m) => SAST.Object SemanticAnn -> m Identifier

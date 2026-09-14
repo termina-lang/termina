@@ -34,12 +34,12 @@ flattenStep (RTTransStepAction name task action path next ann) = do
             flip RTTransStepConditional ann <$> mapM (\(condExpr, condStep) ->
                     return (condExpr, RTTransStepAction name task action path condStep ann)) conds
         _ -> return $ RTTransStepAction name task action path flatNext ann
--- | If the next step is a conditional, we need to flatten each branch of the conditional
+-- | If the next step is a conditional, we need to flatten each branch of the conditional
 flattenStep (RTTransStepConditional conds ann) = do
     flatConds <- forM conds $ \(condExpr, condStep) -> do
         let loc = getLocation ann
         flatCondStep <- flattenStep condStep
-        -- | In the original conditional, the conditional step may never be
+        -- | In the original conditional, the conditional step may never be
         -- another conditional.  However, after flattening, it may be. In
         -- that case, we need to adjust the conditional expressions
         -- accordingly.
@@ -74,7 +74,7 @@ flattenStep (RTTransStepMuticast steps ann) = do
         let flatConds = sequence conditionalStepsList
         newConds <- forM flatConds $ \fcnds -> do
             resultingCondExpr <- foldM (\acc (condExpr, _) -> 
-                    -- | Multiply the conditional expressions and divide by 100
+                    -- | Multiply the conditional expressions and divide by 100
                     return $ productCondExprs acc condExpr)
                 (TInteger 100 DecRepr) fcnds 
             checkConditionalExprRange (getLocation ann) (getLocation ann) resultingCondExpr

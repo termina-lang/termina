@@ -182,7 +182,7 @@ genComponentDiagramFile params progArch param = do
 genModules ::
   TerminaConfig
   -> Platform
-  -- | The map with the option types to generate from defined types 
+  -- | The map with the option types to generate from defined types 
   -> MonadicTypes
   -- | The project to generate the code from
   -> BasicBlocksProject -> IO ()
@@ -197,7 +197,7 @@ genModules params plt initialMonadicTypes bbProject =
           sourceFile = destinationPath </> "src" </> qualifiedName bbModule <.> "c"
           headerFile = destinationPath </> "include" </> qualifiedName bbModule <.> "h"
       sourceFileExists <- doesFileExist sourceFile
-      -- | Get the modification time of the transpiler itself
+      -- | Get the modification time of the transpiler itself
       exePath <- getExecutablePath
       exeModificationTime <- getModificationTime exePath
       terminaYamlModificationTime <- getModificationTime "termina.yaml"
@@ -383,12 +383,12 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     -- | Decode the selected platform field
     plt <- maybe (die . errorMessage $ "Unsupported platform: \"" ++ show (platform config) ++ "\"") return $ checkPlatform (T.unpack (platform config))
     when chatty (putStrLn . debugMessage $ "Selected platform: \"" ++ show plt ++ "\"")
-    -- | Check that the files are in place
+    -- | Check that the files are in place
     existSourceFolder <- doesDirectoryExist (sourceModulesFolder config)
     unless existSourceFolder (die . errorMessage $ "Source folder \"" ++ sourceModulesFolder config ++ "\" does not exist")
     existAppFolder <- doesDirectoryExist (appFolder config)
     unless existAppFolder (die . errorMessage $ "Application folder \"" ++ appFolder config ++ "\" does not exist")
-    -- | Create output header and source folder if it does not exist
+    -- | Create output header and source folder if it does not exist
     let outputSrcFolder = outputFolder config </> "src"
     let outputIncludeFolder = outputFolder config </> "include"
     when chatty (putStrLn . debugMessage $ "Creating output source folder (if missing): \"" ++ outputSrcFolder ++ "\"")
@@ -402,7 +402,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     when chatty (putStrLn . debugMessage $ "Loading project modules")
     parsedModules <- loadModules (importedModules appModule) (sourceModulesFolder config)
     let parsedProject = M.insert (qualifiedName appModule) appModule parsedModules
-    -- | Detect any possible loops in the project
+    -- | Detect any possible loops in the project
     when chatty (putStrLn . debugMessage $ "Ordering project modules")
     let projectDependencies = M.map importedModules parsedProject
     orderedDependencies <-
@@ -416,7 +416,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     -- | Create the initial global environment
     let initialGlobalEnv = makeInitialGlobalEnv (Just config) plt (getPlatformInitialGlobalEnv config plt)
     (typedProject, _finalGlobalEnv) <- typeModules parsedProject initialGlobalEnv orderedDependencies
-    -- | Obtain the set of option types
+    -- | Obtain the set of option types
     when chatty (putStrLn . debugMessage $ "Searching for option types")
     let monadicTypes = monadicTypesMapModules typedProject
     -- | Obtain the basic blocks AST of the program
@@ -444,7 +444,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
               M.foldrWithKey (\_ item prevmap -> M.insert (fullPath item) (sourcecode item) prevmap)
               M.empty rawBBProject in
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
-    -- | Usage checking
+    -- | Usage checking
     when chatty (putStrLn . debugMessage $ "Usage checking project modules")
     case useDefCheckModules rawBBProject of
       Nothing -> return ()
@@ -464,7 +464,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
         TIO.putStrLn (toText err sourceFilesMap) >> exitFailure
     when chatty (putStrLn . debugMessage $ "Performing constant folding")
     bbProject <- constFolding plt rawBBProject
-    -- | Obtain the architectural description of the program
+    -- | Obtain the architectural description of the program
     when chatty (putStrLn . debugMessage $ "Checking the architecture of the program")
     programArchitecture <- genArchitecture bbProject (getPlatformInitialProgram config plt) orderedDependencies
     checkEmitterConnections bbProject programArchitecture
@@ -472,7 +472,7 @@ buildCommand (BuildCmdArgs chatty genTransactionalWCEPs genCmpDiag) = do
     checkResourceUsage bbProject programArchitecture
     checkPoolUsage bbProject programArchitecture
     checkProjectBoxSources bbProject programArchitecture
-    -- | Generate the code
+    -- | Generate the code
     when chatty (putStrLn . debugMessage $ "Generating code")
     genModules config plt monadicTypes bbProject
     genInitFile config plt bbProject (qualifiedName appModule)

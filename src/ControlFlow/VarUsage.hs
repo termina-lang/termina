@@ -147,7 +147,7 @@ useDefStmt (AssignmentStmt obj e ann) = do
   obj_ty <- withLocation (getLocation ann) (getObjType obj)
   case obj_ty of
     (_, TOption (TBoxSubtype _)) -> 
-      -- | We are assigning to an option-box. This can only be done through a
+      -- | We are assigning to an option-box. This can only be done through a
       -- MonadicVariantInitializer.
       case e of 
         MonadicVariantInitializer None _ -> 
@@ -155,13 +155,13 @@ useDefStmt (AssignmentStmt obj e ann) = do
             Variable ident _ -> initializeOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
         MonadicVariantInitializer (Some boxObjExpr) _ -> do
-          -- | We need to move the box object 
+          -- | We need to move the box object 
           case boxObjExpr of
             AccessObject (Variable ident _) -> 
               let loc = getLocation ann in
               safeMoveBox ident loc
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
-          -- | And update the option-box as allocated
+          -- | And update the option-box as allocated
           case obj of
             Variable ident _ -> allocOptionBox ident (getLocation ann)
             _ -> throwError $ annotateError (getLocation ann) EBadOptionBoxAssignExpression
@@ -205,14 +205,14 @@ useDefBasicBlock (ForLoopBlock  _itIdent _itTy eB eE mBrk block ann) = do
     -- The guard is evaluated before each iteration, so the variables it reads
     -- are read at the head of the loop, together with the ones read after it.
     guardLive <- runEncapsWithEmptyVars
-      (putLiveVarSet S.empty >> maybe (return ()) useExpression mBrk >> ST.gets liveVarSet)
+      (putLiveVarSet S.empty >> mapM_ useExpression mBrk >> ST.gets liveVarSet)
     headLive <- loopHeadLive (S.union guardLive (liveVarSet prevSt))
     -- What happens inside the body of a for, may not happen at all.
     loopSt <- runEncapsWithEmptyVars (putLiveVarSet headLive >> useDefBasicBlocks (blockBody block) >> ST.get)
     finalState <- checkUseVariableStates (prevSt {usedVarSet = S.empty}) [(loopSt, getLocation ann)]
     unifyState (optionBoxesMap finalState, movedBoxes finalState, S.union (usedVarSet prevSt) (usedVarSet finalState))
     putLiveVarSet headLive
-    maybe (return ()) useExpression mBrk
+    mapM_ useExpression mBrk
     -- Use the expressions of the for loop bounds, just in case they contain
     -- references to const input parameters.
     useExpression eB
@@ -301,7 +301,7 @@ useDefBasicBlock (AtomicArrayStore obj eI eO _ann)
   = useObject obj >> useExpression eI >> useExpression eO
 useDefBasicBlock (RegularBlock stmts) = useDefStatements stmts
 useDefBasicBlock (ReturnBlock e _ann) =
-  maybe (return ()) useExpression e
+  mapM_ useExpression e
 useDefBasicBlock (ContinueBlock e _ann) = useExpression e
 useDefBasicBlock (RebootBlock _ann) = return ()
 useDefBasicBlock (SystemCall obj _ident args _ann) =
@@ -374,7 +374,7 @@ checkOptionBoxStates lSt ((rSt, rloc):xs) = do
     case (M.lookup k lmap, M.lookup k rmap) of
       (Nothing, Nothing) -> throwError $ annotateError Internal EUnboxingOptionMap
       (Nothing, Just _) -> 
-        -- | If the option-box is not in the previous state, it means that
+        -- | If the option-box is not in the previous state, it means that
         -- it was not used after the branches and it was firstly "mentioned"
         -- in the current one.  However, since there are going to be more
         -- branches, then we will check later on if it is used correctly or

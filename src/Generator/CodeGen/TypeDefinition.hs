@@ -280,7 +280,7 @@ genConstSelfCastStmt ann identifier = do
     let cExpr = cast (ptr selfCType) (thisParam @: ptr (_const void))
     return $ pre_cr (var selfParam (ptr selfCType) @:= cExpr) |>> getLocation ann
 
--- | __termina_lock_t __lock = __termina_resource__lock(
+-- | __termina_lock_t __lock = __termina_resource__lock(
 --        &__ev->owner, &self->__lock_type);
 genResourceLockStmt :: SemanticAnn -> Identifier -> CGenerator CCompoundBlockItem
 genResourceLockStmt ann identifier = do

@@ -43,7 +43,7 @@ evalBinOp op (ConstInt (TInteger v1 repr1) _) (ConstInt (TInteger v2 _repr2) _) 
         BitwiseXor ->
             return $ ConstInt (TInteger (v1 `xor` v2) repr1) (TRPExprTy TConstInt)
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperand op
--- | Both operands are floating-point
+-- | Both operands are floating-point
 evalBinOp op (ConstDouble v1 _) (ConstDouble v2 _) =
     case op of
         Addition -> return $ ConstDouble (v1 + v2) (TRPExprTy TConstDouble)
@@ -55,7 +55,7 @@ evalBinOp op (ConstDouble v1 _) (ConstDouble v2 _) =
             else
                 return $ ConstDouble (v1 / v2) (TRPExprTy TConstDouble)
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperand op
--- | Mismatched operand types
+-- | Mismatched operand types
 evalBinOp op (ConstDouble v1 _) (ConstInt (TInteger v2 _repr2) _) =
     case op of
         Addition -> return $ ConstDouble (v1 + fromInteger v2) (TRPExprTy TConstDouble)
@@ -81,7 +81,7 @@ evalBinOp op (ConstInt (TInteger v1 _repr1) _) (ConstDouble v2 _) =
 evalBinOp _ _ _ =
     throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
--- | Evaluate a constant expression
+-- | Evaluate a constant expression
 evalConstExpression ::
     ConstExpression a -> TRPGenMonad (ConstExpression TRPSemAnn)
 evalConstExpression (ConstInt val _) = return $ ConstInt val (TRPExprTy TConstInt)
@@ -92,10 +92,10 @@ evalConstExpression (ConstObject ident _ann) = do
         Just val -> return val
         Nothing -> throwError . annotateError Internal $ EUnknownConstant ident
 evalConstExpression (ConstBinOp op left right _ann) = do
-    -- | Evaluate left and right expressions first
+    -- | Evaluate left and right expressions first
     left' <- evalConstExpression left
     right' <- evalConstExpression right
-    -- | Now perform the operation
+    -- | Now perform the operation
     evalBinOp op left' right'
 
 getResourceLockSet ::

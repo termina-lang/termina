@@ -79,7 +79,7 @@ genOperation prevCmp (TRPTaskOperation stepName taskName actionName pathName blo
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
-            Nothing -> -- | It is an end step and it does not have further operations
+            Nothing -> -- | It is an end step and it does not have further operations
                 return []
             Just act -> genOperation taskName act
         ) nextSteps
@@ -92,7 +92,7 @@ genOperation prevCmp (TRPHandlerOperation stepName handlerName actionName pathNa
     nextActivities <- mapM (\actId -> do
         stMap <- ST.gets stepMap
         case M.lookup actId stMap of
-            Nothing -> -- | It is an end step and it does not have further operations
+            Nothing -> -- | It is an end step and it does not have further operations
                 return []
             Just act -> genOperation handlerName act
         ) nextSteps

@@ -18,9 +18,9 @@ data Error
   = 
     EEmptyModuleName -- ^ Empty module name (Internal)
     | EParseError ParseError 
-    | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
+    | EInvalidModuleName QualifiedName -- ^ Invalid module name (PE-002)
     | EImportedFileNotFound QualifiedName -- ^ Imported file not found (PE-003)
-    | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
+    | EImportedFilesLoop [ModuleDependency] -- ^ Imported files loop (PE-004)
   deriving Show
 
 type ParsingErrors = AnnotatedError Error Location
@@ -70,7 +70,7 @@ instance ErrorMessage ParsingErrors where
                 _ -> T.pack $ show pos ++ ": " ++ show e
         where
 
-            -- | Prints a trace of imports
+            -- | Prints a trace of imports
             printImportTrace :: QualifiedName -> [ModuleDependency] -> T.Text
             printImportTrace _ [] = ""
             printImportTrace currentFile [ModuleDependency finalCall tracePos@(Position _ traceStartPos _)] =

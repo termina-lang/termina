@@ -53,7 +53,7 @@ lexer = Tok.makeTokenParser langDef
                       ,"!=" -- RelationalNotEqual
                       ,"&" -- BitwiseAnd / reference creation
                       ,"|" -- BitwiseOr
-                      ,"^" -- BitwiseXor
+                      ,"^" -- BitwiseXor
                       ,"&&" -- LogicalAnd
                       ,"||" -- LogicalOr
                       ,"{|" -- multicast start"

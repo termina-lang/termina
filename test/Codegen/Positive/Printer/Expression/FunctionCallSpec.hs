@@ -10,18 +10,18 @@ import Semantic.Types
 var0, var1, pVar :: Object SemanticAnn
 -- | var0 : u16
 var0 = Variable "var0" (objSemAnn Mutable TUInt16)
--- | boxVar1 : 'box u16
+-- | boxVar1 : 'box u16
 var1 = Variable "var1" boxUInt16SemAnn
--- | p_var : &u16
+-- | p_var : &u16
 pVar = Variable "p_var" refUInt16SemAnn
 
 unboxVar1 :: Expression SemanticAnn
 unboxVar1 = AccessObject (Unbox var1 (objSemAnn Mutable TUInt16))
 
 referenceVar0, referenceVar1 :: Expression SemanticAnn
--- | &mut var0 : &u16
+-- | &mut var0 : &u16
 referenceVar0 = ReferenceExpression Mutable var0 refUInt16SemAnn
--- | &mut var1 : &u16
+-- | &mut var1 : &u16
 referenceVar1 = ReferenceExpression Mutable var1 refUInt16SemAnn
 
 dereferencepVar :: Object SemanticAnn

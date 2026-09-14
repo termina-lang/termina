@@ -65,10 +65,10 @@ typeStatement retTy (IfElseStmt condIf elifs condElse anns) = do
   -- | Check that if the statement defines an else-if branch, then it must have an otherwise branch
   when (not (null elifs) && isNothing condElse) (throwError $ annotateError anns EIfElseNoOtherwise)
   SAST.IfElseStmt
-    -- | Check that the condition is a boolean expression
+    -- | Check that the condition is a boolean expression
     <$> typeCondIf condIf
     <*> mapM typeCondElseIf elifs
-    <*> maybe (return Nothing) (fmap Just . typeCondElse) condElse
+    <*> mapM typeCondElse condElse
     <*> return (buildStmtAnn anns)
   where
     typeCondExpr :: Expression ParserAnn -> SemanticMonad (SAST.Expression SemanticAnn)

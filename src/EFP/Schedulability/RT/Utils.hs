@@ -49,7 +49,7 @@ evalBinOp ann op (ConstInt (TInteger v1 repr1) _) (ConstInt (TInteger v2 _repr2)
         BitwiseXor ->
             return $ ConstInt (TInteger (v1 `xor` v2) repr1) ann
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperand op
--- | Both operands are floating-point
+-- | Both operands are floating-point
 evalBinOp ann op (ConstDouble v1 _) (ConstDouble v2 _) = 
     case op of
         Addition -> return $ ConstDouble (v1 + v2) ann
@@ -61,24 +61,24 @@ evalBinOp ann op (ConstDouble v1 _) (ConstDouble v2 _) =
             else
                 return $ ConstDouble (v1 / v2) ann
         _ -> throwError . annotateError (getLocation ann) $ EInvalidConstExpressionOperand op
--- | Mismatched operand types
+-- | Mismatched operand types
 evalBinOp ann _ left right =
     case (getAnnotation left, getAnnotation right) of
         (RTExprTy t1 _, RTExprTy t2 _) -> 
             throwError . annotateError (getLocation ann) $ EConstExpressionTypeMismatch t1 t2
         _ -> throwError . annotateError Internal $ EInvalidConstExpressionOperandTypes
 
--- | Evaluate a constant expression
+-- | Evaluate a constant expression
 evalConstExpression :: (MonadError RTErrors m) 
     => ConstExpression RTSemAnn -> m (ConstExpression RTSemAnn)
 evalConstExpression c@(ConstInt {}) = return c
 evalConstExpression c@(ConstDouble {}) = return c
 evalConstExpression (ConstObject ident ann) = 
-    -- | We do not support constants in these models (yet), so throw an error
+    -- | We do not support constants in these models (yet), so throw an error
     throwError . annotateError (getLocation ann) $ EUnknownConstant ident
 evalConstExpression (ConstBinOp op left right ann) = do
-    -- | Evaluate left and right expressions first
+    -- | Evaluate left and right expressions first
     left' <- evalConstExpression left
     right' <- evalConstExpression right
-    -- | Now perform the operation
+    -- | Now perform the operation
     evalBinOp ann op left' right'

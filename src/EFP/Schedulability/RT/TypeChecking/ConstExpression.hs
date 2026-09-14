@@ -16,7 +16,7 @@ typeConstExpression (ConstInt i ann) =
 typeConstExpression (ConstDouble d ann) = 
     return $ ConstDouble d (RTExprTy TConstDouble (getLocation ann))
 typeConstExpression (ConstObject ident ann) = do
-    -- | We do not support constants in these models (yet), so throw an error
+    -- | We do not support constants in these models (yet), so throw an error
     throwError . annotateError (getLocation ann) $ EUnknownConstant ident
 typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left

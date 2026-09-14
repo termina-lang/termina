@@ -17,19 +17,19 @@ import qualified Data.Text.Lazy as TL
 
 class ErrorMessage a where
 
-    -- | Error identifier 
+    -- | Error identifier 
     errorIdent :: a -> T.Text
 
-    -- | Error title
+    -- | Error title
     errorTitle :: a -> T.Text
 
-    -- | Generates a message from a given error.
+    -- | Generates a message from a given error.
     toText :: 
         a -- ^ The error
         -> M.Map FilePath T.Text -- ^ Map of the project's source files to their contents
         -> T.Text
 
-    -- | Generates an LSP diagnostic from a given error
+    -- | Generates an LSP diagnostic from a given error
     toDiagnostics :: 
         a -- ^ The error
         -> M.Map FilePath T.Text -- ^ Map of the project's source files to their contents

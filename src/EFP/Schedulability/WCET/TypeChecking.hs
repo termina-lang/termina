@@ -74,7 +74,7 @@ typeConstExpression (ConstObject ident ann) = do
         isLocalConst <- ST.gets (S.member ident . localConsts)
         unless isLocalConst $
             throwError . annotateError (getLocation ann) $ EUnknownVariable ident
-    -- | For now, all constants are of integer type: Termina does not support other constant types yet.
+    -- | For now, all constants are of integer type: Termina does not support other constant types yet.
     return $ ConstObject ident (WCETExprTy TConstInt (getLocation ann))
 typeConstExpression (ConstBinOp op left right ann) = do
     left' <- typeConstExpression left
@@ -110,7 +110,7 @@ typeWCET plt (TransactionalWCET classId functionId pathName constParams wcet ann
             functionWCETs <- case M.lookup (classId, functionId) pltMap of
                 Nothing -> return M.empty
                 Just fps -> return fps
-            -- | Check that there is no other worst-case execution time defined for the same path and platform
+            -- | Check that there is no other worst-case execution time defined for the same path and platform
             case M.lookup pathName functionWCETs of
                 Nothing -> return ()
                 Just (TransactionalWCET _ _ _ _ _ ann') ->

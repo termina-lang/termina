@@ -9,17 +9,17 @@ import Utils.Annotations
 -- | Worst-case execution path block
 data WCEPathBlock a
     = 
-    -- | If block
+    -- | If block
     WCEPathCondIf
         [WCEPathBlock a] -- ^ blocks in the if block
         BlockPosition
         a
-    -- | Else-if block
+    -- | Else-if block
     | WCEPathCondElseIf
         [WCEPathBlock a] -- ^ blocks in the else-if block
         BlockPosition
         a
-    -- | Else block
+    -- | Else block
     | WCEPathCondElse
         [WCEPathBlock a] -- ^ blocks in the else block
         BlockPosition
@@ -36,7 +36,7 @@ data WCEPathBlock a
         [WCEPathBlock a] -- ^ blocks in the case block
         BlockPosition
         a
-    -- | Send message
+    -- | Send message
     | WCEPSendMessage 
         Identifier -- ^ Port name
         BlockPosition
@@ -55,12 +55,12 @@ data WCEPathBlock a
         Identifier -- ^ Port name
         BlockPosition
         a
-    -- | Call to the free procedure of a memory allocator 
+    -- | Call to the free procedure of a memory allocator 
     | WCEPFreeBox 
         Identifier -- ^ Port name
         BlockPosition
         a
-    -- | Regular block (list of statements)
+    -- | Regular block (list of statements)
     | WCEPRegularBlock BlockPosition a
     | WCEPReturn BlockPosition a
     | WCEPContinue 
@@ -68,7 +68,7 @@ data WCEPathBlock a
         BlockPosition
         a
     | WCEPReboot BlockPosition a
-    -- | System call
+    -- | System call
     | WCEPSystemCall 
         Identifier
         BlockPosition

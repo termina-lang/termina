@@ -19,16 +19,16 @@ data Error
     EInvalidTransStepType -- ^ Invalid transactional step type (internal)
     | EUnknownComponent Identifier -- ^ Unknown component referenced in transactional step (internal)
     | EUnknownAction -- ^ Unknown action referenced in transactional step (internal)
-    | EInvalidForLoop -- ^ Invalid for-loop structure in transactional step (internal)
+    | EInvalidForLoop -- ^ Invalid for-loop structure in transactional step (internal)
     | EInvalidArgumentPassing -- ^ Invalid argument passing to transactional step (internal)
     | EUnknownAccessPort Identifier Identifier -- ^ Unknown access port referenced in worst-case execution path (internal)
-    | EInvalidWCETExpression -- ^ Invalid worst-case execution time expression (internal)
-    | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression (internal)
+    | EInvalidWCETExpression -- ^ Invalid worst-case execution time expression (internal)
+    | EConstExpressionDivisionByZero -- ^ Division by zero in constant expression (internal)
     | EInvalidConstExpressionOperand Op -- ^ Invalid operand for constant expression (internal)
-    | EInvalidRTElementForTransPath -- ^ Invalid RT element provided for transactional path generation (internal)
+    | EInvalidRTElementForTransPath -- ^ Invalid RT element provided for transactional path generation (internal)
     | EConstExpressionTypeMismatch ConstExprType ConstExprType -- ^ Type mismatch in constant expression (internal)
-    | EInvalidConstExpressionOperandTypes -- ^ Invalid operand types for constant expression (internal)
-    | EUnknownConstant Identifier -- ^ Unknown constant in constant expression (internal)
+    | EInvalidConstExpressionOperandTypes -- ^ Invalid operand types for constant expression (internal)
+    | EUnknownConstant Identifier -- ^ Unknown constant in constant expression (internal)
     | ENoPathsFound Identifier Identifier -- ^ No worst-case paths found for the given component and member names
     | ENoWCETForPath Identifier Identifier Identifier Identifier -- ^ No worst-case execution time found
     deriving Show

@@ -43,7 +43,7 @@ genSourceASTElement glb@(GlobalDeclaration {}) = genGlobal glb
 genSourceASTElement func@(Function {}) = genFunction func
 
 genHeaderFile ::
-    -- | Include option.h
+    -- | Include option.h
     Bool
     -- | Include status.h
     -> Bool
@@ -51,7 +51,7 @@ genHeaderFile ::
     -> Bool
     -- | Module name
     -> QualifiedName
-    -- | Import list
+    -- | Import list
     -> [QualifiedName]
     -> AnnotatedProgram SemanticAnn
     -> CGenerator CFile

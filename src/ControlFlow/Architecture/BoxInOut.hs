@@ -73,7 +73,7 @@ inOutDestroyOptionMatchCases _ _ = throwError $ annotateError Internal EInvalidM
 
 inOutBasicBlock :: BasicBlock SemanticAnn -> BoxInOutMonad ()
 inOutBasicBlock (AllocBox obj arg ann) = do
-    -- | First we need to obtain the name of the allocator port
+    -- | First we need to obtain the name of the allocator port
     inPt <- getPortName obj
     optionBox <- getExprOptionBoxName arg
     addOptionBox optionBox (InOptionBoxAlloc inPt ann)
@@ -83,21 +83,21 @@ inOutBasicBlock (FreeBox obj arg ann) = do
     boxSource <- ST.gets (fromJust . M.lookup boxName . inBoxMap)
     addIOMapFree outPt ann boxSource
 inOutBasicBlock (IfElseBlock bTrue elseIfs bFalse _ann) =
-    localInputScope $ mapM_ inOutBasicBlock (blockBody . condIfBody $ bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . condElseIfBody<$> elseIfs) >> maybe (return ()) (mapM_ inOutBasicBlock . blockBody . condElseBody) bFalse
+    localInputScope $ mapM_ inOutBasicBlock (blockBody . condIfBody $ bTrue) >> mapM_ (mapM_ inOutBasicBlock) (blockBody . condElseIfBody<$> elseIfs) >> mapM_ (mapM_ inOutBasicBlock . blockBody . condElseBody) bFalse
 inOutBasicBlock (ForLoopBlock {}) =
-    -- | Inside a for loop, there cannot be any box releasing
+    -- | Inside a for loop, there cannot be any box releasing
     return ()
 inOutBasicBlock (MatchBlock eMatch cases mDefaultCase _) = do
-    -- | We need to check if we are destroying a box
+    -- | We need to check if we are destroying a box
     eTy <- getExprType eMatch
     case eTy of
-        -- | If the match expression is an option box, we need to destroy the box
+        -- | If the match expression is an option box, we need to destroy the box
         -- and propagate the box to the Some case
         TOption (TBoxSubtype _) -> do
-            -- | First we need to obtain the name of the option box variable, so that
+            -- | First we need to obtain the name of the option box variable, so that
             -- we can look for the port where its box came from.
             optionBox <- getExprOptionBoxName eMatch
-            -- | We look for the port where the box came from
+            -- | We look for the port where the box came from
             optionBoxSource <- ST.gets (fromJust . M.lookup optionBox . inOptionBoxMap)
             inOutDestroyOptionMatchCases optionBoxSource cases
         _ -> mapM_ (mapM_ inOutBasicBlock) (blockBody . matchBody <$> cases)
@@ -114,7 +114,7 @@ inOutBasicBlock (SendMessage obj arg ann) = do
             addIOMapSend outPt ann boxSource
         _ -> return ()
 inOutBasicBlock (ProcedureInvoke obj procId args ann) = do
-    -- | We need to check if we are sending a box as an argument
+    -- | We need to check if we are sending a box as an argument
     argTys <- mapM getExprType args
     zipWithM_ checkArg [0..] argTys
 
@@ -159,7 +159,7 @@ inOutClassMember _ (ClassProcedure _ name params body _ann) = do
 
 inOutClass :: TypeDef SemanticAnn -> BoxInOutMonad ()
 inOutClass (Class _ _ members _ _) = do
-    -- | Get the map between the actions and the ports from the members list
+    -- | Get the map between the actions and the ports from the members list
     let actionsToPorts = M.fromList $ 
             (map (
                 \case {

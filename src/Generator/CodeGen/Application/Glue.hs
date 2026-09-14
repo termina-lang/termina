@@ -121,7 +121,7 @@ genInitEmitters progArchitecture = do
             -- interrupt emitter is connected
             (targetEntity, targetPort) <- case M.lookup timer (emitterTargets progArchitecture) of
                 Just (entity, port, _) -> return (entity, port)
-                -- | If the interrupt emitter is not connected, throw an error
+                -- | If the interrupt emitter is not connected, throw an error
                 Nothing -> throwError $ InternalError $ "Periodic timer emitter not connected: " ++ show timer
             case M.lookup targetEntity (handlers progArchitecture) of
                 Just (TPHandler identifier classId _ _ _ _ _ _) -> do
@@ -180,9 +180,9 @@ genInitEmitters progArchitecture = do
             -- interrupt emitter is connected
             (targetEntity, targetPort) <- case M.lookup irq (emitterTargets progArchitecture) of
                 Just (entity, port, _) -> return (entity, port)
-                -- | If the interrupt emitter is not connected, throw an error
+                -- | If the interrupt emitter is not connected, throw an error
                 Nothing -> throwError $ InternalError $ "Interrupt emitter not connected: " ++ show irq
-            -- | Now we have to check if the target entity is a task or a handler
+            -- | Now we have to check if the target entity is a task or a handler
             case M.lookup targetEntity (handlers progArchitecture) of
                 Just (TPHandler identifier classId _ _ _ _ _ _) -> do
                     let cls = handlerClasses progArchitecture M.! classId
@@ -341,7 +341,7 @@ genInitMessageQueues queues = do
                         "status" @: (_const . ptr $ int32_t)
                     ]
                 ]]
-        -- | Message queues with unit type do not need a definition
+        -- | Message queues with unit type do not need a definition
         genOSALMsgQueueInit (OSALChannelMsgQueue _ TUnit _ _ _) = return []
         genOSALMsgQueueInit mq@(OSALChannelMsgQueue _ ty size _ _) = do
             msgQueueId <- genDefineMsgQueueIdLabel mq
@@ -423,9 +423,9 @@ genInitalEventFunction :: TerminaProgArch a -> TPEmitter a -> CGenerator [CFileI
 genInitalEventFunction progArchitecture (TPSystemInitEmitter systemInit _)= do
     (targetEntity, targetPort) <- case M.lookup systemInit (emitterTargets progArchitecture) of
         Just (entity, port, _) -> return (entity, port)
-        -- | If the interrupt emitter is not connected, throw an error
+        -- | If the interrupt emitter is not connected, throw an error
         Nothing -> throwError $ InternalError $ "System init emitter not connected: " ++ show systemInit
-    -- |  Now we have to check if the target entity is a task or a handler
+    -- |  Now we have to check if the target entity is a task or a handler
     let event = pre_cr $ var "event" __termina_event_t
     eventFunctionBody <-
         case M.lookup targetEntity (handlers progArchitecture) of
@@ -647,7 +647,7 @@ genMainFile mName progArchitecture = do
     where
         -- | List of modules that must be included
         incs = getGlobDeclModules progArchitecture
-        -- | List of include directives
+        -- | List of include directives
         includes = map (\nm -> CPPDirective (CPPInclude False (nm <.> "h")) (internalAnn (CPPDirectiveAnn True))) incs
 
 runGenMainFile ::
