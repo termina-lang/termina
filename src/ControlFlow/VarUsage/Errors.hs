@@ -25,6 +25,7 @@ data Error
   | EAssignedValueNotUsed Identifier -- ^ Value assigned to a variable is never read (VE-006)
   | EReadBeforeAssignment Identifier -- ^ Object read on a path where it has not been assigned (VE-007)
   | EPartialWriteBeforeAssignment Identifier -- ^ Field or element written before the object is assigned as a whole (VE-008)
+  | EInitializerNotUsed Identifier -- ^ Value an initializer gives an object is never read (VE-009)
   deriving Show
 
 type VarUsageError = AnnotatedError Error Location
@@ -39,6 +40,7 @@ instance ErrorMessage VarUsageError where
     errorIdent (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "VE-006"
     errorIdent (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "VE-007"
     errorIdent (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "VE-008"
+    errorIdent (AnnotatedError (EInitializerNotUsed _ident) _pos) = "VE-009"
 
     errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
     errorTitle (AnnotatedError (ENotUsed _ident) _pos) = "variable not used"
@@ -48,6 +50,7 @@ instance ErrorMessage VarUsageError where
     errorTitle (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "assigned value never read"
     errorTitle (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "object read before it is assigned"
     errorTitle (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "partial write to an object that is not assigned yet"
+    errorTitle (AnnotatedError (EInitializerNotUsed _ident) _pos) = "initializer never read"
 
     toText e@(AnnotatedError err pos@(Position _ start _end)) files =
         let fileName = sourceName start
@@ -97,6 +100,12 @@ instance ErrorMessage VarUsageError where
                     (Just ("Variable \x1b[31m" <> T.pack ident <>
                         "\x1b[0m is declared without an initializer and this writes only a part of it.\n" <>
                         "The whole object must be assigned before a field or an element of it is written."))
+            EInitializerNotUsed ident ->
+                pprintSimpleError
+                    sourceLines title fileName pos
+                    (Just ("The value this initializer gives \x1b[31m" <> T.pack ident <>
+                        "\x1b[0m is overwritten before anybody reads it.\n" <>
+                        "Move the declaration to where the value is computed, or declare the object without an initializer."))
 -- | Print the error as is
     toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
 

@@ -378,19 +378,21 @@ testVE005_1 = "task class TaskClass0 {\n" ++
 testVE006 :: String
 testVE006 = "function fun0() -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
+       "    let first : u32 = x;\n" ++
        "    x = 1 : u32;\n" ++
        "    x = 2 : u32;\n" ++
-       "    return x;\n" ++
+       "    return x + first;\n" ++
        "}\n"
 
 testVE006_1 :: String
 testVE006_1 = "function fun0(c : bool) -> u32 {\n" ++
        "    var x : u32 = 0 : u32;\n" ++
+       "    let first : u32 = x;\n" ++
        "    if (c) {\n" ++
        "        x = 1 : u32;\n" ++
        "    }\n" ++
        "    x = 2 : u32;\n" ++
-       "    return x;\n" ++
+       "    return x + first;\n" ++
        "}\n"
 
 -- | The variable is read after the loop, so it is not an unused one, but the
@@ -398,11 +400,12 @@ testVE006_1 = "function fun0(c : bool) -> u32 {\n" ++
 testVE006_2 :: String
 testVE006_2 = "function fun0(array0 : &[u32; 10]) -> u32 {\n" ++
        "    var last : u32 = 0 : u32;\n" ++
+       "    let first : u32 = last;\n" ++
        "    for i : usize in 0 : usize .. 10 : usize {\n" ++
        "        last = (*array0)[i];\n" ++
        "    }\n" ++
        "    last = 5 : u32;\n" ++
-       "    return last;\n" ++
+       "    return last + first;\n" ++
        "}\n"
 
 -- | The value the declaration gives the object is overwritten before anybody
@@ -633,18 +636,18 @@ spec = do
       runNegativeTestVarUsage testVE006_2
         `shouldSatisfy`
           isEAssignedValueNotUsed "last"
-    it "VE-006: initializer overwritten before being read" $ do
+    it "VE-009: initializer overwritten before being read" $ do
       runNegativeTestVarUsage testVE006_3
         `shouldSatisfy`
-          isEAssignedValueNotUsed "x"
-    it "VE-006: initializer overwritten while a field of the same name is read" $ do
+          isEInitializerNotUsed "x"
+    it "VE-009: initializer overwritten while a field of the same name is read" $ do
       runNegativeTestVarUsage testVE006_4
         `shouldSatisfy`
-          isEAssignedValueNotUsed "field0"
-    it "VE-006: the same, with the field reached through (*s).field" $ do
+          isEInitializerNotUsed "field0"
+    it "VE-009: the same, with the field reached through (*s).field" $ do
       runNegativeTestVarUsage testVE006_5
         `shouldSatisfy`
-          isEAssignedValueNotUsed "field0"
+          isEInitializerNotUsed "field0"
     it "VE-002: class field not read while another object's field of the same name is" $ do
       runNegativeTestVarUsage testVE002_1
         `shouldSatisfy`
@@ -727,3 +730,6 @@ spec = do
 
     isEPartialWriteBeforeAssignment :: Identifier -> Maybe VE.Error -> Bool
     isEPartialWriteBeforeAssignment inIdent = \case Just (EPartialWriteBeforeAssignment ident) -> (inIdent == ident); _ -> False
+
+    isEInitializerNotUsed :: Identifier -> Maybe VE.Error -> Bool
+    isEInitializerNotUsed inIdent = \case Just (EInitializerNotUsed ident) -> (inIdent == ident); _ -> False

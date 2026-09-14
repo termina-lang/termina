@@ -8,7 +8,8 @@ import VarUsage.Common (boxUsageErrorCode, varUsageErrorCode)
 import VarUsage.Negative.DetailSpec
   ( testVE001, testVE002, testBE001, testBE002, testBE003, testBE004, testBE005
   , testBE006, testBE007, testBE008, testBE009, testBE010, testBE011, testBE012
-  , testVE003, testVE004, testVE005, testVE006, testVE007, testVE008 )
+  , testVE003, testVE004, testVE005, testVE006, testVE007, testVE008
+  , testVE006_3 )
 
 import Data.Text (Text, unpack)
 import Control.Monad (forM_)
@@ -44,6 +45,7 @@ varCases =
   , ("VE-006", "assigned value never read", testVE006)
   , ("VE-007", "object read before it is assigned", testVE007)
   , ("VE-008", "partial write before the object is assigned", testVE008)
+  , ("VE-009", "initializer never read", testVE006_3)
   ]
 
 spec :: Spec
