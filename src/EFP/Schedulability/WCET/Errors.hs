@@ -32,11 +32,6 @@ data Error
 
 type WCEPathErrors = AnnotatedError Error Location
 
--- | Beware: the codes of this family are not all its own. Four of them are
--- written with the prefix of the parser and five with the prefix of the
--- transactional path generator, which is how they were found, and PE-003 is a
--- code the parser also emits. They are kept as they are until they are
--- renumbered.
 instance Diagnosable Error where
 
     describe (EUnknownClass ident) =
@@ -49,17 +44,17 @@ instance Diagnosable Error where
                     " does not have a member function called " <> emph (T.pack ident) <> ".")
     describe (EDuplicatedWCETAssignment pathName plt (classId, functionId, prevPos)) =
         relatedTo prevPos "the previous definition" $
-            diagnostic "PE-003" "duplicate path name"
+            diagnostic "WTE-003" "duplicate path name"
                 ("Duplicate worst-case execution time assignment on platform " <> emph (T.pack plt) <>
                     " for transactional path " <> emph (T.pack pathName) <>
                     " of member function " <> emph (T.pack functionId) <>
                     " of class " <> emph (T.pack classId) <> ".")
     describe (EUnknownVariable ident) =
-        diagnostic "TPE-004" "unknown variable"
+        diagnostic "WTE-004" "unknown variable"
             ("Unknown variable " <> emph (T.pack ident) <> ".")
     describe (EConstParamsNumMismatch classId functionId expected got functionPos) =
         relatedTo functionPos "the member function is defined here" $
-            diagnostic "TPE-005" "constant parameters number mismatch"
+            diagnostic "WTE-005" "constant parameters number mismatch"
                 ("Member function " <> emph (T.pack functionId) <>
                     " of class " <> emph (T.pack classId) <>
                     " defines " <> emph (T.pack (show expected)) <>
@@ -67,33 +62,33 @@ instance Diagnosable Error where
                     " were provided.")
     describe (EConstVarAlreadyDefined (ident, identLoc)) =
         relatedTo identLoc "the previous definition" $
-            diagnostic "TPE-006" "constant variable already defined"
+            diagnostic "WTE-006" "constant variable already defined"
                 ("There exists a constant variable with the same name " <>
                     emph (T.pack ident) <> ".")
     describe (EConstParamAlreadyDefined ident) =
-        diagnostic "TPE-007" "constant parameter already defined"
+        diagnostic "WTE-007" "constant parameter already defined"
             ("There already exists a constant parameter with the name " <>
                 emph (T.pack ident) <> " in the local scope.")
     describe (EClassPathMismatch classId (Position clsSource _ _, Position pathSource _ _)) =
-        diagnostic "TPE-008" "class path mismatch"
+        diagnostic "WTE-008" "class path mismatch"
             ("The transactional path is defined in a different module than the class.\nClass " <>
                 emph (T.pack classId) <> " is defined in module " <>
                 emph (T.pack (qualifiedToModuleName clsSource)) <>
                 ", but the transactional path is defined in module " <>
                 emph (T.pack (qualifiedToModuleName pathSource)) <> ".")
     describe (EClassPathMismatch _classId _locs) =
-        diagnosticWithoutDetail "TPE-008" "class path mismatch"
+        diagnosticWithoutDetail "WTE-008" "class path mismatch"
     describe (EInvalidPlatform plt) =
-        diagnostic "PE-009" "invalid platform"
+        diagnostic "WTE-009" "invalid platform"
             ("Invalid platform " <> emph (T.pack plt) <>
                 " specified for the worst-case execution time assignment.")
     describe (EUnknownTransactionalPath functionId classId pathName) =
-        diagnostic "PE-010" "unknown transactional path"
+        diagnostic "WTE-010" "unknown transactional path"
             ("Unknown transactional path " <> emph (T.pack pathName) <>
                 " for member function " <> emph (T.pack functionId) <>
                 " of class " <> emph (T.pack classId) <> ".")
     describe (EConstExpressionTypeMismatch t1 t2) =
-        diagnostic "PE-011" "constant expression type mismatch"
+        diagnostic "WTE-011" "constant expression type mismatch"
             ("Constant expression type mismatch: found " <> emph (showText t1) <>
                 " and " <> emph (showText t2) <> ".")
     -- | Everything else is a broken invariant of the compiler, which has no code
