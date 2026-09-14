@@ -6,10 +6,7 @@ module ControlFlow.ConstFolding.Errors where
 import Semantic.AST
 import Utils.Annotations
 import Utils.Errors
-import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import qualified Language.LSP.Protocol.Types as LSP
-import Text.Parsec
 import Semantic.Types
 import Utils.Printer
 
@@ -56,146 +53,83 @@ data Error =
 
 type ConstFoldError = AnnotatedError Error Location
 
+instance Diagnosable Error where
+
+    describe (EAtomicArrayConnectionSizeMismatch expectedSize actualSize) =
+        diagnostic "CFE-001" "atomic array connection size mismatch"
+            ("The size of the connected atomic array is expected to be " <> emph (T.pack (show expectedSize)) <>
+                " but the array has size " <> emph (T.pack (show actualSize)) <> ".")
+    describe (EArrayInitializerSizeMismatch expectedSize initializerSize) =
+        diagnostic "CFE-002" "array initializer size mismatch"
+            ("The size of the array initializer is " <> emph (T.pack (show initializerSize)) <>
+                " but the expected size is " <> emph (T.pack (show expectedSize)) <> ".")
+    describe (EStringInitializerInvalidSize expectedSize initializerSize) =
+        diagnostic "CFE-003" "invalid string initializer size"
+            ("The size of the string initializer is " <> emph (T.pack (show initializerSize)) <>
+                " but the array size is of " <> emph (T.pack (show expectedSize)) <> ".")
+    describe (EConstIntegerOverflow value ty) =
+        diagnostic "CFE-004" "constant integer overflow"
+            ("The resulting value " <> emph (T.pack (show value)) <>
+                " is too large for the type " <> emph (showText ty) <> ".")
+    describe (EConstIntegerUnderflow value ty) =
+        diagnostic "CFE-005" "constant integer underflow"
+            ("The resulting value " <> emph (T.pack (show value)) <>
+                " produces an underflow of the type " <> emph (showText ty) <> ".")
+    describe EConstDivisionByZero =
+        diagnostic "CFE-006" "constant division by zero"
+            "Division by zero in constant expression."
+    describe (EConstCondition value) =
+        diagnostic "CFE-007" "constant condition"
+            ("The condition always evaluates to " <> emph (showText value) <> ".")
+    describe EForLoopStatementZeroIterations =
+        diagnostic "CFE-008" "for loop statement with zero iterations"
+            "The for loop statement has zero iterations."
+    describe (EForLoopStatementNegativeIterations startIndex endIndex) =
+        diagnostic "CFE-009" "for loop statement with negative iterations"
+            ("The for loop statement has negative iterations from " <> emph (T.pack (show startIndex)) <>
+                " to " <> emph (T.pack (show endIndex)) <> ".")
+    describe (EArraySliceOutOfBounds size upperIndex) =
+        diagnostic "CFE-010" "array slice out of bounds"
+            ("The array slice is out of bounds. The upper index " <> emph (T.pack (show upperIndex)) <>
+                " is greater than the size of the array " <> emph (T.pack (show size)) <> ".")
+    describe (EArraySliceNegativeRange lowerIndex upperIndex) =
+        diagnostic "CFE-011" "array slice negative range"
+            ("The array slice has a negative range. The lower index " <> emph (T.pack (show lowerIndex)) <>
+                " is greater than the upper index " <> emph (T.pack (show upperIndex)) <> ".")
+    describe (EArraySliceInvalidRange size lowerIndex upperIndex) =
+        diagnostic "CFE-012" "array slice invalid range"
+            ("The array slice has an invalid range. The size of the slice is expected to be " <> emph (T.pack (show size)) <>
+                " and the range is from " <> emph (T.pack (show lowerIndex)) <>
+                " to " <> emph (T.pack (show upperIndex)) <> ".")
+    describe (EArrayIndexOutOfBounds size index) =
+        diagnostic "CFE-013" "array index out of bounds"
+            ("The array index is out of bounds. The index " <> emph (T.pack (show index)) <>
+                " is greater than the size of the array " <> emph (T.pack (show size)) <> ".")
+    describe (EAtomicArrayIndexOutOfBounds index size) =
+        diagnostic "CFE-014" "atomic array index out of bounds"
+            ("The atomic array index is out of bounds. The index " <> emph (T.pack (show index)) <>
+                " is greater than the size of the atomic array " <> emph (T.pack (show size)) <> ".")
+    describe (EReferencedArraySizeMismatch expectedSize actualSize) =
+        diagnostic "CFE-015" "referenced array size mismatch"
+            ("The referenced array size is " <> emph (T.pack (show actualSize)) <>
+                " but the expected size is " <> emph (T.pack (show expectedSize)) <> ".")
+    describe (EShiftAmountOutOfBounds width amount) =
+        diagnostic "CFE-016" "shift amount out of bounds"
+            ("The shift amount " <> emph (T.pack (show amount)) <>
+                " is greater than or equal to the width " <> emph (T.pack (show width)) <>
+                " of the shifted type.")
+    describe (EInvariantComparison value ty result) =
+        diagnostic "CFE-017" "invariant comparison"
+            ("The comparison against " <> emph (T.pack (show value)) <>
+                " always evaluates to " <> emph (if result then "true" else "false") <>
+                " for any value of type " <> emph (showText ty) <> ".")
+    -- | Everything else is a broken invariant of the compiler, which has no code
+    -- of its own.
+    describe _ = diagnosticWithoutDetail "Internal" "internal error"
+
 instance ErrorMessage ConstFoldError where
 
-    errorIdent (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "CFE-001"
-    errorIdent (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "CFE-002"
-    errorIdent (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "CFE-003"
-    errorIdent (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "CFE-004"
-    errorIdent (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "CFE-005"
-    errorIdent (AnnotatedError EConstDivisionByZero _pos) = "CFE-006"
-    errorIdent (AnnotatedError (EConstCondition _const) _pos) = "CFE-007"
-    errorIdent (AnnotatedError EForLoopStatementZeroIterations _pos) = "CFE-008"
-    errorIdent (AnnotatedError (EForLoopStatementNegativeIterations _start _end) _pos) = "CFE-009"
-    errorIdent (AnnotatedError (EArraySliceOutOfBounds _size _upperIndex) _pos) = "CFE-010"
-    errorIdent (AnnotatedError (EArraySliceNegativeRange _lowerIndex _upperIndex) _pos) = "CFE-011"
-    errorIdent (AnnotatedError (EArraySliceInvalidRange _size _lowerIndex _upperIndex) _pos) = "CFE-012"
-    errorIdent (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "CFE-013"
-    errorIdent (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "CFE-014"
-    errorIdent (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "CFE-015"
-    errorIdent (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "CFE-016"
-    errorIdent (AnnotatedError (EInvariantComparison _value _ty _result) _pos) = "CFE-017"
-    errorIdent _ = "Internal"
-
-    errorTitle (AnnotatedError (EAtomicArrayConnectionSizeMismatch _expectedSize _actualSize) _pos) = "atomic array connection size mismatch"
-    errorTitle (AnnotatedError (EArrayInitializerSizeMismatch _expectedSize _initializerSize) _pos) = "array initializer size mismatch"
-    errorTitle (AnnotatedError (EStringInitializerInvalidSize _expectedSize _initializerSize) _pos) = "invalid string initializer size"
-    errorTitle (AnnotatedError (EConstIntegerOverflow _value _ty) _pos) = "constant integer overflow"
-    errorTitle (AnnotatedError (EConstIntegerUnderflow _value _ty) _pos) = "constant integer underflow"
-    errorTitle (AnnotatedError EConstDivisionByZero _pos) = "constant division by zero"
-    errorTitle (AnnotatedError (EConstCondition _const) _pos) = "constant condition"
-    errorTitle (AnnotatedError EForLoopStatementZeroIterations _pos) = "for loop statement with zero iterations"
-    errorTitle (AnnotatedError (EForLoopStatementNegativeIterations _start _end) _pos) = "for loop statement with negative iterations"
-    errorTitle (AnnotatedError (EArraySliceOutOfBounds _size _upperIndex) _pos) = "array slice out of bounds"
-    errorTitle (AnnotatedError (EArraySliceNegativeRange _lowerIndex _upperIndex) _pos) = "array slice negative range"
-    errorTitle (AnnotatedError (EArraySliceInvalidRange _size _lowerIndex _upperIndex) _pos) = "array slice invalid range"
-    errorTitle (AnnotatedError (EArrayIndexOutOfBounds _index _size) _pos) = "array index out of bounds"
-    errorTitle (AnnotatedError (EAtomicArrayIndexOutOfBounds _index _size) _pos) = "atomic array index out of bounds"
-    errorTitle (AnnotatedError (EReferencedArraySizeMismatch _expectedSize _actualSize) _pos) = "referenced array size mismatch"
-    errorTitle (AnnotatedError (EShiftAmountOutOfBounds _width _amount) _pos) = "shift amount out of bounds"
-    errorTitle (AnnotatedError (EInvariantComparison _value _ty _result) _pos) = "invariant comparison"
-    errorTitle (AnnotatedError _err _pos) = "internal error"
-
-    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
-        let fileName = sourceName start
-            sourceLines = files M.! fileName
-            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-        in
-            case err of 
-                EAtomicArrayConnectionSizeMismatch expectedSize actualSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the connected atomic array is expected to be \x1b[31m" <> T.pack (show expectedSize) <> 
-                            "\x1b[0m but the array has size \x1b[31m" <> T.pack (show actualSize) <> "\x1b[0m."))
-                EArrayInitializerSizeMismatch expectedSize initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the array initializer is \x1b[31m" <> T.pack (show initializerSize) <>
-                            "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
-                EStringInitializerInvalidSize expectedSize initializerSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The size of the string initializer is \x1b[31m" <> T.pack (show initializerSize) <>
-                            "\x1b[0m but the array size is of \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
-                EConstIntegerOverflow value ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The resulting value \x1b[31m" <> T.pack (show value) <>
-                            "\x1b[0m is too large for the type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EConstIntegerUnderflow value ty ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The resulting value \x1b[31m" <> T.pack (show value) <>
-                            "\x1b[0m produces an underflow of the type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                EConstDivisionByZero ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "Division by zero in constant expression.")
-                EConstCondition value ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The condition always evaluates to \x1b[31m" <> showText value <> "\x1b[0m."))
-                EForLoopStatementZeroIterations ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just "The for loop statement has zero iterations.")
-                EForLoopStatementNegativeIterations startIndex endIndex ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The for loop statement has negative iterations from \x1b[31m" <> T.pack (show startIndex) <>
-                            "\x1b[0m to \x1b[31m" <> T.pack (show endIndex) <> "\x1b[0m."))
-                EArraySliceOutOfBounds size upperIndex ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The array slice is out of bounds. The upper index \x1b[31m" <> T.pack (show upperIndex) <>
-                            "\x1b[0m is greater than the size of the array \x1b[31m" <> T.pack (show size) <> "\x1b[0m."))
-                EArraySliceNegativeRange lowerIndex upperIndex ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The array slice has a negative range. The lower index \x1b[31m" <> T.pack (show lowerIndex) <>
-                            "\x1b[0m is greater than the upper index \x1b[31m" <> T.pack (show upperIndex) <> "\x1b[0m."))
-                EArraySliceInvalidRange size lowerIndex upperIndex ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The array slice has an invalid range. The size of the slice is expected to be \x1b[31m" <> T.pack (show size) <>
-                            "\x1b[0m and the range is from \x1b[31m" <> T.pack (show lowerIndex) <>
-                            "\x1b[0m to \x1b[31m" <> T.pack (show upperIndex) <> "\x1b[0m."))
-                EArrayIndexOutOfBounds size index ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The array index is out of bounds. The index \x1b[31m" <> T.pack (show index) <>
-                            "\x1b[0m is greater than the size of the array \x1b[31m" <> T.pack (show size) <> "\x1b[0m."))
-                EAtomicArrayIndexOutOfBounds index size ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The atomic array index is out of bounds. The index \x1b[31m" <> T.pack (show index) <>
-                            "\x1b[0m is greater than the size of the atomic array \x1b[31m" <> T.pack (show size) <> "\x1b[0m."))
-                EReferencedArraySizeMismatch expectedSize actualSize ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The referenced array size is \x1b[31m" <> T.pack (show actualSize) <>
-                            "\x1b[0m but the expected size is \x1b[31m" <> T.pack (show expectedSize) <> "\x1b[0m."))
-                EShiftAmountOutOfBounds width amount ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The shift amount \x1b[31m" <> T.pack (show amount) <>
-                            "\x1b[0m is greater than or equal to the width \x1b[31m" <> T.pack (show width) <>
-                            "\x1b[0m of the shifted type."))
-                EInvariantComparison value ty result ->
-                    pprintSimpleError
-                        sourceLines title fileName pos
-                        (Just ("The comparison against \x1b[31m" <> T.pack (show value) <>
-                            "\x1b[0m always evaluates to \x1b[31m" <> (if result then "true" else "false") <>
-                            "\x1b[0m for any value of type \x1b[31m" <> showText ty <> "\x1b[0m."))
-                _ -> pprintSimpleError sourceLines title fileName pos Nothing
-
-    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
-
-    toDiagnostics e@(AnnotatedError _ pos) _files =
-        [LSP.Diagnostic (loc2Range pos)
-            (Just LSP.DiagnosticSeverity_Error)
-            Nothing Nothing Nothing
-            text (Just []) Nothing Nothing]
-        
-        where 
-            text = "error [" <> errorIdent e <> "]: " <> errorTitle e <> "."
+    errorIdent = diagCode . describe . getError
+    errorTitle = diagTitle . describe . getError
+    toText = errorToText
+    toDiagnostics = errorToDiagnostics

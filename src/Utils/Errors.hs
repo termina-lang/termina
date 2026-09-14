@@ -82,8 +82,17 @@ errorToText (AnnotatedError err pos@(Position _ start _end)) files =
     in
         pprintError sourceLines title fileName pos
             (diagRelated diagnostic) (diagDetail diagnostic)
--- | An error with no position in the source is printed as it is shown.
-errorToText (AnnotatedError err pos) _files = T.pack $ show pos ++ ": " ++ show err
+-- | An error with no position in the source has nothing to quote, so it prints
+-- its message alone. An internal error has no message either, and then the value
+-- that produced it is the only clue there is.
+errorToText (AnnotatedError err pos) _files =
+    let diagnostic = describe err
+        title = "\x1b[31merror [" <> diagCode diagnostic <> "]\x1b[0m: "
+            <> diagTitle diagnostic <> "."
+    in
+        case diagDetail diagnostic of
+            Just detail -> title <> "\n" <> detail
+            Nothing -> title <> "\n" <> T.pack (show pos ++ ": " ++ show err)
 
 -- | The LSP diagnostic of an annotated error, from its description. The fields
 -- are, in order, range, severity, code, code description, source, message, tags,
