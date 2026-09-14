@@ -13,6 +13,8 @@ import Text.Parsec.Pos
 import qualified Language.LSP.Protocol.Types as LSP
 import qualified Data.Map.Strict as M
 import qualified Data.Text.Lazy as TL
+import Data.List (sortOn)
+import Data.Maybe (mapMaybe)
 
 
 -- | What an error says to whoever reads it. Besides the text, it carries what an
@@ -78,7 +80,8 @@ errorToText (AnnotatedError err pos@(Position _ start _end)) files =
         title = "\x1b[31merror [" <> diagCode diagnostic <> "]\x1b[0m: "
             <> diagTitle diagnostic <> "."
     in
-        pprintSimpleError sourceLines title fileName pos (diagDetail diagnostic)
+        pprintError sourceLines title fileName pos
+            (diagRelated diagnostic) (diagDetail diagnostic)
 -- | An error with no position in the source is printed as it is shown.
 errorToText (AnnotatedError err pos) _files = T.pack $ show pos ++ ": " ++ show err
 
@@ -153,31 +156,54 @@ loc2Range (Position _ start end) =
 loc2Range _ = emptyRange
 
 pprintSimpleError :: T.Text -> T.Text -> String -> Location -> Maybe T.Text -> T.Text
-pprintSimpleError sourceLines errorMessage fileName (Position _ start end) msg = 
-    TL.toStrict $ prettyErrors sourceLines [genSimpleErrata]
-    
+pprintSimpleError sourceLines errorMessage fileName pos =
+    pprintError sourceLines errorMessage fileName pos []
+
+-- | The message of an error: the piece of source it points at, one more pointer
+-- for each position related to it, and the explanation underneath. A related
+-- position carries its own label, and one in another file is left out, since a
+-- block quotes a single source.
+pprintError :: T.Text -> T.Text -> String -> Location
+    -> [(Location, T.Text)] -> Maybe T.Text -> T.Text
+pprintError sourceLines errorMessage fileName pos related msg =
+    case mkPointer Nothing pos of
+        Nothing -> error "Internal error: invalid error position"
+        Just mainPointer ->
+            let pointers = sortOn pointerLine
+                    (mainPointer : mapMaybe (\(loc, what) -> mkPointer (Just what) loc) sameFile)
+            in
+                TL.toStrict $ prettyErrors sourceLines [genErrata pointers]
+
     where
 
-        startLine = sourceLine start
-        endLine = sourceLine end
-        startColumn = sourceColumn start
-        endColumn = 
-            if startLine == endLine then 
-                sourceColumn end 
-            else 
-                T.length (T.lines sourceLines !! (startLine - 1)) + 1
+        -- | A related position is drawn in the same block, so it has to quote the
+        -- same source.
+        sameFile = [ (loc, what) | (loc, what) <- related, sameSource pos loc ]
 
-        genSimpleBlock :: Errata.Block
-        genSimpleBlock = Errata.Block
-            fancyRedStyle
-            (fileName, startLine, startColumn)
-            Nothing
-            [Pointer startLine startColumn endColumn False Nothing fancyRedPointer]
-            Nothing
+        merged = not (null sameFile)
 
-        genSimpleErrata :: Errata
-        genSimpleErrata = Errata
+        mkPointer :: Maybe T.Text -> Location -> Maybe Pointer
+        mkPointer label (Position _ start end) =
+            let startLine = sourceLine start
+                endLine = sourceLine end
+                startColumn = sourceColumn start
+                endColumn =
+                    if startLine == endLine then
+                        sourceColumn end
+                    else
+                        T.length (T.lines sourceLines !! (startLine - 1)) + 1
+            in
+                Just $ Pointer startLine startColumn endColumn merged
+                    ((\what -> " " <> emph what) <$> label) fancyRedPointer
+        mkPointer _ _ = Nothing
+
+        genErrata :: [Pointer] -> Errata
+        genErrata pointers = Errata
             (Just errorMessage)
-            [genSimpleBlock]
+            [Errata.Block
+                fancyRedStyle
+                (fileName, pointerLine (head pointers), pointerColStart (head pointers))
+                Nothing
+                pointers
+                Nothing]
             msg
-pprintSimpleError _ _ _ _ _ = error "Internal error: invalid error position"
