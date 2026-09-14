@@ -5,6 +5,7 @@ import Control.Monad.Except
 import ControlFlow.ConstFolding.Errors
 import ControlFlow.ConstFolding.Monad
 import ControlFlow.BasicBlocks.AST
+import ControlFlow.BasicBlocks.Traversal (Rewriter(..), rewriteObject, rewriteExpression)
 import Utils.Annotations
 import qualified Control.Monad.State as ST
 import qualified Data.Map as M
@@ -229,10 +230,14 @@ checkType loc ty expr = do
         throwError $ annotateError loc' (EReferencedArraySizeMismatch lhsArraySizeValue rhsArraySizeValue)
     checkSameTy _ _ _ = return ()
 
+-- | Folding rebuilds the AST, so it gives the shared rewriter what to do with
+-- the three things a node holds and only writes out the nodes it checks.
+folding :: Rewriter ConstFoldMonad SemanticAnn
+folding = Rewriter foldExpression foldObject foldAnnotation
+
 foldObject :: Object SemanticAnn -> ConstFoldMonad (Object SemanticAnn)
-foldObject (Variable ident ann) = do
-  ann' <- foldAnnotation ann
-  return $ Variable ident ann'
+-- | An index that is a constant expression is checked against the size of the
+-- array, which is what the rest of the access path does not need.
 foldObject (ArrayIndexExpression obj index ann) = do
   ann' <- foldAnnotation ann
   obj' <- foldObject obj
@@ -250,48 +255,11 @@ foldObject (ArrayIndexExpression obj index ann) = do
           return $ ArrayIndexExpression obj' index' ann'
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return $ ArrayIndexExpression obj' index' ann'
-foldObject (MemberAccess obj ident ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ MemberAccess obj' ident ann'
-foldObject (Dereference obj ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ Dereference obj' ann'
-foldObject (DereferenceMemberAccess obj ident ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ DereferenceMemberAccess obj' ident ann'
-foldObject (Unbox obj ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ Unbox obj' ann'
+foldObject obj = rewriteObject folding obj
 
 
 foldExpression :: Expression SemanticAnn -> ConstFoldMonad (Expression SemanticAnn)
-foldExpression (Constant c ann) = do
-  ann' <- foldAnnotation ann
-  return $ Constant c ann'
-foldExpression (StringInitializer str ann) = do
-  ann' <- foldAnnotation ann
-  return $ StringInitializer str ann'
-foldExpression (IsEnumVariantExpression obj enum var ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ IsEnumVariantExpression obj' enum var ann'
-foldExpression (IsMonadicVariantExpression obj label ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ IsMonadicVariantExpression obj' label ann'
-foldExpression (MonadicVariantInitializer variant ann) = do
-  ann' <- foldAnnotation ann
-  variant' <- case variant of
-    Some expr -> Some <$> foldExpression expr
-    Ok expr -> Ok <$> foldExpression expr
-    Error expr -> Error <$> foldExpression expr
-    Failure expr -> Failure <$> foldExpression expr
-    v -> return v
-  return $ MonadicVariantInitializer variant' ann'
+-- | Two constant operands are folded into the constant they produce.
 foldExpression e@(BinOp op (Constant lConst@(I {}) _) (Constant rConst@(I {}) _) ann) = do
   ann' <- foldAnnotation ann
   ty <- getExprType e
@@ -395,28 +363,13 @@ foldExpression (ArraySliceExpression ak obj lower upper ann) = do
         _ -> throwError $ annotateError Internal EInvalidConstantEvaluation
     _ -> return ()
   return $ ArraySliceExpression ak obj' lower' upper' ann'
-foldExpression (EnumVariantInitializer enumId variantId exprs ann) = do
-  ann' <- foldAnnotation ann
-  exprs' <- mapM foldExpression exprs
-  return $ EnumVariantInitializer enumId variantId exprs' ann'
+-- | A struct initializer checks the value of each field against its type.
 foldExpression (StructInitializer fvas ann) = do
   ann' <- foldAnnotation ann
   fvas' <- mapM foldFieldValueAssignment fvas
   return $ StructInitializer fvas' ann'
-foldExpression (ArrayInitializer expr size ann) = do
-  ann' <- foldAnnotation ann
-  expr' <- foldExpression expr
-  size' <- foldExpression size
-  return $ ArrayInitializer expr' size' ann'
-foldExpression (ArrayExprListInitializer exprs ann) = do
-  ann' <- foldAnnotation ann
-  exprs' <- mapM foldExpression exprs
-  return $ ArrayExprListInitializer exprs' ann'
-foldExpression (AccessObject obj) = AccessObject <$> foldObject obj
-foldExpression (ReferenceExpression ak obj ann) = do
-  ann' <- foldAnnotation ann
-  obj' <- foldObject obj
-  return $ ReferenceExpression ak obj' ann'
+-- | Every other expression is rebuilt from its folded children.
+foldExpression expr = rewriteExpression folding expr
 
 foldStatement :: Statement SemanticAnn -> ConstFoldMonad (Statement SemanticAnn)
 foldStatement (Declaration ident ak ty initExpr ann) = do

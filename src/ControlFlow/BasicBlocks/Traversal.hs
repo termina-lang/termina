@@ -16,12 +16,16 @@ module ControlFlow.BasicBlocks.Traversal (
     Child(..)
   , FieldAccessor(..)
   , ObjectVisitor(..)
+  , Rewriter(..)
   , expressionChildren
   , simpleBlockChildren
   , childExpressions
   , walkObject
   , rootIdent
   , indexExpressions
+  , rewriteExpression
+  , rewriteObject
+  , rewriteFieldAssignment
 ) where
 
 import ControlFlow.BasicBlocks.AST
@@ -152,6 +156,110 @@ simpleBlockChildren bb = case bb of
   ForLoopBlock {} -> Nothing
   MatchBlock {} -> Nothing
   RegularBlock {} -> Nothing
+
+-- | How to rewrite what a node holds. A pass that produces a new AST instead of
+-- reading the one it walks gives these three functions and gets the rebuilding
+-- of every node for free. Each of the three rewrites one level, so the recursion
+-- is the caller's: a pass passes its own rewriting functions in here.
+data Rewriter f a = Rewriter
+  {
+    onExpression :: Expression a -> f (Expression a)
+  , onObject :: Object a -> f (Object a)
+  , onAnnotation :: a -> f a
+  }
+
+-- | Rebuilds an access path from the rewriting of what it holds. The annotation
+-- of a node is rewritten before the rest, so a pass whose rewriting can fail
+-- reports the outermost annotation first.
+rewriteObject :: Applicative f => Rewriter f a -> Object a -> f (Object a)
+rewriteObject r obj = case obj of
+  Variable ident ann -> Variable ident <$> onAnnotation r ann
+  ArrayIndexExpression inner index ann ->
+    (\ann' inner' index' -> ArrayIndexExpression inner' index' ann')
+      <$> onAnnotation r ann <*> onObject r inner <*> onExpression r index
+  MemberAccess inner ident ann ->
+    (\ann' inner' -> MemberAccess inner' ident ann')
+      <$> onAnnotation r ann <*> onObject r inner
+  Dereference inner ann ->
+    (\ann' inner' -> Dereference inner' ann') <$> onAnnotation r ann <*> onObject r inner
+  DereferenceMemberAccess inner ident ann ->
+    (\ann' inner' -> DereferenceMemberAccess inner' ident ann')
+      <$> onAnnotation r ann <*> onObject r inner
+  Unbox inner ann ->
+    (\ann' inner' -> Unbox inner' ann') <$> onAnnotation r ann <*> onObject r inner
+
+-- | Rebuilds an expression, in the same order as 'rewriteObject'.
+rewriteExpression :: Applicative f => Rewriter f a -> Expression a -> f (Expression a)
+rewriteExpression r expr = case expr of
+  AccessObject obj -> AccessObject <$> onObject r obj
+  Constant c ann -> Constant c <$> onAnnotation r ann
+  StringInitializer str ann -> StringInitializer str <$> onAnnotation r ann
+  BinOp op left right ann ->
+    (\ann' left' right' -> BinOp op left' right' ann')
+      <$> onAnnotation r ann <*> onExpression r left <*> onExpression r right
+  ReferenceExpression ak obj ann ->
+    (\ann' obj' -> ReferenceExpression ak obj' ann')
+      <$> onAnnotation r ann <*> onObject r obj
+  Casting inner ty ann ->
+    (\ann' inner' -> Casting inner' ty ann') <$> onAnnotation r ann <*> onExpression r inner
+  IsEnumVariantExpression obj enum variant ann ->
+    (\ann' obj' -> IsEnumVariantExpression obj' enum variant ann')
+      <$> onAnnotation r ann <*> onObject r obj
+  IsMonadicVariantExpression obj label ann ->
+    (\ann' obj' -> IsMonadicVariantExpression obj' label ann')
+      <$> onAnnotation r ann <*> onObject r obj
+  ArraySliceExpression ak obj lower upper ann ->
+    (\ann' obj' lower' upper' -> ArraySliceExpression ak obj' lower' upper' ann')
+      <$> onAnnotation r ann <*> onObject r obj
+      <*> onExpression r lower <*> onExpression r upper
+  MemberFunctionCall obj ident args ann ->
+    (\ann' obj' args' -> MemberFunctionCall obj' ident args' ann')
+      <$> onAnnotation r ann <*> onObject r obj <*> traverse (onExpression r) args
+  DerefMemberFunctionCall obj ident args ann ->
+    (\ann' obj' args' -> DerefMemberFunctionCall obj' ident args' ann')
+      <$> onAnnotation r ann <*> onObject r obj <*> traverse (onExpression r) args
+  FunctionCall ident args ann ->
+    (\ann' args' -> FunctionCall ident args' ann')
+      <$> onAnnotation r ann <*> traverse (onExpression r) args
+  ArrayInitializer inner size ann ->
+    (\ann' inner' size' -> ArrayInitializer inner' size' ann')
+      <$> onAnnotation r ann <*> onExpression r inner <*> onExpression r size
+  ArrayExprListInitializer exprs ann ->
+    (\ann' exprs' -> ArrayExprListInitializer exprs' ann')
+      <$> onAnnotation r ann <*> traverse (onExpression r) exprs
+  StructInitializer fields ann ->
+    (\ann' fields' -> StructInitializer fields' ann')
+      <$> onAnnotation r ann <*> traverse (rewriteFieldAssignment r) fields
+  EnumVariantInitializer enumId variantId args ann ->
+    (\ann' args' -> EnumVariantInitializer enumId variantId args' ann')
+      <$> onAnnotation r ann <*> traverse (onExpression r) args
+  MonadicVariantInitializer variant ann ->
+    (\ann' variant' -> MonadicVariantInitializer variant' ann')
+      <$> onAnnotation r ann <*> traverseVariant variant
+
+  where
+
+    traverseVariant variant = case variant of
+      Some inner -> Some <$> onExpression r inner
+      Ok inner -> Ok <$> onExpression r inner
+      Error inner -> Error <$> onExpression r inner
+      Failure inner -> Failure <$> onExpression r inner
+      None -> pure None
+      Success -> pure Success
+
+-- | Rebuilds the assignment of a field, which a struct initializer and the
+-- global declaration of an object are made of.
+rewriteFieldAssignment :: Applicative f
+  => Rewriter f a -> FieldAssignment a -> f (FieldAssignment a)
+rewriteFieldAssignment r assignment = case assignment of
+  FieldValueAssignment ident expr ann ->
+    (\ann' expr' -> FieldValueAssignment ident expr' ann')
+      <$> onAnnotation r ann <*> onExpression r expr
+  FieldAddressAssignment ident expr ann ->
+    (\ann' expr' -> FieldAddressAssignment ident expr' ann')
+      <$> onAnnotation r ann <*> onExpression r expr
+  FieldPortConnection kind id1 id2 ann ->
+    FieldPortConnection kind id1 id2 <$> onAnnotation r ann
 
 -- | The children of an expression seen as plain expressions, with the objects
 -- flattened into the index expressions of their access paths. It is the view a
