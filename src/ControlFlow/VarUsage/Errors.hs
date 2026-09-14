@@ -12,9 +12,6 @@ import Core.AST (Identifier)
 import Utils.Annotations
 import Utils.Errors
 import qualified Data.Text as T
-import Text.Parsec
-import qualified Data.Map.Strict as M
-import qualified Language.LSP.Protocol.Types as LSP
 
 data Error
   = EUsedIgnoredParameter Identifier -- ^ Using a variable that is ignored (VE-001)
@@ -30,90 +27,53 @@ data Error
 
 type VarUsageError = AnnotatedError Error Location
 
+instance Diagnosable Error where
+
+    describe (EUsedIgnoredParameter ident) =
+        unnecessary $ diagnostic "VE-001" "using an ignored parameter"
+            ("Parameter " <> emph (T.pack ident) <>
+                " is ignored and should not be used.")
+    describe (ENotUsed ident) =
+        unnecessary $ diagnostic "VE-002" "variable not used"
+            ("Variable " <> emph (T.pack ident) <>
+                " is declared but not used.")
+    describe (EActionSelfNotUsed ident) =
+        diagnostic "VE-003" "action does not use self"
+            ("Action " <> emph (T.pack ident) <>
+                " does not use " <> emph "self" <>
+                ", so it cannot have any effect other than its result.")
+    describe (ESelfNotUsed ident) =
+        diagnostic "VE-004" "self not used"
+            ("Member function " <> emph (T.pack ident) <>
+                " does not use " <> emph "self" <>
+                ". It must be reimplemented as a function.")
+    describe (EMemberFunctionNotUsed ident) =
+        unnecessary $ diagnostic "VE-005" "member function not used"
+            ("Member function " <> emph (T.pack ident) <>
+                " is not called by any member of the class.")
+    describe (EAssignedValueNotUsed ident) =
+        unnecessary $ diagnostic "VE-006" "assigned value never read"
+            ("The value assigned to variable " <> emph (T.pack ident) <>
+                " is never read.")
+    describe (EReadBeforeAssignment ident) =
+        diagnostic "VE-007" "object read before it is assigned"
+            ("Variable " <> emph (T.pack ident) <>
+                " is declared without an initializer and there is a path that reaches this point without assigning it.\n" <>
+                "Assign the whole object on every path before reading it.")
+    describe (EPartialWriteBeforeAssignment ident) =
+        diagnostic "VE-008" "partial write to an object that is not assigned yet"
+            ("Variable " <> emph (T.pack ident) <>
+                " is declared without an initializer and this writes only a part of it.\n" <>
+                "The whole object must be assigned before a field or an element of it is written.")
+    describe (EInitializerNotUsed ident) =
+        unnecessary $ diagnostic "VE-009" "initializer never read"
+            ("The value this initializer gives " <> emph (T.pack ident) <>
+                " is overwritten before anybody reads it.\n" <>
+                "Move the declaration to where the value is computed, or declare the object without an initializer.")
+
 instance ErrorMessage VarUsageError where
 
-    errorIdent (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "VE-001"
-    errorIdent (AnnotatedError (ENotUsed _ident) _pos) = "VE-002"
-    errorIdent (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "VE-003"
-    errorIdent (AnnotatedError (ESelfNotUsed _ident) _pos) = "VE-004"
-    errorIdent (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "VE-005"
-    errorIdent (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "VE-006"
-    errorIdent (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "VE-007"
-    errorIdent (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "VE-008"
-    errorIdent (AnnotatedError (EInitializerNotUsed _ident) _pos) = "VE-009"
-
-    errorTitle (AnnotatedError (EUsedIgnoredParameter _ident) _pos) = "using an ignored parameter"
-    errorTitle (AnnotatedError (ENotUsed _ident) _pos) = "variable not used"
-    errorTitle (AnnotatedError (EActionSelfNotUsed _ident) _pos) = "action does not use self"
-    errorTitle (AnnotatedError (ESelfNotUsed _ident) _pos) = "self not used"
-    errorTitle (AnnotatedError (EMemberFunctionNotUsed _ident) _pos) = "member function not used"
-    errorTitle (AnnotatedError (EAssignedValueNotUsed _ident) _pos) = "assigned value never read"
-    errorTitle (AnnotatedError (EReadBeforeAssignment _ident) _pos) = "object read before it is assigned"
-    errorTitle (AnnotatedError (EPartialWriteBeforeAssignment _ident) _pos) = "partial write to an object that is not assigned yet"
-    errorTitle (AnnotatedError (EInitializerNotUsed _ident) _pos) = "initializer never read"
-
-    toText e@(AnnotatedError err pos@(Position _ start _end)) files =
-        let fileName = sourceName start
-            sourceLines = files M.! fileName
-            title = "\x1b[31merror [" <> errorIdent e <> "]\x1b[0m: " <> errorTitle e <> "."
-        in
-        case err of
-            EUsedIgnoredParameter ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Parameter \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is ignored and should not be used."))
-            ENotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Variable \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is declared but not used."))
-            EActionSelfNotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Action \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m does not use \x1b[31mself\x1b[0m, so it cannot have any effect other than its result."))
-            ESelfNotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Member function \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m does not use \x1b[31mself\x1b[0m. It must be reimplemented as a function."))
-            EMemberFunctionNotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Member function \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is not called by any member of the class."))
-            EAssignedValueNotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("The value assigned to variable \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is never read."))
-            EReadBeforeAssignment ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Variable \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is declared without an initializer and there is a path that reaches this point without assigning it.\n" <>
-                        "Assign the whole object on every path before reading it."))
-            EPartialWriteBeforeAssignment ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("Variable \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is declared without an initializer and this writes only a part of it.\n" <>
-                        "The whole object must be assigned before a field or an element of it is written."))
-            EInitializerNotUsed ident ->
-                pprintSimpleError
-                    sourceLines title fileName pos
-                    (Just ("The value this initializer gives \x1b[31m" <> T.pack ident <>
-                        "\x1b[0m is overwritten before anybody reads it.\n" <>
-                        "Move the declaration to where the value is computed, or declare the object without an initializer."))
--- | Print the error as is
-    toText (AnnotatedError e pos) _files = T.pack $ show pos ++ ": " ++ show e
-
-    toDiagnostics e@(AnnotatedError _ pos) _files =
-        [LSP.Diagnostic (loc2Range pos)
-            (Just LSP.DiagnosticSeverity_Error)
-            Nothing Nothing Nothing
-            text (Just []) Nothing Nothing]
-
-        where
-            text = "error [" <> errorIdent e <> "]: " <> errorTitle e <> "."
+    errorIdent = diagCode . describe . getError
+    errorTitle = diagTitle . describe . getError
+    toText = errorToText
+    toDiagnostics = errorToDiagnostics

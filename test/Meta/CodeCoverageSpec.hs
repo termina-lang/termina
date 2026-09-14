@@ -68,20 +68,29 @@ families =
 -- | Every @PREFIX-<digits>@ token in a string, at a word boundary (so "PE" does
 -- not match inside "CPE").
 codesWithPrefix :: String -> String -> [String]
-codesWithPrefix prefix text =
+codesWithPrefix = codesPrecededBy (not . isAlphaNum)
+
+-- | The same, restricted to the ones written as a string literal.
+quotedCodesWithPrefix :: String -> String -> [String]
+quotedCodesWithPrefix = codesPrecededBy (== '"')
+
+codesPrecededBy :: (Char -> Bool) -> String -> String -> [String]
+codesPrecededBy before prefix text =
   nub [ prefix ++ "-" ++ ds
       | (pre, t) <- zip (' ' : text) (tails text)
-      , not (isAlphaNum pre)
+      , before pre
       , Just afterDash <- [stripPrefix (prefix ++ "-") t]
       , let ds = takeWhile isDigit afterDash
       , not (null ds) ]
 
--- | Codes the compiler can emit: the @PREFIX-NNN@ literals on @errorIdent@ lines.
+-- | Codes the compiler can emit: the @PREFIX-NNN@ string literals of its
+-- Errors.hs, which is where a code is written to be printed. The quote is what
+-- tells them from the codes named in the comments of the error data type, which
+-- claim a code rather than emit it.
 emittableCodes :: Family -> IO [String]
 emittableCodes fam = do
   content <- readFile (fErrorsFile fam)
-  let identLines = unlines [ l | l <- lines content, "errorIdent" `isInfixOf` l ]
-  return $ codesWithPrefix (fPrefix fam) identLines
+  return $ quotedCodesWithPrefix (fPrefix fam) content
 
 -- | Codes that have a test: fixture entry names plus literals in the spec files.
 testedCodes :: Family -> IO [String]
